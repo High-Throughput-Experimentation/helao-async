@@ -1,0 +1,12 @@
+.vscode/*
+.vs/*
+__pycache__/*
+*/__pycache__/*
+*.pyc
+*.DS_Store
+*.pck
+outputs/*
+*/.DS_Store
+.DS_Store
+ntpLastSync.txt
+data/*
