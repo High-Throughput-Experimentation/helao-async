@@ -28,7 +28,7 @@ def makeApp(confPrefix, servKey):
 
     # only for alignment bokeh server
     @app.post(f"/{servKey}/private/align_get_position")
-    async def private_align_get_position(request: Request, action_dict: Optional[dict] = None):
+    async def private_align_get_position(request: Request, action_dict: Optional[dict] = {}):
         """Return the current motor position"""
         # gets position of all axis, but use only axis defined in aligner server params
         # can also easily be 3d axis (but not implemented yet so only 2d for now)
@@ -46,7 +46,7 @@ def makeApp(confPrefix, servKey):
         multi_axis: Optional[Union[List[str], str]] = None,
         speed: Optional[int] = None,
         mode: Optional[move_modes] = "relative",
-        action_dict: Optional[dict] = None
+        action_dict: Optional[dict] = {}
     ):
         A = await setupAct(action_dict, request, locals())
         # A.action_params['stopping'] = False

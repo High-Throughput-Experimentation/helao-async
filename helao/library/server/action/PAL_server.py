@@ -26,7 +26,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/reset_PAL_system_vial_table")
     async def reset_PAL_system_vial_table(
         request: Request, 
-        action_dict: Optional[dict] = None
+        action_dict: Optional[dict] = {}
     ):
         """Resets app.driver vial table. But will make a full dump to CSV first."""
         A = await setupAct(action_dict, request, locals())
@@ -44,7 +44,7 @@ def makeApp(confPrefix, servKey):
         liquid_sample_no: Optional[int] = None,
         tray: Optional[int] = None,
         slot: Optional[int] = None,
-        action_dict: Optional[dict] = None
+        action_dict: Optional[dict] = {}
     ):
         """Updates app.driver vial Table. If sucessful (vial-slot was empty) returns True, else it returns False."""
         A = await setupAct(action_dict, request, locals())
@@ -59,7 +59,7 @@ def makeApp(confPrefix, servKey):
         request: Request, 
         tray: Optional[int] = None, 
         slot: Optional[int] = None, 
-        action_dict: Optional[dict] = None
+        action_dict: Optional[dict] = {}
     ):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -73,7 +73,7 @@ def makeApp(confPrefix, servKey):
         request: Request, 
         tray: Optional[int] = None,
         slot: Optional[int] = None,
-        action_dict: Optional[dict] = None
+        action_dict: Optional[dict] = {}
     ):
         A = await setupAct(action_dict, request, locals())
         A.action_params["csv"] = True # signal subroutine to create a csv
@@ -87,7 +87,7 @@ def makeApp(confPrefix, servKey):
     async def get_new_vial_position(
         request: Request, 
         req_vol: Optional[float] = None,
-        action_dict: Optional[dict] = None
+        action_dict: Optional[dict] = {}
     ):
         """Returns an empty vial position for given max volume.\n
         For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.\n
@@ -115,7 +115,7 @@ def makeApp(confPrefix, servKey):
         sampleperiod: Optional[float] = 0.0,
         spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
         spacingfactor: Optional[float] = 1.0,
-        action_dict: Optional[dict] = None
+        action_dict: Optional[dict] = {}
     ):
 
         dest_tray=None  # dest_tray, # will be filled via call to vial warehouse table

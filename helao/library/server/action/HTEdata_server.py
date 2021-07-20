@@ -131,7 +131,7 @@ def makeApp(confPrefix, servKey):
                             supplier: Optional[str] = None,
                             lot_number: Optional[str] = None,
                             servkey: Optional[str] = servKey,
-                            action_dict: Optional[dict] = None
+                            action_dict: Optional[dict] = {}
                             ):
         '''use CAS for chemical if available. Written on bottles of chemicals with all other necessary information.\n
         For empty DUID and AUID the UID will automatically created. For manual entry leave DUID, AUID, action_time, and action_params empty and servkey on "data".\n

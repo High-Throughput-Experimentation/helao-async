@@ -38,7 +38,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/query_analog_in")
     async def read_analog_in(
-        request: Request, multi_port: Optional[Union[List[int], int]] = None, action_dict: Optional[dict] = None
+        request: Request, multi_port: Optional[Union[List[int], int]] = None, action_dict: Optional[dict] = {}
     ):
         # http://127.0.0.1:8001/io/query/analog_in?port=0
         A = await setupAct(action_dict, request, locals())
@@ -50,7 +50,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/query_digital_in")
     async def read_digital_in(
-        request: Request, multi_port: Optional[Union[List[int], int]] = None, action_dict: Optional[dict] = None
+        request: Request, multi_port: Optional[Union[List[int], int]] = None, action_dict: Optional[dict] = {}
     ):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -60,7 +60,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/query_digital_out")
     async def read_digital_out(
-        request: Request, multi_port: Optional[Union[List[int], int]] = None, action_dict: Optional[dict] = None
+        request: Request, multi_port: Optional[Union[List[int], int]] = None, action_dict: Optional[dict] = {}
     ):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -70,7 +70,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/digital_out_on")
     async def set_digital_out_on(
-        request: Request, multi_port: Optional[Union[List[int], int]] = None, action_dict: Optional[dict] = None
+        request: Request, multi_port: Optional[Union[List[int], int]] = None, action_dict: Optional[dict] = {}
     ):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -80,7 +80,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/digital_out_off")
     async def set_digital_out_off(
-        request: Request, multi_port: Optional[Union[List[int], int]] = None, action_dict: Optional[dict] = None
+        request: Request, multi_port: Optional[Union[List[int], int]] = None, action_dict: Optional[dict] = {}
     ):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -94,7 +94,7 @@ def makeApp(confPrefix, servKey):
         trigger_port: Optional[int] = None,
         out_port: Optional[int] = None,
         t_cycle: Optional[int] = None,
-        action_dict: Optional[dict] = None,
+        action_dict: Optional[dict] = {},
     ):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -107,7 +107,7 @@ def makeApp(confPrefix, servKey):
         request: Request,
         multi_port: Optional[Union[List[int], int]] = None,
         multi_value: Optional[Union[List[float], float]] = None,
-        action_dict: Optional[dict] = None,
+        action_dict: Optional[dict] = {},
     ):
         # async def set_analog_out(handle: int, module: int, bitnum: int, value: float):
         # TODO
@@ -124,7 +124,7 @@ def makeApp(confPrefix, servKey):
         time_off: Optional[float] = None,
         port: Optional[int] = None,
         init_time: Optional[float] = None,
-        action_dict: Optional[dict] = None,
+        action_dict: Optional[dict] = {},
     ):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -133,7 +133,7 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
     @app.post(f"/{servKey}/break_inf_digi_cycles")
-    async def break_inf_cycles(request: Request, action_dict: Optional[dict] = None):
+    async def break_inf_cycles(request: Request, action_dict: Optional[dict] = {}):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data(app.driver.break_infinite_digital_cycles())
@@ -141,7 +141,7 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
     @app.post(f"/{servKey}/reset")
-    async def reset(request: Request, action_dict: Optional[dict] = None):
+    async def reset(request: Request, action_dict: Optional[dict] = {}):
         """resets galil device. only for emergency use!"""
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -150,7 +150,7 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
     @app.post(f"/{servKey}/estop")
-    async def estop(request: Request, switch: Optional[bool] = True, action_dict: Optional[dict] = None):
+    async def estop(request: Request, switch: Optional[bool] = True, action_dict: Optional[dict] = {}):
         # http://127.0.0.1:8001/motor/set/stop
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)

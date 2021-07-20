@@ -39,7 +39,7 @@ def makeApp(confPrefix, servKey):
     )
 
     @app.post(f"/{servKey}/setmotionref")
-    async def setmotionref(request: Request, action_dict: Optional[dict] = None):
+    async def setmotionref(request: Request, action_dict: Optional[dict] = {}):
         """Set the reference position for xyz by 
         (1) homing xyz, 
         (2) set abs zero, 
@@ -54,7 +54,7 @@ def makeApp(confPrefix, servKey):
     # parse as {'M':json.dumps(np.matrix(M).tolist()),'platexy':json.dumps(np.array(platexy).tolist())}
     @app.post(f"/{servKey}/toMotorXY")
     async def transform_platexy_to_motorxy(request: Request, 
-        platexy: Optional[str] = None, action_dict: Optional[dict] = None
+        platexy: Optional[str] = None, action_dict: Optional[dict] = {}
     ):
         """Converts plate to motor xy"""
         A = await setupAct(action_dict, request, locals())
@@ -67,7 +67,7 @@ def makeApp(confPrefix, servKey):
     # parse as {'M':json.dumps(np.matrix(M).tolist()),'platexy':json.dumps(np.array(motorxy).tolist())}
     @app.post(f"/{servKey}/toPlateXY")
     async def transform_motorxy_to_platexy(request: Request, 
-        motorxy: Optional[str] = None, action_dict: Optional[dict] = None
+        motorxy: Optional[str] = None, action_dict: Optional[dict] = {}
     ):
         """Converts motor to plate xy"""
         A = await setupAct(action_dict, request, locals())
@@ -79,7 +79,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/MxytoMPlate")
     async def MxytoMPlate(request: Request, 
-        Mxy: Optional[str] = None, action_dict: Optional[dict] = None
+        Mxy: Optional[str] = None, action_dict: Optional[dict] = {}
     ):
         """removes Minstr from Msystem to obtain Mplate for alignment"""
         A = await setupAct(action_dict, request, locals())
@@ -91,7 +91,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/download_alignmentmatrix")
     async def download_alignmentmatrix(request: Request, 
-        Mxy: Optional[str] = None, action_dict: Optional[dict] = None
+        Mxy: Optional[str] = None, action_dict: Optional[dict] = {}
     ):
         """Get current in use Alignment from motion server"""
         A = await setupAct(action_dict, request, locals())
@@ -102,7 +102,7 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
     @app.post(f"/{servKey}/upload_alignmentmatrix")
-    async def upload_alignmentmatrix(request: Request, action_dict: Optional[dict] = None):
+    async def upload_alignmentmatrix(request: Request, action_dict: Optional[dict] = {}):
         """Send new Alignment to motion server"""
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -120,7 +120,7 @@ def makeApp(confPrefix, servKey):
         transformation: Optional[
             transformation_mode
         ] = "motorxy",  # default, nothing to do
-        action_dict: Optional[dict] = None,
+        action_dict: Optional[dict] = {},
     ):
         """Move a apecified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
         Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.
@@ -141,7 +141,7 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
     @app.post(f"/{servKey}/disconnect")
-    async def disconnect(request: Request, action_dict: Optional[dict] = None):
+    async def disconnect(request: Request, action_dict: Optional[dict] = {}):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data(await app.driver.motor_disconnect())
@@ -149,7 +149,7 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
     @app.post(f"/{servKey}/query_positions")
-    async def query_positions(request: Request, action_dict: Optional[dict] = None):
+    async def query_positions(request: Request, action_dict: Optional[dict] = {}):
         # http://127.0.0.1:8001/motor/query/positions
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -159,7 +159,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/query_position")
     async def query_position(request: Request, 
-        multi_axis: Optional[Union[List[str], str]] = None, action_dict: Optional[dict] = None
+        multi_axis: Optional[Union[List[str], str]] = None, action_dict: Optional[dict] = {}
     ):
         # http://127.0.0.1:8001/motor/query/position?axis=x
         A = await setupAct(action_dict, request, locals())
@@ -170,7 +170,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/query_moving")
     async def query_moving(request: Request, 
-        multi_axis: Optional[Union[List[str], str]] = None, action_dict: Optional[dict] = None
+        multi_axis: Optional[Union[List[str], str]] = None, action_dict: Optional[dict] = {}
     ):
         # http://127.0.0.1:8001/motor/query/moving?axis=x
         A = await setupAct(action_dict, request, locals())
@@ -180,7 +180,7 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
     @app.post(f"/{servKey}/off")
-    async def axis_off(request: Request, multi_axis: Optional[Union[List[str], str]] = None, action_dict: Optional[dict] = None):
+    async def axis_off(request: Request, multi_axis: Optional[Union[List[str], str]] = None, action_dict: Optional[dict] = {}):
         # http://127.0.0.1:8001/motor/set/off?axis=x
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -189,7 +189,7 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
     @app.post(f"/{servKey}/on")
-    async def axis_on(request: Request, multi_axis: Optional[Union[List[str], str]] = None, action_dict: Optional[dict] = None):
+    async def axis_on(request: Request, multi_axis: Optional[Union[List[str], str]] = None, action_dict: Optional[dict] = {}):
         # http://127.0.0.1:8001/motor/set/on?axis=x
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -198,7 +198,7 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
     @app.post(f"/{servKey}/stop")
-    async def stop(request: Request, action_dict: Optional[dict] = None):
+    async def stop(request: Request, action_dict: Optional[dict] = {}):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data(
@@ -208,7 +208,7 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
     @app.post(f"/{servKey}/reset")
-    async def reset(request: Request, action_dict: Optional[dict] = None):
+    async def reset(request: Request, action_dict: Optional[dict] = {}):
         """resets galil device. only for emergency use!"""
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -219,7 +219,7 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
     @app.post(f"/{servKey}/estop")
-    async def estop(request: Request, switch: Optional[bool] = True, action_dict: Optional[dict] = None):
+    async def estop(request: Request, switch: Optional[bool] = True, action_dict: Optional[dict] = {}):
         # http://127.0.0.1:8001/motor/set/stop
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
