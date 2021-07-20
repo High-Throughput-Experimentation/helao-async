@@ -84,20 +84,16 @@ config["servers"] = dict(
     #         tbroadcast=2,  # frequency of websocket broadcast (only broadcasts if something changes but need to reduce the frequeny of that if necessary)
     #     ),
     # ),
-    # potentiostat=dict(
-    #     host=hostip,
-    #     port=8004,
-    #     group="action",
-    #     fast="gamry_server",
-    #     simulate=False,  # choose between simulator(default) or real device
-    #     params=dict(
-    #         # path_to_gamrycom=r"C:\Program Files (x86)\Gamry Instruments\Framework\GamryCOM.exe"
-    #         # dev_family = 'Interface', # 'Interface' or 'Reference', not need anymore, we can autodetect this
-    #         dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
-    #         # path_to_gamrycom=r"C:\Program Files (x86)\Gamry Instruments\Framework\GamryCOM.exe"
-    #         # path_to_gamrycom=r"C:\Program Files (x86)\Gamry Instruments\Framework 6\GamryCOM.exe"
-    #     ),
-    # ),
+    potentiostat=dict(
+        host=hostip,
+        port=8004,
+        group="action",
+        fast="gamry_server",
+        simulate=False,  # choose between simulator(default) or real device
+        params=dict(
+            dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
+        ),
+    ),
     # aligner=dict(
     #     host=hostip,
     #     port=8005,
@@ -199,32 +195,29 @@ config["servers"] = dict(
     #                 }
     #     )
     # ),
-    # PAL=dict(
-    #     host=hostip,
-    #     port=8007,
-    #     group="action",
-    #     fast="PAL_server",
-    #     params = dict(
-    #         user = 'RSHS',
-    #         key = r'c:\helao\sshkeys\rshs_private3.ppk', # needs to be in new openssh file format
-    #         host = 10.231.100.169,#'hte-rshs-01.htejcap.caltech.edu',
-    #         method_path = r'C:\Users\rshs\Desktop\ADSS\adss_psc_methods\lcfc',
-    #         log_file = r'C:\Users\rshs\Desktop\ADSS\adss_logfile\210512_lcfc_manualwatertest\210512_LCFC_manualwatertest_logfile.txt',
-    #         # remote_data_dump1 =  '/cygdrive/c/INST/RUNS',
-    #         # remote_data_dump2 =  r'C:\INST\RUNS',
-    #         local_data_dump=f'{local_data_dump}', # will use this if orch is not running
-    #         timeout = 30*60, # 30min timeout for waiting for TTL
-    #         data_server = "data",
-    #         dev_NImax = { # TTL handshake via NImax
-    #             # 'start':'PFI13',#'PXI-6284/port2/line5',  #P2.5, #PFI13
-    #             # 'continue':'PFI15',#'PXI-6284/port2/line7',  #P2.7 #PFI15
-    #             # 'done':'PFI11',#'PXI-6284/port2/line3',  #P2.3 #PFI11
-    #             'start':'PXI-6284/port2/line5',  #P2.5, #PFI13
-    #             'continue':'PXI-6284/port2/line7',  #P2.7 #PFI15
-    #             'done':'PXI-6284/port2/line3',  #P2.3 #PFI11
-    #             },
-    #     )
-    # ),
+    PAL=dict(
+        host=hostip,
+        port=8007,
+        group="action",
+        fast="PAL_server",
+        params = dict(
+            user = 'RSHS',
+            key = r'c:\helao\sshkeys\rshs_private3.ppk', # needs to be in new openssh file format
+            host = "10.231.100.169",#r'hte-rshs-01.htejcap.caltech.edu',
+            method_path = r'C:\Users\rshs\Desktop\ADSS\adss_psc_methods\lcfc',
+            log_file = r'C:\Users\rshs\Desktop\ADSS\adss_logfile\210512_lcfc_manualwatertest\210512_LCFC_manualwatertest_logfile.txt',
+            timeout = 30*60, # 30min timeout for waiting for TTL
+            data_server = "data",
+            dev_NImax = { # TTL handshake via NImax
+                # 'start':'PFI13',#'PXI-6284/port2/line5',  #P2.5, #PFI13
+                # 'continue':'PFI15',#'PXI-6284/port2/line7',  #P2.7 #PFI15
+                # 'done':'PFI11',#'PXI-6284/port2/line3',  #P2.3 #PFI11
+                'start':'PXI-6284/port2/line5',  #P2.5, #PFI13
+                'continue':'PXI-6284/port2/line7',  #P2.7 #PFI15
+                'done':'PXI-6284/port2/line3',  #P2.3 #PFI11
+                },
+        )
+    ),
     # #########################################################################
     # Visualizers (bokeh servers)
     # #########################################################################

@@ -57,8 +57,8 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/get_vial_holder_table")
     async def get_vial_holder_table(
         request: Request, 
-        tray: Optional[int] = 2, 
-        slot: Optional[int] = 1, 
+        tray: Optional[int] = None, 
+        slot: Optional[int] = None, 
         action_dict: Optional[dict] = None
     ):
         A = await setupAct(action_dict, request, locals())
@@ -75,8 +75,8 @@ def makeApp(confPrefix, servKey):
         slot: Optional[int] = None,
         action_dict: Optional[dict] = None
     ):
-        csv = True # signal subroutine to create a csv
         A = await setupAct(action_dict, request, locals())
+        A.action_params["csv"] = True # signal subroutine to create a csv
         active = await app.base.contain_action(A)
         await active.enqueue_data({"vial_table": await app.driver.get_vial_holder_table(A, active)})
         finished_act = await active.finish()

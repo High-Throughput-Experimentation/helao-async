@@ -6,9 +6,13 @@ import paramiko
 import time
 from datetime import datetime
 from time import strftime
+import json
+import aiofiles
 
 from helao.core.schema import Action
 from helao.core.server import Base
+from helao.core.error import error_codes
+from helao.library.driver.HTEdata_legacy import LocalDataHandler
 
 
 import nidaqmx
@@ -23,10 +27,6 @@ from nidaqmx.constants import LineGrouping
 #from nidaqmx.constants import TaskMode
 #from nidaqmx.constants import SyncType
 #from nidaqmx.constants import TriggerType
-
-##############################################################################
-# PAL classes
-##############################################################################
 
 
 class PALmethods(str, Enum):
@@ -132,13 +132,15 @@ class cPALparams:
 
 
 class cPAL:
-    def __init__(self, config_dict, stat, C, servkey):
-        self.config_dict = config_dict
-        self.stat = stat
-        self.servkey = servkey
+    # def __init__(self, config_dict, stat, C, servkey):
+    def __init__(self, actServ: Base):
+        
+        self.base = actServ
+        self.config_dict = actServ.server_cfg["params"]
+        self.world_config = actServ.world_cfg
 
+        
         # configure the tray
-
         self.trays = [
             PALtray(slot1=None, slot2=None, slot3=None),
             PALtray(slot1=VT54(max_vol_mL=2.0), slot2=VT54(max_vol_mL=2.0), slot3=None),
@@ -148,11 +150,11 @@ class cPAL:
         # load backup of vial table, if file does not exist it will use the default one from above
         asyncio.gather(self.load_PAL_system_vial_table_from_backup())
 
-        self.dataserv = self.config_dict.data_server
-        self.datahost = C[self.config_dict.data_server].host
-        self.dataport = C[self.config_dict.data_server].port
+        self.dataserv = self.config_dict["data_server"]
+        self.datahost = self.world_config["servers"][self.config_dict["data_server"]]["host"]
+        self.dataport = self.world_config["servers"][self.config_dict["data_server"]]["port"]
 
-        self.local_data_dump = self.config_dict["local_data_dump"]
+        self.local_data_dump = self.world_config["save_root"]
 
         self.sshuser = self.config_dict["user"]
         self.sshkey = self.config_dict["key"]
@@ -213,33 +215,26 @@ class cPAL:
         self.IO_PALparams = cPALparams()
         # check for that to return FASTapi post
         self.IO_continue = False
-        self.IO_error = None
-        self.IO_datafile = LocalDataHandler()
-        self.liquid_sample_rcp = LocalDataHandler()
+        self.IO_error = error_codes.none
+        # self.IO_datafile = LocalDataHandler()
+        # self.liquid_sample_rcp = LocalDataHandler()
         self.IO_remotedatafile = ""
 
-        self.runparams = action_runparams
+        # self.runparams = action_runparams
 
         myloop = asyncio.get_event_loop()
         # add meas IOloop
         myloop.create_task(self.IOloop())
 
-        # for saving data localy
-        self.FIFO_epoch = None
-        # self.FIFO_header = ''
-        self.FIFO_gamryheader = (
+
+        self.FIFO_PALheader = (
             ""  # measuement specific, will be reset each measurement
         )
         self.FIFO_name = ""
         self.FIFO_dir = ""
         self.FIFO_unixdir = ""
         self.FIFO_column_headings = []
-        self.FIFO_Gamryname = ""
-        # holds all sample information
-        # self.FIFO_sample = sample_class()
 
-        self.def_action_params = Action_params()
-        self.action_params = self.def_action_params.as_dict()
 
     async def reset_PAL_system_vial_table(self, A, myactive):
         # backup to json
@@ -360,6 +355,7 @@ class cPAL:
 
         await datafile.close_file_async()
 
+
     async def update_PAL_system_vial_table(
         self, tray: int, slot: int, vial: int, vol_mL: float, liquid_sample_no: int
     ):
@@ -387,16 +383,15 @@ class cPAL:
 
     async def write_vial_holder_table_as_CSV(self, tray, slot, myactive):
         # save full table as backup too
-        
-        
         await self.backup_PAL_system_vial_table()
 
         if self.trays[tray - 1] is not None:
             if self.trays[tray - 1].slots[slot - 1] is not None:
-                tmp_output_str = ",".join(["vial_no", "liquid_sample_no", "vol_mL"])
+                tmp_output_str = ""#",".join(["vial_no", "liquid_sample_no", "vol_mL"])
                 
                 for i, _ in enumerate(self.trays[tray - 1].slots[slot - 1].vials):
-                    tmp_output_str += "\n"
+                    if tmp_output_str is not "":
+                        tmp_output_str += "\n"
                     tmp_output_str += ",".join(
                         [
                             str(i + 1),
@@ -414,7 +409,7 @@ class cPAL:
                     file_type = 'pal_vialtable_file',
                     filename = f'VialTable__tray{tray}__slot{slot}__{datetime.now().strftime("%Y%m%d.%H%M%S%f")}.csv',
                     output_str = tmp_output_str,
-                    header = None,
+                    header = ",".join(["vial_no", "liquid_sample_no", "vol_mL"]),
                     sample_str = None
                     )
 
@@ -429,6 +424,8 @@ class cPAL:
         
         
         print(" ... getting table")
+        print(" ... writing to csv:",csv)
+        print(A.action_params)
         if self.trays[tray - 1] is not None:
             if self.trays[tray - 1].slots[slot - 1] is not None:
                 if csv:
@@ -438,6 +435,7 @@ class cPAL:
                 return {}
         else:
             return {}
+
 
     async def get_new_vial_position(self, req_vol: float = 2.0):
         """Returns an empty vial position for given max volume.\n
@@ -582,19 +580,11 @@ class cPAL:
                 await asyncio.sleep(1)
         return True
 
-    async def initcommand(self, A: Action):
-    # async def initcommand(self, PALparams: cPALparams, runparams):
-        if not self.IO_do_meas:
-            try:
-                # use parsed version
-                self.action_params = json.loads(runparams.action_params)
-            except Exception:
-                # use default
-                self.action_params = self.def_action_params.as_dict()
-                self.action_params["actiontime"] = strftime("%Y%m%d.%H%M%S")
 
-            self.runparams = runparams
-            # self.IO_PALparams = PALparams
+    async def initcommand(self, A: Action):
+        activeDict = dict()
+        if not self.IO_do_meas:
+
             self.IO_PALparams = cPALparams(
                 liquid_sample_no = A.action_params["liquid_sample_no"],
                 method = A.action_params["method"],
@@ -613,13 +603,15 @@ class cPAL:
 
 
 
+
+            self.action = A
             self.IO_remotedatafile = ""
             self.FIFO_name = (
                 f'PAL__{strftime("%Y%m%d_%H%M%S%z.txt")}'  # need to be txt at end
             )
-            self.FIFO_dir = os.path.join(
-                self.local_data_dump, self.action_params["save_folder"]
-            )
+            self.FIFO_dir = self.local_data_dump#os.path.join(
+            #     self.local_data_dump, self.action_params["save_folder"]
+            # )
 
             print("##########################################################")
             print(" ... PAL saving to:", self.FIFO_dir)
@@ -629,7 +621,7 @@ class cPAL:
             self.FIFO_unixdir = self.FIFO_unixdir.replace("\\", "/")
             print(" ... RSHS saving to: ", "/cygdrive/c/", self.FIFO_unixdir)
             print("##########################################################")
-            datafile = os.path.join(self.FIFO_dir, self.FIFO_name)
+            # datafile = os.path.join(self.FIFO_dir, self.FIFO_name)
             remotedatafile = os.path.join(
                 self.FIFO_dir, "AUX__" + self.FIFO_name
             )  # self.IO_remotedatafile
@@ -638,23 +630,20 @@ class cPAL:
             # need to wait not until we get the last continue trigger (for multiple samples)
             # or the continue trigger if only one sample
             # idle will be set in IOloop once the done trigger is detected
-            error = None
+            error = error_codes.none
             while not self.IO_continue:
                 await asyncio.sleep(1)
             error = self.IO_error
 
         else:
-            error = "meas already in progress"
-            datafile = ""
+            error = error_codes.in_progress
             remotedatafile = ""
-            await self.stat.set_idle(runparams.statuid, runparams.statname)
 
-        return {
-            "err_code": error,
-            # "eta": eta,
-            "datafile": datafile,
-            "remotedatafile": remotedatafile,
-        }
+        activeDict["data"] = {"err_code": error, 
+                              "emotedatafile": remotedatafile,
+                              }
+        return activeDict
+
 
     async def sendcommand(self, PALparams: cPALparams):
         # default for return dict
@@ -664,7 +653,7 @@ class cPAL:
         done_time = None
         ssh_time = None
         new_liquid_sample_no = None
-        error = None
+        error =  error_codes.none
 
         # (1) check if we have free vial slots
 
@@ -681,7 +670,7 @@ class cPAL:
                 )
 
             else:
-                error = "no_free_vial_slot"
+                error = error_codes.not_available
 
         else:
             PALparams.dest_tray = None
@@ -689,13 +678,13 @@ class cPAL:
             PALparams.dest_vial = None
 
         # (2) Rest
-        if error is None:
+        if error is error_codes.none:
             # these will be constant and dont change for multi PAL sampling
             # only PALparams will be modified accordingly
-            print(" ... PAL got actionparams:", self.action_params)
-            DUID = self.action_params["DUID"]
-            AUID = self.action_params["DUID"]
-            actiontime = self.action_params["actiontime"]
+            # print(" ... PAL got actionparams:", self.action_params)
+            DUID = self.action.decision_uuid#self.action_params["DUID"]
+            AUID = self.action.action_uuid#self.action_params["DUID"]
+            actiontime = self.action.action_queue_time#self.action_params["actiontime"]
 
             print(" ... old sampple is", PALparams.liquid_sample_no)
             if PALparams.liquid_sample_no == -1:
@@ -727,7 +716,7 @@ class cPAL:
                 mass=source_mass,
                 supplier=source_supplier,
                 lot_number=source_lotnumber,
-                servkey=self.servkey,
+                servkey=self.base.server_name,
             )
 
             path_methodfile = os.path.join(self.method_path, PALparams.method.value)
@@ -806,9 +795,9 @@ class cPAL:
                     liquid_sample_no=new_liquid_sample_no,
                 )
                 if retval == False:
-                    error = "vial_slot_not_available"
+                    error = error_codes.not_available
 
-            if error is None:
+            if error is error_codes.none:
                 ssh_time = time.time_ns()
                 (
                     mysshclient_stdin,
@@ -824,7 +813,7 @@ class cPAL:
                     val = await self.poll_start()
                     if not val:
                         print(" ... PAL start trigger timeout")
-                        error = "start_timeout"
+                        error = error_codes.start_timeout
                         self.IO_error = error
                         self.IO_continue = True
                     else:
@@ -835,7 +824,7 @@ class cPAL:
                         val = await self.poll_continue()
                         if not val:
                             print(" ... PAL continue trigger timeout")
-                            error = "continue_timeout"
+                            error = error_codes.continue_timeout
                             self.IO_error = error
                             self.IO_continue = True
                         else:
@@ -849,7 +838,7 @@ class cPAL:
                             val = await self.poll_done()
                             if not val:
                                 print(" ... PAL done trigger timeout")
-                                error = "done_timeout"
+                                error = error_codes.done_timeout
                                 # self.IO_error = error
                                 # self.IO_continue = True
                             else:
@@ -874,48 +863,65 @@ class cPAL:
                     path_logfile,
                     path_methodfile,
                 ]
-                await self.IO_datafile.open_file_async()
-                await self.IO_datafile.write_data_async("\t".join(logdata))
-                await self.IO_datafile.close_file_async()
 
-                # liquid_sample specific rcp
-                liquid_sampe_dict = dict(
-                    decision_uid=self.action_params["DUID"],
-                    action_uid=self.action_params["AUID"],
-                    action=self.action_params["action"],
-                    # action_pars = self.action_params['action_pars'],
-                    action_server_key=self.servkey,
-                    action_created_at=self.action_params["created_at"],
-                    action_time=self.action_params["actiontime"],
-                    action_save_path=self.FIFO_dir,
-                    action_block=self.action_params["block"],
-                    action_preempt=self.action_params["preempt"],
-                    plate_id=self.action_params["plate_id"],
-                    sample_no=self.action_params["sample_no"],
-                    new_liquid_sample_no=new_liquid_sample_no,
-                    old_liquid_sample_no=PALparams.liquid_sample_no,
-                    epoch_PAL=ssh_time,
-                    epoch_start=start_time,
-                    epoch_continue=continue_time,
-                    epoch_done=done_time,
-                    PAL_tool=PALparams.tool,
-                    PAL_source=PALparams.source,
-                    PAL_volume_uL=PALparams.volume_uL,
-                    PAL_dest_tray=PALparams.dest_tray,
-                    PAL_dest_slot=PALparams.dest_slot,
-                    PAL_dest_vial=PALparams.dest_vial,
-                    PAL_logfile=path_logfile,
-                    PAL_method=path_methodfile,
-                )
-                self.liquid_sample_rcp.filename = (
-                    f"{new_liquid_sample_no:08d}__{actiontime}__{AUID}.preinfo"
-                )
-                self.liquid_sample_rcp.filepath = self.FIFO_dir
-                await self.liquid_sample_rcp.open_file_async()
-                await self.liquid_sample_rcp.write_data_async(
-                    json.dumps(liquid_sampe_dict)
-                )
-                await self.liquid_sample_rcp.close_file_async()
+
+
+
+                if self.active:
+                    if self.active.action.save_data:
+                        # print(' ... gamry pushing data:', {k: [v] for k, v in zip(self.FIFO_column_headings, tmp_datapoints)})
+                        await self.active.enqueue_data(
+                            {
+                                k: [v]
+                                for k, v in zip(
+                                    self.FIFO_column_headings, logdata
+                                )
+                            }
+                        )
+
+
+                # await self.IO_datafile.open_file_async()
+                # await self.IO_datafile.write_data_async("\t".join(logdata))
+                # await self.IO_datafile.close_file_async()
+
+                # # liquid_sample specific rcp
+                # liquid_sampe_dict = dict(
+                #     decision_uid=self.action_params["DUID"],
+                #     action_uid=self.action_params["AUID"],
+                #     action=self.action_params["action"],
+                #     # action_pars = self.action_params['action_pars'],
+                #     action_server_key=self.servkey,
+                #     action_created_at=self.action_params["created_at"],
+                #     action_time=self.action_params["actiontime"],
+                #     action_save_path=self.FIFO_dir,
+                #     action_block=self.action_params["block"],
+                #     action_preempt=self.action_params["preempt"],
+                #     plate_id=self.action_params["plate_id"],
+                #     sample_no=self.action_params["sample_no"],
+                #     new_liquid_sample_no=new_liquid_sample_no,
+                #     old_liquid_sample_no=PALparams.liquid_sample_no,
+                #     epoch_PAL=ssh_time,
+                #     epoch_start=start_time,
+                #     epoch_continue=continue_time,
+                #     epoch_done=done_time,
+                #     PAL_tool=PALparams.tool,
+                #     PAL_source=PALparams.source,
+                #     PAL_volume_uL=PALparams.volume_uL,
+                #     PAL_dest_tray=PALparams.dest_tray,
+                #     PAL_dest_slot=PALparams.dest_slot,
+                #     PAL_dest_vial=PALparams.dest_vial,
+                #     PAL_logfile=path_logfile,
+                #     PAL_method=path_methodfile,
+                # )
+                # self.liquid_sample_rcp.filename = (
+                #     f"{new_liquid_sample_no:08d}__{actiontime}__{AUID}.preinfo"
+                # )
+                # self.liquid_sample_rcp.filepath = self.FIFO_dir
+                # await self.liquid_sample_rcp.open_file_async()
+                # await self.liquid_sample_rcp.write_data_async(
+                #     json.dumps(liquid_sampe_dict)
+                # )
+                # await self.liquid_sample_rcp.close_file_async()
 
             # wait another 30sec for program to close
             await asyncio.sleep(20)
@@ -937,11 +943,11 @@ class cPAL:
             if self.IO_do_meas:
                 # are we in estop?
                 if not self.IO_estop:
-                    self.IO_datafile.filename = self.FIFO_name
-                    self.IO_datafile.filepath = self.FIFO_dir
+                    # self.IO_datafile.filename = self.FIFO_name
+                    # self.IO_datafile.filepath = self.FIFO_dir
 
                     # write file header here
-                    header = [
+                    self.FIFO_column_headings = [
                         "new_liquid_sample_no",
                         "old_liquid_sample_no",
                         "epoch_PAL",
@@ -957,9 +963,27 @@ class cPAL:
                         "PAL_logfile",
                         "PAL_method",
                     ]
-                    await self.IO_datafile.open_file_async()
-                    await self.IO_datafile.write_data_async("\t".join(header))
-                    await self.IO_datafile.close_file_async()
+
+
+                    tmps_headings = "\t".join(self.FIFO_column_headings)
+                    self.FIFO_PALheader = "\n".join(
+                        [
+                            f"%techniquename={self.IO_PALparams.method}",
+                            f"%epoch_ns=FIXME",
+                            "%version=0.2",
+                            f"%column_headings={tmps_headings}",
+                        ]
+                    )
+
+                    self.active = await self.base.contain_action(
+                        self.action,
+                        file_type="pal_file",
+                        file_group="pal_files",
+                        header=self.PAL_header,
+                    )
+                    print(f"!!! Active action uuid is {self.active.action.action_uuid}")
+                    realtime = await self.active.set_realtime()
+                    self.FIFO_PALheader.replace(f"%epoch_ns=FIXME", f"%epoch_ns={realtime}")
 
                     # here we need to implement the multi PAL sampling
                     # by having a loop here and sending a local modified
@@ -971,13 +995,13 @@ class cPAL:
                     # need to check here again in case estop was triggered during
                     # measurement
                     # need to set the current meas to idle first
-                    await self.stat.set_idle(
-                        self.runparams.statuid, self.runparams.statname
-                    )
+                    _ = await self.active.finish()
+                    self.active = None
+                    self.action = None
 
                     if self.IO_estop:
                         print(" ... PAL is in estop.")
-                        await self.stat.set_estop()
+                        # await self.stat.set_estop()
                     else:
                         print(" ... setting PAL to idle")
                     #                        await self.stat.set_idle()
@@ -985,9 +1009,4 @@ class cPAL:
                 else:
                     self.IO_do_meas = False
                     print(" ... PAL is in estop.")
-                    await self.stat.set_estop()
-
-
-##############################################################################
-# PAL class end
-##############################################################################
+                    # await self.stat.set_estop()

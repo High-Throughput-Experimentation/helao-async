@@ -784,12 +784,12 @@ class gamry:
                 # signal the IOloop to start the measrurement
                 await self.IO_signalq.put(True)
                 # wait for data to appear in multisubscriber queue before returning active dict
-                async for data_msg in self.base.data_q.subscribe():
-                    for act_uuid, _ in data_msg.items():
-                        if act.action_uuid == act_uuid:
-                            activeDict = self.active.action.as_dict()
-                    if activeDict:
-                        break
+                # async for data_msg in self.base.data_q.subscribe():
+                #     for act_uuid, _ in data_msg.items():
+                #         if act.action_uuid == act_uuid:
+                #             activeDict = self.active.action.as_dict()
+                #     if activeDict:
+                #         break
                 err_code = "none"
             elif self.IO_measuring:
                 err_code = "meas already in progress"

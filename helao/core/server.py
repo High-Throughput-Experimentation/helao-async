@@ -41,16 +41,10 @@ class HelaoFastAPI(FastAPI):
 
 
 async def setupAct(action_dict: dict, request: Request, scope: dict):   
-    servKey, _, action_name = request.url.path.strip("/").partition("/")
-    print('##################################################################')
-    print(request.url.path)
-    
+    servKey, _, action_name = request.url.path.strip("/").partition("/")    
     body_params = await request.json()
-    print('body_params:',body_params)
-    print('query_params:',request.query_params)
     param_names = list(body_params.keys()) + list(request.query_params.keys())
     scope.update(body_params)
-    print('scope:',scope)
     A = Action(action_dict, action_server=servKey, action_name=action_name)
     for k in param_names:
         if k not in A.action_params.keys() and k not in ["request", "action_dict"]:
@@ -58,7 +52,6 @@ async def setupAct(action_dict: dict, request: Request, scope: dict):
                 A.action_params[k] = scope[k]
             else:
                 print(k, "is None")
-    print('##################################################################')
     return A
 
 
@@ -842,11 +835,11 @@ class Base(object):
                 await self.file_conn.write(header)
 
         async def write_live_data(self, output_str: str):
-            "Appends lines to file_conn."
+            """Appends lines to file_conn."""
             if self.file_conn:
-                print('#########################################################')
-                print(' ... appending data to file connection')
-                print('#########################################################')
+                # print('#########################################################')
+                # print(' ... appending data to file connection')
+                # print('#########################################################')
                 if not output_str.endswith("\n"):
                     output_str += "\n"
                 await self.file_conn.write(output_str)
@@ -862,15 +855,15 @@ class Base(object):
             await self.base.data_q.put(data_msg)
 
         async def log_data_task(self):
-            "Self-subscribe to data queue, write to present file path."
+            """Self-subscribe to data queue, write to present file path."""
             print("#########################################################")
             print(" ... starting data logger")
             print("#########################################################")
             # data_msg should be a dict {uuid: list of values or a list of list of values}
             try:
                 async for data_msg in self.base.data_q.subscribe():
-                    print(data_msg)
-                    print(self.action.action_uuid)
+                    # print(data_msg)
+                    # print(self.action.action_uuid)
                     if (
                         self.action.action_uuid in data_msg.keys()
                     ):  # only write data for this action
@@ -911,11 +904,8 @@ class Base(object):
                         #     # print('#################################################')
                         #     lines = str(data_val)
                         self.action.data.append(data_val)
-                        print(self.action.data)
+                        # print(self.action.data)
                         if self.file_conn:
-                            print('#################################################')
-                            print('5 ... data logger: writing lines to file')
-                            print('#################################################')
                             await self.write_live_data(json.dumps(data_val))
                             # await self.write_live_data(lines)
             except asyncio.CancelledError:
@@ -933,6 +923,8 @@ class Base(object):
             _output_path = os.path.join(self.action.output_dir, filename)
             print("#########################################################")
             print(" ... writing non stream data to:", _output_path)
+            # print("header:", header)
+            # print("output_str:", output_str)
             print("#########################################################")
             # create output file and set connection
             file_instance = await aiofiles.open(_output_path, mode="w")
@@ -975,9 +967,14 @@ class Base(object):
             )
             print("#########################################################")
             print(" ... writing rcp to:", output_path)
+            # print(" ... writing:",rcp_dict)
             print("#########################################################")
             output_str = dict_to_rcp(rcp_dict)
             file_instance = await aiofiles.open(output_path, mode="a+")
+            
+            if not output_str.endswith("\n"):
+                output_str += "\n"
+            
             await file_instance.write(output_str)
             await file_instance.close()
 

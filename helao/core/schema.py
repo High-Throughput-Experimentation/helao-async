@@ -81,6 +81,7 @@ class Action(Decision):
         samples_in: Optional[dict] = None,
         # samples_out: Optional[dict] = None,
     ):
+        print('... action_params:', action_params)
         super().__init__(inputdict)  # grab decision keys
         imports = {}
         if inputdict:
@@ -119,6 +120,7 @@ class Action(Decision):
             )
         if self.action_uuid is None:
             self.gen_uuid_action()
+
 
     def gen_uuid_action(self):
         if self.action_uuid:
