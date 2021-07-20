@@ -518,7 +518,8 @@ class cPAL:
                 url, params={"liquid_sample_no": liquid_sample_no}
             ) as resp:
                 response = await resp.json()
-                return response["data"]["liquid_sample"]
+                liquid_sample = response["data"].get("liquid_sample", None)
+                return liquid_sample
 
     async def poll_start(self):
         starttime = time.time()
