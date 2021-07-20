@@ -71,7 +71,7 @@ class Action(Decision):
         inputdict: Optional[dict] = None,
         action_server: str = None,
         action_name: str = None,
-        action_params: dict = {},
+        action_params: dict = None,
         action_enum: str = None,
         action_abbr: str = None,
         save_rcp: bool = False,
@@ -81,7 +81,10 @@ class Action(Decision):
         samples_in: Optional[dict] = None,
         # samples_out: Optional[dict] = None,
     ):
+        if action_params is None:
+            action_params = {}
         print('... action_params:', action_params)
+        print(id(action_params))
         super().__init__(inputdict)  # grab decision keys
         imports = {}
         if inputdict:
