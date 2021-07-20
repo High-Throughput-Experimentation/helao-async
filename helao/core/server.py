@@ -45,13 +45,17 @@ async def setupAct(action_dict: dict, request: Request, scope: dict):
     body_params = await request.json()
     param_names = list(body_params.keys()) + list(request.query_params.keys())
     scope.update(body_params)
-    A = Action(action_dict, action_server=servKey, action_name=action_name)
+    if 'action_params' not in action_dict.keys():
+        action_dict['action_params'] = {}
     for k in param_names:
-        if k not in A.action_params.keys() and k not in ["request", "action_dict"]:
+        if k not in action_dict['action_params'].keys() and k not in ["request", "action_dict"]:
             if scope[k] is not None:
-                A.action_params[k] = scope[k]
+                action_dict['action_params'][k] = scope[k]
             else:
                 print(k, "is None")
+    action_dict['action_server'] = servKey
+    action_dict['action_name'] = action_name
+    A = Action(action_dict)
     return A
 
 

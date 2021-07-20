@@ -61,7 +61,7 @@ def makeApp(confPrefix, servKey):
     )
 
     @app.post(f"/{servKey}/get_meas_status")
-    async def get_meas_status(request: Request, action_dict: Optional[dict] = {}):
+    async def get_meas_status(request: Request, action_dict: dict = {}):
         """Will return 'idle' or 'measuring'. Should be used in conjuction with eta to async.sleep loop poll"""
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -82,7 +82,7 @@ def makeApp(confPrefix, servKey):
         TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         IErange: Optional[Gamry_IErange] = "auto",
-        action_dict: Optional[dict] = {},  # optional parameters
+        action_dict: dict = {},  # optional parameters
     ):
         """Linear Sweep Voltammetry (unlike CV no backward scan is done)\n
         use 4bit bitmask for triggers\n
@@ -103,7 +103,7 @@ def makeApp(confPrefix, servKey):
         TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         IErange: Optional[Gamry_IErange] = "auto",
-        action_dict: Optional[dict] = {},  # optional parameters
+        action_dict: dict = {},  # optional parameters
     ):
         """Chronoamperometry (current response on amplied potential)\n
         use 4bit bitmask for triggers\n
@@ -124,7 +124,7 @@ def makeApp(confPrefix, servKey):
         TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         IErange: Optional[Gamry_IErange] = "auto",
-        action_dict: Optional[dict] = {},  # optional parameters
+        action_dict: dict = {},  # optional parameters
     ):
         """Chronopotentiometry (Potential response on controlled current)\n
         use 4bit bitmask for triggers\n
@@ -149,7 +149,7 @@ def makeApp(confPrefix, servKey):
         TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         IErange: Optional[Gamry_IErange] = "auto",
-        action_dict: Optional[dict] = {},  # optional parameters
+        action_dict: dict = {},  # optional parameters
     ):
         """Cyclic Voltammetry (most widely used technique for acquireing information about electrochemical reactions)\n
         use 4bit bitmask for triggers\n
@@ -173,7 +173,7 @@ def makeApp(confPrefix, servKey):
         TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         IErange: Optional[Gamry_IErange] = "auto",
-        action_dict: Optional[dict] = {},  # optional parameters
+        action_dict: dict = {},  # optional parameters
     ):
         """Electrochemical Impendance Spectroscopy\n
         NOT TESTED\n
@@ -192,7 +192,7 @@ def makeApp(confPrefix, servKey):
         TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         IErange: Optional[Gamry_IErange] = "auto",
-        action_dict: Optional[dict] = {},  # optional parameters
+        action_dict: dict = {},  # optional parameters
     ):
         """mesasures open circuit potential\n
         use 4bit bitmask for triggers\n
@@ -205,7 +205,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/stop")
     async def stop(
         request: Request,
-        action_dict: Optional[dict] = {},
+        action_dict: dict = {},
         ):
         """Stops measurement in a controlled way."""
         A = await setupAct(action_dict, request, locals())
@@ -218,7 +218,7 @@ def makeApp(confPrefix, servKey):
     async def estop(
         request: Request,
         switch: Optional[bool] = True,
-        action_dict: Optional[dict] = {}
+        action_dict: dict = {}
         ):
         """Same as stop, but also sets estop flag."""
         A = await setupAct(action_dict, request, locals())

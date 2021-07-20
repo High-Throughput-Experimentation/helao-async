@@ -33,7 +33,7 @@ def makeApp(confPrefix, servKey):
     )
 
     @app.post(f"/{servKey}/get_elements_plateid")
-    async def get_elements_plateid(request: Request, plateid: Optional[str]=None, action_dict: Optional[dict]=None):
+    async def get_elements_plateid(request: Request, plateid: Optional[str]=None, action_dict: dict = {}):
         """Gets the elements from the screening print in the info file"""
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -43,7 +43,7 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/get_platemap_plateid")
-    async def get_platemap_plateid(request: Request, plateid: Optional[str]=None, action_dict: Optional[dict]=None):
+    async def get_platemap_plateid(request: Request, plateid: Optional[str]=None, action_dict: dict = {}):
         """gets platemap"""
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -53,7 +53,7 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/get_platexycalibration")
-    async def get_platexycalibration(request: Request, plateid: Optional[str]=None, action_dict: Optional[dict]=None):
+    async def get_platexycalibration(request: Request, plateid: Optional[str]=None, action_dict: dict = {}):
         """gets saved plate alignment matrix"""
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -63,7 +63,7 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/save_platexycalibration")
-    async def save_platexycalibration(request: Request, plateid: Optional[str]=None, action_dict: Optional[dict]=None):
+    async def save_platexycalibration(request: Request, plateid: Optional[str]=None, action_dict: dict = {}):
         """saves alignment matrix"""
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -73,7 +73,7 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/check_plateid")
-    async def check_plateid(request: Request, plateid: Optional[str]=None, action_dict: Optional[dict]=None):
+    async def check_plateid(request: Request, plateid: Optional[str]=None, action_dict: dict = {}):
         """checks that the plate_id (info file) exists"""
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -83,7 +83,7 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/check_printrecord_plateid")
-    async def check_printrecord_plateid(request: Request, plateid: Optional[str]=None, action_dict: Optional[dict]=None):
+    async def check_printrecord_plateid(request: Request, plateid: Optional[str]=None, action_dict: dict = {}):
         """checks that a print record exist in the info file"""
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -93,7 +93,7 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/check_annealrecord_plateid")
-    async def check_annealrecord_plateid(request: Request, plateid: Optional[str]=None, action_dict: Optional[dict]=None):
+    async def check_annealrecord_plateid(request: Request, plateid: Optional[str]=None, action_dict: dict = {}):
         """checks that a anneal record exist in the info file"""
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
@@ -103,7 +103,7 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/get_info_plateid")
-    async def get_info_plateid(request: Request, plateid: Optional[str]=None, action_dict: Optional[dict]=None):
+    async def get_info_plateid(request: Request, plateid: Optional[str]=None, action_dict: dict = {}):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data(app.driver.get_info_plateid(**A.action_params))
@@ -112,7 +112,7 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/get_rcp_plateid")
-    async def get_rcp_plateid(request: Request, plateid: Optional[str]=None, action_dict: Optional[dict]=None):
+    async def get_rcp_plateid(request: Request, plateid: Optional[str]=None, action_dict: dict = {}):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data(app.driver.get_rcp_plateid(**A.action_params))
@@ -131,7 +131,7 @@ def makeApp(confPrefix, servKey):
                             supplier: Optional[str] = None,
                             lot_number: Optional[str] = None,
                             servkey: Optional[str] = servKey,
-                            action_dict: Optional[dict] = {}
+                            action_dict: dict = {}
                             ):
         '''use CAS for chemical if available. Written on bottles of chemicals with all other necessary information.\n
         For empty DUID and AUID the UID will automatically created. For manual entry leave DUID, AUID, action_time, and action_params empty and servkey on "data".\n
@@ -144,7 +144,7 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/get_last_liquid_sample_no")
-    async def get_last_liquid_sample_no(request: Request, action_dict: Optional[dict]=None):
+    async def get_last_liquid_sample_no(request: Request, action_dict: dict = {}):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data(await app.driver.get_last_liquid_sample_no())
@@ -153,7 +153,7 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/get_liquid_sample_no")
-    async def get_liquid_sample_no(request: Request, liquid_sample_no: Optional[int]=None, action_dict: Optional[dict]=None):
+    async def get_liquid_sample_no(request: Request, liquid_sample_no: Optional[int]=None, action_dict: dict = {}):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data(await app.driver.get_liquid_sample_no(**A.action_params))
@@ -162,7 +162,7 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/get_liquid_sample_no_json")
-    async def get_liquid_sample_no_json(request: Request, liquid_sample_no: Optional[int]=None, action_dict: Optional[dict]=None):
+    async def get_liquid_sample_no_json(request: Request, liquid_sample_no: Optional[int]=None, action_dict: dict = {}):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data(await app.driver.get_liquid_sample_no_json(**A.action_params))

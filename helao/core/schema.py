@@ -16,27 +16,19 @@ class Decision(object):
 
     def __init__(
         self,
-        inputdict: Optional[dict] = None,
-        orch_name: str = "orchestrator",
-        technique_name: str = None,
-        decision_label: str = "nolabel",
-        actualizer: str = None,
-        actual_pars: dict = {},
-        result_dict: dict = {},
-        access: str = "hte",
+        inputdict: dict = {},
     ):
         imports = {}
-        if inputdict:
-            imports.update(inputdict)
-        self.orch_name = imports.get("orch_name", orch_name)
-        self.technique_name = imports.get("technique_name", technique_name)
+        imports.update(inputdict)
+        self.orch_name = imports.get("orch_name", "orchestrator")
+        self.technique_name = imports.get("technique_name", None)
         self.decision_uuid = imports.get("decision_uuid", None)
         self.decision_timestamp = imports.get("decision_timestamp", None)
-        self.decision_label = imports.get("decision_label", decision_label)
-        self.access = imports.get("access", access)
-        self.actual = imports.get("actual", actualizer)
-        self.actual_pars = imports.get("actual_pars", actual_pars)
-        self.result_dict = imports.get("result_dict", result_dict)
+        self.decision_label = imports.get("decision_label", "noLabel")
+        self.access = imports.get("access", "hte")
+        self.actual = imports.get("actual", None)
+        self.actual_pars = imports.get("actual_pars", {})
+        self.result_dict = imports.get("result_dict", {})
         if self.decision_uuid is None:
             self.gen_uuid_decision()
 
@@ -68,41 +60,25 @@ class Action(Decision):
 
     def __init__(
         self,
-        inputdict: Optional[dict] = None,
-        action_server: str = None,
-        action_name: str = None,
-        action_params: dict = None,
-        action_enum: str = None,
-        action_abbr: str = None,
-        save_rcp: bool = False,
-        save_data: Union[bool, int, str] = None,
-        start_condition: Union[int, dict] = 3,
-        plate_id: Optional[int] = None,
-        samples_in: Optional[dict] = None,
-        # samples_out: Optional[dict] = None,
+        inputdict: dict = {},
     ):
-        if action_params is None:
-            action_params = {}
-        print('... action_params:', action_params)
-        print(id(action_params))
         super().__init__(inputdict)  # grab decision keys
         imports = {}
-        if inputdict:
-            imports.update(inputdict)
+        imports.update(inputdict)
         self.action_uuid = imports.get("action_uuid", None)
         self.action_queue_time = imports.get("action_queue_time", None)
-        self.action_server = imports.get("action_server", action_server)
-        self.action_name = imports.get("action_name", action_name)
-        self.action_params = imports.get("action_params", action_params)
-        self.action_enum = imports.get("action_enum", action_enum)
-        self.action_abbr = imports.get("action_abbr", action_abbr)
-        self.save_rcp = imports.get("save_rcp", save_rcp)
-        self.save_data = imports.get("save_data", save_data)
-        self.start_condition = imports.get("start_condition", start_condition)
-        self.plate_id = imports.get("plate_id", plate_id)
-        self.samples_in = imports.get("samples_in", samples_in)
+        self.action_server = imports.get("action_server", None)
+        self.action_name = imports.get("action_name", None)
+        self.action_params = imports.get("action_params", {})
+        self.action_enum = imports.get("action_enum", None)
+        self.action_abbr = imports.get("action_abbr", None)
+        self.save_rcp = imports.get("save_rcp", False)
+        self.save_data = imports.get("save_data", None)
+        self.start_condition = imports.get("start_condition", 3)
+        self.plate_id = imports.get("plate_id", None)
+        self.samples_in = imports.get("samples_in", {})
         # the following attributes are set during Action dispatch but can be imported
-        self.samples_out = imports.get("samples_out", None)
+        self.samples_out = imports.get("samples_out", {})
         self.file_dict = defaultdict(lambda: defaultdict(dict))
         self.file_dict.update(imports.get("file_dict", {}))
         self.file_paths = imports.get("file_paths", [])
