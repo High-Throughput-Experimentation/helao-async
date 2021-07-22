@@ -42,7 +42,11 @@ class HelaoFastAPI(FastAPI):
 
 async def setupAct(action_dict: dict, request: Request, scope: dict):   
     servKey, _, action_name = request.url.path.strip("/").partition("/")    
-    body_params = await request.json()
+    body_bytes = await request.body()
+    if body_bytes == b'':
+        body_params = {}
+    else:
+        body_params = await request.json()
     param_names = list(body_params.keys()) + list(request.query_params.keys())
     scope.update(body_params)
     if 'action_params' not in action_dict.keys():
