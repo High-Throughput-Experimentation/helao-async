@@ -509,7 +509,8 @@ class cPAL:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, params={}) as resp:
                 response = await resp.json()
-                return response["data"]["liquid_sample"]
+                liquid_sample = response["data"].get("liquid_sample", None)
+                return liquid_sample
 
     async def get_sample_no_json(self, liquid_sample_no: int):
         url = f"http://{self.datahost}:{self.dataport}/{self.dataserv}/get_liquid_sample_no_json"
@@ -518,7 +519,8 @@ class cPAL:
                 url, params={"liquid_sample_no": liquid_sample_no}
             ) as resp:
                 response = await resp.json()
-                return response["data"]["liquid_sample"]
+                liquid_sample = response["data"].get("liquid_sample", None)
+                return liquid_sample
 
     async def poll_start(self):
         starttime = time.time()
