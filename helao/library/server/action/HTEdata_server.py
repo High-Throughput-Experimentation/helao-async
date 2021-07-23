@@ -57,7 +57,7 @@ def makeApp(confPrefix, servKey):
         """gets saved plate alignment matrix"""
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
-        await active.enqueue_data(None)
+        await active.enqueue_data(app.driver.get_platexycalibration(**A.action_params))
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -67,7 +67,7 @@ def makeApp(confPrefix, servKey):
         """saves alignment matrix"""
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
-        await active.enqueue_data(None)
+        await active.enqueue_data(app.driver.save_platexycalibration(**A.action_params))
         finished_act = await active.finish()
         return finished_act.as_dict()
 
