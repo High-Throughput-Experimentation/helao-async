@@ -120,55 +120,6 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
 
-    @app.post(f"/{servKey}/create_new_liquid_sample_no")
-    async def create_new_liquid_sample_no(request: Request, 
-                            source: Optional[str] = None,
-                            sourcevol_mL: Optional[str] = None,
-                            volume_mL: Optional[float] = 0.0,
-                            action_time: Optional[str] = None,
-                            chemical: Optional[str] = None,
-                            mass: Optional[str] = None,
-                            supplier: Optional[str] = None,
-                            lot_number: Optional[str] = None,
-                            servkey: Optional[str] = servKey,
-                            action_dict: dict = {}
-                            ):
-        '''use CAS for chemical if available. Written on bottles of chemicals with all other necessary information.\n
-        For empty DUID and AUID the UID will automatically created. For manual entry leave DUID, AUID, action_time, and action_params empty and servkey on "data".\n
-        If its the very first liquid (no source in database exists) leave source and source_mL empty.'''
-        A = await setupAct(action_dict, request, locals())
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(await app.driver.create_new_liquid_sample_no(**A.action_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
-
-
-    @app.post(f"/{servKey}/get_last_liquid_sample_no")
-    async def get_last_liquid_sample_no(request: Request, action_dict: dict = {}):
-        A = await setupAct(action_dict, request, locals())
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(await app.driver.get_last_liquid_sample_no())
-        finished_act = await active.finish()
-        return finished_act.as_dict()
-
-
-    @app.post(f"/{servKey}/get_liquid_sample_no")
-    async def get_liquid_sample_no(request: Request, liquid_sample_no: Optional[int]=None, action_dict: dict = {}):
-        A = await setupAct(action_dict, request, locals())
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(await app.driver.get_liquid_sample_no(**A.action_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
-
-
-    @app.post(f"/{servKey}/get_liquid_sample_no_json")
-    async def get_liquid_sample_no_json(request: Request, liquid_sample_no: Optional[int]=None, action_dict: dict = {}):
-        A = await setupAct(action_dict, request, locals())
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(await app.driver.get_liquid_sample_no_json(**A.action_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
-
     @app.post("/shutdown")
     def post_shutdown():
         shutdown_event()

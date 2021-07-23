@@ -8,11 +8,15 @@ from datetime import datetime
 from time import strftime
 import json
 import aiofiles
+from fastapi import Request
+
 
 from helao.core.schema import Action
 from helao.core.server import Base
 from helao.core.error import error_codes
 from helao.library.driver.HTEdata_legacy import LocalDataHandler
+from helao.core.data import liquid_sample_no_API
+
 
 
 import nidaqmx
@@ -155,6 +159,11 @@ class cPAL:
         self.dataport = self.world_config["servers"][self.config_dict["data_server"]]["port"]
 
         self.local_data_dump = self.world_config["save_root"]
+        self.liquid_sample_no_DB_path = self.world_config["liquid_sample_no_DB"]
+
+        self.liquid_sample_no_DB = liquid_sample_no_API(self.liquid_sample_no_DB_path)
+        
+        
 
         self.sshuser = self.config_dict["user"]
         self.sshkey = self.config_dict["key"]
@@ -236,7 +245,9 @@ class cPAL:
         self.FIFO_column_headings = []
 
 
-    async def reset_PAL_system_vial_table(self, A, myactive):
+
+    async def reset_PAL_system_vial_table(self, A):
+        myactive = await self.base.contain_action(A)
         # backup to json
         await self.backup_PAL_system_vial_table(reset=True)
         # full backup to csv
@@ -251,6 +262,9 @@ class cPAL:
         ]
         # save new one so it can be loaded of Program startup
         await self.backup_PAL_system_vial_table(reset=False)
+        await myactive.enqueue_data({"reset": "done"})
+        return await myactive.finish()
+
 
     async def load_PAL_system_vial_table_from_backup(self):
         file_path = os.path.join(self.local_data_dump, self.PAL_file)
@@ -390,7 +404,7 @@ class cPAL:
                 tmp_output_str = ""#",".join(["vial_no", "liquid_sample_no", "vol_mL"])
                 
                 for i, _ in enumerate(self.trays[tray - 1].slots[slot - 1].vials):
-                    if tmp_output_str is not "":
+                    if tmp_output_str != "":
                         tmp_output_str += "\n"
                     tmp_output_str += ",".join(
                         [
@@ -415,26 +429,24 @@ class cPAL:
 
 
 
-    async def get_vial_holder_table(self, A, myactive):
+    async def get_vial_holder_table(self, A):
         """Returns vial tray sample table"""
-        
         tray =  A.action_params["tray"]
         slot =  A.action_params["slot"]
         csv = A.action_params.get("csv", False)
-        
-        
-        print(" ... getting table")
-        print(" ... writing to csv:",csv)
-        print(A.action_params)
+
+        myactive = await self.base.contain_action(A)
+        table = {}
+
         if self.trays[tray - 1] is not None:
             if self.trays[tray - 1].slots[slot - 1] is not None:
                 if csv:
                     await self.write_vial_holder_table_as_CSV(tray, slot, myactive)
-                return self.trays[tray - 1].slots[slot - 1].as_dict()
-            else:
-                return {}
-        else:
-            return {}
+                table = self.trays[tray - 1].slots[slot - 1].as_dict()
+        await myactive.enqueue_data({"vial_table": table})
+
+        return await myactive.finish()
+                
 
 
     async def get_new_vial_position(self, req_vol: float = 2.0):
@@ -468,59 +480,6 @@ class cPAL:
 
         return {"tray": new_tray, "slot": new_slot, "vial": new_vial}
 
-    async def create_new_liquid_sample_no(
-        self,
-        DUID: str = "",
-        AUID: str = "",
-        source: str = "",
-        sourcevol_mL: str = "",
-        volume_mL: float = 0.0,
-        action_time: str = strftime("%Y%m%d.%H%M%S"),
-        chemical: str = "",
-        mass: str = "",
-        supplier: str = "",
-        lot_number: str = "",
-        servkey: str = "",
-        action_params="",
-    ):
-        url = f"http://{self.datahost}:{self.dataport}/{self.dataserv}/create_new_liquid_sample_no"
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url,
-                params={
-                    "DUID": DUID,
-                    "AUID": AUID,
-                    "source": source,
-                    "sourcevol_mL": sourcevol_mL,
-                    "volume_mL": volume_mL,
-                    "action_time": action_time,
-                    "chemical": chemical,
-                    "mass": mass,
-                    "supplier": supplier,
-                    "lot_number": lot_number,
-                    "servkey": servkey,
-                },
-            ) as resp:
-                response = await resp.json()
-                return response["data"]["id"]
-
-    async def get_last_liquid_sample_no(self):
-        url = f"http://{self.datahost}:{self.dataport}/{self.dataserv}/get_last_liquid_sample_no"
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, params={}) as resp:
-                response = await resp.json()
-                liquid_sample = response["data"].get("liquid_sample", None)
-                return liquid_sample
-
-    async def get_sample_no_json(self, liquid_sample_no: int):
-        url = f"http://{self.datahost}:{self.dataport}/{self.dataserv}/get_liquid_sample_no_json"
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url, params={"liquid_sample_no": liquid_sample_no}
-            ) as resp:
-                response = await resp.json()
-                liquid_sample = response["data"].get("liquid_sample", None)
-                return liquid_sample
 
     async def poll_start(self):
         starttime = time.time()
@@ -695,7 +654,7 @@ class cPAL:
                 print(" ... last sample is ", PALparams.liquid_sample_no)
             print(" ... old sampple is", PALparams.liquid_sample_no)
 
-            sourceelecrolyte = await self.get_sample_no_json(PALparams.liquid_sample_no)
+            sourceelecrolyte = await self.get_liquid_sample_no_json(PALparams.liquid_sample_no)
 
             source_chemical = sourceelecrolyte.get("chemical", [""])
             source_mass = sourceelecrolyte.get("mass", [""])
@@ -971,7 +930,7 @@ class cPAL:
                     self.FIFO_PALheader = "\n".join(
                         [
                             f"%techniquename={self.IO_PALparams.method}",
-                            f"%epoch_ns=FIXME",
+                            "%epoch_ns=FIXME",
                             "%version=0.2",
                             f"%column_headings={tmps_headings}",
                         ]
@@ -981,11 +940,11 @@ class cPAL:
                         self.action,
                         file_type="pal_file",
                         file_group="pal_files",
-                        header=self.PAL_header,
+                        header=self.FIFO_PALheader,
                     )
                     print(f"!!! Active action uuid is {self.active.action.action_uuid}")
                     realtime = await self.active.set_realtime()
-                    self.FIFO_PALheader.replace(f"%epoch_ns=FIXME", f"%epoch_ns={realtime}")
+                    self.FIFO_PALheader.replace("%epoch_ns=FIXME", f"%epoch_ns={realtime}")
 
                     # here we need to implement the multi PAL sampling
                     # by having a loop here and sending a local modified
@@ -1012,3 +971,85 @@ class cPAL:
                     self.IO_do_meas = False
                     print(" ... PAL is in estop.")
                     # await self.stat.set_estop()
+
+
+    async def get_last_liquid_sample_no(self):
+        lastno = await self.liquid_sample_no_DB.count_IDs()
+        return lastno
+
+
+    async def get_liquid_sample_no(self, liquid_sample_no: int):
+        dataCSV = await self.liquid_sample_no_DB.get_ID_line(liquid_sample_no)
+        return dataCSV
+
+
+    async def get_liquid_sample_no_json(self, liquid_sample_no: int):
+        datajson = await self.liquid_sample_no_DB.get_json(liquid_sample_no)
+        return datajson
+
+
+    async def create_new_liquid_sample_no(
+        self,
+        DUID: str = "",
+        AUID: str = "",
+        source: str = "",
+        sourcevol_mL: str = "",
+        volume_mL: str = "",
+        action_time: str = strftime("%Y%m%d.%H%M%S"),
+        chemical: str = "",
+        mass: str = "",
+        supplier: str = "",
+        lot_number: str = "",
+    ):
+        def tofloat(datastr):
+            try:
+                return float(datastr)
+            except Exception:
+                return None
+
+
+        def str_to_strarray(datastr):
+            sepvals = [";", "\t", "::", ":"]
+            dataarray = None
+    
+            for sep in sepvals:
+                if not (datastr.find(sep) == -1):
+                    dataarray = datastr.split(sep)
+                    break
+    
+            if dataarray == None:
+                dataarray = datastr
+    
+            if type(dataarray) is not list:
+                dataarray = [dataarray]
+            return dataarray
+
+
+        str_to_strarray('test')
+
+        action_time = action_time.replace(",", ";")
+        chemical = chemical.replace(",", ";")
+        mass = mass.replace(",", ";")
+        supplier = supplier.replace(",", ";")
+        lot_number = lot_number.replace(",", ";")
+        sourcevol_mL = sourcevol_mL.replace(",", ";")
+        source = source.replace(",", ";")
+
+        entry = dict(
+            DUID=DUID,
+            AUID=AUID,
+            source=str_to_strarray(source),
+            sourcevol_mL=[
+                tofloat(vol) for vol in str_to_strarray(sourcevol_mL)
+            ],
+            volume_mL=volume_mL,
+            action_time=action_time,
+            chemical=str_to_strarray(chemical),
+            mass=str_to_strarray(mass),
+            supplier=str_to_strarray(supplier),
+            lot_number=str_to_strarray(lot_number),
+            servkey=self.base.server_name,
+        )
+
+        newID = await self.liquid_sample_no_DB.new_ID(entry)
+        return newID

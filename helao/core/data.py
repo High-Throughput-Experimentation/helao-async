@@ -4,7 +4,7 @@ import json
 import zipfile
 from re import compile as regexcompile
 import numpy
-
+import asyncio
 
 class HTE_legacy_API:
     def __init__(self):
@@ -21,24 +21,7 @@ class HTE_legacy_API:
             r"\\htejcap.caltech.edu\share\data\hte_jcap_app_proto\plate",
             r"J:\hte_jcap_app_proto\plate",
         ]
-
-
-    def str_to_strarray(self, datastr):
-        sepvals = [";", "\t", "::", ":"]
-        dataarray = None
-
-        for sep in sepvals:
-            if not (datastr.find(sep) == -1):
-                dataarray = datastr.split(sep)
-                break
-
-        if dataarray == None:
-            dataarray = datastr
-
-        if type(dataarray) is not list:
-            dataarray = [dataarray]
-        return dataarray
-
+        self.qdata = asyncio.Queue(maxsize=100)  # ,loop=asyncio.get_event_loop())
 
 
     def put_in_qdata(self, item):
@@ -179,7 +162,7 @@ class HTE_legacy_API:
     def rcp_to_dict(self, rcppath):  # read standard rcp/exp/ana/info structure to dict
         dlist = []
 
-        def tab_level(self, astr):
+        def tab_level(astr):
             """Count number of leading tabs in a string
             """
             return (len(astr) - len(astr.lstrip("    "))) / 4
@@ -470,9 +453,8 @@ class HTE_legacy_API:
     
 
 class liquid_sample_no_API:
-    def __init__(self, DBfilepath, DBfile, headerlines=0):
-        self.DBfilepath = DBfilepath
-        self.DBfile = DBfile
+    def __init__(self, DB, headerlines=0):
+        self.DBfilepath, self.DBfile = os.path.split(DB)
         self.fDB = None
         self.headerlines = headerlines
         # create folder first if it not exist

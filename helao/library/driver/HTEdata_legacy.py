@@ -109,10 +109,9 @@ class HTEdata:
         self.config_dict = actServ.server_cfg["params"]
 
 
-        self.qdata = asyncio.Queue(maxsize=100)  # ,loop=asyncio.get_event_loop())
-        self.liquidDBpath = self.config_dict["liquid_DBpath"]
-        self.liquidDBfile = self.config_dict["liquid_DBfile"]
-        self.liquid_sample_no_DB = liquid_sample_no_API(self.liquidDBpath, self.liquidDBfile)
+        # self.liquidDBpath = self.config_dict["liquid_DBpath"]
+        # self.liquidDBfile = self.config_dict["liquid_DBfile"]
+        # self.liquid_sample_no_DB = liquid_sample_no_API(self.liquidDBpath, self.liquidDBfile)
         self.data = HTE_legacy_API()
 
 
@@ -154,66 +153,3 @@ class HTEdata:
             print_key_or_keyword="screening_print_id",
             exclude_elements_list=[""],
             return_defaults_if_none=False)
-
-
-    async def get_last_liquid_sample_no(self):
-        lastno = await self.liquid_sample_no_DB.count_IDs()
-        return lastno
-
-
-    async def get_liquid_sample_no(self, liquid_sample_no: int):
-        dataCSV = await self.liquid_sample_no_DB.get_ID_line(liquid_sample_no)
-        return dataCSV
-
-
-    async def get_liquid_sample_no_json(self, liquid_sample_no: int):
-        datajson = await self.liquid_sample_no_DB.get_json(liquid_sample_no)
-        return datajson
-
-
-    async def create_new_liquid_sample_no(
-        self,
-        DUID: str,
-        AUID: str,
-        source: str,
-        sourcevol_mL: str,
-        volume_mL: str,
-        action_time: str,
-        chemical: str,
-        mass: str,
-        supplier: str,
-        lot_number: str,
-        servkey: str,
-    ):
-        def tofloat(self, datastr):
-            try:
-                return float(datastr)
-            except Exception:
-                return None
-
-        action_time = action_time.replace(",", ";")
-        chemical = chemical.replace(",", ";")
-        mass = mass.replace(",", ";")
-        supplier = supplier.replace(",", ";")
-        lot_number = lot_number.replace(",", ";")
-        sourcevol_mL = sourcevol_mL.replace(",", ";")
-        source = source.replace(",", ";")
-
-        entry = dict(
-            DUID=DUID,
-            AUID=AUID,
-            source=self.str_to_strarray(source),
-            sourcevol_mL=[
-                self.tofloat(vol) for vol in self.str_to_strarray(sourcevol_mL)
-            ],
-            volume_mL=volume_mL,
-            action_time=action_time,
-            chemical=self.str_to_strarray(chemical),
-            mass=self.str_to_strarray(mass),
-            supplier=self.str_to_strarray(supplier),
-            lot_number=self.str_to_strarray(lot_number),
-            servkey=servkey,
-        )
-
-        newID = await self.liquid_sample_no_DB.new_ID(entry)
-        return newID
