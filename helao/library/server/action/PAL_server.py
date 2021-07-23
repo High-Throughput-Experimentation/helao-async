@@ -23,6 +23,7 @@ def makeApp(confPrefix, servKey):
         driver_class=cPAL,
     )
 
+
     @app.post(f"/{servKey}/reset_PAL_system_vial_table")
     async def reset_PAL_system_vial_table(
         request: Request, 
@@ -30,9 +31,7 @@ def makeApp(confPrefix, servKey):
     ):
         """Resets app.driver vial table. But will make a full dump to CSV first."""
         A = await setupAct(action_dict, request, locals())
-        active = await app.base.contain_action(A)
-        await active.enqueue_data({"reset":  await app.driver.reset_PAL_system_vial_table(A, active)})
-        finished_act = await active.finish()
+        finished_act = await app.driver.reset_PAL_system_vial_table(A)
         return finished_act.as_dict()
 
 
@@ -62,9 +61,7 @@ def makeApp(confPrefix, servKey):
         action_dict: dict = {}
     ):
         A = await setupAct(action_dict, request, locals())
-        active = await app.base.contain_action(A)
-        await active.enqueue_data({"vial_table": await app.driver.get_vial_holder_table(A, active)})
-        finished_act = await active.finish()
+        finished_act = await app.driver.get_vial_holder_table(A)
         return finished_act.as_dict()
 
 
@@ -77,9 +74,7 @@ def makeApp(confPrefix, servKey):
     ):
         A = await setupAct(action_dict, request, locals())
         A.action_params["csv"] = True # signal subroutine to create a csv
-        active = await app.base.contain_action(A)
-        await active.enqueue_data({"vial_table": await app.driver.get_vial_holder_table(A, active)})
-        finished_act = await active.finish()
+        finished_act = await app.driver.get_vial_holder_table(A)
         return finished_act.as_dict()
 
 
@@ -117,70 +112,69 @@ def makeApp(confPrefix, servKey):
         spacingfactor: Optional[float] = 1.0,
         action_dict: dict = {}
     ):
-
-        dest_tray=None  # dest_tray, # will be filled via call to vial warehouse table
-        dest_slot=None  # dest_slot, # will be filled via call to vial warehouse table
-        dest_vial=None  # dest_vial, # will be filled via call to vial warehouse table
-
-
         A = await setupAct(action_dict, request, locals())
+        A.action_params["dest_tray"] = None
+        A.action_params["dest_slot"] = None
+        A.action_params["dest_vial"] = None
         A.save_data = True
         active_dict = await app.driver.initcommand(A)
         return active_dict
 
+    @app.post(f"/{servKey}/create_new_liquid_sample_no")
+    async def create_new_liquid_sample_no(request: Request, 
+                            source: Optional[str] = None,
+                            sourcevol_mL: Optional[str] = None,
+                            volume_mL: Optional[float] = 0.0,
+                            action_time: Optional[str] = None,
+                            chemical: Optional[str] = None,
+                            mass: Optional[str] = None,
+                            supplier: Optional[str] = None,
+                            lot_number: Optional[str] = None,
+                            action_dict: dict = {}
+                            ):
+        '''use CAS for chemical if available. Written on bottles of chemicals with all other necessary information.\n
+        For empty DUID and AUID the UID will automatically created. For manual entry leave DUID, AUID, action_time, and action_params empty and servkey on "data".\n
+        If its the very first liquid (no source in database exists) leave source and source_mL empty.'''
+        A = await setupAct(action_dict, request, locals())
+        active = await app.base.contain_action(A)
+        A.action_params["DUID"] = A.decision_uuid
+        A.action_params["AUID"] = A.action_uuid
+        await active.enqueue_data({'liquid_sample_no': await app.driver.create_new_liquid_sample_no(**A.action_params)})
+        finished_act = await active.finish()
+        return finished_act.as_dict()
 
-        Vfinal = A.action_params["Vfinal"]
+
+    @app.post(f"/{servKey}/get_last_liquid_sample_no")
+    async def get_last_liquid_sample_no(request: Request, action_dict: dict = {}):
+        A = await setupAct(action_dict, request, locals())
+        active = await app.base.contain_action(A)
+        await active.enqueue_data(await app.driver.get_last_liquid_sample_no())
+        finished_act = await active.finish()
+        return finished_act.as_dict()
 
 
+    @app.post(f"/{servKey}/get_liquid_sample_no")
+    async def get_liquid_sample_no(request: Request, liquid_sample_no: Optional[int]=None, action_dict: dict = {}):
+        A = await setupAct(action_dict, request, locals())
+        active = await app.base.contain_action(A)
+        await active.enqueue_data({'liquid_sample_no': await app.driver.get_liquid_sample_no(**A.action_params)})
+        finished_act = await active.finish()
+        return finished_act.as_dict()
 
-        # runparams = action_runparams(
-        #     uid=getuid(servKey), name="run_method", action_params=action_params
-        # )
-        # retc = return_class(
-        #     measurement_type="PAL_command",
-        #     parameters={
-        #         "command": "sendcommand",
-        #         "parameters": {
-        #             "liquid_sample_no": liquid_sample_no,
-        #             "PAL_method": method.name,
-        #             "PAL_tool": tool,
-        #             "PAL_source": source,
-        #             "PAL_volume_uL": volume_uL,
-        #             # 'PAL_dest_tray': dest_tray, # will be filled via call to vial warehouse table
-        #             # 'PAL_dest_slot': dest_slot, # will be filled via call to vial warehouse table
-        #             # 'PAL_dest_vial': dest_vial, # will be filled via call to vial warehouse table
-        #             #'logfile': logfile,
-        #             "totalvials": totalvials,
-        #             "sampleperiod": sampleperiod,
-        #             "spacingmethod": spacingmethod,
-        #             "spacingfactor": spacingfactor,
-        #         },
-        #     },
-        #     data=await app.driver.initcommand(
-        #         cPALparams(
-        #             liquid_sample_no=liquid_sample_no,
-        #             method=method,
-        #             tool=tool,
-        #             source=source,
-        #             volume_uL=volume_uL,
-        #             dest_tray=None,  # dest_tray, # will be filled via call to vial warehouse table
-        #             dest_slot=None,  # dest_slot, # will be filled via call to vial warehouse table
-        #             dest_vial=None,  # dest_vial, # will be filled via call to vial warehouse table
-        #             # logfile,
-        #             totalvials=totalvials,
-        #             sampleperiod=sampleperiod,
-        #             spacingmethod=spacingmethod,
-        #             spacingfactor=spacingfactor,
-        #         ),
-        #         runparams,
-        #     ),
-        # )
-        # # will be set within the driver
-        # return retc
+
+    @app.post(f"/{servKey}/get_liquid_sample_no_json")
+    async def get_liquid_sample_no_json(request: Request, liquid_sample_no: Optional[int]=None, action_dict: dict = {}):
+        A = await setupAct(action_dict, request, locals())
+        active = await app.base.contain_action(A)
+        await active.enqueue_data({'liquid_sample_no_json': await app.driver.get_liquid_sample_no_json(**A.action_params)})
+        finished_act = await active.finish()
+        return finished_act.as_dict()
+
 
     @app.post("/shutdown")
     def post_shutdown():
         shutdown_event()
+
 
     @app.on_event("shutdown")
     def shutdown_event():

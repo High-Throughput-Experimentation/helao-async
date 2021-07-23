@@ -7,6 +7,7 @@ config = dict()
 config["action_libraries"] = ["lisa_ANEC2"]
 config["technique_name"] = "adss"
 config["save_root"] = r"C:\INST_dev2\RUNS"
+config["liquid_sample_no_DB"] = r"C:\INST_dev2\DATABASE\liquid_ID_database.csv"
 
 
 # we define all the servers here so that the overview is a bit better
@@ -27,8 +28,6 @@ config["servers"] = dict(
         fast="HTEdata_server",
         mode="legacy",  # lagcy; modelyst
         params=dict(
-            liquid_DBpath=r"C:\INST_dev2\DATABASE",
-            liquid_DBfile="liquid_ID_database.csv",
         ),
     ),
     # motor=dict(
