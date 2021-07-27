@@ -101,3 +101,21 @@ class return_runningact(BaseModel):
     samples_in: Optional[dict]
     samples_out: Optional[dict]
     output_dir: Optional[str]
+
+
+class liquid_sample_no(BaseModel):
+    """Return class for liquid sample no objects."""
+    id: int = None
+    DUID: str = None
+    AUID: str = None
+    source: List[str] = []
+    sourcevol_mL: List[float] = []
+    volume_mL: float = None
+    action_time: str = None
+    chemical: List[str] = []
+    mass: List[str] = []
+    supplier: List[str] = []
+    lot_number: List[str] = []
+    servkey: str = None
+    plate_id: Optional[int] = None
+    sample_no: Optional[int] = None
