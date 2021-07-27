@@ -5,6 +5,10 @@ import zipfile
 from re import compile as regexcompile
 import numpy
 import asyncio
+from pydantic import BaseModel
+from typing import List
+
+from helao.core.model import liquid_sample_no
 
 class HTE_legacy_API:
     def __init__(self):
@@ -473,6 +477,7 @@ class liquid_sample_no_API:
         )
         print("##############################################################")
 
+
     async def open_DB(self, mode):
         if os.path.exists(self.DBfilepath):
             self.fDB = await aiofiles.open(
@@ -482,15 +487,12 @@ class liquid_sample_no_API:
         else:
             return False
 
+
     async def close_DB(self):
         await self.fDB.close()
 
-    async def add_line(self, line):
-        if not line.endswith("\n"):
-            line += "\n"
-        await self.fDB.write(line)
 
-    async def count_IDs(self):
+    async def count_new_liquid_sample_no(self):
         # TODO: faster way?
         _ = await self.open_DB("a+")
         counter = 0
@@ -500,72 +502,74 @@ class liquid_sample_no_API:
         await self.close_DB()
         return counter - self.headerlines
 
-    async def new_ID(self, entrydict):
-        # count lines of CSV to get ID
-        newID = await self.count_IDs()
-        newID = newID + 1
-        print(" ... new liquid sample no:", newID)
-        # add new id to dict
-        entrydict["id"] = newID
+
+    async def new_liquid_sample_no(self, entrydict):
+        async def write_ID_jsonfile(filename, datadict):
+            """write a separate json file for each new ID"""
+            self.fjson = await aiofiles.open(os.path.join(self.DBfilepath, filename), "a+")
+            await self.fjson.write(json.dumps(datadict))
+            await self.fjson.close()
+
+        async def add_line(line):
+            if not line.endswith("\n"):
+                line += "\n"
+            await self.fDB.write(line)
+
+        new_liquid_sample_no = liquid_sample_no(**entrydict)
+        new_liquid_sample_no.id = await self.count_liquid_sample_no() + 1
+        print(" ... new liquid sample no:", new_liquid_sample_no.id)
         # dump dict to separate json file
-        AUID = entrydict.get("AUID", "")
-        DUID = entrydict.get("DUID", "")
-        await self.write_ID_jsonfile(f"{newID:08d}__{DUID}__{AUID}.json", entrydict)
+        await write_ID_jsonfile(f"{new_liquid_sample_no.id:08d}__{new_liquid_sample_no.DUID}__{new_liquid_sample_no.AUID}.json",new_liquid_sample_no.dict())
         # add newid to DB csv
         await self.open_DB("a+")
-        await self.add_line(f"{newID},{DUID},{AUID}")
+        await add_line(f"{new_liquid_sample_no.id},{new_liquid_sample_no.DUID},{new_liquid_sample_no.AUID}")
         await self.close_DB()
-        return newID
 
-    async def write_ID_jsonfile(self, filename, datadict):
-        """write a separate json file for each new ID"""
-        self.fjson = await aiofiles.open(os.path.join(self.DBfilepath, filename), "a+")
-        await self.fjson.write(json.dumps(datadict))
-        await self.fjson.close()
+        return new_liquid_sample_no.id
 
-    async def get_ID_line(self, ID):
-        # TODO: faster way?
-        # need to add headerline count
-        ID = ID + self.headerlines
-        await self.open_DB("r+")
-        counter = 0
-        retval = ""
-        await self.fDB.seek(0)
-        async for line in self.fDB:
-            counter += 1
-            if counter == ID:
-                retval = line
-                break
-        await self.close_DB()
-        return retval
 
-    async def load_json_file(self, filename, linenr=1):
-        self.fjsonread = await aiofiles.open(
-            os.path.join(self.DBfilepath, filename), "r+"
-        )
-        counter = 0
-        retval = ""
-        await self.fjsonread.seek(0)
-        async for line in self.fjsonread:
-            counter += 1
-            if counter == linenr:
-                retval = line
-        await self.fjsonread.close()
-        return json.loads(retval)
+    async def get_liquid_sample_no(self, ID):
+        """returns a dict with liquid_sample_no information"""
+        async def load_json_file(filename, linenr=1):
+            self.fjsonread = await aiofiles.open(
+                os.path.join(self.DBfilepath, filename), "r+"
+            )
+            counter = 0
+            retval = ""
+            await self.fjsonread.seek(0)
+            async for line in self.fjsonread:
+                counter += 1
+                if counter == linenr:
+                    retval = line
+            await self.fjsonread.close()
+            return json.loads(retval)
 
-    async def get_json(self, ID):
-        data = await self.get_ID_line(ID)
+        async def get_liquid_sample_no_details(ID):
+            # need to add headerline count
+            ID = ID + self.headerlines
+            await self.open_DB("r+")
+            counter = 0
+            retval = ""
+            await self.fDB.seek(0)
+            async for line in self.fDB:
+                counter += 1
+                if counter == ID:
+                    retval = line
+                    break
+            await self.close_DB()
+            return retval
+
+        data = await get_liquid_sample_no_details(ID)
         if data != "":
             data = data.strip("\n")
             data = data.split(",")
             fileID = int(data[0])
             DUID = data[1]
             AUID = data[2]
-            # await self.write_ID_jsonfile(f'{newID:08d}__{DUID}__{AUID}.json',entrydict)
             filename = f"{fileID:08d}__{DUID}__{AUID}.json"
             print(" ... data json file:", filename)
-            retval = await self.load_json_file(filename, 1)
-            print(" ... data json content:", retval)
+            ret_liquid_sample_no = liquid_sample_no(**json.loads(await load_json_file(filename, 1)))
+            print(" ... data json content:", ret_liquid_sample_no.dict())
+            return ret_liquid_sample_no.dict()
         else:
-            retval = dict()
-        return retval
+            return dict()
