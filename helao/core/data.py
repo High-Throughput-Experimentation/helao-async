@@ -492,7 +492,7 @@ class liquid_sample_no_API:
         await self.fDB.close()
 
 
-    async def count_new_liquid_sample_no(self):
+    async def count_liquid_sample_no(self):
         # TODO: faster way?
         _ = await self.open_DB("a+")
         counter = 0
@@ -524,8 +524,7 @@ class liquid_sample_no_API:
         await self.open_DB("a+")
         await add_line(f"{new_liquid_sample_no.id},{new_liquid_sample_no.DUID},{new_liquid_sample_no.AUID}")
         await self.close_DB()
-
-        return new_liquid_sample_no.id
+        return new_liquid_sample_no.dict()
 
 
     async def get_liquid_sample_no(self, ID):
@@ -561,8 +560,7 @@ class liquid_sample_no_API:
 
         data = await get_liquid_sample_no_details(ID)
         if data != "":
-            data = data.strip("\n")
-            data = data.split(",")
+            data = data.strip("\n").split(",")
             fileID = int(data[0])
             DUID = data[1]
             AUID = data[2]
@@ -572,4 +570,4 @@ class liquid_sample_no_API:
             print(" ... data json content:", ret_liquid_sample_no.dict())
             return ret_liquid_sample_no.dict()
         else:
-            return dict()
+            return liquid_sample_no().dict() # will be default empty one
