@@ -101,15 +101,20 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/run_method")
     async def run_method(
         request: Request, 
-        liquid_sample_no: Optional[int],
-        method: Optional[PALmethods] = PALmethods.fillfixed,  # lcfc_fill_hardcodedvolume.cam',
-        tool: Optional[PALtools] = PALtools.LS3,
-        source: Optional[str] = "elec_res1",
-        volume_uL: Optional[int] = 500,  # uL
-        totalvials: Optional[int] = 1,
-        sampleperiod: Optional[float] = 0.0,
-        spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
-        spacingfactor: Optional[float] = 1.0,
+        liquid_sample_no_in: Optional[int],
+        PAL_method: Optional[PALmethods] = PALmethods.fillfixed,  # lcfc_fill_hardcodedvolume.cam',
+        PAL_tool: Optional[PALtools] = PALtools.LS3,
+        PAL_source: Optional[str] = "elec_res1",
+        PAL_volume_uL: Optional[int] = 500,  # uL
+        PAL_totalvials: Optional[int] = 1,
+        PAL_sampleperiod: Optional[float] = 0.0,
+        PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
+        PAL_spacingfactor: Optional[float] = 1.0,
+        PAL_timeoffset: Optional[float] = 0.0,
+        PAL_wash1: Optional[bool] = False,
+        PAL_wash2: Optional[bool] = False,
+        PAL_wash3: Optional[bool] = False,
+        PAL_wash4: Optional[bool] = False,
         action_dict: dict = {}
     ):
         A = await setupAct(action_dict, request, locals())
@@ -117,8 +122,9 @@ def makeApp(confPrefix, servKey):
         A.action_params["dest_slot"] = None
         A.action_params["dest_vial"] = None
         A.save_data = True
-        active_dict = await app.driver.initcommand(A)
+        active_dict = await app.driver.init_PAL_IOloop(A)
         return active_dict
+
 
     @app.post(f"/{servKey}/create_new_liquid_sample_no")
     async def create_new_liquid_sample_no(request: Request, 
@@ -148,7 +154,7 @@ def makeApp(confPrefix, servKey):
     async def get_last_liquid_sample_no(request: Request, action_dict: dict = {}):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
-        await active.enqueue_data(await app.driver.get_last_liquid_sample_no())
+        await active.enqueue_data({'liquid_sample_no': await app.driver.get_last_liquid_sample_no()})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -158,15 +164,6 @@ def makeApp(confPrefix, servKey):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data({'liquid_sample_no': await app.driver.get_liquid_sample_no(**A.action_params)})
-        finished_act = await active.finish()
-        return finished_act.as_dict()
-
-
-    @app.post(f"/{servKey}/get_liquid_sample_no_json")
-    async def get_liquid_sample_no_json(request: Request, liquid_sample_no: Optional[int]=None, action_dict: dict = {}):
-        A = await setupAct(action_dict, request, locals())
-        active = await app.base.contain_action(A)
-        await active.enqueue_data({'liquid_sample_no_json': await app.driver.get_liquid_sample_no_json(**A.action_params)})
         finished_act = await active.finish()
         return finished_act.as_dict()
 

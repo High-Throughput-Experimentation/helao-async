@@ -110,12 +110,12 @@ class liquid_sample_no(BaseModel):
     AUID: str = None
     source: List[str] = []
     sourcevol_mL: List[float] = []
-    volume_mL: float = None
+    #volume_mL: float = None
     action_time: str = None
     chemical: List[str] = []
     mass: List[str] = []
     supplier: List[str] = []
     lot_number: List[str] = []
     servkey: str = None
-    plate_id: Optional[int] = None
-    sample_no: Optional[int] = None
+    plate_id: int = None
+    sample_no: int = None
