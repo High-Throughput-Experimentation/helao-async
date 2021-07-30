@@ -24,85 +24,11 @@ def makeApp(confPrefix, servKey):
     )
 
 
-    @app.post(f"/{servKey}/reset_PAL_system_vial_table")
-    async def reset_PAL_system_vial_table(
-        request: Request, 
-        action_dict: dict = {}
-    ):
-        """Resets app.driver vial table. But will make a full dump to CSV first."""
-        A = await setupAct(action_dict, request, locals())
-        finished_act = await app.driver.reset_PAL_system_vial_table(A)
-        return finished_act.as_dict()
-
-
-    @app.post(f"/{servKey}/update_PAL_system_vial_table")
-    async def update_PAL_system_vial_table(
-        request: Request, 
-        vial: Optional[int] = None,
-        vol_mL: Optional[float] = None,
-        liquid_sample_no: Optional[int] = None,
-        tray: Optional[int] = None,
-        slot: Optional[int] = None,
-        action_dict: dict = {}
-    ):
-        """Updates app.driver vial Table. If sucessful (vial-slot was empty) returns True, else it returns False."""
-        A = await setupAct(action_dict, request, locals())
-        active = await app.base.contain_action(A)
-        await active.enqueue_data({"update": await app.driver.update_PAL_system_vial_table(**A.action_params)})
-        finished_act = await active.finish()
-        return finished_act.as_dict()
-
-
-    @app.post(f"/{servKey}/get_vial_holder_table")
-    async def get_vial_holder_table(
-        request: Request, 
-        tray: Optional[int] = None, 
-        slot: Optional[int] = None, 
-        action_dict: dict = {}
-    ):
-        A = await setupAct(action_dict, request, locals())
-        finished_act = await app.driver.get_vial_holder_table(A)
-        return finished_act.as_dict()
-
-
-    @app.post(f"/{servKey}/write_vial_holder_table_CSV")
-    async def write_vial_holder_table_CSV(
-        request: Request, 
-        tray: Optional[int] = None,
-        slot: Optional[int] = None,
-        action_dict: dict = {}
-    ):
-        A = await setupAct(action_dict, request, locals())
-        A.action_params["csv"] = True # signal subroutine to create a csv
-        finished_act = await app.driver.get_vial_holder_table(A)
-        return finished_act.as_dict()
-
-
-    @app.post(f"/{servKey}/get_new_vial_position")
-    async def get_new_vial_position(
-        request: Request, 
-        req_vol: Optional[float] = None,
-        action_dict: dict = {}
-    ):
-        """Returns an empty vial position for given max volume.\n
-        For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.\n
-        It will select the first empty vial which has the smallest volume that still can hold req_vol"""
-        A = await setupAct(action_dict, request, locals())
-        active = await app.base.contain_action(A)
-        await active.enqueue_data({"vial_position": await app.driver.get_new_vial_position(**A.action_params)})
-        finished_act = await active.finish()
-        return finished_act.as_dict()
-
-
-    # relay_actuation_test2.cam
-    # lcfc_archive.cam
-    # lcfc_fill.cam
-    # lcfc_fill_hardcodedvolume.cam
-    @app.post(f"/{servKey}/run_method")
-    async def run_method(
+    @app.post(f"/{servKey}/PAL_run_method")
+    async def PAL_run_method(
         request: Request, 
         liquid_sample_no_in: Optional[int],
-        PAL_method: Optional[PALmethods] = PALmethods.fillfixed,  # lcfc_fill_hardcodedvolume.cam',
+        PAL_method: Optional[PALmethods] = PALmethods.fillfixed,
         PAL_tool: Optional[PALtools] = PALtools.LS3,
         PAL_source: Optional[str] = "elec_res1",
         PAL_volume_uL: Optional[int] = 500,  # uL
@@ -126,8 +52,78 @@ def makeApp(confPrefix, servKey):
         return active_dict
 
 
-    @app.post(f"/{servKey}/create_new_liquid_sample_no")
-    async def create_new_liquid_sample_no(request: Request, 
+    @app.post(f"/{servKey}/trayDB_reset")
+    async def trayDB_reset(
+        request: Request, 
+        action_dict: dict = {}
+    ):
+        """Resets app.driver vial table. But will make a full dump to CSV first."""
+        A = await setupAct(action_dict, request, locals())
+        finished_act = await app.driver.trayDB_reset(A)
+        return finished_act.as_dict()
+
+
+    @app.post(f"/{servKey}/trayDB_new")
+    async def trayDB_new(
+        request: Request, 
+        req_vol: Optional[float] = None,
+        action_dict: dict = {}
+    ):
+        """Returns an empty vial position for given max volume.\n
+        For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.\n
+        It will select the first empty vial which has the smallest volume that still can hold req_vol"""
+        A = await setupAct(action_dict, request, locals())
+        active = await app.base.contain_action(A)
+        await active.enqueue_data({"vial_position": await app.driver.trayDB_new(**A.action_params)})
+        finished_act = await active.finish()
+        return finished_act.as_dict()
+
+
+    @app.post(f"/{servKey}/trayDB_update")
+    async def trayDB_update(
+        request: Request, 
+        vial: Optional[int] = None,
+        vol_mL: Optional[float] = None,
+        liquid_sample_no: Optional[int] = None,
+        tray: Optional[int] = None,
+        slot: Optional[int] = None,
+        action_dict: dict = {}
+    ):
+        """Updates app.driver vial Table. If sucessful (vial-slot was empty) returns True, else it returns False."""
+        A = await setupAct(action_dict, request, locals())
+        active = await app.base.contain_action(A)
+        await active.enqueue_data({"update": await app.driver.trayDB_update(**A.action_params)})
+        finished_act = await active.finish()
+        return finished_act.as_dict()
+
+
+    @app.post(f"/{servKey}/trayDB_get_db")
+    async def trayDB_get_db(
+        request: Request, 
+        tray: Optional[int] = None, 
+        slot: Optional[int] = None, 
+        action_dict: dict = {}
+    ):
+        A = await setupAct(action_dict, request, locals())
+        finished_act = await app.driver.trayDB_get_db(A)
+        return finished_act.as_dict()
+
+
+    @app.post(f"/{servKey}/trayDB_export_csv")
+    async def trayDB_export_csv(
+        request: Request, 
+        tray: Optional[int] = None,
+        slot: Optional[int] = None,
+        action_dict: dict = {}
+    ):
+        A = await setupAct(action_dict, request, locals())
+        A.action_params["csv"] = True # signal subroutine to create a csv
+        finished_act = await app.driver.trayDB_get_db(A)
+        return finished_act.as_dict()
+
+
+    @app.post(f"/{servKey}/liquid_sample_no_create_new")
+    async def liquid_sample_no_create_new(request: Request, 
                             source: Optional[str] = None,
                             # sourcevol_mL: Optional[str] = None,
                             volume_mL: Optional[float] = None,
@@ -147,25 +143,25 @@ def makeApp(confPrefix, servKey):
         active = await app.base.contain_action(A)
         A.action_params["DUID"] = A.decision_uuid
         A.action_params["AUID"] = A.action_uuid
-        await active.enqueue_data({'liquid_sample_no': await app.driver.create_new_liquid_sample_no(**A.action_params)})
+        await active.enqueue_data({'liquid_sample_no': await app.driver.liquid_sample_no_create_new(**A.action_params)})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
 
     @app.post(f"/{servKey}/get_last_liquid_sample_no")
-    async def get_last_liquid_sample_no(request: Request, action_dict: dict = {}):
+    async def liquid_sample_no_get_last(request: Request, action_dict: dict = {}):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
-        await active.enqueue_data({'liquid_sample_no': await app.driver.get_last_liquid_sample_no()})
+        await active.enqueue_data({'liquid_sample_no': await app.driver.liquid_sample_no_get_last()})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
 
-    @app.post(f"/{servKey}/get_liquid_sample_no")
-    async def get_liquid_sample_no(request: Request, liquid_sample_no: Optional[int]=None, action_dict: dict = {}):
+    @app.post(f"/{servKey}/liquid_sample_no_get")
+    async def liquid_sample_no_get(request: Request, liquid_sample_no: Optional[int]=None, action_dict: dict = {}):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
-        await active.enqueue_data({'liquid_sample_no': await app.driver.get_liquid_sample_no(**A.action_params)})
+        await active.enqueue_data({'liquid_sample_no': await app.driver.liquid_sample_no_get(**A.action_params)})
         finished_act = await active.finish()
         return finished_act.as_dict()
 

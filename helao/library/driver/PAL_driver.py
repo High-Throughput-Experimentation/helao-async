@@ -45,19 +45,17 @@ class PALtools(str, Enum):
     LS2 = "LS2"
     LS3 = "LS3"
 
-#class
 
 class VT_template:
-    def __init__(self, max_vol_mL: float = 2.0):
-        self.type = "VT54"
+    def __init__(self, max_vol_mL: float = 0.0, VTtype: str = '', positions: int = 0):
+        self.type = VTtype
         self.max_vol_mL = max_vol_mL
-        self.vials = [False for i in range(54)]
-        self.vol_mL = [0.0 for i in range(54)]
-        self.liquid_sample_no = [None for i in range(54)]
+        self.vials = [False for i in range(positions)]
+        self.vol_mL = [0.0 for i in range(positions)]
+        self.liquid_sample_no = [None for i in range(positions)]
 
     def first_empty(self):
         res = next((i for i, j in enumerate(self.vials) if not j), None)
-        # printing result
         print("The values till first True value : " + str(res))
         return res
 
@@ -86,50 +84,58 @@ class VT_template:
         return vars(self)
 
 
-class VTtest(VT_template):
+class VT15(VT_template):
     def __init__(self):
-        super().__init__(max_vol_mL = 1)
-
-    
+        super().__init__(max_vol_mL = 10.0, VTtype = "VT15", positions = 15)
 
 
-class VT54:
-    def __init__(self, max_vol_mL: float = 2.0):
-        self.type = "VT54"
-        self.max_vol_mL = max_vol_mL
-        self.vials = [False for i in range(54)]
-        self.vol_mL = [0.0 for i in range(54)]
-        self.liquid_sample_no = [None for i in range(54)]
+class VT54(VT_template):
+    def __init__(self):
+        super().__init__(max_vol_mL = 2.0, VTtype = "VT54", positions = 54)
 
-    def first_empty(self):
-        res = next((i for i, j in enumerate(self.vials) if not j), None)
-        # printing result
-        print("The values till first True value : " + str(res))
-        return res
 
-    def update_vials(self, vial_dict):
-        for i, vial in enumerate(vial_dict):
-            try:
-                self.vials[i] = bool(vial)
-            except Exception:
-                self.vials[i] = False
+class VT70(VT_template):
+    def __init__(self):
+        super().__init__(max_vol_mL = 1.0, VTtype = "VT70", positions = 70)
 
-    def update_vol(self, vol_dict):
-        for i, vol in enumerate(vol_dict):
-            try:
-                self.vol_mL[i] = float(vol)
-            except Exception:
-                self.vol_mL[i] = 0.0
 
-    def update_liquid_sample_no(self, sample_dict):
-        for i, sample in enumerate(sample_dict):
-            try:
-                self.liquid_sample_no[i] = int(sample)
-            except Exception:
-                self.liquid_sample_no[i] = None
 
-    def as_dict(self):
-        return vars(self)
+    # def __init__(self, max_vol_mL: float = 2.0):
+    #     self.type = "VT54"
+    #     self.max_vol_mL = max_vol_mL
+    #     self.vials = [False for i in range(54)]
+    #     self.vol_mL = [0.0 for i in range(54)]
+    #     self.liquid_sample_no = [None for i in range(54)]
+
+    # def first_empty(self):
+    #     res = next((i for i, j in enumerate(self.vials) if not j), None)
+    #     # printing result
+    #     print("The values till first True value : " + str(res))
+    #     return res
+
+    # def update_vials(self, vial_dict):
+    #     for i, vial in enumerate(vial_dict):
+    #         try:
+    #             self.vials[i] = bool(vial)
+    #         except Exception:
+    #             self.vials[i] = False
+
+    # def update_vol(self, vol_dict):
+    #     for i, vol in enumerate(vol_dict):
+    #         try:
+    #             self.vol_mL[i] = float(vol)
+    #         except Exception:
+    #             self.vol_mL[i] = 0.0
+
+    # def update_liquid_sample_no(self, sample_dict):
+    #     for i, sample in enumerate(sample_dict):
+    #         try:
+    #             self.liquid_sample_no[i] = int(sample)
+    #         except Exception:
+    #             self.liquid_sample_no[i] = None
+
+    # def as_dict(self):
+    #     return vars(self)
     
 
 class PALtray:
@@ -138,6 +144,9 @@ class PALtray:
 
     def as_dict(self):
         return vars(self)
+
+    
+    
 
 
 class cPALparams(BaseModel):
@@ -180,7 +189,7 @@ class cPAL:
 
         self.PAL_file = "PAL_holder_DB.json"
         # load backup of vial table, if file does not exist it will use the default one from above
-        asyncio.gather(self.load_PAL_system_vial_table_from_backup())
+        asyncio.gather(self.trayDB_load_backup())
 
         self.dataserv = self.config_dict["data_server"]
         self.datahost = self.world_config["servers"][self.config_dict["data_server"]]["host"]
@@ -226,14 +235,10 @@ class cPAL:
                 "continue", None
             )
             self.triggerport_done = self.config_dict["dev_NImax"].get("done", None)
-            print("##########################################################")
-            print(" ...  start trigger port", self.triggerport_start)
-            print(" ...  continue trigger port", self.triggerport_continue)
-            print(" ...  done trigger port", self.triggerport_done)
-            print("##########################################################")
+            print(" ...  PAL start trigger port:", self.triggerport_start)
+            print(" ...  PAL continue trigger port:", self.triggerport_continue)
+            print(" ...  PAL done trigger port:", self.triggerport_done)
             self.triggers = True
-
-        # self.triggers = False
 
 
         self.action = (
@@ -274,14 +279,14 @@ class cPAL:
 
 
 
-    async def reset_PAL_system_vial_table(self, A):
+    async def trayDB_reset(self, A):
         myactive = await self.base.contain_action(A)
         # backup to json
-        await self.backup_PAL_system_vial_table(reset=True)
+        await self.trayDB_backup(reset=True)
         # full backup to csv
         for tray in range(len(self.trays)):
             for slot in range(3):  # each tray has 3 slots
-                await self.write_vial_holder_table_as_CSV(tray + 1, slot + 1, myactive)
+                await self.trayDB_export_csv(tray + 1, slot + 1, myactive)
         # reset PAL table
         # todo change that to a config config
         self.trays = [
@@ -289,12 +294,12 @@ class cPAL:
             PALtray(slot1=VT54(max_vol_mL=2.0), slot2=VT54(max_vol_mL=2.0), slot3=None),
         ]
         # save new one so it can be loaded of Program startup
-        await self.backup_PAL_system_vial_table(reset=False)
+        await self.trayDB_backup(reset=False)
         await myactive.enqueue_data({"reset": "done"})
         return await myactive.finish()
 
 
-    async def load_PAL_system_vial_table_from_backup(self):
+    async def trayDB_load_backup(self):
         file_path = os.path.join(self.local_data_dump, self.PAL_file)
         print(" ... loading PAL table from", file_path)
         if not os.path.exists(file_path):
@@ -362,7 +367,9 @@ class cPAL:
                 self.trays[traynum - 1] = None
         return True
 
-    async def backup_PAL_system_vial_table(self, reset: bool = False):
+
+
+    async def trayDB_backup(self, reset: bool = False):
         datafile = LocalDataHandler()
         datafile.filepath = self.local_data_dump
         if reset:
@@ -398,7 +405,7 @@ class cPAL:
         await datafile.close_file_async()
 
 
-    async def update_PAL_system_vial_table(
+    async def trayDB_update(
         self, 
         tray: int, 
         slot: int, 
@@ -417,13 +424,13 @@ class cPAL:
                     self.trays[tray].slots[slot].vol_mL[vial] = vol_mL
                     self.trays[tray].slots[slot].liquid_sample_no[vial] = liquid_sample_no
                     # backup file
-                    await self.backup_PAL_system_vial_table()
+                    await self.trayDB_backup()
                     return True
                 else:
                     if dilute is True:
                         self.trays[tray].slots[slot].vials[vial] = True
                         self.trays[tray].slots[slot].vol_mL[vial] = self.trays[tray].slots[slot].vol_mL[vial]+vol_mL
-                        await self.backup_PAL_system_vial_table()
+                        await self.trayDB_backup()
                         return True
                     else:
                         return False            
@@ -434,9 +441,9 @@ class cPAL:
         pass
 
 
-    async def write_vial_holder_table_as_CSV(self, tray, slot, myactive):
+    async def trayDB_export_csv(self, tray, slot, myactive):
         # save full table as backup too
-        await self.backup_PAL_system_vial_table()
+        await self.trayDB_backup()
 
         if self.trays[tray - 1] is not None:
             if self.trays[tray - 1].slots[slot - 1] is not None:
@@ -468,7 +475,7 @@ class cPAL:
 
 
 
-    async def get_vial_holder_table(self, A):
+    async def trayDB_get_db(self, A):
         """Returns vial tray sample table"""
         tray =  A.action_params["tray"]
         slot =  A.action_params["slot"]
@@ -480,14 +487,14 @@ class cPAL:
         if self.trays[tray - 1] is not None:
             if self.trays[tray - 1].slots[slot - 1] is not None:
                 if csv:
-                    await self.write_vial_holder_table_as_CSV(tray, slot, myactive)
+                    await self.trayDB_export_csv(tray, slot, myactive)
                 table = self.trays[tray - 1].slots[slot - 1].as_dict()
         await myactive.enqueue_data({"vial_table": table})
 
         return await myactive.finish()
                 
 
-    async def get_first_full_vial_position(self, vialtable = None):
+    async def trayDB_get_first_full(self, vialtable = None):
         new_tray = None
         new_slot = None
         new_vial = None
@@ -508,14 +515,13 @@ class cPAL:
                             new_slot = slot_no + 1
                             new_vial = position + 1
                             break
-                        
         
         return {'tray': new_tray,
                 'slot': new_slot,
                 'vial': new_vial}
 
 
-    async def get_new_vial_position(self, req_vol: float = 2.0):
+    async def trayDB_new(self, req_vol: float = 2.0):
         """Returns an empty vial position for given max volume.\n
         For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.\n
         It will select the first empty vial which has the smallest volume that still can hold req_vol"""
@@ -684,7 +690,7 @@ class cPAL:
 
         # (1) check if we have free vial slots
         if PALparams.PAL_method == PALmethods.archive:
-            newvialpos = await self.get_new_vial_position(
+            newvialpos = await self.trayDB_new(
                             req_vol = PALparams.PAL_volume_uL/1000.0
                             )
             if newvialpos['tray'] is not None:
@@ -738,11 +744,11 @@ class cPAL:
             print(" ... liquid_sample_no_in is", PALparams.liquid_sample_no_in)
             if PALparams.liquid_sample_no_in == -1:
                 print(" ... PAL need to get last sample from list")
-                PALparams.liquid_sample_no_in = await self.get_last_liquid_sample_no()
+                PALparams.liquid_sample_no_in = await self.liquid_sample_no_get_last()
                 print(" ... last sample is ", PALparams.liquid_sample_no_in)
             print(" ... old sampple is", PALparams.liquid_sample_no_in)
 
-            sourceelecrolyte = await self.get_liquid_sample_no(PALparams.liquid_sample_no_in)
+            sourceelecrolyte = await self.liquid_sample_no_get(PALparams.liquid_sample_no_in)
 
             source_chemical = sourceelecrolyte.get("chemical", [""])
             source_mass = sourceelecrolyte.get("mass", [""])
@@ -755,7 +761,7 @@ class cPAL:
             print(" ... source_lotnumber:", source_lotnumber)
 
 
-            PALparams.liquid_sample_no_out = await self.create_new_liquid_sample_no(
+            PALparams.liquid_sample_no_out = await self.liquid_sample_no_create_new(
                 DUID,
                 AUID,
                 source=PALparams.liquid_sample_no_in,
@@ -973,7 +979,7 @@ class cPAL:
             # only needs to be updated if
             if  PALparams.PAL_dest_tray is not None:
                 if PALparams.PAL_method == PALmethods.dilute:
-                    retval = await self.update_PAL_system_vial_table(tray = PALparams.PAL_dest_tray,
+                    retval = await self.trayDB_update(tray = PALparams.PAL_dest_tray,
                                                             slot = PALparams.PAL_dest_slot,
                                                             vial = PALparams.PAL_dest_vial,
                                                             vol_mL = PALparams.PAL_volume_uL/1000.0,
@@ -982,7 +988,7 @@ class cPAL:
                 elif PALparams.PAL_method == PALmethods.deepclean:
                     retval = True
                 else:
-                    retval = await self.update_PAL_system_vial_table(tray = PALparams.PAL_dest_tray,
+                    retval = await self.trayDB_update(tray = PALparams.PAL_dest_tray,
                                                             slot = PALparams.PAL_dest_slot,
                                                             vial = PALparams.PAL_dest_vial,
                                                             vol_mL = PALparams.PAL_volume_uL/1000.0,
@@ -1079,7 +1085,7 @@ class cPAL:
                     print(' ... liquid_sample_no_in:', self.IO_PALparams.liquid_sample_no_in)
                     if self.IO_PALparams.liquid_sample_no_in < 0:
                         print(f' ... PAL need to get n-{self.IO_PALparams.liquid_sample_no_in+1} last sample from list')
-                        sampledict = await self.get_last_liquid_sample_no(self.IO_PALparams.liquid_sample_no_in)
+                        sampledict = await self.liquid_sample_no_get_last(self.IO_PALparams.liquid_sample_no_in)
                         self.IO_PALparams.liquid_sample_no_in = sampledict.id
                         print(' ... correct liquid_sample_no_in is now:', self.IO_PALparams.liquid_sample_no_in)
                     if self.IO_PALparams.liquid_sample_no_in is None:
@@ -1105,7 +1111,7 @@ class cPAL:
 
 
                         if self.IO_PALparams.PAL_method == PALmethods.dilute:
-                            newvialpos = await self.get_first_full_vial_position(vialtable = backuptrays)
+                            newvialpos = await self.trayDB_get_first_full(vialtable = backuptrays)
                             if newvialpos['tray'] is not None:
                                 # mark this spot as False now so 
                                 # it won't be found again next time
@@ -1189,17 +1195,17 @@ class cPAL:
         pass
 
 
-    async def get_last_liquid_sample_no(self, last_no: int = -1):
+    async def liquid_sample_no_get_last(self, last_no: int = -1):
         lastno = await self.liquid_sample_no_DB.count_liquid_sample_no()
-        datadict = await self.liquid_sample_no_DB.get_liquid_sample_no(lastno+last_no+1)
+        datadict = await self.liquid_sample_no_DB.liquid_sample_no_get(lastno+last_no+1)
         return datadict
 
 
-    async def get_liquid_sample_no(self, liquid_sample_no: int):
-        datadict = await self.liquid_sample_no_DB.get_liquid_sample_no(liquid_sample_no)
+    async def liquid_sample_no_get(self, liquid_sample_no: int):
+        datadict = await self.liquid_sample_no_DB.liquid_sample_no_get(liquid_sample_no)
         return datadict
 
-    async def create_new_liquid_sample_no(
+    async def liquid_sample_no_create_new(
         self,
         DUID: str = "",
         AUID: str = "",
