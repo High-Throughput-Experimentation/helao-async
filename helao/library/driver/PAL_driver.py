@@ -53,11 +53,20 @@ class VT_template:
         self.vials: List[bool] = [False for i in range(positions)]
         self.vol_mL: List[float] = [0.0 for i in range(positions)]
         self.liquid_sample_no: List[int] = [None for i in range(positions)]
+        self.dilution_factor: List[float] = [1.0 for i in range(positions)]
+
 
     def first_empty(self):
         res = next((i for i, j in enumerate(self.vials) if not j), None)
-        print("The values till first True value : " + str(res))
+        print ("The values till first True value : " + str(res))
         return res
+    
+
+    def first_full(self):
+        res = next((i for i, j in enumerate(self.vials) if j), None)
+        print ("The values till first False value : " + str(res))
+        return res
+
 
     def update_vials(self, vial_dict):
         for i, vial in enumerate(vial_dict):
@@ -79,6 +88,15 @@ class VT_template:
                 self.liquid_sample_no[i] = int(sample)
             except Exception:
                 self.liquid_sample_no[i] = None
+
+
+    def update_dilution_factor(self, sample_dict):
+        for i, df in enumerate(sample_dict):
+            try:
+                self.dilution_factor[i] = float(df)
+            except Exception:
+                self.dilution_factor[i] = 1.0
+
 
     def as_dict(self):
         return vars(self)
@@ -322,6 +340,9 @@ class cPAL:
                             slots[slotnum - 1].update_liquid_sample_no(
                                 slotitem["liquid_sample_no"]
                             )
+                            slots[slotnum - 1].update_dilution_factor(
+                                slotitem["dilution_factor"]
+                            )
                         else:
                             print(f' ... slot type {slotitem["type"]} not supported')
                             slots[slotnum - 1] = None
@@ -398,7 +419,13 @@ class cPAL:
                 else:
                     if dilute is True:
                         self.trays[tray].slots[slot].vials[vial] = True
-                        self.trays[tray].slots[slot].vol_mL[vial] = self.trays[tray].slots[slot].vol_mL[vial]+vol_mL
+                        old_vol = self.trays[tray].slots[slot].vol_mL[vial]
+                        old_df = self.trays[tray].slots[slot].dilution_factor[vial]
+                        tot_vol = old_vol + vol_mL
+                        new_df = tot_vol/(old_vol/old_df)
+                        self.trays[tray].slots[slot].vol_mL[vial] = tot_vol
+                        self.trays[tray].slots[slot].dilution_factor[vial] = new_df
+                        
                         await self.trayDB_backup()
                         return True
                     else:
@@ -443,12 +470,61 @@ class cPAL:
                     )
 
 
+    async def trayDB_export_icpms(self, 
+                                  tray: int, 
+                                  slot: int, 
+                                  myactive, 
+                                  survey_runs: int,
+                                  main_runs: int,
+                                  rack: int,
+                                  dilution_factor: float = None,
+):
+        # save full table as backup too
+        await self.trayDB_backup()
+
+        if self.trays[tray - 1] is not None:
+            if self.trays[tray - 1].slots[slot - 1] is not None:
+                tmp_output_str = ""#",".join(["vial_no", "liquid_sample_no", "vol_mL"])
+                
+                for i, vial in enumerate(self.trays[tray - 1].slots[slot - 1].vials):
+                    if tmp_output_str != "":
+                        tmp_output_str += "\n"
+
+
+                    if vial is True:
+                        if dilution_factor is None:
+                            temp_dilution_factor = self.trays[tray - 1].slots[slot - 1].dilution_factor[i]
+                        tmp_output_str += ";".join(
+                            [
+                                str(
+                                    self.trays[tray - 1]
+                                    .slots[slot - 1]
+                                    .liquid_sample_no[i]
+                                ),
+                                str(survey_runs),
+                                str(main_runs),
+                                str(rack),
+                                str(i + 1),
+                                str(temp_dilution_factor),
+                            ]
+                        )
+                # # await datafile.write_data_async('\t'.join(logdata))
+                # # await datafile.close_file_async()
+                await myactive.write_file(
+                    file_type = 'pal_vialtable_file',
+                    filename = f'VialTable__tray{tray}__slot{slot}__{datetime.now().strftime("%Y%m%d-%H%M%S%f")}_ICPMS.csv',
+                    output_str = tmp_output_str,
+                    header = ";".join(["liquid_sample_no", "Survey Runs", "Main Runs", "Rack", "Vial", "Dilution Factor"]),
+                    sample_str = None
+                    )
+
 
     async def trayDB_get_db(self, A):
         """Returns vial tray sample table"""
         tray =  A.action_params["tray"]
         slot =  A.action_params["slot"]
         csv = A.action_params.get("csv", False)
+        icpms = A.action_params.get("icpms", False)
 
         myactive = await self.base.contain_action(A)
         table = {}
@@ -457,6 +533,16 @@ class cPAL:
             if self.trays[tray - 1].slots[slot - 1] is not None:
                 if csv:
                     await self.trayDB_export_csv(tray, slot, myactive)
+                if icpms:
+                    await self.trayDB_export_icpms(
+                                                 tray = tray,
+                                                 slot = slot,
+                                                 myactive = myactive,
+                                                 survey_runs = A.action_params.get("survey_runs", 1),
+                                                 main_runs = A.action_params.get("main_runs", 3),
+                                                 rack = A.action_params.get("rack", 2),
+                                                 dilution_factor = A.action_params.get("dilution_factor", None),
+                                                )
                 table = self.trays[tray - 1].slots[slot - 1].as_dict()
         await myactive.enqueue_data({"vial_table": table})
 
@@ -472,12 +558,12 @@ class cPAL:
             vialtable = self.trays
 
         for tray_no, tray in enumerate(vialtable):
-            print(' ... tray', tray_no,tray)
+            # print(' ... tray', tray_no,tray)
             if tray is not None:
                 for slot_no, slot in enumerate(tray.slots):
                     if slot is not None:
-                        print(' .... slot ', slot_no,slot)
-                        print(' .... ',slot.type)
+                        # print(' .... slot ', slot_no,slot)
+                        # print(' .... ',slot.type)
                         position = slot.first_full()
                         if position is not None:
                             new_tray = tray_no + 1
@@ -522,6 +608,22 @@ class cPAL:
         return {"tray": new_tray, "slot": new_slot, "vial": new_vial}
 
 
+    async def trayDB_get_vial_liquid_sample_no(self, tray: int, slot: int, vial: int):
+        tray -= 1
+        slot -= 1
+        vial -= 1
+        liquid_sample_no = None
+        vol_mL = None
+        if self.trays[tray] is not None:
+            if self.trays[tray].slots[slot] is not None:
+                if self.trays[tray].slots[slot].vials[vial] is not False:
+                    vol_mL = self.trays[tray].slots[slot].vials[vial]
+                    liquid_sample_no = self.trays[tray].slots[slot].liquid_sample_no[vial]
+
+        return {'liquid_sample_no':liquid_sample_no,
+                'vol_mL':vol_mL}
+
+
     async def poll_start(self):
         starttime = time.time()
         self.trigger_start = False
@@ -542,6 +644,7 @@ class cPAL:
                 await asyncio.sleep(1)
         return True
 
+
     async def poll_continue(self):
         starttime = time.time()
         self.trigger_continue = False
@@ -561,6 +664,7 @@ class cPAL:
                     return False
                 await asyncio.sleep(1)
         return True
+
 
     async def poll_done(self):
         starttime = time.time()
@@ -782,7 +886,7 @@ class cPAL:
                 error = error_codes.not_available
         elif PALparams.PAL_method == PALmethods.dilute:
             PALparams.PAL_dest = "tray"
-            oldvial = await self.get_vial_liquid_sample_no(
+            oldvial = await self.trayDB_get_vial_liquid_sample_no(
                             PALparams.PAL_dest_tray,
                             PALparams.PAL_dest_slot,
                             PALparams.PAL_dest_vial
@@ -1128,8 +1232,8 @@ class cPAL:
                     
                     for vial in range(self.IO_PALparams.PAL_totalvials):
                         print(f' ... vial {vial+1} of {self.IO_PALparams.PAL_totalvials}')
-                        run_PALprams = self.IO_PALparams
-                        run_PALprams.PAL_cur_sample = vial
+                        run_PALparams = self.IO_PALparams
+                        run_PALparams.PAL_cur_sample = vial
 
 
                         if self.IO_PALparams.PAL_method == PALmethods.dilute:
@@ -1138,10 +1242,10 @@ class cPAL:
                                 # mark this spot as False now so 
                                 # it won't be found again next time
                                 backuptrays[newvialpos['tray']-1].slots[newvialpos['slot']-1].vials[newvialpos['vial']-1] = False
-                                run_PALprams.dest_tray = newvialpos['tray']
-                                run_PALprams.dest_slot = newvialpos['slot']
-                                run_PALprams.dest_vial = newvialpos['vial']
-                                print(f' ... diluting liquid sample in tray {run_PALprams.dest_tray}, slot {run_PALprams.dest_slot}, vial {run_PALprams.dest_vial}')
+                                run_PALparams.PAL_dest_tray = newvialpos['tray']
+                                run_PALparams.PAL_dest_slot = newvialpos['slot']
+                                run_PALparams.PAL_dest_vial = newvialpos['vial']
+                                print(f' ... diluting liquid sample in tray {run_PALparams.PAL_dest_tray}, slot {run_PALparams.PAL_dest_slot}, vial {run_PALparams.PAL_dest_vial}')
                             else:
                                 print(' ... no full vial slots')
                                 break
@@ -1178,7 +1282,7 @@ class cPAL:
 
                         last_time = time.time()
                         print(' ... PAL sendcommmand def start')
-                        retvals = await self.sendcommand_main(run_PALprams)
+                        retvals = await self.sendcommand_main(run_PALparams)
                         print(' ... PAL sendcommmand def end')
 
 
