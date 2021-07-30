@@ -8,7 +8,7 @@ from helao.library.driver.PAL_driver import PALtools
 
 
 from fastapi import Request
-from typing import Optional
+from typing import Optional, List, Union
 
 def makeApp(confPrefix, servKey):
 
@@ -107,7 +107,7 @@ def makeApp(confPrefix, servKey):
         PAL_source: Optional[str] = "elec_res1",
         PAL_volume_uL: Optional[int] = 500,  # uL
         PAL_totalvials: Optional[int] = 1,
-        PAL_sampleperiod: Optional[float] = 0.0,
+        PAL_sampleperiod: Optional[List[float]] = [0.0],
         PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
         PAL_spacingfactor: Optional[float] = 1.0,
         PAL_timeoffset: Optional[float] = 0.0,
@@ -129,13 +129,15 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/create_new_liquid_sample_no")
     async def create_new_liquid_sample_no(request: Request, 
                             source: Optional[str] = None,
-                            sourcevol_mL: Optional[str] = None,
-                            volume_mL: Optional[float] = 0.0,
-                            action_time: Optional[str] = None,
-                            chemical: Optional[str] = None,
-                            mass: Optional[str] = None,
-                            supplier: Optional[str] = None,
-                            lot_number: Optional[str] = None,
+                            # sourcevol_mL: Optional[str] = None,
+                            volume_mL: Optional[float] = None,
+                            action_time: Optional[str] = [],
+                            chemical: Optional[List[str]] = [],  
+                            mass: Optional[List[str]] = [],
+                            supplier: Optional[List[str]] = [],
+                            lot_number: Optional[List[str]] = [],
+                            plate_id: int = None,
+                            sample_no: int = None,
                             action_dict: dict = {}
                             ):
         '''use CAS for chemical if available. Written on bottles of chemicals with all other necessary information.\n
