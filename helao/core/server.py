@@ -740,8 +740,8 @@ class Base(object):
 
                 if self.action.save_data:
                     sample_no = str(self.action.save_data).replace("True", "noSampleID")
-                    if self.action.plate_id is None:
-                        self.action.plate_id = "noPlateID"
+                    # if self.action.plate_id is None:
+                    #     self.action.plate_id = "noPlateID"
                     if self.action.header:
                         if isinstance(self.action.header, list):
                             header_lines = len(self.action.header)
