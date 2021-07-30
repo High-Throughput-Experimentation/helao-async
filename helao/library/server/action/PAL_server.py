@@ -109,6 +109,23 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
 
+    @app.post(f"/{servKey}/trayDB_export_icpms")
+    async def trayDB_export_icpms(
+        request: Request, 
+        tray: Optional[int] = None,
+        slot: Optional[int] = None,
+        survey_runs: Optional[int] = None,
+        main_runs: Optional[int] = None,
+        rack: Optional[int] = None,
+        dilution_factor: Optional[float] = None,
+        action_dict: dict = {}
+    ):
+        A = await setupAct(action_dict, request, locals())
+        A.action_params["icpms"] = True
+        finished_act = await app.driver.trayDB_get_db(A)
+        return finished_act.as_dict()
+
+
     @app.post(f"/{servKey}/trayDB_export_csv")
     async def trayDB_export_csv(
         request: Request, 
@@ -148,7 +165,7 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
 
-    @app.post(f"/{servKey}/get_last_liquid_sample_no")
+    @app.post(f"/{servKey}/liquid_sample_no_get_last")
     async def liquid_sample_no_get_last(request: Request, action_dict: dict = {}):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
