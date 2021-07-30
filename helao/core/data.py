@@ -514,8 +514,10 @@ class liquid_sample_no_API:
             if not line.endswith("\n"):
                 line += "\n"
             await self.fDB.write(line)
-
+                
+        print(' ... new entry dict:',entrydict)
         new_liquid_sample_no = liquid_sample_no(**entrydict)
+        print(' ... new_liquid_sample_no DICT:',new_liquid_sample_no.dict())
         new_liquid_sample_no.id = await self.count_liquid_sample_no() + 1
         print(" ... new liquid sample no:", new_liquid_sample_no.id)
         # dump dict to separate json file
@@ -541,7 +543,8 @@ class liquid_sample_no_API:
                 if counter == linenr:
                     retval = line
             await self.fjsonread.close()
-            return json.loads(retval)
+            retval = json.loads(retval)
+            return retval
 
         async def get_liquid_sample_no_details(ID):
             # need to add headerline count
@@ -566,7 +569,7 @@ class liquid_sample_no_API:
             AUID = data[2]
             filename = f"{fileID:08d}__{DUID}__{AUID}.json"
             print(" ... data json file:", filename)
-            ret_liquid_sample_no = liquid_sample_no(**json.loads(await load_json_file(filename, 1)))
+            ret_liquid_sample_no = liquid_sample_no(**(await load_json_file(filename, 1)))
             print(" ... data json content:", ret_liquid_sample_no.dict())
             return ret_liquid_sample_no.dict()
         else:

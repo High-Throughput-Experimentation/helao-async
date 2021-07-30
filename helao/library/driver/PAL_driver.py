@@ -1,6 +1,5 @@
 from enum import Enum
 import asyncio
-import aiohttp
 import os
 import paramiko
 import time
@@ -8,7 +7,6 @@ from datetime import datetime
 from time import strftime
 import json
 import aiofiles
-from fastapi import Request
 import copy
 
 from pydantic import BaseModel
@@ -24,29 +22,23 @@ from helao.core.data import liquid_sample_no_API
 
 import nidaqmx
 from nidaqmx.constants import LineGrouping
-#from nidaqmx.constants import Edge
-#from nidaqmx.constants import AcquisitionType
-#from nidaqmx.constants import TerminalConfiguration
-#from nidaqmx.constants import VoltageUnits
-#from nidaqmx.constants import CurrentShuntResistorLocation
-#from nidaqmx.constants import UnitsPreScaled
-#from nidaqmx.constants import CountDirection
-#from nidaqmx.constants import TaskMode
-#from nidaqmx.constants import SyncType
-#from nidaqmx.constants import TriggerType
 
 
 class PALmethods(str, Enum):
-    archive = "lcfc_archive.cam"
-    fillfixed = "lcfc_fill_hardcodedvolume.cam"
-    fill = "lcfc_fill.cam"
-    test = "relay_actuation_test2.cam"
+    archive = 'lcfc_archive.cam'
+    fillfixed = 'lcfc_fill_hardcodedvolume.cam'
+    fill = 'lcfc_fill.cam'
+    test = 'relay_actuation_test2.cam'
+    dilute = 'lcfc_dilute.cam'
+    deepclean = 'lcfc_deep_clean.cam'
+
 
 class Spacingmethod(str, Enum):
-    linear = "linear"  # 1, 2, 3, 4, 5, ...
-    geometric = "gemoetric"  # 1, 2, 4, 8, 16
-    power = "power"
-    exponential = "exponential"
+    linear = 'linear' # 1, 2, 3, 4, 5, ...
+    geometric = 'gemoetric' # 1, 2, 4, 8, 16
+    custom = 'custom'
+#    power = 'power'
+#    exponential = 'exponential'
 
 class PALtools(str, Enum):
     LS1 = "LS1"
@@ -55,7 +47,7 @@ class PALtools(str, Enum):
 
 #class
 
-class VT54:
+class VT_template:
     def __init__(self, max_vol_mL: float = 2.0):
         self.type = "VT54"
         self.max_vol_mL = max_vol_mL
@@ -94,6 +86,52 @@ class VT54:
         return vars(self)
 
 
+class VTtest(VT_template):
+    def __init__(self):
+        super().__init__(max_vol_mL = 1)
+
+    
+
+
+class VT54:
+    def __init__(self, max_vol_mL: float = 2.0):
+        self.type = "VT54"
+        self.max_vol_mL = max_vol_mL
+        self.vials = [False for i in range(54)]
+        self.vol_mL = [0.0 for i in range(54)]
+        self.liquid_sample_no = [None for i in range(54)]
+
+    def first_empty(self):
+        res = next((i for i, j in enumerate(self.vials) if not j), None)
+        # printing result
+        print("The values till first True value : " + str(res))
+        return res
+
+    def update_vials(self, vial_dict):
+        for i, vial in enumerate(vial_dict):
+            try:
+                self.vials[i] = bool(vial)
+            except Exception:
+                self.vials[i] = False
+
+    def update_vol(self, vol_dict):
+        for i, vol in enumerate(vol_dict):
+            try:
+                self.vol_mL[i] = float(vol)
+            except Exception:
+                self.vol_mL[i] = 0.0
+
+    def update_liquid_sample_no(self, sample_dict):
+        for i, sample in enumerate(sample_dict):
+            try:
+                self.liquid_sample_no[i] = int(sample)
+            except Exception:
+                self.liquid_sample_no[i] = None
+
+    def as_dict(self):
+        return vars(self)
+    
+
 class PALtray:
     def __init__(self, slot1=None, slot2=None, slot3=None):
         self.slots = [slot1, slot2, slot3]
@@ -122,6 +160,7 @@ class cPALparams(BaseModel):
     PAL_spacingfactor: float = 1.0
     # PAL_mixing: str = ""
     PAL_timeoffset: float = 0.0 # sec
+    PAL_cur_sample: int = 0
 
 
 class cPAL:
@@ -517,7 +556,7 @@ class cPAL:
             )
             while self.trigger_start == False:
                 data = task.read(number_of_samples_per_channel=1)
-                print("...................... start port status:", data)
+                # print("...................... start port status:", data)
                 if any(data) == True:
                     print(" ... got PAL start trigger poll")
                     self.trigger_start_epoch = time.time_ns()
@@ -537,7 +576,7 @@ class cPAL:
             )
             while self.trigger_continue == False:
                 data = task.read(number_of_samples_per_channel=1)
-                print("...................... continue port status:", data)
+                # print("...................... continue port status:", data)
                 if any(data) == True:
                     print(" ... got PAL continue trigger poll")
                     self.trigger_continue_epoch = time.time_ns()
@@ -557,7 +596,7 @@ class cPAL:
             )
             while self.trigger_done == False:
                 data = task.read(number_of_samples_per_channel=1)
-                print("...................... done port status:", data)
+                # print("...................... done port status:", data)
                 if any(data) == True:
                     print(" ... got PAL done trigger poll")
                     self.trigger_done_epoch = time.time_ns()
@@ -572,6 +611,28 @@ class cPAL:
     async def init_PAL_IOloop(self, A: Action):
         activeDict = dict()
         if not self.IO_do_meas:
+        
+            
+        
+            # sample_period = A.action_params.get[]
+            #         TTLsend = A.action_params["TTLsend"]
+
+            # if type(new_sampleperiod) is not list:
+            #     sepvals = [',','\t',';','::',':']
+            #     new_sampleperiod = None
+            #     for sep in sepvals:
+            #         if not (sampleperiod.find(sep) == -1):
+            #                 print('...sep', sep)
+            #                 new_sampleperiod = [float(item) for item in sampleperiod.split(sep)]
+            #                 break
+            #     if new_sampleperiod == None:
+            #         new_sampleperiod = float(sampleperiod)
+            #     if type(new_sampleperiod) is not list:
+            #         new_sampleperiod = [new_sampleperiod]            
+                
+            
+            
+            
             self.IO_PALparams = cPALparams(**A.action_params)
             self.action = A
             self.IO_remotedatafile = ""
@@ -622,7 +683,7 @@ class cPAL:
 
 
         # (1) check if we have free vial slots
-        if PALparams.method == PALmethods.archive:
+        if PALparams.PAL_method == PALmethods.archive:
             newvialpos = await self.get_new_vial_position(
                             req_vol = PALparams.PAL_volume_uL/1000.0
                             )
@@ -633,7 +694,7 @@ class cPAL:
                 print(f' ... archiving liquid sample to tray {PALparams.PAL_dest_tray}, slot {PALparams.PAL_dest_slot}, vial {PALparams.PAL_dest_vial}')
             else:
                 error = error_codes.not_available
-        elif PALparams.method == PALmethods.dilute:
+        elif PALparams.PAL_method == PALmethods.dilute:
             oldvial = await self.get_vial_liquid_sample_no(
                             PALparams.PAL_dest_tray,
                             PALparams.PAL_dest_slot,
@@ -643,14 +704,14 @@ class cPAL:
                 pass
             else:
                 error = error_codes.not_available
-        elif PALparams.method == PALmethods.deepclean:
+        elif PALparams.PAL_method == PALmethods.deepclean:
             PALparams.liquid_sample_no_in = 0
-        elif PALparams.method == PALmethods.fillfixed:
+        elif PALparams.PAL_method == PALmethods.fillfixed:
             plate_id =  self.action.plate_id
-            sample_no =  self.action.samples_in
-        elif PALparams.method == PALmethods.fill:
+            sample_no =  None #TODO #self.action.samples_in
+        elif PALparams.PAL_method == PALmethods.fill:
             plate_id =  self.action.plate_id
-            sample_no =  self.action.samples_in
+            sample_no =  None #TODO self.action.samples_in
         else:
             PALparams.PAL_dest_tray = None
             PALparams.PAL_dest_slot = None
@@ -681,7 +742,7 @@ class cPAL:
                 print(" ... last sample is ", PALparams.liquid_sample_no_in)
             print(" ... old sampple is", PALparams.liquid_sample_no_in)
 
-            sourceelecrolyte = await self.get_liquid_sample_no_json(PALparams.liquid_sample_no_in)
+            sourceelecrolyte = await self.get_liquid_sample_no(PALparams.liquid_sample_no_in)
 
             source_chemical = sourceelecrolyte.get("chemical", [""])
             source_mass = sourceelecrolyte.get("mass", [""])
@@ -693,11 +754,12 @@ class cPAL:
             print(" ... source_supplier:", source_supplier)
             print(" ... source_lotnumber:", source_lotnumber)
 
+
             PALparams.liquid_sample_no_out = await self.create_new_liquid_sample_no(
                 DUID,
                 AUID,
                 source=PALparams.liquid_sample_no_in,
-                sourcevol_mL=PALparams.PAL_volume_uL / 1000.0,
+                # sourcevol_mL=PALparams.PAL_volume_uL / 1000.0,
                 volume_mL=PALparams.PAL_volume_uL / 1000.0,
                 action_time=actiontime,
                 chemical=source_chemical,
@@ -824,13 +886,15 @@ class cPAL:
         return {
                 "error": error,
                 "start": start_time,
-                "conintue": continue_time,
+                "continue": continue_time,
                 "done": done_time
                 }
 
 
     async def sendcommand_ssh_helper(self, PALparams: cPALparams):
         ssh_connected = False
+        ssh_time = None
+        error = error_codes.none
         while not ssh_connected:
             try:
                 # open SSH to PAL
@@ -907,7 +971,7 @@ class cPAL:
         
             # update now the vial warehouse before PAL command gets executed
             # only needs to be updated if
-            if  PALparams.dest_tray is not None:
+            if  PALparams.PAL_dest_tray is not None:
                 if PALparams.PAL_method == PALmethods.dilute:
                     retval = await self.update_PAL_system_vial_table(tray = PALparams.PAL_dest_tray,
                                                             slot = PALparams.PAL_dest_slot,
@@ -943,12 +1007,15 @@ class cPAL:
                     mysshclient_stderr,
                 ) = mysshclient.exec_command(cmd_to_execute)
                 mysshclient.close()
-
+ 
         except Exception:
             print('##############################################################')
             print(' ... SSH connection error 2. Could not send commands.')
             print('##############################################################')
             error = error_codes.ssh_error
+
+
+
     
         return {
             "error": error,
@@ -1028,16 +1095,16 @@ class cPAL:
                     backuptrays = copy.deepcopy(self.trays)
                     
                     # for multipe vials we don't wait for first trigger
-                    if self.IO_PALparams.totalvials > 1:
+                    if self.IO_PALparams.PAL_totalvials > 1:
                         self.IO_continue = True
                     
-                    for vial in range(self.IO_PALparams.totalvials):
-                        print(f' ... vial {vial+1} of {self.IO_PALparams.totalvials}')
+                    for vial in range(self.IO_PALparams.PAL_totalvials):
+                        print(f' ... vial {vial+1} of {self.IO_PALparams.PAL_totalvials}')
                         run_PALprams = self.IO_PALparams
-                        run_PALprams.cur_sample = vial
+                        run_PALprams.PAL_cur_sample = vial
 
 
-                        if self.IO_PALparams.method == PALmethods.dilute:
+                        if self.IO_PALparams.PAL_method == PALmethods.dilute:
                             newvialpos = await self.get_first_full_vial_position(vialtable = backuptrays)
                             if newvialpos['tray'] is not None:
                                 # mark this spot as False now so 
@@ -1057,21 +1124,21 @@ class cPAL:
                         # get the scheduled time for next PAL command
                         # self.IO_PALparams.timeoffset corrects for offset 
                         # between send ssh and continue (or any other offset)
-                        if self.IO_PALparams.spacingmethod == Spacingmethod.linear:
+                        if self.IO_PALparams.PAL_spacingmethod == Spacingmethod.linear:
                             print(' ... PAL linear scheduling')
                             cur_time = time.time()
-                            diff_time = self.IO_PALparams.sampleperiod[0]-(cur_time-last_time)-self.IO_PALparams.timeoffset
-                        elif self.IO_PALparams.spacingmethod == Spacingmethod.geometric:
+                            diff_time = self.IO_PALparams.PAL_sampleperiod[0]-(cur_time-last_time)-self.IO_PALparams.PAL_timeoffset
+                        elif self.IO_PALparams.PAL_spacingmethod == Spacingmethod.geometric:
                             print(' ... PAL geometric scheduling')
-                            timepoint = (self.IO_PALparams.sampleperiod.spacingfactor ** vial) * self.IO_PALparams.sampleperiod[0]
-                            diff_time = timepoint-prev_timepoint-(cur_time-last_time)-self.IO_PALparams.timeoffset
+                            timepoint = (self.IO_PALparams.PAL_spacingfactor ** vial) * self.IO_PALparams.PAL_sampleperiod[0]
+                            diff_time = timepoint-prev_timepoint-(cur_time-last_time)-self.IO_PALparams.PAL_timeoffset
                             prev_timepoint = timepoint # todo: consider time lag
-                        elif self.IO_PALparams.spacingmethod == Spacingmethod.custom:
+                        elif self.IO_PALparams.PAL_spacingmethod == Spacingmethod.custom:
                             print(' ... PAL custom scheduling')
                             cur_time = time.time()
                             print((cur_time-last_time))
-                            print(self.IO_PALparams.sampleperiod[vial])
-                            diff_time = self.IO_PALparams.sampleperiod[vial]-(cur_time-start_time)-self.IO_PALparams.timeoffset
+                            print(self.IO_PALparams.PAL_sampleperiod[vial])
+                            diff_time = self.IO_PALparams.PAL_sampleperiod[vial]-(cur_time-start_time)-self.IO_PALparams.PAL_timeoffset
 
 
                         print(f' ... PAL waits {diff_time} for sending next command')
@@ -1132,71 +1199,34 @@ class cPAL:
         datadict = await self.liquid_sample_no_DB.get_liquid_sample_no(liquid_sample_no)
         return datadict
 
-
     async def create_new_liquid_sample_no(
         self,
         DUID: str = "",
         AUID: str = "",
-        source: str = "",
-        sourcevol_mL: str = "",
-        volume_mL: str = "",
+        source: str = None,
+        volume_mL: float = None,
         action_time: str = strftime("%Y%m%d.%H%M%S"),
-        chemical: str = "",
-        mass: str = "",
-        supplier: str = "",
-        lot_number: str = "",
+        chemical: List[str] = [],
+        mass: List[str] = [],
+        supplier: List[str] = [],
+        lot_number: List[str] = [],
+        servkey: str = None,
         plate_id: int = None,
         sample_no: int = None
     ):
-        def tofloat(datastr):
-            try:
-                return float(datastr)
-            except Exception:
-                return None
-
-
-        def str_to_strarray(datastr):
-            sepvals = [";", "\t", "::", ":"]
-            dataarray = None
-    
-            for sep in sepvals:
-                if not (datastr.find(sep) == -1):
-                    dataarray = datastr.split(sep)
-                    break
-    
-            if dataarray == None:
-                dataarray = datastr
-    
-            if type(dataarray) is not list:
-                dataarray = [dataarray]
-            return dataarray
-
-
-        str_to_strarray('test')
-
-        action_time = action_time.replace(",", ";")
-        chemical = chemical.replace(",", ";")
-        mass = mass.replace(",", ";")
-        supplier = supplier.replace(",", ";")
-        lot_number = lot_number.replace(",", ";")
-        sourcevol_mL = sourcevol_mL.replace(",", ";")
-        source = source.replace(",", ";")
-
         entry = dict(
             DUID=DUID,
             AUID=AUID,
-            source=str_to_strarray(source),
-            sourcevol_mL=[
-                tofloat(vol) for vol in str_to_strarray(sourcevol_mL)
-            ],
+            source=source,
             volume_mL=volume_mL,
             action_time=action_time,
-            chemical=str_to_strarray(chemical),
-            mass=str_to_strarray(mass),
-            supplier=str_to_strarray(supplier),
-            lot_number=str_to_strarray(lot_number),
+            chemical=chemical,
+            mass=mass,
+            supplier=supplier,
+            lot_number=lot_number,
             servkey=self.base.server_name,
+            plate_id = plate_id,
+            sample_no = sample_no
         )
-
         datadict = await self.liquid_sample_no_DB.new_liquid_sample_no(entry)
         return datadict
