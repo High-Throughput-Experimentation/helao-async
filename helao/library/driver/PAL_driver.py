@@ -48,11 +48,11 @@ class PALtools(str, Enum):
 
 class VT_template:
     def __init__(self, max_vol_mL: float = 0.0, VTtype: str = '', positions: int = 0):
-        self.type = VTtype
-        self.max_vol_mL = max_vol_mL
-        self.vials = [False for i in range(positions)]
-        self.vol_mL = [0.0 for i in range(positions)]
-        self.liquid_sample_no = [None for i in range(positions)]
+        self.type: str = VTtype
+        self.max_vol_mL: float = max_vol_mL
+        self.vials: List[bool] = [False for i in range(positions)]
+        self.vol_mL: List[float] = [0.0 for i in range(positions)]
+        self.liquid_sample_no: List[int] = [None for i in range(positions)]
 
     def first_empty(self):
         res = next((i for i, j in enumerate(self.vials) if not j), None)
@@ -85,58 +85,19 @@ class VT_template:
 
 
 class VT15(VT_template):
-    def __init__(self):
-        super().__init__(max_vol_mL = 10.0, VTtype = "VT15", positions = 15)
+    def __init__(self, max_vol_mL: float = 10.0):
+        super().__init__(max_vol_mL = max_vol_mL, VTtype = "VT15", positions = 15)
 
 
 class VT54(VT_template):
-    def __init__(self):
-        super().__init__(max_vol_mL = 2.0, VTtype = "VT54", positions = 54)
+    def __init__(self, max_vol_mL: float = 2.0):
+        super().__init__(max_vol_mL = max_vol_mL, VTtype = "VT54", positions = 54)
 
 
 class VT70(VT_template):
-    def __init__(self):
-        super().__init__(max_vol_mL = 1.0, VTtype = "VT70", positions = 70)
+    def __init__(self, max_vol_mL: float = 1.0):
+        super().__init__(max_vol_mL = max_vol_mL, VTtype = "VT70", positions = 70)
 
-
-
-    # def __init__(self, max_vol_mL: float = 2.0):
-    #     self.type = "VT54"
-    #     self.max_vol_mL = max_vol_mL
-    #     self.vials = [False for i in range(54)]
-    #     self.vol_mL = [0.0 for i in range(54)]
-    #     self.liquid_sample_no = [None for i in range(54)]
-
-    # def first_empty(self):
-    #     res = next((i for i, j in enumerate(self.vials) if not j), None)
-    #     # printing result
-    #     print("The values till first True value : " + str(res))
-    #     return res
-
-    # def update_vials(self, vial_dict):
-    #     for i, vial in enumerate(vial_dict):
-    #         try:
-    #             self.vials[i] = bool(vial)
-    #         except Exception:
-    #             self.vials[i] = False
-
-    # def update_vol(self, vol_dict):
-    #     for i, vol in enumerate(vol_dict):
-    #         try:
-    #             self.vol_mL[i] = float(vol)
-    #         except Exception:
-    #             self.vol_mL[i] = 0.0
-
-    # def update_liquid_sample_no(self, sample_dict):
-    #     for i, sample in enumerate(sample_dict):
-    #         try:
-    #             self.liquid_sample_no[i] = int(sample)
-    #         except Exception:
-    #             self.liquid_sample_no[i] = None
-
-    # def as_dict(self):
-    #     return vars(self)
-    
 
 class PALtray:
     def __init__(self, slot1=None, slot2=None, slot3=None):
@@ -145,20 +106,21 @@ class PALtray:
     def as_dict(self):
         return vars(self)
 
-    
-    
-
 
 class cPALparams(BaseModel):
     liquid_sample_no_in: int = None
     liquid_sample_no_out: int = None
     PAL_method: PALmethods = PALmethods.test
     PAL_tool: str = ""
-    PAL_source: str = ""
     PAL_volume_uL: int = 0  # uL
+    PAL_dest: str = "" # dest can be cust. or tray
     PAL_dest_tray: int = None
     PAL_dest_slot: int = None
     PAL_dest_vial: int = None
+    PAL_source: str = ""  # source can be cust. or tray
+    PAL_source_tray: int = None
+    PAL_source_slot: int = None
+    PAL_source_vial: int = None
     PAL_wash1: bool = False
     PAL_wash2: bool = False
     PAL_wash3: bool = False
@@ -170,6 +132,13 @@ class cPALparams(BaseModel):
     # PAL_mixing: str = ""
     PAL_timeoffset: float = 0.0 # sec
     PAL_cur_sample: int = 0
+
+    PAL_plate_id: int = None
+    PAL_plate_sample_no: int = None
+    PAL_start_time: int = None
+    PAL_continue_time: int = None
+    PAL_done_time: int = None
+    PAL_ssh_time: int = None
 
 
 class cPAL:
@@ -617,28 +586,6 @@ class cPAL:
     async def init_PAL_IOloop(self, A: Action):
         activeDict = dict()
         if not self.IO_do_meas:
-        
-            
-        
-            # sample_period = A.action_params.get[]
-            #         TTLsend = A.action_params["TTLsend"]
-
-            # if type(new_sampleperiod) is not list:
-            #     sepvals = [',','\t',';','::',':']
-            #     new_sampleperiod = None
-            #     for sep in sepvals:
-            #         if not (sampleperiod.find(sep) == -1):
-            #                 print('...sep', sep)
-            #                 new_sampleperiod = [float(item) for item in sampleperiod.split(sep)]
-            #                 break
-            #     if new_sampleperiod == None:
-            #         new_sampleperiod = float(sampleperiod)
-            #     if type(new_sampleperiod) is not list:
-            #         new_sampleperiod = [new_sampleperiod]            
-                
-            
-            
-            
             self.IO_PALparams = cPALparams(**A.action_params)
             self.action = A
             self.IO_remotedatafile = ""
@@ -649,7 +596,6 @@ class cPAL:
             remotedatafile = os.path.join(
                 self.FIFO_dir, "AUX__" + self.FIFO_name
             )
-
             print("##########################################################")
             print(" ... PAL saving to:", self.FIFO_dir)
             self.FIFO_rshs_dir = self.FIFO_dir
@@ -665,7 +611,6 @@ class cPAL:
             while not self.IO_continue:
                 await asyncio.sleep(1)
             error = self.IO_error
-
         else:
             error = error_codes.in_progress
             remotedatafile = ""
@@ -677,52 +622,20 @@ class cPAL:
 
 
     async def sendcommand_main(self, PALparams: cPALparams):
+        """PAL takes liquid from sample_in and puts it in sample_out"""
         # default for return dict
         cmd_to_execute = ""
-        start_time = None
-        continue_time = None
-        done_time = None
-        ssh_time = None
+        # start_time = None
+        # continue_time = None
+        # done_time = None
+        # ssh_time = None
         error =  error_codes.none
-        plate_id = None
-        sample_no = None
+        # plate_id = None
+        # sample_no = None
 
 
         # (1) check if we have free vial slots
-        if PALparams.PAL_method == PALmethods.archive:
-            newvialpos = await self.trayDB_new(
-                            req_vol = PALparams.PAL_volume_uL/1000.0
-                            )
-            if newvialpos['tray'] is not None:
-                PALparams.PAL_dest_tray = newvialpos['tray']
-                PALparams.PAL_dest_slot = newvialpos['slot']
-                PALparams.PAL_dest_vial = newvialpos['vial']
-                print(f' ... archiving liquid sample to tray {PALparams.PAL_dest_tray}, slot {PALparams.PAL_dest_slot}, vial {PALparams.PAL_dest_vial}')
-            else:
-                error = error_codes.not_available
-        elif PALparams.PAL_method == PALmethods.dilute:
-            oldvial = await self.get_vial_liquid_sample_no(
-                            PALparams.PAL_dest_tray,
-                            PALparams.PAL_dest_slot,
-                            PALparams.PAL_dest_vial
-                            )            
-            if oldvial['liquid_sample_no'] is not None:
-                pass
-            else:
-                error = error_codes.not_available
-        elif PALparams.PAL_method == PALmethods.deepclean:
-            PALparams.liquid_sample_no_in = 0
-        elif PALparams.PAL_method == PALmethods.fillfixed:
-            plate_id =  self.action.plate_id
-            sample_no =  None #TODO #self.action.samples_in
-        elif PALparams.PAL_method == PALmethods.fill:
-            plate_id =  self.action.plate_id
-            sample_no =  None #TODO self.action.samples_in
-        else:
-            PALparams.PAL_dest_tray = None
-            PALparams.PAL_dest_slot = None
-            PALparams.PAL_dest_vial = None
-
+        error = await self.sendcommand_prechecks(PALparams)
 
 
 
@@ -739,91 +652,98 @@ class cPAL:
                  error = error_codes.not_available
 
 
-
-
-            print(" ... liquid_sample_no_in is", PALparams.liquid_sample_no_in)
-            if PALparams.liquid_sample_no_in == -1:
-                print(" ... PAL need to get last sample from list")
-                PALparams.liquid_sample_no_in = await self.liquid_sample_no_get_last()
-                print(" ... last sample is ", PALparams.liquid_sample_no_in)
-            print(" ... old sampple is", PALparams.liquid_sample_no_in)
-
-            sourceelecrolyte = await self.liquid_sample_no_get(PALparams.liquid_sample_no_in)
-
-            source_chemical = sourceelecrolyte.get("chemical", [""])
-            source_mass = sourceelecrolyte.get("mass", [""])
-            source_supplier = sourceelecrolyte.get("supplier", [""])
-            source_lotnumber = sourceelecrolyte.get("lot_number", [""])
-            print(" ... sourceelectrolyte:", sourceelecrolyte)
-            print(" ... source_chemical:", source_chemical)
-            print(" ... source_mass:", source_mass)
-            print(" ... source_supplier:", source_supplier)
-            print(" ... source_lotnumber:", source_lotnumber)
-
-
-            PALparams.liquid_sample_no_out = await self.liquid_sample_no_create_new(
-                DUID,
-                AUID,
-                source=PALparams.liquid_sample_no_in,
-                # sourcevol_mL=PALparams.PAL_volume_uL / 1000.0,
-                volume_mL=PALparams.PAL_volume_uL / 1000.0,
-                action_time=actiontime,
-                chemical=source_chemical,
-                mass=source_mass,
-                supplier=source_supplier,
-                lot_number=source_lotnumber,
-                servkey=self.base.server_name,
-                plate_id = plate_id, 
-                sample_no = sample_no
-            )
-
-            retvals = await self.sendcommand_ssh_helper(PALparams)
-            error = retvals["error"]
-            ssh_time = retvals["ssh_time"]
-            path_methodfile = retvals["path_methodfile"]
-            rshs_pal_logfile = retvals["rshs_pal_logfile"]
-
-
-
             if error is error_codes.none:
-                # waiting now for all three PAL triggers
-                # continue is use as the sampling timestamp
-                retvals = await self.sendcommand_triggerwait()
+                if PALparams.PAL_method != PALmethods.dilute and PALparams.PAL_method != PALmethods.deepclean: 
+                    print(" ... liquid_sample_no_in is", PALparams.liquid_sample_no_in)
+                    if PALparams.liquid_sample_no_in == -1:
+                        print(" ... PAL need to get last sample from list")
+                        PALparams.liquid_sample_no_in = await self.liquid_sample_no_get_last()
+                        print(" ... updated liquid_sample_no_in is", PALparams.liquid_sample_no_in)
+        
+                    liquid_sample_no_in_dict = await self.liquid_sample_no_get(PALparams.liquid_sample_no_in)
+        
+                    source_chemical = liquid_sample_no_in_dict.get("chemical", [""])
+                    source_mass = liquid_sample_no_in_dict.get("mass", [""])
+                    source_supplier = liquid_sample_no_in_dict.get("supplier", [""])
+                    source_lotnumber = liquid_sample_no_in_dict.get("lot_number", [""])
+                    print(" ... source_electrolyte:", liquid_sample_no_in_dict["id"])
+                    print(" ... source_chemical:", source_chemical)
+                    print(" ... source_mass:", source_mass)
+                    print(" ... source_supplier:", source_supplier)
+                    print(" ... source_lotnumber:", source_lotnumber)
+                    liquid_sample_no_out_dict = await self.liquid_sample_no_create_new(
+                        DUID,
+                        AUID,
+                        source=PALparams.liquid_sample_no_in,
+                        volume_mL=PALparams.PAL_volume_uL / 1000.0,
+                        action_time=actiontime,
+                        chemical=source_chemical,
+                        mass=source_mass,
+                        supplier=source_supplier,
+                        lot_number=source_lotnumber,
+                        servkey=self.base.server_name,
+                        plate_id = PALparams.PAL_plate_id, 
+                        sample_no = PALparams.PAL_plate_sample_no
+                    )
+                    # TODO: check if ID was really created (later)
+                    PALparams.liquid_sample_no_out = liquid_sample_no_out_dict["id"]
+
+
+
+                    # update sample in and out
+                    await self.sendcommand_update_action_sampleinout(PALparams)
+            
+
+
+
+
+                retvals = await self.sendcommand_ssh_helper(PALparams)
                 error = retvals["error"]
-                start_time = retvals["start"]
-                continue_time = retvals["continue"]
-                done_time = retvals["done"]
-
-
-                logdata = [
-                    str(PALparams.liquid_sample_no_out),
-                    str(PALparams.liquid_sample_no_in),
-                    str(ssh_time),
-                    str(start_time),
-                    str(continue_time),
-                    str(done_time),
-                    PALparams.PAL_tool,
-                    PALparams.PAL_source,
-                    str(PALparams.PAL_volume_uL),
-                    str(PALparams.PAL_dest_tray),
-                    str(PALparams.PAL_dest_slot),
-                    str(PALparams.PAL_dest_vial),
-                    rshs_pal_logfile,
-                    path_methodfile,
-                ]
-
-
-                if self.active:
-                    if self.active.action.save_data:
-                        # print(' ... gamry pushing data:', {k: [v] for k, v in zip(self.FIFO_column_headings, tmp_datapoints)})
-                        await self.active.enqueue_data(
-                            {
-                                k: [v]
-                                for k, v in zip(
-                                    self.FIFO_column_headings, logdata
-                                )
-                            }
-                        )
+                # ssh_time = retvals["ssh_time"]
+                path_methodfile = retvals["path_methodfile"]
+                rshs_pal_logfile = retvals["rshs_pal_logfile"]
+    
+    
+    
+                if error is error_codes.none:
+                    # waiting now for all three PAL triggers
+                    # continue is use as the sampling timestamp
+                    error = await self.sendcommand_triggerwait(PALparams)
+    
+                    # write data
+                    if self.active:
+                        if self.active.action.save_data:
+                            logdata = [
+                                str(PALparams.liquid_sample_no_out),
+                                str(PALparams.liquid_sample_no_in),
+                                str(PALparams.PAL_ssh_time),
+                                str(PALparams.PAL_start_time),
+                                str(PALparams.PAL_continue_time),
+                                str(PALparams.PAL_done_time),
+                                PALparams.PAL_tool,
+                                PALparams.PAL_source,
+                                str(PALparams.PAL_volume_uL),
+                                str(PALparams.PAL_source_tray),
+                                str(PALparams.PAL_source_slot),
+                                str(PALparams.PAL_source_vial),
+                                PALparams.PAL_dest,
+                                str(PALparams.PAL_dest_tray),
+                                str(PALparams.PAL_dest_slot),
+                                str(PALparams.PAL_dest_vial),
+                                rshs_pal_logfile,
+                                path_methodfile,
+                            ]
+                            await self.active.enqueue_data(
+                                {
+                                    k: [v]
+                                    for k, v in zip(
+                                        self.FIFO_column_headings, logdata
+                                    )
+                                }
+                            )
+                            print('PAL data ###################')
+                            print({k: [v] for k, v in zip(self.FIFO_column_headings, logdata)})                        
+                            print('PAL data end ###############')
 
 
 
@@ -834,20 +754,68 @@ class cPAL:
         # these will be arrays for multiple samples
         return {
             "cmd": cmd_to_execute,
-            "PALtime": ssh_time,
-            "start": start_time,
-            "conintue": continue_time,
-            "done": done_time,
+            "PALtime": PALparams.PAL_ssh_time,
+            "start": PALparams.PAL_start_time,
+            "continue": PALparams.PAL_continue_time,
+            "done": PALparams.PAL_done_time,
             "liquid_sample_no": PALparams.liquid_sample_no_out,
             "error": error,
         }
 
-    async def sendcommand_triggerwait(self):
-        error =  error_codes.none
-        start_time = None
-        continue_time = None
-        done_time = None
 
+
+    async def sendcommand_prechecks(self, PALparams: cPALparams):
+        error =  error_codes.none
+
+        if PALparams.PAL_method == PALmethods.archive:
+            newvialpos = await self.trayDB_new(
+                            req_vol = PALparams.PAL_volume_uL/1000.0
+                            )
+            if newvialpos['tray'] is not None:
+                # PALparams.PAL_source = "lcfc_res"
+                PALparams.PAL_dest = "tray"
+                PALparams.PAL_dest_tray = newvialpos['tray']
+                PALparams.PAL_dest_slot = newvialpos['slot']
+                PALparams.PAL_dest_vial = newvialpos['vial']
+                print(f' ... archiving liquid sample to tray {PALparams.PAL_dest_tray}, slot {PALparams.PAL_dest_slot}, vial {PALparams.PAL_dest_vial}')
+            else:
+                error = error_codes.not_available
+        elif PALparams.PAL_method == PALmethods.dilute:
+            PALparams.PAL_dest = "tray"
+            oldvial = await self.get_vial_liquid_sample_no(
+                            PALparams.PAL_dest_tray,
+                            PALparams.PAL_dest_slot,
+                            PALparams.PAL_dest_vial
+                            )
+            if oldvial['liquid_sample_no'] is not None:
+                PALparams.liquid_sample_no_out = oldvial['liquid_sample_no']
+            else:
+                error = error_codes.not_available
+        elif PALparams.PAL_method == PALmethods.deepclean:
+            PALparams.PAL_dest = "waste"
+            PALparams.PAL_source = "wash"
+            PALparams.liquid_sample_no_in = 0
+            PALparams.liquid_sample_no_out = 0
+        elif PALparams.PAL_method == PALmethods.fill or PALparams.PAL_method == PALmethods.fillfixed:
+            PALparams.PAL_dest = "lcfc_res"
+            # PALparams.PAL_source = ""
+            PALparams.PAL_plate_id =  self.action.plate_id
+            PALparams.PAL_plate_sample_no =  None #TODO self.action.samples_in
+        else:
+            PALparams.PAL_dest = ""
+            PALparams.PAL_source = ""
+            PALparams.liquid_sample_no_in = 0
+            PALparams.liquid_sample_no_out = 0
+            PALparams.PAL_dest_tray = None
+            PALparams.PAL_dest_slot = None
+            PALparams.PAL_dest_vial = None
+            error = error_codes.not_available
+        
+        return error
+
+
+    async def sendcommand_triggerwait(self, PALparams: cPALparams):
+        error =  error_codes.none
         # only wait if triggers are configured
         if self.triggers:
             print(" ... waiting for PAL start trigger")
@@ -861,7 +829,7 @@ class cPAL:
             else:
                 print(" ... got PAL start trigger")
                 print(" ... waiting for PAL continue trigger")
-                start_time = self.trigger_start_epoch
+                PALparams.PAL_start_time = self.trigger_start_epoch
                 # val = await self.wait_for_trigger_continue()
                 val = await self.poll_continue()
                 if not val:
@@ -875,7 +843,7 @@ class cPAL:
                     )
                     print(" ... got PAL continue trigger")
                     print(" ... waiting for PAL done trigger")
-                    continue_time = self.trigger_continue_epoch
+                    PALparams.PAL_continue_time = self.trigger_continue_epoch
                     # val = await self.wait_for_trigger_done()
                     val = await self.poll_done()
                     if not val:
@@ -887,19 +855,69 @@ class cPAL:
                         # self.IO_continue = True
                         # self.IO_continue = True
                         print(" ... got PAL done trigger")
-                        done_time = self.trigger_done_epoch
+                        PALparams.PAL_done_time = self.trigger_done_epoch
+        return error
 
-        return {
-                "error": error,
-                "start": start_time,
-                "continue": continue_time,
-                "done": done_time
-                }
+
+    async def sendcommand_update_action_sampleinout(self, PALparams: cPALparams):
+        """Updates action sample_in and sample_out"""
+        # TODO: use self.active.append_sample() instead later
+        
+        # get a copy of action in and out samples
+        if "liquid_samples" in self.action.samples_in:
+            temp_liquid_in = self.action.samples_in["liquid_samples"]
+        else:
+            temp_liquid_in = []
+        if "liquid_samples" in self.action.samples_out:
+            temp_liquid_out = self.action.samples_out["liquid_samples"]
+        else:
+            temp_liquid_out = []
+        if "plate_samples" in self.action.samples_in:
+            temp_plate_in = self.action.samples_in["plate_samples"]
+        else:
+            temp_plate_in = []
+
+
+        
+        if PALparams.PAL_method == PALmethods.archive:
+            # we take liquid from this
+            temp_liquid_in.append(PALparams.liquid_sample_no_in)
+            # and add it to a new sample ID
+            temp_liquid_out.append(PALparams.liquid_sample_no_out)
+
+        elif PALparams.PAL_method == PALmethods.dilute:
+            # the sample that gets diluted
+            temp_liquid_in.append(PALparams.liquid_sample_no_out)
+            # the sample that gets added
+            temp_liquid_in.append(PALparams.liquid_sample_no_in)
+            # out the diluted sample
+            temp_liquid_out.append(PALparams.liquid_sample_no_out)
+
+        elif PALparams.PAL_method == PALmethods.deepclean:
+            # nothing in in and out
+            pass
+
+        elif PALparams.PAL_method == PALmethods.fill or PALparams.PAL_method == PALmethods.fillfixed:
+            # the reservoir from which a sample gets taken
+            temp_liquid_in.append(PALparams.liquid_sample_no_in)
+            # the new sample in the echem cell (in contact with the solid sample)
+            temp_liquid_out.append(PALparams.liquid_sample_no_out)
+            # the solid sample
+            temp_plate_in.append(PALparams.PAL_plate_sample_no)
+
+
+        # update action sample in and out (only temp in/out is not empty)
+        # set removes duplicates
+        if temp_liquid_in:
+            self.action.samples_in.update({"liquid_samples": sorted(set(temp_liquid_in))})
+        if temp_liquid_out:
+            self.action.samples_out.update({"liquid_samples": sorted(set(temp_liquid_out))})
+        if temp_plate_in:
+            self.action.samples_in.update({"plate_samples": sorted(set(temp_plate_in))})
 
 
     async def sendcommand_ssh_helper(self, PALparams: cPALparams):
         ssh_connected = False
-        ssh_time = None
         error = error_codes.none
         while not ssh_connected:
             try:
@@ -979,20 +997,24 @@ class cPAL:
             # only needs to be updated if
             if  PALparams.PAL_dest_tray is not None:
                 if PALparams.PAL_method == PALmethods.dilute:
-                    retval = await self.trayDB_update(tray = PALparams.PAL_dest_tray,
-                                                            slot = PALparams.PAL_dest_slot,
-                                                            vial = PALparams.PAL_dest_vial,
-                                                            vol_mL = PALparams.PAL_volume_uL/1000.0,
-                                                            liquid_sample_no = PALparams.liquid_sample_no_out,
-                                                            dilute = True)
+                    retval = await self.trayDB_update(
+                                                      tray = PALparams.PAL_dest_tray,
+                                                      slot = PALparams.PAL_dest_slot,
+                                                      vial = PALparams.PAL_dest_vial,
+                                                      vol_mL = PALparams.PAL_volume_uL/1000.0,
+                                                      liquid_sample_no = PALparams.liquid_sample_no_out,
+                                                      dilute = True
+                                                      )
                 elif PALparams.PAL_method == PALmethods.deepclean:
                     retval = True
                 else:
-                    retval = await self.trayDB_update(tray = PALparams.PAL_dest_tray,
-                                                            slot = PALparams.PAL_dest_slot,
-                                                            vial = PALparams.PAL_dest_vial,
-                                                            vol_mL = PALparams.PAL_volume_uL/1000.0,
-                                                            liquid_sample_no = PALparams.liquid_sample_no_out)
+                    retval = await self.trayDB_update(
+                                                      tray = PALparams.PAL_dest_tray,
+                                                      slot = PALparams.PAL_dest_slot,
+                                                      vial = PALparams.PAL_dest_vial,
+                                                      vol_mL = PALparams.PAL_volume_uL/1000.0,
+                                                      liquid_sample_no = PALparams.liquid_sample_no_out
+                                                      )
                 if retval == False:
                     error = error_codes.not_available
 
@@ -1006,7 +1028,7 @@ class cPAL:
 
         try:
             if error is error_codes.none:
-                ssh_time = time.time_ns()
+                PALparams.PAL_ssh_time = time.time_ns()
                 (
                     mysshclient_stdin,
                     mysshclient_stdout,
@@ -1019,17 +1041,12 @@ class cPAL:
             print(' ... SSH connection error 2. Could not send commands.')
             print('##############################################################')
             error = error_codes.ssh_error
-
-
-
     
         return {
             "error": error,
-            "ssh_time": ssh_time,
             "path_methodfile": path_methodfile,
             "rshs_pal_logfile": rshs_pal_logfile
             }
-
 
 
     async def IOloop(self):
@@ -1040,6 +1057,7 @@ class cPAL:
                 if not self.IO_estop:
 
                     # write file header here
+                    # PAL takes liquid from sample_in and puts it in sample_out
                     self.FIFO_column_headings = [
                         "liquid_sample_no_out",
                         "liquid_sample_no_in",
@@ -1050,6 +1068,10 @@ class cPAL:
                         "PAL_tool",
                         "PAL_source",
                         "PAL_volume_uL",
+                        "PAL_source_tray",
+                        "PAL_source_slot",
+                        "PAL_source_vial",
+                        "PAL_dest",
                         "PAL_dest_tray",
                         "PAL_dest_slot",
                         "PAL_dest_vial",
@@ -1197,12 +1219,12 @@ class cPAL:
 
     async def liquid_sample_no_get_last(self, last_no: int = -1):
         lastno = await self.liquid_sample_no_DB.count_liquid_sample_no()
-        datadict = await self.liquid_sample_no_DB.liquid_sample_no_get(lastno+last_no+1)
+        datadict = await self.liquid_sample_no_DB.get_liquid_sample_no(lastno+last_no+1)
         return datadict
 
 
     async def liquid_sample_no_get(self, liquid_sample_no: int):
-        datadict = await self.liquid_sample_no_DB.liquid_sample_no_get(liquid_sample_no)
+        datadict = await self.liquid_sample_no_DB.get_liquid_sample_no(liquid_sample_no)
         return datadict
 
     async def liquid_sample_no_create_new(

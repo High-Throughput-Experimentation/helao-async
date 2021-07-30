@@ -723,7 +723,7 @@ class Base(object):
                     "orchestrator": self.action.orch_name,
                     "machine_name": self.base.hostname,
                     "access": self.action.access,
-                    "samples_in": self.action.samples_in,
+                    # "samples_in": self.action.samples_in,
                     "output_dir": self.action.output_dir,
                 }
                 initial_dict.update(self.base.calibration)
@@ -1021,6 +1021,8 @@ class Base(object):
             if self.file_conn:
                 await self.file_conn.close()
                 self.file_conn = None
+            if self.action.samples_in:
+                await self.write_to_rcp({"samples_in": self.action.samples_in})
             if self.action.samples_out:
                 await self.write_to_rcp({"samples_out": self.action.samples_out})
             if self.action.file_dict:

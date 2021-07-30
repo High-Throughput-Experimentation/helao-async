@@ -44,9 +44,9 @@ def makeApp(confPrefix, servKey):
         action_dict: dict = {}
     ):
         A = await setupAct(action_dict, request, locals())
-        A.action_params["dest_tray"] = None
-        A.action_params["dest_slot"] = None
-        A.action_params["dest_vial"] = None
+        A.action_params["PAL_dest_tray"] = None
+        A.action_params["PAL_dest_slot"] = None
+        A.action_params["PAL_dest_vial"] = None
         A.save_data = True
         active_dict = await app.driver.init_PAL_IOloop(A)
         return active_dict
