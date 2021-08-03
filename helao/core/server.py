@@ -46,10 +46,15 @@ class HelaoFastAPI(FastAPI):
 class HelaoBokehAPI:#(curdoc):
     """Standard Bokeh class with HELAO config attached for simpler import."""
 
-    def __init__(self, helao_cfg: dict, helao_srv: str, *args, **kwargs):
+    def __init__(self, helao_cfg: dict, helao_srv: str, doc, *args, **kwargs):
         # super().__init__(*args, **kwargs)
         self.helao_cfg = helao_cfg
         self.helao_srv = helao_srv
+        
+        self.srv_config = self.helao_cfg["servers"][self.helao_srv]["params"]
+        self.doc_name = self.srv_config.get("doc_name", "Bokeh App")
+        self.doc = doc
+        self.doc.title = self.doc_name
 
 
 async def setupAct(action_dict: dict, request: Request, scope: dict):   
@@ -387,16 +392,18 @@ def makeOrchServ(
 
 
 def makeVisServ(
-    config, server_key, server_title, description, version, driver_class=None
+    config, server_key, doc, server_title, description, version, driver_class=None, 
 ):
     app = HelaoBokehAPI(
-        config, server_key, title=server_title, description=description, version=version
+        config, 
+        server_key, 
+        doc=doc,
+        title=server_title, 
+        description=description,
+        ersion=version, 
     )
 
-
-
     return app
-
 
 
 class Base(object):
@@ -598,6 +605,11 @@ class Base(object):
 
     async def ws_status(self, websocket: WebSocket):
         "Subscribe to status queue and send message to websocket client."
+        print("##############################################################")
+        print(" ... got new status subscriber")
+        print("##############################################################")
+
+
         await websocket.accept()
         try:
             async for status_msg in self.status_q.subscribe():
@@ -609,6 +621,10 @@ class Base(object):
 
     async def ws_data(self, websocket: WebSocket):
         "Subscribe to data queue and send messages to websocket client."
+        print("##############################################################")
+        print(" ... got new data subscriber")
+        print("##############################################################")
+
         await websocket.accept()
         try:
             async for data_msg in self.data_q.subscribe():
