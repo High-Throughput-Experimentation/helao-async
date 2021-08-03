@@ -298,23 +298,11 @@ def launcher(confPrefix, confDict):
                     if codeKey == "fast":
                         if group == "orchestrators":
                             pidd.orchServs.append(server)
-                        cmd = ["python", f"launcher.py", confPrefix, server]
+                        cmd = ["python", "fast_launcher.py", confPrefix, server]
                         p = subprocess.Popen(cmd, cwd=helao_root)
                         ppid = p.pid
                     elif codeKey == "bokeh":
-                        cmd = [
-                            "bokeh",
-                            "serve",
-                            f"--allow-websocket-origin={servHost}:{servPort}",
-                            "--address",
-                            servHost,
-                            "--port",
-                            f"{servPort}",
-                            f"helao/library/server/{group}/{servPy}.py",
-                            "--args",
-                            confPrefix,
-                            server,
-                        ]
+                        cmd = ["python", "bokeh_launcher.py", confPrefix, server]
                         p = subprocess.Popen(cmd, cwd=helao_root)
                         try:
                             time.sleep(3)
