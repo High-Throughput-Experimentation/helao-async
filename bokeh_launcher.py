@@ -14,10 +14,9 @@ servHost = S["host"]
 servPort = S["port"]
 servPy = S["bokeh"]
 
-makeApp = import_module(f"helao.library.server.{S['group']}.{S['bokeh']}").makeApp
+makeApp = import_module(f"helao.library.server.{S['group']}.{S['bokeh']}").makeBokehApp
 
 if __name__ == "__main__":
-    print(" ... launching bokeh server")
     bokehapp = Server(
                       {f"/{servPy}": partial(makeApp, confPrefix=confPrefix, servKey=servKey)}, 
                       port=servPort, 

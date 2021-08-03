@@ -30,58 +30,51 @@ config["servers"] = dict(
         params=dict(
         ),
     ),
-    # motor=dict(
-    #     host=hostip,
-    #     port=8003,
-    #     group="action",
-    #     fast="galil_motion",
-    #     simulate=False,  # choose between simulator(default) or real device
-    #     params=dict(
-    #         Transfermatrix=[
-    #             [1, 0, 0],
-    #             [0, 1, 0],
-    #             [0, 0, 1],
-    #         ],  # default Transfermatrix for plate calibration
-    #         # 4x6 plate
-    #         # M_instr = [[1,0,0,-76.525],[0,1,0,-50.875],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
-    #         # 100mm wafer
-    #         M_instr=[
-    #             [1, 0, 0, -76.525 + (3 * 25.4 - 50)],
-    #             [0, 1, 0, -50.875 + 2.71],
-    #             [0, 0, 1, 0],
-    #             [0, 0, 0, 1],
-    #         ],  # instrument specific calibration
-    #         count_to_mm=dict(
-    #             A=1.0 / 15835.31275,  # 1.0/15690.3,
-    #             B=1.0 / 6398.771436,  # 1.0/6395.45,
-    #             C=1.0 / 6396.315722,  # 1.0/6395.45,
-    #             D=1.0 / 3154.787,  # 1.0/3154.787,
-    #         ),
-    #         galil_ip_str="192.168.200.234",
-    #         def_speed_count_sec=10000,
-    #         max_speed_count_sec=25000,
-    #         ipstr="192.168.200.234",
-    #         axis_id=dict(
-    #             x="D",
-    #             y="B",
-    #             z="A",
-    #             Rz="C",
-    #             # t="E",
-    #             # u="F"
-    #         ),
-    #         axis_zero=dict(
-    #             A=0.0,  # z
-    #             B=77.0,  # y
-    #             C=77.0,  # x
-    #             D=52.0,  # Rz
-    #             # t="E",
-    #             # u="F"
-    #         ),
-    #         # axlett="ABCD", # not needed anymore
-    #         timeout=10 * 60,  # timeout for axis stop in sec
-    #         tbroadcast=2,  # frequency of websocket broadcast (only broadcasts if something changes but need to reduce the frequeny of that if necessary)
-    #     ),
-    # ),
+    motor=dict(
+        host=hostip,
+        port=8003,
+        group="action",
+        fast="galil_motion",
+        simulate=False, # choose between simulator(default) or real device
+        params=dict(
+            Transfermatrix = [[1,0,0],[0,1,0],[0,0,1]], # default Transfermatrix for plate calibration
+            
+            # 4x6 plate
+            #M_instr = [[1,0,0,-76.525],[0,1,0,-50.875],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
+            # 100mm wafer
+            M_instr = [[1,0,0,-76.525+(3*25.4-50)-0.5+0.75+1.5+0.25],[0,1,0,-50.875+2.71+5-3+1],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
+
+            count_to_mm=dict(
+                A=1.0/15835.31275,#1.0/15690.3,
+                B=1.0/6398.771436,#1.0/6395.45,
+                C=1.0/6396.315722,#1.0/6395.45,
+                D=1.0/3154.787,#1.0/3154.787,
+            ),
+            galil_ip_str="192.168.200.23",
+            def_speed_count_sec=10000,
+            max_speed_count_sec=25000,
+            ipstr="192.168.200.23",
+            axis_id=dict(
+                x="C",
+                y="B",
+                z="A",
+                Rz="D",
+                #t="E",
+                #u="F"
+                ),
+            axis_zero=dict(
+                A=0.0, #z
+                B=52.0, #y
+                C=77.0, #x
+                D=0.0, #Rz
+                #t="E",
+                #u="F"
+                ),
+            #axlett="ABCD", # not needed anymore
+            timeout = 10*60, # timeout for axis stop in sec
+            tbroadcast = 2, # frequency of websocket broadcast (only broadcasts if something changes but need to reduce the frequeny of that if necessary)
+        )
+    ),
     potentiostat=dict(
         host=hostip,
         port=8004,
@@ -219,17 +212,17 @@ config["servers"] = dict(
     # #########################################################################
     # Visualizers (bokeh servers)
     # #########################################################################
-    # exp_vis=dict(#simple dumb modular visualizer
-    #     host=hostip,
-    #     port=5001,
-    #     group="visualizer",
-    #     bokeh="bokeh_modular_visualizer",
-    #     params = dict(
-    #         doc_name = "ANEC2 visualizer",
-    #         ws_nidaqmx="nimax",
-    #         ws_potentiostat = 'potentiostat',
-    #     )
-    # ),
+    exp_vis=dict(#simple dumb modular visualizer
+        host=hostip,
+        port=5001,
+        group="visualizer",
+        bokeh="bokeh_modular_visualizer",
+        params = dict(
+            doc_name = "ADSS visualizer",
+            # ws_nidaqmx="nimax",
+            ws_potentiostat = 'potentiostat',
+        )
+    ),
     # operator=dict(
     #     host=hostip,
     #     port=5002,
