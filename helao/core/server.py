@@ -24,6 +24,9 @@ from aiofiles.os import wrap
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.openapi.utils import get_flat_params
 
+
+from bokeh.io import curdoc
+
 from helao.core.helper import MultisubscriberQueue, dict_to_rcp, eval_val
 from helao.core.schema import Action, Decision
 from helao.core.model import return_dec, return_declist, return_act, return_actlist
@@ -36,6 +39,15 @@ class HelaoFastAPI(FastAPI):
 
     def __init__(self, helao_cfg: dict, helao_srv: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.helao_cfg = helao_cfg
+        self.helao_srv = helao_srv
+
+
+class HelaoBokehAPI:#(curdoc):
+    """Standard Bokeh class with HELAO config attached for simpler import."""
+
+    def __init__(self, helao_cfg: dict, helao_srv: str, *args, **kwargs):
+        # super().__init__(*args, **kwargs)
         self.helao_cfg = helao_cfg
         self.helao_srv = helao_srv
 
@@ -372,6 +384,19 @@ def makeOrchServ(
         time.sleep(0.75)
 
     return app
+
+
+def makeVisServ(
+    config, server_key, server_title, description, version, driver_class=None
+):
+    app = HelaoBokehAPI(
+        config, server_key, title=server_title, description=description, version=version
+    )
+
+
+
+    return app
+
 
 
 class Base(object):
