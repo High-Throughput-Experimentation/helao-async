@@ -81,16 +81,16 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
 
-    @app.post(f"/{servKey}/run_task_Pumps")
-    async def run_task_Pumps(
+    @app.post(f"/{servKey}/run_task_Pump")
+    async def run_task_Pump(
                             request: Request, 
-                            pumps: Optional[pumpitems] = "PeriPump",
+                            pump: Optional[pumpitems] = "PeriPump",
                             on: Optional[bool] = True,
                             action_dict: dict = {}
                             ):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
-        await active.enqueue_data({"pumps": await app.driver.run_task_Pumps(**A.action_params)})
+        await active.enqueue_data({"pumps": await app.driver.run_task_Pump(**A.action_params)})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -128,7 +128,7 @@ def makeApp(confPrefix, servKey):
                                ):
         A = await setupAct(action_dict, request, locals())
         active = await app.base.contain_action(A)
-        await active.enqueue_data({"FSW_done": await app.driver.run_task_getFSW("Done")()})
+        await active.enqueue_data({"FSW_done": await app.driver.run_task_getFSW("Done")})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
