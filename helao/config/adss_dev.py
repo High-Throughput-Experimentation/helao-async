@@ -218,7 +218,7 @@ config["servers"] = dict(
         bokeh="bokeh_modular_visualizer",
         params = dict(
             doc_name = "ADSS visualizer",
-            # ws_nidaqmx="nimax",
+            ws_nidaqmx="nimax",
             ws_potentiostat = 'potentiostat',
         )
     ),

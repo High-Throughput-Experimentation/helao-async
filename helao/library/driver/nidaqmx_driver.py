@@ -95,7 +95,7 @@ class cNIMAX:
             "ICell9_A",
             "ECell1_V",
             "ECell2_V",
-            "ECell4_V",
+            "ECell3_V",
             "ECell4_V",
             "ECell5_V",
             "ECell6_V",
@@ -211,21 +211,21 @@ class cNIMAX:
                 ]
                 # update timeoffset
                 self.IVtimeoffset += number_of_samples / self.samplingrate
-                tmp_datapoints = list([time])
+                tmp_datapoints = []
+                tmp_datapoints.append(time)
                 # for i in range(len(dataI)):
                 for i in range(9):
                     tmp_datapoints.append(dataI[i])
-                    
                 # for i in range(len(dataV)):
                 for i in range(9):
                     tmp_datapoints.append(dataV[i])
-                
+                    
                 # push data to datalogger queue
                 if self.active:
                     if self.active.action.save_data:
                         self.active.enqueue_data_nowait(
                             {
-                                k: [v]
+                                k: v
                                 for k, v in zip(
                                     self.FIFO_column_headings, tmp_datapoints
                                 )

@@ -105,44 +105,63 @@ from bokeh.layouts import layout, Spacer
 
 class C_nidaqmxvis:
     """NImax visualizer module class"""
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, app):
+        self.app = app
 
-        self.config = config
-        self.data_url = config['wsdata_url']
-        self.stat_url = config['wsstat_url']
-        self.dataset_url = config['wsdataset_url']
+        nidaqmx_key = self.app.srv_config["ws_nidaqmx"]
+        potserv_config = self.app.helao_cfg["servers"][nidaqmx_key]
+        self.data_url = f"ws://{potserv_config['host']}:{potserv_config['port']}/ws_data"
+        # self.stat_url = f"ws://{potserv_config['host']}:{potserv_config['port']}/ws_status"
+
+
+
+        # self.dataset_url = config['wsdataset_url']
         self.IOloop_data_run = False
         self.IOloop_dataset_run = False
 
         self.time_stamp = 0
         self.IVlist = {}
-        self.activeCell = [False for _ in range(9)]
+        self.activeCell = [True for _ in range(9)]
 
-        self.sourceIV = ColumnDataSource(data=dict(t_s=[],
-                                                      ICell_1=[],
-                                                      ICell_2=[],
-                                                      ICell_3=[],
-                                                      ICell_4=[],
-                                                      ICell_5=[],
-                                                      ICell_6=[],
-                                                      ICell_7=[],
-                                                      ICell_8=[],
-                                                      ICell_9=[],
-                                                      VCell_1=[],
-                                                      VCell_2=[],
-                                                      VCell_3=[],
-                                                      VCell_4=[],
-                                                      VCell_5=[],
-                                                      VCell_6=[],
-                                                      VCell_7=[],
-                                                      VCell_8=[],
-                                                      VCell_9=[]))
 
-        self.sourceIV_prev = ColumnDataSource(data=dict())
+        datadict = dict(
+                       t_s=[],
+                       ICell1_A=[],
+                       ICell2_A=[],
+                       ICell3_A=[],
+                       ICell4_A=[],
+                       ICell5_A=[],
+                       ICell6_A=[],
+                       ICell7_A=[],
+                       ICell8_A=[],
+                       ICell9_A=[],
+                       ECell1_V=[],
+                       ECell2_V=[],
+                       ECell3_V=[],
+                       ECell4_V=[],
+                       ECell5_V=[],
+                       ECell6_V=[],
+                       ECell7_V=[],
+                       ECell8_V=[],
+                       ECell9_V=[]
+                       )
+
+        self.sourceIV = ColumnDataSource(data=datadict)
+        self.sourceIV_prev = ColumnDataSource(data=datadict)
+
+        self.cur_action_id = ""
+        self.prev_action_id = ""
 
         # create visual elements
         self.layout = []
+        
+        self.paragraph1 = Paragraph(text="""cells:""", width=50, height=15)
+        self.checkbox_button_group = CheckboxButtonGroup(
+                                    labels=[f"{i+1}" for i in range(9)], 
+                                    active=[i for i in range(9)]
+                                    )
+        
+        
         self.plot_VOLT = figure(title="CELL VOLTs", height=300)
         self.plot_CURRENT = figure(title="CELL CURRENTs", height=300)
 
@@ -154,84 +173,78 @@ class C_nidaqmxvis:
         # combine all sublayouts into a single one
         self.layout = layout([
             [Spacer(width=20), Div(text="<b>NImax Visualizer module</b>", width=200+50, height=15)],
+            [self.paragraph1],
+            [self.checkbox_button_group],
+            Spacer(height=10),
             [self.plot_VOLT, self.plot_VOLT_prev],
             Spacer(height=10),
             [self.plot_CURRENT, self.plot_CURRENT_prev],
             Spacer(height=10)
             ],background="#C0C0C0")
 
-
-    # def add_points(self, new_data):
-    #     self.sourceIV_prev.data = {key: val for key, val in self.sourceIV.data.items()}        
-    #     self.sourceIV.data = {k: [] for k in self.sourceIV.data}
-    #     self.sourceIV.stream(new_data)
+        self.app.doc.add_root(self.layout)
+        self.app.doc.add_root(Spacer(height=10))
 
 
-    # async def IOloop_data(self): # non-blocking coroutine, updates data source
-    #     global doc
-    #     async with websockets.connect(self.data_url) as ws:
-    #         self.IOloop_data_run = True
-    #         while self.IOloop_data_run:
-    #             try:
-    #                 data = json.loads(await ws.recv())
-    #                 self.IVlist = {'t_s':data['t_s']}
-    #                 for cell in range(9): # nine cells, but len(data['t_s']) datapoints for each cell
-    #                     self.IVlist[f"ICell_{cell+1}"] = data['I_A'][cell]
-    #                     self.IVlist[f"VCell_{cell+1}"] = data['E_V'][cell]
-    #                 doc.add_next_tick_callback(partial(self.add_points, self.IVlist))
-    #             except Exception:
-    #                 self.IOloop_data_run = False
+    def add_points(self, new_data):
+        new_action_id = list(new_data)[0]
+
+        if (new_action_id != self.cur_action_id):
+            self.prev_action_id = self.cur_action_id
+            self.cur_action_id = new_action_id
+            self.reset_plot()
+
+        data_dict = new_data[new_action_id]["data"]
+        self.sourceIV_prev.data = {key: val for key, val in self.sourceIV.data.items()}        
+        self.sourceIV.data = {k: [] for k in self.sourceIV.data}
+        self.sourceIV.stream(data_dict)
 
 
-    # async def IOloop_datasettings(self): # non-blocking coroutine, updates data source
-    #     global doc
-    #     async with websockets.connect(self.dataset_url) as ws:
-    #         self.IOloop_dataset_run = True
-    #         while self.IOloop_dataset_run:
-    #             try:
-    #                 data = json.loads(await ws.recv())
-    #                 if 'activeCell' in data:
-    #                     self.activeCell = data['activeCell']
-    #                     doc.add_next_tick_callback(partial(self.reset_plot))
-    #             except Exception:
-    #                 self.IOloop_dataset_run = False
+    async def IOloop_data(self): # non-blocking coroutine, updates data source
+        async with websockets.connect(self.data_url) as ws:
+            self.IOloop_data_run = True
+            while self.IOloop_data_run:
+                try:
+                    new_data = json.loads(await ws.recv())
+                    self.app.doc.add_next_tick_callback(partial(self.add_points, new_data))
+                except Exception:
+                    self.IOloop_data_run = False
 
 
     def reset_plot(self):
-        pass
-    #     global doc
-    #     # remove all old lines and clear legend
-    #     if self.plot_VOLT.renderers:
-    #         self.plot_VOLT.legend.items = []
+        # remove all old lines and clear legend
+        if self.plot_VOLT.renderers:
+            self.plot_VOLT.legend.items = []
 
-    #     if self.plot_CURRENT.renderers:
-    #         self.plot_CURRENT.legend.items = []
+        if self.plot_CURRENT.renderers:
+            self.plot_CURRENT.legend.items = []
 
 
-    #     if self.plot_VOLT_prev.renderers:
-    #         self.plot_VOLT_prev.legend.items = []
+        if self.plot_VOLT_prev.renderers:
+            self.plot_VOLT_prev.legend.items = []
 
-    #     if self.plot_CURRENT_prev.renderers:
-    #         self.plot_CURRENT_prev.legend.items = []
+        if self.plot_CURRENT_prev.renderers:
+            self.plot_CURRENT_prev.legend.items = []
             
-    #     self.plot_VOLT.renderers = []
-    #     self.plot_CURRENT.renderers = []
+        self.plot_VOLT.renderers = []
+        self.plot_CURRENT.renderers = []
 
-    #     self.plot_VOLT_prev.renderers = []
-    #     self.plot_CURRENT_prev.renderers = []
+        self.plot_VOLT_prev.renderers = []
+        self.plot_CURRENT_prev.renderers = []
         
-    #     colors = small_palettes['Category10'][9]
-    #     for i,val in enumerate(self.activeCell):
-    #         # only plot active cells
-    #         if val:
-    #             _ = self.plot_VOLT.line(x='t_s', y=f'VCell_{i+1}', source=self.sourceIV, name=f'VCell{i+1}', line_color=colors[i], legend_label=f'VCell{i+1}')
-    #             _ = self.plot_CURRENT.line(x='t_s', y=f'ICell_{i+1}', source=self.sourceIV, name=f'ICell{i+1}', line_color=colors[i], legend_label=f'ICell{i+1}')
 
-    #             _ = self.plot_VOLT_prev.line(x='t_s', y=f'VCell_{i+1}', source=self.sourceIV_prev, name=f'VCell{i+1}', line_color=colors[i], legend_label=f'VCell{i+1}')
-    #             _ = self.plot_CURRENT_prev.line(x='t_s', y=f'ICell_{i+1}', source=self.sourceIV_prev, name=f'ICell{i+1}', line_color=colors[i], legend_label=f'ICell{i+1}')
+        self.plot_VOLT.title.text = ("Action_ID: "+self.cur_action_id)
+        self.plot_VOLT.title.text = ("Action_ID: "+self.cur_action_id)
+        # self.plot_VOLT_prev.title.text = ("Action_ID: "+self.prev_action_id)
+        # self.plot_VOLT_prev.title.text = ("Action_ID: "+self.prev_action_id)
 
 
-
+        colors = small_palettes['Category10'][9]
+        for i in self.checkbox_button_group.active:
+            _ = self.plot_VOLT.line(x='t_s', y=f'ECell{i+1}_V', source=self.sourceIV, name=f'ECell{i+1}_V', line_color=colors[i], legend_label=f'ECell{i+1}_V')
+            _ = self.plot_CURRENT.line(x='t_s', y=f'ICell{i+1}_A', source=self.sourceIV, name=f'ICell{i+1}_A', line_color=colors[i], legend_label=f'ICell{i+1}_A')
+            _ = self.plot_VOLT_prev.line(x='t_s', y=f'ECell{i+1}_V', source=self.sourceIV_prev, name=f'ECell{i+1}_V', line_color=colors[i], legend_label=f'ECell{i+1}_V')
+            _ = self.plot_CURRENT_prev.line(x='t_s', y=f'ICell{i+1}_A', source=self.sourceIV_prev, name=f'ICell{i+1}_A', line_color=colors[i], legend_label=f'ICell{i+1}_A')
 
 
 class C_potvis:
@@ -287,7 +300,7 @@ class C_potvis:
 
 
         self.app.doc.add_root(self.layout)
-        # self.doc.add_root(Spacer(height=10))
+        self.app.doc.add_root(Spacer(height=10))
 
 
     def add_points(self, new_data):
@@ -351,8 +364,6 @@ class C_potvis:
             
             self.plot.title.text = ("Action_ID: "+self.cur_action_id)
             self.plot_prev.title.text = ("Action_ID: "+self.prev_action_id)
-            # self.plot_prev.title.text = ("Prev. Meas. Timecode: "+str(self.time_stamp_prev))
-            # self.plot_prev.title.text = ("Prev. Meas. Timecode: ")
             xstr = ''
             if(self.radio_button_group.active == 0):
                 xstr = 't_s'
@@ -525,6 +536,15 @@ def makeBokehApp(doc, confPrefix, servKey):
         print('No potentiostat visualizer configured')
         potvis = []
 
+
+    if 'ws_nidaqmx' in app.srv_config:
+        NImaxvis = C_nidaqmxvis(app)
+        visoloop.create_task(NImaxvis.IOloop_data())
+    else:
+        print('No NImax visualizer configured')
+        NImaxvis = []
+
+
 # if 'ws_data' in S.params:
 #     tmpserv = S.params.ws_data
 #     dataserv['serv'] = tmpserv
@@ -556,21 +576,6 @@ def makeBokehApp(doc, confPrefix, servKey):
 #     motorvis = []
 
 
-# if 'ws_nidaqmx' in S.params:
-#     tmpserv = S.params.ws_nidaqmx
-#     NImaxserv['serv'] = tmpserv
-#     NImaxserv['wsdata_url'] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_data"
-#     NImaxserv['wsdataset_url'] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_data_settings"
-#     NImaxserv['wsstat_url'] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_status"
-#     print(f"Create Visualizer for {NImaxserv['serv']}")
-#     NImaxvis = C_nidaqmxvis(NImaxserv)
-#     doc.add_root(layout([NImaxvis.layout]))
-#     doc.add_root(layout(Spacer(height=10)))
-#     visoloop.create_task(NImaxvis.IOloop_data())
-#     visoloop.create_task(NImaxvis.IOloop_datasettings())
-# else:
-#     print('No NImax visualizer configured')
-#     NImaxvis = []
 
     # web interface update loop
     # todo put his in the respective classes?
