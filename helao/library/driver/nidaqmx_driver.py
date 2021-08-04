@@ -12,9 +12,6 @@ from nidaqmx.constants import VoltageUnits
 from nidaqmx.constants import CurrentShuntResistorLocation
 from nidaqmx.constants import UnitsPreScaled
 from nidaqmx.constants import TriggerType
-from nidaqmx.constants import CountDirection
-from nidaqmx.constants import TaskMode
-from nidaqmx.constants import SyncType
 
 from helao.core.schema import Action
 from helao.core.server import Base
@@ -111,7 +108,6 @@ class cNIMAX:
         myloop = asyncio.get_event_loop()
         # add meas IOloop
         myloop.create_task(self.IOloop())
-
 
 
     def create_IVtask(self):
@@ -236,7 +232,6 @@ class cNIMAX:
                             }
                         )
 
-
             except Exception:
                 print(" ... canceling NImax IV stream")
 
@@ -292,7 +287,7 @@ class cNIMAX:
                             await asyncio.sleep(0.5)
 
                         # get timecode and correct for offset from first interrupt
-                        self.IOloopstarttime = time.time()+self.buffersizeread/self.samplingrate 
+                        self.IOloopstarttime = time.time()#-self.buffersizeread/self.samplingrate 
 
                         while (time.time() - self.IOloopstarttime < self.duration) and self.IO_do_meas:
                             if not self.IO_signalq.empty():
@@ -342,110 +337,101 @@ class cNIMAX:
                 return {"name": [FSW], "status": data}
 
 
-    async def run_task_FSWBCD(self, BCDs, value):
-        BCD_list = await self.sep_str(BCDs)
+    async def run_task_FSWBCD(self, BCDs, on):
         cmds = []
         with nidaqmx.Task() as task_FSWBCD:
-            for BCD in BCD_list:
+            for BCD in BCDs:
                 if BCD in self.config_dict["dev_FSWBCDCmd"].keys():
                     task_FSWBCD.do_channels.add_do_chan(
                         self.config_dict["dev_FSWBCDCmd"][BCD],
                         line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
                     )
-                    cmds.append(value)
+                    cmds.append(on)
             if cmds:
                 task_FSWBCD.write(cmds)
-                return {"err_code": "0"}
+                return {"err_code": error_codes.none}
             else:
-                return {"err_code": "not found"}
+                return {"err_code": error_codes.not_available}
 
 
-    async def run_task_Pumps(self, pumps, value):
-        print(" ... NIMAX pump:", pumps, value)
-        pump_list = await self.sep_str(pumps)
+    async def run_task_Pump(self, pump, on):
+        print(" ... NIMAX pump:", pump, on)
         cmds = []
         with nidaqmx.Task() as task_Pumps:
-            for pump in pump_list:
-                if pump in self.config_dict["dev_Pumps"].keys():
-                    task_Pumps.do_channels.add_do_chan(
-                        self.config_dict["dev_Pumps"][pump],
-                        line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
-                    )
-                    cmds.append(value)
+            # for pump in pumps:
+            if pump in self.config_dict["dev_Pumps"].keys():
+                task_Pumps.do_channels.add_do_chan(
+                    self.config_dict["dev_Pumps"][pump],
+                    line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
+                )
+                cmds.append(on)
             if cmds:
                 task_Pumps.write(cmds)
-                return {"err_code": "0"}
+                return {"err_code": error_codes.none}
             else:
-                return {"err_code": "not found"}
+                return {"err_code": error_codes.not_available}
 
 
-    async def run_task_GasFlowValves(self, valves, value):
-        valve_list = await self.sep_str(valves)
+    async def run_task_GasFlowValves(self, valves, on):
         cmds = []
         with nidaqmx.Task() as task_GasFlowValves:
-            for valve in valve_list:
+            for valve in valves:
                 if valve in self.config_dict["dev_GasFlowValves"].keys():
                     task_GasFlowValves.do_channels.add_do_chan(
                         self.config_dict["dev_GasFlowValves"][valve],
                         line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
                     )
-                    cmds.append(value)
+                    cmds.append(on)
             if cmds:
                 task_GasFlowValves.write(cmds)
-                return {"err_code": "0"}
+                return {"err_code": error_codes.none}
             else:
-                return {"err_code": "not found"}
+                return {"err_code": error_codes.not_available}
 
 
-    async def run_task_Master_Cell_Select(self, cells, value):
-        cell_list = await self.sep_str(cells)
-        if len(cell_list) > 1:
+    async def run_task_Master_Cell_Select(self, cells, on):
+        if len(cells) > 1:
             print(
                 " ... Multiple cell selected. Only one can be Master cell. Using first one!"
             )
-            print(cell_list)
-            cell_list = [cell_list[0]]
-            print(cell_list)
+            print(cells)
+            cells = [cells[0]]
+            print(cells)
         cmds = []
         with nidaqmx.Task() as task_MasterCell:
-            for cell in cell_list:
+            for cell in cells:
                 if cell in self.config_dict["dev_MasterCellSelect"].keys():
                     task_MasterCell.do_channels.add_do_chan(
                         self.config_dict["dev_MasterCellSelect"][cell],
                         line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
                     )
-                    cmds.append(value)
+                    cmds.append(on)
             if cmds:
                 task_MasterCell.write(cmds)
-                return {"err_code": "0"}
+                return {"err_code": error_codes.none}
             else:
-                return {"err_code": "not found"}
+                return {"err_code": error_codes.not_available}
 
 
-    async def run_task_Active_Cells_Selection(self, cells, value):
-        cell_list = await self.sep_str(cells)
+    async def run_task_Active_Cells_Selection(self, cells, on):
         cmds = []
         with nidaqmx.Task() as task_ActiveCell:
-            for cell in cell_list:
+            for cell in cells:
                 if cell in self.config_dict["dev_ActiveCellsSelection"].keys():
                     task_ActiveCell.do_channels.add_do_chan(
                         self.config_dict["dev_ActiveCellsSelection"][cell],
                         line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
                     )
-                    cmds.append(value)
+                    cmds.append(on)
 
-                self.activeCell[int(cell) - 1] = value
+                self.activeCell[int(cell) - 1] = on
 
-            if self.qsettings.full():
-                print(" ... NImax qsettings is full ...")
-                _ = self.qsettings.get_nowait()
-            self.qsettings.put_nowait({"activeCell": self.activeCell})
 
             if cmds:
                 task_ActiveCell.write(cmds)
-                return {"err_code": "0"}
+                return {"err_code": error_codes.none}
             else:
-                return {"err_code": "not found"}
+                return {"err_code": error_codes.not_available}
 
 
     async def run_cell_IV(self, A: Action):
@@ -485,8 +471,6 @@ class cNIMAX:
             
             await self.IO_signalq.put(True)
 
-            
-            
             err_code = error_codes.none
         else:
             err_code = error_codes.in_progress
@@ -536,22 +520,3 @@ class cNIMAX:
         # then start master to trigger slave
         self.task_CellCurrent.start()
         await self.IO_signalq.put(True)
-
-    
-    async def sep_str(self, cells):
-        sepvals = [",", "\t", ";", "::", ":"]
-        new_cells = None
-        for sep in sepvals:
-            if not (cells.find(sep) == -1):
-                new_cells = cells.split(sep)
-                break
-
-        # single axis
-        if new_cells == None:
-            new_cells = cells
-
-        # convert single axis move to list
-        if type(new_cells) is not list:
-            new_cells = [new_cells]
-
-        return new_cells
