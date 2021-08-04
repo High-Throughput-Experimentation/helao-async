@@ -133,18 +133,18 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
 
-    @app.post(f"/{servKey}/run_task_Cell_IV")
-    async def run_task_Cell_IV(
+    @app.post(f"/{servKey}/run_cell_IV")
+    async def run_cell_IV(
                               request: Request, 
-                              on: Optional[bool] = True, 
-                              tstep: Optional[float] = 1.0,
+                              Tval: Optional[float] = 10.0,
+                              SampleRate: Optional[float] = 1.0, 
+                              TTLwait: Optional[int] = -1,  # -1 disables, else select TTL channel
                               action_dict: dict = {},
                               ):
-        """Get the current/voltage measurement for each cell.
-        Only active cells are plotted in visualizer."""
+        """Runs multi cell IV measurement."""
         A = await setupAct(action_dict, request, locals())
         A.save_data = True
-        active_dict = await app.driver.run_task_Cell_IV(A)
+        active_dict = await app.driver.run_cell_IV(A)
         return active_dict
 
 
