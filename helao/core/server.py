@@ -893,6 +893,7 @@ class Base(object):
                     output_str += "\n"
                 await self.file_conn.write(output_str)
 
+
         async def enqueue_data(self, data, errors: list = []):
             data_msg = {
                 self.action.action_uuid: {
@@ -902,6 +903,18 @@ class Base(object):
                 }
             }
             await self.base.data_q.put(data_msg)
+
+
+        def enqueue_data_nowait(self, data, errors: list = []):
+            data_msg = {
+                self.action.action_uuid: {
+                    "data": data,
+                    "action_name": self.action.action_name,
+                    "errors": errors,
+                }
+            }
+            self.base.data_q.put_nowait(data_msg)
+
 
         async def log_data_task(self):
             """Self-subscribe to data queue, write to present file path."""
