@@ -605,11 +605,7 @@ class Base(object):
 
     async def ws_status(self, websocket: WebSocket):
         "Subscribe to status queue and send message to websocket client."
-        print("##############################################################")
         print(" ... got new status subscriber")
-        print("##############################################################")
-
-
         await websocket.accept()
         try:
             async for status_msg in self.status_q.subscribe():
@@ -621,10 +617,7 @@ class Base(object):
 
     async def ws_data(self, websocket: WebSocket):
         "Subscribe to data queue and send messages to websocket client."
-        print("##############################################################")
         print(" ... got new data subscriber")
-        print("##############################################################")
-
         await websocket.accept()
         try:
             async for data_msg in self.data_q.subscribe():
@@ -918,9 +911,7 @@ class Base(object):
 
         async def log_data_task(self):
             """Self-subscribe to data queue, write to present file path."""
-            print("#########################################################")
             print(" ... starting data logger")
-            print("#########################################################")
             # data_msg should be a dict {uuid: list of values or a list of list of values}
             try:
                 async for data_msg in self.base.data_q.subscribe():
