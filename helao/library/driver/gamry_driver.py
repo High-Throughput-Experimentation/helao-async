@@ -190,7 +190,7 @@ class gamry:
         # for saving data localy
         self.FIFO_epoch = None
         # self.FIFO_header = ''
-        # self.FIFO_gamryheader = '' # measuement specific, will be reset each measurement
+        self.FIFO_gamryheader = ("") # measuement specific, will be reset each measurement
         # self.FIFO_name = ''
         # self.FIFO_dir = ''
         self.FIFO_column_headings = []
@@ -651,7 +651,7 @@ class gamry:
                     f"%ierangemode={self.IO_IErange.name}",
                     "%techniqueparamsname=",
                     f"%techniquename={self.IO_meas_mode.name}",
-                    f"%epoch_ns=FIXME",
+                    "%epoch_ns=FIXME",
                     "%version=0.2",
                     f"%column_headings={tmps_headings}",
                 ]
@@ -665,7 +665,7 @@ class gamry:
             )
             print(f"!!! Active action uuid is {self.active.action.action_uuid}")
             realtime = await self.active.set_realtime()
-            self.FIFO_gamryheader.replace(f"%epoch_ns=FIXME", f"%epoch_ns={realtime}")
+            self.FIFO_gamryheader.replace("%epoch_ns=FIXME", f"%epoch_ns={realtime}")
 
             # dtaqsink.status might still be 'idle' if sleep is too short
             await asyncio.sleep(0.04)
