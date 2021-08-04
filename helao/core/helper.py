@@ -166,6 +166,17 @@ class MultisubscriberQueue(object):
         for q in self.subscribers:
             await q.put(data)
 
+
+    def put_nowait(self, data: Any):
+        """
+        Put new data on all subscriber queues
+        Parameters:
+            data: queue data
+        """
+        for q in self.subscribers:
+            q.put_nowait(data)
+
+
     async def close(self):
         """
         Force clients using MultisubscriberQueue.subscribe() to end iteration
