@@ -41,6 +41,19 @@ class Decision(object):
         }
         return attr_only
 
+
+    def fastdict(self):
+        d = vars(self)
+        attr_only = {
+            k: int(v) if type(v) == bool else v#[] if v == {} else v
+            for k, v in d.items()
+            if type(v) != types.FunctionType and 
+            not k.startswith("__") and 
+            (v is not None) and (v != {})
+        }
+        return attr_only
+
+
     def gen_uuid_decision(self):
         "server_name can be any string used in generating random uuid"
         if self.decision_uuid:
