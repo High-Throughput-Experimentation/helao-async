@@ -25,14 +25,7 @@ class HTE_legacy_API:
             r"\\htejcap.caltech.edu\share\data\hte_jcap_app_proto\plate",
             r"J:\hte_jcap_app_proto\plate",
         ]
-        self.qdata = asyncio.Queue(maxsize=100)  # ,loop=asyncio.get_event_loop())
 
-
-    def put_in_qdata(self, item):
-        if self.qdata.full():
-            print(" ... data q is full ...")
-            _ = self.qdata.get_nowait()
-            self.qdata.put_nowait(item)
 
     def get_rcp_plateid(self, plateid: int):
         print(plateid)
@@ -54,49 +47,39 @@ class HTE_legacy_API:
 
             # 4. gets platemap and passes to alignment code
             # pmpath=getplatemappath_plateid(plateid, return_pmidstr=True)
-            self.put_in_qdata({"info": infod, "plateid": plateid})
 
             return self.get_platemap_plateid(plateid)
 
         else:
-            self.put_in_qdata({"info": None, "plateid": plateid})
-
             return "No plate found!"
 
     def check_plateid(self, plateid: int):
         infod = self.importinfo(str(plateid))
         # 1. checks that the plate_id (info file) exists
         if infod != "No plate found!":
-            self.put_in_qdata({"plateidcheck": True, "plateid": plateid})
             return True
         else:
-            self.put_in_qdata({"plateidcheck": False, "plateid": plateid})
             return False
 
     def check_printrecord_plateid(self, plateid: int):
         infod = self.importinfo(str(plateid))
         if infod != "No plate found!":
             if not "prints" in infod.keys():
-                self.put_in_qdata({"printrecord": False, "plateid": plateid})
                 return False
             else:
-                self.put_in_qdata({"printrecord": True, "plateid": plateid})
                 return True
 
     def check_annealrecord_plateid(self, plateid: int):
         infod = self.importinfo(str(plateid))
         if infod != "No plate found!":
             if not "anneals" in infod.keys():
-                self.put_in_qdata({"annealrecord": False, "plateid": plateid})
                 return False
             else:
-                self.put_in_qdata({"annealrecord": True, "plateid": plateid})
                 return True
 
     def get_platemap_plateid(self, plateid: int):
         pmpath = self.getplatemappath_plateid(plateid)
         pmdlist = self.readsingleplatemaptxt(pmpath)
-        self.put_in_qdata({"map": pmdlist, "plateid": plateid})
         return json.dumps(pmdlist)
 
     def get_elements_plateid(
@@ -112,7 +95,6 @@ class HTE_legacy_API:
         else:
             infofiled = self.importinfo(plateid)
             if infofiled is None:
-                self.put_in_qdata({"elements": None, "plateid": plateid})
                 return None
         requiredkeysthere = (
             lambda infofiled, print_key_or_keyword=print_key_or_keyword: (
@@ -123,7 +105,6 @@ class HTE_legacy_API:
         )
         while not ("prints" in infofiled.keys() and requiredkeysthere(infofiled)):
             if not "lineage" in infofiled.keys() or not "," in infofiled["lineage"]:
-                self.put_in_qdata({"elements": None, "plateid": plateid})
                 return None
             parentplateidstr = infofiled["lineage"].split(",")[-2].strip()
             infofiled = self.importinfo(parentplateidstr)
@@ -135,13 +116,11 @@ class HTE_legacy_API:
                 and printd["id"] == infofiled["screening_print_id"]
             ]
             if len(printdlist) == 0:
-                self.put_in_qdata({"elements": None, "plateid": plateid})
                 return None
             printd = printdlist[0]
         else:
             printd = infofiled["prints"][print_key_or_keyword]
         if not "elements" in printd.keys():
-            self.put_in_qdata({"elements": None, "plateid": plateid})
             return None
         els = [
             x for x in printd["elements"].split(",") if x not in exclude_elements_list
@@ -155,7 +134,6 @@ class HTE_legacy_API:
                 ),
             )
 
-        self.put_in_qdata({"elements": els, "plateid": plateid})
         return els
 
     ##########################################################################
