@@ -1126,7 +1126,7 @@ class Orch(Base):
 
         # compilation of action server status dicts
         self.global_state_dict = defaultdict(lambda: defaultdict(list))
-        self.global_state_dict['_internal']['async_dispatcher'] = []
+        self.global_state_dict['_internal']['async_action_dispatcher'] = []
         self.global_q = MultisubscriberQueue()  # passes global_state_dict dicts
 
         # global state of all instruments as string [idle|busy] independent of dispatch loop
@@ -1294,7 +1294,7 @@ class Orch(Base):
                         A = self.action_dq.popleft()
                         # append previous results to current action
                         A.result_dict = self.active_decision.result_dict
-                        # see async_dispatcher for unpacking
+                        # see async_action_dispatcher for unpacking
                         if isinstance(A.start_condition, int):
                             if A.start_condition == 0:
                                 print(
@@ -1378,7 +1378,7 @@ class Orch(Base):
                         )
                         # keep running list of dispatched actions
                         self.dispatched_actions[A.action_enum] = copy(A)
-                        result = await async_dispatcher(self.world_cfg, A)
+                        result = await async_action_dispatcher(self.world_cfg, A)
                         self.active_decision.result_dict[A.action_enum] = result
             print(" ... decision queue is empty")
             print(" ... stopping operator orch")
@@ -1669,13 +1669,6 @@ def import_actualizers(world_config_dict: dict, library_path: str = None):
     """Import actualizer functions into environment."""
     action_lib = {}
     if library_path is None:
-        # if "action_library_path" not in world_config_dict.keys():
-        #     print(
-        #         " ... library_path argument not specified and key is not present in config."
-        #     )
-        #     library_path = 
-        #     # return action_lib#False
-        # else:
         library_path = world_config_dict.get("action_library_path", os.path.join("helao","library","actualizer"))
     if not os.path.isdir(library_path):
         print(
@@ -1692,7 +1685,7 @@ def import_actualizers(world_config_dict: dict, library_path: str = None):
     return action_lib#True
 
 
-async def async_dispatcher(world_config_dict: dict, A: Action, private: bool = False):
+async def async_action_dispatcher(world_config_dict: dict, A: Action):
     """Request non-blocking action_dq which may run concurrently.
 
     Send action object to action server for processing.
@@ -1706,23 +1699,50 @@ async def async_dispatcher(world_config_dict: dict, A: Action, private: bool = F
     actd = world_config_dict["servers"][A.action_server]
     act_addr = actd["host"]
     act_port = actd["port"]
-    if private:
-        url = f"http://{act_addr}:{act_port}/{A.action_name}"
-        params_dicttemp, json_dicttemp = A.fastdict()
-        json_dicttemp = json_dicttemp.get("action_params",{})
-        json_dict = {}
-        params_dict = {}
-        for key, item in json_dicttemp.items():
-            if type(item) != dict:
-                if item is not None:
-                    params_dict[key] = item
-            else:
-                json_dict[key] = item
-    else:
-        url = f"http://{act_addr}:{act_port}/{A.action_server}/{A.action_name}"
-        params_dict, json_dict = A.fastdict()
+    url = f"http://{act_addr}:{act_port}/{A.action_server}/{A.action_name}"
+    # splits action dict into suitable params and json parts
+    params_dict, json_dict = A.fastdict()
 
-    # print("... Adict", Adict)
+    print("... params_dict", params_dict)
+    print("... json_dict", json_dict)
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            url,
+            params=params_dict,
+            #data = data_dict,
+            json = json_dict,
+        ) as resp:
+            response = await resp.json()
+            return response
+
+
+async def async_private_dispatcher(
+                                    world_config_dict: dict,
+                                    server: str,
+                                    private_action: str,
+                                    params_dict: dict,
+                                    json_dict: dict,
+                                   ):
+    """Request non-blocking private action which may run concurrently.
+
+    Returns:
+        Response string from http POST request to action server
+    """
+
+
+    actd = world_config_dict["servers"][server]
+    act_addr = actd["host"]
+    act_port = actd["port"]
+
+    url = f"http://{act_addr}:{act_port}/{private_action}"
+    # for key, item in json_dicttemp.items():
+    #     if type(item) != dict:
+    #         if item is not None:
+    #             params_dict[key] = item
+    #     else:
+    #         json_dict[key] = item
+
     print("... params_dict", params_dict)
     print("... json_dict", json_dict)
     

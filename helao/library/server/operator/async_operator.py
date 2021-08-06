@@ -53,7 +53,7 @@ from typing import Optional, List, Union
 
 
 from helao.core.server import makeVisServ
-from helao.core.server import import_actualizers, async_dispatcher
+from helao.core.server import import_actualizers, async_private_dispatcher
 # from helao.core.data import liquid_sample_no_API
 from helao.core.data import HTE_legacy_API
 from helao.core.schema import Action, Decision
@@ -276,22 +276,21 @@ class C_async_operator:
         print(' ... current active actions:',self.action_list)
 
 
-    async def do_orch_request(self,action_name, params: dict = {}):
+    async def do_orch_request(self,action_name, 
+                              params_dict: dict = {},
+                              json_dict: dict = {}
+                              ):
         """submit a FastAPI request to orch"""
     
-        A = Action()
-        A.action_server = self.orch_name
-        A.action_name = action_name
-        A.action_params = params
 
-        response = await async_dispatcher(
+        response = await async_private_dispatcher(
             world_config_dict = self.app.world_cfg, 
-            A=A, 
-            private = True)
+            server = self.orch_name,
+            private_action = action_name,
+            params_dict = params_dict,
+            json_dict = json_dict
+            )
             
-        # print('op requests #################################################')
-        # print("response:",response)
-        # print('#############################################################')
         return response
 
 
@@ -373,18 +372,18 @@ class C_async_operator:
 
 
     def append_action(self):
-        params = self.populate_action()
+        params_dict, json_dict = self.populate_action()
         # print("pop acction##############################################################")
         # print(params)
         # print("##############################################################")
         # submit decission to orchestrator
-        self.app.doc.add_next_tick_callback(partial(self.do_orch_request,"append_decision", params))
+        self.app.doc.add_next_tick_callback(partial(self.do_orch_request,"append_decision", params_dict, json_dict))
 
 
     def prepend_action(self):
-        params = self.populate_action()
+        params_dict, json_dict = self.populate_action()
         # submit decission to orchestrator
-        self.app.doc.add_next_tick_callback(partial(self.do_orch_request,"prepend_decision", params))
+        self.app.doc.add_next_tick_callback(partial(self.do_orch_request,"prepend_decision", params_dict, json_dict))
 
 
     def populate_action(self):
@@ -413,7 +412,7 @@ class C_async_operator:
             # "access":access,
         })
 
-        return D.as_dict() # TODO: separate them into params and data for post
+        return D.fastdict()
 
 
     def update_param_layout(self, args, defaults):
