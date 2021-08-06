@@ -129,6 +129,8 @@ class C_async_operator:
         self.button_stop.on_event(ButtonClick, self.callback_stop)
         self.button_skip = Button(label="Skip", button_type="danger", width=70)
         self.button_skip.on_event(ButtonClick, self.callback_skip_dec)
+        self.button_update = Button(label="update tables", button_type="default", width=120)
+        self.button_update.on_event(ButtonClick, self.callback_update_tables)
 
         self.button_clear_dec = Button(label="clear decisions", button_type="danger", width=100)
         self.button_clear_dec.on_event(ButtonClick, self.callback_clear_decisions)
@@ -199,7 +201,7 @@ class C_async_operator:
                 [Spacer(width=20), Div(text="<b>Actions:</b>", width=200+50, height=15)],
                 [self.action_table],
                 Spacer(height=10),
-                [self.button_skip, Spacer(width=5), self.button_clear_dec, Spacer(width=5), self.button_clear_act],
+                [self.button_skip, Spacer(width=5), self.button_clear_dec, Spacer(width=5), self.button_clear_act, self.button_update],
                 Spacer(height=10),
                 ],background="#7fdbff",width=640),
             ])
@@ -373,6 +375,10 @@ class C_async_operator:
 
     def callback_append(self, event):
         self.append_action()
+        self.app.doc.add_next_tick_callback(partial(self.update_tables))
+
+
+    def callback_update_tables(self, event):
         self.app.doc.add_next_tick_callback(partial(self.update_tables))
 
 
