@@ -48,10 +48,11 @@ class HelaoBokehAPI:#(curdoc):
 
     def __init__(self, helao_cfg: dict, helao_srv: str, doc, *args, **kwargs):
         # super().__init__(*args, **kwargs)
-        self.helao_cfg = helao_cfg
+        # self.helao_cfg = helao_cfg
         self.helao_srv = helao_srv
+        self.world_cfg = helao_cfg
         
-        self.srv_config = self.helao_cfg["servers"][self.helao_srv]["params"]
+        self.srv_config = self.world_cfg["servers"][self.helao_srv]["params"]
         self.doc_name = self.srv_config.get("doc_name", "Bokeh App")
         self.doc = doc
         self.doc.title = self.doc_name
@@ -246,11 +247,10 @@ def makeOrchServ(
 
     @app.post("/append_decision")
     async def append_decision(
-        decision_dict: dict = None,
         orch_name: str = None,
         decision_label: str = None,
         actualizer: str = None,
-        actual_pars: dict = {},
+        actualizer_pars: dict = {},
         result_dict: dict = {},
         access: str = "hte",
     ):
@@ -262,7 +262,7 @@ def makeOrchServ(
         plate_id: The sample's plate id (no checksum), as int.
         sample_no: A sample number, as int.
         actualizer: The name of the actualizer for building the action list, as str.
-        actual_pars: Actualizer parameters, as dict.
+        actualizer_pars: Actualizer parameters, as dict.
         result_dict: Action responses dict keyed by action_enum.
         access: Access control group, as str.
 
@@ -270,11 +270,10 @@ def makeOrchServ(
         Nothing.
         """
         await app.orch.add_decision(
-            decision_dict,
             orch_name,
             decision_label,
             actualizer,
-            actual_pars,
+            actualizer_pars,
             result_dict,
             access,
             prepend=False,
@@ -283,11 +282,10 @@ def makeOrchServ(
 
     @app.post("/prepend_decision")
     async def prepend_decision(
-        decision_dict: dict = None,
         orch_name: str = None,
         decision_label: str = None,
         actualizer: str = None,
-        actual_pars: dict = {},
+        actualizer_pars: dict = {},
         result_dict: dict = {},
         access: str = "hte",
     ):
@@ -299,7 +297,7 @@ def makeOrchServ(
         plate_id: The sample's plate id (no checksum), as int.
         sample_no: A sample number, as int.
         actualizer: The name of the actualizer for building the action list, as str.
-        actual_pars: Actualizer parameters, as dict.
+        actualizer_pars: Actualizer parameters, as dict.
         result_dict: Action responses dict keyed by action_enum.
         access: Access control group, as str.
 
@@ -307,11 +305,10 @@ def makeOrchServ(
         Nothing.
         """
         await app.orch.add_decision(
-            decision_dict,
             orch_name,
             decision_label,
             actualizer,
-            actual_pars,
+            actualizer_pars,
             result_dict,
             access,
             prepend=True,
@@ -325,7 +322,7 @@ def makeOrchServ(
         orch_name: str = None,
         decision_label: str = None,
         actualizer: str = None,
-        actual_pars: dict = {},
+        actualizer_pars: dict = {},
         result_dict: dict = {},
         access: str = "hte",
     ):
@@ -338,7 +335,7 @@ def makeOrchServ(
         plate_id: The sample's plate id (no checksum), as int.
         sample_no: A sample number, as int.
         actualizer: The name of the actualizer for building the action list, as str.
-        actual_pars: Actualizer parameters, as dict.
+        actualizer_pars: Actualizer parameters, as dict.
         result_dict: Action responses dict keyed by action_enum.
         access: Access control group, as str.
 
@@ -350,7 +347,7 @@ def makeOrchServ(
             orch_name,
             decision_label,
             actualizer,
-            actual_pars,
+            actualizer_pars,
             result_dict,
             access,
             at_index=idx,
@@ -1118,7 +1115,8 @@ class Orch(Base):
 
     def __init__(self, fastapp: HelaoFastAPI):
         super().__init__(fastapp)
-        self.import_actualizers()
+        # self.import_actualizers()
+        self.action_lib = import_actualizers(world_config_dict = self.world_cfg, library_path = None)
         # instantiate decision/experiment queue, action queue
         self.decision_dq = deque([])
         self.action_dq = deque([])
@@ -1150,29 +1148,6 @@ class Orch(Base):
         self.loop_task = None
         self.status_subscriber = asyncio.create_task(self.subscribe_all())
 
-    def import_actualizers(self, library_path: str = None):
-        """Import actualizer functions into environment."""
-        if library_path is None:
-            if "action_library_path" not in self.world_cfg.keys():
-                print(
-                    " ... library_path argument not specified and key is not present in config."
-                )
-                return False
-            library_path = self.world_cfg["action_library_path"]
-        if not os.path.isdir(library_path):
-            print(
-                f" ... library path {library_path} was specified but is not a valid directory"
-            )
-            return False
-        sys.path.append(library_path)
-        self.action_lib = {}
-        for actlib in self.world_cfg["action_libraries"]:
-            tempd = import_module(actlib).__dict__
-            self.action_lib.update({func: tempd[func] for func in tempd["ACTUALIZERS"]})
-        print(
-            f" ... imported {len(self.world_cfg['action_libraries'])} actualizers specified by config."
-        )
-        return True
 
     async def subscribe_all(self, retry_limit: int = 5):
         """Subscribe to all fastapi servers in config."""
@@ -1269,28 +1244,6 @@ class Orch(Base):
                     running_states.append(f"{act_serv}:{act_name}:{len(act_uuids)}")
         return running_states, idle_states
 
-    async def async_dispatcher(self, A: Action):
-        """Request non-blocking action_dq which may run concurrently.
-
-        Send action object to action server for processing.
-
-        Args:
-            A: an action type object contain action server name, endpoint, parameters
-
-        Returns:
-            Response string from http POST request to action server
-        """
-        actd = self.world_cfg["servers"][A.action_server]
-        act_addr = actd["host"]
-        act_port = actd["port"]
-        Adict = A.as_dict()
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"http://{act_addr}:{act_port}/{A.action_server}/{A.action_name}",
-                params=Adict,
-            ) as resp:
-                response = await resp.json()
-                return response
 
     async def dispatch_loop_task(self):
         """Parse decision and action queues, and dispatch action_dq while tracking run state flags."""
@@ -1311,9 +1264,9 @@ class Orch(Base):
                     self.active_decision = self.decision_dq.popleft()
                     self.active_decision.technique_name = self.technique_name
                     self.active_decision.set_dtime(offset=self.ntp_offset)
-                    actual = self.active_decision.actual
-                    # additional actualizer params should be stored in decision.actual_pars
-                    unpacked_acts = self.action_lib[actual](self.active_decision)
+                    actualizer = self.active_decision.actualizer
+                    # additional actualizer params should be stored in decision.actualizer_pars
+                    unpacked_acts = self.action_lib[actualizer](self.active_decision)
                     for i, act in enumerate(unpacked_acts):
                         act.action_enum = f"{i}"
                         # act.gen_uuid()
@@ -1321,7 +1274,7 @@ class Orch(Base):
                     self.action_dq = deque(unpacked_acts)
                     self.dispatched_actions = {}
                     print(" ... got ", self.action_dq)
-                    print(" ... optional params ", self.active_decision.actual_pars)
+                    print(" ... optional params ", self.active_decision.actualizer_pars)
                 else:
                     if self.loop_intent == "stop":
                         print(" ... stopping orchestrator")
@@ -1425,7 +1378,7 @@ class Orch(Base):
                         )
                         # keep running list of dispatched actions
                         self.dispatched_actions[A.action_enum] = copy(A)
-                        result = await self.async_dispatcher(A)
+                        result = await async_dispatcher(self.world_cfg, A)
                         self.active_decision.result_dict[A.action_enum] = result
             print(" ... decision queue is empty")
             print(" ... stopping operator orch")
@@ -1508,25 +1461,25 @@ class Orch(Base):
 
     async def add_decision(
         self,
-        decision_dict: dict = None,
         orch_name: str = None,
         decision_label: str = None,
         actualizer: str = None,
-        actual_pars: dict = {},
+        actualizer_pars: dict = {},
         result_dict: dict = {},
         access: str = "hte",
         prepend: Optional[bool] = False,
         at_index: Optional[int] = None,
     ):
-        D = Decision(
-            decision_dict,
-            orch_name,
-            decision_label,
-            actualizer,
-            actual_pars,
-            result_dict,
-            access,
-        )
+
+        D = Decision({
+            "orch_name":orch_name,
+            "decision_label":decision_label,
+            "actualizer":actualizer,
+            "actualizer_pars":actualizer_pars,
+            "result_dict":result_dict,
+            "access":access,
+        })
+        
         # reminder: decision_dict values take precedence over keyword args but we grab
         # active or last decision label if decision_label is not specified
         if D.orch_name is None:
@@ -1560,19 +1513,21 @@ class Orch(Base):
 
     def list_decisions(self):
         """Return the current queue of decision_dq."""
+            
         declist = [
             return_dec(
                 index=i,
                 uid=dec.decision_uuid,
                 label=dec.decision_label,
-                actualizer=dec.actual,
-                pars=dec.actual_pars,
+                actualizer=dec.actualizer,
+                pars=dec.actualizer_pars,
                 access=dec.access,
             )
             for i, dec in enumerate(self.decision_dq)
         ]
-        retval = return_declist(decision_dq=declist)
+        retval = return_declist(decisions=declist)
         return retval
+
 
     def get_decision(self, last=False):
         """Return the active or last decision."""
@@ -1586,8 +1541,8 @@ class Orch(Base):
                     index=-1,
                     uid=dec.decision_uuid,
                     label=dec.decision_label,
-                    actualizer=dec.actual,
-                    pars=dec.actual_pars,
+                    actualizer=dec.actualizer,
+                    pars=dec.actualizer_pars,
                     access=dec.access,
                 )
             ]
@@ -1602,7 +1557,7 @@ class Orch(Base):
                     access=None,
                 )
             ]
-        retval = return_declist(decision_dq=declist)
+        retval = return_declist(decisions=declist)
         return retval
 
     def list_actions(self):
@@ -1618,7 +1573,7 @@ class Orch(Base):
             )
             for i, act in enumerate(self.action_dq)
         ]
-        retval = return_actlist(action_dq=actlist)
+        retval = return_actlist(actions=actlist)
         return retval
 
     def supplement_error_action(self, check_uuid: str, sup_action: Action):
@@ -1707,3 +1662,76 @@ class Orch(Base):
         self.status_logger.cancel()
         self.ntp_syncer.cancel()
         self.status_subscriber.cancel()
+
+
+
+def import_actualizers(world_config_dict: dict, library_path: str = None):
+    """Import actualizer functions into environment."""
+    action_lib = {}
+    if library_path is None:
+        # if "action_library_path" not in world_config_dict.keys():
+        #     print(
+        #         " ... library_path argument not specified and key is not present in config."
+        #     )
+        #     library_path = 
+        #     # return action_lib#False
+        # else:
+        library_path = world_config_dict.get("action_library_path", os.path.join("helao","library","actualizer"))
+    if not os.path.isdir(library_path):
+        print(
+            f" ... library path {library_path} was specified but is not a valid directory"
+        )
+        return action_lib#False
+    sys.path.append(library_path)
+    for actlib in world_config_dict["action_libraries"]:
+        tempd = import_module(actlib).__dict__
+        action_lib.update({func: tempd[func] for func in tempd["ACTUALIZERS"]})
+    print(
+        f" ... imported {len(world_config_dict['action_libraries'])} actualizers specified by config."
+    )
+    return action_lib#True
+
+
+async def async_dispatcher(world_config_dict: dict, A: Action, private: bool = False):
+    """Request non-blocking action_dq which may run concurrently.
+
+    Send action object to action server for processing.
+
+    Args:
+        A: an action type object contain action server name, endpoint, parameters
+
+    Returns:
+        Response string from http POST request to action server
+    """
+    actd = world_config_dict["servers"][A.action_server]
+    act_addr = actd["host"]
+    act_port = actd["port"]
+    if private:
+        url = f"http://{act_addr}:{act_port}/{A.action_name}"
+        params_dicttemp, json_dicttemp = A.fastdict()
+        json_dicttemp = json_dicttemp.get("action_params",{})
+        json_dict = {}
+        params_dict = {}
+        for key, item in json_dicttemp.items():
+            if type(item) != dict:
+                if item is not None:
+                    params_dict[key] = item
+            else:
+                json_dict[key] = item
+    else:
+        url = f"http://{act_addr}:{act_port}/{A.action_server}/{A.action_name}"
+        params_dict, json_dict = A.fastdict()
+
+    # print("... Adict", Adict)
+    print("... params_dict", params_dict)
+    print("... json_dict", json_dict)
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            url,
+            params=params_dict,
+            #data = data_dict,
+            json = json_dict,
+        ) as resp:
+            response = await resp.json()
+            return response
