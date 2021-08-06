@@ -109,18 +109,14 @@ class C_nidaqmxvis:
         self.app = app
 
         nidaqmx_key = self.app.srv_config["ws_nidaqmx"]
-        potserv_config = self.app.helao_cfg["servers"][nidaqmx_key]
-        self.data_url = f"ws://{potserv_config['host']}:{potserv_config['port']}/ws_data"
-        # self.stat_url = f"ws://{potserv_config['host']}:{potserv_config['port']}/ws_status"
+        nidaqmxserv_config = self.app.world_cfg["servers"][nidaqmx_key]
+        self.data_url = f"ws://{nidaqmxserv_config['host']}:{nidaqmxserv_config['port']}/ws_data"
+        # self.stat_url = f"ws://{nidaqmxserv_config['host']}:{nidaqmxserv_config['port']}/ws_status"
 
 
 
-        # self.dataset_url = config['wsdataset_url']
         self.IOloop_data_run = False
-        self.IOloop_dataset_run = False
 
-        self.time_stamp = 0
-        self.IVlist = {}
         self.activeCell = [True for _ in range(9)]
 
 
@@ -253,7 +249,7 @@ class C_potvis:
         self.app = app
 
         potentiostat_key = self.app.srv_config["ws_potentiostat"]
-        potserv_config = self.app.helao_cfg["servers"][potentiostat_key]
+        potserv_config = self.app.world_cfg["servers"][potentiostat_key]
         self.data_url = f"ws://{potserv_config['host']}:{potserv_config['port']}/ws_data"
         # self.stat_url = f"ws://{potserv_config['host']}:{potserv_config['port']}/ws_status"
 

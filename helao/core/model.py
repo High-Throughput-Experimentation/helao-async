@@ -51,7 +51,7 @@ class return_finishedact(BaseModel):
     decision_uuid: str
     decision_label: str
     actualizer: str
-    actual_pars: dict
+    actualizer_pars: dict
     result_dict: dict
     action_server: str
     action_queue_time: str
@@ -84,7 +84,7 @@ class return_runningact(BaseModel):
     decision_uuid: str
     decision_label: str
     actualizer: str
-    actual_pars: dict
+    actualizer_pars: dict
     result_dict: dict
     action_server: str
     action_queue_time: str

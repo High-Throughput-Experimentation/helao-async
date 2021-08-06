@@ -6,6 +6,7 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Optional, Union
 import types
+import json
 
 from helao.core.helper import gen_uuid
 from helao.core.model import return_finishedact, return_runningact
@@ -26,8 +27,8 @@ class Decision(object):
         self.decision_timestamp = imports.get("decision_timestamp", None)
         self.decision_label = imports.get("decision_label", "noLabel")
         self.access = imports.get("access", "hte")
-        self.actual = imports.get("actual", None)
-        self.actual_pars = imports.get("actual_pars", {})
+        self.actualizer = imports.get("actualizer", None)
+        self.actualizer_pars = imports.get("actualizer_pars", {})
         self.result_dict = imports.get("result_dict", {})
         if self.decision_uuid is None:
             self.gen_uuid_decision()
@@ -44,14 +45,21 @@ class Decision(object):
 
     def fastdict(self):
         d = vars(self)
-        attr_only = {
-            k: int(v) if type(v) == bool else v#[] if v == {} else v
+        params_dict = {
+            k: int(v) if type(v) == bool else v
             for k, v in d.items()
             if type(v) != types.FunctionType and 
             not k.startswith("__") and 
-            (v is not None) and (v != {})
+            (v is not None) and (type(v) != dict)  and (v != {})
         }
-        return attr_only
+        json_dict = {
+            k: v
+            for k, v in d.items()
+            if type(v) != types.FunctionType and 
+            not k.startswith("__") and 
+            (v is not None) and (type(v) == dict)
+        }
+        return params_dict, json_dict
 
 
     def gen_uuid_decision(self):
@@ -136,7 +144,7 @@ class Action(Decision):
     #         decision_uuid=self.decision_uuid,
     #         decision_label=self.decision_label,
     #         actualizer=self.actualizer,
-    #         actual_pars=self.actual_pars,
+    #         actualizer_pars=self.actualizer_pars,
     #         result_dict=self.result_dict,
     #         action_server=self.action_server,
     #         action_queue_time=self.action_queue_time,
@@ -169,7 +177,7 @@ class Action(Decision):
     #         decision_uuid=self.decision_uuid,
     #         decision_label=self.decision_label,
     #         actualizer=self.actualizer,
-    #         actual_pars=self.actual_pars,
+    #         actualizer_pars=self.actualizer_pars,
     #         result_dict=self.result_dict,
     #         action_server=self.action_server,
     #         action_queue_time=self.action_queue_time,
