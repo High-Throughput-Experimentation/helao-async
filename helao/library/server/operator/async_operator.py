@@ -218,7 +218,7 @@ class C_async_operator:
     def get_actualizers(self):
         """Return the current list of ACTUALIZERS."""
         self.actualizers = []
-        print('##############', self.action_lib)
+        print(' ... found actualizer:', self.action_lib)
         for i, act in enumerate(self.action_lib):
             print('full',inspect.getfullargspec(self.action_lib[act]))
             #print('anno',inspect.getfullargspec(self.action_lib[act]).annotations)
@@ -338,26 +338,31 @@ class C_async_operator:
     def callback_start(self, event):
         print(' ... starting orch')
         self.app.doc.add_next_tick_callback(partial(self.do_orch_request,"start"))
+        self.app.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_stop(self, event):
         print(' ... stopping operator orch')
         self.app.doc.add_next_tick_callback(partial(self.do_orch_request,"stop"))
+        self.app.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_skip_dec(self, event):
         print(' ... skipping decision')
         self.app.doc.add_next_tick_callback(partial(self.do_orch_request,"skip"))
+        self.app.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_clear_decisions(self, event):
         print(' ... clearing decisions')
         self.app.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_decisions"))
+        self.app.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_clear_actions(self, event):
         print(' ... clearing actions')
         self.app.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_actions"))
+        self.app.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_prepend(self, event):
@@ -373,9 +378,6 @@ class C_async_operator:
 
     def append_action(self):
         params_dict, json_dict = self.populate_action()
-        # print("pop acction##############################################################")
-        # print(params)
-        # print("##############################################################")
         # submit decission to orchestrator
         self.app.doc.add_next_tick_callback(partial(self.do_orch_request,"append_decision", params_dict, json_dict))
 
@@ -391,9 +393,9 @@ class C_async_operator:
         selplateid = self.input_plateid.value
         selsample = self.input_sampleno.value
         sellabel = self.input_label.value
-        elements = self.input_elements.value
-        code  = self.input_code.value
-        composition = self.input_composition.value
+        # elements = self.input_elements.value
+        # code  = self.input_code.value
+        # composition = self.input_composition.value
 
         print(' ... selected action from list:', selaction)
         print(' ... selected plateid:', selplateid)
@@ -573,23 +575,25 @@ class C_async_operator:
 
 
 
-    def update_tables(self):
-        pass
-    #     self.get_decisions()
-    #     self.columns_dec = [TableColumn(field=key, title=key) for key in self.decision_list.keys()]
-    #     self.decision_table.source.data = self.decision_list
-    #     self.decision_table.columns=self.columns_dec
-
-    #     self.get_actions()
-    #     self.columns_act = [TableColumn(field=key, title=key) for key in self.action_list.keys()]
-    #     self.action_table.source.data=self.action_list
-    #     self.action_table.columns=self.columns_act
+    async def update_tables(self):
+        await self.get_decisions()
+        await self.get_actions()
 
 
-    # async def IOloop_visualizer(self):
-    #     # should maybe update it do ws later instead of polling once orch2 is ready
-    #     # itr seems when orch is in dispatch loop this here is not updating
-    #     self.update_tables()
+
+        self.columns_dec = [TableColumn(field=key, title=key) for key in self.decision_list.keys()]
+        self.decision_table.source.data = self.decision_list
+        self.decision_table.columns=self.columns_dec
+
+        self.columns_act = [TableColumn(field=key, title=key) for key in self.action_list.keys()]
+        self.action_table.source.data=self.action_list
+        self.action_table.columns=self.columns_act
+
+
+    async def IOloop(self):
+        # should maybe update it do ws later instead of polling once orch2 is ready
+        # itr seems when orch is in dispatch loop this here is not updating
+        await self.update_tables()
 
 
 
@@ -612,15 +616,9 @@ def makeBokehApp(doc, confPrefix, servKey):
 
     operator = C_async_operator(app)
     # get the event loop
-    operatorloop = asyncio.get_event_loop()
+    # operatorloop = asyncio.get_event_loop()
 
-
-
-# # select the first item to force an update of the layout
-# if operator.act_select_list:
-#     operator.actions_dropdown.value = operator.act_select_list[0]
-
-# # self.operator.app.doc.add_periodic_callback(operator.IOloop_visualizer,2000) # time in ms
-
+    # this periodically updates the GUI (action and decision tables)
+    # operator.app.doc.add_periodic_callback(operator.IOloop,2000) # time in ms
 
     return doc

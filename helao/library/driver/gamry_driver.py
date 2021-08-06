@@ -17,10 +17,6 @@ import psutil
 import os
 
 
-helao_root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-sys.path.append(helao_root)
-
-
 class Gamry_modes(str, Enum):
     CA = "CA"
     CP = "CP"
@@ -51,8 +47,6 @@ class Gamry_modes(str, Enum):
 #     mode15 = '3kA'
 
 # for IFC1010
-
-
 class Gamry_IErange(str, Enum):
     # NOTE: The ranges listed below are for 300 mA or 30 mA models. For 750 mA models, multiply the ranges by 2.5. For 600 mA models, multiply the ranges by 2.0.
     auto = "auto"
