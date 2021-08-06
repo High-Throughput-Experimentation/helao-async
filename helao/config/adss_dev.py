@@ -3,8 +3,8 @@ config = dict()
 
 # action library provides generator functions which produce action
 # lists from input decision_id grouping
-# config["action_libraries"] = ["lisa_sdc_demo"]
-config["action_libraries"] = ["lisa_ANEC2"]
+# config["action_library_path"] = ""
+config["action_libraries"] = ["ADSS"]
 config["technique_name"] = "adss"
 config["save_root"] = r"C:\INST_dev2\RUNS"
 config["liquid_sample_no_DB"] = r"C:\INST_dev2\DATABASE\liquid_ID_database.csv"
@@ -211,30 +211,29 @@ config["servers"] = dict(
     # #########################################################################
     # Visualizers (bokeh servers)
     # #########################################################################
-    exp_vis=dict(#simple dumb modular visualizer
-        host=hostip,
-        port=5001,
-        group="visualizer",
-        bokeh="bokeh_modular_visualizer",
-        params = dict(
-            doc_name = "ADSS visualizer",
-            ws_nidaqmx="nimax",
-            ws_potentiostat = 'potentiostat',
-        )
-    ),
-    # operator=dict(
+    # exp_vis=dict(#simple dumb modular visualizer
     #     host=hostip,
-    #     port=5002,
-    #     group="operator",
-    #     bokeh="async_operator",
-    #     path=".",
+    #     port=5001,
+    #     group="visualizer",
+    #     bokeh="bokeh_modular_visualizer",
     #     params = dict(
-    #         doc_name = "ADSS Operator",
-    #         orch = 'orchestrator',
-    #         data_server = "data",
-    #         servicemode=False,
+    #         doc_name = "ADSS visualizer",
+    #         ws_nidaqmx="nimax",
+    #         ws_potentiostat = 'potentiostat',
     #     )
     # ),
+    operator=dict(
+        host=hostip,
+        port=5002,
+        group="operator",
+        bokeh="async_operator",
+        params = dict(
+            doc_name = "ADSS Operator",
+            orch = 'orchestrator',
+            # data_server = "data",
+            # servicemode=False,
+        )
+    ),
     # aligner_vis=dict(
     #     host=hostip,
     #     port=5003,
