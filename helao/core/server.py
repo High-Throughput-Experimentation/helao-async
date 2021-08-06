@@ -70,11 +70,16 @@ async def setupAct(action_dict: dict, request: Request, scope: dict):
     if 'action_params' not in action_dict.keys():
         action_dict['action_params'] = {}
     for k in param_names:
-        if k not in action_dict['action_params'].keys() and k not in ["request", "action_dict"]:
-            if scope[k] is not None:
-                action_dict['action_params'][k] = scope[k]
-            else:
-                print(k, "is None")
+        if k not in action_dict['action_params'].keys() and k not in ["request", "action_dict"] and k not in action_dict.keys():
+            if k in scope:
+                print(" .... locals() key is", k)
+                # if k is not in ["action_dict"]:
+                if scope[k] is not None:
+                    action_dict['action_params'][k] = scope[k]
+                else:
+                    print(k, "is None")
+            # else:
+            #     print(f" ... {k} not in scope")
     action_dict['action_server'] = servKey
     action_dict['action_name'] = action_name
     A = Action(action_dict)
@@ -1338,7 +1343,9 @@ class Orch(Base):
                                     async for _ in self.global_q.subscribe():
                                         running_states, _ = self.check_global_state()
                                         global_free = len(running_states) == 0
+                                        print(" ... len(running_states):", len(running_states))
                                         if global_free:
+                                            print(" ... global_free is true")
                                             break
                         elif isinstance(A.start_condition, dict):
                             print(
@@ -1374,7 +1381,10 @@ class Orch(Base):
                                 if global_free:
                                     break
                         print(
-                            f" ... dispatching action {A.action} on server {A.server}"
+                            " ... dispatching action",  A.as_dict()
+                        )
+                        print(
+                            f" ... dispatching action {A.action_name} on server {A.action_server}"
                         )
                         # keep running list of dispatched actions
                         self.dispatched_actions[A.action_enum] = copy(A)
@@ -1386,6 +1396,7 @@ class Orch(Base):
             await self.intend_none()
             return True
         except asyncio.CancelledError:
+            print(" ... serious orch exception occurred")
             return False
 
     async def start_loop(self):
@@ -1743,8 +1754,8 @@ async def async_private_dispatcher(
     #     else:
     #         json_dict[key] = item
 
-    print("... params_dict", params_dict)
-    print("... json_dict", json_dict)
+    print(" ... params_dict", params_dict)
+    print(" ... json_dict", json_dict)
     
     async with aiohttp.ClientSession() as session:
         async with session.post(
