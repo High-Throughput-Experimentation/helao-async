@@ -30,6 +30,7 @@ class Decision(object):
         self.actualizer = imports.get("actualizer", None)
         self.actualizer_pars = imports.get("actualizer_pars", {})
         self.result_dict = imports.get("result_dict", {})
+        self.global_params = {}
         if self.decision_uuid is None:
             self.gen_uuid_decision()
 
@@ -111,6 +112,9 @@ class Action(Decision):
         self.filename = imports.get("filename", None)
         self.file_group = imports.get("file_group", None)
         self.error_code = imports.get("error_code", "0")
+        self.from_global_params = imports.get("from_global_params", {})
+        self.to_global_params = imports.get("to_global_params", [])
+
 
         check_args = {"server": self.action_server, "name": self.action_name}
         missing_args = [k for k, v in check_args.items() if v is None]

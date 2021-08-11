@@ -14,6 +14,7 @@ from socket import gethostname
 from time import ctime, time, strftime, strptime, time_ns
 from typing import Optional, Union
 from math import floor
+from enum import Enum
 
 import numpy as np
 import ntplib
@@ -32,6 +33,13 @@ from helao.core.schema import Action, Decision
 from helao.core.model import return_dec, return_declist, return_act, return_actlist
 
 async_copy = wrap(shutil.copy)
+
+
+class action_start_condition(int, Enum):
+    no_wait = 0             # orch is dispatching an unconditional action
+    wait_for_endpoint = 1   # orch is waiting for endpoint to become available
+    wait_for_server = 2     # orch is waiting for server to become available
+    wait_for_all = 3        #  (or other): orch is waiting for all action_dq to finish
 
 
 class HelaoFastAPI(FastAPI):
@@ -813,10 +821,15 @@ class Base(object):
             )
 
         async def clear_status(self):
-            self.base.status[self.action.action_name].remove(self.action.action_uuid)
-            print(
-                f" ... Removed {self.action.action_uuid} from {self.action.action_name} status list."
-            )
+            if self.action.action_uuid in self.base.status[self.action.action_name]:
+                self.base.status[self.action.action_name].remove(self.action.action_uuid)
+                print(
+                    f" ... Removed {self.action.action_uuid} from {self.action.action_name} status list."
+                )
+            else:
+                print(
+                    f" ... {self.action.action_uuid} did not excist in {self.action.action_name} status list."
+                )
             await self.base.status_q.put(
                 {self.action.action_name: self.base.status[self.action.action_name]}
             )
@@ -1299,14 +1312,15 @@ class Orch(Base):
                         A = self.action_dq.popleft()
                         # append previous results to current action
                         A.result_dict = self.active_decision.result_dict
+                        
                         # see async_action_dispatcher for unpacking
                         if isinstance(A.start_condition, int):
-                            if A.start_condition == 0:
+                            if A.start_condition == action_start_condition.no_wait:
                                 print(
                                     " ... orch is dispatching an unconditional action"
                                 )
                             else:
-                                if A.start_condition == 1:
+                                if A.start_condition == action_start_condition.wait_for_endpoint:
                                     print(
                                         " ... orch is waiting for endpoint to become available"
                                     )
@@ -1321,7 +1335,7 @@ class Orch(Base):
                                         )
                                         if endpoint_free:
                                             break
-                                elif A.start_condition == 2:
+                                elif A.start_condition == action_start_condition.wait_for_server:
                                     print(
                                         " ... orch is waiting for server to become available"
                                     )
@@ -1380,6 +1394,14 @@ class Orch(Base):
                                 global_free = len(running_states) == 0
                                 if global_free:
                                     break
+
+                        # copy requested global param to action params
+                        async for k,v in A.from_global_params.items():
+                            if k in self.active_decision.global_params.keys():
+                                A.action_params.update({
+                                    v:self.active_decision.global_params[k]
+                                    })
+
                         print(
                             " ... dispatching action",  A.as_dict()
                         )
@@ -1390,6 +1412,17 @@ class Orch(Base):
                         self.dispatched_actions[A.action_enum] = copy(A)
                         result = await async_action_dispatcher(self.world_cfg, A)
                         self.active_decision.result_dict[A.action_enum] = result
+
+                        async for k in result.to_global_params:
+                            if k in result.action_params.keys():
+                                if result.action_params[k] is None and k in self.active_decision.global_params.keys():
+                                    self.active_decision.global_params.pop(k)
+                                else:
+                                    self.active_decision.global_params.update({
+                                        k:result.action_params[k]
+                                        })
+
+                        
             print(" ... decision queue is empty")
             print(" ... stopping operator orch")
             self.loop_state = "stopped"
