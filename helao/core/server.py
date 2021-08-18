@@ -1491,14 +1491,13 @@ class Orch(Base):
                         self.print_message(" ... copying global vars back to decision")
                         self.print_message(result)
                         if "to_global_params" in result:
-                            for k in result.to_global_params:
-                                print(k)
-                                if k in result.action_params.keys():
-                                    if result.action_params[k] is None and k in self.active_decision.global_params.keys():
+                            for k in result["to_global_params"]:
+                                if k in result["action_params"].keys():
+                                    if result["action_params"][k] is None and k in self.active_decision.global_params.keys():
                                         self.active_decision.global_params.pop(k)
                                     else:
                                         self.active_decision.global_params.update({
-                                            k:result.action_params[k]
+                                            k:result["action_params"][k]
                                             })
                         self.print_message(" ... done copying global vars back to decision")
 
