@@ -16,6 +16,8 @@ from enum import Enum
 import psutil
 import os
 
+from helao.core.error import error_codes
+
 
 class Gamry_modes(str, Enum):
     CA = "CA"
@@ -191,6 +193,10 @@ class gamry:
         self.FIFO_Gamryname = ""
         # holds all sample information
         # self.FIFO_sample = sample_class()
+        
+        # signals return to endpoint after active was created
+        self.IO_continue = False
+
 
         ### passing Action dict will contain all UID and action paramter information ###
         # self.runparams = action_runparams
@@ -536,6 +542,34 @@ class gamry:
         this is the main function for the instrument"""
         await asyncio.sleep(0.001)
         if self.pstat:
+
+            # write header lines with one function call
+            tmps_headings = "\t".join(self.FIFO_column_headings)
+            self.FIFO_gamryheader = "\n".join(
+                [
+                    f"%gamry={self.FIFO_Gamryname}",
+                    self.FIFO_gamryheader,
+                    f"%ierangemode={self.IO_IErange.name}",
+                    "%techniqueparamsname=",
+                    f"%techniquename={self.IO_meas_mode.name}",
+                    "%epoch_ns=FIXME",
+                    "%version=0.2",
+                    f"%column_headings={tmps_headings}",
+                ]
+            )
+
+            self.active = await self.base.contain_action(
+                self.action,
+                file_type="gamry_pstat_file",
+                file_group="pstat_files",
+                header=self.FIFO_gamryheader,
+            )
+            print(f"!!! Active action uuid is {self.active.action.action_uuid}")
+            # active object is set so we can set the continue flag
+            self.IO_continue = True
+
+
+
             # TODO:
             # - I/E range: auto, fixed
             # - IRcomp: None, PF, CI
@@ -636,28 +670,8 @@ class gamry:
                 del connection
                 return {"measure": "run_error"}
 
-            # write header lines with one function call
-            tmps_headings = "\t".join(self.FIFO_column_headings)
-            self.FIFO_gamryheader = "\n".join(
-                [
-                    f"%gamry={self.FIFO_Gamryname}",
-                    self.FIFO_gamryheader,
-                    f"%ierangemode={self.IO_IErange.name}",
-                    "%techniqueparamsname=",
-                    f"%techniquename={self.IO_meas_mode.name}",
-                    "%epoch_ns=FIXME",
-                    "%version=0.2",
-                    f"%column_headings={tmps_headings}",
-                ]
-            )
 
-            self.active = await self.base.contain_action(
-                self.action,
-                file_type="gamry_pstat_file",
-                file_group="pstat_files",
-                header=self.FIFO_gamryheader,
-            )
-            print(f"!!! Active action uuid is {self.active.action.action_uuid}")
+
             realtime = await self.active.set_realtime()
             self.FIFO_gamryheader.replace("%epoch_ns=FIXME", f"%epoch_ns={realtime}")
 
@@ -784,6 +798,16 @@ class gamry:
                 #             activeDict = self.active.action.as_dict()
                 #     if activeDict:
                 #         break
+
+                # need to wait now for the activation of the meas routine
+                # and that the active object is activated and sets action status
+
+                while not self.IO_continue:
+                    await asyncio.sleep(1)
+
+                # reset continue flag
+                self.IO_continue = False
+
                 err_code = "none"
             elif self.IO_measuring:
                 err_code = "meas already in progress"
