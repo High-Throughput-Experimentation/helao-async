@@ -38,6 +38,8 @@ from importlib import import_module
 from fastapi import Request
 from typing import Optional
 import asyncio
+import time
+
 
 from helao.core.server import makeOrchServ, setupAct
 
@@ -63,8 +65,14 @@ def makeApp(confPrefix, servKey):
         """Sleep action"""    
         A = await setupAct(action_dict, request, locals())
         active = await app.orch.contain_action(action = A)
+        waittime = A.action_params["waittime"]
         print(' ... wait action:', waittime)
-        await asyncio.sleep(waittime)
+        start_time = time.time()
+        last_time = start_time
+        while time.time()-start_time < waittime:
+            await asyncio.sleep(0.5)
+            # print(time.time()-start_time)
+        # await asyncio.sleep(waittime)
         print(' ... wait action done')
         finished_act = await active.finish()
         return finished_act.as_dict()
