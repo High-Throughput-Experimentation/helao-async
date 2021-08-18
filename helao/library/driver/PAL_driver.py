@@ -789,8 +789,13 @@ class cPAL:
                         plate_id = PALparams.PAL_plate_id, 
                         sample_no = PALparams.PAL_plate_sample_no
                     )
+                
                     # TODO: check if ID was really created (later)
                     PALparams.liquid_sample_no_out = liquid_sample_no_out_dict["id"]
+
+                    if PALparams.PAL_method == PALmethods.fill or PALparams.PAL_method == PALmethods.fillfixed:
+                        if self.active:
+                            self.active.action_params.update({"_eche_sample_no":PALparams.liquid_sample_no_out})
 
 
 
