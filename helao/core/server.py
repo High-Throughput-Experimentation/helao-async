@@ -675,7 +675,6 @@ class Base(object):
                 self.status.update(status_msg)
                 for client_servkey in self.status_clients:
                     success = False
-                    print(client_servkey)
 
                     for _ in range(retry_limit):
 
@@ -1190,6 +1189,8 @@ class Orch(Base):
         self.global_state_dict = defaultdict(lambda: defaultdict(list))
         self.global_state_dict['_internal']['async_action_dispatcher'] = []
         self.global_q = MultisubscriberQueue()  # passes global_state_dict dicts
+        self.dispatch_q = self.global_q.queue()
+
 
         # global state of all instruments as string [idle|busy] independent of dispatch loop
         self.global_state_str = None
@@ -1209,12 +1210,27 @@ class Orch(Base):
         # pointer to dispatch_loop_task
         self.loop_task = None
         self.status_subscriber = asyncio.create_task(self.subscribe_all())
+        self.status_subscriber = asyncio.create_task(self.update_global_state_task())
 
 
     def print_message(self,*args):
         for arg in args:
             print(Style.BRIGHT+Fore.YELLOW+f"{arg}"+Style.RESET_ALL)
 
+
+    async def check_dispatch_queue(self):
+        val = await self.dispatch_q.get()        
+        while not self.dispatch_q.empty():
+            val = await self.dispatch_q.get()
+        return val
+
+        
+    async def check_wait_for_all_actions(self):
+        running_states, _ = await self.check_global_state()
+        global_free = len(running_states) == 0
+        print(" ... check len(running_states):", len(running_states))
+        return global_free
+        
 
     async def subscribe_all(self, retry_limit: int = 5):
         """Subscribe to all fastapi servers in config."""
@@ -1289,6 +1305,7 @@ class Orch(Base):
                         _running_uuids.append(uuid_tup)
         self.running_uuids = _running_uuids
 
+
     async def update_global_state_task(self):
         """Self-subscribe to global_q and update status dict."""
         async for status_dict in self.global_q.subscribe():
@@ -1302,7 +1319,8 @@ class Orch(Base):
                 self.global_state_str = "idle"
             else:
                 self.global_state_str = "busy"
-                print(" ... ", running_states)
+                print(" ... running_states:", running_states)
+
 
     async def check_global_state(self):
         """Return global state of action servers."""
@@ -1359,7 +1377,9 @@ class Orch(Base):
                     if self.loop_intent == "stop":
                         print(" ... stopping orchestrator")
                         # monitor status of running action_dq, then end loop
-                        async for _ in self.global_q.subscribe():
+                        # async for _ in self.global_q.subscribe():
+                        while True:
+                            _ = await self.check_dispatch_queue()
                             if self.global_state_str == "idle":
                                 self.loop_state = "stopped"
                                 await self.intend_none()
@@ -1386,7 +1406,9 @@ class Orch(Base):
                                     self.print_message(
                                         " ... orch is waiting for endpoint to become available"
                                     )
-                                    async for _ in self.global_q.subscribe():
+                                    # async for _ in self.global_q.subscribe():
+                                    while True:
+                                        _ = await self.check_dispatch_queue()
                                         endpoint_free = (
                                             len(
                                                 self.global_state_dict[A.action_server][
@@ -1401,7 +1423,9 @@ class Orch(Base):
                                     self.print_message(
                                         " ... orch is waiting for server to become available"
                                     )
-                                    async for _ in self.global_q.subscribe():
+                                    # async for _ in self.global_q.subscribe():
+                                    while True:
+                                        _ = await self.check_dispatch_queue()
                                         server_free = all(
                                             [
                                                 len(uuid_list) == 0
@@ -1416,20 +1440,10 @@ class Orch(Base):
                                     self.print_message(
                                         " ... orch is waiting for all action_dq to finish"
                                     )
-
-                                    running_states, _ = await self.check_global_state()
-                                    global_free = len(running_states) == 0
-                                    print(" ... len(running_states):", len(running_states))
-                                    if not global_free:
-
-                                        async for _ in self.global_q.subscribe():
-                                        # async with self.global_q.subscribe() as data:
-                                        # while True:
-                                            running_states, _ = await self.check_global_state()
-                                            global_free = len(running_states) == 0
-                                            print(" ... len(running_states):", len(running_states))
-                                            if global_free:
-                                                print(" ... global_free is true")
+                                    if not await self.check_wait_for_all_actions():
+                                        while True:
+                                            _ = await self.check_dispatch_queue()
+                                            if await self.check_wait_for_all_actions():
                                                 break
                                     else:
                                         print(" ... global_free is true")
@@ -1438,7 +1452,9 @@ class Orch(Base):
                                 " ... waiting for multiple conditions on external servers"
                             )
                             condition_dict = A.start_condition
-                            async for _ in self.global_q.subscribe():
+                            # async for _ in self.global_q.subscribe():
+                            while True:
+                                _ = await self.check_dispatch_queue()
                                 conditions_free = all(
                                     [
                                         len(self.global_state_dict[k][v] == 0)
@@ -1461,10 +1477,10 @@ class Orch(Base):
                             self.print_message(
                                 " ... invalid start condition, waiting for all action_dq to finish"
                             )
-                            async for _ in self.global_q.subscribe():
-                                running_states, _ = await self.check_global_state()
-                                global_free = len(running_states) == 0
-                                if global_free:
+                            # async for _ in self.global_q.subscribe():
+                            while True:
+                                _ = await self.check_dispatch_queue()
+                                if await self.check_wait_for_all_actions():
                                     break
 
                         self.print_message(" ... copying global vars to action")
