@@ -15,6 +15,8 @@ from time import ctime, time, strftime, strptime, time_ns
 from typing import Optional, Union
 from math import floor
 from enum import Enum
+import colorama
+from colorama import Fore, Back, Style
 
 import numpy as np
 import ntplib
@@ -33,6 +35,9 @@ from helao.core.schema import Action, Decision
 from helao.core.model import return_dec, return_declist, return_act, return_actlist
 
 async_copy = wrap(shutil.copy)
+
+# ANSI color codes converted to the Windows versions
+colorama.init()
 
 
 class action_start_condition(int, Enum):
@@ -130,8 +135,8 @@ def makeActServ(
         return app.base.status
 
     @app.post("/attach_client")
-    async def attach_client(client_addr: str):
-        await app.base.attach_client(client_addr)
+    async def attach_client(client_servkey: str):
+        return await app.base.attach_client(client_servkey)
 
     @app.post("/endpoints")
     def get_all_urls():
@@ -163,11 +168,11 @@ def makeOrchServ(
 
     @app.post("/update_status")
     async def update_status(server: str, status: str):
-        await app.orch.update_status(act_serv=server, status_dict=json.loads(status))
+        return await app.orch.update_status(act_serv=server, status_dict=json.loads(status))
 
     @app.post("/attach_client")
-    async def attach_client(client_addr: str):
-        await app.orch.attach_client(client_addr)
+    async def attach_client(client_servkey: str):
+        return await app.orch.attach_client(client_servkey)
 
     @app.websocket("/ws_status")
     async def websocket_status(websocket: WebSocket):
@@ -501,6 +506,16 @@ class Base(object):
         self.status_logger = self.aloop.create_task(self.log_status_task())
         self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
 
+
+    def print_color_msg(self, msg, color):
+        print(color + msg + Style.RESET_ALL)
+
+
+    def print_message(self,*args):
+        for arg in args:
+            print(Style.BRIGHT+Fore.GREEN+f"{arg}"+Style.RESET_ALL)
+
+
     def init_endpoint_status(self, app: FastAPI):
         "Populate status dict with FastAPI server endpoints for monitoring."
         for route in app.routes:
@@ -574,44 +589,56 @@ class Base(object):
             f" ... retrieved time at {ctime(self.ntp_response.tx_timestamp)} from {self.ntp_server}"
         )
 
-    async def attach_client(self, client_addr: str, retry_limit=5):
-        "Add client for pushing status updates via HTTP POST."
-        if client_addr in self.status_clients:
-            print(f" ... Client {client_addr} is already subscribed to status updates.")
-        else:
-            self.status_clients.add(client_addr)
-            print(f"Added {client_addr} to status subscriber list.")
-            current_status = self.status
-            async with aiohttp.ClientSession() as session:
-                success = False
-                for _ in range(retry_limit):
-                    async with session.post(
-                        f"http://{client_addr}/update_status",
-                        params={
-                            "server": self.server_name,
-                            "status": json.dumps(current_status),
-                        },
-                    ) as response:
-                        # response = await resp
-                        if response.status < 400:
-                            success = True
-                            break
-                if success:
-                    print(
-                        f" ... Updated {self.server_name} status to {current_status} on {client_addr}."
-                    )
-                else:
-                    print(
-                        f" ... Failed to push status message to {client_addr} after {retry_limit} attempts."
-                    )
 
-    def detach_client(self, client_addr: str):
+    async def attach_client(self, client_servkey: str, retry_limit=5):
+        "Add client for pushing status updates via HTTP POST."
+        success = False
+
+        if client_servkey in self.world_cfg["servers"]:
+        
+            if client_servkey in self.status_clients:
+                self.print_message(f" ... Client {client_servkey} is already subscribed to {self.server_name} status updates.")
+            else:
+                self.status_clients.add(client_servkey)
+
+                current_status = self.status
+                for _ in range(retry_limit):
+                    response = await async_private_dispatcher(
+                        world_config_dict = self.world_cfg, 
+                        server = client_servkey,
+                        private_action = "update_status",
+                        params_dict = {
+                                      "server": self.server_name,
+                                      "status": json.dumps(current_status)
+                                      },
+                        json_dict = {}
+                        )
+                    if response == True:
+                        self.print_message(f" ... Added {client_servkey} to {self.server_name} status subscriber list.")
+                        success = True
+                        break
+                    else:
+                        self.print_message(f" ... Failed to add {client_servkey} to {self.server_name} status subscriber list.")
+
+            if success:
+                self.print_message(
+                    f" ... Updated {self.server_name} status to {current_status} on {client_servkey}."
+                )
+            else:
+                self.print_message(
+                    f" ... Failed to push status message to {client_servkey} after {retry_limit} attempts."
+                )
+
+        return success
+
+
+    def detach_client(self, client_servkey: str):
         "Remove client from receiving status updates via HTTP POST"
-        if client_addr in self.status_clients:
-            self.status_clients.remove(client_addr)
-            print(f"Client {client_addr} will no longer receive status updates.")
+        if client_servkey in self.status_clients:
+            self.status_clients.remove(client_servkey)
+            print(f"Client {client_servkey} will no longer receive status updates.")
         else:
-            print(f" ... Client {client_addr} is not subscribed.")
+            print(f" ... Client {client_servkey} is not subscribed.")
 
     async def ws_status(self, websocket: WebSocket):
         "Subscribe to status queue and send message to websocket client."
@@ -621,8 +648,9 @@ class Base(object):
             async for status_msg in self.status_q.subscribe():
                 await websocket.send_text(json.dumps(status_msg))
         except WebSocketDisconnect:
-            print(
-                f" ... Status websocket client {websocket.client[0]}:{websocket.client[1]} disconnected."
+            self.print_color_msg(
+                f" ... Status websocket client {websocket.client[0]}:{websocket.client[1]} disconnected.",
+                Fore.BLACK+Back.RED
             )
 
     async def ws_data(self, websocket: WebSocket):
@@ -633,41 +661,57 @@ class Base(object):
             async for data_msg in self.data_q.subscribe():
                 await websocket.send_text(json.dumps(data_msg))
         except WebSocketDisconnect:
-            print(
-                f" ... Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected."
+            self.print_color_msg(
+                f" ... Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected.",
+                Fore.BLACK+Back.RED
             )
 
     async def log_status_task(self, retry_limit: int = 5):
         "Self-subscribe to status queue, log status changes, POST to clients."
+        print(f" ... {self.server_name} status log task created.")
+       
         try:
             async for status_msg in self.status_q.subscribe():
                 self.status.update(status_msg)
-                for client_addr in self.status_clients:
-                    async with aiohttp.ClientSession() as session:
-                        success = False
-                        for _ in range(retry_limit):
-                            async with session.post(
-                                f"http://{client_addr}/update_status",
-                                params={
-                                    "server": self.server_name,
-                                    "status": status_msg,
-                                },
-                            ) as resp:
-                                response = await resp
-                            if response.status < 400:
-                                success = True
-                                break
+                for client_servkey in self.status_clients:
+                    success = False
+                    print(client_servkey)
+
+                    for _ in range(retry_limit):
+
+                        response = await async_private_dispatcher(
+                            world_config_dict = self.world_cfg, 
+                            server = client_servkey,
+                            private_action = "update_status",
+                            params_dict = {
+                                          "server": self.server_name,
+                                           "status": json.dumps(status_msg)
+                                          },
+                            json_dict = {}
+                            )
+                        if response == True:
+                            self.print_message(f" ... send status msg to {client_servkey}.")
+                            success = True
+                            break
+                        else:
+                            self.print_message(f" ... Failed to send status msg {client_servkey}.")
+
                     if success:
-                        print(
-                            f" ... Updated {self.server_name} status to {status_msg} on {client_addr}."
+                        self.print_color_msg(
+                            f" ... Updated {self.server_name} status to {status_msg} on {client_servkey}.",
+                            Fore.GREEN
                         )
                     else:
-                        print(
-                            f" ... Failed to push status message to {client_addr} after {retry_limit} attempts."
+                        self.print_color_msg(
+                            f" ... Failed to push status message to {client_servkey} after {retry_limit} attempts.",
+                            Fore.GREEN
                         )
+
+
                 # TODO:write to log if save_root exists
         except asyncio.CancelledError:
-            print(" ... status logger task was cancelled")
+            self.print_color_msg(" ... status logger task was cancelled",Fore.BLACK+Back.RED)
+
 
     async def detach_subscribers(self):
         await self.status_q.put(StopAsyncIteration)
@@ -688,7 +732,7 @@ class Base(object):
                     wait_time = time() - self.ntp_last_sync
                     await asyncio.sleep(wait_time)
         except asyncio.CancelledError:
-            print(" ... ntp sync task was cancelled")
+            self.print_color_msg(" ... ntp sync task was cancelled",Fore.BLACK+Back.RED)
 
     async def shutdown(self):
         await self.detach_subscribers()
@@ -977,7 +1021,7 @@ class Base(object):
                             await self.write_live_data(json.dumps(data_val))
                             # await self.write_live_data(lines)
             except asyncio.CancelledError:
-                print(" ... data logger task was cancelled")
+                self.base.print_color_msg(" ... data logger task was cancelled",Fore.BLACK+Back.RED)
 
         async def write_file(
             self,
@@ -1167,39 +1211,48 @@ class Orch(Base):
         self.status_subscriber = asyncio.create_task(self.subscribe_all())
 
 
+    def print_message(self,*args):
+        for arg in args:
+            print(Style.BRIGHT+Fore.YELLOW+f"{arg}"+Style.RESET_ALL)
+
+
     async def subscribe_all(self, retry_limit: int = 5):
         """Subscribe to all fastapi servers in config."""
-        orch_addr = self.server_cfg["host"]
-        orch_port = self.server_cfg["port"]
         fails = []
         for serv_key, serv_dict in self.world_cfg["servers"].items():
             if "fast" in serv_dict.keys():
+                self.print_message(f" ... trying to subscribe to {serv_key} status")
+
+                success = False
+                for _ in range(retry_limit):
+                    response = await async_private_dispatcher(
+                        world_config_dict = self.world_cfg, 
+                        server = serv_key,
+                        private_action = "attach_client",
+                        params_dict = {"client_servkey":self.server_name},
+                        json_dict = {}
+                        )
+                    if response == True:
+                        success = True
+                        break
+
                 serv_addr = serv_dict["host"]
                 serv_port = serv_dict["port"]
-                async with aiohttp.ClientSession() as session:
-                    success = False
-                    for _ in range(retry_limit):
-                        async with session.post(
-                            f"http://{serv_addr}:{serv_port}/attach_client",
-                            params={"client_addr": f"{orch_addr}:{orch_port}"},
-                        ) as resp:
-                            response = await resp
-                        if response.status < 400:
-                            success = True
-                            break
-                    if success:
-                        print(f"Subscribed to {serv_key} at {serv_addr}:{serv_port}")
-                    else:
-                        fails.append(serv_key)
-                        print(
-                            f" ... Failed to subscribe to {serv_key} at {serv_addr}:{serv_port}. Check connection."
-                        )
+                if success:
+                    print(f"Subscribed to {serv_key} at {serv_addr}:{serv_port}")
+                else:
+                    fails.append(serv_key)
+                    print(
+                        f" ... Failed to subscribe to {serv_key} at {serv_addr}:{serv_port}. Check connection."
+                    )
+
         if len(fails) == 0:
             self.init_success = True
         else:
             print(
                 " ... Orchestrator cannot process decision_dq unless all FastAPI servers in config file are accessible."
             )
+
 
     async def update_status(self, act_serv: str, status_dict: dict):
         """Dict update method for action server to push status messages.
@@ -1220,6 +1273,7 @@ class Orch(Base):
                     print(f" ... {act_serv}:{act_name} ongoing {','.join(ongoing)}")
         self.global_state_dict[act_serv].update(status_dict)
         await self.global_q.put(self.global_state_dict)
+        return True
 
     async def update_global_state(self, status_dict: dict):
         _running_uuids = []
@@ -1239,7 +1293,7 @@ class Orch(Base):
         """Self-subscribe to global_q and update status dict."""
         async for status_dict in self.global_q.subscribe():
             await self.update_global_state(status_dict)
-            running_states, _ = self.check_global_state()
+            running_states, _ = await self.check_global_state()
             if self.estop_uuids and self.loop_state == "started":
                 await self.estop_loop()
             elif self.error_uuids and self.loop_state == "started":
@@ -1250,33 +1304,41 @@ class Orch(Base):
                 self.global_state_str = "busy"
                 print(" ... ", running_states)
 
-    def check_global_state(self):
+    async def check_global_state(self):
         """Return global state of action servers."""
         running_states = []
         idle_states = []
+        print(" ... checking global state:")
+        print(self.global_state_dict.items())
         for act_serv, act_dict in self.global_state_dict.items():
+            print(f" ... checking {act_serv} state")
             for act_name, act_uuids in act_dict.items():
                 if len(act_uuids) == 0:
                     idle_states.append(f"{act_serv}:{act_name}")
                 else:
                     running_states.append(f"{act_serv}:{act_name}:{len(act_uuids)}")
+            await asyncio.sleep(
+                0.001
+            )  # allows status changes to affect between action_dq, also enforce unique timestamp
         return running_states, idle_states
 
 
     async def dispatch_loop_task(self):
         """Parse decision and action queues, and dispatch action_dq while tracking run state flags."""
-        print(" ... running operator orch")
-        print(" ... orch status:", self.global_state_str)
+        self.print_message(" ... running operator orch")
+        self.print_message(" ... orch status:",self.global_state_str)
         # clause for resuming paused action list
-        print(" ... orch descisions: ", self.decision_dq)
+        self.print_message(" ... orch descisions: ", self.decision_dq)
         try:
             self.loop_state = "started"
             while self.loop_state == "started" and (self.action_dq or self.decision_dq):
+                self.print_message(self.action_dq)
+                self.print_message(self.decision_dq)
                 await asyncio.sleep(
                     0.001
                 )  # allows status changes to affect between action_dq, also enforce unique timestamp
                 if not self.action_dq:
-                    print(" ... getting action_dq from new decision")
+                    self.print_message(" ... getting action_dq from new decision")
                     # generate uids when populating, generate timestamp when acquring
                     self.last_decision = copy(self.active_decision)
                     self.active_decision = self.decision_dq.popleft()
@@ -1291,8 +1353,8 @@ class Orch(Base):
                     # TODO:update actualizer code
                     self.action_dq = deque(unpacked_acts)
                     self.dispatched_actions = {}
-                    print(" ... got ", self.action_dq)
-                    print(" ... optional params ", self.active_decision.actualizer_pars)
+                    self.print_message(" ... got ", self.action_dq)
+                    self.print_message(" ... optional params ", self.active_decision.actualizer_pars)
                 else:
                     if self.loop_intent == "stop":
                         print(" ... stopping orchestrator")
@@ -1306,7 +1368,7 @@ class Orch(Base):
                         # clear action queue, forcing next decision
                         self.action_dq.clear()
                         await self.intend_none()
-                        print(" ... skipping to next decision")
+                        self.print_message(" ... skipping to next decision")
                     else:
                         # all action blocking is handled like preempt, check Action requirements
                         A = self.action_dq.popleft()
@@ -1316,12 +1378,12 @@ class Orch(Base):
                         # see async_action_dispatcher for unpacking
                         if isinstance(A.start_condition, int):
                             if A.start_condition == action_start_condition.no_wait:
-                                print(
+                                self.print_message(
                                     " ... orch is dispatching an unconditional action"
                                 )
                             else:
                                 if A.start_condition == action_start_condition.wait_for_endpoint:
-                                    print(
+                                    self.print_message(
                                         " ... orch is waiting for endpoint to become available"
                                     )
                                     async for _ in self.global_q.subscribe():
@@ -1336,7 +1398,7 @@ class Orch(Base):
                                         if endpoint_free:
                                             break
                                 elif A.start_condition == action_start_condition.wait_for_server:
-                                    print(
+                                    self.print_message(
                                         " ... orch is waiting for server to become available"
                                     )
                                     async for _ in self.global_q.subscribe():
@@ -1351,18 +1413,28 @@ class Orch(Base):
                                         if server_free:
                                             break
                                 else:  # start_condition is 3 or unsupported value
-                                    print(
+                                    self.print_message(
                                         " ... orch is waiting for all action_dq to finish"
                                     )
-                                    async for _ in self.global_q.subscribe():
-                                        running_states, _ = self.check_global_state()
-                                        global_free = len(running_states) == 0
-                                        print(" ... len(running_states):", len(running_states))
-                                        if global_free:
-                                            print(" ... global_free is true")
-                                            break
+
+                                    running_states, _ = await self.check_global_state()
+                                    global_free = len(running_states) == 0
+                                    print(" ... len(running_states):", len(running_states))
+                                    if not global_free:
+
+                                        async for _ in self.global_q.subscribe():
+                                        # async with self.global_q.subscribe() as data:
+                                        # while True:
+                                            running_states, _ = await self.check_global_state()
+                                            global_free = len(running_states) == 0
+                                            print(" ... len(running_states):", len(running_states))
+                                            if global_free:
+                                                print(" ... global_free is true")
+                                                break
+                                    else:
+                                        print(" ... global_free is true")
                         elif isinstance(A.start_condition, dict):
-                            print(
+                            self.print_message(
                                 " ... waiting for multiple conditions on external servers"
                             )
                             condition_dict = A.start_condition
@@ -1386,26 +1458,29 @@ class Orch(Base):
                                 if conditions_free:
                                     break
                         else:
-                            print(
+                            self.print_message(
                                 " ... invalid start condition, waiting for all action_dq to finish"
                             )
                             async for _ in self.global_q.subscribe():
-                                running_states, _ = self.check_global_state()
+                                running_states, _ = await self.check_global_state()
                                 global_free = len(running_states) == 0
                                 if global_free:
                                     break
 
+                        self.print_message(" ... copying global vars to action")
+
                         # copy requested global param to action params
-                        async for k,v in A.from_global_params.items():
+                        for k,v in A.from_global_params.items():
+                            print(k,v)
                             if k in self.active_decision.global_params.keys():
                                 A.action_params.update({
                                     v:self.active_decision.global_params[k]
                                     })
 
-                        print(
+                        self.print_message(
                             " ... dispatching action",  A.as_dict()
                         )
-                        print(
+                        self.print_message(
                             f" ... dispatching action {A.action_name} on server {A.action_server}"
                         )
                         # keep running list of dispatched actions
@@ -1413,24 +1488,33 @@ class Orch(Base):
                         result = await async_action_dispatcher(self.world_cfg, A)
                         self.active_decision.result_dict[A.action_enum] = result
 
-                        async for k in result.to_global_params:
-                            if k in result.action_params.keys():
-                                if result.action_params[k] is None and k in self.active_decision.global_params.keys():
-                                    self.active_decision.global_params.pop(k)
-                                else:
-                                    self.active_decision.global_params.update({
-                                        k:result.action_params[k]
-                                        })
+                        self.print_message(" ... copying global vars back to decision")
+                        self.print_message(result)
+                        if "to_global_params" in result:
+                            for k in result.to_global_params:
+                                print(k)
+                                if k in result.action_params.keys():
+                                    if result.action_params[k] is None and k in self.active_decision.global_params.keys():
+                                        self.active_decision.global_params.pop(k)
+                                    else:
+                                        self.active_decision.global_params.update({
+                                            k:result.action_params[k]
+                                            })
+                        self.print_message(" ... done copying global vars back to decision")
 
                         
-            print(" ... decision queue is empty")
-            print(" ... stopping operator orch")
+            self.print_message(" ... decision queue is empty\n ... stopping operator orch")
             self.loop_state = "stopped"
             await self.intend_none()
             return True
-        except asyncio.CancelledError:
-            print(" ... serious orch exception occurred")
+        # except asyncio.CancelledError:
+        #     self.print_color_msg(" ... serious orch exception occurred",Fore.BLACK+Back.RED)
+        #     return False
+        except Exception as e:
+            self.print_color_msg(" ... serious orch exception occurred",Fore.BLACK+Back.RED)
+            print(e)
             return False
+
 
     async def start_loop(self):
         if self.loop_state == "stopped":
@@ -1747,8 +1831,8 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action):
     # splits action dict into suitable params and json parts
     params_dict, json_dict = A.fastdict()
 
-    print("... params_dict", params_dict)
-    print("... json_dict", json_dict)
+    # print("... params_dict", params_dict)
+    # print("... json_dict", json_dict)
     
     async with aiohttp.ClientSession() as session:
         async with session.post(
@@ -1780,15 +1864,9 @@ async def async_private_dispatcher(
     act_port = actd["port"]
 
     url = f"http://{act_addr}:{act_port}/{private_action}"
-    # for key, item in json_dicttemp.items():
-    #     if type(item) != dict:
-    #         if item is not None:
-    #             params_dict[key] = item
-    #     else:
-    #         json_dict[key] = item
 
-    print(" ... params_dict", params_dict)
-    print(" ... json_dict", json_dict)
+    # print(" ... params_dict", params_dict)
+    # print(" ... json_dict", json_dict)
     
     async with aiohttp.ClientSession() as session:
         async with session.post(
