@@ -121,8 +121,8 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/move")
     async def move(
         request: Request, 
-        multi_d_mm: Optional[List[float]] = [],
-        multi_axis: Optional[List[str]] = [],
+        d_mm: Optional[List[float]] = [],
+        axis: Optional[List[str]] = [],
         speed: Optional[int] = None,
         mode: Optional[move_modes] = "relative",
         transformation: Optional[transformation_mode] = "motorxy"  # default, nothing to do
@@ -160,7 +160,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/query_position")
     async def query_position(request: Request, 
-        multi_axis: Optional[Union[List[str], str]] = None
+        axis: Optional[Union[List[str], str]] = None
     ):
         A = await setupAct(request, locals())
         active = await app.base.contain_action(A)
@@ -171,7 +171,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/query_moving")
     async def query_moving(request: Request, 
-        multi_axis: Optional[Union[List[str], str]] = None
+        axis: Optional[Union[List[str], str]] = None
     ):
         A = await setupAct(request, locals())
         active = await app.base.contain_action(A)
@@ -181,7 +181,7 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/axis_off")
-    async def axis_off(request: Request, multi_axis: Optional[Union[List[str], str]] = None):
+    async def axis_off(request: Request, axis: Optional[Union[List[str], str]] = None):
         # http://127.0.0.1:8001/motor/set/off?axis=x
         A = await setupAct(request, locals())
         active = await app.base.contain_action(A)
@@ -191,7 +191,7 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/axis_on")
-    async def axis_on(request: Request, multi_axis: Optional[Union[List[str], str]] = None):
+    async def axis_on(request: Request, axis: Optional[Union[List[str], str]] = None):
         A = await setupAct(request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data(await app.driver.motor_on(**A.action_params))
