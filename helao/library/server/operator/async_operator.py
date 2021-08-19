@@ -146,6 +146,7 @@ class C_async_operator:
 
 
         self.act_descr_txt = Paragraph(text="""select item""", width=600, height=30)
+        self.error_txt = Paragraph(text="""no error""", width=600, height=30, style={'font-size': '100%', 'color': 'black'})
 
 
         self.input_sampleno = TextInput(value="", title="sample no", disabled=False, width=330, height=40)
@@ -175,6 +176,8 @@ class C_async_operator:
                 [Spacer(width=10), Div(text="<b>Actualizer description:</b>", width=200+50, height=15)],
                 [self.act_descr_txt],
                 Spacer(height=10),
+                [Spacer(width=10), Div(text="<b>Error message:</b>", width=200+50, height=15, style={'font-size': '100%', 'color': 'black'})],
+                [Spacer(width=10), self.error_txt],
                 Spacer(height=10),
                 ],background="#808080",width=640),
             layout([
@@ -473,6 +476,9 @@ class C_async_operator:
         self.act_descr_txt.text = value
 
 
+    def update_error(self, value):
+        self.error_txt.text = value
+
     def update_plateid(self, value):
         """updates plateid text input"""
         self.input_plateid.value = value
@@ -530,6 +536,8 @@ class C_async_operator:
         """"gets plate map from aligner server"""
         #simple one for tests is plateid = '4534'
         self.pmdata = json.loads(self.dataAPI.get_platemap_plateid(plateid))
+        if len(self.pmdata) == 0:
+            self.app.doc.add_next_tick_callback(partial(self.update_error,"no pm found"))
         self.app.doc.add_next_tick_callback(partial(self.update_pm_plot))
 
     
@@ -560,7 +568,8 @@ class C_async_operator:
             print_key_or_keyword="screening_print_id",
             exclude_elements_list=[""],
             return_defaults_if_none=False)
-        self.app.doc.add_next_tick_callback(partial(self.update_elements, elements))
+        if elements is not None:
+            self.app.doc.add_next_tick_callback(partial(self.update_elements, elements))
 
 
     def get_sample_infos(self, PMnum: List = None):
