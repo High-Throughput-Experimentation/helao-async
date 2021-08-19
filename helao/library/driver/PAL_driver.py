@@ -402,7 +402,8 @@ class cPAL:
         vial: int, 
         vol_mL: float, 
         liquid_sample_no: int,
-        dilute: bool = False
+        dilute: bool = False,
+        *args,**kwargs
     ):
         tray -= 1
         slot -= 1
@@ -576,7 +577,7 @@ class cPAL:
                 'vial': new_vial}
 
 
-    async def trayDB_new(self, req_vol: float = 2.0):
+    async def trayDB_new(self, req_vol: float = 2.0,*args,**kwargs):
         """Returns an empty vial position for given max volume.\n
         For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.\n
         It will select the first empty vial which has the smallest volume that still can hold req_vol"""
@@ -1332,7 +1333,7 @@ class cPAL:
         return datadict
 
 
-    async def liquid_sample_no_get(self, liquid_sample_no: int):
+    async def liquid_sample_no_get(self, liquid_sample_no: int,*args,**kwargs):
         datadict = await self.liquid_sample_no_DB.get_liquid_sample_no(liquid_sample_no)
         return datadict
 
@@ -1349,7 +1350,8 @@ class cPAL:
         lot_number: List[str] = [],
         servkey: str = None,
         plate_id: int = None,
-        sample_no: int = None
+        sample_no: int = None,
+        *args,**kwargs
     ):
         entry = dict(
             DUID=DUID,

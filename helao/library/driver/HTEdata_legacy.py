@@ -115,38 +115,38 @@ class HTEdata:
         self.dataAPI = HTE_legacy_API()
 
 
-    def get_platexycalibration(self, plateid: int):
+    def get_platexycalibration(self, plateid: int,*args,**kwargs):
         return None
     
-    def save_platexycalibration(self, plateid: int):
+    def save_platexycalibration(self, plateid: int,*args,**kwargs):
         return None
 
 
-    def get_rcp_plateid(self, plateid: int):
+    def get_rcp_plateid(self, plateid: int,*args,**kwargs):
         return self.dataAPI.get_rcp_plateid(plateid)
 
 
-    def get_info_plateid(self, plateid: int):
+    def get_info_plateid(self, plateid: int,*args,**kwargs):
         return self.dataAPI.get_info_plateid(plateid)
 
 
-    def check_annealrecord_plateid(self, plateid: int):
+    def check_annealrecord_plateid(self, plateid: int,*args,**kwargs):
         return self.dataAPI.check_annealrecord_plateid(plateid)
 
 
-    def check_printrecord_plateid(self, plateid: int):
+    def check_printrecord_plateid(self, plateid: int,*args,**kwargs):
         return self.dataAPI.check_printrecord_plateid(plateid)
 
 
-    def check_plateid(self, plateid: int):
+    def check_plateid(self, plateid: int,*args,**kwargs):
         return self.dataAPI.check_plateid(plateid)
 
 
-    def get_platemap_plateid(self, plateid: int):
+    def get_platemap_plateid(self, plateid: int,*args,**kwargs):
         return self.dataAPI.get_platemap_plateid(plateid)
 
 
-    def get_elements_plateid(self, plateid: int):
+    def get_elements_plateid(self, plateid: int,*args,**kwargs):
         return self.dataAPI.get_elements_plateid(
             plateid,
             multielementink_concentrationinfo_bool=False,

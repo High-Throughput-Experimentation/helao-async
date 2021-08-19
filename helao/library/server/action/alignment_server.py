@@ -50,7 +50,7 @@ def makeApp(confPrefix, servKey):
         A = await setupAct(request, locals())
         # A.action_params['stopping'] = False
         active = await app.base.contain_action(A)
-        await active.enqueue_data(await app.driver.move(**A.action_params))
+        await active.enqueue_data(await app.driver.move(A))
         finished_act = await active.finish()
         return finished_act.as_dict()
         

@@ -93,7 +93,7 @@ def makeApp(confPrefix, servKey):
         request: Request,
         trigger_port: Optional[int] = None,
         out_port: Optional[int] = None,
-        t_cycle: Optional[int] = None
+        t_cycle: Optional[float] = None
     ):
         A = await setupAct(request, locals())
         active = await app.base.contain_action(A)

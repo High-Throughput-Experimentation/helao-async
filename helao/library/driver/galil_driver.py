@@ -11,6 +11,7 @@ import time
 import pathlib
 import asyncio
 from enum import Enum
+from typing import List
 
 from helao.core.server import Base
 from helao.core.error import error_codes
@@ -645,7 +646,7 @@ class galil:
         return {"connection": "motor_offline"}
 
 
-    async def query_axis_position(self, multi_axis):
+    async def query_axis_position(self, multi_axis,*args,**kwargs):
         # this only queries the position of a single axis
         # server example:
         # http://127.0.0.1:8000/motor/query/position?axis=x
@@ -693,7 +694,7 @@ class galil:
 
         return {"ax": ret_ax, "position": ret_position}
 
-    async def query_axis_moving(self, multi_axis):
+    async def query_axis_moving(self, multi_axis,*args,**kwargs):
         # this functions queries the status of the axis
         q = self.c("SC")
         axlett = "ABCDEFGH"
@@ -742,7 +743,7 @@ class galil:
         # along with parameter values, and saved sequences are restored.
         return self.c("RS")
 
-    async def estop_axis(self, switch):
+    async def estop_axis(self, switch,*args,**kwargs):
         # this will estop the axis
         # set estop: switch=true
         # release estop: switch=false
@@ -788,7 +789,7 @@ class galil:
         ret.update(await self.query_axis_position(multi_axis))
         return ret
 
-    async def motor_off(self, multi_axis):
+    async def motor_off(self, multi_axis,*args,**kwargs):
 
         # sometimes it is useful to turn the motors off for manual alignment
         # this function does exactly that
@@ -821,7 +822,7 @@ class galil:
         ret.update(await self.query_axis_position(multi_axis))
         return ret
 
-    async def motor_on(self, multi_axis):
+    async def motor_on(self, multi_axis,*args,**kwargs):
         # sometimes it is useful to turn the motors back on for manual alignment
         # this function does exactly that
         # It then returns the status
@@ -852,7 +853,7 @@ class galil:
         ret.update(await self.query_axis_position(multi_axis))
         return ret
 
-    async def read_analog_in(self, multi_port):
+    async def read_analog_in(self, multi_port:List[int],*args,**kwargs):
         # this reads the value of an analog in port
         # http://127.0.0.1:8000/
         if type(multi_port) is not list:
@@ -866,7 +867,7 @@ class galil:
                 ret.append("AI ERROR")
         return {"port": multi_port, "value": ret, "type": "analog_in"}
 
-    async def read_digital_in(self, multi_port):
+    async def read_digital_in(self, multi_port:List[int],*args,**kwargs):
         # this reads the value of a digital in port
         # http://127.0.0.1:8000/
         if type(multi_port) is not list:
@@ -880,7 +881,7 @@ class galil:
                 ret.append("DI ERROR")
         return {"port": multi_port, "value": ret, "type": "digital_in"}
 
-    async def read_digital_out(self, multi_port):
+    async def read_digital_out(self, multi_port:List[int],*args,**kwargs):
         # this reads the value of an digital out port i.e. what is
         # actuallybeing put out (for checking)
         # http://127.0.0.1:8000/
@@ -896,7 +897,7 @@ class galil:
         return {"port": multi_port, "value": ret, "type": "digital_out"}
 
     # def set_analog_out(self, multi_port, handle: int, module: int, bitnum: int, multi_value):
-    async def set_analog_out(self, multi_port, multi_value):
+    async def set_analog_out(self, multi_port:List[int], multi_value:List[float],*args,**kwargs):
         # this is essentially a placeholder for now since the DMC-4143 does not support
         # analog out but I believe it is worthwhile to have this in here for the RIO
         # Handle num is A-H and must be on port 502 for the modbus commons
@@ -907,7 +908,7 @@ class galil:
         # _ = self.c("AO {},{}".format(port, value))
         return {"port": multi_port, "value": multi_value, "type": "analog_out"}
 
-    async def digital_out_on(self, multi_port):
+    async def digital_out_on(self, multi_port:List[int],*args,**kwargs):
         if type(multi_port) is not list:
             multi_port = [multi_port]
         for port in multi_port:
@@ -920,7 +921,7 @@ class galil:
             "type": "digital_out",
         }
 
-    async def digital_out_off(self, multi_port):
+    async def digital_out_off(self, multi_port:List[int],*args,**kwargs):
         if type(multi_port) is not list:
             multi_port = [multi_port]
 
@@ -941,7 +942,7 @@ class galil:
             self.c(DMC_prog_line)
         self.c("\x1a")  # terminator "<cntrl>Z"
 
-    async def set_digital_cycle(self, trigger_port, out_port, t_cycle):
+    async def set_digital_cycle(self, trigger_port:int, out_port:int, t_cycle:float,*args,**kwargs):
         DMC_prog = pathlib.Path(
             os.path.join(driver_path, "galil_toogle.dmc")
         ).read_text()
@@ -953,7 +954,7 @@ class galil:
         self.c("XQ #main")  # excecute main routine
 
     async def infinite_digital_cycles(
-        self, on_time=0.2, off_time=0.2, port=0, init_time=0
+        self, on_time:float=0.2, off_time:float=0.2, port:int=0, init_time:float=0,*args,**kwargs
     ):
         self.cycle_lights = True
         time.sleep(init_time)
@@ -1038,7 +1039,7 @@ class transformxy:
         print(" ... Minstr", self.Minstr)
         print(" ... Minstrxyz", self.Minstrxyz)
 
-    def transform_platexy_to_motorxy(self, platexy):
+    def transform_platexy_to_motorxy(self, platexy,*args,**kwargs):
         """simply calculates motorxy based on platexy
         plate warping (z) will be a different call"""
         platexy = np.asarray(platexy)
@@ -1053,7 +1054,7 @@ class transformxy:
         motorxy = np.array(motorxy)[0]
         return motorxy
 
-    def transform_motorxy_to_platexy(self, motorxy):
+    def transform_motorxy_to_platexy(self, motorxy,*args,**kwargs):
         """simply calculates platexy from current motorxy"""
         motorxy = np.asarray(motorxy)
         if len(motorxy) == 3:
@@ -1065,7 +1066,7 @@ class transformxy:
         platexy = np.array(platexy)[0]
         return platexy
 
-    def transform_motorxyz_to_instrxyz(self, motorxyz):
+    def transform_motorxyz_to_instrxyz(self, motorxyz,*args,**kwargs):
         """simply calculatesinstrxyz from current motorxyz"""
         motorxyz = np.asarray(motorxyz)
         if len(motorxyz) == 3:
@@ -1076,7 +1077,7 @@ class transformxy:
         instrxyz = np.dot(self.Minstrinv, motorxyz)
         return np.array(instrxyz)[0]
 
-    def transform_instrxyz_to_motorxyz(self, instrxyz):
+    def transform_instrxyz_to_motorxyz(self, instrxyz,*args,**kwargs):
         """simply calculates motorxyz from current instrxyz"""
         instrxyz = np.asarray(instrxyz)
         if len(instrxyz) == 3:
@@ -1288,7 +1289,7 @@ class transformxy:
             print(" ... new inverse system matrix:")
             print(self.Minv)
 
-    def update_Mplatexy(self, Mxy):
+    def update_Mplatexy(self, Mxy,*args,**kwargs):
         """updates the xy part of the plate calibration"""
         Mxy = np.matrix(Mxy)
         # assign the xy part
@@ -1310,7 +1311,7 @@ class transformxy:
         self.Mplatexy[1, 2] = self.Mplate[1, 3]
         return self.Mplatexy
 
-    def get_Mplate_Msystem(self, Mxy):
+    def get_Mplate_Msystem(self, Mxy,*args,**kwargs):
         """removes Minstr from Msystem to obtain Mplate for alignment"""
         Mxy = np.asarray(Mxy)
         Mglobal = np.asmatrix(np.identity(4))
