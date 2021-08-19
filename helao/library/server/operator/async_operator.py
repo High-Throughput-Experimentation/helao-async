@@ -319,15 +319,27 @@ class C_async_operator:
 
 
     def callback_changed_plateid(self, attr, old, new):
-        self.get_pm(new)
-        self.get_elements_plateid(new)
-
-
-    def callback_changed_sampleno(self, attr, old, new):
+        """callback for plateid text input"""
         def to_int(val):
             try:
                 return int(val)
-            except Exception:
+            except ValueError:
+                return None
+
+        plateid = to_int(new)
+        if plateid is not None:
+            self.get_pm(new)
+            self.get_elements_plateid(new)
+        else:
+            self.app.doc.add_next_tick_callback(partial(self.update_plateid,""))
+
+
+    def callback_changed_sampleno(self, attr, old, new):
+        """callback for sampleno text input"""
+        def to_int(val):
+            try:
+                return int(val)
+            except ValueError:
                 return None
 
         sample_no = to_int(new)
@@ -459,6 +471,11 @@ class C_async_operator:
 
     def update_doc(self, value):
         self.act_descr_txt.text = value
+
+
+    def update_plateid(self, value):
+        """updates plateid text input"""
+        self.input_plateid.value = value
 
 
     def update_samples(self, value):
