@@ -13,6 +13,10 @@ import asyncio
 from enum import Enum
 
 from helao.core.server import Base
+from helao.core.error import error_codes
+from helao.core.schema import Action
+# from helao.core.server import import_actualizers, async_private_dispatcher
+
 
 driver_path = os.path.dirname(__file__)
 
@@ -91,13 +95,22 @@ class galil:
             self.g.GOpen("%s --direct -s ALL" % (self.config_dict["galil_ip_str"]))
             print(self.g.GInfo())
             self.c = self.g.GCommand  # alias the command callable
-            self.c("SH; PF 10.0")
-            axis_init = [("MT", 2), ("CE", 4), ("TW", 32000)]
+            # The SH commands tells the controller to use the current 
+            # motor position as the command position and to enable servo control here.
+            # The SH command changes the coordinate system.
+            # Therefore, all position commands given prior to SH, 
+            # must be repeated. Otherwise, the controller produces incorrect motion.
+            self.c("SH; PF 10.4")
+            axis_init = [
+                        ("MT", 2), # Specifies Step motor with active low step pulses
+                        ("CE", 4), # Configure Encoder: Normal pulse and direction
+                        ("TW", 32000),  # Timeout for IN Position (MC) in ms
+                        ("SD", 256000), # sets the linear deceleration rate of the motors when a limit switch has been reached.
+                        ]
             for ax in self.config_dict['axis_id'].values():
                 for ac, av in axis_init:
                     self.c(f"{ac}{ax}={av}")
         except Exception:
-            # todo retrzy counter
             print("###########################################################")
             print(
                 " ........................... severe Galil error ... please power cycle Galil and try again"
@@ -106,7 +119,7 @@ class galil:
 
         self.cycle_lights = False
 
-        self.qdata = asyncio.Queue(maxsize=500)  # ,loop=asyncio.get_event_loop())
+        # self.qdata = asyncio.Queue(maxsize=500)  # ,loop=asyncio.get_event_loop())
 
         # local buffer for motion data streaming
         # nees to be upated by every motion function
@@ -119,33 +132,38 @@ class galil:
             platexy=[0.0, 0.0, 1],
         )
 
+
     def update_wsmotorbufferall(self, datakey, dataitems):
-        if datakey in self.wsmotordata_buffer.keys():
-            self.wsmotordata_buffer[datakey] = dataitems
+        pass
+        # if datakey in self.wsmotordata_buffer.keys():
+        #     self.wsmotordata_buffer[datakey] = dataitems
 
-        # update plateposition
-        if datakey == "position":
-            self.motor_to_plate_calc()
+        # # update plateposition
+        # if datakey == "position":
+        #     self.motor_to_plate_calc()
 
-        if self.qdata.full():
-            # print(' ... motion q is full ...')
-            _ = self.qdata.get_nowait()
-        self.qdata.put_nowait(self.wsmotordata_buffer)
+        # if self.qdata.full():
+        #     # print(' ... motion q is full ...')
+        #     _ = self.qdata.get_nowait()
+        # self.qdata.put_nowait(self.wsmotordata_buffer)
+
 
     def update_wsmotorbuffersingle(self, datakey, ax, item):
-        if datakey in self.wsmotordata_buffer.keys():
-            if ax in self.wsmotordata_buffer["axis"]:
-                idx = self.wsmotordata_buffer["axis"].index(ax)
-                self.wsmotordata_buffer[datakey][idx] = item
+        pass
+        # if datakey in self.wsmotordata_buffer.keys():
+        #     if ax in self.wsmotordata_buffer["axis"]:
+        #         idx = self.wsmotordata_buffer["axis"].index(ax)
+        #         self.wsmotordata_buffer[datakey][idx] = item
 
-        # update plateposition
-        if datakey == "position":
-            self.motor_to_plate_calc()
+        # # update plateposition
+        # if datakey == "position":
+        #     self.motor_to_plate_calc()
 
-        if self.qdata.full():
-            # print(' ... motion q is full ...')
-            _ = self.qdata.get_nowait()
-        self.qdata.put_nowait(self.wsmotordata_buffer)
+        # if self.qdata.full():
+        #     # print(' ... motion q is full ...')
+        #     _ = self.qdata.get_nowait()
+        # self.qdata.put_nowait(self.wsmotordata_buffer)
+
 
     async def setaxisref(self):
         # home all axis first
@@ -160,30 +178,59 @@ class galil:
         #            axis.pop(axis.index('Rz'))
         print(" ... axis:", axis)
 
+
         if axis is not None:
             # go slow to find the same position every time
             # first a fast move to find the switch
             retc1 = await self.motor_move(
-                [0 for ax in axis], axis, None, move_modes.homing, "motorxy"
+                Action({
+                        "action_params": {
+                                "d_mm": [0 for ax in axis],
+                                "axis": axis,
+                                "speed": None,
+                                "mode": move_modes.homing,
+                                "transformation": transformation_mode.motorxy,
+                                },
+                        })
             )
             # move back 2mm
             retc1 = await self.motor_move(
-                [2 for ax in axis], axis, None, move_modes.relative, "motorxy"
+                Action({
+                        "action_params": {
+                                "d_mm": [2 for ax in axis],
+                                "axis": axis,
+                                "speed": None,
+                                "mode": move_modes.relative,
+                                "transformation": transformation_mode.motorxy,
+                                },
+                        })
             )
             # approach switch again very slow to get better zero position
             retc1 = await self.motor_move(
-                [0 for ax in axis], axis, 1000, move_modes.homing, "motorxy"
+                Action({
+                        "action_params": {
+                                "d_mm": [0 for ax in axis],
+                                "axis": axis,
+                                "speed": 1000,
+                                "mode": move_modes.homing,
+                                "transformation": transformation_mode.motorxy,
+                                },
+                        })
             )
 
             retc2 = await self.motor_move(
-                [
+                Action({
+                        "action_params": {
+                                "d_mm":[
                     self.config_dict["axis_zero"][self.config_dict["axis_id"][ax]]
                     for ax in axis
-                ],
-                [ax for ax in axis],
-                None,
-                move_modes.relative,
-                "motorxy"
+                                        ],
+                                "axis": axis,
+                                "speed": None,
+                                "mode": move_modes.relative,
+                                "transformation": transformation_mode.motorxy,
+                                },
+                        })
             )
 
             # set absolute zero to current position
@@ -204,23 +251,34 @@ class galil:
         else:
             return "error"
 
+
     def motor_to_plate_calc(self):
+        pass
         # add some extra data
-        if "x" in self.wsmotordata_buffer["axis"]:
-            idx = self.wsmotordata_buffer["axis"].index("x")
-            xmotor = self.wsmotordata_buffer["position"][idx]
-        else:
-            xmotor = None
+        # if "x" in self.wsmotordata_buffer["axis"]:
+        #     idx = self.wsmotordata_buffer["axis"].index("x")
+        #     xmotor = self.wsmotordata_buffer["position"][idx]
+        # else:
+        #     xmotor = None
 
-        if "y" in self.wsmotordata_buffer["axis"]:
-            idx = self.wsmotordata_buffer["axis"].index("y")
-            ymotor = self.wsmotordata_buffer["position"][idx]
-        else:
-            ymotor = None
-        platexy = self.transform.transform_motorxy_to_platexy([xmotor, ymotor, 1])
-        self.wsmotordata_buffer["platexy"] = [platexy[0], platexy[1], 1]
+        # if "y" in self.wsmotordata_buffer["axis"]:
+        #     idx = self.wsmotordata_buffer["axis"].index("y")
+        #     ymotor = self.wsmotordata_buffer["position"][idx]
+        # else:
+        #     ymotor = None
+        # platexy = self.transform.transform_motorxy_to_platexy([xmotor, ymotor, 1])
+        # self.wsmotordata_buffer["platexy"] = [platexy[0], platexy[1], 1]
 
-    async def motor_move(self, multi_d_mm, multi_axis, speed, mode, transformation):
+
+    async def motor_move(self, A: Action):
+        multi_d_mm = A.action_params.get("multi_d_mm",[])
+        multi_axis = A.action_params.get("multi_axis",[])
+        speed = A.action_params.get("speed", None)
+        mode = A.action_params.get("mode",move_modes.absolute)
+        transformation = A.action_params.get("transformation",transformation_mode.motorxy)
+        
+        error =  error_codes.none
+
         stopping = False  # no stopping of any movement by other actions
         mode = move_modes(mode)
         transformation = transformation_mode(transformation)
@@ -271,9 +329,9 @@ class galil:
 
         if transformation == transformation_mode.motorxy:
             # nothing to do
-            print("motion: got motorxy (", mode, "), no transformation necessary")
+            print(" ... motion: got motorxy (", mode, "), no transformation necessary")
         elif transformation == transformation_mode.platexy:
-            print("motion: got platexy (", mode, "), converting to motorxy")
+            print(" ... motion: got platexy (", mode, "), converting to motorxy")
             motorxy = [0, 0, 1]
             motorxy[0] = current_positionvec[0]
             motorxy[1] = current_positionvec[1]
@@ -578,12 +636,14 @@ class galil:
             "counts": ret_counts,
         }
 
+
     async def motor_disconnect(self):
         try:
             self.g.GClose()  # don't forget to close connections!
         except gclib.GclibError as e:
             return {"connection": {"Unexpected GclibError:", e}}
         return {"connection": "motor_offline"}
+
 
     async def query_axis_position(self, multi_axis):
         # this only queries the position of a single axis
@@ -606,7 +666,7 @@ class galil:
         q = self.c(cmd)  # query position of all axis
         # _ = self.c("PF 10.4")  # set format
         # q = self.c("TP")  # query position of all axis
-
+        print(" ... ",q)
         # now we need to map these outputs to the ABCDEFG... channels
         # and then map that to xyz so it is humanly readable
         axlett = "ABCDEFGH"
@@ -615,7 +675,7 @@ class galil:
         ax_abc_to_xyz = {l: inv_axis_id[l] for i, l in enumerate(axlett) if l in inv_axis_id.keys()}
         # this puts the counts back to motor mm
         pos = {
-            axl: int(r) * self.config_dict["count_to_mm"][axl]
+            axl: float(r) * self.config_dict["count_to_mm"][axl]
             for axl, r in zip(axlett, q.split(", "))
         }
         # return the results through calculating things into mm
