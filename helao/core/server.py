@@ -71,28 +71,31 @@ class HelaoBokehAPI:#(curdoc):
         self.doc.title = self.doc_name
 
 
-async def setupAct(action_dict: dict, request: Request, scope: dict):   
+async def setupAct(action_dict: dict, request: Request, scope: dict):
     servKey, _, action_name = request.url.path.strip("/").partition("/")    
     body_bytes = await request.body()
     if body_bytes == b'':
         body_params = {}
     else:
         body_params = await request.json()
-    param_names = list(body_params.keys()) + list(request.query_params.keys())
-    scope.update(body_params)
-    if 'action_params' not in action_dict.keys():
-        action_dict['action_params'] = {}
-    for k in param_names:
-        if k not in action_dict['action_params'].keys() and k not in ["request", "action_dict"] and k not in action_dict.keys():
-            if k in scope:
-                print(" .... locals() key is", k)
-                # if k is not in ["action_dict"]:
-                if scope[k] is not None:
-                    action_dict['action_params'][k] = scope[k]
-                else:
-                    print(k, "is None")
-            # else:
-            #     print(f" ... {k} not in scope")
+
+    action_dict = dict()
+    # action_dict.update(request.query_params)
+    if len(request.query_params) == 0: # cannot check against {}
+        # empty: orch
+        action_dict.update(body_params)
+    else:
+        # not empty: swagger
+        if "action_params" not in action_dict:
+            action_dict.update({"action_params":{}})
+        action_dict["action_params"].update(body_params)
+        # action_dict["action_params"].update(request.query_params)
+        for k in scope:
+            if k not in ["request", "action_dict", "app"]:
+                print(" ... scope key is", k, scope[k])
+                action_dict['action_params'][k] = scope[k]
+
+
     action_dict['action_server'] = servKey
     action_dict['action_name'] = action_name
     A = Action(action_dict)
@@ -650,7 +653,7 @@ class Base(object):
         except WebSocketDisconnect:
             self.print_color_msg(
                 f" ... Status websocket client {websocket.client[0]}:{websocket.client[1]} disconnected.",
-                Fore.BLACK+Back.RED
+                Style.BRIGHT+Fore.BLACK+Back.RED
             )
 
     async def ws_data(self, websocket: WebSocket):
@@ -663,7 +666,7 @@ class Base(object):
         except WebSocketDisconnect:
             self.print_color_msg(
                 f" ... Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected.",
-                Fore.BLACK+Back.RED
+                Style.BRIGHT+Fore.BLACK+Back.RED
             )
 
     async def log_status_task(self, retry_limit: int = 5):
@@ -709,7 +712,7 @@ class Base(object):
 
                 # TODO:write to log if save_root exists
         except asyncio.CancelledError:
-            self.print_color_msg(" ... status logger task was cancelled",Fore.BLACK+Back.RED)
+            self.print_color_msg(" ... status logger task was cancelled",Style.BRIGHT+Fore.BLACK+Back.RED)
 
 
     async def detach_subscribers(self):
@@ -731,7 +734,7 @@ class Base(object):
                     wait_time = time() - self.ntp_last_sync
                     await asyncio.sleep(wait_time)
         except asyncio.CancelledError:
-            self.print_color_msg(" ... ntp sync task was cancelled",Fore.BLACK+Back.RED)
+            self.print_color_msg(" ... ntp sync task was cancelled",Style.BRIGHT+Fore.BLACK+Back.RED)
 
     async def shutdown(self):
         await self.detach_subscribers()
@@ -1020,7 +1023,7 @@ class Base(object):
                             await self.write_live_data(json.dumps(data_val))
                             # await self.write_live_data(lines)
             except asyncio.CancelledError:
-                self.base.print_color_msg(" ... data logger task was cancelled",Fore.BLACK+Back.RED)
+                self.base.print_color_msg(" ... data logger task was cancelled",Style.BRIGHT+Fore.BLACK+Back.RED)
 
         async def write_file(
             self,
@@ -1326,8 +1329,8 @@ class Orch(Base):
         """Return global state of action servers."""
         running_states = []
         idle_states = []
-        print(" ... checking global state:")
-        print(self.global_state_dict.items())
+        # print(" ... checking global state:")
+        # print(self.global_state_dict.items())
         for act_serv, act_dict in self.global_state_dict.items():
             print(f" ... checking {act_serv} state")
             for act_name, act_uuids in act_dict.items():
@@ -1366,7 +1369,7 @@ class Orch(Base):
                     # additional actualizer params should be stored in decision.actualizer_pars
                     unpacked_acts = self.action_lib[actualizer](self.active_decision)
                     for i, act in enumerate(unpacked_acts):
-                        act.action_enum = f"{i}"
+                        act.action_enum = float(i)#f"{i}"
                         # act.gen_uuid()
                     # TODO:update actualizer code
                     self.action_dq = deque(unpacked_acts)
@@ -1523,10 +1526,10 @@ class Orch(Base):
             await self.intend_none()
             return True
         # except asyncio.CancelledError:
-        #     self.print_color_msg(" ... serious orch exception occurred",Fore.BLACK+Back.RED)
+        #     self.print_color_msg(" ... serious orch exception occurred",Style.BRIGHT+Fore.BLACK+Back.RED)
         #     return False
         except Exception as e:
-            self.print_color_msg(" ... serious orch exception occurred",Fore.BLACK+Back.RED)
+            self.print_color_msg(" ... serious orch exception occurred",Style.BRIGHT+Fore.BLACK+Back.RED)
             print(e)
             return False
 
@@ -1844,7 +1847,9 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action):
     act_port = actd["port"]
     url = f"http://{act_addr}:{act_port}/{A.action_server}/{A.action_name}"
     # splits action dict into suitable params and json parts
-    params_dict, json_dict = A.fastdict()
+    # params_dict, json_dict = A.fastdict()
+    params_dict = {}
+    json_dict = A.as_dict()
 
     # print("... params_dict", params_dict)
     # print("... json_dict", json_dict)
