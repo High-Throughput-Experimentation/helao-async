@@ -40,11 +40,10 @@ def makeApp(confPrefix, servKey):
     async def run_task_GasFlowValves(
                                     request: Request, 
                                     valves: Optional[List[int]] = [],
-                                    on: Optional[bool] = True,
-                                    action_dict: dict = {}
+                                    on: Optional[bool] = True
                                     ):
         """Provide list of Valves (number) separated by ,"""
-        A = await setupAct(action_dict, request, locals())
+        A = await setupAct(request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data({"GasFlowValves": await app.driver.run_task_GasFlowValves(**A.action_params)})
         finished_act = await active.finish()
@@ -55,11 +54,10 @@ def makeApp(confPrefix, servKey):
     async def run_task_Master_Cell_Select(
                                          request: Request, 
                                          cells: Optional[List[int]] = [], 
-                                         on: Optional[bool] = True,
-                                         action_dict: dict = {}
+                                         on: Optional[bool] = True
                                          ):
         """Provide list of Cells separated by ,"""
-        A = await setupAct(action_dict, request, locals())
+        A = await setupAct(request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data({"Master_Cell": await app.driver.run_task_Master_Cell_Select(**A.action_params)})
         finished_act = await active.finish()
@@ -70,11 +68,10 @@ def makeApp(confPrefix, servKey):
     async def run_task_Active_Cells_Selection(
                                              request: Request,
                                              cells: Optional[List[int]] = [], 
-                                             on: Optional[bool] = True,
-                                             action_dict: dict = {}
+                                             on: Optional[bool] = True
                                              ):
         """Provide list of Cells (number) separated by ,"""
-        A = await setupAct(action_dict, request, locals())
+        A = await setupAct(request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data({"Active_Cells": await app.driver.run_task_Active_Cells_Selection(**A.action_params)})
         finished_act = await active.finish()
@@ -85,10 +82,9 @@ def makeApp(confPrefix, servKey):
     async def run_task_Pump(
                             request: Request, 
                             pump: Optional[pumpitems] = "PeriPump",
-                            on: Optional[bool] = True,
-                            action_dict: dict = {}
+                            on: Optional[bool] = True
                             ):
-        A = await setupAct(action_dict, request, locals())
+        A = await setupAct(request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data({"pumps": await app.driver.run_task_Pump(**A.action_params)})
         finished_act = await active.finish()
@@ -99,10 +95,9 @@ def makeApp(confPrefix, servKey):
     async def run_task_FSWBCD(
                              request: Request,
                              BCDs: Optional[str] = "",
-                             on: Optional[bool] = True,
-                             action_dict: dict = {}
+                             on: Optional[bool] = True
                              ):
-        A = await setupAct(action_dict, request, locals())
+        A = await setupAct(request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data({"FSWBCD": await app.driver.run_task_FSWBCD(**A.action_params)})
         finished_act = await active.finish()
@@ -110,11 +105,8 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/run_task_FSW_error")
-    async def run_task_FSW_error(
-                                request: Request, 
-                                action_dict: dict = {}
-                                ):
-        A = await setupAct(action_dict, request, locals())
+    async def run_task_FSW_error(request: Request):
+        A = await setupAct(request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data({"FSW_error": await app.driver.run_task_getFSW("Error")})
         finished_act = await active.finish()
@@ -122,11 +114,8 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/run_task_FSW_done")
-    async def run_task_FSW_done(
-                                request: Request, 
-                                action_dict: dict = {}
-                               ):
-        A = await setupAct(action_dict, request, locals())
+    async def run_task_FSW_done(request: Request):
+        A = await setupAct(request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data({"FSW_done": await app.driver.run_task_getFSW("Done")})
         finished_act = await active.finish()
@@ -138,23 +127,19 @@ def makeApp(confPrefix, servKey):
                               request: Request, 
                               Tval: Optional[float] = 10.0,
                               SampleRate: Optional[float] = 1.0, 
-                              TTLwait: Optional[int] = -1,  # -1 disables, else select TTL channel
-                              action_dict: dict = {},
+                              TTLwait: Optional[int] = -1  # -1 disables, else select TTL channel
                               ):
         """Runs multi cell IV measurement."""
-        A = await setupAct(action_dict, request, locals())
+        A = await setupAct(request, locals())
         A.save_data = True
         active_dict = await app.driver.run_cell_IV(A)
         return active_dict
 
 
     @app.post(f"/{servKey}/stop")
-    async def stop(
-                  request: Request, 
-                  action_dict: dict = {}
-                  ):
+    async def stop(request: Request):
         """Stops measurement in a controlled way."""
-        A = await setupAct(action_dict, request, locals())
+        A = await setupAct(request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data({"stop_result": await app.driver.stop()})
         finished_act = await active.finish()
@@ -164,11 +149,10 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/estop")
     async def estop(
                    request: Request, 
-                   switch: Optional[bool] = True,
-                   action_dict: dict = {}
+                   switch: Optional[bool] = True
                    ):
         """Same as stop, but also sets estop flag."""
-        A = await setupAct(action_dict, request, locals())
+        A = await setupAct(request, locals())
         active = await app.base.contain_action(A)
         await active.enqueue_data({"estop_result": await app.driver.estop(**A.action_params)})
         finished_act = await active.finish()

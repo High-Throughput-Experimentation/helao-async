@@ -754,9 +754,11 @@ class gamry:
             # file and Gamry connection will be closed with the meas loop
             await self.IO_signalq.put(False)
 
-    async def estop(self, switch):
+    async def estop(self, A: Action):
         """same as stop, set or clear estop flag with switch parameter"""
         # should be the same as stop()
+        switch = A.action_params["switch"]
+        
         self.IO_estop = switch
         if self.IO_measuring:
             if switch:

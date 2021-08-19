@@ -409,7 +409,7 @@ class C_async_operator:
         print(' ... selected label:', sellabel)
 
 
-        actparams = {paraminput.title: paraminput.value for paraminput in self.param_input}
+        actparams = {paraminput.title: json.loads(paraminput.value) for paraminput in self.param_input}
 
         D = Decision(inputdict={
             # "orch_name":orch_name,
@@ -441,7 +441,13 @@ class C_async_operator:
             if args[idx] == 'decisionObj':
                 continue
 
-            self.param_input.append(TextInput(value=buf, title=args[idx], disabled=False, width=400, height=40))
+            disabled = False
+            if args[idx] == 'x_mm':
+                disabled = True
+            if args[idx] == 'y_mm':
+                disabled = True
+
+            self.param_input.append(TextInput(value=buf, title=args[idx], disabled=disabled, width=400, height=40))
             self.param_layout.append(layout([
                         [self.param_input[item]],
                         Spacer(height=10),

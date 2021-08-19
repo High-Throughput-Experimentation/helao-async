@@ -71,7 +71,7 @@ class HelaoBokehAPI:#(curdoc):
         self.doc.title = self.doc_name
 
 
-async def setupAct(action_dict: dict, request: Request, scope: dict):
+async def setupAct(request: Request, scope: dict):
     servKey, _, action_name = request.url.path.strip("/").partition("/")    
     body_bytes = await request.body()
     if body_bytes == b'':
