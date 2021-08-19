@@ -38,7 +38,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/query_analog_in")
     async def read_analog_in(
-        request: Request, multi_port: Optional[Union[List[int], int]] = None
+        request: Request, ports: Optional[Union[List[int], int]] = None
     ):
         # http://127.0.0.1:8001/io/query/analog_in?port=0
         A = await setupAct(request, locals())
@@ -50,7 +50,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/query_digital_in")
     async def read_digital_in(
-        request: Request, multi_port: Optional[Union[List[int], int]] = None
+        request: Request, ports: Optional[Union[List[int], int]] = None
     ):
         A = await setupAct(request, locals())
         active = await app.base.contain_action(A)
@@ -60,7 +60,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/query_digital_out")
     async def read_digital_out(
-        request: Request, multi_port: Optional[Union[List[int], int]] = None
+        request: Request, ports: Optional[Union[List[int], int]] = None
     ):
         A = await setupAct(request, locals())
         active = await app.base.contain_action(A)
@@ -70,7 +70,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/digital_out_on")
     async def set_digital_out_on(
-        request: Request, multi_port: Optional[Union[List[int], int]] = None
+        request: Request, ports: Optional[Union[List[int], int]] = None
     ):
         A = await setupAct(request, locals())
         active = await app.base.contain_action(A)
@@ -80,7 +80,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/digital_out_off")
     async def set_digital_out_off(
-        request: Request, multi_port: Optional[Union[List[int], int]] = None
+        request: Request, ports: Optional[Union[List[int], int]] = None
     ):
         A = await setupAct(request, locals())
         active = await app.base.contain_action(A)
@@ -104,7 +104,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/analog_out")
     async def set_analog_out(
         request: Request,
-        multi_port: Optional[Union[List[int], int]] = None,
+        ports: Optional[Union[List[int], int]] = None,
         multi_value: Optional[Union[List[float], float]] = None
     ):
         # async def set_analog_out(handle: int, module: int, bitnum: int, value: float):

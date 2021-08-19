@@ -225,11 +225,11 @@ class C_async_operator:
         self.actualizers = []
         print(' ... found actualizer:', self.action_lib)
         for i, act in enumerate(self.action_lib):
-            print('full',inspect.getfullargspec(self.action_lib[act]))
+            # print('full',inspect.getfullargspec(self.action_lib[act]))
             #print('anno',inspect.getfullargspec(self.action_lib[act]).annotations)
             #print('def',inspect.getfullargspec(self.action_lib[act]).defaults)
             tmpdoc = self.action_lib[act].__doc__ 
-            print("... doc:", tmpdoc)
+            # print("... doc:", tmpdoc)
             if tmpdoc == None:
                 tmpdoc = ""
             tmpargs = inspect.getfullargspec(self.action_lib[act]).args
@@ -451,7 +451,7 @@ class C_async_operator:
         item = 0
         for idx in range(len(args)):
             buf = f'{defaults[idx]}'
-            print(' ... action parameter:',args[idx])
+            # print(' ... action parameter:',args[idx])
             # skip the decisionObj parameter
             if args[idx] == 'decisionObj':
                 continue
