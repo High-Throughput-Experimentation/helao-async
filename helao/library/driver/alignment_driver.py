@@ -49,7 +49,7 @@ class aligner:
             self.motorport = self.C[motor]['port']
             self.motorserv = motor
         else:
-            print(f'Alignment Error. {motor} server not found.')
+            self.base.print_message(f'Alignment Error. {motor} server not found.')
             return []
 
         if data in self.C.keys():
@@ -57,7 +57,7 @@ class aligner:
             self.dataport = self.C[data]['port']
             self.dataserv = data
         else:
-            print(f'Alignment Error. {data} server not found.')
+            self.base.print_message(f'Alignment Error. {data} server not found.')
             return []
 
 #        if visualizer in self.C:
@@ -65,10 +65,10 @@ class aligner:
 #            self.visport = self.C[visualizer].port
 #            self.visserv= visualizer
 #        else:
-#            print(f'Alignment Error. {visualizer} server not found.')
+#            self.base.print_message(f'Alignment Error. {visualizer} server not found.')
 #            return []
 
-        print(f'Plate Aligner web interface: http://{self.vishost}:{self.visport}/{self.visserv}')
+        self.base.print_message(f'Plate Aligner web interface: http://{self.vishost}:{self.visport}/{self.visserv}')
         
         
 # alignement needs to be returned via status, else we get a timeout       

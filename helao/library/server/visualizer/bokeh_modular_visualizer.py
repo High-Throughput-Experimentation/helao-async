@@ -4,6 +4,7 @@ from helao.core.server import makeVisServ
 # from helao.core.server import Action, setupAct
 
 
+from helao.core.server import Vis
 
 
 
@@ -105,11 +106,19 @@ from bokeh.layouts import layout, Spacer
 
 class C_nidaqmxvis:
     """NImax visualizer module class"""
-    def __init__(self, app):
-        self.app = app
+    def __init__(self, visServ: Vis):
+        self.vis = visServ
+        self.config_dict = self.vis.server_cfg["params"]
+        self.show = False
 
-        nidaqmx_key = self.app.srv_config["ws_nidaqmx"]
-        nidaqmxserv_config = self.app.world_cfg["servers"][nidaqmx_key]
+        nidaqmx_key = self.config_dict.get("ws_nidaqmx", None)
+        nidaqmxserv_config = self.vis.world_cfg["servers"].get(nidaqmx_key, None)
+        if nidaqmxserv_config is None:
+            return
+        
+        self.show = True
+
+        
         self.data_url = f"ws://{nidaqmxserv_config['host']}:{nidaqmxserv_config['port']}/ws_data"
         # self.stat_url = f"ws://{nidaqmxserv_config['host']}:{nidaqmxserv_config['port']}/ws_status"
 
@@ -178,8 +187,8 @@ class C_nidaqmxvis:
             Spacer(height=10)
             ],background="#C0C0C0")
 
-        self.app.doc.add_root(self.layout)
-        self.app.doc.add_root(Spacer(height=10))
+        self.vis.doc.add_root(self.layout)
+        self.vis.doc.add_root(Spacer(height=10))
 
 
     def add_points(self, new_data):
@@ -202,7 +211,7 @@ class C_nidaqmxvis:
             while self.IOloop_data_run:
                 try:
                     new_data = json.loads(await ws.recv())
-                    self.app.doc.add_next_tick_callback(partial(self.add_points, new_data))
+                    self.vis.doc.add_next_tick_callback(partial(self.add_points, new_data))
                 except Exception:
                     self.IOloop_data_run = False
 
@@ -245,11 +254,19 @@ class C_nidaqmxvis:
 
 class C_potvis:
     """potentiostat visualizer module class"""
-    def __init__(self, app):
-        self.app = app
+    def __init__(self, visServ: Vis):
+        self.vis = visServ
+        # self.vis = app
+        self.config_dict = self.vis.server_cfg["params"]
+        self.show = False
 
-        potentiostat_key = self.app.srv_config["ws_potentiostat"]
-        potserv_config = self.app.world_cfg["servers"][potentiostat_key]
+
+        potentiostat_key = self.config_dict.get("ws_potentiostat", None)
+        potserv_config = self.vis.world_cfg["servers"].get(potentiostat_key, None)
+        if potserv_config is None:
+            return
+        self.show = True
+
         self.data_url = f"ws://{potserv_config['host']}:{potserv_config['port']}/ws_data"
         # self.stat_url = f"ws://{potserv_config['host']}:{potserv_config['port']}/ws_status"
 
@@ -295,8 +312,8 @@ class C_potvis:
         self.yselect = self.checkbox_button_group.active
 
 
-        self.app.doc.add_root(self.layout)
-        self.app.doc.add_root(Spacer(height=10))
+        self.vis.doc.add_root(self.layout)
+        self.vis.doc.add_root(Spacer(height=10))
 
 
     def add_points(self, new_data):
@@ -339,7 +356,7 @@ class C_potvis:
                     # print(' ... new data for potentiostat visualizer module:')
                     # print(new_data)
                     if new_data is not None:
-                        self.app.doc.add_next_tick_callback(partial(self.add_points, new_data))
+                        self.vis.doc.add_next_tick_callback(partial(self.add_points, new_data))
                 except Exception:
                     self.IOloop_data_run = False
 
@@ -525,8 +542,9 @@ def makeBokehApp(doc, confPrefix, servKey):
     # create visualizer objects for defined instruments
 
     if 'ws_potentiostat' in app.srv_config:
-        potvis = C_potvis(app)
-        visoloop.create_task(potvis.IOloop_data())
+        potvis = C_potvis(app.vis)
+        if potvis.show:
+            visoloop.create_task(potvis.IOloop_data())
         # visoloop.create_task(potvis.IOloop_stat())
     else:
         print('No potentiostat visualizer configured')
@@ -534,8 +552,9 @@ def makeBokehApp(doc, confPrefix, servKey):
 
 
     if 'ws_nidaqmx' in app.srv_config:
-        NImaxvis = C_nidaqmxvis(app)
-        visoloop.create_task(NImaxvis.IOloop_data())
+        NImaxvis = C_nidaqmxvis(app.vis)
+        if NImaxvis.show:
+            visoloop.create_task(NImaxvis.IOloop_data())
     else:
         print('No NImax visualizer configured')
         NImaxvis = []

@@ -33,7 +33,7 @@ class cNIMAX:
         self.world_config = actServ.world_cfg
 
 
-        print(" ... init NI-MAX")
+        self.base.print_message(" ... init NI-MAX")
 
         self.action = (
             None  # for passing action object from technique method to measure loop
@@ -49,9 +49,9 @@ class cNIMAX:
                 "NEGATE3", -1.0, 0.0, UnitsPreScaled.AMPS, "AMPS"
             )
         except Exception as e:
-            print("##########################################################")
-            print(" ... NImax error")
-            print("##########################################################")
+            self.base.print_message("##########################################################")
+            self.base.print_message(" ... NImax error")
+            self.base.print_message("##########################################################")
             raise e
         self.time_stamp = time.time()
 
@@ -233,7 +233,7 @@ class cNIMAX:
                         )
 
             except Exception:
-                print(" ... canceling NImax IV stream")
+                self.base.print_message(" ... canceling NImax IV stream")
 
         elif self.IO_estop and self.IO_do_meas:
             _ = self.task_CellCurrent.read(
@@ -256,7 +256,7 @@ class cNIMAX:
                 number_of_samples_per_channel=number_of_samples
             )
             # task should be already off or should be closed soon
-            print(" ... meas was turned off but NImax IV task is still running ...")
+            self.base.print_message(" ... meas was turned off but NImax IV task is still running ...")
             # self.task_CellCurrent.close()
             # self.task_CellVoltage.close()
 
@@ -273,7 +273,7 @@ class cNIMAX:
                 if self.IO_do_meas and not self.IO_measuring:
                     # are we in estop?
                     if not self.IO_estop:
-                        print(" ... NImax IV task got measurement request")
+                        self.base.print_message(" ... NImax IV task got measurement request")
 
 
                         # start slave first
@@ -306,24 +306,24 @@ class cNIMAX:
 
 
                         if self.IO_estop:
-                            print(" ... NImax IV task is in estop.")
+                            self.base.print_message(" ... NImax IV task is in estop.")
                             # await self.stat.set_estop()
                         else:
-                            print(" ... setting NImax IV task to idle")
+                            self.base.print_message(" ... setting NImax IV task to idle")
                             # await self.stat.set_idle()
-                        print(" ... NImax IV task measurement is done")
+                        self.base.print_message(" ... NImax IV task measurement is done")
                     else:
                         self.IO_do_meas = False
-                        print(" ... NImax IV task is in estop.")
+                        self.base.print_message(" ... NImax IV task is in estop.")
                         # await self.stat.set_estop()
                 elif self.IO_do_meas and self.IO_measuring:
-                    print(" ... got measurement request but NImax IV task is busy")
+                    self.base.print_message(" ... got measurement request but NImax IV task is busy")
                 elif not self.IO_do_meas and self.IO_measuring:
-                    print(" ... got stop request, measurement will stop next cycle")
+                    self.base.print_message(" ... got stop request, measurement will stop next cycle")
                 else:
-                    print(" ... got stop request but NImax IV task is idle")
+                    self.base.print_message(" ... got stop request but NImax IV task is idle")
         except asyncio.CancelledError:
-            print("IOloop task was cancelled")
+            self.base.print_message("IOloop task was cancelled")
 
 
     async def run_task_getFSW(self, FSW:str):
@@ -355,7 +355,7 @@ class cNIMAX:
 
 
     async def run_task_Pump(self, pump:pumpitems, on:bool,*args,**kwargs):
-        print(" ... NIMAX pump:", pump, on)
+        self.base.print_message(" ... NIMAX pump:", pump, on)
         cmds = []
         with nidaqmx.Task() as task_Pumps:
             # for pump in pumps:
@@ -391,12 +391,12 @@ class cNIMAX:
 
     async def run_task_Master_Cell_Select(self, cells:List[int], on: bool,*args,**kwargs):
         if len(cells) > 1:
-            print(
+            self.base.print_message(
                 " ... Multiple cell selected. Only one can be Master cell. Using first one!"
             )
-            print(cells)
+            self.base.print_message(cells)
             cells = [cells[0]]
-            print(cells)
+            self.base.print_message(cells)
         cmds = []
         with nidaqmx.Task() as task_MasterCell:
             for cell in cells:
@@ -464,7 +464,7 @@ class cNIMAX:
                 file_group="NImax_files",
                 header=self.FIFO_NImaxheader,
             )
-            print(f"!!! Active action uuid is {self.active.action.action_uuid}")
+            self.base.print_message(f"!!! Active action uuid is {self.active.action.action_uuid}")
 
             # create the cell IV task
             self.create_IVtask()
@@ -513,7 +513,7 @@ class cNIMAX:
             file_group="NImax_files",
             header=self.FIFO_NImaxheader,
         )
-        print(f"!!! Active action uuid is {self.active.action.action_uuid}")
+        self.base.print_message(f"!!! Active action uuid is {self.active.action.action_uuid}")
 
         # start slave first
         self.task_CellVoltage.start()

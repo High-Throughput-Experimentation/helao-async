@@ -210,9 +210,9 @@ def makeOrchServ(
             ):  # resume actions from a paused run
                 await app.orch.start_loop()
             else:
-                print("decision list is empty")
+                app.orch.print_message("decision list is empty")
         else:
-            print("already running")
+            app.orch.print_message("already running")
         return {}
 
     @app.post("/estop")
@@ -221,9 +221,9 @@ def makeOrchServ(
         if app.orch.loop_state == "started":
             await app.orch.estop_loop()
         elif app.orch.loop_state == "E-STOP":
-            print("orchestrator E-STOP flag already raised")
+            app.orch.print_message("orchestrator E-STOP flag already raised")
         else:
-            print("orchestrator is not running")
+            app.orch.print_message("orchestrator is not running")
         return {}
 
     @app.post("/stop")
@@ -232,16 +232,16 @@ def makeOrchServ(
         if app.orch.loop_state == "started":
             await app.orch.intend_stop()
         elif app.orch.loop_state == "E-STOP":
-            print("orchestrator E-STOP flag was raised; nothing to stop")
+            app.orch.print_message("orchestrator E-STOP flag was raised; nothing to stop")
         else:
-            print("orchestrator is not running")
+            app.orch.print_message("orchestrator is not running")
         return {}
 
     @app.post("/clear_estop")
     async def clear_estop():
         """Remove emergency stop condition."""
         if app.orch.loop_state != "E-STOP":
-            print("orchestrator is not currently in E-STOP")
+            app.orch.print_message("orchestrator is not currently in E-STOP")
         else:
             await app.orch.clear_estop()
 
@@ -251,7 +251,7 @@ def makeOrchServ(
         if app.orch.loop_state == "started":
             await app.orch.intend_skip()
         else:
-            print("orchestrator not running, clearing action queue")
+            app.orch.print_message("orchestrator not running, clearing action queue")
             await asyncio.sleep(0.001)
             app.orch.action_dq.clear()
         return {}
@@ -259,7 +259,7 @@ def makeOrchServ(
     @app.post("/clear_actions")
     async def clear_actions():
         """Clear the present action queue while stopped."""
-        print("clearing action queue")
+        app.orch.print_message("clearing action queue")
         await asyncio.sleep(0.001)
         app.orch.action_dq.clear()
         return {}
@@ -267,7 +267,7 @@ def makeOrchServ(
     @app.post("/clear_decisions")
     async def clear_decisions():
         """Clear the present decision queue while stopped."""
-        print("clearing decision queue")
+        app.orch.print_message("clearing decision queue")
         await asyncio.sleep(0.001)
         app.orch.decision_dq.clear()
         return {}
@@ -426,7 +426,7 @@ def makeVisServ(
         description=description,
         ersion=version, 
     )
-
+    app.vis = Vis(app)
     return app
 
 
@@ -471,7 +471,7 @@ class Base(object):
         self.aloop = asyncio.get_running_loop()
 
         if "technique_name" in self.world_cfg.keys():
-            print(
+            self.print_message(
                 f" ... Found technique_name in config: {self.world_cfg['technique_name']}"
             )
             self.technique_name = self.world_cfg["technique_name"]
@@ -483,11 +483,11 @@ class Base(object):
         self.calibration = calibration
         if "save_root" in self.world_cfg.keys():
             self.save_root = self.world_cfg["save_root"]
-            print(
+            self.print_message(
                 f" ... Found root save directory in config: {self.world_cfg['save_root']}"
             )
             if not os.path.isdir(self.save_root):
-                print(" ... Warning: root save directory does not exist. Creatig it.")
+                self.print_message(" ... Warning: root save directory does not exist. Creatig it.")
                 os.makedirs(self.save_root)
         else:
             raise ValueError(
@@ -520,9 +520,13 @@ class Base(object):
         print(color + msg + Style.RESET_ALL)
 
 
-    def print_message(self,*args):
-        for arg in args:
-            print(f"{Style.BRIGHT}{Fore.GREEN}{arg}{Style.RESET_ALL}")
+    def print_message(self,*args,**kwargs):
+        print_message(self.server_cfg,self.server_name,*args,**kwargs)
+
+        # style = self.server_cfg.get("msg_color","")
+        # for arg in args:
+        #     # print(f"{Style.BRIGHT}{Fore.GREEN}{arg}{Style.RESET_ALL}")
+        #     print(f"[{strftime('%H:%M:%S')}_{self.server_name}]: {style}{arg}{Style.RESET_ALL}")
 
 
     def init_endpoint_status(self, app: FastAPI):
@@ -531,7 +535,7 @@ class Base(object):
             if route.path.startswith(f"/{self.server_name}"):
                 self.status[route.name] = []
                 self.endpoints.append(route.name)
-        print(
+        self.print_message(
             f" ... Found {len(self.status)} endpoints for status monitoring on {self.server_name}."
         )
 
@@ -577,7 +581,7 @@ class Base(object):
             action_dict = await self.actives[action_uuid].active.as_dict()
             return action_dict
         else:
-            print(f" ... Specified action uuid {action_uuid} was not found.")
+            self.print_message(f" ... Specified action uuid {action_uuid} was not found.")
             return None
 
     async def get_ntp_time(self):
@@ -587,14 +591,14 @@ class Base(object):
         self.ntp_response = response
         self.ntp_last_sync = response.orig_time
         self.ntp_offset = response.offset
-        print("#############################################################")
-        print(" ... ntp_offset: ", self.ntp_offset)
-        print("#############################################################")
+        self.print_message("#############################################################")
+        self.print_message(" ... ntp_offset: ", self.ntp_offset)
+        self.print_message("#############################################################")
 
         time_inst = await aiofiles.open("ntpLastSync.txt", "w")
         await time_inst.write(f"{self.ntp_last_sync},{self.ntp_offset}")
         await time_inst.close()
-        print(
+        self.print_message(
             f" ... retrieved time at {ctime(self.ntp_response.tx_timestamp)} from {self.ntp_server}"
         )
 
@@ -645,13 +649,13 @@ class Base(object):
         "Remove client from receiving status updates via HTTP POST"
         if client_servkey in self.status_clients:
             self.status_clients.remove(client_servkey)
-            print(f"Client {client_servkey} will no longer receive status updates.")
+            self.print_message(f"Client {client_servkey} will no longer receive status updates.")
         else:
-            print(f" ... Client {client_servkey} is not subscribed.")
+            self.print_message(f" ... Client {client_servkey} is not subscribed.")
 
     async def ws_status(self, websocket: WebSocket):
         "Subscribe to status queue and send message to websocket client."
-        print(" ... got new status subscriber")
+        self.print_message(" ... got new status subscriber")
         await websocket.accept()
         try:
             async for status_msg in self.status_q.subscribe():
@@ -664,7 +668,7 @@ class Base(object):
 
     async def ws_data(self, websocket: WebSocket):
         "Subscribe to data queue and send messages to websocket client."
-        print(" ... got new data subscriber")
+        self.print_message(" ... got new data subscriber")
         await websocket.accept()
         try:
             async for data_msg in self.data_q.subscribe():
@@ -677,7 +681,7 @@ class Base(object):
 
     async def log_status_task(self, retry_limit: int = 5):
         "Self-subscribe to status queue, log status changes, POST to clients."
-        print(f" ... {self.server_name} status log task created.")
+        self.print_message(f" ... {self.server_name} status log task created.")
        
         try:
             async for status_msg in self.status_q.subscribe():
@@ -775,7 +779,7 @@ class Base(object):
                     .replace("\t", ",")
                     .split(",")
                 ]
-                print(self.column_names)
+                self.base.print_message(self.column_names)
             self.action.set_atime(offset=self.base.ntp_offset)
             self.file_conn = None
             # if Action is not created from Decision+Actualizer, Action is independent
@@ -785,7 +789,7 @@ class Base(object):
             decision_time = self.action.decision_timestamp.split(".")[-1]
             year_week = strftime("%y.%U", strptime(decision_date, "%Y%m%d"))
             if not self.base.save_root:
-                print(
+                self.base.print_message(
                     " ... Root save directory not specified, cannot save action results."
                 )
                 self.action.save_data = False
@@ -804,9 +808,9 @@ class Base(object):
             self.data_logger = self.base.aloop.create_task(self.log_data_task())
 
         async def myinit(self):
-            # print('#################################################')
-            # print('myinit')
-            # print('#################################################')
+            # self.base.print_message('#################################################')
+            # self.base.print_message('myinit')
+            # self.base.print_message('#################################################')
             if self.action.save_rcp:
                 os.makedirs(self.action.output_dir, exist_ok=True)
                 self.action.actionnum = (
@@ -865,7 +869,7 @@ class Base(object):
 
         async def add_status(self):
             self.base.status[self.action.action_name].append(self.action.action_uuid)
-            print(
+            self.base.print_message(
                 f" ... Added {self.action.action_uuid} to {self.action.action_name} status list."
             )
             await self.base.status_q.put(
@@ -875,11 +879,11 @@ class Base(object):
         async def clear_status(self):
             if self.action.action_uuid in self.base.status[self.action.action_name]:
                 self.base.status[self.action.action_name].remove(self.action.action_uuid)
-                print(
+                self.base.print_message(
                     f" ... Removed {self.action.action_uuid} from {self.action.action_name} status list."
                 )
             else:
-                print(
+                self.base.print_message(
                     f" ... {self.action.action_uuid} did not excist in {self.action.action_name} status list."
                 )
             await self.base.status_q.put(
@@ -891,7 +895,7 @@ class Base(object):
             self.base.status[self.action.action_name].append(
                 f"{self.action.action_uuid}__estop"
             )
-            print(
+            self.base.print_message(
                 f" ... E-STOP {self.action.action_uuid} on {self.action.action_name} status."
             )
             await self.base.status_q.put(
@@ -903,7 +907,7 @@ class Base(object):
             self.base.status[self.action.action_name].append(
                 f"{self.action.action_uuid}__error"
             )
-            print(
+            self.base.print_message(
                 f" ... ERROR {self.action.action_uuid} on {self.action.action_name} status."
             )
             if err_msg:
@@ -933,9 +937,9 @@ class Base(object):
         async def set_output_file(self, filename: str, header: Optional[str] = None):
             "Set active save_path, write header if supplied."
             output_path = os.path.join(self.action.output_dir, filename)
-            print("#########################################################")
-            print(" ... writing data to:", output_path)
-            print("#########################################################")
+            self.base.print_message("#########################################################")
+            self.base.print_message(" ... writing data to:", output_path)
+            self.base.print_message("#########################################################")
             # create output file and set connection
             self.file_conn = await aiofiles.open(output_path, mode="a+")
             if header:
@@ -946,9 +950,9 @@ class Base(object):
         async def write_live_data(self, output_str: str):
             """Appends lines to file_conn."""
             if self.file_conn:
-                # print('#########################################################')
-                # print(' ... appending data to file connection')
-                # print('#########################################################')
+                # self.base.print_message('#########################################################')
+                # self.base.print_message(' ... appending data to file connection')
+                # self.base.print_message('#########################################################')
                 if not output_str.endswith("\n"):
                     output_str += "\n"
                 await self.file_conn.write(output_str)
@@ -978,53 +982,53 @@ class Base(object):
 
         async def log_data_task(self):
             """Self-subscribe to data queue, write to present file path."""
-            print(" ... starting data logger")
+            self.base.print_message(" ... starting data logger")
             # data_msg should be a dict {uuid: list of values or a list of list of values}
             try:
                 async for data_msg in self.base.data_q.subscribe():
-                    # print(data_msg)
-                    # print(self.action.action_uuid)
+                    # self.base.print_message(data_msg)
+                    # self.base.print_message(self.action.action_uuid)
                     if (
                         self.action.action_uuid in data_msg.keys()
                     ):  # only write data for this action
-                        # print('#################################################')
-                        # print('1 ... data logger: received message')
-                        # print('#################################################')
+                        # self.base.print_message('#################################################')
+                        # self.base.print_message('1 ... data logger: received message')
+                        # self.base.print_message('#################################################')
                         data_dict = data_msg[self.action.action_uuid]
                         data_val = data_dict["data"]
                         # if isinstance(data_val, list) or isinstance(data_val, tuple):
-                        #     # print('#################################################')
-                        #     # print('2 ... data logger: message is tuple/list')
-                        #     # print('#################################################')
+                        #     # self.base.print_message('#################################################')
+                        #     # self.base.print_message('2 ... data logger: message is tuple/list')
+                        #     # self.base.print_message('#################################################')
                         #     lines = "\n".join(
                         #         [",".join([str(x) for x in l]) for l in data_val]
                         #     )
                         # elif isinstance(data_val, dict):
-                        #     # print('#################################################')
-                        #     # print('3 ... data logger: message is dict')
-                        #     # print('#################################################')
-                        #     # print(self.column_names)
-                        #     # print(data_val)
+                        #     # self.base.print_message('#################################################')
+                        #     # self.base.print_message('3 ... data logger: message is dict')
+                        #     # self.base.print_message('#################################################')
+                        #     # self.base.print_message(self.column_names)
+                        #     # self.base.print_message(data_val)
                         #     # for col in self.column_names:
                         #     #     if col!='unknown1':
-                        #     #         print(col, data_val[col])
+                        #     #         self.base.print_message(col, data_val[col])
                         #     columns = [
                         #         data_val[col]
                         #         for col in self.column_names
                         #         if col != "unknown1"
                         #     ]
-                        #     # print(columns)
+                        #     # self.base.print_message(columns)
                         #     lines = "\n".join(
                         #         [",".join([str(x) for x in l]) for l in zip(*columns)]
                         #     )
-                        #     # print(lines)
+                        #     # self.base.print_message(lines)
                         # else:
-                        #     # print('#################################################')
-                        #     # print('4 ... data logger: message is not dict or tuple/list')
-                        #     # print('#################################################')
+                        #     # self.base.print_message('#################################################')
+                        #     # self.base.print_message('4 ... data logger: message is not dict or tuple/list')
+                        #     # self.base.print_message('#################################################')
                         #     lines = str(data_val)
                         self.action.data.append(data_val)
-                        # print(self.action.data)
+                        # self.base.print_message(self.action.data)
                         if self.file_conn:
                             await self.write_live_data(json.dumps(data_val))
                             # await self.write_live_data(lines)
@@ -1041,11 +1045,11 @@ class Base(object):
         ):
             "Write complete file, not used with queue streaming."
             _output_path = os.path.join(self.action.output_dir, filename)
-            print("#########################################################")
-            print(" ... writing non stream data to:", _output_path)
-            # print("header:", header)
-            # print("output_str:", output_str)
-            print("#########################################################")
+            self.base.print_message("#########################################################")
+            self.base.print_message(" ... writing non stream data to:", _output_path)
+            # self.base.print_message("header:", header)
+            # self.base.print_message("output_str:", output_str)
+            self.base.print_message("#########################################################")
             # create output file and set connection
             file_instance = await aiofiles.open(_output_path, mode="w")
             numlines = len(output_str.split("\n"))
@@ -1078,17 +1082,17 @@ class Base(object):
             self.action.file_dict[self.action.filetech_key]["aux_files"].update(
                 {filename: file_info}
             )
-            print(f" ... Wrote {numlines} lines to {_output_path}")
+            self.base.print_message(f" ... Wrote {numlines} lines to {_output_path}")
 
         async def write_to_rcp(self, rcp_dict: dict):
             "Create new rcp if it doesn't exist, otherwise append rcp_dict to file."
             output_path = os.path.join(
                 self.action.output_dir, f"{self.action.action_queue_time}.rcp"
             )
-            print("#########################################################")
-            print(" ... writing rcp to:", output_path)
-            # print(" ... writing:",rcp_dict)
-            print("#########################################################")
+            self.base.print_message("#########################################################")
+            self.base.print_message(" ... writing rcp to:", output_path)
+            # self.base.print_message(" ... writing:",rcp_dict)
+            self.base.print_message("#########################################################")
             output_str = dict_to_rcp(rcp_dict)
             file_instance = await aiofiles.open(output_path, mode="a+")
             
@@ -1124,12 +1128,12 @@ class Base(object):
                 }
                 self.action.samples_out["liquid_samples"].update(liquid_dict)
             else:
-                print(f"Type '{type}' is not supported.")
+                self.base.print_message(f"Type '{type}' is not supported.")
 
         async def finish(self):
             "Close file_conn, finish rcp, copy aux, set endpoint status, and move active dict to past."
             await asyncio.sleep(1)
-            print(" ... finishing data logging.")
+            self.base.print_message(" ... finishing data logging.")
             if self.file_conn:
                 await self.file_conn.close()
                 self.file_conn = None
@@ -1153,7 +1157,7 @@ class Base(object):
             self.action.file_dict[self.action.filetech_key]["aux_files"].update(
                 {filename: file_info}
             )
-            print(
+            self.base.print_message(
                 f" ... {filename} added to files_technique__{self.action.actionnum} / aux_files list."
             )
 
@@ -1222,11 +1226,6 @@ class Orch(Base):
         self.status_subscriber = asyncio.create_task(self.update_global_state_task())
 
 
-    def print_message(self,*args):
-        for arg in args:
-            print(Style.BRIGHT+Fore.YELLOW+f"{arg}"+Style.RESET_ALL)
-
-
     async def check_dispatch_queue(self):
         val = await self.dispatch_q.get()        
         while not self.dispatch_q.empty():
@@ -1237,7 +1236,7 @@ class Orch(Base):
     async def check_wait_for_all_actions(self):
         running_states, _ = await self.check_global_state()
         global_free = len(running_states) == 0
-        print(" ... check len(running_states):", len(running_states))
+        self.print_message(" ... check len(running_states):", len(running_states))
         return global_free
         
 
@@ -1264,17 +1263,17 @@ class Orch(Base):
                 serv_addr = serv_dict["host"]
                 serv_port = serv_dict["port"]
                 if success:
-                    print(f"Subscribed to {serv_key} at {serv_addr}:{serv_port}")
+                    self.print_message(f"Subscribed to {serv_key} at {serv_addr}:{serv_port}")
                 else:
                     fails.append(serv_key)
-                    print(
+                    self.print_message(
                         f" ... Failed to subscribe to {serv_key} at {serv_addr}:{serv_port}. Check connection."
                     )
 
         if len(fails) == 0:
             self.init_success = True
         else:
-            print(
+            self.print_message(
                 " ... Orchestrator cannot process decision_dq unless all FastAPI servers in config file are accessible."
             )
 
@@ -1291,11 +1290,11 @@ class Orch(Base):
                 removed = set(last_dict[act_name]).difference(acts)
                 ongoing = set(acts).intersection(last_dict[act_name])
                 if removed:
-                    print(f" ... {act_serv}:{act_name} finished {','.join(removed)}")
+                    self.print_message(f" ... {act_serv}:{act_name} finished {','.join(removed)}")
                 if started:
-                    print(f" ... {act_serv}:{act_name} started {','.join(started)}")
+                    self.print_message(f" ... {act_serv}:{act_name} started {','.join(started)}")
                 if ongoing:
-                    print(f" ... {act_serv}:{act_name} ongoing {','.join(ongoing)}")
+                    self.print_message(f" ... {act_serv}:{act_name} ongoing {','.join(ongoing)}")
         self.global_state_dict[act_serv].update(status_dict)
         await self.global_q.put(self.global_state_dict)
         return True
@@ -1328,17 +1327,17 @@ class Orch(Base):
                 self.global_state_str = "idle"
             else:
                 self.global_state_str = "busy"
-                print(" ... running_states:", running_states)
+                self.print_message(" ... running_states:", running_states)
 
 
     async def check_global_state(self):
         """Return global state of action servers."""
         running_states = []
         idle_states = []
-        # print(" ... checking global state:")
-        # print(self.global_state_dict.items())
+        # self.print_message(" ... checking global state:")
+        # self.print_message(self.global_state_dict.items())
         for act_serv, act_dict in self.global_state_dict.items():
-            print(f" ... checking {act_serv} state")
+            self.print_message(f" ... checking {act_serv} state")
             for act_name, act_uuids in act_dict.items():
                 if len(act_uuids) == 0:
                     idle_states.append(f"{act_serv}:{act_name}")
@@ -1384,7 +1383,7 @@ class Orch(Base):
                     self.print_message(" ... optional params ", self.active_decision.actualizer_pars)
                 else:
                     if self.loop_intent == "stop":
-                        print(" ... stopping orchestrator")
+                        self.print_message(" ... stopping orchestrator")
                         # monitor status of running action_dq, then end loop
                         # async for _ in self.global_q.subscribe():
                         while True:
@@ -1455,7 +1454,7 @@ class Orch(Base):
                                             if await self.check_wait_for_all_actions():
                                                 break
                                     else:
-                                        print(" ... global_free is true")
+                                        self.print_message(" ... global_free is true")
                         elif isinstance(A.start_condition, dict):
                             self.print_message(
                                 " ... waiting for multiple conditions on external servers"
@@ -1496,7 +1495,7 @@ class Orch(Base):
 
                         # copy requested global param to action params
                         for k,v in A.from_global_params.items():
-                            print(k,v)
+                            self.print_message(k,v)
                             if k in self.active_decision.global_params.keys():
                                 A.action_params.update({
                                     v:self.active_decision.global_params[k]
@@ -1536,7 +1535,7 @@ class Orch(Base):
         #     return False
         except Exception as e:
             self.print_color_msg(" ... serious orch exception occurred",Style.BRIGHT+Fore.BLACK+Back.RED)
-            print(e)
+            self.print_message(e)
             return False
 
 
@@ -1544,9 +1543,9 @@ class Orch(Base):
         if self.loop_state == "stopped":
             self.loop_task = asyncio.create_task(self.dispatch_loop_task())
         elif self.loop_state == "E-STOP":
-            print(" ... E-STOP flag was raised, clear E-STOP before starting.")
+            self.print_message(" ... E-STOP flag was raised, clear E-STOP before starting.")
         else:
-            print(" ... loop already started.")
+            self.print_message(" ... loop already started.")
         return self.loop_state
 
     async def estop_loop(self):
@@ -1570,12 +1569,12 @@ class Orch(Base):
         for serv in running_servers:
             serv_conf = self.world_cfg["servers"][serv]
             async with aiohttp.ClientSession() as session:
-                print(f" ... Sending force-stop request to {serv}")
+                self.print_message(f" ... Sending force-stop request to {serv}")
                 async with session.post(
                     f"http://{serv_conf['host']}:{serv_conf['port']}/force_stop"
                 ) as resp:
                     response = await resp.text()
-                    print(response)
+                    self.print_message(response)
 
     async def intend_skip(self):
         await asyncio.sleep(0.001)
@@ -1591,23 +1590,23 @@ class Orch(Base):
 
     async def clear_estate(self, clear_estop=True, clear_error=True):
         if not clear_estop and not clear_error:
-            print(
+            self.print_message(
                 " ... both clear_estop and clear_error parameters are False, nothing to clear"
             )
         await self.update_global_state()
         cleared_status = copy(self.global_state_dict)
         if clear_estop:
             for serv, act, myuuid in self.estop_uuids:
-                print(f" ... clearing E-STOP {act} on {serv}")
+                self.print_message(f" ... clearing E-STOP {act} on {serv}")
                 cleared_status[serv][act] = cleared_status[serv][act].remove(myuuid)
         if clear_error:
             for serv, act, myuuid in self.error_uuids:
-                print(f" ... clearing error {act} on {serv}")
+                self.print_message(f" ... clearing error {act} on {serv}")
                 cleared_status[serv][act] = cleared_status[serv][act].remove(myuuid)
         await self.global_q.put(cleared_status)
-        print(" ... resetting dispatch loop state")
+        self.print_message(" ... resetting dispatch loop state")
         self.loop_state = "stopped"
-        print(
+        self.print_message(
             f" ... {len(self.running_uuids)} running action_dq did not fully stop after E-STOP/error was raised"
         )
 
@@ -1639,18 +1638,18 @@ class Orch(Base):
         if decision_label is None:
             if self.active_decision is not None:
                 active_label = self.active_decision.decision_label
-                print(
+                self.print_message(
                     f" ... decision_label not specified, inheriting {active_label} from active decision"
                 )
                 D.decision_label = active_label
             elif self.last_decision is not None:
                 last_label = self.last_decision.decision_label
-                print(
+                self.print_message(
                     f" ... decision_label not specified, inheriting {last_label} from previous decision"
                 )
                 D.decision_label = last_label
             else:
-                print(
+                self.print_message(
                     " ... decision_label not specified, no past decision_dq to inherit so using default 'nolabel"
                 )
         await asyncio.sleep(0.001)
@@ -1658,10 +1657,10 @@ class Orch(Base):
             self.decision_dq.insert(at_index)
         elif prepend:
             self.decision_dq.appendleft(D)
-            print(f" ... decision {D.decision_uuid} prepended to queue")
+            self.print_message(f" ... decision {D.decision_uuid} prepended to queue")
         else:
             self.decision_dq.append(D)
-            print(f" ... decision {D.decision_uuid} appended to queue")
+            self.print_message(f" ... decision {D.decision_uuid} appended to queue")
 
     def list_decisions(self):
         """Return the current queue of decision_dq."""
@@ -1731,7 +1730,7 @@ class Orch(Base):
     def supplement_error_action(self, check_uuid: str, sup_action: Action):
         """Insert action at front of action queue with subversion of errored action, inherit parameters if desired."""
         if self.error_uuids == []:
-            print("There are no error statuses to replace")
+            self.print_message("There are no error statuses to replace")
         else:
             matching_error = [tup for tup in self.error_uuids if tup[2] == check_uuid]
             if matching_error:
@@ -1747,8 +1746,8 @@ class Orch(Base):
                 new_action.action_enum = new_enum
                 self.action_dq.appendleft(new_action)
             else:
-                print(f"uuid {check_uuid} not found in list of error statuses:")
-                print(", ".join(self.error_uuids))
+                self.print_message(f"uuid {check_uuid} not found in list of error statuses:")
+                self.print_message(", ".join(self.error_uuids))
 
     def remove_decision(
         self, by_index: Optional[int] = None, by_uuid: Optional[str] = None
@@ -1763,7 +1762,7 @@ class Orch(Base):
                 if D.decision_uuid == by_uuid
             ][0]
         else:
-            print("No arguments given for locating existing decision to remove.")
+            self.print_message("No arguments given for locating existing decision to remove.")
             return None
         del self.decision_dq[i]
 
@@ -1790,7 +1789,7 @@ class Orch(Base):
                 if A.action_enum == by_enum
             ][0]
         else:
-            print("No arguments given for locating existing action to replace.")
+            self.print_message("No arguments given for locating existing action to replace.")
             return None
         current_enum = self.action_dq[i].action_enum
         new_action = sup_action
@@ -1815,6 +1814,22 @@ class Orch(Base):
         self.ntp_syncer.cancel()
         self.status_subscriber.cancel()
 
+
+class Vis(object):
+    """Base class for all HELAO bokeh servers."""
+    def __init__(self, bokehapp: HelaoBokehAPI):
+        self.server_name = bokehapp.helao_srv
+        self.server_cfg = bokehapp.world_cfg["servers"][self.server_name]
+        self.world_cfg = bokehapp.world_cfg
+        self.hostname = gethostname()
+        self.doc = bokehapp.doc
+        # self.save_root = None
+        # self.technique_name = None
+        # self.aloop = asyncio.get_running_loop()
+
+
+    def print_message(self,*args,**kwargs):
+        print_message(self.server_cfg,self.server_name,*args,**kwargs)
 
 
 def import_actualizers(world_config_dict: dict, library_path: str = None):
@@ -1903,3 +1918,10 @@ async def async_private_dispatcher(
         ) as resp:
             response = await resp.json()
             return response
+
+
+def print_message(server_cfg,server_name,*args,**kwargs):
+    style = server_cfg.get("msg_color","")
+    for arg in args:
+        # print(f"{Style.BRIGHT}{Fore.GREEN}{arg}{Style.RESET_ALL}")
+        print(f"[{strftime('%H:%M:%S')}_{server_name}]: {style}{arg}{Style.RESET_ALL}")

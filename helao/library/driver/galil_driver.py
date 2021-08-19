@@ -62,7 +62,7 @@ class galil:
         if "Ain_id" not in self.config_dict:
             self.config_dict["Ain_id"] = dict()
 
-        print(" ... motor config:", self.config_dict)
+        # self.base.print_message(" ... motor config:", self.config_dict)
 
         # this is only here for testing purposes to supply a matrix
         if "Transfermatrix" not in self.config_dict:
@@ -79,22 +79,22 @@ class galil:
         self.xyTransfermatrix = np.matrix(self.config_dict["Transfermatrix"])
 
         # Mplatexy is identity matrix by default
-        self.transform = transformxy(
+        self.transform = transformxy(self.base,
             self.config_dict["M_instr"], self.config_dict["axis_id"]
         )
         # only here for testing: will overwrite the default identity matrix
         self.transform.update_Mplatexy(self.config_dict["Transfermatrix"])
         #        self.transform.update_Msystem()
-        print(" ... M_instr:", self.transform.Minstr)
-        print(" ... M_plate:", self.transform.Mplate)
+        # self.base.print_message(" ... M_instr:", self.transform.Minstr)
+        # self.base.print_message(" ... M_plate:", self.transform.Mplate)
 
         # if this is the main instance let us make a galil connection
         self.g = gclib.py()
-        print("gclib version:", self.g.GVersion())
+        self.base.print_message("gclib version:", self.g.GVersion())
         # TODO: error checking here: Galil can crash an dcarsh program
         try:
             self.g.GOpen("%s --direct -s ALL" % (self.config_dict["galil_ip_str"]))
-            print(self.g.GInfo())
+            self.base.print_message(self.g.GInfo())
             self.c = self.g.GCommand  # alias the command callable
             # The SH commands tells the controller to use the current 
             # motor position as the command position and to enable servo control here.
@@ -112,11 +112,11 @@ class galil:
                 for ac, av in axis_init:
                     self.c(f"{ac}{axl}={av}")
         except Exception:
-            print("###########################################################")
-            print(
+            self.base.print_message("###########################################################")
+            self.base.print_message(
                 " ........................... severe Galil error ... please power cycle Galil and try again"
             )
-            print("###########################################################")
+            self.base.print_message("###########################################################")
 
         self.cycle_lights = False
 
@@ -144,7 +144,7 @@ class galil:
         #     self.motor_to_plate_calc()
 
         # if self.qdata.full():
-        #     # print(' ... motion q is full ...')
+        #     # self.base.print_message(' ... motion q is full ...')
         #     _ = self.qdata.get_nowait()
         # self.qdata.put_nowait(self.wsmotordata_buffer)
 
@@ -161,7 +161,7 @@ class galil:
         #     self.motor_to_plate_calc()
 
         # if self.qdata.full():
-        #     # print(' ... motion q is full ...')
+        #     # self.base.print_message(' ... motion q is full ...')
         #     _ = self.qdata.get_nowait()
         # self.qdata.put_nowait(self.wsmotordata_buffer)
 
@@ -169,7 +169,7 @@ class galil:
     async def setaxisref(self):
         # home all axis first
         axis = await self.get_all_axis()
-        print(" ... axis:", axis)
+        self.base.print_message(" ... axis:", axis)
         if "Rx" in axis:
             axis.remove("Rx")
         if "Ry" in axis:
@@ -177,7 +177,7 @@ class galil:
         if "Rz" in axis:
             axis.remove("Rz")
         #            axis.pop(axis.index('Rz'))
-        print(" ... axis:", axis)
+        self.base.print_message(" ... axis:", axis)
 
 
         if axis is not None:
@@ -236,14 +236,14 @@ class galil:
 
             # set absolute zero to current position
             q = self.c("TP")  # query position of all axis
-            print(" ... q1", q)
+            self.base.print_message(" ... q1", q)
             cmd = "DP "
             for i in range(len(q.split(","))):
                 if i == 0:
                     cmd += "0"
                 else:
                     cmd += ",0"
-            print(" ... ", cmd)
+            self.base.print_message(" ... ", cmd)
 
             # sets abs zero here
             _ = self.c(cmd)
@@ -305,7 +305,7 @@ class galil:
         tmpmotorpos = await self.query_axis_position(
             await self.get_all_axis()
         )
-        print(" ... current absolute motor positions:", tmpmotorpos)
+        self.base.print_message(" ... current absolute motor positions:", tmpmotorpos)
         # don't use dicts as we do math on these vectors
         current_positionvec = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # x, y, z, Rx, Ry, Rz
         # map the request to this
@@ -313,7 +313,7 @@ class galil:
         req_positionvec = [None, None, None, None, None, None]  # x, y, z, Rx, Ry, Rz
 
         reqdict = dict(zip(axis, d_mm))
-        print(" ... requested position (", mode, "): ", reqdict)
+        self.base.print_message(" ... requested position (", mode, "): ", reqdict)
 
         for idx, ax in enumerate(["x", "y", "z", "Rx", "Ry", "Rz"]):
             if ax in tmpmotorpos["ax"]:
@@ -325,20 +325,20 @@ class galil:
                 if ax in reqdict:
                     req_positionvec[idx] = reqdict[ax]
 
-        print(" ... motor position vector:", current_positionvec[0:3])
-        print(" ... requested position vector (", mode, ")", req_positionvec)
+        self.base.print_message(" ... motor position vector:", current_positionvec[0:3])
+        self.base.print_message(" ... requested position vector (", mode, ")", req_positionvec)
 
         if transformation == transformation_mode.motorxy:
             # nothing to do
-            print(" ... motion: got motorxy (", mode, "), no transformation necessary")
+            self.base.print_message(" ... motion: got motorxy (", mode, "), no transformation necessary")
         elif transformation == transformation_mode.platexy:
-            print(" ... motion: got platexy (", mode, "), converting to motorxy")
+            self.base.print_message(" ... motion: got platexy (", mode, "), converting to motorxy")
             motorxy = [0, 0, 1]
             motorxy[0] = current_positionvec[0]
             motorxy[1] = current_positionvec[1]
             current_platexy = self.transform.transform_motorxy_to_platexy(motorxy)
             # transform.transform_motorxyz_to_instrxyz(current_positionvec[0:3])
-            print(" ... current plate position (calc from motor):", current_platexy)
+            self.base.print_message(" ... current plate position (calc from motor):", current_platexy)
             if mode == move_modes.relative:
                 new_platexy = [0, 0, 1]
 
@@ -352,11 +352,11 @@ class galil:
                 else:
                     new_platexy[1] = current_platexy[1]
 
-                print(" ... new platexy (abs)", new_platexy)
+                self.base.print_message(" ... new platexy (abs)", new_platexy)
                 new_motorxy = self.transform.transform_platexy_to_motorxy(
                     new_platexy
                 )
-                print(" ... new motorxy (abs):", new_motorxy)
+                self.base.print_message(" ... new motorxy (abs):", new_motorxy)
                 axis = ["x", "y"]
                 d_mm = [d for d in new_motorxy[0:2]]
                 mode = move_modes.absolute
@@ -373,11 +373,11 @@ class galil:
                 else:
                     new_platexy[1] = current_platexy[1]
 
-                print(" ... new platexy (abs)", new_platexy)
+                self.base.print_message(" ... new platexy (abs)", new_platexy)
                 new_motorxy = self.transform.transform_platexy_to_motorxy(
                     new_platexy
                 )
-                print(" ... new motorxy (abs):", new_motorxy)
+                self.base.print_message(" ... new motorxy (abs):", new_motorxy)
                 axis = ["x", "y"]
                 d_mm = [d for d in new_motorxy[0:2]]
 
@@ -392,12 +392,12 @@ class galil:
                 if ax == "y":
                     xyvec[1] = d_mm[1]
         elif transformation == transformation_mode.instrxy:
-            print(" ................mode", mode)
-            print("motion: got instrxyz (", mode, "), converting to motorxy")
+            self.base.print_message(" ................mode", mode)
+            self.base.print_message("motion: got instrxyz (", mode, "), converting to motorxy")
             current_instrxyz = self.transform.transform_motorxyz_to_instrxyz(
                 current_positionvec[0:3]
             )
-            print(
+            self.base.print_message(
                 " ... current instrument position (calc from motor):", current_instrxyz
             )
             if mode == move_modes.relative:
@@ -407,12 +407,12 @@ class galil:
                         new_instrxyz[i] = new_instrxyz[i] + req_positionvec[i]
                     else:
                         new_instrxyz[i] = new_instrxyz[i]
-                print(" ... new instrument position (abs):", new_instrxyz)
+                self.base.print_message(" ... new instrument position (abs):", new_instrxyz)
                 # transform from instrxyz to motorxyz
                 new_motorxyz = self.transform.transform_instrxyz_to_motorxyz(
                     new_instrxyz[0:3]
                 )
-                print(" ... new motor position (abs):", new_motorxyz)
+                self.base.print_message(" ... new motor position (abs):", new_motorxyz)
                 axis = ["x", "y", "z"]
                 d_mm = [d for d in new_motorxyz[0:3]]
                 mode = move_modes.absolute
@@ -423,19 +423,19 @@ class galil:
                         new_instrxyz[i] = req_positionvec[i]
                     else:
                         new_instrxyz[i] = new_instrxyz[i]
-                print(" ... new instrument position (abs):", new_instrxyz)
+                self.base.print_message(" ... new instrument position (abs):", new_instrxyz)
                 new_motorxyz = self.transform.transform_instrxyz_to_motorxyz(
                     new_instrxyz[0:3]
                 )
-                print(" ... new motor position (abs):", new_motorxyz)
+                self.base.print_message(" ... new motor position (abs):", new_motorxyz)
                 axis = ["x", "y", "z"]
                 d_mm = [d for d in new_motorxyz[0:3]]
             elif mode == move_modes.homing:
                 # not coordinate conversoion needed as these are not used (but length is still checked)
                 pass
 
-        print(" ... final axis requested:", axis)
-        print(" ... final d (", mode, ") requested:", d_mm)
+        self.base.print_message(" ... final axis requested:", axis)
+        self.base.print_message(" ... final d (", mode, ") requested:", d_mm)
 
         # return value arrays for multi axis movement
         ret_moved_axis = []
@@ -484,7 +484,7 @@ class galil:
             # recalculate the distance in mm into distance in counts
             # if 1:
             try:
-                print(" ... count_to_mm:", axl, self.config_dict["count_to_mm"][axl])
+                self.base.print_message(" ... count_to_mm:", axl, self.config_dict["count_to_mm"][axl])
                 float_counts = (
                     d / self.config_dict["count_to_mm"][axl]
                 )  # calculate float dist from steupd
@@ -542,7 +542,7 @@ class galil:
                 timeofmove.append(abs(counts / speed))
 
                 # ret = ""
-                print("BUGCHECK:", cmd_seq)
+                self.base.print_message("BUGCHECK:", cmd_seq)
                 # BUG
                 # TODO
                 # it can happen that it crashes below for some reasons
@@ -550,7 +550,7 @@ class galil:
                 for cmd in cmd_seq:
                     _ = self.c(cmd)
                     # ret.join(_)
-                print(" ... Galil cmd:", cmd_seq)
+                self.base.print_message(" ... Galil cmd:", cmd_seq)
                 ret_moved_axis.append(axl)
                 ret_speed.append(speed)
                 ret_accepted_rel_dist.append(None)
@@ -572,7 +572,7 @@ class galil:
                 continue
 
         # get max time until all axis are expected to have stopped
-        print(" ... timeofmove", timeofmove)
+        self.base.print_message(" ... timeofmove", timeofmove)
         if len(timeofmove) > 0:
             tmax = max(timeofmove)
             if tmax > 30 * 60:
@@ -581,7 +581,7 @@ class galil:
             tmax = 0
 
         # wait for expected axis move time before checking if axis stoppped
-        print(" ... axis expected to stop in", tmax, "sec")
+        self.base.print_message(" ... axis expected to stop in", tmax, "sec")
 
         if self.config_dict["estop_motor"] == False:
 
@@ -666,7 +666,7 @@ class galil:
         q = self.c(cmd)  # query position of all axis
         # _ = self.c("PF 10.4")  # set format
         # q = self.c("TP")  # query position of all axis
-        print(" ... ",q)
+        self.base.print_message(" ... ",q)
         # now we need to map these outputs to the ABCDEFG... channels
         # and then map that to xyz so it is humanly readable
         axlett = "ABCDEFGH"
@@ -746,7 +746,7 @@ class galil:
         # this will estop the axis
         # set estop: switch=true
         # release estop: switch=false
-        print("Axis Estop")
+        self.base.print_message("Axis Estop")
         if switch == True:
             await self.stop_axis(await self.get_all_axis())
             await self.motor_off(await self.get_all_axis())
@@ -760,7 +760,7 @@ class galil:
         # this will estop the io
         # set estop: switch=true
         # release estop: switch=false
-        print("IO Estop")
+        self.base.print_message("IO Estop")
         if switch == True:
             await self.break_infinite_digital_cycles()
             await self.digital_out_off(await self.get_all_digital_out())
@@ -990,7 +990,7 @@ class galil:
         # this gets called when the server is shut down or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
         # self.stop_axis(self.get_all_axis())
-        print(" ... shutting down galil motion")
+        self.base.print_message(" ... shutting down galil motion")
         # asyncio.gather(self.motor_off(asyncio.gather(self.get_all_axis()))) # already contains stop command
         self.g.GClose()
         return {"shutdown"}
@@ -1011,7 +1011,8 @@ class transformation_mode(str, Enum):
 class transformxy:
     # Updating plate calibration will automatically update the system transformation
     # matrix. When angles are changed updated them also here and run update_Msystem
-    def __init__(self, Minstr, seq=None):
+    def __init__(self, actServ: Base, Minstr, seq=None):
+        self.base = actServ
         # instrument specific matrix
         # motor to instrument
         self.Minstrxyz = np.asmatrix(Minstr)  # np.asmatrix(np.identity(4))
@@ -1033,8 +1034,8 @@ class transformxy:
 
         # pre calculates the system Matrix M
         self.update_Msystem()
-        print(" ... Minstr", self.Minstr)
-        print(" ... Minstrxyz", self.Minstrxyz)
+        # self.base.print_message(" ... Minstr", self.Minstr)
+        # self.base.print_message(" ... Minstrxyz", self.Minstrxyz)
 
     def transform_platexy_to_motorxy(self, platexy,*args,**kwargs):
         """simply calculates motorxy based on platexy
@@ -1044,8 +1045,8 @@ class transformxy:
             platexy = np.insert(platexy, 2, 0)
         # for _ in range(4-len(platexy)):
         #     platexy = np.append(platexy,1)
-        print(" ... M:\n", self.M)
-        print(" ... xy:", platexy)
+        # self.base.print_message(" ... M:\n", self.M)
+        # self.base.print_message(" ... xy:", platexy)
         motorxy = np.dot(self.M, platexy)
         motorxy = np.delete(motorxy, 2)
         motorxy = np.array(motorxy)[0]
@@ -1056,8 +1057,8 @@ class transformxy:
         motorxy = np.asarray(motorxy)
         if len(motorxy) == 3:
             motorxy = np.insert(motorxy, 2, 0)
-        print(" ... Minv:\n", self.Minv)
-        print(" ... xy:", motorxy)
+        # self.base.print_message(" ... Minv:\n", self.Minv)
+        # self.base.print_message(" ... xy:", motorxy)
         platexy = np.dot(self.Minv, motorxy)
         platexy = np.delete(platexy, 2)
         platexy = np.array(platexy)[0]
@@ -1069,8 +1070,8 @@ class transformxy:
         if len(motorxyz) == 3:
             # append 1 at end
             motorxyz = np.append(motorxyz, 1)
-        print(" ... Minstrinv:\n", self.Minstrinv)
-        print(" ... xyz:", motorxyz)
+        # self.base.print_message(" ... Minstrinv:\n", self.Minstrinv)
+        # self.base.print_message(" ... xyz:", motorxyz)
         instrxyz = np.dot(self.Minstrinv, motorxyz)
         return np.array(instrxyz)[0]
 
@@ -1079,8 +1080,8 @@ class transformxy:
         instrxyz = np.asarray(instrxyz)
         if len(instrxyz) == 3:
             instrxyz = np.append(instrxyz, 1)
-        print(" ... Minstr:\n", self.Minstr)
-        print(" ... xyz:", instrxyz)
+        # self.base.print_message(" ... Minstr:\n", self.Minstr)
+        # self.base.print_message(" ... xyz:", instrxyz)
 
         motorxyz = np.dot(self.Minstr, instrxyz)
         return np.array(motorxyz)[0]
@@ -1185,21 +1186,21 @@ class transformxy:
         """returns Mx part of Minstr"""
         Mx = np.asmatrix(np.identity(4))
         Mx[0, 0:4] = self.Minstrxyz[0, 0:4]
-        print(" ... Mx", Mx)
+        # self.base.print_message(" ... Mx", Mx)
         return Mx
 
     def My(self):
         """returns My part of Minstr"""
         My = np.asmatrix(np.identity(4))
         My[1, 0:4] = self.Minstrxyz[1, 0:4]
-        print(" ... My", My)
+        # self.base.print_message(" ... My", My)
         return My
 
     def Mz(self):
         """returns Mz part of Minstr"""
         Mz = np.asmatrix(np.identity(4))
         Mz[2, 0:4] = self.Minstrxyz[2, 0:4]
-        print(" ... Mz", Mz)
+        # self.base.print_message(" ... Mz", Mz)
         return Mz
 
     def Mplatewarp(self, platexy):
@@ -1212,10 +1213,10 @@ class transformxy:
         when angles are changed.
         Follows stacking sequence from bottom to top (plate)"""
 
-        print(" ... updatting M")
+        self.base.print_message(" ... updatting M")
 
         if self.seq == None:
-            print(" ... seq is empty, using default transformation")
+            self.base.print_message(" ... seq is empty, using default transformation")
             # default case, we simply have xy calibration
             self.M = np.dot(self.Minstrxyz, self.Mplate)
         else:
@@ -1232,28 +1233,28 @@ class transformxy:
             # sequence does not matter so should define it like this in the config
             # if we want to use this
             if axstr.find("xy") == 0 and axstr.find("z") <= 2:
-                print(" ... got xyz seq")
+                self.base.print_message(" ... got xyz seq")
                 self.Minstr = self.Minstrxyz
                 Mcommon1 = True
 
             for ax in self.seq.keys():
                 if ax == "x" and not Mcommon1:
-                    print(" ... got x seq")
+                    self.base.print_message(" ... got x seq")
                     self.Minstr = np.dot(self.Minstr, self.Mx())
                 elif ax == "y" and not Mcommon1:
-                    print(" ... got y seq")
+                    self.base.print_message(" ... got y seq")
                     self.Minstr = np.dot(self.Minstr, self.My())
                 elif ax == "z" and not Mcommon1:
-                    print(" ... got z seq")
+                    self.base.print_message(" ... got z seq")
                     self.Minstr = np.dot(self.Minstr, self.Mz())
                 elif ax == "Rx":
-                    print(" ... got Rx seq")
+                    self.base.print_message(" ... got Rx seq")
                     self.Minstr = np.dot(self.Minstr, self.Rx())
                 elif ax == "Ry":
-                    print(" ... got Ry seq")
+                    self.base.print_message(" ... got Ry seq")
                     self.Minstr = np.dot(self.Minstr, self.Ry())
                 elif ax == "Rz":
-                    print(" ... got Rz seq")
+                    self.base.print_message(" ... got Rz seq")
                     self.Minstr = np.dot(self.Minstr, self.Rz())
 
             self.M = np.dot(self.Minstr, self.Mplate)
@@ -1262,7 +1263,7 @@ class transformxy:
             try:
                 self.Minv = self.M.I
             except Exception:
-                print(
+                self.base.print_message(
                     "------------------------------ System Matrix singular ---------------------------"
                 )
                 # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
@@ -1273,7 +1274,7 @@ class transformxy:
             try:
                 self.Minstrinv = self.Minstr.I
             except Exception:
-                print(
+                self.base.print_message(
                     "------------------------------ Instrument Matrix singular ---------------------------"
                 )
                 # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
@@ -1281,10 +1282,10 @@ class transformxy:
                     [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, -1]]
                 )
 
-            print(" ... new system matrix:")
-            print(self.M)
-            print(" ... new inverse system matrix:")
-            print(self.Minv)
+            # self.base.print_message(" ... new system matrix:")
+            # self.base.print_message(self.M)
+            # self.base.print_message(" ... new inverse system matrix:")
+            # self.base.print_message(self.Minv)
 
     def update_Mplatexy(self, Mxy,*args,**kwargs):
         """updates the xy part of the plate calibration"""
@@ -1326,7 +1327,7 @@ class transformxy:
 
             return self.Mplatexy
         except Exception:
-            print(
+            self.base.print_message(
                 "------------------------------ Instrument Matrix singular ---------------------------"
             )
             # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
