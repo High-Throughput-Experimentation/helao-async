@@ -1,6 +1,6 @@
 from enum import Enum
 import time
-
+from typing import List
 import asyncio
 
 import nidaqmx
@@ -326,7 +326,7 @@ class cNIMAX:
             print("IOloop task was cancelled")
 
 
-    async def run_task_getFSW(self, FSW):
+    async def run_task_getFSW(self, FSW:str):
         with nidaqmx.Task() as task_FSW:
             if FSW in self.config_dict["dev_FSW"].keys():
                 task_FSW.di_channels.add_di_chan(
@@ -337,7 +337,7 @@ class cNIMAX:
                 return {"name": [FSW], "status": data}
 
 
-    async def run_task_FSWBCD(self, BCDs, on):
+    async def run_task_FSWBCD(self, BCDs:str, on:bool,*args,**kwargs):
         cmds = []
         with nidaqmx.Task() as task_FSWBCD:
             for BCD in BCDs:
@@ -354,7 +354,7 @@ class cNIMAX:
                 return {"err_code": error_codes.not_available}
 
 
-    async def run_task_Pump(self, pump, on):
+    async def run_task_Pump(self, pump:pumpitems, on:bool,*args,**kwargs):
         print(" ... NIMAX pump:", pump, on)
         cmds = []
         with nidaqmx.Task() as task_Pumps:
@@ -372,7 +372,7 @@ class cNIMAX:
                 return {"err_code": error_codes.not_available}
 
 
-    async def run_task_GasFlowValves(self, valves, on):
+    async def run_task_GasFlowValves(self, valves:List[int], on:bool,*args,**kwargs):
         cmds = []
         with nidaqmx.Task() as task_GasFlowValves:
             for valve in valves:
@@ -389,7 +389,7 @@ class cNIMAX:
                 return {"err_code": error_codes.not_available}
 
 
-    async def run_task_Master_Cell_Select(self, cells, on):
+    async def run_task_Master_Cell_Select(self, cells:List[int], on: bool,*args,**kwargs):
         if len(cells) > 1:
             print(
                 " ... Multiple cell selected. Only one can be Master cell. Using first one!"
@@ -413,7 +413,7 @@ class cNIMAX:
                 return {"err_code": error_codes.not_available}
 
 
-    async def run_task_Active_Cells_Selection(self, cells, on):
+    async def run_task_Active_Cells_Selection(self, cells:List[int], on:bool,*args,**kwargs):
         cmds = []
         with nidaqmx.Task() as task_ActiveCell:
             for cell in cells:
@@ -486,7 +486,7 @@ class cNIMAX:
             await self.IO_signalq.put(False)
 
 
-    async def estop(self, switch):
+    async def estop(self, switch:bool,*args,**kwargs):
         """same as estop, but also sets flag"""
         self.IO_estop = switch
         if self.IO_measuring:
