@@ -90,10 +90,16 @@ async def setupAct(request: Request, scope: dict):
             action_dict.update({"action_params":{}})
         action_dict["action_params"].update(body_params)
         # action_dict["action_params"].update(request.query_params)
-        for k in scope:
-            if k not in ["request", "action_dict", "app"]:
-                print(" ... scope key is", k, scope[k])
-                action_dict['action_params'][k] = scope[k]
+        for k,v in request.query_params.items():
+            try:
+                val = json.loads(v)
+            except ValueError:
+                val = v
+            action_dict['action_params'][k] = val
+        # for k in scope:
+        #     if k not in ["request", "action_dict", "app"]:
+        #         print(" ... scope key is", k, scope[k])
+        #         action_dict['action_params'][k] = scope[k]
 
 
     action_dict['action_server'] = servKey
@@ -516,7 +522,7 @@ class Base(object):
 
     def print_message(self,*args):
         for arg in args:
-            print(Style.BRIGHT+Fore.GREEN+f"{arg}"+Style.RESET_ALL)
+            print(f"{Style.BRIGHT}{Fore.GREEN}{arg}{Style.RESET_ALL}")
 
 
     def init_endpoint_status(self, app: FastAPI):
