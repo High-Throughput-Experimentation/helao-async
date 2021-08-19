@@ -11,9 +11,12 @@ from typing import List
 import sqlite3
 
 from helao.core.model import liquid_sample_no
+from helao.core.server import Base
+
 
 class HTE_legacy_API:
-    def __init__(self):
+    def __init__(self, Serv_class):
+        self.base = Serv_class
 
         self.PLATEMAPFOLDERS = [
             r"\\htejcap.caltech.edu\share\data\hte_jcap_app_proto\map",
@@ -30,22 +33,22 @@ class HTE_legacy_API:
 
 
     def get_rcp_plateid(self, plateid: int):
-        print(plateid)
+        self.base.print_message(plateid)
         return None
 
     def get_info_plateid(self, plateid: int):
         infod = self.importinfo(str(plateid))
         # 1. checks that the plate_id (info file) exists
         if infod is not None:
-            # print(infod)
+            # self.base.print_message(infod)
 
             # 2. gets the elements from the screening print in the info file (see getelements_plateid()) and presents them to user
             elements = self.get_elements_plateid(plateid)
-            print("Elements:", elements)
+            self.base.print_message("Elements:", elements)
 
             # 3. checks that a print and anneal record exist in the info file
             if not "prints" or not "anneals" in infod.keys():
-                print("Warning: no print or anneal record exists")
+                self.base.print_message("Warning: no print or anneal record exists")
 
             # 4. gets platemap and passes to alignment code
             # pmpath=getplatemappath_plateid(plateid, return_pmidstr=True)
@@ -401,10 +404,10 @@ class HTE_legacy_API:
             if (
                 not "," in s[s.find("(") : s.find(")")]
             ):  # needed because sometimes x,y in fiducials is comma delim and sometimes not
-                print(
+                self.base.print_message(
                     "WARNING: commas inserted into fiducials line to adhere to format."
                 )
-                print(s)
+                self.base.print_message(s)
                 s = (
                     s.replace("(   ", "(  ",)
                     .replace("(  ", "( ",)
@@ -418,7 +421,7 @@ class HTE_legacy_API:
                     .replace("  ", ",",)
                     .replace(" ", ",",)
                 )
-                print(s)
+                self.base.print_message(s)
             fid = eval("[%s]" % s)
             fid = numpy.array(fid)
         for count, l in enumerate(ls):
@@ -440,7 +443,8 @@ class HTE_legacy_API:
     
 
 class sqlite_liquid_sample_no_API:
-    def __init__(self, DB):
+    def __init__(self, Serv_class, DB):
+        self.base = Serv_class
         self.DB = DB
         self.con = None
         self.cur = None
@@ -452,9 +456,9 @@ class sqlite_liquid_sample_no_API:
           AND name='liquid_sample_no'; """).fetchall()
          
         if listOfTables == []:
-            print('Table not found!')
+            self.base.print_message('Table not found!')
         else:
-            print('Table found!')
+            self.base.print_message('Table found!')
 
         self.close_DB()
 
@@ -484,7 +488,8 @@ class sqlite_liquid_sample_no_API:
 
 
 class liquid_sample_no_API:
-    def __init__(self, DB):
+    def __init__(self, Serv_class, DB):
+        self.base = Serv_class
         self.DBfilepath, self.DBfile = os.path.split(DB)
         self.fDB = None
         self.headerlines = 0
@@ -497,12 +502,12 @@ class liquid_sample_no_API:
             f = open(os.path.join(self.DBfilepath, self.DBfile), "w")
             f.close()
 
-        print("##############################################################")
-        print(
+        self.base.print_message("##############################################################")
+        self.base.print_message(
             " ... liquid sample no database is:",
             os.path.join(self.DBfilepath, self.DBfile),
         )
-        print("##############################################################")
+        self.base.print_message("##############################################################")
 
 
     async def open_DB(self, mode):
@@ -542,11 +547,11 @@ class liquid_sample_no_API:
                 line += "\n"
             await self.fDB.write(line)
                 
-        print(' ... new entry dict:',entrydict)
+        self.base.print_message(' ... new entry dict:',entrydict)
         new_liquid_sample_no = liquid_sample_no(**entrydict)
-        print(' ... new_liquid_sample_no DICT:',new_liquid_sample_no.dict())
+        self.base.print_message(' ... new_liquid_sample_no DICT:',new_liquid_sample_no.dict())
         new_liquid_sample_no.id = await self.count_liquid_sample_no() + 1
-        print(" ... new liquid sample no:", new_liquid_sample_no.id)
+        self.base.print_message(" ... new liquid sample no:", new_liquid_sample_no.id)
         # dump dict to separate json file
         await write_ID_jsonfile(f"{new_liquid_sample_no.id:08d}__{new_liquid_sample_no.DUID}__{new_liquid_sample_no.AUID}.json",new_liquid_sample_no.dict())
         # add newid to DB csv
@@ -595,9 +600,9 @@ class liquid_sample_no_API:
             DUID = data[1]
             AUID = data[2]
             filename = f"{fileID:08d}__{DUID}__{AUID}.json"
-            print(" ... data json file:", filename)
+            self.base.print_message(" ... data json file:", filename)
             ret_liquid_sample_no = liquid_sample_no(**(await load_json_file(filename, 1)))
-            print(" ... data json content:", ret_liquid_sample_no.dict())
+            self.base.print_message(" ... data json content:", ret_liquid_sample_no.dict())
             return ret_liquid_sample_no.dict()
         else:
             return liquid_sample_no().dict() # will be default empty one

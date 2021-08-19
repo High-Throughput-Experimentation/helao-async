@@ -42,10 +42,8 @@ def makeApp(confPrefix, servKey):
     # check if 'simulate' settings is present
     if not "simulate" in S.keys():
         # default if no simulate is defined
-        print('"simulate" not defined, switching to Gamry Simulator.')
         S["simulate"] = False
     if S["simulate"]:
-        print("Gamry simulator loaded.")
         from helao.library.driver.gamry_simulate import gamry
     else:
         from helao.library.driver.gamry_driver import gamry
@@ -59,6 +57,10 @@ def makeApp(confPrefix, servKey):
         version=2.0,
         driver_class=gamry,
     )
+    
+    if S["simulate"]:
+        app.base.print_message("Gamry simulator loaded.")
+
 
     @app.post(f"/{servKey}/get_meas_status")
     async def get_meas_status(request: Request):

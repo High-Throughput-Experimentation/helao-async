@@ -24,10 +24,8 @@ def makeApp(confPrefix, servKey):
     # check if 'simulate' settings is present
     if not "simulate" in S.keys():
         # default if no simulate is defined
-        print('"simulate" not defined, switching to Galil Simulator.')
         S["simulate"] = False
     if S["simulate"]:
-        print("Galil I/O simulator loaded.")
         from helao.library.driver.galil_simulate import galil
     else:
         from helao.library.driver.galil_driver import galil
@@ -35,6 +33,8 @@ def makeApp(confPrefix, servKey):
     app = makeActServ(
         config, servKey, servKey, "Galil IO server", version=2.0, driver_class=galil
     )
+    if S["simulate"]:
+        app.base.print_message("Galil I/O simulator loaded.")
 
     @app.post(f"/{servKey}/query_analog_in")
     async def read_analog_in(

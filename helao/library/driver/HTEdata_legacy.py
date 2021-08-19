@@ -109,10 +109,7 @@ class HTEdata:
         self.config_dict = actServ.server_cfg["params"]
 
 
-        # self.liquidDBpath = self.config_dict["liquid_DBpath"]
-        # self.liquidDBfile = self.config_dict["liquid_DBfile"]
-        # self.liquid_sample_no_DB = liquid_sample_no_API(self.liquidDBpath, self.liquidDBfile)
-        self.dataAPI = HTE_legacy_API()
+        self.dataAPI = HTE_legacy_API(self.base)
 
 
     def get_platexycalibration(self, plateid: int,*args,**kwargs):

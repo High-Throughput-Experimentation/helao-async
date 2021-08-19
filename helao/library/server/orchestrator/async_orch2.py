@@ -66,14 +66,14 @@ def makeApp(confPrefix, servKey):
         A = await setupAct(action_dict, request, locals())
         active = await app.orch.contain_action(action = A)
         waittime = A.action_params["waittime"]
-        print(' ... wait action:', waittime)
+        app.orch.print_message(' ... wait action:', waittime)
         start_time = time.time()
         last_time = start_time
         while time.time()-start_time < waittime:
             await asyncio.sleep(0.5)
             # print(time.time()-start_time)
         # await asyncio.sleep(waittime)
-        print(' ... wait action done')
+        app.orch.print_message(' ... wait action done')
         finished_act = await active.finish()
         return finished_act.as_dict()
 

@@ -57,6 +57,7 @@ from helao.core.server import import_actualizers, async_private_dispatcher
 # from helao.core.data import liquid_sample_no_API
 from helao.core.data import HTE_legacy_API
 from helao.core.schema import Action, Decision
+from helao.core.server import Vis
 
 
 class return_actlib(BaseModel):
@@ -73,13 +74,13 @@ class return_actlib(BaseModel):
 
 
 class C_async_operator:
-    def __init__(self, app):
-        self.app = app
+    def __init__(self, visServ: Vis):
+        self.vis = visServ
 
-        self.dataAPI = HTE_legacy_API()
+        self.dataAPI = HTE_legacy_API(self.vis)
 
-
-        self.orch_name = self.app.srv_config["orch"]
+        self.config_dict = self.vis.server_cfg["params"]
+        self.orch_name = self.config_dict["orch"]
         
         self.pmdata = []
         
@@ -94,16 +95,16 @@ class C_async_operator:
 
         self.act_select_list = []
         self.actualizers = []
-        self.action_lib = import_actualizers(world_config_dict = self.app.world_cfg, library_path = None)
+        self.action_lib = import_actualizers(world_config_dict = self.vis.world_cfg, library_path = None)
 
 
 
         # FastAPI calls
         self.get_actualizers()
-        self.app.doc.add_next_tick_callback(partial(self.get_decisions))
-        self.app.doc.add_next_tick_callback(partial(self.get_actions))
+        self.vis.doc.add_next_tick_callback(partial(self.get_decisions))
+        self.vis.doc.add_next_tick_callback(partial(self.get_actions))
 
-        #print([key for key in self.decision_list.keys()])
+        #self.vis.print_message([key for key in self.decision_list.keys()])
         self.decision_source = ColumnDataSource(data=self.decision_list)
         self.columns_dec = [TableColumn(field=key, title=key) for key in self.decision_list.keys()]
         self.decision_table = DataTable(source=self.decision_source, columns=self.columns_dec, width=620, height=200)
@@ -169,7 +170,7 @@ class C_async_operator:
 
         self.layout0 = layout([
             layout(
-                [Spacer(width=20), Div(text=f"<b>{self.app.srv_config['doc_name']}</b>", width=200+50, height=15, style={'font-size': '200%', 'color': 'red'})],
+                [Spacer(width=20), Div(text=f"<b>{self.config_dict['doc_name']}</b>", width=200+50, height=15, style={'font-size': '200%', 'color': 'red'})],
                 background="#C0C0C0",width=640),
             layout([
                 [self.actions_dropdown],
@@ -211,7 +212,7 @@ class C_async_operator:
 
 
         self.dynamic_col = column(self.layout0, self.layout2)
-        self.app.doc.add_root(self.dynamic_col)
+        self.vis.doc.add_root(self.dynamic_col)
 
 
         # select the first item to force an update of the layout
@@ -223,13 +224,13 @@ class C_async_operator:
     def get_actualizers(self):
         """Return the current list of ACTUALIZERS."""
         self.actualizers = []
-        print(' ... found actualizer:', self.action_lib)
+        self.vis.print_message(' ... found actualizer:', self.action_lib)
         for i, act in enumerate(self.action_lib):
-            # print('full',inspect.getfullargspec(self.action_lib[act]))
-            #print('anno',inspect.getfullargspec(self.action_lib[act]).annotations)
-            #print('def',inspect.getfullargspec(self.action_lib[act]).defaults)
+            # self.vis.print_message('full',inspect.getfullargspec(self.action_lib[act]))
+            #self.vis.print_message('anno',inspect.getfullargspec(self.action_lib[act]).annotations)
+            #self.vis.print_message('def',inspect.getfullargspec(self.action_lib[act]).defaults)
             tmpdoc = self.action_lib[act].__doc__ 
-            # print("... doc:", tmpdoc)
+            # self.vis.print_message("... doc:", tmpdoc)
             if tmpdoc == None:
                 tmpdoc = ""
             tmpargs = inspect.getfullargspec(self.action_lib[act]).args
@@ -267,7 +268,7 @@ class C_async_operator:
             for line in response:
                 for key, value in line.items():
                     self.decision_list[key].append(value)
-        print(' ... current active decisions:',self.decision_list)
+        self.vis.print_message(' ... current active decisions:',self.decision_list)
 
 
     async def get_actions(self):
@@ -278,7 +279,7 @@ class C_async_operator:
         if len(response):
             for key in response[0].keys():
                 self.action_list[key] = []
-        print(' ... current active actions:',self.action_list)
+        self.vis.print_message(' ... current active actions:',self.action_list)
 
 
     async def do_orch_request(self,action_name, 
@@ -289,7 +290,7 @@ class C_async_operator:
     
 
         response = await async_private_dispatcher(
-            world_config_dict = self.app.world_cfg, 
+            world_config_dict = self.vis.world_cfg, 
             server = self.orch_name,
             private_action = action_name,
             params_dict = params_dict,
@@ -304,15 +305,15 @@ class C_async_operator:
         idx = self.act_select_list.index(new)
         act_doc = self.actualizers[idx]['doc']
         # for arg in self.actualizers[idx]['args']:
-        #     print(arg)
+        #     self.vis.print_message(arg)
         self.update_param_layout(self.actualizers[idx]['args'], self.actualizers[idx]['defaults'])
-        self.app.doc.add_next_tick_callback(partial(self.update_doc,act_doc))
+        self.vis.doc.add_next_tick_callback(partial(self.update_doc,act_doc))
 
 
     def callback_clicked_pmplot(self, event):
         """double click/tap on PM plot to add/move marker"""
-        print("DOUBLE TAP PMplot")
-        print(event.x, event.y)
+        self.vis.print_message("DOUBLE TAP PMplot")
+        self.vis.print_message(event.x, event.y)
         # get coordinates of doubleclick
         platex = event.x
         platey = event.y
@@ -334,7 +335,7 @@ class C_async_operator:
             self.get_pm(new)
             self.get_elements_plateid(new)
         else:
-            self.app.doc.add_next_tick_callback(partial(self.update_plateid,""))
+            self.vis.doc.add_next_tick_callback(partial(self.update_plateid,""))
 
 
     def callback_changed_sampleno(self, attr, old, new):
@@ -349,64 +350,64 @@ class C_async_operator:
         if sample_no is not None:
             self.get_sample_infos([sample_no])
         else:
-            self.app.doc.add_next_tick_callback(partial(self.update_samples,""))
+            self.vis.doc.add_next_tick_callback(partial(self.update_samples,""))
 
 
     def callback_start(self, event):
-        print(' ... starting orch')
-        self.app.doc.add_next_tick_callback(partial(self.do_orch_request,"start"))
-        self.app.doc.add_next_tick_callback(partial(self.update_tables))
+        self.vis.print_message(' ... starting orch')
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"start"))
+        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_stop(self, event):
-        print(' ... stopping operator orch')
-        self.app.doc.add_next_tick_callback(partial(self.do_orch_request,"stop"))
-        self.app.doc.add_next_tick_callback(partial(self.update_tables))
+        self.vis.print_message(' ... stopping operator orch')
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"stop"))
+        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_skip_dec(self, event):
-        print(' ... skipping decision')
-        self.app.doc.add_next_tick_callback(partial(self.do_orch_request,"skip"))
-        self.app.doc.add_next_tick_callback(partial(self.update_tables))
+        self.vis.print_message(' ... skipping decision')
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"skip"))
+        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_clear_decisions(self, event):
-        print(' ... clearing decisions')
-        self.app.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_decisions"))
-        self.app.doc.add_next_tick_callback(partial(self.update_tables))
+        self.vis.print_message(' ... clearing decisions')
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_decisions"))
+        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_clear_actions(self, event):
-        print(' ... clearing actions')
-        self.app.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_actions"))
-        self.app.doc.add_next_tick_callback(partial(self.update_tables))
+        self.vis.print_message(' ... clearing actions')
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_actions"))
+        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_prepend(self, event):
         self.prepend_action()
-        self.app.doc.add_next_tick_callback(partial(self.update_tables))
+        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
 
     def callback_append(self, event):
-        self.append_action()
-        self.app.doc.add_next_tick_callback(partial(self.update_tables))
+        self.visend_action()
+        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_update_tables(self, event):
-        self.app.doc.add_next_tick_callback(partial(self.update_tables))
+        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def append_action(self):
         params_dict, json_dict = self.populate_action()
         # submit decission to orchestrator
-        self.app.doc.add_next_tick_callback(partial(self.do_orch_request,"append_decision", params_dict, json_dict))
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"append_decision", params_dict, json_dict))
 
 
     def prepend_action(self):
         params_dict, json_dict = self.populate_action()
         # submit decission to orchestrator
-        self.app.doc.add_next_tick_callback(partial(self.do_orch_request,"prepend_decision", params_dict, json_dict))
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"prepend_decision", params_dict, json_dict))
 
 
     def populate_action(self):
@@ -418,10 +419,10 @@ class C_async_operator:
         # code  = self.input_code.value
         # composition = self.input_composition.value
 
-        print(' ... selected action from list:', selaction)
-        print(' ... selected plateid:', selplateid)
-        print(' ... selected sample:', selsample)
-        print(' ... selected label:', sellabel)
+        self.vis.print_message(' ... selected action from list:', selaction)
+        self.vis.print_message(' ... selected plateid:', selplateid)
+        self.vis.print_message(' ... selected sample:', selsample)
+        self.vis.print_message(' ... selected label:', sellabel)
 
 
         actparams = {paraminput.title: json.loads(paraminput.value) for paraminput in self.param_input}
@@ -451,7 +452,7 @@ class C_async_operator:
         item = 0
         for idx in range(len(args)):
             buf = f'{defaults[idx]}'
-            # print(' ... action parameter:',args[idx])
+            # self.vis.print_message(' ... action parameter:',args[idx])
             # skip the decisionObj parameter
             if args[idx] == 'decisionObj':
                 continue
@@ -522,14 +523,14 @@ class C_async_operator:
     def get_sample_list(self, attr, old_file, new_file):
         f = io.BytesIO(b64decode(new_file))
         samplelist = np.loadtxt(f, skiprows=2, delimiter=",")
-        print(samplelist)
+        self.vis.print_message(samplelist)
         samplestr = ''
         for sample in samplelist:
             samplestr += str(int(sample)) + ','
         if samplestr.endswith(','):
             samplestr = samplestr[:-1]
-        print(samplestr)
-        self.app.doc.add_next_tick_callback(partial(self.update_samples,samplestr))
+        self.vis.print_message(samplestr)
+        self.vis.doc.add_next_tick_callback(partial(self.update_samples,samplestr))
 
 
     def get_pm(self, plateid):
@@ -537,8 +538,8 @@ class C_async_operator:
         #simple one for tests is plateid = '4534'
         self.pmdata = json.loads(self.dataAPI.get_platemap_plateid(plateid))
         if len(self.pmdata) == 0:
-            self.app.doc.add_next_tick_callback(partial(self.update_error,"no pm found"))
-        self.app.doc.add_next_tick_callback(partial(self.update_pm_plot))
+            self.vis.doc.add_next_tick_callback(partial(self.update_error,"no pm found"))
+        self.vis.doc.add_next_tick_callback(partial(self.update_pm_plot))
 
     
     def xy_to_sample(self, xy, pmapxy):
@@ -569,18 +570,18 @@ class C_async_operator:
             exclude_elements_list=[""],
             return_defaults_if_none=False)
         if elements is not None:
-            self.app.doc.add_next_tick_callback(partial(self.update_elements, elements))
+            self.vis.doc.add_next_tick_callback(partial(self.update_elements, elements))
 
 
     def get_sample_infos(self, PMnum: List = None):
-        print(" ... updating samples")
+        self.vis.print_message(" ... updating samples")
         buf = ""
         if PMnum is not None and self.pmdata:
             if PMnum[0] is not None: # need to check as this can also happen
-                print(' ... selected sampleid:', PMnum[0])
+                self.vis.print_message(' ... selected sampleid:', PMnum[0])
                 if PMnum[0] > len(self.pmdata):
-                    print(" ... invalid sample no")
-                    self.app.doc.add_next_tick_callback(partial(self.update_samples,""))
+                    self.vis.print_message(" ... invalid sample no")
+                    self.vis.doc.add_next_tick_callback(partial(self.update_samples,""))
                     return False
                 
                 platex = self.pmdata[PMnum[0]]['x']
@@ -596,10 +597,10 @@ class C_async_operator:
                     buf = "%s%s_%s " % (buf,fraclet, self.pmdata[PMnum[0]][fraclet])
                 if len(buf) == 0:
                     buf = "-"
-                self.app.doc.add_next_tick_callback(partial(self.update_samples,str(PMnum[0])))
-                self.app.doc.add_next_tick_callback(partial(self.update_xysamples,str(platex), str(platey)))
-                self.app.doc.add_next_tick_callback(partial(self.update_composition,buf))
-                self.app.doc.add_next_tick_callback(partial(self.update_code,str(code)))
+                self.vis.doc.add_next_tick_callback(partial(self.update_samples,str(PMnum[0])))
+                self.vis.doc.add_next_tick_callback(partial(self.update_xysamples,str(platex), str(platey)))
+                self.vis.doc.add_next_tick_callback(partial(self.update_composition,buf))
+                self.vis.doc.add_next_tick_callback(partial(self.update_code,str(code)))
 
                 # remove old Marker point
                 old_point = self.plot_mpmap.select(name='selsample')
@@ -652,7 +653,7 @@ def makeBokehApp(doc, confPrefix, servKey):
     )
 
 
-    operator = C_async_operator(app)
+    operator = C_async_operator(app.vis)
     # get the event loop
     # operatorloop = asyncio.get_event_loop()
 

@@ -26,10 +26,8 @@ def makeApp(confPrefix, servKey):
     # check if 'simulate' settings is present
     if not "simulate" in S.keys():
         # default if no simulate is defined
-        print('"simulate" not defined, switching to Galil Simulator.')
         S["simulate"] = False
     if S["simulate"]:
-        print("Galil motion simulator loaded.")
         from helao.library.driver.galil_simulate import galil
     else:
         from helao.library.driver.galil_driver import galil
@@ -37,7 +35,8 @@ def makeApp(confPrefix, servKey):
     app = makeActServ(
         config, servKey, servKey, "Galil motion server", version=2.0, driver_class=galil
     )
-
+    if S["simulate"]:
+        app.base.print_message("Galil motion simulator loaded.")
 
     @app.post(f"/{servKey}/setmotionref")
     async def setmotionref(request: Request):
@@ -135,7 +134,7 @@ def makeApp(confPrefix, servKey):
         move_response = await app.driver.motor_move(A)
         await active.enqueue_data(move_response)
         # if move_response.get("err_code", [])!=[0]:
-        #     print(move_response)
+        #     app.base.print_message(move_response)
         #     await active.set_error(f"{move_response['err_code']}")
         finished_act = await active.finish()
         return finished_act.as_dict()
@@ -234,7 +233,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post("/shutdown")
     def post_shutdown():
-        print(" ... motion shutdown")
+        app.base.print_message(" ... motion shutdown")
         app.driver.shutdown_event()
     #    shutdown_event()
 
