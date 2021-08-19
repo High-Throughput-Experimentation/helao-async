@@ -8,6 +8,8 @@ import asyncio
 from pydantic import BaseModel
 from typing import List
 
+import sqlite3
+
 from helao.core.model import liquid_sample_no
 
 class HTE_legacy_API:
@@ -29,12 +31,12 @@ class HTE_legacy_API:
 
     def get_rcp_plateid(self, plateid: int):
         print(plateid)
-        return ""
+        return None
 
     def get_info_plateid(self, plateid: int):
         infod = self.importinfo(str(plateid))
         # 1. checks that the plate_id (info file) exists
-        if infod != "No plate found!":
+        if infod is not None:
             # print(infod)
 
             # 2. gets the elements from the screening print in the info file (see getelements_plateid()) and presents them to user
@@ -51,19 +53,19 @@ class HTE_legacy_API:
             return self.get_platemap_plateid(plateid)
 
         else:
-            return "No plate found!"
+            return None
 
     def check_plateid(self, plateid: int):
         infod = self.importinfo(str(plateid))
         # 1. checks that the plate_id (info file) exists
-        if infod != "No plate found!":
+        if infod is not None:
             return True
         else:
             return False
 
     def check_printrecord_plateid(self, plateid: int):
         infod = self.importinfo(str(plateid))
-        if infod != "No plate found!":
+        if infod is not None:
             if not "prints" in infod.keys():
                 return False
             else:
@@ -71,7 +73,7 @@ class HTE_legacy_API:
 
     def check_annealrecord_plateid(self, plateid: int):
         infod = self.importinfo(str(plateid))
-        if infod != "No plate found!":
+        if infod is not None:
             if not "anneals" in infod.keys():
                 return False
             else:
@@ -79,8 +81,11 @@ class HTE_legacy_API:
 
     def get_platemap_plateid(self, plateid: int):
         pmpath = self.getplatemappath_plateid(plateid)
+        if pmpath is None:
+            return json.dumps({})
         pmdlist = self.readsingleplatemaptxt(pmpath)
         return json.dumps(pmdlist)
+
 
     def get_elements_plateid(
         self,
@@ -179,7 +184,7 @@ class HTE_legacy_API:
         pmidstr=None,
     ):
         pmfold = self.tryprependpath(self.PLATEMAPFOLDERS, "")
-        p = ""
+        p = None
         if pmidstr is None:
             pmidstr = ""
             infop = self.getinfopath_plateid(plateid)
@@ -223,7 +228,7 @@ class HTE_legacy_API:
             testdir=False,
         )
         if not os.path.isfile(p):
-            return "No plate found!"
+            return None
         with open(p, mode="r") as f:
             lines = f.readlines()
         infofiled = self.filedict_lines(lines)
@@ -434,11 +439,55 @@ class HTE_legacy_API:
         return dlist
     
 
+class sqlite_liquid_sample_no_API:
+    def __init__(self, DB):
+        self.DB = DB
+        self.con = None
+        self.cur = None
+        self.open_DB()
+        
+        # check if table exists
+        listOfTables = self.cur.execute(
+          """SELECT name FROM sqlite_master WHERE type='table'
+          AND name='liquid_sample_no'; """).fetchall()
+         
+        if listOfTables == []:
+            print('Table not found!')
+        else:
+            print('Table found!')
+
+        self.close_DB()
+
+
+    def open_DB(self):
+        self.con = sqlite3.connect(self.DB)
+        self.cur = self.con.cursor()
+
+
+    def close_DB(self):
+        if self.con is not None:
+            self.con.close()
+            self.con = None
+            self.cur = None
+
+
+    async def count_liquid_sample_no(self):
+        pass
+
+    
+    async def new_liquid_sample_no(self, entrydict):
+        pass
+
+
+    async def get_liquid_sample_no(self, ID):
+        pass
+
+
 class liquid_sample_no_API:
-    def __init__(self, DB, headerlines=0):
+    def __init__(self, DB):
         self.DBfilepath, self.DBfile = os.path.split(DB)
         self.fDB = None
-        self.headerlines = headerlines
+        self.headerlines = 0
         # create folder first if it not exist
         if not os.path.exists(self.DBfilepath):
             os.makedirs(self.DBfilepath)
