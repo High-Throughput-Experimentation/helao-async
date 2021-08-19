@@ -661,9 +661,9 @@ class Base(object):
             async for status_msg in self.status_q.subscribe():
                 await websocket.send_text(json.dumps(status_msg))
         except WebSocketDisconnect:
-            self.print_color_msg(
+            self.print_message(
                 f" ... Status websocket client {websocket.client[0]}:{websocket.client[1]} disconnected.",
-                Style.BRIGHT+Fore.BLACK+Back.RED
+                error = True
             )
 
     async def ws_data(self, websocket: WebSocket):
@@ -674,9 +674,9 @@ class Base(object):
             async for data_msg in self.data_q.subscribe():
                 await websocket.send_text(json.dumps(data_msg))
         except WebSocketDisconnect:
-            self.print_color_msg(
+            self.print_message(
                 f" ... Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected.",
-                Style.BRIGHT+Fore.BLACK+Back.RED
+                error = True
             )
 
     async def log_status_task(self, retry_limit: int = 5):
@@ -709,12 +709,12 @@ class Base(object):
                             self.print_message(f" ... Failed to send status msg {client_servkey}.")
 
                     if success:
-                        self.print_color_msg(
+                        self.print_message(
                             f" ... Updated {self.server_name} status to {status_msg} on {client_servkey}.",
                             Fore.GREEN
                         )
                     else:
-                        self.print_color_msg(
+                        self.print_message(
                             f" ... Failed to push status message to {client_servkey} after {retry_limit} attempts.",
                             Fore.GREEN
                         )
@@ -722,7 +722,7 @@ class Base(object):
 
                 # TODO:write to log if save_root exists
         except asyncio.CancelledError:
-            self.print_color_msg(" ... status logger task was cancelled",Style.BRIGHT+Fore.BLACK+Back.RED)
+            self.print_message(" ... status logger task was cancelled",error = True)
 
 
     async def detach_subscribers(self):
@@ -744,7 +744,7 @@ class Base(object):
                     wait_time = time() - self.ntp_last_sync
                     await asyncio.sleep(wait_time)
         except asyncio.CancelledError:
-            self.print_color_msg(" ... ntp sync task was cancelled",Style.BRIGHT+Fore.BLACK+Back.RED)
+            self.print_message(" ... ntp sync task was cancelled",error = True)
 
     async def shutdown(self):
         await self.detach_subscribers()
@@ -1033,7 +1033,7 @@ class Base(object):
                             await self.write_live_data(json.dumps(data_val))
                             # await self.write_live_data(lines)
             except asyncio.CancelledError:
-                self.base.print_color_msg(" ... data logger task was cancelled",Style.BRIGHT+Fore.BLACK+Back.RED)
+                self.base.print_color_msg(" ... data logger task was cancelled",error = True)
 
         async def write_file(
             self,
@@ -1531,10 +1531,10 @@ class Orch(Base):
             await self.intend_none()
             return True
         # except asyncio.CancelledError:
-        #     self.print_color_msg(" ... serious orch exception occurred",Style.BRIGHT+Fore.BLACK+Back.RED)
+        #     self.print_message(" ... serious orch exception occurred",error = True)
         #     return False
         except Exception as e:
-            self.print_color_msg(" ... serious orch exception occurred",Style.BRIGHT+Fore.BLACK+Back.RED)
+            self.print_message(" ... serious orch exception occurred",error = True)
             self.print_message(e)
             return False
 
@@ -1921,7 +1921,10 @@ async def async_private_dispatcher(
 
 
 def print_message(server_cfg,server_name,*args,**kwargs):
+    precolor = ""
+    if "error" in kwargs:
+        precolor = f"{Style.BRIGHT}{Fore.RED}"
     style = server_cfg.get("msg_color","")
     for arg in args:
         # print(f"{Style.BRIGHT}{Fore.GREEN}{arg}{Style.RESET_ALL}")
-        print(f"[{strftime('%H:%M:%S')}_{server_name}]: {style}{arg}{Style.RESET_ALL}")
+        print(f"{precolor}[{strftime('%H:%M:%S')}_{server_name}]:{Style.RESET_ALL} {style}{arg}{Style.RESET_ALL}")
