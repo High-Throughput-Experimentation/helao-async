@@ -88,6 +88,8 @@ async def setupAct(request: Request, scope: dict):
         # not empty: swagger
         if "action_params" not in action_dict:
             action_dict.update({"action_params":{}})
+        print(body_params)
+        print(scope)
         action_dict["action_params"].update(body_params)
         # action_dict["action_params"].update(request.query_params)
         for k,v in request.query_params.items():
@@ -504,7 +506,9 @@ class Base(object):
         self.ntp_offset = None  # add to system time for correction
         self.ntp_last_sync = None
         if os.path.exists("ntpLastSync.txt"):
-            tmps = open("ntpLastSync.txt", "r").readlines()
+            time_inst = open("ntpLastSync.txt", "r")
+            tmps = time_inst.readlines()
+            time_inst.close()
             if len(tmps) > 0:
                 self.ntp_last_sync, self.ntp_offset = tmps[0].strip().split(",")
                 self.ntp_offset = float(self.ntp_offset)
@@ -1280,11 +1284,11 @@ class Orch(Base):
                 removed = set(last_dict[act_name]).difference(acts)
                 ongoing = set(acts).intersection(last_dict[act_name])
                 if removed:
-                    self.print_message(f" ... {act_serv}:{act_name} finished {','.join(removed)}")
+                    self.print_message(f" ... '{act_serv}:{act_name}' finished {','.join(removed)}")
                 if started:
-                    self.print_message(f" ... {act_serv}:{act_name} started {','.join(started)}")
+                    self.print_message(f" ... '{act_serv}:{act_name}' started {','.join(started)}")
                 if ongoing:
-                    self.print_message(f" ... {act_serv}:{act_name} ongoing {','.join(ongoing)}")
+                    self.print_message(f" ... '{act_serv}:{act_name}' ongoing {','.join(ongoing)}")
         self.global_state_dict[act_serv].update(status_dict)
         await self.global_q.put(self.global_state_dict)
         return True
@@ -1865,6 +1869,7 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action):
 
     # print("... params_dict", params_dict)
     # print("... json_dict", json_dict)
+    # print(url)
     
     async with aiohttp.ClientSession() as session:
         async with session.post(
@@ -1915,6 +1920,20 @@ def print_message(server_cfg,server_name,*args,**kwargs):
     precolor = ""
     if "error" in kwargs:
         precolor = f"{Style.BRIGHT}{Fore.RED}"
-    style = server_cfg.get("msg_color","")
+
+    srv_type = server_cfg.get("group","")
+    style = ""
+    if srv_type == "orchestrator":
+        style = f"{Style.BRIGHT}{Fore.GREEN}"
+    elif srv_type == "action":
+        style = f"{Style.BRIGHT}{Fore.YELLOW}"
+    elif srv_type == "operator":
+        style = f"{Style.BRIGHT}{Fore.CYAN}"
+    elif srv_type == "visualizer":
+        style = f"{Style.BRIGHT}{Fore.CYAN}"
+    else:
+        style = ""
+    # style = server_cfg.get("msg_color",style)
+    
     for arg in args:
         print(f"{precolor}[{strftime('%H:%M:%S')}_{server_name}]:{Style.RESET_ALL} {style}{arg}{Style.RESET_ALL}")

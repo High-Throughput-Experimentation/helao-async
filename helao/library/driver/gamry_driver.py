@@ -243,7 +243,7 @@ class gamry:
         }
 
         for pid in pyPids.keys():
-            self.base.print_message(" ... killing GamryCom on PID: ", pid)
+            self.base.print_message(f" ... killing GamryCom on PID: {pid}")
             p = psutil.Process(pid)
             for _ in range(3):
                 # os.kill(p.pid, signal.SIGTERM)
@@ -260,23 +260,23 @@ class gamry:
         """connect to a Gamry"""
         try:
             self.devices = client.CreateObject("GamryCOM.GamryDeviceList")
-            self.base.print_message(" ... GamryDeviceList:", self.devices.EnumSections())
-            self.base.print_message(" ... ", len(self.devices.EnumSections()))
+            self.base.print_message(f" ... GamryDeviceList: {self.devices.EnumSections()}")
+            # self.base.print_message(f" ... {len(self.devices.EnumSections())}")
             if len(self.devices.EnumSections()) >= devid + 1:
                 self.FIFO_Gamryname = self.devices.EnumSections()[devid]
 
                 if self.FIFO_Gamryname.find("IFC") == 0:
                     self.pstat = client.CreateObject("GamryCOM.GamryPC6Pstat")
-                    self.base.print_message(" ... Gamry, using Interface", self.pstat)
+                    self.base.print_message(f" ... Gamry, using Interface {self.pstat}")
                 elif self.FIFO_Gamryname.find("REF") == 0:
                     self.pstat = client.CreateObject("GamryCOM.GamryPC5Pstat")
-                    self.base.print_message(" ... Gamry, using Reference", self.pstat)
+                    self.base.print_message(f" ... Gamry, using Reference {self.pstat}")
                 # else: # old version before Framework 7.06
                 #     self.pstat = client.CreateObject('GamryCOM.GamryPstat')
                 #     self.base.print_message(' ... Gamry, using Farmework , 7.06?', self.pstat)
 
                 self.pstat.Init(self.devices.EnumSections()[devid])
-                self.base.print_message(" ... ", self.pstat)
+                # self.base.print_message(" ... ", self.pstat)
 
             else:
                 self.pstat = None
@@ -811,15 +811,23 @@ class gamry:
                 self.IO_continue = False
 
                 err_code = "none"
+
+                if self.active:
+                    activeDict = self.active.action.as_dict()
+                else:
+                    activeDict = act.as_dict()                
+
             elif self.IO_measuring:
+                activeDict = act.as_dict()                
                 err_code = "meas already in progress"
             else:
+                activeDict = act.as_dict()                
                 err_code = "not initialized"
         else:
+            activeDict = act.as_dict()                
             err_code = retval["potentiostat_connection"]
-            self.base.print_message("###############################################################")
-            self.base.print_message(retval)
-            self.base.print_message("###############################################################")
+
+        
         activeDict["data"] = {"err_code": err_code, "eta": eta}
         return activeDict
 

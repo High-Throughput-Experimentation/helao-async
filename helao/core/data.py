@@ -502,12 +502,9 @@ class liquid_sample_no_API:
             f = open(os.path.join(self.DBfilepath, self.DBfile), "w")
             f.close()
 
-        self.base.print_message("##############################################################")
         self.base.print_message(
-            " ... liquid sample no database is:",
-            os.path.join(self.DBfilepath, self.DBfile),
+            f" ... liquid sample no database is: {os.path.join(self.DBfilepath, self.DBfile)}"
         )
-        self.base.print_message("##############################################################")
 
 
     async def open_DB(self, mode):

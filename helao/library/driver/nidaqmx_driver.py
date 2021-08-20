@@ -477,7 +477,14 @@ class cNIMAX:
             await self.IO_signalq.put(True)
 
             err_code = error_codes.none
+
+            if self.active:
+                activeDict = self.active.action.as_dict()
+            else:
+                activeDict = A.as_dict()
+
         else:
+            activeDict = A.as_dict()
             err_code = error_codes.in_progress
 
         activeDict["data"] = {"err_code": err_code}

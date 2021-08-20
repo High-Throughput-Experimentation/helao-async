@@ -206,6 +206,7 @@ class C_nidaqmxvis:
 
 
     async def IOloop_data(self): # non-blocking coroutine, updates data source
+        self.vis.print_message(f" ... NI visualizer subscribing to: {self.data_url}")
         async with websockets.connect(self.data_url) as ws:
             self.IOloop_data_run = True
             while self.IOloop_data_run:
@@ -348,8 +349,7 @@ class C_potvis:
 
 
     async def IOloop_data(self): # non-blocking coroutine, updates data source
-        # global doc
-        self.vis.print_message(" ... potentiostat visualizer subscribing to:", self.data_url)
+        self.vis.print_message(f" ... potentiostat visualizer subscribing to: {self.data_url}")
         async with websockets.connect(self.data_url) as ws:
             self.IOloop_data_run = True
             while self.IOloop_data_run:

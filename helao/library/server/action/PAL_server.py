@@ -27,12 +27,13 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/PAL_run_method")
     async def PAL_run_method(
         request: Request, 
-        liquid_sample_no_in: Optional[int],
+        liquid_sample_no_in: Optional[int] = None,
         PAL_method: Optional[PALmethods] = PALmethods.fillfixed,
         PAL_tool: Optional[PALtools] = PALtools.LS3,
         PAL_source: Optional[str] = "elec_res1",
         PAL_volume_uL: Optional[int] = 500,  # uL
         PAL_totalvials: Optional[int] = 1,
+        # its a necessary param, but as its the only dict, it partially breaks swagger
         PAL_sampleperiod: Optional[List[float]] = [0.0],
         PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
         PAL_spacingfactor: Optional[float] = 1.0,
@@ -40,13 +41,10 @@ def makeApp(confPrefix, servKey):
         PAL_wash1: Optional[bool] = False,
         PAL_wash2: Optional[bool] = False,
         PAL_wash3: Optional[bool] = False,
-        PAL_wash4: Optional[bool] = False
+        PAL_wash4: Optional[bool] = False,
+        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
         A = await setupAct(request, locals())
-        A.action_params["PAL_dest_tray"] = None
-        A.action_params["PAL_dest_slot"] = None
-        A.action_params["PAL_dest_vial"] = None
-        A.save_data = True
         active_dict = await app.driver.init_PAL_IOloop(A)
         return active_dict
 
