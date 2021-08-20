@@ -224,7 +224,7 @@ class C_async_operator:
     def get_actualizers(self):
         """Return the current list of ACTUALIZERS."""
         self.actualizers = []
-        self.vis.print_message(' ... found actualizer:', self.action_lib)
+        self.vis.print_message(f" ... found actualizer: {self.action_lib}")
         for i, act in enumerate(self.action_lib):
             # self.vis.print_message('full',inspect.getfullargspec(self.action_lib[act]))
             #self.vis.print_message('anno',inspect.getfullargspec(self.action_lib[act]).annotations)
@@ -354,31 +354,31 @@ class C_async_operator:
 
 
     def callback_start(self, event):
-        self.vis.print_message(' ... starting orch')
+        self.vis.print_message(" ... starting orch")
         self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"start"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_stop(self, event):
-        self.vis.print_message(' ... stopping operator orch')
+        self.vis.print_message(" ... stopping operator orch")
         self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"stop"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_skip_dec(self, event):
-        self.vis.print_message(' ... skipping decision')
+        self.vis.print_message(" ... skipping decision")
         self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"skip"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_clear_decisions(self, event):
-        self.vis.print_message(' ... clearing decisions')
+        self.vis.print_message(" ... clearing decisions")
         self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_decisions"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_clear_actions(self, event):
-        self.vis.print_message(' ... clearing actions')
+        self.vis.print_message(" ... clearing actions")
         self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_actions"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
@@ -419,10 +419,10 @@ class C_async_operator:
         # code  = self.input_code.value
         # composition = self.input_composition.value
 
-        self.vis.print_message(' ... selected action from list:', selaction)
-        self.vis.print_message(' ... selected plateid:', selplateid)
-        self.vis.print_message(' ... selected sample:', selsample)
-        self.vis.print_message(' ... selected label:', sellabel)
+        self.vis.print_message(f" ... selected action from list: {selaction}")
+        self.vis.print_message(f" ... selected plateid: {selplateid}")
+        self.vis.print_message(f" ... selected sample: {selsample}")
+        self.vis.print_message(f" ... selected label: {sellabel}")
 
 
         actparams = {paraminput.title: json.loads(paraminput.value) for paraminput in self.param_input}
@@ -578,7 +578,7 @@ class C_async_operator:
         buf = ""
         if PMnum is not None and self.pmdata:
             if PMnum[0] is not None: # need to check as this can also happen
-                self.vis.print_message(' ... selected sampleid:', PMnum[0])
+                self.vis.print_message(f" ... selected sampleid: {PMnum[0]}")
                 if PMnum[0] > len(self.pmdata):
                     self.vis.print_message(" ... invalid sample no")
                     self.vis.doc.add_next_tick_callback(partial(self.update_samples,""))

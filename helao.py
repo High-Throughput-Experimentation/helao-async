@@ -333,6 +333,12 @@ def launcher(confPrefix, confDict):
 
 # def main():
 if __name__ == "__main__":
+    print('\x1b[2J') # clear screen
+    print("##############################################################################")
+    print("#                                                                            #")
+    print("#                      Starting HELAO version 2                              #")
+    print("#                                                                            #")
+    print("##############################################################################")
     pidd = launcher(confPrefix, config)
     result = None
     while result not in [b"\x18", b"\x04"]:

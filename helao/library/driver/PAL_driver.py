@@ -31,6 +31,7 @@ class PALmethods(str, Enum):
     test = 'relay_actuation_test2.cam'
     dilute = 'lcfc_dilute.cam'
     deepclean = 'lcfc_deep_clean.cam'
+    none = ""
 
 
 class Spacingmethod(str, Enum):
@@ -128,7 +129,7 @@ class PALtray:
 class cPALparams(BaseModel):
     liquid_sample_no_in: int = None
     liquid_sample_no_out: int = None
-    PAL_method: PALmethods = PALmethods.test
+    PAL_method: PALmethods = PALmethods.none
     PAL_tool: str = ""
     PAL_volume_uL: int = 0  # uL
     PAL_dest: str = "" # dest can be cust. or tray
@@ -178,16 +179,10 @@ class cPAL:
         # load backup of vial table, if file does not exist it will use the default one from above
         asyncio.gather(self.trayDB_load_backup())
 
-        self.dataserv = self.config_dict["data_server"]
-        self.datahost = self.world_config["servers"][self.config_dict["data_server"]]["host"]
-        self.dataport = self.world_config["servers"][self.config_dict["data_server"]]["port"]
-
         self.local_data_dump = self.world_config["save_root"]
         self.liquid_sample_no_DB_path = self.world_config["liquid_sample_no_DB"]
 
         self.liquid_sample_no_DB = liquid_sample_no_API(self.base, self.liquid_sample_no_DB_path)
-        
-        
 
         self.sshuser = self.config_dict["user"]
         self.sshkey = self.config_dict["key"]
@@ -222,9 +217,9 @@ class cPAL:
                 "continue", None
             )
             self.triggerport_done = self.config_dict["dev_NImax"].get("done", None)
-            self.base.print_message(" ...  PAL start trigger port:", self.triggerport_start)
-            self.base.print_message(" ...  PAL continue trigger port:", self.triggerport_continue)
-            self.base.print_message(" ...  PAL done trigger port:", self.triggerport_done)
+            self.base.print_message(f" ... PAL start trigger port: {self.triggerport_start}")
+            self.base.print_message(f" ... PAL continue trigger port: {self.triggerport_continue}")
+            self.base.print_message(f" ... PAL done trigger port: {self.triggerport_done}")
             self.triggers = True
 
 
@@ -288,7 +283,7 @@ class cPAL:
 
     async def trayDB_load_backup(self):
         file_path = os.path.join(self.local_data_dump, self.PAL_file)
-        self.base.print_message(" ... loading PAL table from", file_path)
+        self.base.print_message(f" ... loading PAL table from: {file_path}")
         if not os.path.exists(file_path):
             return False
 
@@ -315,7 +310,7 @@ class cPAL:
         # reset old tray DB
         self.trays = []
         for traynum, trayitem in trays_dict.items():
-            self.base.print_message(" ... tray num", traynum)
+            # self.base.print_message(" ... tray num", traynum)
             # check if long enough
             for i in range(traynum):
                 if len(self.trays) < i + 1:
@@ -330,7 +325,7 @@ class cPAL:
                         if len(slots) < i + 1:
                             slots.append(None)
 
-                    self.base.print_message(" ... slot num", slotnum)
+                    # self.base.print_message(" ... slot num", slotnum)
                     if slotitem is not None:
                         if slotitem["type"] == "VT54":
                             self.base.print_message(" ... got VT54")
@@ -701,14 +696,12 @@ class cPAL:
             remotedatafile = os.path.join(
                 self.FIFO_dir, "AUX__" + self.FIFO_name
             )
-            self.base.print_message("##########################################################")
             self.base.print_message(" ... PAL saving to:", self.FIFO_dir)
             self.FIFO_rshs_dir = self.FIFO_dir
             #            self.FIFO_rshs_dir = self.FIFO_rshs_dir.replace('C:\\','/cygdrive/c/')
             self.FIFO_rshs_dir = self.FIFO_rshs_dir.replace("C:\\", "")
             self.FIFO_rshs_dir = self.FIFO_rshs_dir.replace("\\", "/")
             self.base.print_message(" ... RSHS saving to: ", "/cygdrive/c/", self.FIFO_rshs_dir)
-            self.base.print_message("##########################################################")
             self.IO_continue = False
             self.IO_do_meas = True
             # wait for first continue trigger
@@ -716,13 +709,19 @@ class cPAL:
             while not self.IO_continue:
                 await asyncio.sleep(1)
             error = self.IO_error
+            if self.active:
+                activeDict = self.active.action.as_dict()
+            else:
+                activeDict = A.as_dict()
         else:
+            activeDict = A.as_dict()
             error = error_codes.in_progress
             remotedatafile = ""
 
+
         activeDict["data"] = {"err_code": error, 
                               "remotedatafile": remotedatafile,
-                              }
+                          }
         return activeDict
 
 
@@ -741,8 +740,8 @@ class cPAL:
 
         # (1) check if we have free vial slots
         error = await self.sendcommand_prechecks(PALparams)
-
-
+        if error is not error_codes.none:
+            self.base.print_message(f" ... Got error after pre-checks: {error}", error = True)
 
         # (2) Rest
         if error is error_codes.none:
@@ -755,11 +754,11 @@ class cPAL:
 
             if PALparams.liquid_sample_no_in < 0:
                  error = error_codes.not_available
-
+                 self.base.print_message(f" ... liquid_sample_no < 0 ('{PALparams.liquid_sample_no_in}')", error = True)
 
             if error is error_codes.none:
                 if PALparams.PAL_method != PALmethods.dilute and PALparams.PAL_method != PALmethods.deepclean: 
-                    self.base.print_message(" ... liquid_sample_no_in is", PALparams.liquid_sample_no_in)
+                    self.base.print_message(f" ... liquid_sample_no_in is: {PALparams.liquid_sample_no_in}")
                     if PALparams.liquid_sample_no_in == -1:
                         self.base.print_message(" ... PAL need to get last sample from list")
                         PALparams.liquid_sample_no_in = await self.liquid_sample_no_get_last()
@@ -796,7 +795,7 @@ class cPAL:
 
                     if PALparams.PAL_method == PALmethods.fill or PALparams.PAL_method == PALmethods.fillfixed:
                         if self.active:
-                            self.active.action_params.update({"_eche_sample_no":PALparams.liquid_sample_no_out})
+                            self.active.action.action_params.update({"_eche_sample_no":PALparams.liquid_sample_no_out})
 
 
 
@@ -813,12 +812,17 @@ class cPAL:
                 path_methodfile = retvals["path_methodfile"]
                 rshs_pal_logfile = retvals["rshs_pal_logfile"]
     
+                if error is not error_codes.none:
+                    self.base.print_message(f" ... Got error after sendcommand_ssh_helper: {error}", error = True)
     
     
                 if error is error_codes.none:
                     # waiting now for all three PAL triggers
                     # continue is use as the sampling timestamp
                     error = await self.sendcommand_triggerwait(PALparams)
+
+                    if error is not error_codes.none:
+                        self.base.print_message(f" ... Got error after triggerwait: {error}", error = True)
     
                     # write data
                     if self.active:
@@ -889,6 +893,7 @@ class cPAL:
                 PALparams.PAL_dest_vial = newvialpos['vial']
                 self.base.print_message(f' ... archiving liquid sample to tray {PALparams.PAL_dest_tray}, slot {PALparams.PAL_dest_slot}, vial {PALparams.PAL_dest_vial}')
             else:
+                self.base.print_message(' ... Tray is not available', error= True)
                 error = error_codes.not_available
         elif PALparams.PAL_method == PALmethods.dilute:
             PALparams.PAL_dest = "tray"
@@ -901,6 +906,7 @@ class cPAL:
                 PALparams.liquid_sample_no_out = oldvial['liquid_sample_no']
             else:
                 error = error_codes.not_available
+                self.base.print_message(' ... old liquid_sample_no is None.', error= True)
         elif PALparams.PAL_method == PALmethods.deepclean:
             PALparams.PAL_dest = "waste"
             PALparams.PAL_source = "wash"
@@ -919,6 +925,8 @@ class cPAL:
             PALparams.PAL_dest_tray = None
             PALparams.PAL_dest_slot = None
             PALparams.PAL_dest_vial = None
+            self.base.print_message(f' ... unknown PAL method: {PALparams.PAL_method}', error= True)
+
             error = error_codes.not_available
         
         return error
@@ -932,7 +940,7 @@ class cPAL:
             # val = await self.wait_for_trigger_start()
             val = await self.poll_start()
             if not val:
-                self.base.print_message(" ... PAL start trigger timeout")
+                self.base.print_message(" ... PAL start trigger timeout", error = True)
                 error = error_codes.start_timeout
                 self.IO_error = error
                 self.IO_continue = True
@@ -943,7 +951,7 @@ class cPAL:
                 # val = await self.wait_for_trigger_continue()
                 val = await self.poll_continue()
                 if not val:
-                    self.base.print_message(" ... PAL continue trigger timeout")
+                    self.base.print_message(" ... PAL continue trigger timeout", error = True)
                     error = error_codes.continue_timeout
                     self.IO_error = error
                     self.IO_continue = True
@@ -957,7 +965,7 @@ class cPAL:
                     # val = await self.wait_for_trigger_done()
                     val = await self.poll_done()
                     if not val:
-                        self.base.print_message(" ... PAL done trigger timeout")
+                        self.base.print_message(" ... PAL done trigger timeout", error = True)
                         error = error_codes.done_timeout
                         # self.IO_error = error
                         # self.IO_continue = True
@@ -1058,7 +1066,7 @@ class cPAL:
                     ) = mysshclient.exec_command(sshcmd)
             if not rshs_path.endswith("/"):
                 rshs_path += "/"
-            self.base.print_message(" ... final RSHS path:", rshs_path)
+            self.base.print_message(f" ... final RSHS path: {rshs_path}")
         
             rshs_logfile = "AUX__" + self.FIFO_name
             rshs_logfilefull = rshs_path + rshs_logfile
@@ -1076,7 +1084,7 @@ class cPAL:
                 mysshclient_stdout,
                 mysshclient_stderr,
             ) = mysshclient.exec_command(sshcmd)
-            self.base.print_message(" ... final RSHS logfile:", rshs_logfilefull)
+            self.base.print_message(f" ... final RSHS logfile: {rshs_logfilefull}")
 
             # rshs_pal_logfile = self.log_file
             rshs_pal_logfile = os.path.join(
@@ -1100,8 +1108,7 @@ class cPAL:
             
             path_methodfile = os.path.join(self.method_path, PALparams.PAL_method.value)
             cmd_to_execute = f'tmux new-window PAL  /loadmethod "{path_methodfile}" "{PALparams.PAL_tool};{PALparams.PAL_source};{PALparams.PAL_volume_uL};{PALparams.PAL_dest_tray};{PALparams.PAL_dest_slot};{PALparams.PAL_dest_vial};{wash1};{wash2};{wash3};{wash4};{rshs_pal_logfile}" /start /quit'
-            self.base.print_message(' ... PAL command:')
-            self.base.print_message(cmd_to_execute)
+            self.base.print_message(" ... PAL command: {cmd_to_execute}")
         
             # update now the vial warehouse before PAL command gets executed
             # only needs to be updated if
@@ -1214,82 +1221,89 @@ class cPAL:
 
 
                     # for sequence, the sample in is always the same
-                    self.base.print_message(' ... liquid_sample_no_in:', self.IO_PALparams.liquid_sample_no_in)
-                    if self.IO_PALparams.liquid_sample_no_in < 0:
-                        self.base.print_message(f' ... PAL need to get n-{self.IO_PALparams.liquid_sample_no_in+1} last sample from list')
-                        sampledict = await self.liquid_sample_no_get_last(self.IO_PALparams.liquid_sample_no_in)
-                        self.IO_PALparams.liquid_sample_no_in = sampledict.id
-                        self.base.print_message(' ... correct liquid_sample_no_in is now:', self.IO_PALparams.liquid_sample_no_in)
+                    self.base.print_message(f" ... liquid_sample_no_in: {self.IO_PALparams.liquid_sample_no_in}")
+                    # need to check for None
+                    
                     if self.IO_PALparams.liquid_sample_no_in is None:
                         self.base.print_message(' ... error, invalid liquid_sample_no_in.')
-                        await self.IOloop_meas_end_helper()
+                        # await self.IOloop_meas_end_helper()
+                    else:
                         
-
-
-                    start_time = time.time()
-                    last_time = start_time
-                    prev_timepoint = 0.0
-                    diff_time = 0.0
-                    backuptrays = copy.deepcopy(self.trays)
-                    
-                    # for multipe vials we don't wait for first trigger
-                    if self.IO_PALparams.PAL_totalvials > 1:
-                        self.IO_continue = True
-                    
-                    for vial in range(self.IO_PALparams.PAL_totalvials):
-                        self.base.print_message(f' ... vial {vial+1} of {self.IO_PALparams.PAL_totalvials}')
-                        run_PALparams = self.IO_PALparams
-                        run_PALparams.PAL_cur_sample = vial
-
-
-                        if self.IO_PALparams.PAL_method == PALmethods.dilute:
-                            newvialpos = await self.trayDB_get_first_full(vialtable = backuptrays)
-                            if newvialpos['tray'] is not None:
-                                # mark this spot as False now so 
-                                # it won't be found again next time
-                                backuptrays[newvialpos['tray']-1].slots[newvialpos['slot']-1].vials[newvialpos['vial']-1] = False
-                                run_PALparams.PAL_dest_tray = newvialpos['tray']
-                                run_PALparams.PAL_dest_slot = newvialpos['slot']
-                                run_PALparams.PAL_dest_vial = newvialpos['vial']
-                                self.base.print_message(f' ... diluting liquid sample in tray {run_PALparams.PAL_dest_tray}, slot {run_PALparams.PAL_dest_slot}, vial {run_PALparams.PAL_dest_vial}')
-                            else:
-                                self.base.print_message(' ... no full vial slots')
-                                break
-
-
-
-
-                        # get the scheduled time for next PAL command
-                        # self.IO_PALparams.timeoffset corrects for offset 
-                        # between send ssh and continue (or any other offset)
-                        if self.IO_PALparams.PAL_spacingmethod == Spacingmethod.linear:
-                            self.base.print_message(' ... PAL linear scheduling')
-                            cur_time = time.time()
-                            diff_time = self.IO_PALparams.PAL_sampleperiod[0]-(cur_time-last_time)-self.IO_PALparams.PAL_timeoffset
-                        elif self.IO_PALparams.PAL_spacingmethod == Spacingmethod.geometric:
-                            self.base.print_message(' ... PAL geometric scheduling')
-                            timepoint = (self.IO_PALparams.PAL_spacingfactor ** vial) * self.IO_PALparams.PAL_sampleperiod[0]
-                            diff_time = timepoint-prev_timepoint-(cur_time-last_time)-self.IO_PALparams.PAL_timeoffset
-                            prev_timepoint = timepoint # todo: consider time lag
-                        elif self.IO_PALparams.PAL_spacingmethod == Spacingmethod.custom:
-                            self.base.print_message(' ... PAL custom scheduling')
-                            cur_time = time.time()
-                            self.base.print_message((cur_time-last_time))
-                            self.base.print_message(self.IO_PALparams.PAL_sampleperiod[vial])
-                            diff_time = self.IO_PALparams.PAL_sampleperiod[vial]-(cur_time-start_time)-self.IO_PALparams.PAL_timeoffset
-
-
-                        self.base.print_message(f' ... PAL waits {diff_time} for sending next command')
-                        # only wait for positive time
-                        if (diff_time > 0):
-                            await asyncio.sleep(diff_time)
-
-
-
-                        last_time = time.time()
-                        self.base.print_message(' ... PAL sendcommmand def start')
-                        retvals = await self.sendcommand_main(run_PALparams)
-                        self.base.print_message(' ... PAL sendcommmand def end')
+                        if self.IO_PALparams.liquid_sample_no_in < 0:
+                            self.base.print_message(f' ... PAL need to get n-{self.IO_PALparams.liquid_sample_no_in+1} last sample from list')
+                            sampledict = await self.liquid_sample_no_get_last(self.IO_PALparams.liquid_sample_no_in)
+                            self.IO_PALparams.liquid_sample_no_in = sampledict.id
+                            self.base.print_message(' ... correct liquid_sample_no_in is now:', self.IO_PALparams.liquid_sample_no_in)
+                        # need to check for none again if no sample_no_was obtained
+                        if self.IO_PALparams.liquid_sample_no_in is None:
+                            self.base.print_message(' ... error, invalid liquid_sample_no_in.')
+                        else:
+        
+        
+                            start_time = time.time()
+                            last_time = start_time
+                            prev_timepoint = 0.0
+                            diff_time = 0.0
+                            backuptrays = copy.deepcopy(self.trays)
+                            
+                            # for multipe vials we don't wait for first trigger
+                            if self.IO_PALparams.PAL_totalvials > 1:
+                                self.IO_continue = True
+                            
+                            for vial in range(self.IO_PALparams.PAL_totalvials):
+                                self.base.print_message(f' ... vial {vial+1} of {self.IO_PALparams.PAL_totalvials}')
+                                run_PALparams = self.IO_PALparams
+                                run_PALparams.PAL_cur_sample = vial
+        
+        
+                                if self.IO_PALparams.PAL_method == PALmethods.dilute:
+                                    newvialpos = await self.trayDB_get_first_full(vialtable = backuptrays)
+                                    if newvialpos['tray'] is not None:
+                                        # mark this spot as False now so 
+                                        # it won't be found again next time
+                                        backuptrays[newvialpos['tray']-1].slots[newvialpos['slot']-1].vials[newvialpos['vial']-1] = False
+                                        run_PALparams.PAL_dest_tray = newvialpos['tray']
+                                        run_PALparams.PAL_dest_slot = newvialpos['slot']
+                                        run_PALparams.PAL_dest_vial = newvialpos['vial']
+                                        self.base.print_message(f' ... diluting liquid sample in tray {run_PALparams.PAL_dest_tray}, slot {run_PALparams.PAL_dest_slot}, vial {run_PALparams.PAL_dest_vial}')
+                                    else:
+                                        self.base.print_message(' ... no full vial slots')
+                                        break
+        
+        
+        
+        
+                                # get the scheduled time for next PAL command
+                                # self.IO_PALparams.timeoffset corrects for offset 
+                                # between send ssh and continue (or any other offset)
+                                if self.IO_PALparams.PAL_spacingmethod == Spacingmethod.linear:
+                                    self.base.print_message(' ... PAL linear scheduling')
+                                    cur_time = time.time()
+                                    diff_time = self.IO_PALparams.PAL_sampleperiod[0]-(cur_time-last_time)-self.IO_PALparams.PAL_timeoffset
+                                elif self.IO_PALparams.PAL_spacingmethod == Spacingmethod.geometric:
+                                    self.base.print_message(' ... PAL geometric scheduling')
+                                    timepoint = (self.IO_PALparams.PAL_spacingfactor ** vial) * self.IO_PALparams.PAL_sampleperiod[0]
+                                    diff_time = timepoint-prev_timepoint-(cur_time-last_time)-self.IO_PALparams.PAL_timeoffset
+                                    prev_timepoint = timepoint # todo: consider time lag
+                                elif self.IO_PALparams.PAL_spacingmethod == Spacingmethod.custom:
+                                    self.base.print_message(' ... PAL custom scheduling')
+                                    cur_time = time.time()
+                                    self.base.print_message((cur_time-last_time))
+                                    self.base.print_message(self.IO_PALparams.PAL_sampleperiod[vial])
+                                    diff_time = self.IO_PALparams.PAL_sampleperiod[vial]-(cur_time-start_time)-self.IO_PALparams.PAL_timeoffset
+        
+        
+                                self.base.print_message(f' ... PAL waits {diff_time} for sending next command')
+                                # only wait for positive time
+                                if (diff_time > 0):
+                                    await asyncio.sleep(diff_time)
+        
+        
+        
+                                last_time = time.time()
+                                self.base.print_message(' ... PAL sendcommmand def start')
+                                retvals = await self.sendcommand_main(run_PALparams)
+                                self.base.print_message(' ... PAL sendcommmand def end')
 
 
 

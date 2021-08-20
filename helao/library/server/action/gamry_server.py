@@ -89,7 +89,7 @@ def makeApp(confPrefix, servKey):
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
         A = await setupAct(request, locals())
-        A.save_data = True
+        # A.save_data = True
         active_dict = await app.driver.technique_LSV(A)
         return active_dict
 
@@ -109,7 +109,7 @@ def makeApp(confPrefix, servKey):
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
         A = await setupAct(request, locals())
-        A.save_data = True
+        # A.save_data = True
         active_dict = await app.driver.technique_CA(A)
         return active_dict
 
@@ -129,7 +129,7 @@ def makeApp(confPrefix, servKey):
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
         A = await setupAct(request, locals())
-        A.save_data = True
+        # A.save_data = True
         active_dict = await app.driver.technique_CP(A)
         return active_dict
 
@@ -153,7 +153,7 @@ def makeApp(confPrefix, servKey):
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
         A = await setupAct(request, locals())
-        A.save_data = True
+        # A.save_data = True
         active_dict = await app.driver.technique_CV(A)
         return active_dict
 
@@ -177,7 +177,7 @@ def makeApp(confPrefix, servKey):
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
         A = await setupAct(request, locals())
-        A.save_data = True
+        # A.save_data = True
         active_dict = await app.driver.technique_EIS(A)
         return active_dict
 
@@ -194,7 +194,7 @@ def makeApp(confPrefix, servKey):
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
         A = await setupAct(request, locals())
-        A.save_data = True
+        # A.save_data = True
         active_dict = await app.driver.technique_OCV(A)
         return active_dict
 
