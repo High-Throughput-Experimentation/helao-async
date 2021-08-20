@@ -15,13 +15,16 @@ config["servers"] = dict(
     ##########################################################################
     # Orchestrator
     ##########################################################################
-    orchestrator=dict(
-        host=hostip, port=8001, group="orchestrator", fast="async_orch2",
+    ORCH=dict(
+        host=hostip, 
+        port=8001, 
+        group="orchestrator", 
+        fast="async_orch2",
     ),
     ##########################################################################
     # Instrument Servers
     ##########################################################################
-    data=dict(
+    DATA=dict(
         host=hostip,
         port=8002,
         group="action",
@@ -30,7 +33,7 @@ config["servers"] = dict(
         params=dict(
         ),
     ),
-    motor=dict(
+    MOTOR=dict(
         host=hostip,
         port=8003,
         group="action",
@@ -59,23 +62,18 @@ config["servers"] = dict(
                 y="B",
                 z="A",
                 Rz="D",
-                #t="E",
-                #u="F"
                 ),
             axis_zero=dict(
                 A=0.0, #z
                 B=52.0, #y
                 C=77.0, #x
                 D=0.0, #Rz
-                #t="E",
-                #u="F"
                 ),
-            #axlett="ABCD", # not needed anymore
             timeout = 10*60, # timeout for axis stop in sec
             tbroadcast = 2, # frequency of websocket broadcast (only broadcasts if something changes but need to reduce the frequeny of that if necessary)
         )
     ),
-    potentiostat=dict(
+    PSTAT=dict(
         host=hostip,
         port=8004,
         group="action",
@@ -97,7 +95,7 @@ config["servers"] = dict(
     #         cutoff=6,  # cutoff of digits for TransferMatrix calculation
     #     ),
     # ),
-    nimax=dict(
+    NI=dict(
         host="127.0.0.1",
         port=8006,
         group="action",
@@ -197,7 +195,6 @@ config["servers"] = dict(
             method_path = r'C:\Users\rshs\Desktop\ADSS\adss_psc_methods\lcfc',
             log_file = r'C:\Users\rshs\Desktop\ADSS\adss_logfile\210512_lcfc_manualwatertest\210512_LCFC_manualwatertest_logfile.txt',
             timeout = 30*60, # 30min timeout for waiting for TTL
-            data_server = "data",
             dev_NImax = { # TTL handshake via NImax
                 # 'start':'PFI13',#'PXI-6284/port2/line5',  #P2.5, #PFI13
                 # 'continue':'PFI15',#'PXI-6284/port2/line7',  #P2.7 #PFI15
@@ -211,25 +208,25 @@ config["servers"] = dict(
     # #########################################################################
     # Visualizers (bokeh servers)
     # #########################################################################
-    # exp_vis=dict(#simple dumb modular visualizer
-    #     host=hostip,
-    #     port=5001,
-    #     group="visualizer",
-    #     bokeh="bokeh_modular_visualizer",
-    #     params = dict(
-    #         doc_name = "ADSS visualizer",
-    #         ws_nidaqmx="nimax",
-    #         ws_potentiostat = 'potentiostat',
-    #     )
-    # ),
-    operator=dict(
+    VIS=dict(#simple dumb modular visualizer
+        host=hostip,
+        port=5001,
+        group="visualizer",
+        bokeh="bokeh_modular_visualizer",
+        params = dict(
+            doc_name = "ADSS visualizer",
+            ws_nidaqmx="NI",
+            ws_potentiostat = 'PSTAT',
+        )
+    ),
+    OP=dict(
         host=hostip,
         port=5002,
         group="operator",
         bokeh="async_operator",
         params = dict(
             doc_name = "ADSS Operator",
-            orch = 'orchestrator',
+            orch = 'ORCH',
             # data_server = "data",
             # servicemode=False,
         )
