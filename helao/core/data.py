@@ -33,7 +33,7 @@ class HTE_legacy_API:
 
 
     def get_rcp_plateid(self, plateid: int):
-        self.base.print_message(plateid)
+        self.base.print_message(f" ... get rcp for plateid: {plateid}")
         return None
 
     def get_info_plateid(self, plateid: int):
@@ -44,11 +44,11 @@ class HTE_legacy_API:
 
             # 2. gets the elements from the screening print in the info file (see getelements_plateid()) and presents them to user
             elements = self.get_elements_plateid(plateid)
-            self.base.print_message("Elements:", elements)
+            self.base.print_message(f" ... Elements: {elements}")
 
             # 3. checks that a print and anneal record exist in the info file
             if not "prints" or not "anneals" in infod.keys():
-                self.base.print_message("Warning: no print or anneal record exists")
+                self.base.print_message("Warning: no print or anneal record exists", warning = True)
 
             # 4. gets platemap and passes to alignment code
             # pmpath=getplatemappath_plateid(plateid, return_pmidstr=True)
@@ -405,7 +405,8 @@ class HTE_legacy_API:
                 not "," in s[s.find("(") : s.find(")")]
             ):  # needed because sometimes x,y in fiducials is comma delim and sometimes not
                 self.base.print_message(
-                    "WARNING: commas inserted into fiducials line to adhere to format."
+                    "WARNING: commas inserted into fiducials line to adhere to format.",
+                    warning = True
                 )
                 self.base.print_message(s)
                 s = (
@@ -544,11 +545,11 @@ class liquid_sample_no_API:
                 line += "\n"
             await self.fDB.write(line)
                 
-        self.base.print_message(' ... new entry dict:',entrydict)
+        self.base.print_message(f" ... new entry dict: {entrydict}")
         new_liquid_sample_no = liquid_sample_no(**entrydict)
-        self.base.print_message(' ... new_liquid_sample_no DICT:',new_liquid_sample_no.dict())
+        self.base.print_message(f" ... new_liquid_sample_no DICT: {new_liquid_sample_no.dict()}")
         new_liquid_sample_no.id = await self.count_liquid_sample_no() + 1
-        self.base.print_message(" ... new liquid sample no:", new_liquid_sample_no.id)
+        self.base.print_message(f" ... new liquid sample no: {new_liquid_sample_no.id}")
         # dump dict to separate json file
         await write_ID_jsonfile(f"{new_liquid_sample_no.id:08d}__{new_liquid_sample_no.DUID}__{new_liquid_sample_no.AUID}.json",new_liquid_sample_no.dict())
         # add newid to DB csv
@@ -597,9 +598,9 @@ class liquid_sample_no_API:
             DUID = data[1]
             AUID = data[2]
             filename = f"{fileID:08d}__{DUID}__{AUID}.json"
-            self.base.print_message(" ... data json file:", filename)
+            self.base.print_message(f" ... data json file: {filename}")
             ret_liquid_sample_no = liquid_sample_no(**(await load_json_file(filename, 1)))
-            self.base.print_message(" ... data json content:", ret_liquid_sample_no.dict())
+            self.base.print_message(f" ... data json content: {ret_liquid_sample_no.dict()}")
             return ret_liquid_sample_no.dict()
         else:
             return liquid_sample_no().dict() # will be default empty one

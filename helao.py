@@ -145,11 +145,11 @@ class Pidd:
         activeserver = [k for k, _, _, _ in active]
         KILL_ORDER = ["operator", "visualizer", "action", "orchestrator"]
         for group in KILL_ORDER:
-            print_message({}, "launcher", f"Killing {group} group.")
+            print_message({}, "launcher", f"Killing {group} group.", error = True)
             if group in pidd.A:
                 G = pidd.A[group]
                 for server in G:
-                    print_message({}, "launcher", f"Killing {server}.")
+                    print_message({}, "launcher", f"Killing {server}.", error = True)
                     if server in activeserver:
                         self.kill_server(server)
 

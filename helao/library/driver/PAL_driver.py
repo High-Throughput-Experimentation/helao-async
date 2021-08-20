@@ -59,13 +59,13 @@ class VT_template:
 
     def first_empty(self):
         res = next((i for i, j in enumerate(self.vials) if not j), None)
-        print ("The values till first True value : " + str(res))
+        # print ("The values till first True value : " + str(res))
         return res
     
 
     def first_full(self):
         res = next((i for i, j in enumerate(self.vials) if j), None)
-        print ("The values till first False value : " + str(res))
+        # print ("The values till first False value : " + str(res))
         return res
 
 
@@ -365,7 +365,7 @@ class cPAL:
         else:
             datafile.filename = self.PAL_file
 
-        self.base.print_message(" ... updating table:", datafile.filepath, datafile.filename)
+        self.base.print_message(f" ... updating table: {datafile.filepath}:{datafile.filename}")
         await datafile.open_file_async(mode="w+")
 
         for mytray_no, mytray in enumerate(self.trays):
@@ -583,13 +583,10 @@ class cPAL:
         new_vial_vol = float("inf")
 
         for tray_no, tray in enumerate(self.trays):
-            self.base.print_message(" ... tray", tray_no, tray)
+            # self.base.print_message(" ... tray", tray_no, tray)
             if tray is not None:
                 for slot_no, slot in enumerate(tray.slots):
                     if slot is not None:
-                        self.base.print_message(" .... slot ", slot_no, slot)
-                        self.base.print_message(" .... ", slot.type)
-                        self.base.print_message(" .... ", slot.max_vol_mL)
                         if (
                             slot.max_vol_mL >= req_vol
                             and new_vial_vol > slot.max_vol_mL
@@ -601,6 +598,7 @@ class cPAL:
                                 new_vial = position + 1
                                 new_vial_vol = slot.max_vol_mL
 
+        self.base.print_message(f" ... new vial nr. {new_vial} in slot {new_slot} in tray {new_tray}")
         return {"tray": new_tray, "slot": new_slot, "vial": new_vial}
 
 
@@ -696,12 +694,12 @@ class cPAL:
             remotedatafile = os.path.join(
                 self.FIFO_dir, "AUX__" + self.FIFO_name
             )
-            self.base.print_message(" ... PAL saving to:", self.FIFO_dir)
+            self.base.print_message(" ... PAL saving to: {self.FIFO_dir}")
             self.FIFO_rshs_dir = self.FIFO_dir
             #            self.FIFO_rshs_dir = self.FIFO_rshs_dir.replace('C:\\','/cygdrive/c/')
             self.FIFO_rshs_dir = self.FIFO_rshs_dir.replace("C:\\", "")
             self.FIFO_rshs_dir = self.FIFO_rshs_dir.replace("\\", "/")
-            self.base.print_message(" ... RSHS saving to: ", "/cygdrive/c/", self.FIFO_rshs_dir)
+            self.base.print_message(f" ... RSHS saving to: /cygdrive/c/{self.FIFO_rshs_dir}")
             self.IO_continue = False
             self.IO_do_meas = True
             # wait for first continue trigger
@@ -770,11 +768,11 @@ class cPAL:
                     source_mass = liquid_sample_no_in_dict.get("mass", [""])
                     source_supplier = liquid_sample_no_in_dict.get("supplier", [""])
                     source_lotnumber = liquid_sample_no_in_dict.get("lot_number", [""])
-                    self.base.print_message(" ... source_electrolyte:", liquid_sample_no_in_dict["id"])
-                    self.base.print_message(" ... source_chemical:", source_chemical)
-                    self.base.print_message(" ... source_mass:", source_mass)
-                    self.base.print_message(" ... source_supplier:", source_supplier)
-                    self.base.print_message(" ... source_lotnumber:", source_lotnumber)
+                    self.base.print_message(f" ... source_electrolyte: {liquid_sample_no_in_dict['id']}")
+                    self.base.print_message(f" ... source_chemical: {source_chemical}")
+                    self.base.print_message(f" ... source_mass: {source_mass}")
+                    self.base.print_message(f" ... source_supplier: {source_supplier}")
+                    self.base.print_message(f" ... source_lotnumber: {source_lotnumber}")
                     liquid_sample_no_out_dict = await self.liquid_sample_no_create_new(
                         DUID,
                         AUID,
@@ -801,9 +799,6 @@ class cPAL:
 
                     # update sample in and out
                     await self.sendcommand_update_action_sampleinout(PALparams)
-            
-
-
 
 
                 retvals = await self.sendcommand_ssh_helper(PALparams)
@@ -855,11 +850,8 @@ class cPAL:
                                     )
                                 }
                             )
-                            self.base.print_message('PAL data ###################')
-                            self.base.print_message({k: [v] for k, v in zip(self.FIFO_column_headings, logdata)})                        
-                            self.base.print_message('PAL data end ###############')
-
-
+                            tmpdata = {k: [v] for k, v in zip(self.FIFO_column_headings, logdata)}
+                            self.base.print_message(f" ... PAL data: {tmpdata}")
 
 
             # wait another 30sec for program to close
@@ -1108,7 +1100,7 @@ class cPAL:
             
             path_methodfile = os.path.join(self.method_path, PALparams.PAL_method.value)
             cmd_to_execute = f'tmux new-window PAL  /loadmethod "{path_methodfile}" "{PALparams.PAL_tool};{PALparams.PAL_source};{PALparams.PAL_volume_uL};{PALparams.PAL_dest_tray};{PALparams.PAL_dest_slot};{PALparams.PAL_dest_vial};{wash1};{wash2};{wash3};{wash4};{rshs_pal_logfile}" /start /quit'
-            self.base.print_message(" ... PAL command: {cmd_to_execute}")
+            self.base.print_message(f" ... PAL command: {cmd_to_execute}")
         
             # update now the vial warehouse before PAL command gets executed
             # only needs to be updated if
@@ -1213,7 +1205,7 @@ class cPAL:
                         file_group="pal_files",
                         header=self.FIFO_PALheader,
                     )
-                    self.base.print_message(f"!!! Active action uuid is {self.active.action.action_uuid}")
+                    self.base.print_message(f" ... Active action uuid is {self.active.action.action_uuid}")
                     realtime = await self.active.set_realtime()
                     self.FIFO_PALheader.replace("%epoch_ns=FIXME", f"%epoch_ns={realtime}")
 

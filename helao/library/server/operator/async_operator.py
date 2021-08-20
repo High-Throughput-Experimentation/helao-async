@@ -411,6 +411,13 @@ class C_async_operator:
 
 
     def populate_action(self):
+        def to_json(v):
+            try:
+                val = json.loads(v)
+            except ValueError:
+                val = v
+            return val
+        
         selaction = self.actions_dropdown.value
         selplateid = self.input_plateid.value
         selsample = self.input_sampleno.value
@@ -425,7 +432,7 @@ class C_async_operator:
         self.vis.print_message(f" ... selected label: {sellabel}")
 
 
-        actparams = {paraminput.title: json.loads(paraminput.value) for paraminput in self.param_input}
+        actparams = {paraminput.title: to_json(paraminput.value) for paraminput in self.param_input}
 
         D = Decision(inputdict={
             # "orch_name":orch_name,
