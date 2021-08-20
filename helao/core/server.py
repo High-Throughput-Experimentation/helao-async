@@ -591,9 +591,7 @@ class Base(object):
         self.ntp_response = response
         self.ntp_last_sync = response.orig_time
         self.ntp_offset = response.offset
-        self.print_message("#############################################################")
-        self.print_message(" ... ntp_offset: ", self.ntp_offset)
-        self.print_message("#############################################################")
+        self.print_message(f" ... ntp_offset: {self.ntp_offset}")
 
         time_inst = await aiofiles.open("ntpLastSync.txt", "w")
         await time_inst.write(f"{self.ntp_last_sync},{self.ntp_offset}")
@@ -710,13 +708,11 @@ class Base(object):
 
                     if success:
                         self.print_message(
-                            f" ... Updated {self.server_name} status to {status_msg} on {client_servkey}.",
-                            Fore.GREEN
+                            f" ... Updated {self.server_name} status to {status_msg} on {client_servkey}."
                         )
                     else:
                         self.print_message(
-                            f" ... Failed to push status message to {client_servkey} after {retry_limit} attempts.",
-                            Fore.GREEN
+                            f" ... Failed to push status message to {client_servkey} after {retry_limit} attempts."
                         )
 
 
@@ -808,9 +804,6 @@ class Base(object):
             self.data_logger = self.base.aloop.create_task(self.log_data_task())
 
         async def myinit(self):
-            # self.base.print_message('#################################################')
-            # self.base.print_message('myinit')
-            # self.base.print_message('#################################################')
             if self.action.save_rcp:
                 os.makedirs(self.action.output_dir, exist_ok=True)
                 self.action.actionnum = (
@@ -937,7 +930,7 @@ class Base(object):
         async def set_output_file(self, filename: str, header: Optional[str] = None):
             "Set active save_path, write header if supplied."
             output_path = os.path.join(self.action.output_dir, filename)
-            self.base.print_message(" ... writing data to:", output_path)
+            self.base.print_message(f" ... writing data to: {output_path}")
             # create output file and set connection
             self.file_conn = await aiofiles.open(output_path, mode="a+")
             if header:
@@ -948,9 +941,6 @@ class Base(object):
         async def write_live_data(self, output_str: str):
             """Appends lines to file_conn."""
             if self.file_conn:
-                # self.base.print_message('#########################################################')
-                # self.base.print_message(' ... appending data to file connection')
-                # self.base.print_message('#########################################################')
                 if not output_str.endswith("\n"):
                     output_str += "\n"
                 await self.file_conn.write(output_str)
@@ -984,52 +974,14 @@ class Base(object):
             # data_msg should be a dict {uuid: list of values or a list of list of values}
             try:
                 async for data_msg in self.base.data_q.subscribe():
-                    # self.base.print_message(data_msg)
-                    # self.base.print_message(self.action.action_uuid)
                     if (
                         self.action.action_uuid in data_msg.keys()
                     ):  # only write data for this action
-                        # self.base.print_message('#################################################')
-                        # self.base.print_message('1 ... data logger: received message')
-                        # self.base.print_message('#################################################')
                         data_dict = data_msg[self.action.action_uuid]
                         data_val = data_dict["data"]
-                        # if isinstance(data_val, list) or isinstance(data_val, tuple):
-                        #     # self.base.print_message('#################################################')
-                        #     # self.base.print_message('2 ... data logger: message is tuple/list')
-                        #     # self.base.print_message('#################################################')
-                        #     lines = "\n".join(
-                        #         [",".join([str(x) for x in l]) for l in data_val]
-                        #     )
-                        # elif isinstance(data_val, dict):
-                        #     # self.base.print_message('#################################################')
-                        #     # self.base.print_message('3 ... data logger: message is dict')
-                        #     # self.base.print_message('#################################################')
-                        #     # self.base.print_message(self.column_names)
-                        #     # self.base.print_message(data_val)
-                        #     # for col in self.column_names:
-                        #     #     if col!='unknown1':
-                        #     #         self.base.print_message(col, data_val[col])
-                        #     columns = [
-                        #         data_val[col]
-                        #         for col in self.column_names
-                        #         if col != "unknown1"
-                        #     ]
-                        #     # self.base.print_message(columns)
-                        #     lines = "\n".join(
-                        #         [",".join([str(x) for x in l]) for l in zip(*columns)]
-                        #     )
-                        #     # self.base.print_message(lines)
-                        # else:
-                        #     # self.base.print_message('#################################################')
-                        #     # self.base.print_message('4 ... data logger: message is not dict or tuple/list')
-                        #     # self.base.print_message('#################################################')
-                        #     lines = str(data_val)
                         self.action.data.append(data_val)
-                        # self.base.print_message(self.action.data)
                         if self.file_conn:
                             await self.write_live_data(json.dumps(data_val))
-                            # await self.write_live_data(lines)
             except asyncio.CancelledError:
                 self.base.print_message(" ... data logger task was cancelled",error = True)
 
@@ -1043,7 +995,7 @@ class Base(object):
         ):
             "Write complete file, not used with queue streaming."
             _output_path = os.path.join(self.action.output_dir, filename)
-            self.base.print_message(" ... writing non stream data to:", _output_path)
+            self.base.print_message(f" ... writing non stream data to: {_output_path}")
             # self.base.print_message("header:", header)
             # self.base.print_message("output_str:", output_str)
             # create output file and set connection
@@ -1085,7 +1037,7 @@ class Base(object):
             output_path = os.path.join(
                 self.action.output_dir, f"{self.action.action_queue_time}.rcp"
             )
-            self.base.print_message(" ... writing rcp to:", output_path)
+            self.base.print_message(f" ... writing to rcp: {output_path}")
             # self.base.print_message(" ... writing:",rcp_dict)
             output_str = dict_to_rcp(rcp_dict)
             file_instance = await aiofiles.open(output_path, mode="a+")
@@ -1230,7 +1182,7 @@ class Orch(Base):
     async def check_wait_for_all_actions(self):
         running_states, _ = await self.check_global_state()
         global_free = len(running_states) == 0
-        self.print_message(" ... check len(running_states):", len(running_states))
+        self.print_message(f" ... check len(running_states): {len(running_states)}")
         return global_free
         
 
@@ -1321,7 +1273,7 @@ class Orch(Base):
                 self.global_state_str = "idle"
             else:
                 self.global_state_str = "busy"
-                self.print_message(" ... running_states:", running_states)
+                self.print_message(f" ... running_states: {running_states}")
 
 
     async def check_global_state(self):
@@ -1346,9 +1298,9 @@ class Orch(Base):
     async def dispatch_loop_task(self):
         """Parse decision and action queues, and dispatch action_dq while tracking run state flags."""
         self.print_message(" ... running operator orch")
-        self.print_message(" ... orch status:",self.global_state_str)
+        self.print_message(f" ... orch status: {self.global_state_str}")
         # clause for resuming paused action list
-        self.print_message(" ... orch descisions: ", self.decision_dq)
+        self.print_message(f" ... orch descisions: {self.decision_dq}")
         try:
             self.loop_state = "started"
             while self.loop_state == "started" and (self.action_dq or self.decision_dq):
@@ -1373,8 +1325,8 @@ class Orch(Base):
                     # TODO:update actualizer code
                     self.action_dq = deque(unpacked_acts)
                     self.dispatched_actions = {}
-                    self.print_message(" ... got ", self.action_dq)
-                    self.print_message(" ... optional params ", self.active_decision.actualizer_pars)
+                    self.print_message(f" ... got: {self.action_dq}")
+                    self.print_message(f" ... optional params: {self.active_decision.actualizer_pars}")
                 else:
                     if self.loop_intent == "stop":
                         self.print_message(" ... stopping orchestrator")
@@ -1489,7 +1441,7 @@ class Orch(Base):
 
                         # copy requested global param to action params
                         for k,v in A.from_global_params.items():
-                            self.print_message(k,v)
+                            self.print_message(f"{k}:{v}")
                             if k in self.active_decision.global_params.keys():
                                 A.action_params.update({
                                     v:self.active_decision.global_params[k]
@@ -1530,7 +1482,7 @@ class Orch(Base):
         #     return False
         except Exception as e:
             self.print_message(" ... serious orch exception occurred",error = True)
-            self.print_message("ERROR:",e)
+            self.print_message(f"ERROR: {e}", error = True)
             return False
 
 
@@ -1920,6 +1872,8 @@ def print_message(server_cfg,server_name,*args,**kwargs):
     precolor = ""
     if "error" in kwargs:
         precolor = f"{Style.BRIGHT}{Fore.RED}"
+    if "warning" in kwargs:
+        precolor = f"{Style.BRIGHT}{Fore.YELLOW}"
 
     srv_type = server_cfg.get("group","")
     style = ""

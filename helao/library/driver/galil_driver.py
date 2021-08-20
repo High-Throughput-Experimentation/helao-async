@@ -1213,7 +1213,7 @@ class transformxy:
         when angles are changed.
         Follows stacking sequence from bottom to top (plate)"""
 
-        self.base.print_message(" ... updatting M")
+        self.base.print_message(" ... updating M")
 
         if self.seq == None:
             self.base.print_message(" ... seq is empty, using default transformation")
