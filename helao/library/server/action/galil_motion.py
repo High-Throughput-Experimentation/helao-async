@@ -35,8 +35,8 @@ def makeApp(confPrefix, servKey):
     app = makeActServ(
         config, servKey, servKey, "Galil motion server", version=2.0, driver_class=galil
     )
-    if S["simulate"]:
-        app.base.print_message("Galil motion simulator loaded.")
+    # if S["simulate"]:
+    #     app.base.print_message("Galil motion simulator loaded.")
 
     @app.post(f"/{servKey}/setmotionref")
     async def setmotionref(request: Request):
@@ -130,6 +130,7 @@ def makeApp(confPrefix, servKey):
         Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.
         No z, Rx, Ry, Rz when platexy selected."""
         A = await setupAct(request, locals())
+        app.base.print_message(A.as_dict())
         active = await app.base.contain_action(A)
         move_response = await app.driver.motor_move(A)
         await active.enqueue_data(move_response)

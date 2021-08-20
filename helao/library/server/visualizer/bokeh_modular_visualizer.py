@@ -99,7 +99,7 @@ from bokeh.layouts import layout, Spacer
 #             while self.IOloop_data_run:
 #                 try:
 #                     self.data =  await ws.recv()
-#                     print(" ... VisulizerWSrcv:",self.data)
+#                     self.vis.print_message(" ... VisulizerWSrcv:",self.data)
 #                 except Exception:
 #                     self.IOloop_data_run = False
 
@@ -211,7 +211,9 @@ class C_nidaqmxvis:
             while self.IOloop_data_run:
                 try:
                     new_data = json.loads(await ws.recv())
-                    self.vis.doc.add_next_tick_callback(partial(self.add_points, new_data))
+                    new_action_id = list(new_data)[0]
+                    if new_data[new_action_id]["action_name"] == "run_cell_IV":
+                        self.vis.doc.add_next_tick_callback(partial(self.add_points, new_data))
                 except Exception:
                     self.IOloop_data_run = False
 
@@ -311,6 +313,7 @@ class C_potvis:
         self.xselect = self.radio_button_group.active
         self.yselect = self.checkbox_button_group.active
 
+        self.reset_plot(self.cur_action_id, forceupdate= True)
 
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
@@ -340,21 +343,20 @@ class C_potvis:
         tmpdata["Ach_V"] = data_dict.get("Ach_V", [0])
         tmpdata["I_A"] = data_dict.get("I_A", [0])
 
-        # print(tmpdata)
 
         self.datasource.stream(tmpdata)
 
 
     async def IOloop_data(self): # non-blocking coroutine, updates data source
         # global doc
-        print(" ... potentiostat visualizer subscribing to:", self.data_url)
+        self.vis.print_message(" ... potentiostat visualizer subscribing to:", self.data_url)
         async with websockets.connect(self.data_url) as ws:
             self.IOloop_data_run = True
             while self.IOloop_data_run:
                 try:
                     new_data = json.loads(await ws.recv())
-                    # print(' ... new data for potentiostat visualizer module:')
-                    # print(new_data)
+                    # self.vis.print_message(' ... new data for potentiostat visualizer module:')
+                    # self.vis.print_message(new_data)
                     if new_data is not None:
                         self.vis.doc.add_next_tick_callback(partial(self.add_points, new_data))
                 except Exception:
@@ -363,7 +365,7 @@ class C_potvis:
     
     def reset_plot(self, new_action_id, forceupdate: bool = False):
         if (new_action_id != self.cur_action_id) or forceupdate:
-            print(' ... reseting Gamry graph')
+            self.vis.print_message(' ... reseting Gamry graph')
             # copy old data to 'prev' plot
             self.prev_action_id = self.cur_action_id
             self.datasource_prev.data = {key: val for key, val in self.datasource.data.items()}
@@ -436,7 +438,7 @@ class C_potvis:
 #             while self.IOloop_data_run:
 #                 try:
 #                     self.data =  await ws.recv()
-#                     print(" ... VisulizerWSrcv: pm data")
+#                     self.vis.print_message(" ... VisulizerWSrcv: pm data")
 #                 except Exception:
 #                     self.IOloop_data_run = False
 
@@ -547,7 +549,7 @@ def makeBokehApp(doc, confPrefix, servKey):
             visoloop.create_task(potvis.IOloop_data())
         # visoloop.create_task(potvis.IOloop_stat())
     else:
-        print('No potentiostat visualizer configured')
+        app.vis.print_message('No potentiostat visualizer configured')
         potvis = []
 
 
@@ -556,7 +558,7 @@ def makeBokehApp(doc, confPrefix, servKey):
         if NImaxvis.show:
             visoloop.create_task(NImaxvis.IOloop_data())
     else:
-        print('No NImax visualizer configured')
+        app.vis.print_message('No NImax visualizer configured')
         NImaxvis = []
 
 
@@ -565,11 +567,11 @@ def makeBokehApp(doc, confPrefix, servKey):
 #     dataserv['serv'] = tmpserv
 #     dataserv['wsdata_url'] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_data"
 #     dataserv['wsstat_url'] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_status"
-#     print(f"Create Visualizer for {dataserv['serv']}")
+#     self.vis.print_message(f"Create Visualizer for {dataserv['serv']}")
 #     datavis = C_datavis(dataserv)
 #     visoloop.create_task(datavis.IOloop_data())
 # else:
-#     print('No data visualizer configured')
+#     app.vis.print_message('No data visualizer configured')
 #     datavis = []
 
 # if 'ws_motor' in S.params:    
@@ -581,13 +583,13 @@ def makeBokehApp(doc, confPrefix, servKey):
 #     motorserv['wsstat_url'] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_status"
 #     if not 'sample_marker_type' in S.params.ws_motor_params:
 #         S.params.ws_motor_params.sample_marker_type = 0
-#     print(f"Create Visualizer for {motorserv['serv']}")
+#     app.vis.print_message(f"Create Visualizer for {motorserv['serv']}")
 #     motorvis = C_motorvis(motorserv)
 #     doc.add_root(layout([motorvis.layout]))
 #     doc.add_root(layout(Spacer(height=10)))
 #     visoloop.create_task(motorvis.IOloop_data())
 # else:
-#     print('No motor visualizer configured')
+#     app.vis.print_message('No motor visualizer configured')
 #     motorvis = []
 
 

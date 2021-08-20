@@ -516,10 +516,6 @@ class Base(object):
         self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
 
 
-    def print_color_msg(self, msg, color):
-        print(color + msg + Style.RESET_ALL)
-
-
     def print_message(self,*args,**kwargs):
         print_message(self.server_cfg,self.server_name,*args,**kwargs)
 
@@ -937,9 +933,7 @@ class Base(object):
         async def set_output_file(self, filename: str, header: Optional[str] = None):
             "Set active save_path, write header if supplied."
             output_path = os.path.join(self.action.output_dir, filename)
-            self.base.print_message("#########################################################")
             self.base.print_message(" ... writing data to:", output_path)
-            self.base.print_message("#########################################################")
             # create output file and set connection
             self.file_conn = await aiofiles.open(output_path, mode="a+")
             if header:
@@ -1033,7 +1027,7 @@ class Base(object):
                             await self.write_live_data(json.dumps(data_val))
                             # await self.write_live_data(lines)
             except asyncio.CancelledError:
-                self.base.print_color_msg(" ... data logger task was cancelled",error = True)
+                self.base.print_message(" ... data logger task was cancelled",error = True)
 
         async def write_file(
             self,
@@ -1045,11 +1039,9 @@ class Base(object):
         ):
             "Write complete file, not used with queue streaming."
             _output_path = os.path.join(self.action.output_dir, filename)
-            self.base.print_message("#########################################################")
             self.base.print_message(" ... writing non stream data to:", _output_path)
             # self.base.print_message("header:", header)
             # self.base.print_message("output_str:", output_str)
-            self.base.print_message("#########################################################")
             # create output file and set connection
             file_instance = await aiofiles.open(_output_path, mode="w")
             numlines = len(output_str.split("\n"))
@@ -1089,10 +1081,8 @@ class Base(object):
             output_path = os.path.join(
                 self.action.output_dir, f"{self.action.action_queue_time}.rcp"
             )
-            self.base.print_message("#########################################################")
             self.base.print_message(" ... writing rcp to:", output_path)
             # self.base.print_message(" ... writing:",rcp_dict)
-            self.base.print_message("#########################################################")
             output_str = dict_to_rcp(rcp_dict)
             file_instance = await aiofiles.open(output_path, mode="a+")
             
@@ -1190,7 +1180,7 @@ class Orch(Base):
     def __init__(self, fastapp: HelaoFastAPI):
         super().__init__(fastapp)
         # self.import_actualizers()
-        self.action_lib = import_actualizers(world_config_dict = self.world_cfg, library_path = None)
+        self.action_lib = import_actualizers(world_config_dict = self.world_cfg, library_path = None, server_name = self.server_name)
         # instantiate decision/experiment queue, action queue
         self.decision_dq = deque([])
         self.action_dq = deque([])
@@ -1513,7 +1503,7 @@ class Orch(Base):
                         self.active_decision.result_dict[A.action_enum] = result
 
                         self.print_message(" ... copying global vars back to decision")
-                        self.print_message(result)
+                        # self.print_message(result)
                         if "to_global_params" in result:
                             for k in result["to_global_params"]:
                                 if k in result["action_params"].keys():
@@ -1526,7 +1516,8 @@ class Orch(Base):
                         self.print_message(" ... done copying global vars back to decision")
 
                         
-            self.print_message(" ... decision queue is empty\n ... stopping operator orch")
+            self.print_message(" ... decision queue is empty")
+            self.print_message(" ... stopping operator orch")
             self.loop_state = "stopped"
             await self.intend_none()
             return True
@@ -1535,7 +1526,7 @@ class Orch(Base):
         #     return False
         except Exception as e:
             self.print_message(" ... serious orch exception occurred",error = True)
-            self.print_message(e)
+            self.print_message("ERROR:",e)
             return False
 
 
@@ -1832,13 +1823,13 @@ class Vis(object):
         print_message(self.server_cfg,self.server_name,*args,**kwargs)
 
 
-def import_actualizers(world_config_dict: dict, library_path: str = None):
+def import_actualizers(world_config_dict: dict, library_path: str = None, server_name: str = ""):
     """Import actualizer functions into environment."""
     action_lib = {}
     if library_path is None:
         library_path = world_config_dict.get("action_library_path", os.path.join("helao","library","actualizer"))
     if not os.path.isdir(library_path):
-        print(
+        print_message(world_config_dict, server_name,
             f" ... library path {library_path} was specified but is not a valid directory"
         )
         return action_lib#False
@@ -1846,7 +1837,7 @@ def import_actualizers(world_config_dict: dict, library_path: str = None):
     for actlib in world_config_dict["action_libraries"]:
         tempd = import_module(actlib).__dict__
         action_lib.update({func: tempd[func] for func in tempd["ACTUALIZERS"]})
-    print(
+    print_message(world_config_dict, server_name,
         f" ... imported {len(world_config_dict['action_libraries'])} actualizers specified by config."
     )
     return action_lib#True
@@ -1926,5 +1917,4 @@ def print_message(server_cfg,server_name,*args,**kwargs):
         precolor = f"{Style.BRIGHT}{Fore.RED}"
     style = server_cfg.get("msg_color","")
     for arg in args:
-        # print(f"{Style.BRIGHT}{Fore.GREEN}{arg}{Style.RESET_ALL}")
         print(f"{precolor}[{strftime('%H:%M:%S')}_{server_name}]:{Style.RESET_ALL} {style}{arg}{Style.RESET_ALL}")

@@ -95,7 +95,7 @@ class C_async_operator:
 
         self.act_select_list = []
         self.actualizers = []
-        self.action_lib = import_actualizers(world_config_dict = self.vis.world_cfg, library_path = None)
+        self.action_lib = import_actualizers(world_config_dict = self.vis.world_cfg, library_path = None, server_name=self.vis.server_name)
 
 
 
@@ -165,7 +165,7 @@ class C_async_operator:
 
         self.plot_mpmap = figure(title="PlateMap", height=300,x_axis_label='X (mm)', y_axis_label='Y (mm)',width = 640)
         self.plot_mpmap.on_event(DoubleTap, self.callback_clicked_pmplot)
-
+        self.update_pm_plot()
 
 
         self.layout0 = layout([
@@ -390,7 +390,7 @@ class C_async_operator:
 
 
     def callback_append(self, event):
-        self.visend_action()
+        self.append_action()
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
