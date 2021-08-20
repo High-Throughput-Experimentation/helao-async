@@ -58,8 +58,8 @@ def makeApp(confPrefix, servKey):
         driver_class=gamry,
     )
     
-    if S["simulate"]:
-        app.base.print_message("Gamry simulator loaded.")
+    # if S["simulate"]:
+    #     app.base.print_message("Gamry simulator loaded.")
 
 
     @app.post(f"/{servKey}/get_meas_status")

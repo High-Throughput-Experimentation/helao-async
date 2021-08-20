@@ -338,6 +338,7 @@ class cNIMAX:
 
 
     async def run_task_FSWBCD(self, BCDs:str, on:bool,*args,**kwargs):
+        on = bool(on)
         cmds = []
         with nidaqmx.Task() as task_FSWBCD:
             for BCD in BCDs:
@@ -356,6 +357,7 @@ class cNIMAX:
 
     async def run_task_Pump(self, pump:pumpitems, on:bool,*args,**kwargs):
         self.base.print_message(" ... NIMAX pump:", pump, on)
+        on = bool(on)
         cmds = []
         with nidaqmx.Task() as task_Pumps:
             # for pump in pumps:
@@ -373,6 +375,7 @@ class cNIMAX:
 
 
     async def run_task_GasFlowValves(self, valves:List[int], on:bool,*args,**kwargs):
+        on = bool(on)
         cmds = []
         with nidaqmx.Task() as task_GasFlowValves:
             for valve in valves:
@@ -390,6 +393,7 @@ class cNIMAX:
 
 
     async def run_task_Master_Cell_Select(self, cells:List[int], on: bool,*args,**kwargs):
+        on = bool(on)
         if len(cells) > 1:
             self.base.print_message(
                 " ... Multiple cell selected. Only one can be Master cell. Using first one!"
@@ -414,6 +418,7 @@ class cNIMAX:
 
 
     async def run_task_Active_Cells_Selection(self, cells:List[int], on:bool,*args,**kwargs):
+        on = bool(on)
         cmds = []
         with nidaqmx.Task() as task_ActiveCell:
             for cell in cells:
@@ -488,6 +493,7 @@ class cNIMAX:
 
     async def estop(self, switch:bool,*args,**kwargs):
         """same as estop, but also sets flag"""
+        switch = bool(switch)
         self.IO_estop = switch
         if self.IO_measuring:
             if switch:

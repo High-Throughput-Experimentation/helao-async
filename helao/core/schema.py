@@ -29,7 +29,8 @@ class Decision(object):
         self.access = imports.get("access", "hte")
         self.actualizer = imports.get("actualizer", None)
         self.actualizer_pars = imports.get("actualizer_pars", {})
-        self.result_dict = imports.get("result_dict", {})
+        # this gets big really fast, bad for debugging
+        self.result_dict = {}#imports.get("result_dict", {})
         self.global_params = {}
         if self.decision_uuid is None:
             self.gen_uuid_decision()

@@ -33,8 +33,8 @@ def makeApp(confPrefix, servKey):
     app = makeActServ(
         config, servKey, servKey, "Galil IO server", version=2.0, driver_class=galil
     )
-    if S["simulate"]:
-        app.base.print_message("Galil I/O simulator loaded.")
+    # if S["simulate"]:
+    #     app.base.print_message("Galil I/O simulator loaded.")
 
     @app.post(f"/{servKey}/query_analog_in")
     async def read_analog_in(
