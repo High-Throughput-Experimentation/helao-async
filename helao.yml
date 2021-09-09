@@ -94,5 +94,7 @@ dependencies:
   - shortuuid
   - paramiko
   - ntplib
+  - termcolor
+  - pyfiglet
  
   
