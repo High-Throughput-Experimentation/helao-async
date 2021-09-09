@@ -146,7 +146,8 @@ class C_async_operator:
 
 
 
-        self.act_descr_txt = Paragraph(text="""select item""", width=600, height=30)
+#        self.act_descr_txt = Paragraph(text="""select item""", width=600, height=30)
+        self.act_descr_txt = Div(text="""select item""", width=600, height=30)
         self.error_txt = Paragraph(text="""no error""", width=600, height=30, style={'font-size': '100%', 'color': 'black'})
 
 
@@ -170,7 +171,7 @@ class C_async_operator:
 
         self.layout0 = layout([
             layout(
-                [Spacer(width=20), Div(text=f"<b>{self.config_dict['doc_name']}</b>", width=200+50, height=15, style={'font-size': '200%', 'color': 'red'})],
+                [Spacer(width=20), Div(text=f"<b>{self.config_dict['doc_name']}</b>", width=200+50, height=32, style={'font-size': '200%', 'color': 'red'})],
                 background="#C0C0C0",width=640),
             layout([
                 [self.actions_dropdown],
@@ -481,11 +482,12 @@ class C_async_operator:
 
 
     def update_doc(self, value):
-        self.act_descr_txt.text = value
+        self.act_descr_txt.text = value.replace("\n", "<br>")
 
 
     def update_error(self, value):
         self.error_txt.text = value
+
 
     def update_plateid(self, value):
         """updates plateid text input"""

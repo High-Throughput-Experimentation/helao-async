@@ -37,8 +37,8 @@ from helao.core.model import return_dec, return_declist, return_act, return_actl
 async_copy = wrap(shutil.copy)
 
 # ANSI color codes converted to the Windows versions
-colorama.init()
-
+colorama.init(strip=not sys.stdout.isatty()) # strip colors if stdout is redirected
+# colorama.init()
 
 class action_start_condition(int, Enum):
     no_wait = 0             # orch is dispatching an unconditional action

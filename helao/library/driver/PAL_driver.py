@@ -1224,7 +1224,7 @@ class cPAL:
                         if self.IO_PALparams.liquid_sample_no_in < 0:
                             self.base.print_message(f' ... PAL need to get n-{self.IO_PALparams.liquid_sample_no_in+1} last sample from list')
                             sampledict = await self.liquid_sample_no_get_last(self.IO_PALparams.liquid_sample_no_in)
-                            self.IO_PALparams.liquid_sample_no_in = sampledict.id
+                            self.IO_PALparams.liquid_sample_no_in = sampledict["id"]
                             self.base.print_message(' ... correct liquid_sample_no_in is now:', self.IO_PALparams.liquid_sample_no_in)
                         # need to check for none again if no sample_no_was obtained
                         if self.IO_PALparams.liquid_sample_no_in is None:
