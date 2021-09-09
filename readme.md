@@ -8,6 +8,8 @@ Helao is deploys Hierachical Experimental Laboratory Orchestration
 - install miniconda[https://docs.conda.io/en/latest/miniconda.html], python 3 only
 - clone git repository
 - from repo directory, setup conda environment using `conda env create -f helao.yml`
+- update environment with `conda env update -f helao.yml`
+- for Galil install gclib with: `python "c:\Program Files (x86)\Galil\gclib\source\wrappers\python\setup.py" install`
 
 ## simulation servers
 - galil and gamry server code current import from driver.*_simulate
