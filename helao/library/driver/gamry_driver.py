@@ -110,7 +110,7 @@ class GamryDtaqEvents(object):
 
     def _IGamryDtaqEvents_OnDataDone(self):
         self.cook()  # a final cook
-        self.status = "idle"
+        self.status = "done"
 
 
 class dummy_sink:
@@ -684,44 +684,49 @@ class gamry:
             # self.base.print_message(f"!!! sink_status is {sink_status}, loop flag is {self.IO_do_meas}")
 
             while (
-                counter < len(self.dtaqsink.acquired_points)
-                and self.IO_do_meas
-                and sink_status == "measuring"
+                # counter < len(self.dtaqsink.acquired_points)
+                self.IO_do_meas
+                and sink_status != "done"
             ):
                 # need some await points
                 await asyncio.sleep(0.001)
                 client.PumpEvents(0.001)
-                tmp_datapoints = self.dtaqsink.acquired_points[counter]
-                # Need to get additional data for EIS
-                if self.IO_meas_mode == Gamry_modes.EIS:
-                    test = list(tmp_datapoints)
-                    test.append(self.dtaqsink.dtaq.Zreal())
-                    test.append(self.dtaqsink.dtaq.Zimag())
-                    test.append(self.dtaqsink.dtaq.Zsig())
-                    test.append(self.dtaqsink.dtaq.Zphz())
-                    test.append(self.dtaqsink.dtaq.Zfreq())
-                    test.append(self.dtaqsink.dtaq.Zmod())
-                    tmp_datapoints = tuple(test)
-
-                if self.active:
-                    if self.active.action.save_data:
-                        # self.base.print_message(' ... gamry pushing data:', {k: [v] for k, v in zip(self.FIFO_column_headings, tmp_datapoints)})
-                        await self.active.enqueue_data(
-                            {
-                                k: [v]
-                                for k, v in zip(
-                                    self.FIFO_column_headings, tmp_datapoints
-                                )
-                            }
-                        )
+                while counter < len(self.dtaqsink.acquired_points) and self.IO_do_meas:
+                    await asyncio.sleep(0.001)
+                    tmp_datapoints = self.dtaqsink.acquired_points[counter]
+                    # Need to get additional data for EIS
+                    if self.IO_meas_mode == Gamry_modes.EIS:
+                        test = list(tmp_datapoints)
+                        test.append(self.dtaqsink.dtaq.Zreal())
+                        test.append(self.dtaqsink.dtaq.Zimag())
+                        test.append(self.dtaqsink.dtaq.Zsig())
+                        test.append(self.dtaqsink.dtaq.Zphz())
+                        test.append(self.dtaqsink.dtaq.Zfreq())
+                        test.append(self.dtaqsink.dtaq.Zmod())
+                        tmp_datapoints = tuple(test)
+    
+                    if self.active:
+                        if self.active.action.save_data:
+                            # self.base.print_message(' ... gamry pushing data:', {k: [v] for k, v in zip(self.FIFO_column_headings, tmp_datapoints)})
+                            await self.active.enqueue_data(
+                                {
+                                    k: [v]
+                                    for k, v in zip(
+                                        self.FIFO_column_headings, tmp_datapoints
+                                    )
+                                }
+                            )
+                        # else:
+                        # self.base.print_message(' ... gamry not pushing data:', {k: [v] for k, v in zip(self.FIFO_column_headings, tmp_datapoints)})
                     # else:
-                    # self.base.print_message(' ... gamry not pushing data:', {k: [v] for k, v in zip(self.FIFO_column_headings, tmp_datapoints)})
-                # else:
-                # self.base.print_message(' ... gamry not pushing data:', {k: [v] for k, v in zip(self.FIFO_column_headings, tmp_datapoints)})
+                    # self.base.print_message(' ... gamry not pushing data:', {k: [v] for k, v in zip(self.FIFO_column_headings, tmp_datapoints)})    
+                    counter += 1
 
-                counter += 1
                 sink_status = self.dtaqsink.status
                 # self.base.print_message(sink_status, self.IO_do_meas)
+
+
+
             self.IO_measuring = False
             self.dtaq.Run(False)
             self.pstat.SetCell(self.GamryCOM.CellOff)
@@ -731,6 +736,7 @@ class gamry:
             # # delete this at the very last step
             del connection
             # connection will be closed in IOloop
+            self.dtaqsink = dummy_sink()
 
             self.base.print_message(" ... gamry finishes active action")
             _ = await self.active.finish()
@@ -1069,7 +1075,6 @@ class gamry:
         """The OCV class manages data acquisition for a Controlled Voltage I-V curve. However, it is a special purpose curve
         designed for measuring the open circuit voltage over time. The measurement is made in the Potentiostatic mode but with the Cell
         Switch open. The operator may set a voltage stability limit. When this limit is met the Ocv terminates."""
-
         # time expected for measurement to be completed
         eta = Tval  # +delay
         sigfunc_params = [self.pstat, 0.0, Tval, SampleRate, self.GamryCOM.PstatMode]
