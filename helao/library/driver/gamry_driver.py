@@ -686,13 +686,12 @@ class gamry:
             while (
                 # counter < len(self.dtaqsink.acquired_points)
                 self.IO_do_meas
-                and sink_status != "done"
+                and (sink_status != "done" or counter < len(self.dtaqsink.acquired_points))
             ):
                 # need some await points
                 await asyncio.sleep(0.001)
                 client.PumpEvents(0.001)
-                while counter < len(self.dtaqsink.acquired_points) and self.IO_do_meas:
-                    await asyncio.sleep(0.001)
+                if counter < len(self.dtaqsink.acquired_points):
                     tmp_datapoints = self.dtaqsink.acquired_points[counter]
                     # Need to get additional data for EIS
                     if self.IO_meas_mode == Gamry_modes.EIS:
