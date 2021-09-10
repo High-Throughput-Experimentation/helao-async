@@ -44,11 +44,11 @@ from bokeh.layouts import layout, Spacer
 # class C_motorvis:
 #     def __init__(self, config):
 #         self.config = config
-#         self.data_url = config['wsdata_url']
-#         self.stat_url = config['wsstat_url']
+#         self.data_url = config["wsdata_url"]
+#         self.stat_url = config["wsstat_url"]
 #         self.IOloop_data_run = False
-#         self.axis_id = config['axis_id']
-#         self.params = config['params']
+#         self.axis_id = config["axis_id"]
+#         self.params = config["params"]
 
 #         self.data = dict()
 #         # buffered version
@@ -65,19 +65,19 @@ from bokeh.layouts import layout, Spacer
 #         self.axiserrdisp = []
 #         tmpidx = 0
 #         for axkey, axitem in self.axis_id.items():
-#             self.axisvaldisp.append(TextInput(value="", title=axkey+"(mm)", disabled=True, width=100, height=40, css_classes=['custom_input2']))
+#             self.axisvaldisp.append(TextInput(value="", title=axkey+"(mm)", disabled=True, width=100, height=40, css_classes=["custom_input2"]))
 #             self.motorlayout_axis.append(layout([[self.axisvaldisp[tmpidx],Spacer(width=40)]]))
-#             self.axisstatdisp.append(TextInput(value="", title=axkey+" status", disabled=True, width=100, height=40, css_classes=['custom_input2']))
+#             self.axisstatdisp.append(TextInput(value="", title=axkey+" status", disabled=True, width=100, height=40, css_classes=["custom_input2"]))
 #             self.motorlayout_stat.append(layout([[self.axisstatdisp[tmpidx],Spacer(width=40)]]))
-#             self.axiserrdisp.append(TextInput(value="", title=axkey+" Error code", disabled=True, width=100, height=40, css_classes=['custom_input2']))
+#             self.axiserrdisp.append(TextInput(value="", title=axkey+" Error code", disabled=True, width=100, height=40, css_classes=["custom_input2"]))
 #             self.motorlayout_err.append(layout([[self.axiserrdisp[tmpidx],Spacer(width=40)]]))
 #             tmpidx = tmpidx+1
 
 #         # add a 2D map for xy
-#         ratio = (self.params['xmax']-self.params['xmin'])/(self.params['ymax']-self.params['ymin'])
-#         self.plot_motor = figure(title="xy MotorPlot", height=300,x_axis_label='plate X (mm)', y_axis_label='plate Y (mm)',width = 800, aspect_ratio=ratio)
-#         self.plot_motor.x_range=Range1d(self.params['xmin'], self.params['xmax'])
-#         self.plot_motor.y_range=Range1d(self.params['ymin'], self.params['ymax'])
+#         ratio = (self.params["xmax"]-self.params["xmin"])/(self.params["ymax"]-self.params["ymin"])
+#         self.plot_motor = figure(title="xy MotorPlot", height=300,x_axis_label="plate X (mm)", y_axis_label="plate Y (mm)",width = 800, aspect_ratio=ratio)
+#         self.plot_motor.x_range=Range1d(self.params["xmin"], self.params["xmax"])
+#         self.plot_motor.y_range=Range1d(self.params["ymin"], self.params["ymax"])
 
 #         # combine all sublayouts into a single one
 #         self.layout = layout([
@@ -120,7 +120,7 @@ class C_nidaqmxvis:
 
         
         self.data_url = f"ws://{nidaqmxserv_config['host']}:{nidaqmxserv_config['port']}/ws_data"
-        # self.stat_url = f"ws://{nidaqmxserv_config['host']}:{nidaqmxserv_config['port']}/ws_status"
+        # self.stat_url = f"ws://{nidaqmxserv_config["host"]}:{nidaqmxserv_config["port"]}/ws_status"
 
 
 
@@ -247,12 +247,12 @@ class C_nidaqmxvis:
         # self.plot_VOLT_prev.title.text = ("Action_ID: "+self.prev_action_id)
 
 
-        colors = small_palettes['Category10'][9]
+        colors = small_palettes["Category10"][9]
         for i in self.checkbox_button_group.active:
-            _ = self.plot_VOLT.line(x='t_s', y=f'ECell{i+1}_V', source=self.sourceIV, name=f'ECell{i+1}_V', line_color=colors[i], legend_label=f'ECell{i+1}_V')
-            _ = self.plot_CURRENT.line(x='t_s', y=f'ICell{i+1}_A', source=self.sourceIV, name=f'ICell{i+1}_A', line_color=colors[i], legend_label=f'ICell{i+1}_A')
-            _ = self.plot_VOLT_prev.line(x='t_s', y=f'ECell{i+1}_V', source=self.sourceIV_prev, name=f'ECell{i+1}_V', line_color=colors[i], legend_label=f'ECell{i+1}_V')
-            _ = self.plot_CURRENT_prev.line(x='t_s', y=f'ICell{i+1}_A', source=self.sourceIV_prev, name=f'ICell{i+1}_A', line_color=colors[i], legend_label=f'ICell{i+1}_A')
+            _ = self.plot_VOLT.line(x="t_s", y=f"ECell{i+1}_V", source=self.sourceIV, name=f"ECell{i+1}_V", line_color=colors[i], legend_label=f"ECell{i+1}_V")
+            _ = self.plot_CURRENT.line(x="t_s", y=f"ICell{i+1}_A", source=self.sourceIV, name=f"ICell{i+1}_A", line_color=colors[i], legend_label=f"ICell{i+1}_A")
+            _ = self.plot_VOLT_prev.line(x="t_s", y=f"ECell{i+1}_V", source=self.sourceIV_prev, name=f"ECell{i+1}_V", line_color=colors[i], legend_label=f"ECell{i+1}_V")
+            _ = self.plot_CURRENT_prev.line(x="t_s", y=f"ICell{i+1}_A", source=self.sourceIV_prev, name=f"ICell{i+1}_A", line_color=colors[i], legend_label=f"ICell{i+1}_A")
 
 
 class C_potvis:
@@ -271,7 +271,7 @@ class C_potvis:
         self.show = True
 
         self.data_url = f"ws://{potserv_config['host']}:{potserv_config['port']}/ws_data"
-        # self.stat_url = f"ws://{potserv_config['host']}:{potserv_config['port']}/ws_status"
+        # self.stat_url = f"ws://{potserv_config["host"]}:{potserv_config["port"]}/ws_status"
 
 
 
@@ -335,7 +335,7 @@ class C_potvis:
             self.reset_plot(new_action_id)
         
         
-        tmpdata = {'pt':[0]}
+        tmpdata = {"pt":[0]}
         # for some techniques not all data is present
         # we should only get one data point at the time
         data_dict = new_data[new_action_id]["data"]
@@ -355,7 +355,7 @@ class C_potvis:
             while self.IOloop_data_run:
                 try:
                     new_data = json.loads(await ws.recv())
-                    # self.vis.print_message(' ... new data for potentiostat visualizer module:')
+                    # self.vis.print_message(" ... new data for potentiostat visualizer module:")
                     # self.vis.print_message(new_data)
                     if new_data is not None:
                         self.vis.doc.add_next_tick_callback(partial(self.add_points, new_data))
@@ -365,8 +365,8 @@ class C_potvis:
     
     def reset_plot(self, new_action_id, forceupdate: bool = False):
         if (new_action_id != self.cur_action_id) or forceupdate:
-            self.vis.print_message(' ... reseting Gamry graph')
-            # copy old data to 'prev' plot
+            self.vis.print_message(" ... reseting Gamry graph")
+            # copy old data to "prev" plot
             self.prev_action_id = self.cur_action_id
             self.datasource_prev.data = {key: val for key, val in self.datasource.data.items()}
             self.cur_action_id = new_action_id
@@ -379,30 +379,30 @@ class C_potvis:
             
             self.plot.title.text = ("Action_ID: "+self.cur_action_id)
             self.plot_prev.title.text = ("Action_ID: "+self.prev_action_id)
-            xstr = ''
+            xstr = ""
             if(self.radio_button_group.active == 0):
-                xstr = 't_s'
+                xstr = "t_s"
             elif(self.radio_button_group.active == 1):
-                xstr = 'Ewe_V'
+                xstr = "Ewe_V"
             elif(self.radio_button_group.active == 2):
-                xstr = 'Ach_V'
+                xstr = "Ach_V"
             else:
-                xstr = 'I_A'
-            colors = ['red', 'blue', 'yellow', 'green']
+                xstr = "I_A"
+            colors = ["red", "blue", "yellow", "green"]
             color_count = 0
             for i in self.checkbox_button_group.active:
                 if i == 0:
-                    self.plot.line(x=xstr, y='t_s', line_color=colors[color_count], source=self.datasource, name=self.cur_action_id)
-                    self.plot_prev.line(x=xstr, y='t_s', line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_id)
+                    self.plot.line(x=xstr, y="t_s", line_color=colors[color_count], source=self.datasource, name=self.cur_action_id, legend_label="t_s")
+                    self.plot_prev.line(x=xstr, y="t_s", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_id, legend_label="t_s")
                 elif i == 1:
-                    self.plot.line(x=xstr, y='Ewe_V', line_color=colors[color_count], source=self.datasource, name=self.cur_action_id)
-                    self.plot_prev.line(x=xstr, y='Ewe_V', line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_id)
+                    self.plot.line(x=xstr, y="Ewe_V", line_color=colors[color_count], source=self.datasource, name=self.cur_action_id, legend_label="Ewe_V")
+                    self.plot_prev.line(x=xstr, y="Ewe_V", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_id, legend_label="Ewe_V")
                 elif i == 2:
-                    self.plot.line(x=xstr, y='Ach_V', line_color=colors[color_count], source=self.datasource, name=self.cur_action_id)
-                    self.plot_prev.line(x=xstr, y='Ach_V', line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_id)
+                    self.plot.line(x=xstr, y="Ach_V", line_color=colors[color_count], source=self.datasource, name=self.cur_action_id, legend_label="Ach_V")
+                    self.plot_prev.line(x=xstr, y="Ach_V", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_id, legend_label="Ach_V")
                 else:
-                    self.plot.line(x=xstr, y='I_A', line_color=colors[color_count], source=self.datasource, name=self.cur_action_id)
-                    self.plot_prev.line(x=xstr, y='I_A', line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_id)
+                    self.plot.line(x=xstr, y="I_A", line_color=colors[color_count], source=self.datasource, name=self.cur_action_id, legend_label="I_A")
+                    self.plot_prev.line(x=xstr, y="I_A", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_id, legend_label="I_A")
                 color_count += 1
    
 
@@ -415,8 +415,8 @@ class C_potvis:
 # class C_jobvis:
 #     def __init__(self, config):
 #         self.config = config
-#         self.data_url = config['wsdata_url']
-#         self.stat_url = config['wsstat_url']
+#         self.data_url = config["wsdata_url"]
+#         self.stat_url = config["wsstat_url"]
 
 
 # ##############################################################################
@@ -425,8 +425,8 @@ class C_potvis:
 # class C_datavis:
 #     def __init__(self, config):
 #         self.config = config
-#         self.data_url = config['wsdata_url']
-#         self.stat_url = config['wsstat_url']
+#         self.data_url = config["wsdata_url"]
+#         self.stat_url = config["wsstat_url"]
 #         self.data = dict()
 #         # buffered version
 #         self.dataold = copy.deepcopy(self.data)
@@ -454,16 +454,16 @@ class C_potvis:
 #             # update only if changed
 #             if not datavis.data == datavis.dataold:
 #                 datavis.dataold = copy.deepcopy(datavis.data)
-#                 pmdata = json.loads(datavis.data)['map']
+#                 pmdata = json.loads(datavis.data)["map"]
 #                 # plot only if motorvis is active
 #                 if motorvis:
-#                     x = [col['x'] for col in pmdata]
-#                     y = [col['y'] for col in pmdata]
+#                     x = [col["x"] for col in pmdata]
+#                     y = [col["y"] for col in pmdata]
 #                     # remove old Pmplot
 #                     old_point = motorvis.plot_motor.select(name="PMplot")
 #                     if len(old_point)>0:
 #                         motorvis.plot_motor.renderers.remove(old_point[0])
-#                     motorvis.plot_motor.square(x, y, size=5, color=None, alpha=0.5, line_color='black',name="PMplot")
+#                     motorvis.plot_motor.square(x, y, size=5, color=None, alpha=0.5, line_color="black",name="PMplot")
 
             
 #     if motorvis:
@@ -474,32 +474,32 @@ class C_potvis:
 #                 motorvis.dataold = copy.deepcopy(motorvis.data)
 #                 tmpmotordata = json.loads(motorvis.data)                
 #                 for idx in range(len(motorvis.axisvaldisp)):
-#                     motorvis.axisvaldisp[idx].value = (str)(tmpmotordata['position'][idx])
-#                     motorvis.axisstatdisp[idx].value = (str)(tmpmotordata['motor_status'][idx])
-#                     motorvis.axiserrdisp[idx].value = (str)(tmpmotordata['err_code'][idx])
+#                     motorvis.axisvaldisp[idx].value = (str)(tmpmotordata["position"][idx])
+#                     motorvis.axisstatdisp[idx].value = (str)(tmpmotordata["motor_status"][idx])
+#                     motorvis.axiserrdisp[idx].value = (str)(tmpmotordata["err_code"][idx])
 #                 # check if x and y motor is present and plot it
 #                 pangle = 0.0
-#                 if 'Rz' in tmpmotordata['axis']:
-#                     pangle = tmpmotordata['position'][tmpmotordata['axis'].index('Rz')]
+#                 if "Rz" in tmpmotordata["axis"]:
+#                     pangle = tmpmotordata["position"][tmpmotordata["axis"].index("Rz")]
 #                     pangle = math.pi/180.0*pangle # TODO
-# #                if 'x' in tmpmotordata['axis'] and 'y' in tmpmotordata['axis']:
-# #                    ptx = tmpmotordata['position'][tmpmotordata['axis'].index('x')]
-# #                    pty = tmpmotordata['position'][tmpmotordata['axis'].index('y')]
-#                 if 'platexy' in tmpmotordata:
-#                     ptx = tmpmotordata['platexy'][0]
-#                     pty = tmpmotordata['platexy'][1]
+# #                if "x" in tmpmotordata["axis"] and "y" in tmpmotordata["axis"]:
+# #                    ptx = tmpmotordata["position"][tmpmotordata["axis"].index("x")]
+# #                    pty = tmpmotordata["position"][tmpmotordata["axis"].index("y")]
+#                 if "platexy" in tmpmotordata:
+#                     ptx = tmpmotordata["platexy"][0]
+#                     pty = tmpmotordata["platexy"][1]
                     
 #                     # update plot
-#                     old_point = motorvis.plot_motor.select(name='motor_xy')
+#                     old_point = motorvis.plot_motor.select(name="motor_xy")
 #                     if len(old_point)>0:
 #                         for oldpoint in old_point:
 #                             motorvis.plot_motor.renderers.remove(oldpoint)
 
-#                     motorvis.plot_motor.rect(6.0*25.4/2,  4.0*25.4/2.0, width = 6.0*25.4, height = 4.0*25.4, angle = 0.0, angle_units='rad', fill_alpha=0.0, fill_color='gray', line_width=2, alpha=1.0, line_color=(0,0,0), name='motor_xy')
+#                     motorvis.plot_motor.rect(6.0*25.4/2,  4.0*25.4/2.0, width = 6.0*25.4, height = 4.0*25.4, angle = 0.0, angle_units="rad", fill_alpha=0.0, fill_color="gray", line_width=2, alpha=1.0, line_color=(0,0,0), name="motor_xy")
 #                     # plot new Marker point
 #                     if S.params.ws_motor_params.sample_marker_type == 0:
 #                         # standard square marker
-#                         motorvis.plot_motor.square(ptx, pty, size=7,line_width=2, color=None, alpha=1.0, line_color=MarkerColors[0], name='motor_xy')
+#                         motorvis.plot_motor.square(ptx, pty, size=7,line_width=2, color=None, alpha=1.0, line_color=MarkerColors[0], name="motor_xy")
 
 #                     elif S.params.ws_motor_params.sample_marker_type == 1: # RSHS
 #                         # marker symbold for ANEC2, need exact dimensions for final marker
@@ -507,12 +507,12 @@ class C_potvis:
 #                         sample_spacing = 0.425*25.4
 #                         sample_count = 9;
 #                         # the square box
-#                         motorvis.plot_motor.rect(ptx, pty, width = sample_size+10, height = (sample_count-1)*sample_spacing+10, angle = -1.0*pangle, angle_units='rad', fill_alpha=0.0, fill_color='gray', line_width=2, alpha=1.0, line_color=(255,0,0), name='motor_xy')
+#                         motorvis.plot_motor.rect(ptx, pty, width = sample_size+10, height = (sample_count-1)*sample_spacing+10, angle = -1.0*pangle, angle_units="rad", fill_alpha=0.0, fill_color="gray", line_width=2, alpha=1.0, line_color=(255,0,0), name="motor_xy")
 #                         # and the different sample circles
-#                         motorvis.plot_motor.ellipse(ptx, pty, width = sample_size, height = sample_size, fill_alpha=0.0, fill_color=None, line_width=2, alpha=1.0, line_color=(0,0,255), name='motor_xy')
+#                         motorvis.plot_motor.ellipse(ptx, pty, width = sample_size, height = sample_size, fill_alpha=0.0, fill_color=None, line_width=2, alpha=1.0, line_color=(0,0,255), name="motor_xy")
 #                         for i in range(1,(int)((sample_count-1)/2)+1):
-#                             motorvis.plot_motor.ellipse(ptx+i*sample_spacing*math.sin(pangle), pty+i*sample_spacing*math.cos(pangle), width = sample_size, height = sample_size, fill_alpha=0.0, fill_color='gray', line_width=2, alpha=1.0, line_color=(255,0,0), name='motor_xy')
-#                             motorvis.plot_motor.ellipse(ptx-i*sample_spacing*math.sin(pangle), pty-i*sample_spacing*math.cos(pangle), width = sample_size, height = sample_size, fill_alpha=0.0, fill_color='gray', line_width=2, alpha=1.0, line_color=(255,0,0), name='motor_xy')
+#                             motorvis.plot_motor.ellipse(ptx+i*sample_spacing*math.sin(pangle), pty+i*sample_spacing*math.cos(pangle), width = sample_size, height = sample_size, fill_alpha=0.0, fill_color="gray", line_width=2, alpha=1.0, line_color=(255,0,0), name="motor_xy")
+#                             motorvis.plot_motor.ellipse(ptx-i*sample_spacing*math.sin(pangle), pty-i*sample_spacing*math.cos(pangle), width = sample_size, height = sample_size, fill_alpha=0.0, fill_color="gray", line_width=2, alpha=1.0, line_color=(255,0,0), name="motor_xy")
 
 
 
@@ -534,7 +534,7 @@ def makeBokehApp(doc, confPrefix, servKey):
 
 
     # is there any better way to inlcude external CSS? 
-    # css_styles = Div(text="""<style>%s</style>""" % pathlib.Path(os.path.join(helao_root, 'visualizer\styles.css')).read_text())
+    # css_styles = Div(text="""<style>%s</style>""" % pathlib.Path(os.path.join(helao_root, "visualizer\styles.css")).read_text())
     # doc.add_root(css_styles)
 
     visoloop = asyncio.get_event_loop()
@@ -543,45 +543,45 @@ def makeBokehApp(doc, confPrefix, servKey):
 
     # create visualizer objects for defined instruments
 
-    if 'ws_potentiostat' in app.srv_config:
+    if "ws_potentiostat" in app.srv_config:
         potvis = C_potvis(app.vis)
         if potvis.show:
             visoloop.create_task(potvis.IOloop_data())
         # visoloop.create_task(potvis.IOloop_stat())
     else:
-        app.vis.print_message('No potentiostat visualizer configured')
+        app.vis.print_message("No potentiostat visualizer configured")
         potvis = []
 
 
-    if 'ws_nidaqmx' in app.srv_config:
+    if "ws_nidaqmx" in app.srv_config:
         NImaxvis = C_nidaqmxvis(app.vis)
         if NImaxvis.show:
             visoloop.create_task(NImaxvis.IOloop_data())
     else:
-        app.vis.print_message('No NImax visualizer configured')
+        app.vis.print_message("No NImax visualizer configured")
         NImaxvis = []
 
 
-# if 'ws_data' in S.params:
+# if "ws_data" in S.params:
 #     tmpserv = S.params.ws_data
-#     dataserv['serv'] = tmpserv
-#     dataserv['wsdata_url'] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_data"
-#     dataserv['wsstat_url'] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_status"
+#     dataserv["serv"] = tmpserv
+#     dataserv["wsdata_url"] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_data"
+#     dataserv["wsstat_url"] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_status"
 #     self.vis.print_message(f"Create Visualizer for {dataserv['serv']}")
 #     datavis = C_datavis(dataserv)
 #     visoloop.create_task(datavis.IOloop_data())
 # else:
-#     app.vis.print_message('No data visualizer configured')
+#     app.vis.print_message("No data visualizer configured")
 #     datavis = []
 
-# if 'ws_motor' in S.params:    
+# if "ws_motor" in S.params:    
 #     tmpserv = S.params.ws_motor
-#     motorserv['serv'] = tmpserv
-#     motorserv['params']  = S.params.ws_motor_params
-#     motorserv['axis_id'] = C[tmpserv].params.axis_id
-#     motorserv['wsdata_url'] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_motordata"
-#     motorserv['wsstat_url'] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_status"
-#     if not 'sample_marker_type' in S.params.ws_motor_params:
+#     motorserv["serv"] = tmpserv
+#     motorserv["params"]  = S.params.ws_motor_params
+#     motorserv["axis_id"] = C[tmpserv].params.axis_id
+#     motorserv["wsdata_url"] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_motordata"
+#     motorserv["wsstat_url"] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_status"
+#     if not "sample_marker_type" in S.params.ws_motor_params:
 #         S.params.ws_motor_params.sample_marker_type = 0
 #     app.vis.print_message(f"Create Visualizer for {motorserv['serv']}")
 #     motorvis = C_motorvis(motorserv)
@@ -589,7 +589,7 @@ def makeBokehApp(doc, confPrefix, servKey):
 #     doc.add_root(layout(Spacer(height=10)))
 #     visoloop.create_task(motorvis.IOloop_data())
 # else:
-#     app.vis.print_message('No motor visualizer configured')
+#     app.vis.print_message("No motor visualizer configured")
 #     motorvis = []
 
 
