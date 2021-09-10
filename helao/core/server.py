@@ -33,6 +33,8 @@ from bokeh.io import curdoc
 from helao.core.helper import MultisubscriberQueue, dict_to_rcp, eval_val
 from helao.core.schema import Action, Decision
 from helao.core.model import return_dec, return_declist, return_act, return_actlist
+from helao.core.model import liquid_sample_no, gas_sample_no, solid_sample_no
+
 
 async_copy = wrap(shutil.copy)
 
@@ -1050,31 +1052,106 @@ class Base(object):
 
         async def append_sample(
             self,
-            sample_no,
-            type,
-            plate_id: Optional[int] = None,
-            tray_id: Optional[str] = None,
-            slot: Optional[int] = None,
-            vial: Optional[int] = None,
-            custom_location: Optional[str] = None,
+            label,
+            sample_type: str,
+            in_out: str,
+            solid: Union[solid_sample_no, None] = None,
+            liquid: Union[liquid_sample_no, None] = None,
+            gas: Union[gas_sample_no, None] = None,
+            samples_preserved: Optional[bool] = None,
+            inheritance_blocking: Optional[str] = None,
+            created: Optional[bool] = None,
+            machine: Optional[str] =  None,
         ):
             "Add sample to samples_out dict"
-            if type == "solid":
-                self.action.samples_out["plate_samples"].update({sample_no: plate_id})
-            elif type == "liquid":
-                liquid_dict = {
-                    sample_no: {
-                        k: v
-                        for k, v in zip(
-                            ["tray_id", "slot", "vial", "custom_location"],
-                            [tray_id, slot, vial, custom_location],
-                        )
-                        if v
-                    }
-                }
-                self.action.samples_out["liquid_samples"].update(liquid_dict)
+            def add_subkeys(samples_preserved, inheritance_blocking, created):
+                tmpdict = dict()
+                if samples_preserved is not None:
+                    tmpdict.update({"samples_preserved":samples_preserved})
+                if inheritance_blocking is not None:
+                    tmpdict.update({"inheritance_blocking":inheritance_blocking})
+                if created is not None:
+                    tmpdict.update({"created":created})
+                return tmpdict
+
+
+            def solid_to_dict(solid):
+                solid_dict = dict()
+                if solid is not None:
+                    solid_dict.update({"plate_id":solid.plate_id})
+                    solid_dict.update({"sample_no":solid.sample_no})
+                return solid_dict
+
+            def gas_to_dict(gas):
+                gas_dict = dict()
+                if gas is not None:
+                    gas_dict.update({"sample_no":gas.id})
+                return gas_dict
+            
+            def liquid_to_dict(liquid):
+                liquid_dict = dict()
+                if liquid is not None:
+                    liquid_dict.update({"sample_no":liquid.id})
+                return liquid_dict
+
+            
+            def update_dict(self, in_out, sample_type, append_dict):
+                if in_out == "in":
+                    if sample_type in self.action.samples_in:
+                        self.action.samples_in[sample_type].update(append_dict)
+                    else:
+                        self.action.samples_in[sample_type] = append_dict
+                if in_out == "out":
+                    if sample_type in self.action.samples_in:
+                        self.action.samples_out[sample_type].update(append_dict)
+                    else:
+                        self.action.samples_out[sample_type] = append_dict
+
+
+            if sample_type == "solid":
+                append_dict = {"label":label}
+                append_dict.update({"machine":machine})
+                append_dict.update(solid_to_dict(solid))
+                append_dict.update(add_subkeys(samples_preserved, inheritance_blocking, created))
+                update_dict(self, in_out, sample_type, append_dict)
+                    
+            elif sample_type == "liquid":
+                append_dict = {"label":label}
+                append_dict.update({"machine":machine})
+                append_dict.update(liquid_to_dict(liquid))
+                append_dict.update(add_subkeys(samples_preserved, inheritance_blocking, created))
+                update_dict(self, in_out, sample_type, append_dict)
+
+            elif sample_type == "gas":
+                append_dict = {"label":label}
+                append_dict.update({"machine":machine})
+                append_dict.update(gas_to_dict(gas))
+                append_dict.update(add_subkeys(samples_preserved, inheritance_blocking, created))
+                update_dict(self, in_out, sample_type, append_dict)
+
+            elif sample_type == "liquid_reservoir":
+                append_dict = {"label":label}
+                append_dict.update({"machine":machine})
+                append_dict.update(liquid_to_dict(liquid))
+                append_dict.update(add_subkeys(samples_preserved, inheritance_blocking, created))
+                update_dict(self, in_out, sample_type, append_dict)
+
+            elif sample_type == "sample_assembly":
+                append_dict = {"label":label}
+                append_dict.update({"machine":machine})
+                if liquid is not None:
+                    append_dict.update({"liquid":liquid_to_dict(liquid)})
+                if solid is not None:
+                    append_dict.update({"solid":solid_to_dict(solid)})
+                if gas is not None:
+                    append_dict.update({"gas":gas_to_dict(gas)})
+                    
+                append_dict.update(add_subkeys(samples_preserved, inheritance_blocking, created))
+                update_dict(self, in_out, sample_type, append_dict)
+
             else:
-                self.base.print_message(f"Type '{type}' is not supported.")
+                self.base.print_message(f"Type '{sample_type}' is not supported.")
+
 
         async def finish(self):
             "Close file_conn, finish rcp, copy aux, set endpoint status, and move active dict to past."

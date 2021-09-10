@@ -434,6 +434,8 @@ class C_async_operator:
 
 
         actparams = {paraminput.title: to_json(paraminput.value) for paraminput in self.param_input}
+        actparams["plate_id"] = selplateid
+        actparams["plate_sample_no"] = selsample
 
         D = Decision(inputdict={
             # "orch_name":orch_name,
