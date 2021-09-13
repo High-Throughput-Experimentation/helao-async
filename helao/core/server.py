@@ -16,7 +16,6 @@ from typing import Optional, Union
 from math import floor
 from enum import Enum
 import colorama
-from colorama import Fore, Back, Style
 
 import numpy as np
 import ntplib
@@ -31,6 +30,7 @@ from fastapi.openapi.utils import get_flat_params
 from bokeh.io import curdoc
 
 from helao.core.helper import MultisubscriberQueue, dict_to_rcp, eval_val
+from helao.core.helper import print_message
 from helao.core.schema import Action, Decision
 from helao.core.model import return_dec, return_declist, return_act, return_actlist
 from helao.core.model import liquid_sample_no, gas_sample_no, solid_sample_no
@@ -476,26 +476,26 @@ class Base(object):
 
         if "technique_name" in self.world_cfg.keys():
             self.print_message(
-                f" ... Found technique_name in config: {self.world_cfg['technique_name']}"
+                f" ... Found technique_name in config: {self.world_cfg['technique_name']}", info = True
             )
             self.technique_name = self.world_cfg["technique_name"]
         else:
             raise ValueError(
-                "Missing 'technique_name' in config, cannot create server object."
+                "Missing 'technique_name' in config, cannot create server object.", error = True
             )
 
         self.calibration = calibration
         if "save_root" in self.world_cfg.keys():
             self.save_root = self.world_cfg["save_root"]
             self.print_message(
-                f" ... Found root save directory in config: {self.world_cfg['save_root']}"
+                f" ... Found root save directory in config: {self.world_cfg['save_root']}", info = True
             )
             if not os.path.isdir(self.save_root):
-                self.print_message(" ... Warning: root save directory does not exist. Creatig it.")
+                self.print_message(" ... Warning: root save directory does not exist. Creatig it.", warning = True)
                 os.makedirs(self.save_root)
         else:
             raise ValueError(
-                " ... Warning: root save directory was not defined. Logs, RCPs, and data will not be written."
+                " ... Warning: root save directory was not defined. Logs, RCPs, and data will not be written.", error = True
             )
         self.actives = {}
         self.status = {}
@@ -583,7 +583,7 @@ class Base(object):
             action_dict = await self.actives[action_uuid].active.as_dict()
             return action_dict
         else:
-            self.print_message(f" ... Specified action uuid {action_uuid} was not found.")
+            self.print_message(f" ... Specified action uuid {action_uuid} was not found.", error = True)
             return None
 
     async def get_ntp_time(self):
@@ -631,7 +631,10 @@ class Base(object):
                         success = True
                         break
                     else:
-                        self.print_message(f" ... Failed to add {client_servkey} to {self.server_name} status subscriber list.")
+                        self.print_message(
+                            f" ... Failed to add {client_servkey} to {self.server_name} status subscriber list.", 
+                            error = True
+                        )
 
             if success:
                 self.print_message(
@@ -639,7 +642,8 @@ class Base(object):
                 )
             else:
                 self.print_message(
-                    f" ... Failed to push status message to {client_servkey} after {retry_limit} attempts."
+                    f" ... Failed to push status message to {client_servkey} after {retry_limit} attempts.", 
+                    error = True
                 )
 
         return success
@@ -1059,17 +1063,24 @@ class Base(object):
             liquid: Union[liquid_sample_no, None] = None,
             gas: Union[gas_sample_no, None] = None,
             samples_preserved: Optional[bool] = None,
-            inheritance_blocking: Optional[str] = None,
+            inheritance: Optional[str] = None,
             created: Optional[bool] = None,
             machine: Optional[str] =  None,
         ):
-            "Add sample to samples_out dict"
+            "Add sample to samples_out and samples_in dict"
+
+            if inheritance is None or inheritance not in ["give_only", "receive_only", "allow_both", "block_both"]:
+                self.base.print_message(f"inheritance '{inheritance}' is not supported. Using 'allow_both'.", info = True)
+                inheritance = "allow_both"
+                    
+
+
             def add_subkeys(samples_preserved, inheritance_blocking, created):
                 tmpdict = dict()
                 if samples_preserved is not None:
                     tmpdict.update({"samples_preserved":samples_preserved})
                 if inheritance_blocking is not None:
-                    tmpdict.update({"inheritance_blocking":inheritance_blocking})
+                    tmpdict.update({"inheritance":inheritance_blocking})
                 if created is not None:
                     tmpdict.update({"created":created})
                 return tmpdict
@@ -1109,44 +1120,54 @@ class Base(object):
 
 
             if sample_type == "solid":
-                append_dict = {"label":label}
-                append_dict.update({"machine":machine})
-                append_dict.update(solid_to_dict(solid))
-                append_dict.update(add_subkeys(samples_preserved, inheritance_blocking, created))
+                # append_dict = {"label":label}
+                # append_dict.update({"machine":machine})
+                labelkey = f"- label: {label}"
+                append_dict = {labelkey:{"machine":machine}}
+                append_dict[labelkey].update(solid_to_dict(solid))
+                append_dict[labelkey].update(add_subkeys(samples_preserved, inheritance, created))
                 update_dict(self, in_out, sample_type, append_dict)
                     
             elif sample_type == "liquid":
-                append_dict = {"label":label}
-                append_dict.update({"machine":machine})
-                append_dict.update(liquid_to_dict(liquid))
-                append_dict.update(add_subkeys(samples_preserved, inheritance_blocking, created))
+                # append_dict = {"label":label}
+                # append_dict.update({"machine":machine})
+                labelkey = f"- label: {label}"
+                append_dict = {labelkey:{"machine":machine}}
+                append_dict[labelkey].update(liquid_to_dict(liquid))
+                append_dict[labelkey].update(add_subkeys(samples_preserved, inheritance, created))
                 update_dict(self, in_out, sample_type, append_dict)
 
             elif sample_type == "gas":
-                append_dict = {"label":label}
-                append_dict.update({"machine":machine})
-                append_dict.update(gas_to_dict(gas))
-                append_dict.update(add_subkeys(samples_preserved, inheritance_blocking, created))
+                # append_dict = {"label":label}
+                # append_dict.update({"machine":machine})
+                labelkey = f"- label: {label}"
+                append_dict = {labelkey:{"machine":machine}}
+                append_dict[labelkey].update(gas_to_dict(gas))
+                append_dict[labelkey].update(add_subkeys(samples_preserved, inheritance, created))
                 update_dict(self, in_out, sample_type, append_dict)
 
             elif sample_type == "liquid_reservoir":
-                append_dict = {"label":label}
-                append_dict.update({"machine":machine})
-                append_dict.update(liquid_to_dict(liquid))
-                append_dict.update(add_subkeys(samples_preserved, inheritance_blocking, created))
+                # append_dict = {"label":label}
+                # append_dict.update({"machine":machine})
+                labelkey = f"- label: {label}"
+                append_dict = {labelkey:{"machine":machine}}
+                append_dict[labelkey].update(liquid_to_dict(liquid))
+                append_dict[labelkey].update(add_subkeys(samples_preserved, inheritance, created))
                 update_dict(self, in_out, sample_type, append_dict)
 
             elif sample_type == "sample_assembly":
-                append_dict = {"label":label}
-                append_dict.update({"machine":machine})
+                # append_dict = {"label":label}
+                # append_dict.update({"machine":machine})
+                labelkey = f"- label: {label}"
+                append_dict = {labelkey:{"machine":machine}}
                 if liquid is not None:
-                    append_dict.update({"liquid":liquid_to_dict(liquid)})
+                    append_dict[labelkey].update({"liquid":liquid_to_dict(liquid)})
                 if solid is not None:
-                    append_dict.update({"solid":solid_to_dict(solid)})
+                    append_dict[labelkey].update({"solid":solid_to_dict(solid)})
                 if gas is not None:
-                    append_dict.update({"gas":gas_to_dict(gas)})
+                    append_dict[labelkey].update({"gas":gas_to_dict(gas)})
                     
-                append_dict.update(add_subkeys(samples_preserved, inheritance_blocking, created))
+                append_dict[labelkey].update(add_subkeys(samples_preserved, inheritance, created))
                 update_dict(self, in_out, sample_type, append_dict)
 
             else:
@@ -1943,28 +1964,3 @@ async def async_private_dispatcher(
         ) as resp:
             response = await resp.json()
             return response
-
-
-def print_message(server_cfg,server_name,*args,**kwargs):
-    precolor = ""
-    if "error" in kwargs:
-        precolor = f"{Style.BRIGHT}{Fore.RED}"
-    if "warning" in kwargs:
-        precolor = f"{Style.BRIGHT}{Fore.YELLOW}"
-
-    srv_type = server_cfg.get("group","")
-    style = ""
-    if srv_type == "orchestrator":
-        style = f"{Style.BRIGHT}{Fore.GREEN}"
-    elif srv_type == "action":
-        style = f"{Style.BRIGHT}{Fore.YELLOW}"
-    elif srv_type == "operator":
-        style = f"{Style.BRIGHT}{Fore.CYAN}"
-    elif srv_type == "visualizer":
-        style = f"{Style.BRIGHT}{Fore.CYAN}"
-    else:
-        style = ""
-    # style = server_cfg.get("msg_color",style)
-    
-    for arg in args:
-        print(f"{precolor}[{strftime('%H:%M:%S')}_{server_name}]:{Style.RESET_ALL} {style}{arg}{Style.RESET_ALL}")
