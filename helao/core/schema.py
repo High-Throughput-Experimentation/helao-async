@@ -32,8 +32,6 @@ class Decision(object):
         # this gets big really fast, bad for debugging
         self.result_dict = {}#imports.get("result_dict", {})
         self.global_params = {}
-        if self.decision_uuid is None:
-            self.gen_uuid_decision()
 
     def as_dict(self):
         d = vars(self)
@@ -64,12 +62,12 @@ class Decision(object):
         return params_dict, json_dict
 
 
-    def gen_uuid_decision(self):
+    def gen_uuid_decision(self, machine_name: str):
         "server_name can be any string used in generating random uuid"
         if self.decision_uuid:
             print(f"decision_uuid: {self.decision_uuid} already exists")
         else:
-            self.decision_uuid = gen_uuid(self.orch_name)
+            self.decision_uuid = gen_uuid(label=machine_name, timestamp=self.decision_timestamp)
             print(f"decision_uuid: {self.decision_uuid} assigned")
 
     def set_dtime(self, offset: float = 0):
@@ -123,15 +121,13 @@ class Action(Decision):
             print(
                 f'Action {" and ".join(missing_args)} not specified. Placeholder actions will only affect the action queue enumeration.'
             )
-        if self.action_uuid is None:
-            self.gen_uuid_action()
 
 
-    def gen_uuid_action(self):
+    def gen_uuid_action(self, machine_name: str):
         if self.action_uuid:
             print(f"action_uuid: {self.action_uuid} already exists")
         else:
-            self.action_uuid = gen_uuid(self.action_name)
+            self.action_uuid = gen_uuid(label=f"{machine_name}_{self.action_name}", timestamp=self.action_queue_time)
             print(f"action_uuid: {self.action_uuid} assigned")
 
     def set_atime(self, offset: float = 0.0):
@@ -139,66 +135,4 @@ class Action(Decision):
         if offset is not None:
             atime = datetime.fromtimestamp(atime.timestamp() + offset)
         self.action_queue_time = atime.strftime("%Y%m%d.%H%M%S%f")
-
-    # def return_finished(self):
-    #     return return_finishedact(
-    #         technique_name=self.technique_name,
-    #         access=self.access,
-    #         orch_name=self.orch_name,
-    #         decision_timestamp=self.decision_timestamp,
-    #         decision_uuid=self.decision_uuid,
-    #         decision_label=self.decision_label,
-    #         actualizer=self.actualizer,
-    #         actualizer_pars=self.actualizer_pars,
-    #         result_dict=self.result_dict,
-    #         action_server=self.action_server,
-    #         action_queue_time=self.action_queue_time,
-    #         action_real_time=self.action_real_time,
-    #         action_name=self.action_name,
-    #         action_params=self.action_params,
-    #         action_uuid=self.action_uuid,
-    #         action_enum=self.action_enum,
-    #         action_abbr=self.action_abbr,
-    #         actionnum=self.actionnum,
-    #         start_condition=self.start_condition,
-    #         save_rcp=self.save_rcp,
-    #         save_data=self.save_data,
-    #         plate_id=self.plate_id,
-    #         samples_in=self.samples_in,
-    #         samples_out=self.samples_out,
-    #         output_dir=self.output_dir,
-    #         file_dict=self.file_dict,
-    #         column_names=self.column_names,
-    #         header=self.header,
-    #         data=self.data,
-    #     )
-
-    # def return_running(self):
-    #     return return_runningact(
-    #         technique_name=self.technique_name,
-    #         access=self.access,
-    #         orch_name=self.orch_name,
-    #         decision_timestamp=self.decision_timestamp,
-    #         decision_uuid=self.decision_uuid,
-    #         decision_label=self.decision_label,
-    #         actualizer=self.actualizer,
-    #         actualizer_pars=self.actualizer_pars,
-    #         result_dict=self.result_dict,
-    #         action_server=self.action_server,
-    #         action_queue_time=self.action_queue_time,
-    #         action_real_time=self.action_real_time,
-    #         action_name=self.action_name,
-    #         action_params=self.action_params,
-    #         action_uuid=self.action_uuid,
-    #         action_enum=self.action_enum,
-    #         action_abbr=self.action_abbr,
-    #         actionnum=self.actionnum,
-    #         start_condition=self.start_condition,
-    #         plate_id=self.plate_id,
-    #         save_rcp=self.save_rcp,
-    #         save_data=self.save_data,
-    #         samples_in=self.samples_in,
-    #         samples_out=self.samples_out,
-    #         output_dir=self.output_dir,
-    #     )
 

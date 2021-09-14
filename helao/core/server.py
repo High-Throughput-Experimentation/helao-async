@@ -8,6 +8,7 @@ import sys
 import json
 import uuid
 import shutil
+import pyaml
 from copy import copy
 from collections import defaultdict, deque
 from socket import gethostname
@@ -245,7 +246,15 @@ def makeOrchServ(
         if app.orch.loop_state != "E-STOP":
             app.orch.print_message("orchestrator is not currently in E-STOP")
         else:
-            await app.orch.clear_estop()
+            await app.orch.clear_estate(clear_estop=True, clear_error=False)
+
+    @app.post("/clear_error")
+    async def clear_error():
+        """Remove error condition."""
+        if app.orch.loop_state != "ERROR":
+            app.orch.print_message("orchestrator is not currently in ERROR")
+        else:
+            await app.orch.clear_estate(clear_estop=False, clear_error=True)
 
     @app.post("/skip")
     async def skip_decision():
@@ -777,10 +786,12 @@ class Base(object):
                 ]
                 self.base.print_message(self.column_names)
             self.action.set_atime(offset=self.base.ntp_offset)
+            self.action.gen_uuid_action(self.base.hostname)
             self.file_conn = None
             # if Action is not created from Decision+Actualizer, Action is independent
             if self.action.decision_timestamp is None:
                 self.action.set_dtime(offset=self.base.ntp_offset)
+                self.action.gen_uuid_decision(self.base.hostname)
             decision_date = self.action.decision_timestamp.split(".")[0]
             decision_time = self.action.decision_timestamp.split(".")[-1]
             year_week = strftime("%y.%U", strptime(decision_date, "%Y%m%d"))
@@ -836,16 +847,22 @@ class Base(object):
                     # if self.action.plate_id is None:
                     #     self.action.plate_id = "noPlateID"
                     if self.action.header:
-                        if isinstance(self.action.header, list):
-                            header_lines = len(self.action.header)
-                            self.action.header = "\n".join(self.header)
-                        else:
+                        if isinstance(self.action.header, dict):
+                            header_dict = copy(self.action.header)
+                            self.action.header = pyaml.dump(self.action.header)
                             header_lines = len(self.action.header.split("\n"))
-                        header_parts = ",".join(
-                            self.action.header.split("\n")[-1]
-                            .replace(",", "\t")
-                            .split()
-                        )
+                            header_parts = len(header_dict.keys())
+                        else:
+                            if isinstance(self.action.header, list):
+                                header_lines = len(self.action.header)
+                                self.action.header = "\n".join(self.action.header)
+                            else:
+                                header_lines = len(self.action.header.split("\n"))
+                            header_parts = ",".join(
+                                self.action.header.split("\n")[-1]
+                                .replace(",", "\t")
+                                .split()
+                            )
                         file_info = f"{self.action.file_type};{header_parts};{header_lines};{sample_no}"
                     else:
                         file_info = f"{self.action.file_type};{sample_no}"
@@ -1316,6 +1333,7 @@ class Orch(Base):
                     self.active_decision = self.decision_dq.popleft()
                     self.active_decision.technique_name = self.technique_name
                     self.active_decision.set_dtime(offset=self.ntp_offset)
+                    self.active_decision.gen_uuid_decision(self.hostname)
                     actualizer = self.active_decision.actualizer
                     # additional actualizer params should be stored in decision.actualizer_pars
                     unpacked_acts = self.action_lib[actualizer](self.active_decision)
@@ -1508,7 +1526,7 @@ class Orch(Base):
             for act_name, uuids in act_named.items():
                 for myuuid in uuids:
                     uuid_tup = (act_serv, act_name, myuuid)
-                    if uuid.endswith("__estop"):
+                    if myuuid.endswith("__estop"):
                         estop_uuids.append(uuid_tup)
                     else:
                         running_uuids.append(uuid_tup)
@@ -1540,7 +1558,6 @@ class Orch(Base):
             self.print_message(
                 " ... both clear_estop and clear_error parameters are False, nothing to clear"
             )
-        await self.update_global_state()
         cleared_status = copy(self.global_state_dict)
         if clear_estop:
             for serv, act, myuuid in self.estop_uuids:
@@ -1601,7 +1618,7 @@ class Orch(Base):
                 )
         await asyncio.sleep(0.001)
         if at_index:
-            self.decision_dq.insert(at_index)
+            self.decision_dq.insert(i=at_index, x=D)
         elif prepend:
             self.decision_dq.appendleft(D)
             self.print_message(f" ... decision {D.decision_uuid} prepended to queue")
