@@ -405,6 +405,11 @@ def makeOrchServ(
         """Return the current list of actions."""
         return app.orch.list_actions()
 
+    @app.post("/list_active_actions")
+    def list_actions():
+        """Return the current list of actions."""
+        return app.orch.list_active_actions()
+
     @app.post("/endpoints")
     def get_all_urls():
         """Return a list of all endpoints on this server."""
@@ -1056,33 +1061,48 @@ class Base(object):
 
         async def append_sample(
             self,
-            label,
             sample_type: str,
             in_out: str,
+            label: Optional[str] = None,
             solid: Union[solid_sample_no, None] = None,
             liquid: Union[liquid_sample_no, None] = None,
             gas: Union[gas_sample_no, None] = None,
-            samples_preserved: Optional[bool] = None,
-            inheritance: Optional[str] = None,
-            created: Optional[bool] = None,
+            # samples_preserved: Optional[bool] = None,
+            status: Optional[str] = "preserved",#None,
+            inheritance: Optional[str] = "allow_both",#None,
+            # created: Optional[bool] = None,
             machine: Optional[str] =  None,
         ):
             "Add sample to samples_out and samples_in dict"
 
-            if inheritance is None or inheritance not in ["give_only", "receive_only", "allow_both", "block_both"]:
-                self.base.print_message(f"inheritance '{inheritance}' is not supported. Using 'allow_both'.", info = True)
-                inheritance = "allow_both"
-                    
+                
+            # created: pretty self-explanatory; the sample was created during the process.
+            # destroyed: also self-explanatory
+            # preserved: the sample exists before and after the process. e.g. an echem experiment
+            # incorporated: the sample was combined with others in the process. E.g. the creation of an electrode assembly from electrodes and electrolytes
+            # recovered: the opposite of incorporated. E.g. an electrode assembly is taken apart, and the original electrodes are recovered, and further experiments may be done on those electrodes
 
 
-            def add_subkeys(samples_preserved, inheritance_blocking, created):
+            def add_subkeys(status, inheritance):
+                if inheritance is None or inheritance not in ["give_only", "receive_only", "allow_both", "block_both"]:
+                    self.base.print_message(f"inheritance '{inheritance}' is not supported. Using 'allow_both'.", info = True)
+                    inheritance = "allow_both"
+                        
+                if type(status) is not list:
+                    status = [status]
+
+                for i, stat in enumerate(status):
+                    if stat is None or stat not in ["created", "destroyed", "preserved", "incorporated", "recovered"]:
+                        self.base.print_message(f"Sample status '{stat}' is not supported. Using 'unknown'.", info = True)
+                        status[i] = "unknown"
+
                 tmpdict = dict()
-                if samples_preserved is not None:
-                    tmpdict.update({"samples_preserved":samples_preserved})
-                if inheritance_blocking is not None:
-                    tmpdict.update({"inheritance":inheritance_blocking})
-                if created is not None:
-                    tmpdict.update({"created":created})
+                if inheritance is not None:
+                    tmpdict.update({"inheritance":inheritance})
+                if status is not None:
+                    # tmpdict.update({"status":status})
+                    tmpdict.update({"status":";".join(status)})
+
                 return tmpdict
 
 
@@ -1118,56 +1138,54 @@ class Base(object):
                     else:
                         self.action.samples_out[sample_type] = append_dict
 
+            def append_liquid(liquid, machine, status, inheritance):
+                labelkey = f"- label: {machine}__{liquid.id}"
+                append_dict = {labelkey:{"machine":machine}}
+                append_dict[labelkey].update(liquid_to_dict(liquid))
+                append_dict[labelkey].update(add_subkeys(status, inheritance))
+                return append_dict
+                
+            def append_gas(gas, machine, status, inheritance):
+                labelkey = f"- label: {machine}__{gas.id}"
+                append_dict = {labelkey:{"machine":machine}}
+                append_dict[labelkey].update(gas_to_dict(gas))
+                append_dict[labelkey].update(add_subkeys(status, inheritance))
+                return append_dict
 
-            if sample_type == "solid":
-                # append_dict = {"label":label}
-                # append_dict.update({"machine":machine})
-                labelkey = f"- label: {label}"
+            def append_solid(solid, machine, status, inheritance):
+                labelkey = f"- label: {solid.plate_id}__{solid.sample_no}"
                 append_dict = {labelkey:{"machine":machine}}
                 append_dict[labelkey].update(solid_to_dict(solid))
-                append_dict[labelkey].update(add_subkeys(samples_preserved, inheritance, created))
+                append_dict[labelkey].update(add_subkeys(status, inheritance))
+                return append_dict
+
+
+            if sample_type == "solid":
+                append_dict = append_solid(solid, machine, status, inheritance)
                 update_dict(self, in_out, sample_type, append_dict)
                     
             elif sample_type == "liquid":
-                # append_dict = {"label":label}
-                # append_dict.update({"machine":machine})
-                labelkey = f"- label: {label}"
-                append_dict = {labelkey:{"machine":machine}}
-                append_dict[labelkey].update(liquid_to_dict(liquid))
-                append_dict[labelkey].update(add_subkeys(samples_preserved, inheritance, created))
+                append_dict = append_liquid(liquid, machine, status, inheritance)
                 update_dict(self, in_out, sample_type, append_dict)
 
             elif sample_type == "gas":
-                # append_dict = {"label":label}
-                # append_dict.update({"machine":machine})
-                labelkey = f"- label: {label}"
-                append_dict = {labelkey:{"machine":machine}}
-                append_dict[labelkey].update(gas_to_dict(gas))
-                append_dict[labelkey].update(add_subkeys(samples_preserved, inheritance, created))
+                append_dict = append_gas(liquid, machine, status, inheritance)
                 update_dict(self, in_out, sample_type, append_dict)
 
             elif sample_type == "liquid_reservoir":
-                # append_dict = {"label":label}
-                # append_dict.update({"machine":machine})
-                labelkey = f"- label: {label}"
-                append_dict = {labelkey:{"machine":machine}}
-                append_dict[labelkey].update(liquid_to_dict(liquid))
-                append_dict[labelkey].update(add_subkeys(samples_preserved, inheritance, created))
+                append_dict = append_liquid(liquid, machine, status, inheritance)
                 update_dict(self, in_out, sample_type, append_dict)
 
             elif sample_type == "sample_assembly":
-                # append_dict = {"label":label}
-                # append_dict.update({"machine":machine})
                 labelkey = f"- label: {label}"
                 append_dict = {labelkey:{"machine":machine}}
                 if liquid is not None:
-                    append_dict[labelkey].update({"liquid":liquid_to_dict(liquid)})
+                    append_dict[labelkey].update({"liquid":append_liquid(liquid, machine, status, inheritance)})
                 if solid is not None:
-                    append_dict[labelkey].update({"solid":solid_to_dict(solid)})
+                    append_dict[labelkey].update({"solid":append_solid(solid, machine, status, inheritance)})
                 if gas is not None:
-                    append_dict[labelkey].update({"gas":gas_to_dict(gas)})
-                    
-                append_dict[labelkey].update(add_subkeys(samples_preserved, inheritance, created))
+                    append_dict[labelkey].update({"gas":append_gas(gas, machine, status, inheritance)})
+                append_dict[labelkey].update(add_subkeys(status, inheritance))
                 update_dict(self, in_out, sample_type, append_dict)
 
             else:
@@ -1402,8 +1420,8 @@ class Orch(Base):
         try:
             self.loop_state = "started"
             while self.loop_state == "started" and (self.action_dq or self.decision_dq):
-                self.print_message(self.action_dq)
-                self.print_message(self.decision_dq)
+                self.print_message(f" ... current content of action_dq: {self.action_dq}")
+                self.print_message(f" ... current content of decision_dq: {self.decision_dq}")
                 await asyncio.sleep(
                     0.001
                 )  # allows status changes to affect between action_dq, also enforce unique timestamp
@@ -1756,6 +1774,29 @@ class Orch(Base):
         retval = return_declist(decisions=declist)
         return retval
 
+
+    def list_active_actions(self):
+        """Return the current queue running actions."""
+        actlist = []
+        index = 0
+        for act_serv, act_dict in self.global_state_dict.items():
+            for act_name, act_uuids in act_dict.items():
+                for act_uuid in act_uuids:
+                    actlist.append(
+                        return_act(
+                        index=index,
+                        uid=act_uuid,
+                        server=act_serv,
+                        action=act_name,
+                        pars=dict(),
+                        preempt=-1,
+                        )
+                    )
+                    index = index + 1
+        retval = return_actlist(actions=actlist)
+        return retval
+
+
     def list_actions(self):
         """Return the current queue of action_dq."""
         actlist = [
@@ -1771,6 +1812,7 @@ class Orch(Base):
         ]
         retval = return_actlist(actions=actlist)
         return retval
+
 
     def supplement_error_action(self, check_uuid: str, sup_action: Action):
         """Insert action at front of action queue with subversion of errored action, inherit parameters if desired."""
