@@ -34,14 +34,17 @@ import subprocess
 from importlib import import_module
 
 from munch import munchify
+from termcolor import cprint
+from pyfiglet import figlet_format
+import colorama
 
 helao_root = os.path.dirname(os.path.realpath(__file__))
 confPrefix = sys.argv[1]
 config = import_module(f"helao.config.{confPrefix}").config
 conf = munchify(config)
 
-from helao.core.server import print_message
-
+from helao.core.helper import print_message
+colorama.init(strip=not sys.stdout.isatty()) # strip colors if stdout is redirected 
 # print_message({}, "launcher", "test")
 
 class Pidd:
@@ -126,11 +129,11 @@ class Pidd:
                         p.terminate()
                         time.sleep(0.5)
                         if not psutil.pid_exists(p.pid):
-                            print_message({}, "launcher", f"Successfully terminated server '{k}'.")
+                            print_message({}, "launcher", f"Successfully terminated server '{k}'.", info = True)
                             return True
                     if psutil.pid_exists(p.pid):
                         print_message({}, "launcher", 
-                            f"Failed to terminate server '{k}' after {self.RETRIES} retries."
+                            f"Failed to terminate server '{k}' after {self.RETRIES} retries.", error = True
                         )
                         return False
                 except Exception as e:
@@ -159,11 +162,11 @@ class Pidd:
             self.kill_server(k)
         active = self.list_active()
         if active:
-            print_message({}, "launcher", "Following processes failed to terminate:")
+            print_message({}, "launcher", "Following processes failed to terminate:", error = True)
             for x in active:
                 print_message({}, "launcher", x)
         else:
-            print_message({}, "launcher", f"All processes terminated. Removing '{self.pidFile}'")
+            print_message({}, "launcher", f"All processes terminated. Removing '{self.pidFile}'", info = True)
             os.remove(self.pidFile)
 
 
@@ -184,20 +187,20 @@ def validateConfig(PIDD, confDict):
             )
             return False
         if not isinstance(serverDict["host"], str):
-            print_message({}, "launcher", f"{server} server 'host' is not a string")
+            print_message({}, "launcher", f"{server} server 'host' is not a string", error = True)
             return False
         if not isinstance(serverDict["port"], int):
-            print_message({}, "launcher", f"{server} server 'port' is not an integer")
+            print_message({}, "launcher", f"{server} server 'port' is not an integer", error = True)
             return False
         if not isinstance(serverDict["group"], str):
-            print_message({}, "launcher", f"{server} server 'group' is not a string")
+            print_message({}, "launcher", f"{server} server 'group' is not a string", error = True)
             return False
         if hasCode:
             if len(hasCode) != 1:
-                print_message({}, "launcher", f"{server} cannot have more than one code key {PIDD.codeKeys}")
+                print_message({}, "launcher", f"{server} cannot have more than one code key {PIDD.codeKeys}", error = True)
                 return False
             if not isinstance(serverDict[hasCode[0]], str):
-                print_message({}, "launcher", f"{server} server '{hasCode[0]}' is not a string")
+                print_message({}, "launcher", f"{server} server '{hasCode[0]}' is not a string", error = True)
                 return False
             launchPath = os.path.join(
                 "helao",
@@ -208,7 +211,8 @@ def validateConfig(PIDD, confDict):
             )
             if not os.path.exists(os.path.join(os.getcwd(), launchPath)):
                 print_message({}, "launcher", 
-                    f"{server} server code helao/library/server/{serverDict['group']}/{serverDict[hasCode[0]]+'.py'} does not exist."
+                    f"{server} server code helao/library/server/{serverDict['group']}/{serverDict[hasCode[0]]+'.py'} does not exist.", 
+                    error = True
                 )
                 return False
     serverAddrs = [f"{d['host']}:{d['port']}" for d in confDict["servers"].values()]
@@ -252,6 +256,7 @@ def launcher(confPrefix, confDict):
 
     pidd = Pidd(f"pids_{confPrefix}.pck")
     if not validateConfig(pidd, confDict):
+        print_message({}, "launcher", f"Configuration for '{confPrefix}' is invalid.", error = True)
         raise Exception(f"Configuration for '{confPrefix}' is invalid.")
     else:
         print_message({}, "launcher", f"Configuration for '{confPrefix}' is valid.")
@@ -284,11 +289,13 @@ def launcher(confPrefix, confDict):
                 # if 'py' key is None, assume remotely started or monitored by a separate process
                 if servPy is None:
                     print_message({}, "launcher", 
-                        f"{server} does not specify one of ({pidd.codeKeys}) so process not be managed."
+                        f"{server} does not specify one of ({pidd.codeKeys}) so process not be managed.",
+                        info = True
                     )
                 elif servKHP in activeKHP:
                     print_message({}, "launcher", 
-                        f"{server} already running with pid [{active[activeKHP.index(servKHP)][3]}]"
+                        f"{server} already running with pid [{active[activeKHP.index(servKHP)][3]}]",
+                        info = True
                     )
                 elif servHP in activeHP:
                     raise (
@@ -333,12 +340,8 @@ def launcher(confPrefix, confDict):
 
 # def main():
 if __name__ == "__main__":
-    print('\x1b[2J') # clear screen
-    print("##############################################################################")
-    print("#                                                                            #")
-    print("#                      Starting HELAO version 2                              #")
-    print("#                                                                            #")
-    print("##############################################################################")
+    print("\x1b[2J") # clear screen
+    cprint(figlet_format("HELAO\nV2", font="starwars"),"yellow", "on_red", attrs=["bold"])
     pidd = launcher(confPrefix, config)
     result = None
     while result not in [b"\x18", b"\x04"]:
