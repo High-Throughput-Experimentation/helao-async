@@ -2,6 +2,7 @@ from enum import Enum
 import time
 from typing import List
 import asyncio
+import pyaml
 
 import nidaqmx
 from nidaqmx.constants import LineGrouping
@@ -77,9 +78,7 @@ class cNIMAX:
 
         self.FIFO_epoch = None
         # self.FIFO_header = ''
-        self.FIFO_NImaxheader = (
-            ""  # measuement specific, will be reset each measurement
-        )
+        self.FIFO_NImaxheader = dict()
         self.FIFO_name = ""
         self.FIFO_dir = ""
         self.FIFO_column_headings = [
@@ -194,6 +193,14 @@ class cNIMAX:
         if self.IO_do_meas and not self.IO_estop:
             try:
                 self.IO_measuring = True
+
+                if self.FIFO_epoch is None:
+                    self.FIFO_epoch = self.active.set_realtime_nowait()
+                    # need to correct for the first datapoints 
+                    self.FIFO_epoch -= number_of_samples / self.samplingrate
+                    if self.active:
+                        self.active.enqueue_data_nowait(pyaml.dump({"epoch_ns":self.FIFO_epoch}))
+                        self.active.enqueue_data_nowait("%%")
                 
                 # start seq: V then current, so read current first then Volt
                 # put callback only on current (Volt should the always have enough points)
@@ -454,15 +461,12 @@ class cNIMAX:
             self.buffersizeread = int(self.samplingrate)
             # save submitted action object
             self.action = A
+            self.FIFO_epoch = None
             # create active and write streaming file header
-            tmps_headings = "\t".join(self.FIFO_column_headings)
-            self.FIFO_NImaxheader = "\n".join(
-                [
-                    "%epoch_ns=FIXME",
-                    "%version=0.2",
-                    f"%column_headings={tmps_headings}",
-                ]
-            )
+            self.FIFO_NImaxheader = {
+                    "version":0.2,
+                    "column_headings":self.FIFO_column_headings
+            }
             self.active = await self.base.contain_action(
                 self.action,
                 file_type="NImax_IV_file",
@@ -508,28 +512,3 @@ class cNIMAX:
                 await self.base.set_estop(
                     self.active.active.action_name, self.active.active.action_uuid
                 )
-
-
-    async def start_cell_IV(self):
-        # write header lines with one function call
-        tmps_headings = "\t".join(self.FIFO_column_headings)
-        self.FIFO_NImaxheader = "\n".join(
-            [
-                "%epoch_ns=FIXME",
-                "%version=0.2",
-                f"%column_headings={tmps_headings}",
-            ]
-        )
-        self.active = await self.base.contain_action(
-            self.action,
-            file_type="NImax_IV_file",
-            file_group="NImax_files",
-            header=self.FIFO_NImaxheader,
-        )
-        self.base.print_message(f"!!! Active action uuid is {self.active.action.action_uuid}")
-
-        # start slave first
-        self.task_CellVoltage.start()
-        # then start master to trigger slave
-        self.task_CellCurrent.start()
-        await self.IO_signalq.put(True)

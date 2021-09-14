@@ -131,6 +131,7 @@ def makeApp(confPrefix, servKey):
                               ):
         """Runs multi cell IV measurement."""
         A = await setupAct(request, locals())
+        A.action_abbr = "IV"
         # A.save_data = True
         active_dict = await app.driver.run_cell_IV(A)
         return active_dict
