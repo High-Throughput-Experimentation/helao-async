@@ -3,18 +3,21 @@ Miscellaneous helper functions.
 
 """
 import os
-import uuid
+# import uuid
+import time
+import datetime
 import shortuuid
 import zipfile
 from typing import Any
 from asyncio import Queue
+from typing import Optional
 
 
-def gen_uuid(label: str, trunc: int = 8):
+def gen_uuid(label: str, timestamp: Optional[str] = None, trunc: int = 8):
     "Generate a uuid, encode with larger character set, and trucate."
-    uuid1 = uuid.uuid1()
-    uuid3 = uuid.uuid3(uuid.NAMESPACE_URL, f"{uuid1}-{label}")
-    short = shortuuid.encode(uuid3)[:trunc]
+    if timestamp is None:
+        timestamp = time.monotonic_ns()
+    short = shortuuid.uuid(name=f"{label}_{timestamp}")[:trunc]
     return short
 
 
