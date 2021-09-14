@@ -10,6 +10,7 @@ import json
 
 from helao.core.helper import gen_uuid
 from helao.core.model import return_finishedact, return_runningact
+from helao.core.helper import print_message
 
 
 class Decision(object):
@@ -65,10 +66,10 @@ class Decision(object):
     def gen_uuid_decision(self, machine_name: str):
         "server_name can be any string used in generating random uuid"
         if self.decision_uuid:
-            print(f"decision_uuid: {self.decision_uuid} already exists")
+            print_message({}, "decision", f"decision_uuid: {self.decision_uuid} already exists", info = True)
         else:
             self.decision_uuid = gen_uuid(label=machine_name, timestamp=self.decision_timestamp)
-            print(f"decision_uuid: {self.decision_uuid} assigned")
+            print_message({}, "decision", f"decision_uuid: {self.decision_uuid} assigned", info = True)
 
     def set_dtime(self, offset: float = 0):
         dtime = datetime.now()
@@ -118,17 +119,18 @@ class Action(Decision):
         check_args = {"server": self.action_server, "name": self.action_name}
         missing_args = [k for k, v in check_args.items() if v is None]
         if missing_args:
-            print(
-                f'Action {" and ".join(missing_args)} not specified. Placeholder actions will only affect the action queue enumeration.'
+            print_message({}, "action", 
+                f'Action {" and ".join(missing_args)} not specified. Placeholder actions will only affect the action queue enumeration.',
+                info = True
             )
 
 
     def gen_uuid_action(self, machine_name: str):
         if self.action_uuid:
-            print(f"action_uuid: {self.action_uuid} already exists")
+            print_message({}, "action", f"action_uuid: {self.action_uuid} already exists", error = True)
         else:
             self.action_uuid = gen_uuid(label=f"{machine_name}_{self.action_name}", timestamp=self.action_queue_time)
-            print(f"action_uuid: {self.action_uuid} assigned")
+            print_message({}, "action", f"action_uuid: {self.action_uuid} assigned", info = True)
 
     def set_atime(self, offset: float = 0.0):
         atime = datetime.now()

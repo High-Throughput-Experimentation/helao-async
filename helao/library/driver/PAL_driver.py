@@ -17,7 +17,7 @@ from helao.core.server import Base
 from helao.core.error import error_codes
 from helao.library.driver.HTEdata_legacy import LocalDataHandler
 from helao.core.data import liquid_sample_no_API
-
+from helao.core.model import liquid_sample_no, gas_sample_no, solid_sample_no
 
 
 import nidaqmx
@@ -683,6 +683,9 @@ class cPAL:
 
     async def init_PAL_IOloop(self, A: Action):
         activeDict = dict()
+        PALparams = cPALparams(**A.action_params)
+        A.action_abbr = PALparams.PAL_method.name
+
         if not self.IO_do_meas:
             self.IO_PALparams = cPALparams(**A.action_params)
             self.action = A
@@ -907,8 +910,9 @@ class cPAL:
         elif PALparams.PAL_method == PALmethods.fill or PALparams.PAL_method == PALmethods.fillfixed:
             PALparams.PAL_dest = "lcfc_res"
             # PALparams.PAL_source = ""
-            PALparams.PAL_plate_id =  self.action.plate_id
-            PALparams.PAL_plate_sample_no =  None #TODO self.action.samples_in
+            # PALparams.PAL_plate_id =  self.action.plate_id
+            PALparams.PAL_plate_id =  self.action.actualizer_pars.get("plate_id", None)
+            PALparams.PAL_plate_sample_no =  self.action.actualizer_pars.get("plate_sample_no", None)
         else:
             PALparams.PAL_dest = ""
             PALparams.PAL_source = ""
@@ -971,59 +975,118 @@ class cPAL:
 
     async def sendcommand_update_action_sampleinout(self, PALparams: cPALparams):
         """Updates action sample_in and sample_out"""
-        # TODO: use self.active.append_sample() instead later
-        
-        # get a copy of action in and out samples
-        if "liquid_samples" in self.action.samples_in:
-            temp_liquid_in = self.action.samples_in["liquid_samples"]
-        else:
-            temp_liquid_in = []
-        if "liquid_samples" in self.action.samples_out:
-            temp_liquid_out = self.action.samples_out["liquid_samples"]
-        else:
-            temp_liquid_out = []
-        if "plate_samples" in self.action.samples_in:
-            temp_plate_in = self.action.samples_in["plate_samples"]
-        else:
-            temp_plate_in = []
 
+        if self.active:
+            if PALparams.PAL_method == PALmethods.archive:
+                # we take liquid from this
+                liquid_sample_no_dict = await self.liquid_sample_no_get(PALparams.liquid_sample_no_in)
 
-        
-        if PALparams.PAL_method == PALmethods.archive:
-            # we take liquid from this
-            temp_liquid_in.append(PALparams.liquid_sample_no_in)
-            # and add it to a new sample ID
-            temp_liquid_out.append(PALparams.liquid_sample_no_out)
+                await self.active.append_sample(
+                    label = f"{self.action.technique_name}__{liquid_sample_no_dict['action_time']}__{PALparams.PAL_source}",
+                    sample_type = "sample_assembly",
+                    liquid = liquid_sample_no(**liquid_sample_no_dict),
+                    solid = solid_sample_no(
+                        plate_id = PALparams.PAL_plate_id,
+                        sample_no = PALparams.PAL_plate_sample_no
+                        ),
+                    in_out = "in",
+                    machine = self.action.technique_name,
+                    status = "preserved",
+                )
+    
+    
+                # and add it to a new sample ID
+                liquid_sample_no_dict = await self.liquid_sample_no_get(PALparams.liquid_sample_no_out)
+                await self.active.append_sample(
+                    liquid = liquid_sample_no(**liquid_sample_no_dict),
+                    sample_type = "liquid",
+                    in_out = "out",
+                    machine = self.action.technique_name,
+                    status = "created",
+                )
+    
+    
+            elif PALparams.PAL_method == PALmethods.dilute:
+                # TODO: if clause when liquid in is not reservoir
+                # the sample that gets diluted
+                liquid_sample_no_dict = await self.liquid_sample_no_get(PALparams.liquid_sample_no_out)
+                await self.active.append_sample(
+                    liquid = liquid_sample_no(**liquid_sample_no_dict),
+                    sample_type = "liquid",
+                    in_out = "in",
+                    machine = self.action.technique_name,
+                    status = "preserved"
+                )
+                # the sample that gets added
+                liquid_sample_no_dict = await self.liquid_sample_no_get(PALparams.liquid_sample_no_in)
+                await self.active.append_sample(
+                    liquid = liquid_sample_no(**liquid_sample_no_dict),
+                    sample_type = "liquid_reservoir",
+                    in_out = "in",
+                    machine = self.action.technique_name,
+                    status = "preserved",
+                    inheritance = "give_only"
+                )
+                # out the diluted sample
+                liquid_sample_no_dict = await self.liquid_sample_no_get(PALparams.liquid_sample_no_out)
+                await self.active.append_sample(
+                    liquid = liquid_sample_no(**liquid_sample_no_dict),
+                    sample_type = "liquid",
+                    in_out = "out",
+                    status = "preserved",
+                    machine = self.action.technique_name
+                )
+    
+            elif PALparams.PAL_method == PALmethods.deepclean:
+                # nothing in in and out
+                pass
+    
+    
+            elif PALparams.PAL_method == PALmethods.fill or PALparams.PAL_method == PALmethods.fillfixed:
+                # the reservoir from which a sample gets taken
+                liquid_sample_no_dict1 = await self.liquid_sample_no_get(PALparams.liquid_sample_no_in)
+                await self.active.append_sample(
+                    liquid = liquid_sample_no(**liquid_sample_no_dict1),
+                    sample_type = "liquid_reservoir",
+                    in_out = "in",
+                    machine = self.action.technique_name,
+                    status = "preserved",
+                    inheritance = "give_only"
+                )
+                # the new sample in the echem cell (in contact with the solid sample)
+                liquid_sample_no_dict2 = await self.liquid_sample_no_get(PALparams.liquid_sample_no_out)
+                await self.active.append_sample(
+                    liquid = liquid_sample_no(**liquid_sample_no_dict2),
+                    sample_type = "liquid",
+                    in_out = "out",
+                    machine = self.action.technique_name,
+                    status = ["created", "incorporated"],
+                )
+                # the solid sample
+                await self.active.append_sample(
+                    sample_type = "solid",
+                    in_out = "in",
+                    solid = solid_sample_no(
+                        plate_id = PALparams.PAL_plate_id,
+                        sample_no = PALparams.PAL_plate_sample_no
+                        ),
+                    machine = self.action.technique_name,
+                    status = "incorporated",
+                )
+                # the electrode assembly
+                await self.active.append_sample(
+                    label = f"{self.action.technique_name}__{liquid_sample_no_dict2['action_time']}__{PALparams.PAL_dest}",
+                    sample_type = "sample_assembly",
+                    liquid = liquid_sample_no(**liquid_sample_no_dict2),
+                    solid = solid_sample_no(
+                        plate_id = PALparams.PAL_plate_id,
+                        sample_no = PALparams.PAL_plate_sample_no
+                        ),
+                    in_out = "out",
+                    machine = self.action.technique_name,
+                    status = "created",
+                )
 
-        elif PALparams.PAL_method == PALmethods.dilute:
-            # the sample that gets diluted
-            temp_liquid_in.append(PALparams.liquid_sample_no_out)
-            # the sample that gets added
-            temp_liquid_in.append(PALparams.liquid_sample_no_in)
-            # out the diluted sample
-            temp_liquid_out.append(PALparams.liquid_sample_no_out)
-
-        elif PALparams.PAL_method == PALmethods.deepclean:
-            # nothing in in and out
-            pass
-
-        elif PALparams.PAL_method == PALmethods.fill or PALparams.PAL_method == PALmethods.fillfixed:
-            # the reservoir from which a sample gets taken
-            temp_liquid_in.append(PALparams.liquid_sample_no_in)
-            # the new sample in the echem cell (in contact with the solid sample)
-            temp_liquid_out.append(PALparams.liquid_sample_no_out)
-            # the solid sample
-            temp_plate_in.append(PALparams.PAL_plate_sample_no)
-
-
-        # update action sample in and out (only temp in/out is not empty)
-        # set removes duplicates
-        if temp_liquid_in:
-            self.action.samples_in.update({"liquid_samples": sorted(set(temp_liquid_in))})
-        if temp_liquid_out:
-            self.action.samples_out.update({"liquid_samples": sorted(set(temp_liquid_out))})
-        if temp_plate_in:
-            self.action.samples_in.update({"plate_samples": sorted(set(temp_plate_in))})
 
 
     async def sendcommand_ssh_helper(self, PALparams: cPALparams):
@@ -1129,9 +1192,10 @@ class cPAL:
 
 
         except Exception:
-            self.base.print_message('##############################################################')
-            self.base.print_message(' ... SSH connection error 1. Could not send commands.')
-            self.base.print_message('##############################################################')
+            self.base.print_message(
+                ' ... SSH connection error 1. Could not send commands.',
+                error = True
+            )
             error = error_codes.ssh_error
 
 
@@ -1146,9 +1210,10 @@ class cPAL:
                 mysshclient.close()
  
         except Exception:
-            self.base.print_message('##############################################################')
-            self.base.print_message(' ... SSH connection error 2. Could not send commands.')
-            self.base.print_message('##############################################################')
+            self.base.print_message(
+                ' ... SSH connection error 2. Could not send commands.',
+                error = True
+            )
             error = error_codes.ssh_error
     
         return {
@@ -1224,7 +1289,7 @@ class cPAL:
                         if self.IO_PALparams.liquid_sample_no_in < 0:
                             self.base.print_message(f' ... PAL need to get n-{self.IO_PALparams.liquid_sample_no_in+1} last sample from list')
                             sampledict = await self.liquid_sample_no_get_last(self.IO_PALparams.liquid_sample_no_in)
-                            self.IO_PALparams.liquid_sample_no_in = sampledict.id
+                            self.IO_PALparams.liquid_sample_no_in = sampledict["id"]
                             self.base.print_message(' ... correct liquid_sample_no_in is now:', self.IO_PALparams.liquid_sample_no_in)
                         # need to check for none again if no sample_no_was obtained
                         if self.IO_PALparams.liquid_sample_no_in is None:

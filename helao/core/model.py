@@ -118,3 +118,16 @@ class liquid_sample_no(BaseModel):
     servkey: str = None
     plate_id: Union[int, None] = None
     sample_no: Union[int, None] = None
+
+
+class solid_sample_no(BaseModel):
+    plate_id: int = None
+    sample_no: int = None
+
+    
+class gas_sample_no(BaseModel):
+    id: int = None
+    DUID: str = None
+    AUID: str = None
+    volume_mL: float = None
+    action_time: str = None
