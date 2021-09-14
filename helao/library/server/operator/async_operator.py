@@ -92,6 +92,7 @@ class C_async_operator:
 
         self.decision_list = dict()
         self.action_list = dict()
+        self.active_action_list = dict()
 
         self.act_select_list = []
         self.actualizers = []
@@ -103,6 +104,7 @@ class C_async_operator:
         self.get_actualizers()
         self.vis.doc.add_next_tick_callback(partial(self.get_decisions))
         self.vis.doc.add_next_tick_callback(partial(self.get_actions))
+        self.vis.doc.add_next_tick_callback(partial(self.get_active_actions))
 
         #self.vis.print_message([key for key in self.decision_list.keys()])
         self.decision_source = ColumnDataSource(data=self.decision_list)
@@ -113,6 +115,9 @@ class C_async_operator:
         self.columns_act = [TableColumn(field=key, title=key) for key in self.action_list.keys()]
         self.action_table = DataTable(source=self.action_source, columns=self.columns_act, width=620, height=200)
 
+        self.active_action_source = ColumnDataSource(data=self.active_action_list)
+        self.columns_active_act = [TableColumn(field=key, title=key) for key in self.active_action_list.keys()]
+        self.active_action_table = DataTable(source=self.active_action_source, columns=self.columns_active_act, width=620, height=200)
 
 
 
@@ -201,10 +206,12 @@ class C_async_operator:
                     [self.button_append, self.button_prepend, self.button_start, self.button_stop],
                     ]),
                 layout([
-                [Spacer(width=20), Div(text="<b>Decisions:</b>", width=200+50, height=15)],
+                [Spacer(width=20), Div(text="<b>queued Decisions:</b>", width=200+50, height=15)],
                 [self.decision_table],
-                [Spacer(width=20), Div(text="<b>Actions:</b>", width=200+50, height=15)],
+                [Spacer(width=20), Div(text="<b>queued Actions:</b>", width=200+50, height=15)],
                 [self.action_table],
+                [Spacer(width=20), Div(text="<b>Active Actions:</b>", width=200+50, height=15)],
+                [self.active_action_table],
                 Spacer(height=10),
                 [self.button_skip, Spacer(width=5), self.button_clear_dec, Spacer(width=5), self.button_clear_act, self.button_update],
                 Spacer(height=10),
@@ -225,7 +232,7 @@ class C_async_operator:
     def get_actualizers(self):
         """Return the current list of ACTUALIZERS."""
         self.actualizers = []
-        self.vis.print_message(f" ... found actualizer: {self.action_lib}")
+        self.vis.print_message(f" ... found actualizer: {[act for act in self.action_lib.keys()]}")
         for i, act in enumerate(self.action_lib):
             # self.vis.print_message('full',inspect.getfullargspec(self.action_lib[act]))
             #self.vis.print_message('anno',inspect.getfullargspec(self.action_lib[act]).annotations)
@@ -269,7 +276,7 @@ class C_async_operator:
             for line in response:
                 for key, value in line.items():
                     self.decision_list[key].append(value)
-        self.vis.print_message(' ... current active decisions:',self.decision_list)
+        self.vis.print_message(' ... current queued decisions:',self.decision_list)
 
 
     async def get_actions(self):
@@ -280,7 +287,24 @@ class C_async_operator:
         if len(response):
             for key in response[0].keys():
                 self.action_list[key] = []
-        self.vis.print_message(' ... current active actions:',self.action_list)
+            for line in response:
+                for key, value in line.items():
+                    self.action_list[key].append(value)
+        self.vis.print_message(' ... current queued actions:',self.action_list)
+
+
+    async def get_active_actions(self):
+        '''get action list from orch'''
+        response = await self.do_orch_request(action_name = "list_active_actions")
+        response = response["actions"]
+        self.active_action_list = dict()
+        if len(response):
+            for key in response[0].keys():
+                self.active_action_list[key] = []
+            for line in response:
+                for key, value in line.items():
+                    self.active_action_list[key].append(value)
+        self.vis.print_message(' ... current active actions:',self.active_action_list)
 
 
     async def do_orch_request(self,action_name, 
@@ -628,6 +652,7 @@ class C_async_operator:
     async def update_tables(self):
         await self.get_decisions()
         await self.get_actions()
+        await self.get_active_actions()
 
 
 
@@ -638,6 +663,11 @@ class C_async_operator:
         self.columns_act = [TableColumn(field=key, title=key) for key in self.action_list.keys()]
         self.action_table.source.data=self.action_list
         self.action_table.columns=self.columns_act
+
+        self.columns_active_act = [TableColumn(field=key, title=key) for key in self.active_action_list.keys()]
+        self.active_action_table.source.data=self.active_action_list
+        self.active_action_table.columns=self.columns_active_act
+
 
 
     async def IOloop(self):
@@ -669,6 +699,6 @@ def makeBokehApp(doc, confPrefix, servKey):
     # operatorloop = asyncio.get_event_loop()
 
     # this periodically updates the GUI (action and decision tables)
-    # operator.app.doc.add_periodic_callback(operator.IOloop,2000) # time in ms
+    # operator.vis.doc.add_periodic_callback(operator.IOloop,2000) # time in ms
 
     return doc
