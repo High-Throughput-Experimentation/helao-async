@@ -89,6 +89,7 @@ def makeApp(confPrefix, servKey):
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
         A = await setupAct(request, locals())
+        A.action_abbr = "LSV"
         # A.save_data = True
         active_dict = await app.driver.technique_LSV(A)
         return active_dict
@@ -109,6 +110,7 @@ def makeApp(confPrefix, servKey):
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
         A = await setupAct(request, locals())
+        A.action_abbr = "CA"
         # A.save_data = True
         active_dict = await app.driver.technique_CA(A)
         return active_dict
@@ -129,6 +131,7 @@ def makeApp(confPrefix, servKey):
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
         A = await setupAct(request, locals())
+        A.action_abbr = "CP"
         # A.save_data = True
         active_dict = await app.driver.technique_CP(A)
         return active_dict
@@ -153,6 +156,7 @@ def makeApp(confPrefix, servKey):
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
         A = await setupAct(request, locals())
+        A.action_abbr = "CV"
         # A.save_data = True
         active_dict = await app.driver.technique_CV(A)
         return active_dict
@@ -177,6 +181,7 @@ def makeApp(confPrefix, servKey):
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
         A = await setupAct(request, locals())
+        A.action_abbr = "EIS"
         # A.save_data = True
         active_dict = await app.driver.technique_EIS(A)
         return active_dict
@@ -194,6 +199,7 @@ def makeApp(confPrefix, servKey):
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
         A = await setupAct(request, locals())
+        A.action_abbr = "OCV"
         # A.save_data = True
         active_dict = await app.driver.technique_OCV(A)
         return active_dict
@@ -202,6 +208,7 @@ def makeApp(confPrefix, servKey):
     async def stop(request: Request):
         """Stops measurement in a controlled way."""
         A = await setupAct(request, locals())
+        A.action_abbr = "stop"
         active = await app.base.contain_action(A)
         await active.enqueue_data({"stop_result": await app.driver.stop()})
         finished_act = await active.finish()
@@ -215,6 +222,7 @@ def makeApp(confPrefix, servKey):
         ):
         """Same as stop, but also sets estop flag."""
         A = await setupAct(request, locals())
+        A.action_abbr = "estop"
         active = await app.base.contain_action(A)
         await active.enqueue_data({"estop_result": await app.driver.estop(A)})
         finished_act = await active.finish()

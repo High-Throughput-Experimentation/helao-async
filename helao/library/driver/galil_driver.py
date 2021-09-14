@@ -112,11 +112,9 @@ class galil:
                 for ac, av in axis_init:
                     self.c(f"{ac}{axl}={av}")
         except Exception:
-            self.base.print_message("###########################################################")
             self.base.print_message(
-                " ........................... severe Galil error ... please power cycle Galil and try again"
+                " ........................... severe Galil error ... please power cycle Galil and try again",error = True
             )
-            self.base.print_message("###########################################################")
 
         self.cycle_lights = False
 

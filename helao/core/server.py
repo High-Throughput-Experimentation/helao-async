@@ -17,7 +17,6 @@ from typing import Optional, Union
 from math import floor
 from enum import Enum
 import colorama
-from colorama import Fore, Back, Style
 
 import numpy as np
 import ntplib
@@ -32,14 +31,17 @@ from fastapi.openapi.utils import get_flat_params
 from bokeh.io import curdoc
 
 from helao.core.helper import MultisubscriberQueue, dict_to_rcp, eval_val
+from helao.core.helper import print_message
 from helao.core.schema import Action, Decision
 from helao.core.model import return_dec, return_declist, return_act, return_actlist
+from helao.core.model import liquid_sample_no, gas_sample_no, solid_sample_no
+
 
 async_copy = wrap(shutil.copy)
 
 # ANSI color codes converted to the Windows versions
-colorama.init()
-
+colorama.init(strip=not sys.stdout.isatty()) # strip colors if stdout is redirected
+# colorama.init()
 
 class action_start_condition(int, Enum):
     no_wait = 0             # orch is dispatching an unconditional action
@@ -412,6 +414,11 @@ def makeOrchServ(
         """Return the current list of actions."""
         return app.orch.list_actions()
 
+    @app.post("/list_active_actions")
+    def list_actions():
+        """Return the current list of actions."""
+        return app.orch.list_active_actions()
+
     @app.post("/endpoints")
     def get_all_urls():
         """Return a list of all endpoints on this server."""
@@ -483,26 +490,26 @@ class Base(object):
 
         if "technique_name" in self.world_cfg.keys():
             self.print_message(
-                f" ... Found technique_name in config: {self.world_cfg['technique_name']}"
+                f" ... Found technique_name in config: {self.world_cfg['technique_name']}", info = True
             )
             self.technique_name = self.world_cfg["technique_name"]
         else:
             raise ValueError(
-                "Missing 'technique_name' in config, cannot create server object."
+                "Missing 'technique_name' in config, cannot create server object.", error = True
             )
 
         self.calibration = calibration
         if "save_root" in self.world_cfg.keys():
             self.save_root = self.world_cfg["save_root"]
             self.print_message(
-                f" ... Found root save directory in config: {self.world_cfg['save_root']}"
+                f" ... Found root save directory in config: {self.world_cfg['save_root']}", info = True
             )
             if not os.path.isdir(self.save_root):
-                self.print_message(" ... Warning: root save directory does not exist. Creatig it.")
+                self.print_message(" ... Warning: root save directory does not exist. Creatig it.", warning = True)
                 os.makedirs(self.save_root)
         else:
             raise ValueError(
-                " ... Warning: root save directory was not defined. Logs, RCPs, and data will not be written."
+                " ... Warning: root save directory was not defined. Logs, RCPs, and data will not be written.", error = True
             )
         self.actives = {}
         self.status = {}
@@ -590,7 +597,7 @@ class Base(object):
             action_dict = await self.actives[action_uuid].active.as_dict()
             return action_dict
         else:
-            self.print_message(f" ... Specified action uuid {action_uuid} was not found.")
+            self.print_message(f" ... Specified action uuid {action_uuid} was not found.", error = True)
             return None
 
     async def get_ntp_time(self):
@@ -638,7 +645,10 @@ class Base(object):
                         success = True
                         break
                     else:
-                        self.print_message(f" ... Failed to add {client_servkey} to {self.server_name} status subscriber list.")
+                        self.print_message(
+                            f" ... Failed to add {client_servkey} to {self.server_name} status subscriber list.", 
+                            error = True
+                        )
 
             if success:
                 self.print_message(
@@ -646,7 +656,8 @@ class Base(object):
                 )
             else:
                 self.print_message(
-                    f" ... Failed to push status message to {client_servkey} after {retry_limit} attempts."
+                    f" ... Failed to push status message to {client_servkey} after {retry_limit} attempts.", 
+                    error = True
                 )
 
         return success
@@ -818,7 +829,7 @@ class Base(object):
             if self.action.save_rcp:
                 os.makedirs(self.action.output_dir, exist_ok=True)
                 self.action.actionnum = (
-                    f"{self.action.action_abbr}{self.action.action_enum}"
+                    f"{self.action.action_abbr}-{self.action.action_enum}"
                 )
                 self.action.filetech_key = f"files_technique__{self.action.actionnum}"
                 initial_dict = {
@@ -837,7 +848,8 @@ class Base(object):
                         "action_uuid": self.action.action_uuid,
                         "action_enum": self.action.action_enum,
                         "action_name": self.action.action_name,
-                        f"{self.action.technique_name}_params__{self.action.actionnum}": self.action.action_params,
+                        # f"{self.action.technique_name}_params__{self.action.actionnum}": self.action.action_params,
+                        f"{self.base.server_name}_params__{self.action.actionnum}": self.action.action_params,
                     }
                 )
                 await self.write_to_rcp(initial_dict)
@@ -1067,31 +1079,136 @@ class Base(object):
 
         async def append_sample(
             self,
-            sample_no,
-            type,
-            plate_id: Optional[int] = None,
-            tray_id: Optional[str] = None,
-            slot: Optional[int] = None,
-            vial: Optional[int] = None,
-            custom_location: Optional[str] = None,
+            sample_type: str,
+            in_out: str,
+            label: Optional[str] = None,
+            solid: Union[solid_sample_no, None] = None,
+            liquid: Union[liquid_sample_no, None] = None,
+            gas: Union[gas_sample_no, None] = None,
+            # samples_preserved: Optional[bool] = None,
+            status: Optional[str] = "preserved",#None,
+            inheritance: Optional[str] = "allow_both",#None,
+            # created: Optional[bool] = None,
+            machine: Optional[str] =  None,
         ):
-            "Add sample to samples_out dict"
-            if type == "solid":
-                self.action.samples_out["plate_samples"].update({sample_no: plate_id})
-            elif type == "liquid":
-                liquid_dict = {
-                    sample_no: {
-                        k: v
-                        for k, v in zip(
-                            ["tray_id", "slot", "vial", "custom_location"],
-                            [tray_id, slot, vial, custom_location],
-                        )
-                        if v
-                    }
-                }
-                self.action.samples_out["liquid_samples"].update(liquid_dict)
+            "Add sample to samples_out and samples_in dict"
+
+                
+            # created: pretty self-explanatory; the sample was created during the process.
+            # destroyed: also self-explanatory
+            # preserved: the sample exists before and after the process. e.g. an echem experiment
+            # incorporated: the sample was combined with others in the process. E.g. the creation of an electrode assembly from electrodes and electrolytes
+            # recovered: the opposite of incorporated. E.g. an electrode assembly is taken apart, and the original electrodes are recovered, and further experiments may be done on those electrodes
+
+
+            def add_subkeys(status, inheritance):
+                if inheritance is None or inheritance not in ["give_only", "receive_only", "allow_both", "block_both"]:
+                    self.base.print_message(f"inheritance '{inheritance}' is not supported. Using 'allow_both'.", info = True)
+                    inheritance = "allow_both"
+                        
+                if type(status) is not list:
+                    status = [status]
+
+                for i, stat in enumerate(status):
+                    if stat is None or stat not in ["created", "destroyed", "preserved", "incorporated", "recovered"]:
+                        self.base.print_message(f"Sample status '{stat}' is not supported. Using 'unknown'.", info = True)
+                        status[i] = "unknown"
+
+                tmpdict = dict()
+                if inheritance is not None:
+                    tmpdict.update({"inheritance":inheritance})
+                if status is not None:
+                    # tmpdict.update({"status":status})
+                    tmpdict.update({"status":";".join(status)})
+
+                return tmpdict
+
+
+            def solid_to_dict(solid):
+                solid_dict = dict()
+                if solid is not None:
+                    solid_dict.update({"plate_id":solid.plate_id})
+                    solid_dict.update({"sample_no":solid.sample_no})
+                return solid_dict
+
+            def gas_to_dict(gas):
+                gas_dict = dict()
+                if gas is not None:
+                    gas_dict.update({"sample_no":gas.id})
+                return gas_dict
+            
+            def liquid_to_dict(liquid):
+                liquid_dict = dict()
+                if liquid is not None:
+                    liquid_dict.update({"sample_no":liquid.id})
+                return liquid_dict
+
+            
+            def update_dict(self, in_out, sample_type, append_dict):
+                if in_out == "in":
+                    if sample_type in self.action.samples_in:
+                        self.action.samples_in[sample_type].update(append_dict)
+                    else:
+                        self.action.samples_in[sample_type] = append_dict
+                if in_out == "out":
+                    if sample_type in self.action.samples_in:
+                        self.action.samples_out[sample_type].update(append_dict)
+                    else:
+                        self.action.samples_out[sample_type] = append_dict
+
+            def append_liquid(liquid, machine, status, inheritance):
+                labelkey = f"- label: {machine}__{liquid.id}"
+                append_dict = {labelkey:{"machine":machine}}
+                append_dict[labelkey].update(liquid_to_dict(liquid))
+                append_dict[labelkey].update(add_subkeys(status, inheritance))
+                return append_dict
+                
+            def append_gas(gas, machine, status, inheritance):
+                labelkey = f"- label: {machine}__{gas.id}"
+                append_dict = {labelkey:{"machine":machine}}
+                append_dict[labelkey].update(gas_to_dict(gas))
+                append_dict[labelkey].update(add_subkeys(status, inheritance))
+                return append_dict
+
+            def append_solid(solid, machine, status, inheritance):
+                labelkey = f"- label: {solid.plate_id}__{solid.sample_no}"
+                append_dict = {labelkey:{"machine":machine}}
+                append_dict[labelkey].update(solid_to_dict(solid))
+                append_dict[labelkey].update(add_subkeys(status, inheritance))
+                return append_dict
+
+
+            if sample_type == "solid":
+                append_dict = append_solid(solid, machine, status, inheritance)
+                update_dict(self, in_out, sample_type, append_dict)
+                    
+            elif sample_type == "liquid":
+                append_dict = append_liquid(liquid, machine, status, inheritance)
+                update_dict(self, in_out, sample_type, append_dict)
+
+            elif sample_type == "gas":
+                append_dict = append_gas(liquid, machine, status, inheritance)
+                update_dict(self, in_out, sample_type, append_dict)
+
+            elif sample_type == "liquid_reservoir":
+                append_dict = append_liquid(liquid, machine, status, inheritance)
+                update_dict(self, in_out, sample_type, append_dict)
+
+            elif sample_type == "sample_assembly":
+                labelkey = f"- label: {label}"
+                append_dict = {labelkey:{"machine":machine}}
+                if liquid is not None:
+                    append_dict[labelkey].update({"liquid":append_liquid(liquid, machine, status, inheritance)})
+                if solid is not None:
+                    append_dict[labelkey].update({"solid":append_solid(solid, machine, status, inheritance)})
+                if gas is not None:
+                    append_dict[labelkey].update({"gas":append_gas(gas, machine, status, inheritance)})
+                append_dict[labelkey].update(add_subkeys(status, inheritance))
+                update_dict(self, in_out, sample_type, append_dict)
+
             else:
-                self.base.print_message(f"Type '{type}' is not supported.")
+                self.base.print_message(f"Type '{sample_type}' is not supported.")
+
 
         async def finish(self):
             "Close file_conn, finish rcp, copy aux, set endpoint status, and move active dict to past."
@@ -1321,8 +1438,8 @@ class Orch(Base):
         try:
             self.loop_state = "started"
             while self.loop_state == "started" and (self.action_dq or self.decision_dq):
-                self.print_message(self.action_dq)
-                self.print_message(self.decision_dq)
+                self.print_message(f" ... current content of action_dq: {self.action_dq}")
+                self.print_message(f" ... current content of decision_dq: {self.decision_dq}")
                 await asyncio.sleep(
                     0.001
                 )  # allows status changes to affect between action_dq, also enforce unique timestamp
@@ -1675,6 +1792,29 @@ class Orch(Base):
         retval = return_declist(decisions=declist)
         return retval
 
+
+    def list_active_actions(self):
+        """Return the current queue running actions."""
+        actlist = []
+        index = 0
+        for act_serv, act_dict in self.global_state_dict.items():
+            for act_name, act_uuids in act_dict.items():
+                for act_uuid in act_uuids:
+                    actlist.append(
+                        return_act(
+                        index=index,
+                        uid=act_uuid,
+                        server=act_serv,
+                        action=act_name,
+                        pars=dict(),
+                        preempt=-1,
+                        )
+                    )
+                    index = index + 1
+        retval = return_actlist(actions=actlist)
+        return retval
+
+
     def list_actions(self):
         """Return the current queue of action_dq."""
         actlist = [
@@ -1690,6 +1830,7 @@ class Orch(Base):
         ]
         retval = return_actlist(actions=actlist)
         return retval
+
 
     def supplement_error_action(self, check_uuid: str, sup_action: Action):
         """Insert action at front of action queue with subversion of errored action, inherit parameters if desired."""
@@ -1883,28 +2024,3 @@ async def async_private_dispatcher(
         ) as resp:
             response = await resp.json()
             return response
-
-
-def print_message(server_cfg,server_name,*args,**kwargs):
-    precolor = ""
-    if "error" in kwargs:
-        precolor = f"{Style.BRIGHT}{Fore.RED}"
-    if "warning" in kwargs:
-        precolor = f"{Style.BRIGHT}{Fore.YELLOW}"
-
-    srv_type = server_cfg.get("group","")
-    style = ""
-    if srv_type == "orchestrator":
-        style = f"{Style.BRIGHT}{Fore.GREEN}"
-    elif srv_type == "action":
-        style = f"{Style.BRIGHT}{Fore.YELLOW}"
-    elif srv_type == "operator":
-        style = f"{Style.BRIGHT}{Fore.CYAN}"
-    elif srv_type == "visualizer":
-        style = f"{Style.BRIGHT}{Fore.CYAN}"
-    else:
-        style = ""
-    # style = server_cfg.get("msg_color",style)
-    
-    for arg in args:
-        print(f"{precolor}[{strftime('%H:%M:%S')}_{server_name}]:{Style.RESET_ALL} {style}{arg}{Style.RESET_ALL}")
