@@ -787,15 +787,15 @@ class Base(object):
 
             if header:
                 self.action.header = header
-                self.column_names = [
-                    x.strip()
-                    for x in header.split("\n")[-1]
-                    .replace("%columns=", "")
-                    .replace("%column_headings=", "")
-                    .replace("\t", ",")
-                    .split(",")
-                ]
-                self.base.print_message(self.column_names)
+                # self.column_names = [
+                #     x.strip()
+                #     for x in header.split("\n")[-1]
+                #     .replace("%columns=", "")
+                #     .replace("%column_headings=", "")
+                #     .replace("\t", ",")
+                #     .split(",")
+                # ]
+                # self.base.print_message(self.column_names)
             self.action.set_atime(offset=self.base.ntp_offset)
             self.action.gen_uuid_action(self.base.hostname)
             self.file_conn = None
@@ -861,21 +861,23 @@ class Base(object):
                     if self.action.header:
                         if isinstance(self.action.header, dict):
                             header_dict = copy(self.action.header)
-                            self.action.header = pyaml.dump(self.action.header)
-                            header_lines = len(self.action.header.split("\n"))
-                            header_parts = len(header_dict.keys())
+                            self.action.header = pyaml.dump(self.action.header, sort_dicts=False)
+                            # header_lines = len(self.action.header.split("\n"))
+                            # header_parts = len(header_dict.keys())
+                            header_lines = len(header_dict.keys())
                         else:
                             if isinstance(self.action.header, list):
                                 header_lines = len(self.action.header)
                                 self.action.header = "\n".join(self.action.header)
                             else:
                                 header_lines = len(self.action.header.split("\n"))
-                            header_parts = ",".join(
-                                self.action.header.split("\n")[-1]
-                                .replace(",", "\t")
-                                .split()
-                            )
-                        file_info = f"{self.action.file_type};{header_parts};{header_lines};{sample_no}"
+                            # header_parts = ",".join(
+                            #     self.action.header.split("\n")[-1]
+                            #     .replace(",", "\t")
+                            #     .split()
+                            # )
+                        # file_info = f"{self.action.file_type};{header_parts};{header_lines};{sample_no}"
+                        file_info = f"{self.action.file_type};{header_lines};{sample_no}"
                     else:
                         file_info = f"{self.action.file_type};{sample_no}"
                     if self.action.filename is None:  # generate filename
@@ -940,7 +942,14 @@ class Base(object):
                 {self.action.action_name: self.base.status[self.action.action_name]}
             )
 
+
         async def set_realtime(
+            self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
+        ):
+            return self.set_realtime_nowait(epoch_ns = epoch_ns, offset = offset)
+
+
+        def set_realtime_nowait(
             self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
         ):
             if offset is None:
@@ -956,6 +965,7 @@ class Base(object):
                 action_real_time = epoch_ns + offset_ns
             return action_real_time
 
+
         async def set_output_file(self, filename: str, header: Optional[str] = None):
             "Set active save_path, write header if supplied."
             output_path = os.path.join(self.action.output_dir, filename)
@@ -966,6 +976,7 @@ class Base(object):
                 if not header.endswith("\n"):
                     header += "\n"
                 await self.file_conn.write(header)
+
 
         async def write_live_data(self, output_str: str):
             """Appends lines to file_conn."""
@@ -1010,7 +1021,10 @@ class Base(object):
                         data_val = data_dict["data"]
                         self.action.data.append(data_val)
                         if self.file_conn:
-                            await self.write_live_data(json.dumps(data_val))
+                            if type(data_val) is dict:
+                                await self.write_live_data(json.dumps(data_val))
+                            else:
+                                await self.write_live_data(data_val)
             except asyncio.CancelledError:
                 self.base.print_message(" ... data logger task was cancelled",error = True)
 
