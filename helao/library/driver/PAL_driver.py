@@ -683,6 +683,9 @@ class cPAL:
 
     async def init_PAL_IOloop(self, A: Action):
         activeDict = dict()
+        PALparams = cPALparams(**A.action_params)
+        A.action_abbr = PALparams.PAL_method.name
+
         if not self.IO_do_meas:
             self.IO_PALparams = cPALparams(**A.action_params)
             self.action = A

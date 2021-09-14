@@ -818,7 +818,7 @@ class Base(object):
             if self.action.save_rcp:
                 os.makedirs(self.action.output_dir, exist_ok=True)
                 self.action.actionnum = (
-                    f"{self.action.action_abbr}{self.action.action_enum}"
+                    f"{self.action.action_abbr}-{self.action.action_enum}"
                 )
                 self.action.filetech_key = f"files_technique__{self.action.actionnum}"
                 initial_dict = {
@@ -837,7 +837,8 @@ class Base(object):
                         "action_uuid": self.action.action_uuid,
                         "action_enum": self.action.action_enum,
                         "action_name": self.action.action_name,
-                        f"{self.action.technique_name}_params__{self.action.actionnum}": self.action.action_params,
+                        # f"{self.action.technique_name}_params__{self.action.actionnum}": self.action.action_params,
+                        f"{self.base.server_name}_params__{self.action.actionnum}": self.action.action_params,
                     }
                 )
                 await self.write_to_rcp(initial_dict)
