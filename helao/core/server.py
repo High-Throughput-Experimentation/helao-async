@@ -91,8 +91,6 @@ async def setupAct(request: Request, scope: dict):
         # not empty: swagger
         if "action_params" not in action_dict:
             action_dict.update({"action_params":{}})
-        print(body_params)
-        print(scope)
         action_dict["action_params"].update(body_params)
         # action_dict["action_params"].update(request.query_params)
         for k,v in request.query_params.items():
@@ -101,15 +99,17 @@ async def setupAct(request: Request, scope: dict):
             except ValueError:
                 val = v
             action_dict['action_params'][k] = val
-        # for k in scope:
-        #     if k not in ["request", "action_dict", "app"]:
-        #         print(" ... scope key is", k, scope[k])
-        #         action_dict['action_params'][k] = scope[k]
 
 
     action_dict['action_server'] = servKey
     action_dict['action_name'] = action_name
     A = Action(action_dict)
+    # setting some default values of action was notsubmitted via orch
+    if A.machine_name is None:
+        A.machine_name = gethostname()
+    if A.technique_name is None:
+        A.technique_name = "MANUAL"
+        
     return A
 
 
@@ -1463,6 +1463,7 @@ class Orch(Base):
                     self.last_decision = copy(self.active_decision)
                     self.active_decision = self.decision_dq.popleft()
                     self.active_decision.technique_name = self.technique_name
+                    self.active_decision.machine_name = self.hostname
                     self.active_decision.set_dtime(offset=self.ntp_offset)
                     self.active_decision.gen_uuid_decision(self.hostname)
                     actualizer = self.active_decision.actualizer
@@ -1756,6 +1757,7 @@ class Orch(Base):
         else:
             self.decision_dq.append(D)
             self.print_message(f" ... decision {D.decision_uuid} appended to queue")
+            
 
     def list_decisions(self):
         """Return the current queue of decision_dq."""
