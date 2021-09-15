@@ -12,6 +12,7 @@ from typing import Any, Optional
 from asyncio import Queue
 from colorama import Fore, Back, Style
 from time import strftime
+import pyaml
 
 
 def gen_uuid(label: str, timestamp: Optional[str] = None, trunc: int = 8):
@@ -90,15 +91,15 @@ def rcp_to_dict(rcppath: str):  # read common info/rcp/exp/ana structure into di
 
 
 def dict_to_rcp(d: dict, level: int = 0):
-    lines = []
-    for k, v in d.items():
-        if isinstance(v, dict):
-            lines.append(f"{'    '*level}{k}:")
-            lines.append(dict_to_rcp(v, level + 1))
-        else:
-            lines.append(f"{'    '*level}{k}: {str(v).strip()}")
-    return "\n".join(lines)
-
+    # lines = []
+    # for k, v in d.items():
+    #     if isinstance(v, dict):
+    #         lines.append(f"{'    '*level}{k}:")
+    #         lines.append(dict_to_rcp(v, level + 1))
+    #     else:
+    #         lines.append(f"{'    '*level}{k}: {str(v).strip()}")
+    # return "\n".join(lines)
+    return pyaml.dump(d, sort_dicts=False)
 
 # multisubscriber queue by Kyle Smith
 # https://github.com/smithk86/asyncio-multisubscriber-queue
