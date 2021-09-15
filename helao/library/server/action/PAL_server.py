@@ -44,7 +44,7 @@ def makeApp(confPrefix, servKey):
         PAL_wash4: Optional[bool] = False,
         scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active_dict = await app.driver.init_PAL_IOloop(A)
         return active_dict
 
@@ -52,7 +52,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/trayDB_reset")
     async def trayDB_reset(request: Request):
         """Resets app.driver vial table. But will make a full dump to CSV first."""
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         finished_act = await app.driver.trayDB_reset(A)
         return finished_act.as_dict()
 
@@ -65,7 +65,7 @@ def makeApp(confPrefix, servKey):
         """Returns an empty vial position for given max volume.\n
         For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.\n
         It will select the first empty vial which has the smallest volume that still can hold req_vol"""
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data({"vial_position": await app.driver.trayDB_new(**A.action_params)})
         finished_act = await active.finish()
@@ -82,7 +82,7 @@ def makeApp(confPrefix, servKey):
         slot: Optional[int] = None
     ):
         """Updates app.driver vial Table. If sucessful (vial-slot was empty) returns True, else it returns False."""
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data({"update": await app.driver.trayDB_update(**A.action_params)})
         finished_act = await active.finish()
@@ -95,7 +95,7 @@ def makeApp(confPrefix, servKey):
         tray: Optional[int] = None, 
         slot: Optional[int] = None
     ):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         finished_act = await app.driver.trayDB_get_db(A)
         return finished_act.as_dict()
 
@@ -110,7 +110,7 @@ def makeApp(confPrefix, servKey):
         rack: Optional[int] = None,
         dilution_factor: Optional[float] = None
     ):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         A.action_abbr = "export"
         A.action_params["icpms"] = True
         finished_act = await app.driver.trayDB_get_db(A)
@@ -123,7 +123,7 @@ def makeApp(confPrefix, servKey):
         tray: Optional[int] = None,
         slot: Optional[int] = None
     ):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         A.action_abbr = "export"
         A.action_params["csv"] = True # signal subroutine to create a csv
         finished_act = await app.driver.trayDB_get_db(A)
@@ -146,7 +146,7 @@ def makeApp(confPrefix, servKey):
         '''use CAS for chemical if available. Written on bottles of chemicals with all other necessary information.\n
         For empty DUID and AUID the UID will automatically created. For manual entry leave DUID, AUID, action_time, and action_params empty and servkey on "data".\n
         If its the very first liquid (no source in database exists) leave source and source_mL empty.'''
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         A.action_params["DUID"] = A.decision_uuid
         A.action_params["AUID"] = A.action_uuid
@@ -157,7 +157,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/liquid_sample_no_get_last")
     async def liquid_sample_no_get_last(request: Request):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data({'liquid_sample_no': await app.driver.liquid_sample_no_get_last()})
         finished_act = await active.finish()
@@ -166,7 +166,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/liquid_sample_no_get")
     async def liquid_sample_no_get(request: Request, liquid_sample_no: Optional[int]=None):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data({'liquid_sample_no': await app.driver.liquid_sample_no_get(**A.action_params)})
         finished_act = await active.finish()
