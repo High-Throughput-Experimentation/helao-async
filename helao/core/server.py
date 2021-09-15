@@ -829,8 +829,15 @@ class Base(object):
                 self.action.save_rcp = False
                 self.action.output_dir = None
             else:
-                self.action.save_data = True
-                self.action.save_rcp = True
+                if self.action.save_data is None:
+                    self.action.save_data = False
+                if self.action.save_rcp is None:
+                    self.action.save_rcp = False
+                # cannot save data without rcp
+                if self.action.save_data is True:
+                    self.action.save_rcp = True
+                # self.action.save_data = True
+                # self.action.save_rcp = True
                 self.action.output_dir = os.path.join(
                     self.base.save_root,
                     year_week,
