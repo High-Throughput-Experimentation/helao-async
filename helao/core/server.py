@@ -109,6 +109,8 @@ async def setupAct(request: Request, scope: dict):
         A.machine_name = gethostname()
     if A.technique_name is None:
         A.technique_name = "MANUAL"
+        A.orch_name = "MANUAL"
+        A.decision_label = "MANUAL"
         
     return A
 
@@ -831,12 +833,13 @@ class Base(object):
                 self.action.actionnum = (
                     f"{self.action.action_abbr}-{self.action.action_enum}"
                 )
-                self.action.filetech_key = f"files_technique__{self.action.actionnum}"
+                # self.action.filetech_key = f"files_technique__{self.action.actionnum}"
+                self.action.filetech_key = f"{self.base.server_name}_files__{self.action.actionnum}"
                 initial_dict = {
-                    "technique_name": self.base.technique_name,
+                    "technique_name": self.action.technique_name,#self.base.technique_name,
                     "server_name": self.base.server_name,
                     "orchestrator": self.action.orch_name,
-                    "machine_name": self.base.hostname,
+                    "machine_name": self.action.machine_name,#self.base.hostname,
                     "access": self.action.access,
                     # "samples_in": self.action.samples_in,
                     "output_dir": self.action.output_dir,

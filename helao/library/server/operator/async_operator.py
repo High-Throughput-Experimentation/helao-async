@@ -409,13 +409,13 @@ class C_async_operator:
 
 
     def callback_prepend(self, event):
-        self.prepend_action()
+        self.prepend_decision()
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
 
     def callback_append(self, event):
-        self.append_action()
+        self.append_decision()
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
@@ -423,13 +423,13 @@ class C_async_operator:
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
-    def append_action(self):
+    def append_decision(self):
         params_dict, json_dict = self.populate_action()
         # submit decission to orchestrator
         self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"append_decision", params_dict, json_dict))
 
 
-    def prepend_action(self):
+    def prepend_decision(self):
         params_dict, json_dict = self.populate_action()
         # submit decission to orchestrator
         self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"prepend_decision", params_dict, json_dict))
