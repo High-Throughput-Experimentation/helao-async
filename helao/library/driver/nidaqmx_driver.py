@@ -469,8 +469,9 @@ class cNIMAX:
             }
             self.active = await self.base.contain_action(
                 self.action,
-                file_type="NImax_IV_file",
-                file_group="NImax_files",
+                file_type="ni_helao__file",
+                file_group="helao_files",
+                file_data_keys=self.FIFO_column_headings,
                 header=self.FIFO_NImaxheader,
             )
             self.base.print_message(f"!!! Active action uuid is {self.active.action.action_uuid}")

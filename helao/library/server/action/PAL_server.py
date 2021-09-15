@@ -111,6 +111,7 @@ def makeApp(confPrefix, servKey):
         dilution_factor: Optional[float] = None
     ):
         A = await setupAct(request, locals())
+        A.action_abbr = "export"
         A.action_params["icpms"] = True
         finished_act = await app.driver.trayDB_get_db(A)
         return finished_act.as_dict()
@@ -123,6 +124,7 @@ def makeApp(confPrefix, servKey):
         slot: Optional[int] = None
     ):
         A = await setupAct(request, locals())
+        A.action_abbr = "export"
         A.action_params["csv"] = True # signal subroutine to create a csv
         finished_act = await app.driver.trayDB_get_db(A)
         return finished_act.as_dict()

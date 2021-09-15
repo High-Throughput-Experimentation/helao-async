@@ -583,13 +583,22 @@ class Base(object):
     async def contain_action(
         self,
         action: Action,
-        file_type: str = "stream_csv",
-        file_group: str = "stream_files",
+        file_type: str = "helao__file",
+        file_group: str = "helao_files",
+        file_data_keys: Optional[str] = None,
+        file_sample_label: Optional[str] = None,
         filename: Optional[str] = None,
         header: Optional[str] = None,
     ):
         self.actives[action.action_uuid] = Base.Active(
-            self, action, file_type, file_group, filename, header
+            self, 
+            action=action,
+            file_type=file_type,
+            file_group=file_group,
+            file_data_keys=file_data_keys,
+            file_sample_label=file_sample_label,
+            filename=filename,
+            header=header
         )
         await self.actives[action.action_uuid].myinit()
         return self.actives[action.action_uuid]
@@ -776,8 +785,10 @@ class Base(object):
             self,
             base,  # outer instance
             action: Action,
-            file_type: str = "stream_csv",
-            file_group: str = "stream_files",
+            file_type: str = "helao__file",
+            file_group: str = "helao_files",
+            file_data_keys: Optional[str] = None,
+            file_sample_label: Optional[str] = None,
             filename: Optional[str] = None,
             header: Optional[str] = None,
         ):
@@ -786,6 +797,8 @@ class Base(object):
             self.action.file_type = file_type
             self.action.file_group = file_group
             self.action.filename = filename
+            self.action.file_data_keys = file_data_keys
+            self.action.file_sample_label = file_sample_label
 
             if header:
                 self.action.header = header
@@ -845,13 +858,15 @@ class Base(object):
                     "output_dir": self.action.output_dir,
                 }
                 initial_dict.update(self.base.calibration)
+                # need to remove swagger workaround value if present
+                if "scratch" in self.action.action_params:
+                    del self.action.action_params["scratch"]
                 initial_dict.update(
                     {
                         "decision_uuid": self.action.decision_uuid,
                         "action_uuid": self.action.action_uuid,
                         "action_enum": self.action.action_enum,
                         "action_name": self.action.action_name,
-                        # f"{self.action.technique_name}_params__{self.action.actionnum}": self.action.action_params,
                         f"{self.base.server_name}_params__{self.action.actionnum}": self.action.action_params,
                     }
                 )
@@ -880,14 +895,24 @@ class Base(object):
                             #     .split()
                             # )
                         # file_info = f"{self.action.file_type};{header_parts};{header_lines};{sample_no}"
-                        file_info = f"{self.action.file_type};{header_lines};{sample_no}"
-                    else:
-                        file_info = f"{self.action.file_type};{sample_no}"
+                        # file_info = f"{self.action.file_type};{header_lines};{sample_no}"
+                    # else:
+                    #     file_info = f"{self.action.file_type};{sample_no}"
+                    file_info = {"type":self.action.file_type}
+                    if self.action.file_data_keys is not None:
+                        file_info.update({"keys":self.action.file_data_keys})
+                    if self.action.file_sample_label is not None:
+                        file_info.update({"sample":self.action.file_sample_label})
                     if self.action.filename is None:  # generate filename
+                        file_ext = "csv"
+                        if  self.action.file_group == "helao_files":
+                            file_ext = "hlo"
+                            
+                    
                         if self.action.action_enum is not None:
-                            self.action.filename = f"act{self.action.action_enum:.2f}_{self.action.action_abbr}__{self.action.plate_id}_{sample_no}.csv"
+                            self.action.filename = f"act{self.action.action_enum:.2f}_{self.action.action_abbr}__{self.action.plate_id}_{sample_no}.{file_ext}"
                         else:
-                            self.action.filename = f"actNone_{self.action.action_abbr}__{self.action.plate_id}_{sample_no}.csv"
+                            self.action.filename = f"actNone_{self.action.action_abbr}__{self.action.plate_id}_{sample_no}.{file_ext}"
                     self.action.file_dict[self.action.filetech_key][
                         self.action.file_group
                     ].update({self.action.filename: file_info})
@@ -1036,6 +1061,7 @@ class Base(object):
             file_type: str,
             filename: str,
             output_str: str,
+            file_group: Optional[str] = "aux_files",
             header: Optional[str] = None,
             sample_str: Optional[str] = None,
         ):
@@ -1047,30 +1073,43 @@ class Base(object):
             # create output file and set connection
             file_instance = await aiofiles.open(_output_path, mode="w")
             numlines = len(output_str.split("\n"))
+            header_lines = 0
+
             if header:
                 header_lines = len(header.split("\n"))
-                header_parts = ",".join(
-                    header.split("\n")[-1].replace(",", "\t").split()
-                )
-                file_info = ";".join(
-                    [
-                        f"{x}"
-                        for x in (
-                            file_type,
-                            header_parts,
-                            header_lines,
-                            numlines,
-                            sample_str,
-                        )
-                    ]
-                )
+                # header_parts = ",".join(
+                #     header.split("\n")[-1].replace(",", "\t").split()
+                # )
+                # file_info = ";".join(
+                #     [
+                #         f"{x}"
+                #         for x in (
+                #             file_type,
+                #             header_parts,
+                #             header_lines,
+                #             numlines,
+                #             sample_str,
+                #         )
+                #     ]
+                # )
                 if not header.endswith("\n"):
                     header += "\n"
+                # add header to data lines
                 output_str = header + output_str
-            else:
-                file_info = ";".join(
-                    [f"{x}" for x in (file_type, numlines, sample_str)]
-                )
+            # else:
+            #     file_info = ";".join(
+            #         [f"{x}" for x in (file_type, numlines, sample_str)]
+            #     )
+
+            file_info = {
+                "type":file_type,
+                "header_lines":header_lines,
+                "data_lines":numlines,
+            }
+            if sample_str is not None:
+                file_info.update({"sample":sample_str})
+
+
             await file_instance.write(output_str)
             await file_instance.close()
             self.action.file_dict[self.action.filetech_key]["aux_files"].update(
@@ -1135,8 +1174,7 @@ class Base(object):
                 if inheritance is not None:
                     tmpdict.update({"inheritance":inheritance})
                 if status is not None:
-                    # tmpdict.update({"status":status})
-                    tmpdict.update({"status":";".join(status)})
+                    tmpdict.update({"status":status})
 
                 return tmpdict
 
@@ -1166,32 +1204,38 @@ class Base(object):
                     if sample_type in self.action.samples_in:
                         self.action.samples_in[sample_type].update(append_dict)
                     else:
-                        self.action.samples_in[sample_type] = append_dict
+                        self.action.samples_in[sample_type] = [append_dict]
                 if in_out == "out":
                     if sample_type in self.action.samples_in:
                         self.action.samples_out[sample_type].update(append_dict)
                     else:
-                        self.action.samples_out[sample_type] = append_dict
+                        self.action.samples_out[sample_type] = [append_dict]
 
             def append_liquid(liquid, machine, status, inheritance):
-                labelkey = f"- label: {machine}__{liquid.id}"
-                append_dict = {labelkey:{"machine":machine}}
-                append_dict[labelkey].update(liquid_to_dict(liquid))
-                append_dict[labelkey].update(add_subkeys(status, inheritance))
+                append_dict = {
+                    "label":f"{machine}__{liquid.id}",
+                    "machine":machine,
+                    }
+                append_dict.update(liquid_to_dict(liquid))
+                append_dict.update(add_subkeys(status, inheritance))
                 return append_dict
                 
             def append_gas(gas, machine, status, inheritance):
-                labelkey = f"- label: {machine}__{gas.id}"
-                append_dict = {labelkey:{"machine":machine}}
-                append_dict[labelkey].update(gas_to_dict(gas))
-                append_dict[labelkey].update(add_subkeys(status, inheritance))
+                append_dict = {
+                    "label":f"{machine}__{gas.id}",
+                    "machine":machine,
+                    }
+                append_dict.update(gas_to_dict(gas))
+                append_dict.update(add_subkeys(status, inheritance))
                 return append_dict
 
             def append_solid(solid, machine, status, inheritance):
-                labelkey = f"- label: {solid.plate_id}__{solid.sample_no}"
-                append_dict = {labelkey:{"machine":machine}}
-                append_dict[labelkey].update(solid_to_dict(solid))
-                append_dict[labelkey].update(add_subkeys(status, inheritance))
+                append_dict = {
+                    "label":f"{solid.plate_id}__{solid.sample_no}",
+                    "machine":machine,
+                    }
+                append_dict.update(solid_to_dict(solid))
+                append_dict.update(add_subkeys(status, inheritance))
                 return append_dict
 
 
@@ -1212,15 +1256,17 @@ class Base(object):
                 update_dict(self, in_out, sample_type, append_dict)
 
             elif sample_type == "sample_assembly":
-                labelkey = f"- label: {label}"
-                append_dict = {labelkey:{"machine":machine}}
+                append_dict = {
+                    "label":f"{label}",
+                    "machine":machine,
+                    }
                 if liquid is not None:
-                    append_dict[labelkey].update({"liquid":append_liquid(liquid, machine, status, inheritance)})
+                    append_dict["liquid"]=[append_liquid(liquid, machine, status, inheritance)]
                 if solid is not None:
-                    append_dict[labelkey].update({"solid":append_solid(solid, machine, status, inheritance)})
+                    append_dict["solid"]=[append_solid(solid, machine, status, inheritance)]
                 if gas is not None:
-                    append_dict[labelkey].update({"gas":append_gas(gas, machine, status, inheritance)})
-                append_dict[labelkey].update(add_subkeys(status, inheritance))
+                    append_dict["gas"]=[append_gas(gas, machine, status, inheritance)]
+                append_dict.update(add_subkeys(status, inheritance))
                 update_dict(self, in_out, sample_type, append_dict)
 
             else:
