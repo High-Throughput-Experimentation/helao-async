@@ -717,6 +717,7 @@ class cPAL:
         A.action_abbr = PALparams.PAL_method.name
 
         if not self.IO_do_meas:
+            self.IO_error = error_codes.none
             self.IO_PALparams = cPALparams(**A.action_params)
             self.action = A
             self.IO_remotedatafile = ""
@@ -745,6 +746,7 @@ class cPAL:
             else:
                 activeDict = A.as_dict()
         else:
+            self.base.print_message(" ... PAL method already in progress.", error = True)
             activeDict = A.as_dict()
             error = error_codes.in_progress
             remotedatafile = ""
@@ -753,6 +755,7 @@ class cPAL:
         activeDict["data"] = {"err_code": error, 
                               "remotedatafile": remotedatafile,
                           }
+        activeDict["error_code"] = error
         return activeDict
 
 
@@ -791,9 +794,9 @@ class cPAL:
                 if PALparams.PAL_method != PALmethods.dilute and PALparams.PAL_method != PALmethods.deepclean: 
                     self.base.print_message(f" ... liquid_sample_no_in is: {PALparams.liquid_sample_no_in}")
                     if PALparams.liquid_sample_no_in == -1:
-                        self.base.print_message(" ... PAL need to get last sample from list")
+                        self.base.print_message(" ... PAL need to get last sample from list", info = True)
                         PALparams.liquid_sample_no_in = await self.liquid_sample_no_get_last()
-                        self.base.print_message(" ... updated liquid_sample_no_in is", PALparams.liquid_sample_no_in)
+                        self.base.print_message(" ... updated liquid_sample_no_in is", PALparams.liquid_sample_no_in, info = True)
         
                     liquid_sample_no_in_dict = await self.liquid_sample_no_get(PALparams.liquid_sample_no_in)
         
@@ -1309,7 +1312,8 @@ class cPAL:
                     # need to check for None
                     
                     if self.IO_PALparams.liquid_sample_no_in is None:
-                        self.base.print_message(' ... error, invalid liquid_sample_no_in.')
+                        self.base.print_message(' ... error, invalid liquid_sample_no_in.', error = True)
+                        self.IO_error = error_codes.not_available
                         # await self.IOloop_meas_end_helper()
                     else:
                         
@@ -1320,7 +1324,8 @@ class cPAL:
                             self.base.print_message(' ... correct liquid_sample_no_in is now:', self.IO_PALparams.liquid_sample_no_in)
                         # need to check for none again if no sample_no_was obtained
                         if self.IO_PALparams.liquid_sample_no_in is None:
-                            self.base.print_message(' ... error, invalid liquid_sample_no_in.')
+                            self.base.print_message(' ... error, invalid liquid_sample_no_in.', error = True)
+                            self.IO_error = error_codes.not_available
                         else:
         
         
@@ -1351,7 +1356,8 @@ class cPAL:
                                         run_PALparams.PAL_dest_vial = newvialpos['vial']
                                         self.base.print_message(f' ... diluting liquid sample in tray {run_PALparams.PAL_dest_tray}, slot {run_PALparams.PAL_dest_slot}, vial {run_PALparams.PAL_dest_vial}')
                                     else:
-                                        self.base.print_message(' ... no full vial slots')
+                                        self.base.print_message(' ... no full vial slots', error = True)
+                                        self.IO_error = error_codes.not_available
                                         break
         
         
@@ -1387,6 +1393,7 @@ class cPAL:
                                 last_time = time.time()
                                 self.base.print_message(' ... PAL sendcommmand def start')
                                 retvals = await self.sendcommand_main(run_PALparams)
+                                self.IO_error = retvals["error"]
                                 self.base.print_message(' ... PAL sendcommmand def end')
 
 

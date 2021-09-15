@@ -44,7 +44,114 @@ def makeApp(confPrefix, servKey):
         PAL_wash4: Optional[bool] = False,
         scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
+        """universal pal action"""
         A = await setupAct(request)
+        active_dict = await app.driver.init_PAL_IOloop(A)
+        return active_dict
+
+
+    @app.post(f"/{servKey}/PAL_archive")
+    async def PAL_archive(
+        request: Request, 
+        liquid_sample_no_in: Optional[int] = None,
+        PAL_tool: Optional[PALtools] = PALtools.LS3,
+        PAL_source: Optional[str] = "lcfc_res",
+        PAL_volume_uL: Optional[int] = 500,  # uL
+        PAL_totalvials: Optional[int] = 1,
+        # its a necessary param, but as its the only dict, it partially breaks swagger
+        PAL_sampleperiod: Optional[List[float]] = [0.0],
+        PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
+        PAL_spacingfactor: Optional[float] = 1.0,
+        PAL_timeoffset: Optional[float] = 0.0,
+        PAL_wash1: Optional[bool] = False,
+        PAL_wash2: Optional[bool] = False,
+        PAL_wash3: Optional[bool] = False,
+        PAL_wash4: Optional[bool] = False,
+        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+    ):
+        A = await setupAct(request)
+        A.action_params["PAL_method"] =  PALmethods.archive.value
+        active_dict = await app.driver.init_PAL_IOloop(A)
+        
+        return active_dict
+
+
+    @app.post(f"/{servKey}/PAL_fill")
+    async def PAL_fill(
+        request: Request, 
+        liquid_sample_no_in: Optional[int] = None,
+        PAL_tool: Optional[PALtools] = PALtools.LS3,
+        PAL_source: Optional[str] = "elec_res1",
+        PAL_volume_uL: Optional[int] = 500,  # uL
+        PAL_wash1: Optional[bool] = False,
+        PAL_wash2: Optional[bool] = False,
+        PAL_wash3: Optional[bool] = False,
+        PAL_wash4: Optional[bool] = False,
+    ):
+        """fills eche"""
+        A = await setupAct(request)
+        A.action_params["PAL_method"] =  PALmethods.fill.value
+        active_dict = await app.driver.init_PAL_IOloop(A)
+        return active_dict
+
+
+    @app.post(f"/{servKey}/PAL_fillfixed")
+    async def PAL_fillfixed(
+        request: Request, 
+        liquid_sample_no_in: Optional[int] = None,
+        PAL_tool: Optional[PALtools] = PALtools.LS3,
+        PAL_source: Optional[str] = "elec_res1",
+        PAL_volume_uL: Optional[int] = 500,  # uL
+        PAL_wash1: Optional[bool] = False,
+        PAL_wash2: Optional[bool] = False,
+        PAL_wash3: Optional[bool] = False,
+        PAL_wash4: Optional[bool] = False,
+    ):
+        """fills eche with hardcoded volume"""
+        A = await setupAct(request)
+        A.action_params["PAL_method"] =  PALmethods.fillfixed.value
+        active_dict = await app.driver.init_PAL_IOloop(A)
+        return active_dict
+
+
+    @app.post(f"/{servKey}/PAL_deepclean")
+    async def PAL_deepclean(
+        request: Request, 
+        PAL_tool: Optional[PALtools] = PALtools.LS3,
+        PAL_volume_uL: Optional[int] = 500,  # uL
+    ):
+        """cleans the PAL tool"""
+        A = await setupAct(request)
+        A.action_params["liquid_sample_no_in"] = 0
+        A.action_params["PAL_method"] =  PALmethods.deepclean.value
+        A.action_params["PAL_wash1"] =  True
+        A.action_params["PAL_wash2"] =  True
+        A.action_params["PAL_wash3"] =  True
+        A.action_params["PAL_wash4"] =  True
+        active_dict = await app.driver.init_PAL_IOloop(A)
+        return active_dict
+
+
+    @app.post(f"/{servKey}/PAL_dilute")
+    async def PAL_dilute(
+        request: Request, 
+        liquid_sample_no_in: Optional[int] = None,
+        PAL_tool: Optional[PALtools] = PALtools.LS3,
+        PAL_source: Optional[str] = "elec_res2",
+        PAL_volume_uL: Optional[int] = 500,  # uL
+        PAL_totalvials: Optional[int] = 1,
+        # its a necessary param, but as its the only dict, it partially breaks swagger
+        # PAL_sampleperiod: Optional[List[float]] = [0.0],
+        # PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
+        # PAL_spacingfactor: Optional[float] = 1.0,
+        PAL_timeoffset: Optional[float] = 0.0,
+        PAL_wash1: Optional[bool] = False,
+        PAL_wash2: Optional[bool] = False,
+        PAL_wash3: Optional[bool] = False,
+        PAL_wash4: Optional[bool] = False,
+    ):
+        A = await setupAct(request)
+        A.action_params["PAL_method"] =  PALmethods.dilute.value
         active_dict = await app.driver.init_PAL_IOloop(A)
         return active_dict
 
