@@ -11,7 +11,7 @@ class return_dec(BaseModel):
     """Return class for queried Decision objects."""
 
     index: int
-    uid: str
+    uid: Union[str, None]
     label: str
     actualizer: str
     pars: dict
@@ -28,7 +28,7 @@ class return_act(BaseModel):
     """Return class for queried Action objects."""
 
     index: int
-    uid: str
+    uid: Union[str, None]
     server: str
     action: str
     pars: dict
