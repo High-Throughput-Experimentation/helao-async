@@ -558,8 +558,13 @@ class gamry:
 
             self.active = await self.base.contain_action(
                 self.action,
-                file_type="gamry_pstat_file",
-                file_group="pstat_files",
+                file_type="pstat_helao__file",
+                file_group="helao_files",
+                file_data_keys=self.FIFO_column_headings,
+                file_sample_label={
+                    "liquid":["FIXME_TODO"],
+                    "solid":["FIXME_TODO"],
+                },
                 header=self.FIFO_gamryheader,
             )
             self.base.print_message(f"!!! Active action uuid is {self.active.action.action_uuid}")

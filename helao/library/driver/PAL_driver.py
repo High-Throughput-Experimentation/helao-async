@@ -8,6 +8,7 @@ from time import strftime
 import json
 import aiofiles
 import copy
+import pyaml
 
 from pydantic import BaseModel
 from typing import List
@@ -18,7 +19,6 @@ from helao.core.error import error_codes
 from helao.library.driver.HTEdata_legacy import LocalDataHandler
 from helao.core.data import liquid_sample_no_API
 from helao.core.model import liquid_sample_no, gas_sample_no, solid_sample_no
-
 
 import nidaqmx
 from nidaqmx.constants import LineGrouping
@@ -262,9 +262,20 @@ class cPAL:
 
 
     async def trayDB_reset(self, A):
-        myactive = await self.base.contain_action(A)
+        myactive = await self.base.contain_action(
+            A,
+            file_type="paltray_helao__file",
+            file_group="helao_files",
+            file_data_keys=["tray_no", "slot_no", "content"],
+            header=None,
+        )
+        realtime = await myactive.set_realtime()
+        if myactive:
+            myactive.enqueue_data_nowait(pyaml.dump({"epoch_ns":realtime}))
+            myactive.enqueue_data_nowait("%%")
+
         # backup to json
-        await self.trayDB_backup(reset=True)
+        await self.trayDB_backup(reset=True, myactive = myactive)
         # full backup to csv
         for tray in range(len(self.trays)):
             for slot in range(3):  # each tray has 3 slots
@@ -277,7 +288,6 @@ class cPAL:
         ]
         # save new one so it can be loaded of Program startup
         await self.trayDB_backup(reset=False)
-        await myactive.enqueue_data({"reset": "done"})
         return await myactive.finish()
 
 
@@ -354,7 +364,7 @@ class cPAL:
 
 
 
-    async def trayDB_backup(self, reset: bool = False):
+    async def trayDB_backup(self, reset: bool = False, myactive = None):
         datafile = LocalDataHandler()
         datafile.filepath = self.local_data_dump
         if reset:
@@ -378,14 +388,22 @@ class cPAL:
                             content=slot.as_dict(),
                         )
                         await datafile.write_data_async(json.dumps(tray_dict))
+                        if myactive:
+                            await myactive.enqueue_data(tray_dict)
+                            
                     else:
                         tray_dict = dict(
                             tray_no=mytray_no + 1, slot_no=slot_no + 1, content=None
                         )
                         await datafile.write_data_async(json.dumps(tray_dict))
+                        if myactive:
+                            await myactive.enqueue_data(tray_dict)
+                            
             else:
                 tray_dict = dict(tray_no=mytray_no + 1, slot_no=None, content=None)
                 await datafile.write_data_async(json.dumps(tray_dict))
+                if myactive:
+                    await myactive.enqueue_data(tray_dict)
 
         await datafile.close_file_async()
 
@@ -507,7 +525,7 @@ class cPAL:
                 # # await datafile.write_data_async('\t'.join(logdata))
                 # # await datafile.close_file_async()
                 await myactive.write_file(
-                    file_type = 'pal_vialtable_file',
+                    file_type = 'pal_icpms_file',
                     filename = f'VialTable__tray{tray}__slot{slot}__{datetime.now().strftime("%Y%m%d-%H%M%S%f")}_ICPMS.csv',
                     output_str = tmp_output_str,
                     header = ";".join(["liquid_sample_no", "Survey Runs", "Main Runs", "Rack", "Vial", "Dilution Factor"]),
@@ -522,7 +540,19 @@ class cPAL:
         csv = A.action_params.get("csv", False)
         icpms = A.action_params.get("icpms", False)
 
-        myactive = await self.base.contain_action(A)
+        myactive = await self.base.contain_action(
+            A,
+            file_type="palvialtable_helao__file",
+            file_group="helao_files",
+            file_data_keys=["vial_table"],
+            header=None,
+        )
+        realtime = await myactive.set_realtime()
+        if myactive:
+            myactive.enqueue_data_nowait(pyaml.dump({"epoch_ns":realtime}))
+            myactive.enqueue_data_nowait("%%")
+
+
         table = {}
 
         if self.trays[tray - 1] is not None:
@@ -1254,28 +1284,25 @@ class cPAL:
                     ]
 
 
-                    tmps_headings = "\t".join(self.FIFO_column_headings)
-                    self.FIFO_PALheader = "\n".join(
-                        [
-                            f"%techniquename={self.IO_PALparams.PAL_method}",
-                            "%epoch_ns=FIXME",
-                            "%version=0.2",
-                            f"%column_headings={tmps_headings}",
-                        ]
-                    )
+                    self.FIFO_PALheader = {
+                            "techniquename":self.IO_PALparams.PAL_method.name,
+                            "version":0.2,
+                            "column_headings":self.FIFO_column_headings,
+                    }
+
 
                     self.active = await self.base.contain_action(
                         self.action,
-                        file_type="pal_file",
-                        file_group="pal_files",
+                        file_type="pal_helao__file",
+                        file_group="helao_files",
+                        file_data_keys=self.FIFO_column_headings,
                         header=self.FIFO_PALheader,
                     )
                     self.base.print_message(f" ... Active action uuid is {self.active.action.action_uuid}")
                     realtime = await self.active.set_realtime()
-                    self.FIFO_PALheader.replace("%epoch_ns=FIXME", f"%epoch_ns={realtime}")
-
-
-
+                    if self.active:
+                        self.active.enqueue_data_nowait(pyaml.dump({"epoch_ns":realtime}))
+                        self.active.enqueue_data_nowait("%%")
 
                     # for sequence, the sample in is always the same
                     self.base.print_message(f" ... liquid_sample_no_in: {self.IO_PALparams.liquid_sample_no_in}")
