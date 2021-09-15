@@ -24,6 +24,7 @@ class Decision(object):
         imports.update(inputdict)
         self.orch_name = imports.get("orch_name", "orchestrator")
         self.technique_name = imports.get("technique_name", None)
+        self.machine_name = imports.get("machine_name", None)
         self.decision_uuid = imports.get("decision_uuid", None)
         self.decision_timestamp = imports.get("decision_timestamp", None)
         self.decision_label = imports.get("decision_label", "noLabel")
