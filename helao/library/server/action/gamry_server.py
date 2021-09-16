@@ -31,24 +31,13 @@ from typing import Optional
 from importlib import import_module
 from fastapi import Request
 from helao.core.server import makeActServ, setupAct
+from helao.library.driver.gamry_driver import gamry, Gamry_IErange
 
 
 def makeApp(confPrefix, servKey):
 
     config = import_module(f"helao.config.{confPrefix}").config
-    C = config["servers"]
-    S = C[servKey]
-
-    # check if 'simulate' settings is present
-    if not "simulate" in S.keys():
-        # default if no simulate is defined
-        S["simulate"] = False
-    if S["simulate"]:
-        from helao.library.driver.gamry_simulate import gamry
-    else:
-        from helao.library.driver.gamry_driver import gamry
-        from helao.library.driver.gamry_driver import Gamry_IErange
-
+ 
     app = makeActServ(
         config,
         servKey,
@@ -58,9 +47,6 @@ def makeApp(confPrefix, servKey):
         driver_class=gamry,
     )
     
-    # if S["simulate"]:
-    #     app.base.print_message("Gamry simulator loaded.")
-
 
     @app.post(f"/{servKey}/get_meas_status")
     async def get_meas_status(request: Request):
