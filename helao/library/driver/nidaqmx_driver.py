@@ -36,13 +36,8 @@ class cNIMAX:
 
         self.base.print_message(" ... init NI-MAX")
 
-        self.action = (
-            None  # for passing action object from technique method to measure loop
-        )
-
-        self.active = (
-            None  # for holding active action object, clear this at end of measurement
-        )
+        self.action = None  # for passing action object from technique method to measure loop
+        self.active = None  # for holding active action object, clear this at end of measurement
 
         # seems to work by just defining the scale and then only using its name
         try:
@@ -50,9 +45,7 @@ class cNIMAX:
                 "NEGATE3", -1.0, 0.0, UnitsPreScaled.AMPS, "AMPS"
             )
         except Exception as e:
-            self.base.print_message("##########################################################")
-            self.base.print_message(" ... NImax error")
-            self.base.print_message("##########################################################")
+            self.base.print_message(" ... NImax error", error = True)
             raise e
         self.time_stamp = time.time()
 
@@ -81,27 +74,25 @@ class cNIMAX:
         self.FIFO_NImaxheader = dict()
         self.FIFO_name = ""
         self.FIFO_dir = ""
-        self.FIFO_column_headings = [
-            "t_s",
-            "ICell1_A",
-            "ICell2_A",
-            "ICell3_A",
-            "ICell4_A",
-            "ICell5_A",
-            "ICell6_A",
-            "ICell7_A",
-            "ICell8_A",
-            "ICell9_A",
-            "ECell1_V",
-            "ECell2_V",
-            "ECell3_V",
-            "ECell4_V",
-            "ECell5_V",
-            "ECell6_V",
-            "ECell7_V",
-            "ECell8_V",
-            "ECell9_V",
+        self.FIFO_sample_keys = [
+            "Cell1",
+            "Cell2",
+            "Cell3",
+            "Cell4",
+            "Cell5",
+            "Cell6",
+            "Cell7",
+            "Cell8",
+            "Cell9",
         ]
+        self.FIFO_column_headings = dict()
+        for FIFO_sample_key in self.FIFO_sample_keys:
+            self.FIFO_column_headings[FIFO_sample_key] = [
+                "t_s",
+                "Icell_A",
+                "Ecell_V",
+                ]
+        
 
         # keeps track of the multi cell IV measurements in the background        
         myloop = asyncio.get_event_loop()
@@ -199,8 +190,22 @@ class cNIMAX:
                     # need to correct for the first datapoints 
                     self.FIFO_epoch -= number_of_samples / self.samplingrate
                     if self.active:
-                        self.active.enqueue_data_nowait(pyaml.dump({"epoch_ns":self.FIFO_epoch}))
-                        self.active.enqueue_data_nowait("%%")
+                        if self.active.action.save_data:
+                            data_dict = dict()
+                            for i,FIFO_sample_key in enumerate(self.FIFO_sample_keys):
+                                data_dict[FIFO_sample_key] = pyaml.dump({"epoch_ns":self.FIFO_epoch})
+                            self.active.enqueue_data_nowait(
+                                data_dict,
+                                file_sample_keys = self.FIFO_sample_keys
+                            )
+                            data_dict = dict()
+                            for i,FIFO_sample_key in enumerate(self.FIFO_sample_keys):
+                                data_dict[FIFO_sample_key] = "%%"
+                            self.active.enqueue_data_nowait(
+                                data_dict,
+                                file_sample_keys = self.FIFO_sample_keys
+                                )
+
                 
                 # start seq: V then current, so read current first then Volt
                 # put callback only on current (Volt should the always have enough points)
@@ -218,25 +223,22 @@ class cNIMAX:
                 ]
                 # update timeoffset
                 self.IVtimeoffset += number_of_samples / self.samplingrate
-                tmp_datapoints = []
-                tmp_datapoints.append(time)
-                # for i in range(len(dataI)):
-                for i in range(9):
-                    tmp_datapoints.append(dataI[i])
-                # for i in range(len(dataV)):
-                for i in range(9):
-                    tmp_datapoints.append(dataV[i])
-                    
+
+
+                data_dict = dict()
+                for i,FIFO_sample_key in enumerate(self.FIFO_sample_keys):
+                    data_dict[FIFO_sample_key] = {
+                        f"{self.FIFO_column_headings[FIFO_sample_key][0]}":time,
+                        f"{self.FIFO_column_headings[FIFO_sample_key][1]}":dataI[i],
+                        f"{self.FIFO_column_headings[FIFO_sample_key][2]}":dataV[i],
+                        }
+
                 # push data to datalogger queue
                 if self.active:
                     if self.active.action.save_data:
                         self.active.enqueue_data_nowait(
-                            {
-                                k: v
-                                for k, v in zip(
-                                    self.FIFO_column_headings, tmp_datapoints
-                                )
-                            }
+                            data_dict,
+                            file_sample_keys = self.FIFO_sample_keys
                         )
 
             except Exception:
@@ -463,17 +465,23 @@ class cNIMAX:
             self.action = A
             self.FIFO_epoch = None
             # create active and write streaming file header
-            self.FIFO_NImaxheader = {
+            
+            self.FIFO_NImaxheader = dict()
+            for FIFO_sample_key in self.FIFO_sample_keys:
+                self.FIFO_NImaxheader[FIFO_sample_key] = {
                     "version":0.2,
-                    "column_headings":self.FIFO_column_headings
-            }
+                    "column_headings":self.FIFO_column_headings[FIFO_sample_key]
+                    }
             self.active = await self.base.contain_action(
                 self.action,
                 file_type="ni_helao__file",
                 file_group="helao_files",
                 file_data_keys=self.FIFO_column_headings,
+                file_sample_keys = self.FIFO_sample_keys,
                 header=self.FIFO_NImaxheader,
             )
+
+
             self.base.print_message(f"!!! Active action uuid is {self.active.action.action_uuid}")
 
             # create the cell IV task

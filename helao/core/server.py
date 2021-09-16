@@ -602,8 +602,8 @@ class Base(object):
         file_type: str = "helao__file",
         file_group: str = "helao_files",
         file_data_keys: Optional[str] = None,
-        file_sample_label: Optional[str] = None,
-        filename: Optional[str] = None,
+        file_sample_label: Optional[str] = None, # this is also keyd by file_sample_keys
+        file_sample_keys: Optional[list] = None, # I need one key per datafile, but each datafile can still be based on multiple samples
         header: Optional[str] = None,
     ):
         self.actives[action.action_uuid] = Base.Active(
@@ -613,7 +613,7 @@ class Base(object):
             file_group=file_group,
             file_data_keys=file_data_keys,
             file_sample_label=file_sample_label,
-            filename=filename,
+            file_sample_keys=file_sample_keys,
             header=header,
         )
         await self.actives[action.action_uuid].myinit()
@@ -813,31 +813,38 @@ class Base(object):
             file_group: str = "helao_files",
             file_data_keys: Optional[str] = None,
             file_sample_label: Optional[str] = None,
-            filename: Optional[str] = None,
+            file_sample_keys: Optional[list] = None,
             header: Optional[str] = None,
         ):
             self.base = base
             self.action = action
             self.action.file_type = file_type
             self.action.file_group = file_group
-            self.action.filename = filename
             self.action.file_data_keys = file_data_keys
             self.action.file_sample_label = file_sample_label
+            self.action.header = header
+            
+            if file_sample_keys is None:
+                self.action.file_sample_keys = ["None"]
+                self.action.file_sample_label = {"None":self.action.file_sample_label}
+                self.action.file_data_keys = {"None":self.action.file_data_keys}
+                self.action.header = {"None":self.action.header}
+            else:
+                self.action.file_sample_keys = file_sample_keys
+                if type(self.action.file_sample_keys) is not list:
+                    self.action.file_sample_keys = [self.action.file_sample_keys]
+                if self.action.file_sample_label is None:
+                    self.action.file_sample_label = {f"{file_sample_key}":None for file_sample_key in self.action.file_sample_keys}
+                if self.action.file_data_keys is None:
+                    self.action.file_data_keys = {f"{file_sample_key}":None for file_sample_key in self.action.file_sample_keys}
+                if self.action.header is None:
+                    self.action.header = {f"{file_sample_key}":None for file_sample_key in self.action.file_sample_keys}
+                    
 
-            if header:
-                self.action.header = header
-                # self.column_names = [
-                #     x.strip()
-                #     for x in header.split("\n")[-1]
-                #     .replace("%columns=", "")
-                #     .replace("%column_headings=", "")
-                #     .replace("\t", ",")
-                #     .split(",")
-                # ]
-                # self.base.print_message(self.column_names)
+
             self.action.set_atime(offset=self.base.ntp_offset)
             self.action.gen_uuid_action(self.base.hostname)
-            self.file_conn = None
+            self.file_conn = dict()
             # if Action is not created from Decision+Actualizer, Action is independent
             if self.action.decision_timestamp is None:
                 self.action.set_dtime(offset=self.base.ntp_offset)
@@ -869,6 +876,7 @@ class Base(object):
                     f"{self.action.action_queue_time}__{self.action.action_server}__{self.action.action_name}__{self.action.action_uuid}",
                 )
             self.data_logger = self.base.aloop.create_task(self.log_data_task())
+
 
         async def myinit(self):
             if self.action.save_rcp:
@@ -905,55 +913,28 @@ class Base(object):
                 await self.write_to_rcp(initial_dict)
 
                 if self.action.save_data:
-                    # if self.action.header:
-                    #     if isinstance(self.action.header, dict):
-                    #         header_dict = copy(self.action.header)
-                    #         self.action.header = pyaml.dump(
-                    #             self.action.header, sort_dicts=False
-                    #         )
-                    #         # header_lines = len(self.action.header.split("\n"))
-                    #         # header_parts = len(header_dict.keys())
-                    #         header_lines = len(header_dict.keys())
-                    #     else:
-                    #         if isinstance(self.action.header, list):
-                    #             header_lines = len(self.action.header)
-                    #             self.action.header = "\n".join(self.action.header)
-                    #         else:
-                    #             header_lines = len(self.action.header.split("\n"))
+                    for i, file_sample_key in enumerate(self.action.file_sample_keys):
+                        filename, header, file_info = self.init_datafile(
+                            header = self.action.header.get(file_sample_key,None),
+                            file_type = self.action.file_type,
+                            file_data_keys = self.action.file_data_keys.get(file_sample_key,None),
+                            file_sample_label = self.action.file_sample_label.get(file_sample_key,None),
+                            filename = None, # always autogen a filename
+                            file_group = self.action.file_group,
+                            action_enum = self.action.action_enum,
+                            action_abbr = self.action.action_abbr,
+                            filenum=i
+                        )
+                        
+                        self.action.file_dict[self.action.filetech_key][
+                            self.action.file_group
+                        ].update({filename: file_info})
+                        await self.set_output_file(
+                            filename=filename, 
+                            header=header, 
+                            file_sample_key=file_sample_key,
+                        )
 
-                    # file_info = {"type": self.action.file_type}
-                    # if self.action.file_data_keys is not None:
-                    #     file_info.update({"keys": self.action.file_data_keys})
-                    # if self.action.file_sample_label is not None:
-                    #     file_info.update({"sample": self.action.file_sample_label})
-                    # if self.action.filename is None:  # generate filename
-                    #     file_ext = "csv"
-                    #     if self.action.file_group == "helao_files":
-                    #         file_ext = "hlo"
-
-                    #     if self.action.action_enum is not None:
-                    #         self.action.filename = f"act{self.action.action_enum:.1f}_{self.action.action_abbr}.{file_ext}"
-                    #     else:
-                    #         self.action.filename = (
-                    #             f"actNone_{self.action.action_abbr}.{file_ext}"
-                    #         )
-
-
-                    filename, header, file_info = self.init_datafile(
-                        header = self.action.header,
-                        file_type = self.action.file_type,
-                        file_data_keys = self.action.file_data_keys, 
-                        file_sample_label = self.action.file_sample_label,
-                        filename = self.action.filename,
-                        file_group = self.action.file_group,
-                        action_enum = self.action.action_enum,
-                        action_abbr = self.action.action_abbr,
-                    )
-                    
-                    self.action.file_dict[self.action.filetech_key][
-                        self.action.file_group
-                    ].update({filename: file_info})
-                    await self.set_output_file(filename, header)
             await self.add_status()
 
 
@@ -967,6 +948,7 @@ class Base(object):
                 file_group,
                 action_enum,
                 action_abbr,
+                filenum: Optional[int] = 0
             ):
 
             if header:
@@ -994,10 +976,10 @@ class Base(object):
                     file_ext = "hlo"
     
                 if action_enum is not None:
-                    filename = f"act{action_enum:.1f}_{action_abbr}.{file_ext}"
+                    filename = f"{action_abbr}-{action_enum:.1f}__{filenum}.{file_ext}"
                 else:
                     filename = (
-                        f"actNone_{action_abbr}.{file_ext}"
+                        f"{action_abbr}-0.0__{filenum}.{file_ext}"
                     )
 
             if header:
@@ -1086,46 +1068,65 @@ class Base(object):
             return action_real_time
 
 
-        async def set_output_file(self, filename: str, header: Optional[str] = None):
+        async def set_output_file(self, filename: str, file_sample_key: str, header: Optional[str] = None):
             "Set active save_path, write header if supplied."
             output_path = os.path.join(self.base.save_root,self.action.output_dir, filename)
             self.base.print_message(f" ... writing data to: {output_path}")
             # create output file and set connection
-            self.file_conn = await aiofiles.open(output_path, mode="a+")
+            self.file_conn[file_sample_key] = await aiofiles.open(output_path, mode="a+")
             if header:
                 if not header.endswith("\n"):
                     header += "\n"
-                await self.file_conn.write(header)
+                await self.file_conn[file_sample_key].write(header)
 
 
-        async def write_live_data(self, output_str: str):
+        async def write_live_data(self, output_str: str, file_conn_key):
             """Appends lines to file_conn."""
-            if self.file_conn:
-                if not output_str.endswith("\n"):
-                    output_str += "\n"
-                await self.file_conn.write(output_str)
+            if file_conn_key in self.file_conn:
+                if self.file_conn[file_conn_key]:
+                    if not output_str.endswith("\n"):
+                        output_str += "\n"
+                    await self.file_conn[file_conn_key].write(output_str)
 
 
-        async def enqueue_data(self, data, errors: list = []):
+        async def enqueue_data(self, data, errors: list = [], file_sample_keys: Optional[list] = None):
+            await self.base.data_q.put(
+                self.assemble_data_msg(
+                    data=data,
+                    errors=errors,
+                    file_sample_keys=file_sample_keys
+                )
+            )
+
+
+        def enqueue_data_nowait(self, data, errors: list = [], file_sample_keys: Optional[list] = None):
+            self.base.data_q.put_nowait(
+                self.assemble_data_msg(
+                    data=data,
+                    errors=errors,
+                    file_sample_keys=file_sample_keys
+                )
+            )
+
+
+        def assemble_data_msg(self, data, errors: list = [], file_sample_keys: list = None):
+            data_dict = dict()
+            if file_sample_keys is None:
+               data_dict["None"] = data
+            else:
+                if type(file_sample_keys) is not list:
+                    file_sample_keys = [file_sample_keys]
+                for file_sample_key in file_sample_keys:
+                    data_dict[file_sample_key] = data.get(file_sample_key,dict())
+
             data_msg = {
                 self.action.action_uuid: {
-                    "data": data,
+                    "data": data_dict,
                     "action_name": self.action.action_name,
                     "errors": errors,
                 }
             }
-            await self.base.data_q.put(data_msg)
-
-
-        def enqueue_data_nowait(self, data, errors: list = []):
-            data_msg = {
-                self.action.action_uuid: {
-                    "data": data,
-                    "action_name": self.action.action_name,
-                    "errors": errors,
-                }
-            }
-            self.base.data_q.put_nowait(data_msg)
+            return data_msg
 
 
         async def log_data_task(self):
@@ -1140,11 +1141,24 @@ class Base(object):
                         data_dict = data_msg[self.action.action_uuid]
                         data_val = data_dict["data"]
                         self.action.data.append(data_val)
-                        if self.file_conn:
-                            if type(data_val) is dict:
-                                await self.write_live_data(json.dumps(data_val))
+                        for sample, sample_data in data_val.items():
+                            if sample in self.file_conn:
+                                if self.file_conn[sample]:
+                                    if type(sample_data) is dict:
+                                        await self.write_live_data(
+                                             output_str=json.dumps(sample_data),
+                                             file_conn_key=sample
+                                             )
+                                    else:
+                                        await self.write_live_data(
+                                             output_str=sample_data,
+                                             file_conn_key=sample
+                                             )
                             else:
-                                await self.write_live_data(data_val)
+                                self.base.print_message(
+                                    " ... {sample} doesn not exist in file_conn.", error=True
+                                )
+
             except asyncio.CancelledError:
                 self.base.print_message(
                     " ... data logger task was cancelled", error=True
@@ -1394,9 +1408,11 @@ class Base(object):
             "Close file_conn, finish rcp, copy aux, set endpoint status, and move active dict to past."
             await asyncio.sleep(1)
             self.base.print_message(" ... finishing data logging.")
-            if self.file_conn:
-                await self.file_conn.close()
-                self.file_conn = None
+            for filekey in self.file_conn.keys():
+                if self.file_conn[filekey]:
+                    await self.file_conn[filekey].close()
+            self.file_conn = dict()
+
             if self.action.samples_in:
                 await self.write_to_rcp({"samples_in": self.action.samples_in})
             if self.action.samples_out:

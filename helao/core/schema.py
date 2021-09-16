@@ -113,6 +113,7 @@ class Action(Decision):
         self.filename = imports.get("filename", None)
         self.file_data_keys = imports.get("file_data_keys", None)
         self.file_sample_label = imports.get("file_sample_label", None)
+        self.file_sample_keys = imports.get("file_sample_keys", None)
         self.file_group = imports.get("file_group", None)
         self.error_code = imports.get("error_code", "0")
         self.from_global_params = imports.get("from_global_params", {})
