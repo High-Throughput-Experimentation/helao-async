@@ -415,7 +415,7 @@ def makeOrchServ(
         return app.orch.list_actions()
 
     @app.post("/list_active_actions")
-    def list_actions():
+    def list_active_actions():
         """Return the current list of actions."""
         return app.orch.list_active_actions()
 
@@ -470,10 +470,10 @@ class Base(object):
     For a given root directory, files and folders will be written as follows:
     {%y.%j}/  # decision_date year.weeknum
         {%Y%m%d}/  # decision_date
-            {%H%M%S}__{decision_label}__{plate_id}/  # decision_time
-                {%Y%m%d.%H%M%S}__{uuid}/  # action_datetime, action_uuid
-                    {sampleno}__{filename}.{ext}
-                    {%Y%m%d.%H%M%S}__{uuid}.rcp  # action_datetime
+            {%H%M%S}__{decision_label}/  # decision_time
+                {%Y%m%d.%H%M%S}__{action_server_name}__{action_name}__{action_uuid}/
+                    {filename}.{ext}
+                    {%Y%m%d.%H%M%S%f}.rcp  # action_datetime
                     (aux_files)
     """
 
@@ -880,9 +880,9 @@ class Base(object):
                         file_info = f"{self.action.file_type};{sample_no}"
                     if self.action.filename is None:  # generate filename
                         if self.action.action_enum is not None:
-                            self.action.filename = f"act{self.action.action_enum:.2f}_{self.action.action_abbr}__{self.action.plate_id}_{sample_no}.csv"
+                            self.action.filename = f"act{self.action.action_enum:.1f}_{self.action.action_abbr}.hlo"
                         else:
-                            self.action.filename = f"actNone_{self.action.action_abbr}__{self.action.plate_id}_{sample_no}.csv"
+                            self.action.filename = f"act0.0_{self.action.action_abbr}.hlo"
                     self.action.file_dict[self.action.filetech_key][
                         self.action.file_group
                     ].update({self.action.filename: file_info})
@@ -1068,7 +1068,7 @@ class Base(object):
             )
             self.base.print_message(f" ... writing to rcp: {output_path}")
             # self.base.print_message(" ... writing:",rcp_dict)
-            output_str = dict_to_rcp(rcp_dict)
+            output_str = pyaml.dump(rcp_dict)
             file_instance = await aiofiles.open(output_path, mode="a+")
             
             if not output_str.endswith("\n"):
