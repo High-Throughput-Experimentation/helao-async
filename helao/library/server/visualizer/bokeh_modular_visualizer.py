@@ -129,24 +129,26 @@ class C_nidaqmxvis:
         self.activeCell = [True for _ in range(9)]
 
         self.datakeys = ["t_s",
-                    "ICell1_A",
-                    "ICell2_A",
-                    "ICell3_A",
-                    "ICell4_A",
-                    "ICell5_A",
-                    "ICell6_A",
-                    "ICell7_A",
-                    "ICell8_A",
-                    "ICell9_A",
-                    "ECell1_V",
-                    "ECell2_V",
-                    "ECell3_V",
-                    "ECell4_V",
-                    "ECell5_V",
-                    "ECell6_V",
-                    "ECell7_V",
-                    "ECell8_V",
-                    "ECell9_V"]
+                    "Icell1_A",
+                    "Icell2_A",
+                    "Icell3_A",
+                    "Icell4_A",
+                    "Icell5_A",
+                    "Icell6_A",
+                    "Icell7_A",
+                    "Icell8_A",
+                    "Icell9_A",
+                    "Ecell1_V",
+                    "Ecell2_V",
+                    "Ecell3_V",
+                    "Ecell4_V",
+                    "Ecell5_V",
+                    "Ecell6_V",
+                    "Ecell7_V",
+                    "Ecell8_V",
+                    "Ecell9_V"]
+
+
         datadict = {key:[] for key in self.datakeys}
 
         self.sourceIV = ColumnDataSource(data=datadict)
@@ -200,14 +202,22 @@ class C_nidaqmxvis:
         data_dict = new_data[new_action_id]["data"]
         if type(data_dict) is not dict:
             return
-        
-        tmpdata = {key:[] for key in self.datakeys}
 
-        for key, val in data_dict.items():
-            if key in self.datakeys:
-                tmpdata[key] = val
+        tmpdata = {key:[] for key in self.datakeys}
+        for sample_key, sample_data in data_dict.items():
+            if type(sample_data) is dict:
+                for key, val in sample_data.items():
+                    if key == "t_s":
+                        tmpdata[key] = val
+                    elif key == "Icell_A":
+                        tmpdata[f"I{sample_key}_A"] = val
+                    elif key == "Ecell_V":
+                        tmpdata[f"E{sample_key}_V"] = val
+
+                    else:
+                        return
             else:
-                return
+                break
 
         self.sourceIV_prev.data = {key: val for key, val in self.sourceIV.data.items()}        
         self.sourceIV.data = {k: [] for k in self.sourceIV.data}
@@ -259,10 +269,10 @@ class C_nidaqmxvis:
 
         colors = small_palettes["Category10"][9]
         for i in self.checkbox_button_group.active:
-            _ = self.plot_VOLT.line(x="t_s", y=f"ECell{i+1}_V", source=self.sourceIV, name=f"ECell{i+1}_V", line_color=colors[i], legend_label=f"ECell{i+1}_V")
-            _ = self.plot_CURRENT.line(x="t_s", y=f"ICell{i+1}_A", source=self.sourceIV, name=f"ICell{i+1}_A", line_color=colors[i], legend_label=f"ICell{i+1}_A")
-            _ = self.plot_VOLT_prev.line(x="t_s", y=f"ECell{i+1}_V", source=self.sourceIV_prev, name=f"ECell{i+1}_V", line_color=colors[i], legend_label=f"ECell{i+1}_V")
-            _ = self.plot_CURRENT_prev.line(x="t_s", y=f"ICell{i+1}_A", source=self.sourceIV_prev, name=f"ICell{i+1}_A", line_color=colors[i], legend_label=f"ICell{i+1}_A")
+            _ = self.plot_VOLT.line(x="t_s", y=f"Ecell{i+1}_V", source=self.sourceIV, name=f"Ecell{i+1}_V", line_color=colors[i], legend_label=f"Ecell{i+1}_V")
+            _ = self.plot_CURRENT.line(x="t_s", y=f"Icell{i+1}_A", source=self.sourceIV, name=f"Icell{i+1}_A", line_color=colors[i], legend_label=f"Icell{i+1}_A")
+            _ = self.plot_VOLT_prev.line(x="t_s", y=f"Ecell{i+1}_V", source=self.sourceIV_prev, name=f"Ecell{i+1}_V", line_color=colors[i], legend_label=f"Ecell{i+1}_V")
+            _ = self.plot_CURRENT_prev.line(x="t_s", y=f"Icell{i+1}_A", source=self.sourceIV_prev, name=f"Icell{i+1}_A", line_color=colors[i], legend_label=f"Icell{i+1}_A")
 
 
 class C_potvis:
@@ -351,13 +361,16 @@ class C_potvis:
         data_dict = new_data[new_action_id]["data"]
         if type(data_dict) is not dict:
             return
-        tmpdata["t_s"] = data_dict.get("t_s", [0])
-        tmpdata["Ewe_V"] = data_dict.get("Ewe_V", [0])
-        tmpdata["Ach_V"] = data_dict.get("Ach_V", [0])
-        tmpdata["I_A"] = data_dict.get("I_A", [0])
 
+        for sample_key, sample_data in data_dict.items():
+            if type(sample_data) is dict:
+                tmpdata["t_s"] = sample_data.get("t_s", [0])
+                tmpdata["Ewe_V"] = sample_data.get("Ewe_V", [0])
+                tmpdata["Ach_V"] = sample_data.get("Ach_V", [0])
+                tmpdata["I_A"] = sample_data.get("I_A", [0])
+                self.datasource.stream(tmpdata)
+            break # we only measure/display first sample
 
-        self.datasource.stream(tmpdata)
 
 
     async def IOloop_data(self): # non-blocking coroutine, updates data source

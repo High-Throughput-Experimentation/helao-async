@@ -601,10 +601,10 @@ class Base(object):
         action: Action,
         file_type: str = "helao__file",
         file_group: str = "helao_files",
-        file_data_keys: Optional[str] = None,
+        file_data_keys: Optional[str] = None, # this is also keyd by file_sample_keys
         file_sample_label: Optional[str] = None, # this is also keyd by file_sample_keys
         file_sample_keys: Optional[list] = None, # I need one key per datafile, but each datafile can still be based on multiple samples
-        header: Optional[str] = None,
+        header: Optional[str] = None, # this is also keyd by file_sample_keys
     ):
         self.actives[action.action_uuid] = Base.Active(
             self,
