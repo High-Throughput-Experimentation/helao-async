@@ -15,28 +15,22 @@ from typing import Optional, List, Union
 from fastapi import Request
 from helao.library.driver.galil_driver import move_modes, transformation_mode
 from helao.core.server import makeActServ, setupAct
+from helao.library.driver.galil_driver import galil
 
 
 def makeApp(confPrefix, servKey):
 
     config = import_module(f"helao.config.{confPrefix}").config
-    C = config["servers"]
-    S = C[servKey]
-
-    # check if 'simulate' settings is present
-    if not "simulate" in S.keys():
-        # default if no simulate is defined
-        S["simulate"] = False
-    if S["simulate"]:
-        from helao.library.driver.galil_simulate import galil
-    else:
-        from helao.library.driver.galil_driver import galil
 
     app = makeActServ(
-        config, servKey, servKey, "Galil motion server", version=2.0, driver_class=galil
+        config, 
+        servKey, 
+        servKey, 
+        "Galil motion server", 
+        version=2.0, 
+        driver_class=galil
     )
-    # if S["simulate"]:
-    #     app.base.print_message("Galil motion simulator loaded.")
+
 
     @app.post(f"/{servKey}/setmotionref")
     async def setmotionref(request: Request):
