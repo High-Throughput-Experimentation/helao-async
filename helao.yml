@@ -64,7 +64,7 @@ dependencies:
   - python-dateutil
   - python-multipart
   - python_abi
-  - pyyaml
+  - pyaml
   - qt
   - requests
   - setuptools

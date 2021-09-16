@@ -62,7 +62,7 @@ def makeApp(confPrefix, servKey):
         waittime: Optional[float] = 0.0
         ):
         """Sleep action"""    
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.orch.contain_action(action = A)
         waittime = A.action_params["waittime"]
         app.orch.print_message(' ... wait action:', waittime)

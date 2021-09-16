@@ -44,7 +44,114 @@ def makeApp(confPrefix, servKey):
         PAL_wash4: Optional[bool] = False,
         scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
-        A = await setupAct(request, locals())
+        """universal pal action"""
+        A = await setupAct(request)
+        active_dict = await app.driver.init_PAL_IOloop(A)
+        return active_dict
+
+
+    @app.post(f"/{servKey}/PAL_archive")
+    async def PAL_archive(
+        request: Request, 
+        liquid_sample_no_in: Optional[int] = None,
+        PAL_tool: Optional[PALtools] = PALtools.LS3,
+        PAL_source: Optional[str] = "lcfc_res",
+        PAL_volume_uL: Optional[int] = 500,  # uL
+        PAL_totalvials: Optional[int] = 1,
+        # its a necessary param, but as its the only dict, it partially breaks swagger
+        PAL_sampleperiod: Optional[List[float]] = [0.0],
+        PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
+        PAL_spacingfactor: Optional[float] = 1.0,
+        PAL_timeoffset: Optional[float] = 0.0,
+        PAL_wash1: Optional[bool] = False,
+        PAL_wash2: Optional[bool] = False,
+        PAL_wash3: Optional[bool] = False,
+        PAL_wash4: Optional[bool] = False,
+        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+    ):
+        A = await setupAct(request)
+        A.action_params["PAL_method"] =  PALmethods.archive.value
+        active_dict = await app.driver.init_PAL_IOloop(A)
+        
+        return active_dict
+
+
+    @app.post(f"/{servKey}/PAL_fill")
+    async def PAL_fill(
+        request: Request, 
+        liquid_sample_no_in: Optional[int] = None,
+        PAL_tool: Optional[PALtools] = PALtools.LS3,
+        PAL_source: Optional[str] = "elec_res1",
+        PAL_volume_uL: Optional[int] = 500,  # uL
+        PAL_wash1: Optional[bool] = False,
+        PAL_wash2: Optional[bool] = False,
+        PAL_wash3: Optional[bool] = False,
+        PAL_wash4: Optional[bool] = False,
+    ):
+        """fills eche"""
+        A = await setupAct(request)
+        A.action_params["PAL_method"] =  PALmethods.fill.value
+        active_dict = await app.driver.init_PAL_IOloop(A)
+        return active_dict
+
+
+    @app.post(f"/{servKey}/PAL_fillfixed")
+    async def PAL_fillfixed(
+        request: Request, 
+        liquid_sample_no_in: Optional[int] = None,
+        PAL_tool: Optional[PALtools] = PALtools.LS3,
+        PAL_source: Optional[str] = "elec_res1",
+        PAL_volume_uL: Optional[int] = 500,  # uL
+        PAL_wash1: Optional[bool] = False,
+        PAL_wash2: Optional[bool] = False,
+        PAL_wash3: Optional[bool] = False,
+        PAL_wash4: Optional[bool] = False,
+    ):
+        """fills eche with hardcoded volume"""
+        A = await setupAct(request)
+        A.action_params["PAL_method"] =  PALmethods.fillfixed.value
+        active_dict = await app.driver.init_PAL_IOloop(A)
+        return active_dict
+
+
+    @app.post(f"/{servKey}/PAL_deepclean")
+    async def PAL_deepclean(
+        request: Request, 
+        PAL_tool: Optional[PALtools] = PALtools.LS3,
+        PAL_volume_uL: Optional[int] = 500,  # uL
+    ):
+        """cleans the PAL tool"""
+        A = await setupAct(request)
+        A.action_params["liquid_sample_no_in"] = 0
+        A.action_params["PAL_method"] =  PALmethods.deepclean.value
+        A.action_params["PAL_wash1"] =  True
+        A.action_params["PAL_wash2"] =  True
+        A.action_params["PAL_wash3"] =  True
+        A.action_params["PAL_wash4"] =  True
+        active_dict = await app.driver.init_PAL_IOloop(A)
+        return active_dict
+
+
+    @app.post(f"/{servKey}/PAL_dilute")
+    async def PAL_dilute(
+        request: Request, 
+        liquid_sample_no_in: Optional[int] = None,
+        PAL_tool: Optional[PALtools] = PALtools.LS3,
+        PAL_source: Optional[str] = "elec_res2",
+        PAL_volume_uL: Optional[int] = 500,  # uL
+        PAL_totalvials: Optional[int] = 1,
+        # its a necessary param, but as its the only dict, it partially breaks swagger
+        # PAL_sampleperiod: Optional[List[float]] = [0.0],
+        # PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
+        # PAL_spacingfactor: Optional[float] = 1.0,
+        PAL_timeoffset: Optional[float] = 0.0,
+        PAL_wash1: Optional[bool] = False,
+        PAL_wash2: Optional[bool] = False,
+        PAL_wash3: Optional[bool] = False,
+        PAL_wash4: Optional[bool] = False,
+    ):
+        A = await setupAct(request)
+        A.action_params["PAL_method"] =  PALmethods.dilute.value
         active_dict = await app.driver.init_PAL_IOloop(A)
         return active_dict
 
@@ -52,7 +159,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/trayDB_reset")
     async def trayDB_reset(request: Request):
         """Resets app.driver vial table. But will make a full dump to CSV first."""
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         finished_act = await app.driver.trayDB_reset(A)
         return finished_act.as_dict()
 
@@ -65,7 +172,7 @@ def makeApp(confPrefix, servKey):
         """Returns an empty vial position for given max volume.\n
         For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.\n
         It will select the first empty vial which has the smallest volume that still can hold req_vol"""
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data({"vial_position": await app.driver.trayDB_new(**A.action_params)})
         finished_act = await active.finish()
@@ -82,7 +189,7 @@ def makeApp(confPrefix, servKey):
         slot: Optional[int] = None
     ):
         """Updates app.driver vial Table. If sucessful (vial-slot was empty) returns True, else it returns False."""
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data({"update": await app.driver.trayDB_update(**A.action_params)})
         finished_act = await active.finish()
@@ -95,7 +202,7 @@ def makeApp(confPrefix, servKey):
         tray: Optional[int] = None, 
         slot: Optional[int] = None
     ):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         finished_act = await app.driver.trayDB_get_db(A)
         return finished_act.as_dict()
 
@@ -110,7 +217,8 @@ def makeApp(confPrefix, servKey):
         rack: Optional[int] = None,
         dilution_factor: Optional[float] = None
     ):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
+        A.action_abbr = "export"
         A.action_params["icpms"] = True
         finished_act = await app.driver.trayDB_get_db(A)
         return finished_act.as_dict()
@@ -122,7 +230,8 @@ def makeApp(confPrefix, servKey):
         tray: Optional[int] = None,
         slot: Optional[int] = None
     ):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
+        A.action_abbr = "export"
         A.action_params["csv"] = True # signal subroutine to create a csv
         finished_act = await app.driver.trayDB_get_db(A)
         return finished_act.as_dict()
@@ -144,7 +253,7 @@ def makeApp(confPrefix, servKey):
         '''use CAS for chemical if available. Written on bottles of chemicals with all other necessary information.\n
         For empty DUID and AUID the UID will automatically created. For manual entry leave DUID, AUID, action_time, and action_params empty and servkey on "data".\n
         If its the very first liquid (no source in database exists) leave source and source_mL empty.'''
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         A.action_params["DUID"] = A.decision_uuid
         A.action_params["AUID"] = A.action_uuid
@@ -155,7 +264,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/liquid_sample_no_get_last")
     async def liquid_sample_no_get_last(request: Request):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data({'liquid_sample_no': await app.driver.liquid_sample_no_get_last()})
         finished_act = await active.finish()
@@ -164,7 +273,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/liquid_sample_no_get")
     async def liquid_sample_no_get(request: Request, liquid_sample_no: Optional[int]=None):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data({'liquid_sample_no': await app.driver.liquid_sample_no_get(**A.action_params)})
         finished_act = await active.finish()

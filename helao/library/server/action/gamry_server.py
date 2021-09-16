@@ -31,24 +31,13 @@ from typing import Optional
 from importlib import import_module
 from fastapi import Request
 from helao.core.server import makeActServ, setupAct
+from helao.library.driver.gamry_driver import gamry, Gamry_IErange
 
 
 def makeApp(confPrefix, servKey):
 
     config = import_module(f"helao.config.{confPrefix}").config
-    C = config["servers"]
-    S = C[servKey]
-
-    # check if 'simulate' settings is present
-    if not "simulate" in S.keys():
-        # default if no simulate is defined
-        S["simulate"] = False
-    if S["simulate"]:
-        from helao.library.driver.gamry_simulate import gamry
-    else:
-        from helao.library.driver.gamry_driver import gamry
-        from helao.library.driver.gamry_driver import Gamry_IErange
-
+ 
     app = makeActServ(
         config,
         servKey,
@@ -58,14 +47,11 @@ def makeApp(confPrefix, servKey):
         driver_class=gamry,
     )
     
-    # if S["simulate"]:
-    #     app.base.print_message("Gamry simulator loaded.")
-
 
     @app.post(f"/{servKey}/get_meas_status")
     async def get_meas_status(request: Request):
         """Will return 'idle' or 'measuring'. Should be used in conjuction with eta to async.sleep loop poll"""
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         driver_status = await app.driver.status()
         await active.enqueue_data({"status": driver_status})
@@ -88,7 +74,7 @@ def makeApp(confPrefix, servKey):
         """Linear Sweep Voltammetry (unlike CV no backward scan is done)\n
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         A.action_abbr = "LSV"
         # A.save_data = True
         active_dict = await app.driver.technique_LSV(A)
@@ -109,7 +95,7 @@ def makeApp(confPrefix, servKey):
         """Chronoamperometry (current response on amplied potential)\n
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         A.action_abbr = "CA"
         # A.save_data = True
         active_dict = await app.driver.technique_CA(A)
@@ -130,7 +116,7 @@ def makeApp(confPrefix, servKey):
         """Chronopotentiometry (Potential response on controlled current)\n
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         A.action_abbr = "CP"
         # A.save_data = True
         active_dict = await app.driver.technique_CP(A)
@@ -155,7 +141,7 @@ def makeApp(confPrefix, servKey):
         """Cyclic Voltammetry (most widely used technique for acquireing information about electrochemical reactions)\n
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         A.action_abbr = "CV"
         # A.save_data = True
         active_dict = await app.driver.technique_CV(A)
@@ -180,7 +166,7 @@ def makeApp(confPrefix, servKey):
         NOT TESTED\n
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         A.action_abbr = "EIS"
         # A.save_data = True
         active_dict = await app.driver.technique_EIS(A)
@@ -198,7 +184,7 @@ def makeApp(confPrefix, servKey):
         """mesasures open circuit potential\n
         use 4bit bitmask for triggers\n
         IErange depends on gamry model used (test actual limit before using)"""
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         A.action_abbr = "OCV"
         # A.save_data = True
         active_dict = await app.driver.technique_OCV(A)
@@ -207,7 +193,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/stop")
     async def stop(request: Request):
         """Stops measurement in a controlled way."""
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         A.action_abbr = "stop"
         active = await app.base.contain_action(A)
         await active.enqueue_data({"stop_result": await app.driver.stop()})
@@ -221,7 +207,7 @@ def makeApp(confPrefix, servKey):
         switch: Optional[bool] = True,
         ):
         """Same as stop, but also sets estop flag."""
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         A.action_abbr = "estop"
         active = await app.base.contain_action(A)
         await active.enqueue_data({"estop_result": await app.driver.estop(A)})

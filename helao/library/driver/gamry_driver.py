@@ -15,6 +15,7 @@ import time
 from enum import Enum
 import psutil
 import os
+import pyaml
 
 from helao.core.error import error_codes
 
@@ -186,7 +187,7 @@ class gamry:
         # for saving data localy
         self.FIFO_epoch = None
         # self.FIFO_header = ''
-        self.FIFO_gamryheader = ("") # measuement specific, will be reset each measurement
+        self.FIFO_gamryheader = dict() # measuement specific, will be reset each measurement
         # self.FIFO_name = ''
         # self.FIFO_dir = ''
         self.FIFO_column_headings = []
@@ -544,24 +545,26 @@ class gamry:
         if self.pstat:
 
             # write header lines with one function call
-            tmps_headings = "\t".join(self.FIFO_column_headings)
-            self.FIFO_gamryheader = "\n".join(
-                [
-                    f"%gamry={self.FIFO_Gamryname}",
-                    self.FIFO_gamryheader,
-                    f"%ierangemode={self.IO_IErange.name}",
-                    "%techniqueparamsname=",
-                    f"%techniquename={self.IO_meas_mode.name}",
-                    "%epoch_ns=FIXME",
-                    "%version=0.2",
-                    f"%column_headings={tmps_headings}",
-                ]
+            self.FIFO_gamryheader.update(
+                    {
+                    "gamry":self.FIFO_Gamryname,
+                    "ierangemode":self.IO_IErange.name,
+                    "techniqueparamsname":"",
+                    "techniquename":self.IO_meas_mode.name,
+                    "version":0.2,
+                    "column_headings":self.FIFO_column_headings,
+                    }
             )
 
             self.active = await self.base.contain_action(
                 self.action,
-                file_type="gamry_pstat_file",
-                file_group="pstat_files",
+                file_type="pstat_helao__file",
+                file_group="helao_files",
+                file_data_keys=self.FIFO_column_headings,
+                file_sample_label={
+                    "liquid":["FIXME_TODO"],
+                    "solid":["FIXME_TODO"],
+                },
                 header=self.FIFO_gamryheader,
             )
             self.base.print_message(f"!!! Active action uuid is {self.active.action.action_uuid}")
@@ -623,7 +626,7 @@ class gamry:
                     #     if (bits & 0x08):
                     #         break
                     break  # for testing, we don't want to wait forever
-                    # await asyncio.sleep(0.001)
+                    await asyncio.sleep(0.001)
 
             # second, send a trigger
             # TODO: need to reset trigger first during init to high/low
@@ -673,8 +676,11 @@ class gamry:
 
 
             realtime = await self.active.set_realtime()
-            self.FIFO_gamryheader.replace("%epoch_ns=FIXME", f"%epoch_ns={realtime}")
-
+            if self.active:
+                self.active.enqueue_data_nowait(pyaml.dump({"epoch_ns":realtime}))
+                self.active.enqueue_data_nowait("%%")
+                    
+                    
             # dtaqsink.status might still be 'idle' if sleep is too short
             await asyncio.sleep(0.04)
             client.PumpEvents(0.001)
@@ -862,15 +868,13 @@ class gamry:
         measmode = Gamry_modes.LSV
 
         # setup partial header which will be completed in measure loop
-        self.FIFO_gamryheader = "\n".join(
-            [
-                f"%Vinit={Vinit}",
-                f"%Vfinal={Vfinal}",
-                f"%scanrate={ScanRate}",
-                f"%samplerate={SampleRate}",
-                f"%eta={eta}",
-            ]
-        )
+        self.FIFO_gamryheader = {
+                "Vinit":Vinit,
+                "Vfinal":Vfinal,
+                "scanrate":ScanRate,
+                "samplerate":SampleRate,
+                "eta":eta,
+        }
 
         # common
         self.IO_IErange = Gamry_IErange(IErange)
@@ -899,14 +903,12 @@ class gamry:
         measmode = Gamry_modes.CA
 
         # setup partial header which will be completed in measure loop
-        self.FIFO_gamryheader = "\n".join(
-            [
-                f"%Vval={Vval}",
-                f"%Tval={Tval}",
-                f"%samplerate={SampleRate}",
-                f"%eta={eta}",
-            ]
-        )
+        self.FIFO_gamryheader = {
+                "Vval":Vval,
+                "Tval":Tval,
+                "samplerate":SampleRate,
+                "eta":eta,
+        }
 
         # common
         self.IO_IErange = Gamry_IErange(IErange)
@@ -935,14 +937,12 @@ class gamry:
         measmode = Gamry_modes.CP
 
         # setup partial header which will be completed in measure loop
-        self.FIFO_gamryheader = "\n".join(
-            [
-                f"%Ival={Ival}",
-                f"%Tval={Tval}",
-                f"%samplerate={SampleRate}",
-                f"%eta={eta}",
-            ]
-        )
+        self.FIFO_gamryheader = {
+                "Ival":Ival,
+                "Tval":Tval,
+                "samplerate":SampleRate,
+                "eta":eta,
+        }
 
         # common
         self.IO_IErange = Gamry_IErange(IErange)
@@ -995,23 +995,21 @@ class gamry:
         measmode = Gamry_modes.CV
 
         # setup partial header which will be completed in measure loop
-        self.FIFO_gamryheader = "\n".join(
-            [
-                f"%Vinit={Vinit}",
-                f"%Vapex1={Vapex1}",
-                f"%Vapex2={Vapex2}",
-                f"%Vfinal={Vfinal}",
-                f"%scaninit={ScanInit}",
-                f"%scanapex={ScanApex}",
-                f"%scanfinal={ScanFinal}",
-                f"%holdtime0={HoldTime0}",
-                f"%holdtime1={HoldTime1}",
-                f"%holdtime2={HoldTime2}",
-                f"%samplerate={SampleRate}",
-                f"%cycles={Cycles}",
-                f"%eta={eta}",
-            ]
-        )
+        self.FIFO_gamryheader = {
+                "Vinit":Vinit,
+                "Vapex1":Vapex1,
+                "Vapex2":Vapex2,
+                "Vfinal":Vfinal,
+                "scaninit":ScanInit,
+                "scanapex":ScanApex,
+                "scanfinal":ScanFinal,
+                "holdtime0":HoldTime0,
+                "holdtime1":HoldTime1,
+                "holdtime2":HoldTime2,
+                "samplerate":SampleRate,
+                "cycles":Cycles,
+                "eta":eta,
+        }
 
         # common
         self.IO_IErange = Gamry_IErange(IErange)
@@ -1042,17 +1040,15 @@ class gamry:
         argv = (Freq, RMS, Precision)
 
         # setup partial header which will be completed in measure loop
-        self.FIFO_gamryheader = "\n".join(
-            [
-                f"%Vval={Vval}",
-                f"%Tval={Tval}",
-                f"%freq={Freq}",
-                f"%rms={RMS}",
-                f"%precision={Precision}",
-                f"%samplerate={SampleRate}",
-                f"%eta={eta}",
-            ]
-        )
+        self.FIFO_gamryheader = {
+                "Vval":Vval,
+                "Tval":Tval,
+                "freq":Freq,
+                "rms":RMS,
+                "precision":Precision,
+                "samplerate":SampleRate,
+                "eta":eta,
+        }
 
         # common
         self.IO_IErange = Gamry_IErange(IErange)
@@ -1081,9 +1077,11 @@ class gamry:
         measmode = Gamry_modes.OCV
 
         # setup partial header which will be completed in measure loop
-        self.FIFO_gamryheader = "\n".join(
-            [f"%Tval={Tval}", f"%samplerate={SampleRate}", f"%eta={eta}"]
-        )
+        self.FIFO_gamryheader = {
+            "Tval":Tval,
+            "samplerate":SampleRate,
+            "eta":eta,
+        }
 
         # common
         self.IO_IErange = Gamry_IErange(IErange)
