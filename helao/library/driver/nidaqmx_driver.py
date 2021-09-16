@@ -75,15 +75,15 @@ class cNIMAX:
         self.FIFO_name = ""
         self.FIFO_dir = ""
         self.FIFO_sample_keys = [
-            "Cell1",
-            "Cell2",
-            "Cell3",
-            "Cell4",
-            "Cell5",
-            "Cell6",
-            "Cell7",
-            "Cell8",
-            "Cell9",
+            "cell1",
+            "cell2",
+            "cell3",
+            "cell4",
+            "cell5",
+            "cell6",
+            "cell7",
+            "cell8",
+            "cell9",
         ]
         self.FIFO_column_headings = dict()
         for FIFO_sample_key in self.FIFO_sample_keys:
