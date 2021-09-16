@@ -863,7 +863,6 @@ class Base(object):
                 # self.action.save_data = True
                 # self.action.save_rcp = True
                 self.action.output_dir = os.path.join(
-                    self.base.save_root,
                     year_week,
                     decision_date,
                     f"{decision_time}_{self.action.decision_label}",
@@ -873,7 +872,7 @@ class Base(object):
 
         async def myinit(self):
             if self.action.save_rcp:
-                os.makedirs(self.action.output_dir, exist_ok=True)
+                os.makedirs(os.path.join(self.base.save_root,self.action.output_dir), exist_ok=True)
                 self.action.actionnum = (
                     f"{self.action.action_abbr}-{self.action.action_enum}"
                 )
@@ -906,54 +905,109 @@ class Base(object):
                 await self.write_to_rcp(initial_dict)
 
                 if self.action.save_data:
-                    sample_no = str(self.action.save_data).replace("True", "noSampleID")
-                    # if self.action.plate_id is None:
-                    #     self.action.plate_id = "noPlateID"
-                    if self.action.header:
-                        if isinstance(self.action.header, dict):
-                            header_dict = copy(self.action.header)
-                            self.action.header = pyaml.dump(
-                                self.action.header, sort_dicts=False
-                            )
-                            # header_lines = len(self.action.header.split("\n"))
-                            # header_parts = len(header_dict.keys())
-                            header_lines = len(header_dict.keys())
-                        else:
-                            if isinstance(self.action.header, list):
-                                header_lines = len(self.action.header)
-                                self.action.header = "\n".join(self.action.header)
-                            else:
-                                header_lines = len(self.action.header.split("\n"))
-                            # header_parts = ",".join(
-                            #     self.action.header.split("\n")[-1]
-                            #     .replace(",", "\t")
-                            #     .split()
-                            # )
-                        # file_info = f"{self.action.file_type};{header_parts};{header_lines};{sample_no}"
-                        # file_info = f"{self.action.file_type};{header_lines};{sample_no}"
-                    # else:
-                    #     file_info = f"{self.action.file_type};{sample_no}"
-                    file_info = {"type": self.action.file_type}
-                    if self.action.file_data_keys is not None:
-                        file_info.update({"keys": self.action.file_data_keys})
-                    if self.action.file_sample_label is not None:
-                        file_info.update({"sample": self.action.file_sample_label})
-                    if self.action.filename is None:  # generate filename
-                        file_ext = "csv"
-                        if self.action.file_group == "helao_files":
-                            file_ext = "hlo"
+                    # if self.action.header:
+                    #     if isinstance(self.action.header, dict):
+                    #         header_dict = copy(self.action.header)
+                    #         self.action.header = pyaml.dump(
+                    #             self.action.header, sort_dicts=False
+                    #         )
+                    #         # header_lines = len(self.action.header.split("\n"))
+                    #         # header_parts = len(header_dict.keys())
+                    #         header_lines = len(header_dict.keys())
+                    #     else:
+                    #         if isinstance(self.action.header, list):
+                    #             header_lines = len(self.action.header)
+                    #             self.action.header = "\n".join(self.action.header)
+                    #         else:
+                    #             header_lines = len(self.action.header.split("\n"))
 
-                        if self.action.action_enum is not None:
-                            self.action.filename = f"act{self.action.action_enum:.1f}_{self.action.action_abbr}.{file_ext}"
-                        else:
-                            self.action.filename = (
-                                f"actNone_{self.action.action_abbr}.{file_ext}"
-                            )
+                    # file_info = {"type": self.action.file_type}
+                    # if self.action.file_data_keys is not None:
+                    #     file_info.update({"keys": self.action.file_data_keys})
+                    # if self.action.file_sample_label is not None:
+                    #     file_info.update({"sample": self.action.file_sample_label})
+                    # if self.action.filename is None:  # generate filename
+                    #     file_ext = "csv"
+                    #     if self.action.file_group == "helao_files":
+                    #         file_ext = "hlo"
+
+                    #     if self.action.action_enum is not None:
+                    #         self.action.filename = f"act{self.action.action_enum:.1f}_{self.action.action_abbr}.{file_ext}"
+                    #     else:
+                    #         self.action.filename = (
+                    #             f"actNone_{self.action.action_abbr}.{file_ext}"
+                    #         )
+
+
+                    filename, header, file_info = self.init_datafile(
+                        header = self.action.header,
+                        file_type = self.action.file_type,
+                        file_data_keys = self.action.file_data_keys, 
+                        file_sample_label = self.action.file_sample_label,
+                        filename = self.action.filename,
+                        file_group = self.action.file_group,
+                        action_enum = self.action.action_enum,
+                        action_abbr = self.action.action_abbr,
+                    )
+                    
                     self.action.file_dict[self.action.filetech_key][
                         self.action.file_group
-                    ].update({self.action.filename: file_info})
-                    await self.set_output_file(self.action.filename, self.action.header)
+                    ].update({filename: file_info})
+                    await self.set_output_file(filename, header)
             await self.add_status()
+
+
+        def init_datafile(
+                self, 
+                header, 
+                file_type, 
+                file_data_keys, 
+                file_sample_label,
+                filename,
+                file_group,
+                action_enum,
+                action_abbr,
+            ):
+
+            if header:
+                if isinstance(header, dict):
+                    header_dict = copy(header)
+                    header = pyaml.dump(
+                        header, sort_dicts=False
+                    )
+                    header_lines = len(header_dict.keys())
+                else:
+                    if isinstance(header, list):
+                        header_lines = len(header)
+                        header = "\n".join(header)
+                    else:
+                        header_lines = len(header.split("\n"))
+    
+            file_info = {"type": file_type}
+            if file_data_keys is not None:
+                file_info.update({"keys": file_data_keys})
+            if file_sample_label is not None:
+                file_info.update({"sample": file_sample_label})
+            if filename is None:  # generate filename
+                file_ext = "csv"
+                if file_group == "helao_files":
+                    file_ext = "hlo"
+    
+                if action_enum is not None:
+                    filename = f"act{action_enum:.1f}_{action_abbr}.{file_ext}"
+                else:
+                    filename = (
+                        f"actNone_{action_abbr}.{file_ext}"
+                    )
+
+            if header:
+                if not header.endswith("\n"):
+                    header += "\n"
+
+            return filename, header, file_info
+
+
+
 
         async def add_status(self):
             self.base.status[self.action.action_name].append(self.action.action_uuid)
@@ -1008,10 +1062,12 @@ class Base(object):
                 {self.action.action_name: self.base.status[self.action.action_name]}
             )
 
+
         async def set_realtime(
             self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
         ):
             return self.set_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
+
 
         def set_realtime_nowait(
             self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
@@ -1029,9 +1085,10 @@ class Base(object):
                 action_real_time = epoch_ns + offset_ns
             return action_real_time
 
+
         async def set_output_file(self, filename: str, header: Optional[str] = None):
             "Set active save_path, write header if supplied."
-            output_path = os.path.join(self.action.output_dir, filename)
+            output_path = os.path.join(self.base.save_root,self.action.output_dir, filename)
             self.base.print_message(f" ... writing data to: {output_path}")
             # create output file and set connection
             self.file_conn = await aiofiles.open(output_path, mode="a+")
@@ -1040,12 +1097,14 @@ class Base(object):
                     header += "\n"
                 await self.file_conn.write(header)
 
+
         async def write_live_data(self, output_str: str):
             """Appends lines to file_conn."""
             if self.file_conn:
                 if not output_str.endswith("\n"):
                     output_str += "\n"
                 await self.file_conn.write(output_str)
+
 
         async def enqueue_data(self, data, errors: list = []):
             data_msg = {
@@ -1057,6 +1116,7 @@ class Base(object):
             }
             await self.base.data_q.put(data_msg)
 
+
         def enqueue_data_nowait(self, data, errors: list = []):
             data_msg = {
                 self.action.action_uuid: {
@@ -1066,6 +1126,7 @@ class Base(object):
                 }
             }
             self.base.data_q.put_nowait(data_msg)
+
 
         async def log_data_task(self):
             """Self-subscribe to data queue, write to present file path."""
@@ -1089,74 +1150,85 @@ class Base(object):
                     " ... data logger task was cancelled", error=True
                 )
 
+
         async def write_file(
             self,
-            file_type: str,
-            filename: str,
             output_str: str,
+            file_type: str,
+            filename: Optional[str] = None,
             file_group: Optional[str] = "aux_files",
             header: Optional[str] = None,
             sample_str: Optional[str] = None,
+            file_sample_label: Optional[str] = None,
+            file_data_keys: Optional[str] = None,
         ):
             "Write complete file, not used with queue streaming."
-            _output_path = os.path.join(self.action.output_dir, filename)
-            self.base.print_message(f" ... writing non stream data to: {_output_path}")
-            # self.base.print_message("header:", header)
-            # self.base.print_message("output_str:", output_str)
-            # create output file and set connection
-            file_instance = await aiofiles.open(_output_path, mode="w")
-            numlines = len(output_str.split("\n"))
-            header_lines = 0
+            if self.action.save_data:
+                filename, header, file_info = self.init_datafile(
+                    header = header,
+                    file_type = file_type,
+                    file_data_keys = file_data_keys, 
+                    file_sample_label = file_sample_label,
+                    filename = filename,
+                    file_group = file_group,
+                    action_enum = self.action.action_enum,
+                    action_abbr = self.action.action_abbr,
+                )
+                output_path = os.path.join(self.base.save_root,self.action.output_dir, filename)
+                self.base.print_message(f" ... writing non stream data to: {output_path}")
 
-            if header:
-                header_lines = len(header.split("\n"))
-                # header_parts = ",".join(
-                #     header.split("\n")[-1].replace(",", "\t").split()
-                # )
-                # file_info = ";".join(
-                #     [
-                #         f"{x}"
-                #         for x in (
-                #             file_type,
-                #             header_parts,
-                #             header_lines,
-                #             numlines,
-                #             sample_str,
-                #         )
-                #     ]
-                # )
-                if not header.endswith("\n"):
-                    header += "\n"
-                # add header to data lines
-                output_str = header + output_str
-            # else:
-            #     file_info = ";".join(
-            #         [f"{x}" for x in (file_type, numlines, sample_str)]
-            #     )
+                file_instance = await aiofiles.open(output_path, mode="w")
+                await file_instance.write(header + output_str)
+                await file_instance.close()
+                self.action.file_dict[self.action.filetech_key][file_group].update(
+                    {filename: file_info}
+                )
 
-            file_info = {
-                "type": file_type,
-                "header_lines": header_lines,
-                "data_lines": numlines,
-            }
-            if sample_str is not None:
-                file_info.update({"sample": sample_str})
 
-            await file_instance.write(output_str)
-            await file_instance.close()
-            self.action.file_dict[self.action.filetech_key]["aux_files"].update(
-                {filename: file_info}
-            )
-            self.base.print_message(f" ... Wrote {numlines} lines to {_output_path}")
+        def write_file_nowait(
+            self,
+            output_str: str,
+            file_type: str,
+            filename: Optional[str] = None,
+            file_group: Optional[str] = "aux_files",
+            header: Optional[str] = None,
+            sample_str: Optional[str] = None,
+            file_sample_label: Optional[str] = None,
+            file_data_keys: Optional[str] = None,
+        ):
+            "Write complete file, not used with queue streaming."
+            if self.action.save_data:
+                filename, header, file_info = self.init_datafile(
+                    header = header,
+                    file_type = file_type,
+                    file_data_keys = file_data_keys, 
+                    file_sample_label = file_sample_label,
+                    filename = filename,
+                    file_group = file_group,
+                    action_enum = self.action.action_enum,
+                    action_abbr = self.action.action_abbr,
+                )
+                output_path = os.path.join(self.base.save_root,self.action.output_dir, filename)
+                self.base.print_message(f" ... writing non stream data to: {output_path}")
+
+                file_instance = open(output_path, mode="w")
+                file_instance.write(header + output_str)
+                file_instance.close()
+                self.action.file_dict[self.action.filetech_key][file_group].update(
+                    {filename: file_info}
+                )
+
 
         async def write_to_rcp(self, rcp_dict: dict):
             "Create new rcp if it doesn't exist, otherwise append rcp_dict to file."
             output_path = os.path.join(
-                self.action.output_dir, f"{self.action.action_queue_time}.rcp"
+                self.base.save_root,
+                self.action.output_dir,
+                f"{self.action.action_queue_time}.rcp"
             )
             self.base.print_message(f" ... writing to rcp: {output_path}")
             # self.base.print_message(" ... writing:",rcp_dict)
-            output_str = pyaml.dump(rcp_dict)
+            output_str = pyaml.dump(rcp_dict, sort_dicts=False)
             file_instance = await aiofiles.open(output_path, mode="a+")
 
             if not output_str.endswith("\n"):
@@ -1164,6 +1236,7 @@ class Base(object):
 
             await file_instance.write(output_str)
             await file_instance.close()
+
 
         async def append_sample(
             self,
@@ -1173,10 +1246,8 @@ class Base(object):
             solid: Union[solid_sample_no, None] = None,
             liquid: Union[liquid_sample_no, None] = None,
             gas: Union[gas_sample_no, None] = None,
-            # samples_preserved: Optional[bool] = None,
-            status: Optional[str] = "preserved",  # None,
-            inheritance: Optional[str] = "allow_both",  # None,
-            # created: Optional[bool] = None,
+            status: Optional[str] = "preserved",
+            inheritance: Optional[str] = "allow_both",
             machine: Optional[str] = None,
         ):
             "Add sample to samples_out and samples_in dict"
@@ -1188,39 +1259,39 @@ class Base(object):
             # recovered: the opposite of incorporated. E.g. an electrode assembly is taken apart, and the original electrodes are recovered, and further experiments may be done on those electrodes
 
             def add_subkeys(status, inheritance):
-                if inheritance is None or inheritance not in [
-                    "give_only",
-                    "receive_only",
-                    "allow_both",
-                    "block_both",
-                ]:
-                    self.base.print_message(
-                        f"inheritance '{inheritance}' is not supported. Using 'allow_both'.",
-                        info=True,
-                    )
-                    inheritance = "allow_both"
+                # if inheritance is None or inheritance not in [
+                #     "give_only",
+                #     "receive_only",
+                #     "allow_both",
+                #     "block_both",
+                # ]:
+                #     self.base.print_message(
+                #         f"inheritance '{inheritance}' is not supported. Using 'allow_both'.",
+                #         info=True,
+                #     )
+                #     inheritance = "allow_both"
 
-                if type(status) is not list:
-                    status = [status]
 
-                for i, stat in enumerate(status):
-                    if stat is None or stat not in [
-                        "created",
-                        "destroyed",
-                        "preserved",
-                        "incorporated",
-                        "recovered",
-                    ]:
-                        self.base.print_message(
-                            f"Sample status '{stat}' is not supported. Using 'unknown'.",
-                            info=True,
-                        )
-                        status[i] = "unknown"
+                # for i, stat in enumerate(status):
+                #     if stat is None or stat not in [
+                #         "created",
+                #         "destroyed",
+                #         "preserved",
+                #         "incorporated",
+                #         "recovered",
+                #     ]:
+                #         self.base.print_message(
+                #             f"Sample status '{stat}' is not supported. Using 'unknown'.",
+                #             info=True,
+                #         )
+                #         status[i] = "unknown"
 
                 tmpdict = dict()
                 if inheritance is not None:
                     tmpdict.update({"inheritance": inheritance})
                 if status is not None:
+                    if type(status) is not list:
+                        status = [status]
                     tmpdict.update({"status": status})
 
                 return tmpdict
@@ -1277,7 +1348,6 @@ class Base(object):
             def append_solid(solid, machine, status, inheritance):
                 append_dict = {
                     "label": f"{solid.plate_id}__{solid.sample_no}",
-                    "machine": machine,
                 }
                 append_dict.update(solid_to_dict(solid))
                 append_dict.update(add_subkeys(status, inheritance))
@@ -1306,14 +1376,14 @@ class Base(object):
                 }
                 if liquid is not None:
                     append_dict["liquid"] = [
-                        append_liquid(liquid, machine, status, inheritance)
+                        append_liquid(liquid, machine, None, None)
                     ]
                 if solid is not None:
                     append_dict["solid"] = [
-                        append_solid(solid, machine, status, inheritance)
+                        append_solid(solid, machine, None, None)
                     ]
                 if gas is not None:
-                    append_dict["gas"] = [append_gas(gas, machine, status, inheritance)]
+                    append_dict["gas"] = [append_gas(gas, machine, None, None)]
                 append_dict.update(add_subkeys(status, inheritance))
                 update_dict(self, in_out, sample_type, append_dict)
 
@@ -1340,7 +1410,7 @@ class Base(object):
 
         async def track_file(self, file_type: str, file_path: str, sample_no: str):
             "Add auxiliary files to file dictionary."
-            if os.path.dirname(file_path) != self.action.output_dir:
+            if os.path.dirname(file_path) != os.path.join(self.base.save_root,self.action.output_dir):
                 self.action.file_paths.append(file_path)
             file_info = f"{file_type};{sample_no}"
             filename = os.path.basename(file_path)
@@ -1354,7 +1424,11 @@ class Base(object):
         async def relocate_files(self):
             "Copy auxiliary files from folder path to rcp directory."
             for x in self.action.file_paths:
-                new_path = os.path.join(self.action.output_dir, os.path.basename(x))
+                new_path = os.path.join(
+                    self.base.save_root,
+                    self.action.output_dir,
+                    os.path.basename(x)
+                )
                 await async_copy(x, new_path)
 
 
