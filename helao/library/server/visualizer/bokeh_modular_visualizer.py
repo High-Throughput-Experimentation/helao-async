@@ -128,28 +128,26 @@ class C_nidaqmxvis:
 
         self.activeCell = [True for _ in range(9)]
 
-
-        datadict = dict(
-                       t_s=[],
-                       ICell1_A=[],
-                       ICell2_A=[],
-                       ICell3_A=[],
-                       ICell4_A=[],
-                       ICell5_A=[],
-                       ICell6_A=[],
-                       ICell7_A=[],
-                       ICell8_A=[],
-                       ICell9_A=[],
-                       ECell1_V=[],
-                       ECell2_V=[],
-                       ECell3_V=[],
-                       ECell4_V=[],
-                       ECell5_V=[],
-                       ECell6_V=[],
-                       ECell7_V=[],
-                       ECell8_V=[],
-                       ECell9_V=[]
-                       )
+        self.datakeys = ["t_s",
+                    "ICell1_A",
+                    "ICell2_A",
+                    "ICell3_A",
+                    "ICell4_A",
+                    "ICell5_A",
+                    "ICell6_A",
+                    "ICell7_A",
+                    "ICell8_A",
+                    "ICell9_A",
+                    "ECell1_V",
+                    "ECell2_V",
+                    "ECell3_V",
+                    "ECell4_V",
+                    "ECell5_V",
+                    "ECell6_V",
+                    "ECell7_V",
+                    "ECell8_V",
+                    "ECell9_V"]
+        datadict = {key:[] for key in self.datakeys}
 
         self.sourceIV = ColumnDataSource(data=datadict)
         self.sourceIV_prev = ColumnDataSource(data=datadict)
@@ -200,9 +198,21 @@ class C_nidaqmxvis:
             self.reset_plot()
 
         data_dict = new_data[new_action_id]["data"]
+        if type(data_dict) is not dict:
+            return
+        
+        tmpdata = {key:[] for key in self.datakeys}
+
+        for key, val in data_dict.items():
+            if key in self.datakeys:
+                tmpdata[key] = val
+            else:
+                return
+
         self.sourceIV_prev.data = {key: val for key, val in self.sourceIV.data.items()}        
         self.sourceIV.data = {k: [] for k in self.sourceIV.data}
-        self.sourceIV.stream(data_dict)
+        # self.sourceIV.stream(data_dict)
+        self.sourceIV.stream(tmpdata)
 
 
     async def IOloop_data(self): # non-blocking coroutine, updates data source
@@ -339,6 +349,8 @@ class C_potvis:
         # for some techniques not all data is present
         # we should only get one data point at the time
         data_dict = new_data[new_action_id]["data"]
+        if type(data_dict) is not dict:
+            return
         tmpdata["t_s"] = data_dict.get("t_s", [0])
         tmpdata["Ewe_V"] = data_dict.get("Ewe_V", [0])
         tmpdata["Ach_V"] = data_dict.get("Ach_V", [0])

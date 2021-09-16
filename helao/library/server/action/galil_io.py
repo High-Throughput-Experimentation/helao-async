@@ -13,35 +13,28 @@ from typing import Optional, Union, List
 from importlib import import_module
 from fastapi import Request
 from helao.core.server import makeActServ, setupAct
+from helao.library.driver.galil_driver import galil
 
 
 def makeApp(confPrefix, servKey):
 
     config = import_module(f"helao.config.{confPrefix}").config
-    C = config["servers"]
-    S = C[servKey]
-
-    # check if 'simulate' settings is present
-    if not "simulate" in S.keys():
-        # default if no simulate is defined
-        S["simulate"] = False
-    if S["simulate"]:
-        from helao.library.driver.galil_simulate import galil
-    else:
-        from helao.library.driver.galil_driver import galil
 
     app = makeActServ(
-        config, servKey, servKey, "Galil IO server", version=2.0, driver_class=galil
+        config, 
+        servKey, 
+        servKey, 
+        "Galil IO server", 
+        version=2.0, 
+        driver_class=galil
     )
-    # if S["simulate"]:
-    #     app.base.print_message("Galil I/O simulator loaded.")
 
     @app.post(f"/{servKey}/query_analog_in")
     async def read_analog_in(
         request: Request, ports: Optional[Union[List[int], int]] = None
     ):
         # http://127.0.0.1:8001/io/query/analog_in?port=0
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data(app.driver.read_analog_in(**A.action_params))
         finished_act = await active.finish()
@@ -52,7 +45,7 @@ def makeApp(confPrefix, servKey):
     async def read_digital_in(
         request: Request, ports: Optional[Union[List[int], int]] = None
     ):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data(app.driver.read_digital_in(**A.action_params))
         finished_act = await active.finish()
@@ -62,7 +55,7 @@ def makeApp(confPrefix, servKey):
     async def read_digital_out(
         request: Request, ports: Optional[Union[List[int], int]] = None
     ):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data(app.driver.read_digital_out(**A.action_params))
         finished_act = await active.finish()
@@ -72,7 +65,7 @@ def makeApp(confPrefix, servKey):
     async def set_digital_out_on(
         request: Request, ports: Optional[Union[List[int], int]] = None
     ):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data(app.driver.digital_out_on(**A.action_params))
         finished_act = await active.finish()
@@ -82,7 +75,7 @@ def makeApp(confPrefix, servKey):
     async def set_digital_out_off(
         request: Request, ports: Optional[Union[List[int], int]] = None
     ):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data(app.driver.digital_out_off(**A.action_params))
         finished_act = await active.finish()
@@ -95,7 +88,7 @@ def makeApp(confPrefix, servKey):
         out_port: Optional[int] = None,
         t_cycle: Optional[float] = None
     ):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data(app.driver.set_digital_cycle(**A.action_params))
         finished_act = await active.finish()
@@ -109,7 +102,7 @@ def makeApp(confPrefix, servKey):
     ):
         # async def set_analog_out(handle: int, module: int, bitnum: int, value: float):
         # TODO
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data(app.driver.set_analog_out(**A.action_params))
         finished_act = await active.finish()
@@ -123,7 +116,7 @@ def makeApp(confPrefix, servKey):
         port: Optional[int] = None,
         init_time: Optional[float] = None
     ):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data(app.driver.infinite_digital_cycles(**A.action_params))
         finished_act = await active.finish()
@@ -131,7 +124,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/break_inf_digi_cycles")
     async def break_inf_cycles(request: Request):
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data(app.driver.break_infinite_digital_cycles())
         finished_act = await active.finish()
@@ -140,7 +133,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/reset")
     async def reset(request: Request):
         """resets galil device. only for emergency use!"""
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data(await app.driver.reset())
         finished_act = await active.finish()
@@ -149,7 +142,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/estop")
     async def estop(request: Request, switch: Optional[bool] = True):
         # http://127.0.0.1:8001/motor/set/stop
-        A = await setupAct(request, locals())
+        A = await setupAct(request)
         active = await app.base.contain_action(A)
         await active.enqueue_data(await app.driver.estop_io(switch))
         finished_act = await active.finish()
