@@ -547,9 +547,9 @@ class gamry:
                     {
                     "gamry":self.FIFO_Gamryname,
                     "ierangemode":self.IO_IErange.name,
-                    "techniqueparamsname":"",
-                    "techniquename":self.IO_meas_mode.name,
-                    "version":0.2,
+                    # "techniqueparamsname":"",
+                    "technique_name":self.IO_meas_mode.name,
+                    # "version":0.2,
                     "column_headings":self.FIFO_column_headings,
                     }
             )
@@ -672,8 +672,7 @@ class gamry:
 
             realtime = await self.active.set_realtime()
             if self.active:
-                self.active.enqueue_data_nowait(pyaml.dump({"epoch_ns":realtime}))
-                self.active.enqueue_data_nowait("%%")
+                self.active.finish_hlo_header(realtime=realtime)
                     
                     
             # dtaqsink.status might still be 'idle' if sleep is too short

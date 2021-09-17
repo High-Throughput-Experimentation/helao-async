@@ -43,6 +43,8 @@ async_copy = wrap(shutil.copy)
 colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
 # colorama.init()
 
+# version number, gets written into every rcp and hlo file
+hlo_version = 0.2
 
 class action_start_condition(int, Enum):
     no_wait = 0  # orch is dispatching an unconditional action
@@ -621,6 +623,9 @@ class Base(object):
 
 
     def create_file_sample_label(self, samples):
+        if samples is None:
+            return None
+
         if type(samples) is not list:
             samples = [samples]
 
@@ -886,6 +891,10 @@ class Base(object):
 
             self.action.set_atime(offset=self.base.ntp_offset)
             self.action.gen_uuid_action(self.base.hostname)
+            # signals the data logger that it got data and hlo header was written or not
+            # active.finish_hlo_header should be called within the driver before
+            # any data is pushed to avoid a forced header end write
+            self.finished_hlo_header = dict()
             self.file_conn = dict()
             # if Action is not created from Decision+Actualizer, Action is independent
             if self.action.decision_timestamp is None:
@@ -931,6 +940,7 @@ class Base(object):
                     f"{self.base.server_name}_files__{self.action.actionnum}"
                 )
                 initial_dict = {
+                    "hlo_version":hlo_version,
                     "technique_name": self.action.technique_name,  # self.base.technique_name,
                     "server_name": self.base.server_name,
                     "orchestrator": self.action.orch_name,
@@ -1016,6 +1026,10 @@ class Base(object):
                 file_ext = "csv"
                 if file_group == "helao_files":
                     file_ext = "hlo"
+                    if header is None:
+                        header = pyaml.dump({"hlo_version":hlo_version}, sort_dicts=False)
+                    else:
+                        header = pyaml.dump({"hlo_version":hlo_version}, sort_dicts=False)+header
     
                 if action_enum is not None:
                     filename = f"{action_abbr}-{action_enum:.1f}__{filenum}.{file_ext}"
@@ -1030,6 +1044,31 @@ class Base(object):
 
             return filename, header, file_info
 
+
+        def finish_hlo_header(self, realtime: Optional[int] = None):
+            # needs to be a sync function
+            if realtime == None:
+                 realtime = self.set_realtime_nowait()
+
+            data_dict1 = dict()
+            data_dict2 = dict()
+            file_keys = []
+            for file_key in self.file_conn.keys():
+                data_dict1[file_key] = pyaml.dump({"epoch_ns":realtime})
+                data_dict2[file_key] = "%%"
+                file_keys.append(file_key)
+                # before we push the header end onto the dataq, need to set the flag
+                self.finished_hlo_header[file_key] = True
+
+            self.enqueue_data_nowait(
+                            data_dict1,
+                            file_sample_keys = file_keys
+                        )
+            self.enqueue_data_nowait(
+                            data_dict2,
+                            file_sample_keys = file_keys
+                        )
+            
 
         async def add_status(self):
             self.base.status[self.action.action_name].append(self.action.action_uuid)
@@ -1118,6 +1157,7 @@ class Base(object):
             self.base.print_message(f" ... writing data to: {output_path}")
             # create output file and set connection
             self.file_conn[file_sample_key] = await aiofiles.open(output_path, mode="a+")
+            self.finished_hlo_header[file_sample_key] = False
             if header:
                 if not header.endswith("\n"):
                     header += "\n"
@@ -1188,6 +1228,20 @@ class Base(object):
                         for sample, sample_data in data_val.items():
                             if sample in self.file_conn:
                                 if self.file_conn[sample]:
+                                    # check if end of hlo header was writen
+                                    # else force it here
+                                    # e.g. just write the separator
+                                    if not self.finished_hlo_header[sample]:
+                                        self.base.print_message(
+                                            f" ... {self.action.action_abbr} data file {sample} is missing hlo separator. Writing it.",
+                                            error = True
+                                        )
+                                        self.finished_hlo_header[sample] = True
+                                        await self.write_live_data(
+                                             output_str="%%",
+                                             file_conn_key=sample
+                                        )
+                                        
                                     if type(sample_data) is dict:
                                         await self.write_live_data(
                                              output_str=json.dumps(sample_data),
@@ -1382,6 +1436,9 @@ class Base(object):
                 append_dict.update(add_subkeys(status, inheritance))
                 return append_dict
 
+
+            if samples is None:
+                return
 
             if type(samples) is not list:
                     samples = [samples]
