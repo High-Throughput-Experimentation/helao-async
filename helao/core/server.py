@@ -1347,12 +1347,12 @@ class Base(object):
             def update_dict(self, in_out, sample_type, append_dict):
                 if in_out == "in":
                     if sample_type in self.action.samples_in:
-                        self.action.samples_in[sample_type].update(append_dict)
+                        self.action.samples_in[sample_type].append(append_dict)
                     else:
                         self.action.samples_in[sample_type] = [append_dict]
                 if in_out == "out":
                     if sample_type in self.action.samples_in:
-                        self.action.samples_out[sample_type].update(append_dict)
+                        self.action.samples_out[sample_type].append(append_dict)
                     else:
                         self.action.samples_out[sample_type] = [append_dict]
 
