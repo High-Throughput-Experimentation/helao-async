@@ -10,3 +10,4 @@ outputs/*
 .DS_Store
 ntpLastSync.txt
 data/*
+bugreports/*
