@@ -38,6 +38,7 @@ class cNIMAX:
 
         self.action = None  # for passing action object from technique method to measure loop
         self.active = None  # for holding active action object, clear this at end of measurement
+        self.samples_in = []
 
         # seems to work by just defining the scale and then only using its name
         try:
@@ -312,6 +313,7 @@ class cNIMAX:
                         _ = await self.active.finish()
                         self.active = None
                         self.action = None
+                        self.samples_in = []
 
 
                         if self.IO_estop:
@@ -463,24 +465,34 @@ class cNIMAX:
             self.buffersizeread = int(self.samplingrate)
             # save submitted action object
             self.action = A
+            self.samples_in = A.get_sample_in()
             self.FIFO_epoch = None
             # create active and write streaming file header
             
             self.FIFO_NImaxheader = dict()
-            for FIFO_sample_key in self.FIFO_sample_keys:
+            file_sample_label = dict()
+                
+            for i, FIFO_sample_key in enumerate(self.FIFO_sample_keys):
                 self.FIFO_NImaxheader[FIFO_sample_key] = {
                     "version":0.2,
                     "column_headings":self.FIFO_column_headings[FIFO_sample_key]
                     }
+                if len(self.samples_in) == 9:
+                    sample_label = self.base.create_file_sample_label(self.samples_in[i])
+                else:
+                    sample_label = self.base.create_file_sample_label(self.samples_in)
+                file_sample_label[FIFO_sample_key]=sample_label
+                
             self.active = await self.base.contain_action(
                 self.action,
                 file_type="ni_helao__file",
                 file_group="helao_files",
                 file_data_keys=self.FIFO_column_headings,
                 file_sample_keys = self.FIFO_sample_keys,
+                file_sample_label=file_sample_label,
                 header=self.FIFO_NImaxheader,
             )
-
+            await self.active.append_sample(self.samples_in)
 
             self.base.print_message(f"!!! Active action uuid is {self.active.action.action_uuid}")
 
