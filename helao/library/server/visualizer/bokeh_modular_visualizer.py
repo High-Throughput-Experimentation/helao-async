@@ -221,7 +221,6 @@ class C_nidaqmxvis:
 
         self.sourceIV_prev.data = {key: val for key, val in self.sourceIV.data.items()}        
         self.sourceIV.data = {k: [] for k in self.sourceIV.data}
-        # self.sourceIV.stream(data_dict)
         self.sourceIV.stream(tmpdata)
 
 

@@ -106,16 +106,16 @@ class return_runningact(BaseModel):
 class liquid_sample_no(BaseModel):
     """Return class for liquid sample no objects."""
     id: int = None
-    DUID: str = None
-    AUID: str = None
+    DUID: Optional[str] = None
+    AUID: Optional[str] = None
     source: Union[List[str],str] = None
-    volume_mL: float = None
-    action_time: str = None
-    chemical: List[str] = []
-    mass: List[str] = []
-    supplier: List[str] = []
-    lot_number: List[str] = []
-    servkey: str = None
+    volume_mL: Optional[float] = None
+    action_time: Optional[str] = None
+    chemical: Optional[List[str]] = []
+    mass: Optional[List[str]] = []
+    supplier: Optional[List[str]] = []
+    lot_number: Optional[List[str]] = []
+    servkey: Optional[str] = None
     plate_id: Union[int, None] = None
     sample_no: Union[int, None] = None
 
@@ -127,7 +127,19 @@ class solid_sample_no(BaseModel):
     
 class gas_sample_no(BaseModel):
     id: int = None
-    DUID: str = None
-    AUID: str = None
-    volume_mL: float = None
-    action_time: str = None
+    DUID: Optional[str] = None
+    AUID: Optional[str] = None
+    volume_mL: Optional[float] = None
+    action_time: Optional[str] = None
+
+
+class samples_inout(BaseModel):
+    sample_type: str
+    in_out: str
+    label: Optional[Union[str, None]]
+    solid: Optional[Union[solid_sample_no, None]]
+    liquid: Optional[Union[liquid_sample_no, None]]
+    gas: Optional[Union[gas_sample_no, None]]
+    status: Optional[Union[Union[List[str], str], None]]
+    inheritance: Optional[Union[str, None]]
+    machine: Optional[Union[str, None]]
