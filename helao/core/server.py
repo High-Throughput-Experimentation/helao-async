@@ -13,7 +13,7 @@ from copy import copy
 from collections import defaultdict, deque
 from socket import gethostname
 from time import ctime, time, strftime, strptime, time_ns
-from typing import Optional, Union
+from typing import Optional, Union, List
 from math import floor
 from enum import Enum
 import colorama
@@ -619,6 +619,39 @@ class Base(object):
         await self.actives[action.action_uuid].myinit()
         return self.actives[action.action_uuid]
 
+
+    def create_file_sample_label(self, samples):
+        if type(samples) is not list:
+            samples = [samples]
+
+        file_sample_label={}
+        for sample in samples:
+            label = None
+            if sample.sample_type == "liquid":
+                if sample.liquid is not None:
+                    label = f"{sample.machine}__{sample.liquid.id}"
+                
+            elif sample.sample_type == "gas":
+                if sample.gas is not None:
+                    label = f"{sample.machine}__{sample.gas.id}"
+            elif sample.sample_type == "solid":
+                if sample.solid is not None:
+                    label = f"{sample.solid.plate_id}__{sample.solid.sample_no}"
+
+            elif sample.sample_type == "sample_assembly":
+                label = sample.label
+            
+            if label is not None:
+                if sample.sample_type in file_sample_label:
+                    file_sample_label[sample.sample_type].append(label)
+                else:
+                    file_sample_label[sample.sample_type]=[label]
+
+        if len(file_sample_label) == 0:
+            file_sample_label = None 
+        return file_sample_label
+
+
     async def get_active_info(self, action_uuid: str):
         if action_uuid in self.actives.keys():
             action_dict = await self.actives[action_uuid].active.as_dict()
@@ -998,8 +1031,6 @@ class Base(object):
             return filename, header, file_info
 
 
-
-
         async def add_status(self):
             self.base.status[self.action.action_name].append(self.action.action_uuid)
             self.base.print_message(
@@ -1015,11 +1046,13 @@ class Base(object):
                     self.action.action_uuid
                 )
                 self.base.print_message(
-                    f" ... Removed {self.action.action_uuid} from {self.action.action_name} status list."
+                    f" ... Removed {self.action.action_uuid} from {self.action.action_name} status list.",
+                    info = True
                 )
             else:
                 self.base.print_message(
-                    f" ... {self.action.action_uuid} did not excist in {self.action.action_name} status list."
+                    f" ... {self.action.action_uuid} did not excist in {self.action.action_name} status list.",
+                    error = True
                 )
             await self.base.status_q.put(
                 {self.action.action_name: self.base.status[self.action.action_name]}
@@ -1031,7 +1064,8 @@ class Base(object):
                 f"{self.action.action_uuid}__estop"
             )
             self.base.print_message(
-                f" ... E-STOP {self.action.action_uuid} on {self.action.action_name} status."
+                f" ... E-STOP {self.action.action_uuid} on {self.action.action_name} status.",
+                error = True
             )
             await self.base.status_q.put(
                 {self.action.action_name: self.base.status[self.action.action_name]}
@@ -1043,7 +1077,8 @@ class Base(object):
                 f"{self.action.action_uuid}__error"
             )
             self.base.print_message(
-                f" ... ERROR {self.action.action_uuid} on {self.action.action_name} status."
+                f" ... ERROR {self.action.action_uuid} on {self.action.action_name} status.",
+                error = True
             )
             if err_msg:
                 self.action.error_code = err_msg
@@ -1259,40 +1294,21 @@ class Base(object):
 
             await file_instance.write(output_str)
             await file_instance.close()
-
+           
 
         async def append_sample(
             self,
-            samples_inout
-            # sample_type: str,
-            # in_out: str,
-            # label: Optional[str] = None,
-            # solid: Union[solid_sample_no, None] = None,
-            # liquid: Union[liquid_sample_no, None] = None,
-            # gas: Union[gas_sample_no, None] = None,
-            # status: Optional[str] = "preserved",
-            # inheritance: Optional[str] = "allow_both",
-            # machine: Optional[str] = None,
+            samples: Union[List[samples_inout],samples_inout]
         ):
             "Add sample to samples_out and samples_in dict"
 
-            sample_type = samples_inout.sample_type
-            in_out = samples_inout.in_out
-            label = samples_inout.label
-            solid = samples_inout.solid
-            liquid = samples_inout.liquid
-            gas = samples_inout.gas
-            status = samples_inout.status
-            inheritance = samples_inout.inheritance
-            machine = samples_inout.machine
-            if inheritance is None:
-                inheritance = "allow_both"
-            if status is None:
-                status = "preserved"
-            if machine is None:
-                machine = self.action.machine_name
-                print("##############", machine)
+            # - inheritance
+            # give_only:
+            # receive_only:
+            # allow_both:
+            # block_both:
 
+            # - status:
             # created: pretty self-explanatory; the sample was created during the process.
             # destroyed: also self-explanatory
             # preserved: the sample exists before and after the process. e.g. an echem experiment
@@ -1300,42 +1316,14 @@ class Base(object):
             # recovered: the opposite of incorporated. E.g. an electrode assembly is taken apart, and the original electrodes are recovered, and further experiments may be done on those electrodes
 
             def add_subkeys(status, inheritance):
-                # if inheritance is None or inheritance not in [
-                #     "give_only",
-                #     "receive_only",
-                #     "allow_both",
-                #     "block_both",
-                # ]:
-                #     self.base.print_message(
-                #         f"inheritance '{inheritance}' is not supported. Using 'allow_both'.",
-                #         info=True,
-                #     )
-                #     inheritance = "allow_both"
-
-
-                # for i, stat in enumerate(status):
-                #     if stat is None or stat not in [
-                #         "created",
-                #         "destroyed",
-                #         "preserved",
-                #         "incorporated",
-                #         "recovered",
-                #     ]:
-                #         self.base.print_message(
-                #             f"Sample status '{stat}' is not supported. Using 'unknown'.",
-                #             info=True,
-                #         )
-                #         status[i] = "unknown"
-
-                tmpdict = dict()
+                subdict = dict()
                 if inheritance is not None:
-                    tmpdict.update({"inheritance": inheritance})
+                    subdict.update({"inheritance": inheritance})
                 if status is not None:
                     if type(status) is not list:
                         status = [status]
-                    tmpdict.update({"status": status})
-
-                return tmpdict
+                    subdict.update({"status": status})
+                return subdict
 
             def solid_to_dict(solid):
                 solid_dict = dict()
@@ -1394,42 +1382,55 @@ class Base(object):
                 append_dict.update(add_subkeys(status, inheritance))
                 return append_dict
 
-            if sample_type == "solid":
-                append_dict = append_solid(solid, machine, status, inheritance)
-                update_dict(self, in_out, sample_type, append_dict)
 
-            elif sample_type == "liquid":
-                append_dict = append_liquid(liquid, machine, status, inheritance)
-                update_dict(self, in_out, sample_type, append_dict)
+            if type(samples) is not list:
+                    samples = [samples]
+                    
+            for sample in samples:
+                if sample.inheritance is None:
+                    sample.inheritance = "allow_both"
+                if sample.status is None:
+                    sample.status = "preserved"
+                if sample.machine is None:
+                    sample.machine = self.action.machine_name
+    
+                if sample.sample_type == "solid":
+                    append_dict = append_solid(sample.solid, sample.machine, sample.status, sample.inheritance)
+                    update_dict(self, sample.in_out, sample.sample_type, append_dict)
+    
+                elif sample.sample_type == "liquid":
+                    append_dict = append_liquid(sample.liquid, sample.machine, sample.status, sample.inheritance)
+                    update_dict(self, sample.in_out, sample.sample_type, append_dict)
+    
+                elif sample.sample_type == "gas":
+                    append_dict = append_gas(sample.liquid, sample.machine, sample.status, sample.inheritance)
+                    update_dict(self, sample.in_out, sample.sample_type, append_dict)
+    
+                elif sample.sample_type == "liquid_reservoir":
+                    append_dict = append_liquid(sample.liquid, sample.machine, sample.status, sample.inheritance)
+                    update_dict(self, sample.in_out, sample.sample_type, append_dict)
+    
+                elif sample.sample_type == "sample_assembly":
+                    append_dict = {
+                        "label": f"{sample.label}",
+                        "machine": sample.machine,
+                    }
+                    if sample.liquid is not None:
+                        append_dict["liquid"] = [
+                            append_liquid(sample.liquid, sample.machine, None, None)
+                        ]
+                    if sample.solid is not None:
+                        append_dict["solid"] = [
+                            append_solid(sample.solid, sample.machine, None, None)
+                        ]
+                    if sample.gas is not None:
+                        append_dict["gas"] = [append_gas(sample.gas, sample.machine, None, None)]
+                    append_dict.update(add_subkeys(sample.status, sample.inheritance))
+                    update_dict(self, sample.in_out, sample.sample_type, append_dict)
+    
+                else:
+                    self.base.print_message(f"Type '{sample.sample_type}' is not supported.", error = True)
 
-            elif sample_type == "gas":
-                append_dict = append_gas(liquid, machine, status, inheritance)
-                update_dict(self, in_out, sample_type, append_dict)
-
-            elif sample_type == "liquid_reservoir":
-                append_dict = append_liquid(liquid, machine, status, inheritance)
-                update_dict(self, in_out, sample_type, append_dict)
-
-            elif sample_type == "sample_assembly":
-                append_dict = {
-                    "label": f"{label}",
-                    "machine": machine,
-                }
-                if liquid is not None:
-                    append_dict["liquid"] = [
-                        append_liquid(liquid, machine, None, None)
-                    ]
-                if solid is not None:
-                    append_dict["solid"] = [
-                        append_solid(solid, machine, None, None)
-                    ]
-                if gas is not None:
-                    append_dict["gas"] = [append_gas(gas, machine, None, None)]
-                append_dict.update(add_subkeys(status, inheritance))
-                update_dict(self, in_out, sample_type, append_dict)
-
-            else:
-                self.base.print_message(f"Type '{sample_type}' is not supported.")
 
         async def finish(self):
             "Close file_conn, finish rcp, copy aux, set endpoint status, and move active dict to past."
