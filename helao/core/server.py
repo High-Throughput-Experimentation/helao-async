@@ -34,7 +34,7 @@ from helao.core.helper import MultisubscriberQueue, dict_to_rcp, eval_val
 from helao.core.helper import print_message
 from helao.core.schema import Action, Decision
 from helao.core.model import return_dec, return_declist, return_act, return_actlist
-from helao.core.model import liquid_sample_no, gas_sample_no, solid_sample_no
+from helao.core.model import liquid_sample_no, gas_sample_no, solid_sample_no, samples_inout
 
 
 async_copy = wrap(shutil.copy)
@@ -824,6 +824,15 @@ class Base(object):
             self.action.file_sample_label = file_sample_label
             self.action.header = header
             
+            # this can be filled in via copy_globals
+            # or in the actualizer
+            # but should not be written to rcp
+            # as its filled in to  self.action.samples_in later by the server
+            # this way samples can be action input params, without writing the
+            # complete samples_inout object into the rcp
+            if "samples_in" in self.action.action_params:
+                del self.action.action_params["samples_in"]
+            
             if file_sample_keys is None:
                 self.action.file_sample_keys = ["None"]
                 self.action.file_sample_label = {"None":self.action.file_sample_label}
@@ -1254,17 +1263,35 @@ class Base(object):
 
         async def append_sample(
             self,
-            sample_type: str,
-            in_out: str,
-            label: Optional[str] = None,
-            solid: Union[solid_sample_no, None] = None,
-            liquid: Union[liquid_sample_no, None] = None,
-            gas: Union[gas_sample_no, None] = None,
-            status: Optional[str] = "preserved",
-            inheritance: Optional[str] = "allow_both",
-            machine: Optional[str] = None,
+            samples_inout
+            # sample_type: str,
+            # in_out: str,
+            # label: Optional[str] = None,
+            # solid: Union[solid_sample_no, None] = None,
+            # liquid: Union[liquid_sample_no, None] = None,
+            # gas: Union[gas_sample_no, None] = None,
+            # status: Optional[str] = "preserved",
+            # inheritance: Optional[str] = "allow_both",
+            # machine: Optional[str] = None,
         ):
             "Add sample to samples_out and samples_in dict"
+
+            sample_type = samples_inout.sample_type
+            in_out = samples_inout.in_out
+            label = samples_inout.label
+            solid = samples_inout.solid
+            liquid = samples_inout.liquid
+            gas = samples_inout.gas
+            status = samples_inout.status
+            inheritance = samples_inout.inheritance
+            machine = samples_inout.machine
+            if inheritance is None:
+                inheritance = "allow_both"
+            if status is None:
+                status = "preserved"
+            if machine is None:
+                machine = self.action.machine_name
+                print("##############", machine)
 
             # created: pretty self-explanatory; the sample was created during the process.
             # destroyed: also self-explanatory
