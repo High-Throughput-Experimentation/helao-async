@@ -11,7 +11,7 @@ import json
 from helao.core.helper import gen_uuid
 from helao.core.model import return_finishedact, return_runningact
 from helao.core.helper import print_message
-
+from helao.core.model import liquid_sample_no, gas_sample_no, solid_sample_no, samples_inout
 
 class Decision(object):
     "Sample-process grouping class."
@@ -142,3 +142,47 @@ class Action(Decision):
             atime = datetime.fromtimestamp(atime.timestamp() + offset)
         self.action_queue_time = atime.strftime("%Y%m%d.%H%M%S%f")
 
+
+    def get_sample_in(self):
+        
+        def dict_to_samples_inout(self, samples_in_dictlist):
+            if type(samples_in_dictlist) is not list:
+                samples_in_dictlist = [samples_in_dictlist]
+            samples_in_retlist = []
+    
+            for samples_in_dict in samples_in_dictlist:
+                solid = samples_in_dict.get("solid",None)
+                if solid is not None:
+                    solid = solid_sample_no(**solid)
+                liquid = samples_in_dict.get("liquid",None)
+                if liquid is not None:
+                    liquid = liquid_sample_no(**liquid)
+                gas = samples_in_dict.get("gas",None)
+                if gas is not None:
+                    gas = gas_sample_no(**gas)
+                machine = samples_in_dict.get("machine",None)
+                if machine is None:
+                    machine = self.machine_name
+        
+                samples_in_retlist.append(samples_inout(
+                           sample_type = samples_in_dict.get("sample_type",""),
+                           in_out = samples_in_dict.get("in_out",""),
+                           label = samples_in_dict.get("label",None),
+                           solid = solid,
+                           liquid = liquid,
+                           gas = gas,
+                           status = samples_in_dict.get("status",None),
+                           inheritance = samples_in_dict.get("inheritance",None),
+                           machine = machine
+                    )
+                )
+            return samples_in_retlist
+
+
+        samples_in = self.action_params.get("samples_in",None)
+        if "samples_in" in self.action_params:
+            del self.action_params["samples_in"]
+
+        if samples_in is not None:
+            samples_in = dict_to_samples_inout(self,samples_in)
+        return samples_in

@@ -554,45 +554,18 @@ class gamry:
                     }
             )
 
-
-            file_sample_label={}
-            for samples_in in self.samples_in:
-                label = None
-                if samples_in.sample_type == "liquid":
-                    if samples_in.liquid is not None:
-                        label = f"{samples_in.machine}__{samples_in.liquid.id}"
-                    
-                elif samples_in.sample_type == "gas":
-                    if samples_in.gas is not None:
-                        label = f"{samples_in.machine}__{samples_in.gas.id}"
-                elif samples_in.sample_type == "solid":
-                    if samples_in.solid is not None:
-                        label = f"{samples_in.solid.plate_id}__{samples_in.solid.sample_no}"
-
-                elif samples_in.sample_type == "sample_assembly":
-                    label = samples_in.label
-                
-                if label is not None:
-                    if samples_in.sample_type in file_sample_label:
-                        file_sample_label[samples_in.sample_type].append(label)
-                    else:
-                        file_sample_label[samples_in.sample_type]=[label]
-
-            if len(file_sample_label) == 0:
-                file_sample_label = None
-
             self.active = await self.base.contain_action(
                 self.action,
                 file_type="pstat_helao__file",
                 file_group="helao_files",
                 file_data_keys=self.FIFO_column_headings,
-                file_sample_label=file_sample_label,
+                file_sample_label=self.base.create_file_sample_label(self.samples_in),
                 header=self.FIFO_gamryheader,
             )
             self.base.print_message(f"!!! Active action uuid is {self.active.action.action_uuid}")
             # active object is set so we can set the continue flag
             self.IO_continue = True
-            await self.update_action_sampleinout()
+            await self.active.append_sample(self.samples_in)
 
 
             # TODO:
@@ -878,9 +851,7 @@ class gamry:
         self, A: Action,
     ):
         """LSV definition"""
-        samples_in = A.action_params.get("samples_in",None)
-        if samples_in is not None:
-            samples_in = self.to_samples_inout(samples_in, A)
+        samples_in = A.get_sample_in()
         Vinit = A.action_params["Vinit"]
         Vfinal = A.action_params["Vfinal"]
         ScanRate = A.action_params["ScanRate"]
@@ -933,9 +904,7 @@ class gamry:
         self, A: Action,
     ):
         """CA definition"""
-        samples_in = A.action_params.get("samples_in",None)
-        if samples_in is not None:
-            samples_in = self.to_samples_inout(samples_in, A)
+        samples_in = A.get_sample_in()
         Vval = A.action_params["Vval"]
         Tval = A.action_params["Tval"]
         SampleRate = A.action_params["SampleRate"]
@@ -976,9 +945,7 @@ class gamry:
         self, A: Action,
     ):
         """CP definition"""
-        samples_in = A.action_params.get("samples_in",None)
-        if samples_in is not None:
-            samples_in = self.to_samples_inout(samples_in, A)
+        samples_in = A.get_sample_in()
         Ival = A.action_params["Ival"]
         Tval = A.action_params["Tval"]
         SampleRate = A.action_params["SampleRate"]
@@ -1016,9 +983,7 @@ class gamry:
         return activeDict
 
     async def technique_CV(self, A: Action):
-        samples_in = A.action_params.get("samples_in",None)
-        if samples_in is not None:
-            samples_in = self.to_samples_inout(samples_in, A)
+        samples_in = A.get_sample_in()
         Vinit = A.action_params["Vinit"]
         Vapex1 = A.action_params["Vapex1"]
         Vapex2 = A.action_params["Vapex2"]
@@ -1093,9 +1058,7 @@ class gamry:
 
     async def technique_EIS(self, A: Action):
         """EIS definition"""
-        samples_in = A.action_params.get("samples_in",None)
-        if samples_in is not None:
-            samples_in = self.to_samples_inout(samples_in, A)
+        samples_in = A.get_sample_in()
         Vval = A.action_params["Vval"]
         Tval = A.action_params["Tval"]
         Freq = A.action_params["Freq"]
@@ -1142,9 +1105,7 @@ class gamry:
 
     async def technique_OCV(self, A: Action):
         """OCV definition"""
-        samples_in = A.action_params.get("samples_in",None)
-        if samples_in is not None:
-            samples_in = self.to_samples_inout(samples_in, A)
+        samples_in = A.get_sample_in()
         Tval = A.action_params["Tval"]
         SampleRate = A.action_params["SampleRate"]
         # runparams = A.action_params['runparams']
@@ -1182,49 +1143,3 @@ class gamry:
             samples_in=samples_in
         )
         return activeDict
-
-
-    def to_samples_inout(self, samples_in_dictlist, A):
-        if type(samples_in_dictlist) is not list:
-            samples_in_dictlist = [samples_in_dictlist]
-        samples_in_retlist = []
-
-        for samples_in_dict in samples_in_dictlist:
-            solid = samples_in_dict.get("solid",None)
-            if solid is not None:
-                # print(solid)
-                solid = solid_sample_no(**solid)
-            liquid = samples_in_dict.get("liquid",None)
-            if liquid is not None:
-                # print(liquid)
-                liquid = liquid_sample_no(**liquid)
-            gas = samples_in_dict.get("gas",None)
-            if gas is not None:
-                # print(gas)
-                gas = gas_sample_no(**gas)
-            machine = samples_in_dict.get("machine",None)
-            if machine is None:
-                machine = A.machine_name
-    
-            samples_in_retlist.append(samples_inout(
-                       sample_type = samples_in_dict.get("sample_type",""),
-                       in_out = samples_in_dict.get("in_out",""),
-                       label = samples_in_dict.get("label",None),
-                       solid = solid,
-                       liquid = liquid,
-                       gas = gas,
-                       status = samples_in_dict.get("status",None),
-                       inheritance = samples_in_dict.get("inheritance",None),
-                       machine = machine
-                )
-            )
-        return samples_in_retlist
-
-
-    async def update_action_sampleinout(self):
-        """Updates action sample_in and sample_out"""
-        if self.active:
-            for samples_in in self.samples_in:
-                await self.active.append_sample(samples_in)
-            
-
