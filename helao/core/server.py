@@ -634,11 +634,11 @@ class Base(object):
             label = None
             if sample.sample_type == "liquid":
                 if sample.liquid is not None:
-                    label = f"{sample.machine}__{sample.liquid.id}"
+                    label = f"{sample.machine}__{sample.liquid.sample_id}"
                 
             elif sample.sample_type == "gas":
                 if sample.gas is not None:
-                    label = f"{sample.machine}__{sample.gas.id}"
+                    label = f"{sample.machine}__{sample.gas.sample_id}"
             elif sample.sample_type == "solid":
                 if sample.solid is not None:
                     label = f"{sample.solid.plate_id}__{sample.solid.sample_no}"
@@ -1389,13 +1389,13 @@ class Base(object):
             def gas_to_dict(gas):
                 gas_dict = dict()
                 if gas is not None:
-                    gas_dict.update({"sample_no": gas.id})
+                    gas_dict.update({"sample_no": gas.sample_id})
                 return gas_dict
 
             def liquid_to_dict(liquid):
                 liquid_dict = dict()
                 if liquid is not None:
-                    liquid_dict.update({"sample_no": liquid.id})
+                    liquid_dict.update({"sample_no": liquid.sample_id})
                 return liquid_dict
 
             def update_dict(self, in_out, sample_type, append_dict):
@@ -1412,7 +1412,7 @@ class Base(object):
 
             def append_liquid(liquid, machine, status, inheritance):
                 append_dict = {
-                    "label": f"{machine}__{liquid.id}",
+                    "label": f"{machine}__{liquid.sample_id}",
                     "machine": machine,
                 }
                 append_dict.update(liquid_to_dict(liquid))
@@ -1421,7 +1421,7 @@ class Base(object):
 
             def append_gas(gas, machine, status, inheritance):
                 append_dict = {
-                    "label": f"{machine}__{gas.id}",
+                    "label": f"{machine}__{gas.sample_id}",
                     "machine": machine,
                 }
                 append_dict.update(gas_to_dict(gas))

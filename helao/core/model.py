@@ -105,11 +105,14 @@ class return_runningact(BaseModel):
 
 class liquid_sample_no(BaseModel):
     """Return class for liquid sample no objects."""
-    id: int = None
+    sample_id: int = None
     DUID: Optional[str] = None
     AUID: Optional[str] = None
     source: Union[List[str],str] = None
     volume_mL: Optional[float] = None
+    inheritance: Optional[str] = None
+    machine: Optional[str] = None
+    sample_hash: Optional[str] = None
     action_time: Optional[str] = None
     chemical: Optional[List[str]] = []
     mass: Optional[List[str]] = []
@@ -117,7 +120,7 @@ class liquid_sample_no(BaseModel):
     lot_number: Optional[List[str]] = []
     servkey: Optional[str] = None
     plate_id: Union[int, None] = None
-    sample_no: Union[int, None] = None
+    plate_sample_no: Union[int, None] = None
 
 
 class solid_sample_no(BaseModel):
@@ -126,7 +129,7 @@ class solid_sample_no(BaseModel):
 
     
 class gas_sample_no(BaseModel):
-    id: int = None
+    sample_id: int = None
     DUID: Optional[str] = None
     AUID: Optional[str] = None
     volume_mL: Optional[float] = None

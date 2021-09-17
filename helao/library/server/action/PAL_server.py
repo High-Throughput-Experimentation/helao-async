@@ -24,6 +24,12 @@ def makeApp(confPrefix, servKey):
     )
 
 
+    @app.post(f"/{servKey}/convert_DB")
+    async def convert_DB(request: Request):
+        await app.driver.convert_oldDB_to_sqllite()
+        return {}
+
+
     @app.post(f"/{servKey}/PAL_run_method")
     async def PAL_run_method(
         request: Request, 

@@ -18,6 +18,8 @@ from helao.core.server import Base
 from helao.core.error import error_codes
 from helao.library.driver.HTEdata_legacy import LocalDataHandler
 from helao.core.data import liquid_sample_no_API
+from helao.core.data import sqlite_liquid_sample_no_API
+
 from helao.core.model import liquid_sample_no, gas_sample_no, solid_sample_no, samples_inout
 
 import nidaqmx
@@ -183,6 +185,7 @@ class cPAL:
         self.liquid_sample_no_DB_path = self.world_config["liquid_sample_no_DB"]
 
         self.liquid_sample_no_DB = liquid_sample_no_API(self.base, self.liquid_sample_no_DB_path)
+        self.sqlite_liquid_sample_no_API = sqlite_liquid_sample_no_API(self.base, self.liquid_sample_no_DB_path)
 
         self.sshuser = self.config_dict["user"]
         self.sshkey = self.config_dict["key"]
@@ -259,6 +262,9 @@ class cPAL:
         self.FIFO_rshs_dir = ""
         self.FIFO_column_headings = []
 
+
+    async def convert_oldDB_to_sqllite(self):
+        await self.sqlite_liquid_sample_no_API.old_jsondb_to_sqlitedb()
 
 
     async def trayDB_reset(self, A):
@@ -802,7 +808,7 @@ class cPAL:
                     source_mass = liquid_sample_no_in_dict.get("mass", [""])
                     source_supplier = liquid_sample_no_in_dict.get("supplier", [""])
                     source_lotnumber = liquid_sample_no_in_dict.get("lot_number", [""])
-                    self.base.print_message(f" ... source_electrolyte: {liquid_sample_no_in_dict['id']}")
+                    self.base.print_message(f" ... source_electrolyte: {liquid_sample_no_in_dict['sample_id']}")
                     self.base.print_message(f" ... source_chemical: {source_chemical}")
                     self.base.print_message(f" ... source_mass: {source_mass}")
                     self.base.print_message(f" ... source_supplier: {source_supplier}")
@@ -819,7 +825,7 @@ class cPAL:
                         lot_number=source_lotnumber,
                         servkey=self.base.server_name,
                         plate_id = PALparams.PAL_plate_id, 
-                        sample_no = PALparams.PAL_plate_sample_no
+                        plate_sample_no = PALparams.PAL_plate_sample_no
                     )
                 
                     # TODO: check if ID was really created (later)
@@ -1457,6 +1463,7 @@ class cPAL:
         datadict = await self.liquid_sample_no_DB.get_liquid_sample_no(liquid_sample_no)
         return datadict
 
+
     async def liquid_sample_no_create_new(
         self,
         DUID: str = "",
@@ -1470,7 +1477,7 @@ class cPAL:
         lot_number: List[str] = [],
         servkey: str = None,
         plate_id: int = None,
-        sample_no: int = None,
+        plate_sample_no: int = None,
         *args,**kwargs
     ):
         entry = dict(
@@ -1485,7 +1492,7 @@ class cPAL:
             lot_number=lot_number,
             servkey=self.base.server_name,
             plate_id = plate_id,
-            sample_no = sample_no
+            plate_sample_no = plate_sample_no
         )
         datadict = await self.liquid_sample_no_DB.new_liquid_sample_no(entry)
         return datadict
