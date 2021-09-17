@@ -271,8 +271,7 @@ class cPAL:
         )
         realtime = await myactive.set_realtime()
         if myactive:
-            myactive.enqueue_data_nowait(pyaml.dump({"epoch_ns":realtime}))
-            myactive.enqueue_data_nowait("%%")
+            myactive.finish_hlo_header(realtime=realtime)
 
         # backup to json
         await self.trayDB_backup(reset=True, myactive = myactive)
@@ -549,8 +548,7 @@ class cPAL:
         )
         realtime = await myactive.set_realtime()
         if myactive:
-            myactive.enqueue_data_nowait(pyaml.dump({"epoch_ns":realtime}))
-            myactive.enqueue_data_nowait("%%")
+            myactive.finish_hlo_header(realtime=realtime)
 
 
         table = {}
@@ -1306,8 +1304,8 @@ class cPAL:
 
 
                     self.FIFO_PALheader = {
-                            "techniquename":self.IO_PALparams.PAL_method.name,
-                            "version":0.2,
+                            "technique_name":self.IO_PALparams.PAL_method.name,
+                            # "version":0.2,
                             "column_headings":self.FIFO_column_headings,
                     }
 
@@ -1322,8 +1320,7 @@ class cPAL:
                     self.base.print_message(f" ... Active action uuid is {self.active.action.action_uuid}")
                     realtime = await self.active.set_realtime()
                     if self.active:
-                        self.active.enqueue_data_nowait(pyaml.dump({"epoch_ns":realtime}))
-                        self.active.enqueue_data_nowait("%%")
+                        self.active.finish_hlo_header(realtime=realtime)
 
                     # for sequence, the sample in is always the same
                     self.base.print_message(f" ... liquid_sample_no_in: {self.IO_PALparams.liquid_sample_no_in}")

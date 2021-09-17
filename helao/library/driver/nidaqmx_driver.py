@@ -192,20 +192,7 @@ class cNIMAX:
                     self.FIFO_epoch -= number_of_samples / self.samplingrate
                     if self.active:
                         if self.active.action.save_data:
-                            data_dict = dict()
-                            for i,FIFO_sample_key in enumerate(self.FIFO_sample_keys):
-                                data_dict[FIFO_sample_key] = pyaml.dump({"epoch_ns":self.FIFO_epoch})
-                            self.active.enqueue_data_nowait(
-                                data_dict,
-                                file_sample_keys = self.FIFO_sample_keys
-                            )
-                            data_dict = dict()
-                            for i,FIFO_sample_key in enumerate(self.FIFO_sample_keys):
-                                data_dict[FIFO_sample_key] = "%%"
-                            self.active.enqueue_data_nowait(
-                                data_dict,
-                                file_sample_keys = self.FIFO_sample_keys
-                                )
+                            self.active.finish_hlo_header(realtime=self.FIFO_epoch)
 
                 
                 # start seq: V then current, so read current first then Volt
@@ -474,7 +461,8 @@ class cNIMAX:
                 
             for i, FIFO_sample_key in enumerate(self.FIFO_sample_keys):
                 self.FIFO_NImaxheader[FIFO_sample_key] = {
-                    "version":0.2,
+                    # "version":0.2,
+                    "technique_name":"multi_cell_IV",
                     "column_headings":self.FIFO_column_headings[FIFO_sample_key]
                     }
                 if len(self.samples_in) == 9:
