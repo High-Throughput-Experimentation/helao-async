@@ -460,25 +460,22 @@ class cNIMAX:
             file_sample_label = dict()
                 
             for i, FIFO_sample_key in enumerate(self.FIFO_sample_keys):
-                self.FIFO_NImaxheader[FIFO_sample_key] = {
-                    # "version":0.2,
-                    "technique_name":"multi_cell_IV",
-                    "column_headings":self.FIFO_column_headings[FIFO_sample_key]
-                    }
-                if len(self.samples_in) == 9:
-                    sample_label = self.base.create_file_sample_label(self.samples_in[i])
+                if self.samples_in is not None:
+                    if len(self.samples_in) == 9:
+                        sample_label = self.base.create_file_sample_label(self.samples_in[i])
+                    else:
+                        sample_label = self.base.create_file_sample_label(self.samples_in)
                 else:
-                    sample_label = self.base.create_file_sample_label(self.samples_in)
+                    sample_label = None
                 file_sample_label[FIFO_sample_key]=sample_label
                 
             self.active = await self.base.contain_action(
                 self.action,
                 file_type="ni_helao__file",
-                file_group="helao_files",
                 file_data_keys=self.FIFO_column_headings,
                 file_sample_keys = self.FIFO_sample_keys,
                 file_sample_label=file_sample_label,
-                header=self.FIFO_NImaxheader,
+                header=None,
             )
             await self.active.append_sample(self.samples_in)
 

@@ -447,11 +447,11 @@ class HTE_legacy_API:
     
 
 class sqlite_liquid_sample_no_API:
-    def __init__(self, Serv_class, DB):
-        self.DBfilepath, self.DBfile = os.path.split(DB)
-        
+    def __init__(self, Serv_class, DBpath):
+        self.DBfile = "local_liquid.db"
+        self.DBfilepath = DBpath
         self.base = Serv_class
-        self.DB = os.path.join(self.DBfilepath, "local_liquid.db")#DB
+        self.DB = os.path.join(self.DBfilepath, self.DBfile)
         self.con = None
         self.cur = None
         self.open_DB()
@@ -475,27 +475,7 @@ class sqlite_liquid_sample_no_API:
 
     def create_init_db(self):
         # create tables
-        self.cur.execute(
-          """CREATE TABLE liquid_sample_no(
-          idx INTEGER PRIMARY KEY AUTOINCREMENT,
-          sample_id INTEGER NOT NULL,
-          action_time VARCHAR(255) NOT NULL,
-          type VARCHAR(255) NOT NULL,
-          machine VARCHAR(255) NOT NULL,
-          volume_mL REAL NOT NULL,
-          inheritance VARCHAR(255),
-          sample_hash VARCHAR(255),
-          DUID VARCHAR(255),
-          AUID VARCHAR(255),
-          source TEXT,
-          chemical TEXT,
-          mass TEXT,
-          supplier TEXT,
-          lot_number TEXT,
-          servkey VARCHAR(255),
-          comment TEXT,
-          plate_id INTEGER,
-          plate_sample_no INTEGER);""")
+        create_initial_sqllitedb(dbcur=self.cur)
         self.base.print_message('Liquid_sample table created', info = True)
         # commit changes
         self.con.commit()
@@ -600,7 +580,7 @@ class sqlite_liquid_sample_no_API:
             source,
             comment,
             plate_id,
-            plate_sample_no
+            plate_sample_no,
             ) VALUES (
                 ?,
                 ?,
@@ -622,8 +602,9 @@ class sqlite_liquid_sample_no_API:
         self.close_DB()
 
 
-    async def get_liquid_sample_no(self, ID):
-        pass
+    # async def get_liquid_sample_no(self, sample_id = None, global_hash: Optional[str] = None):
+    #     pass
+
 
     async def old_jsondb_to_sqlitedb(self):
         old_liquid_sample_no_DB = liquid_sample_no_API(self.base, os.path.join(self.DBfilepath, self.DBfile))
@@ -635,9 +616,12 @@ class sqlite_liquid_sample_no_API:
 
 
 class liquid_sample_no_API:
-    def __init__(self, Serv_class, DB):
+    def __init__(self, Serv_class, DBpath):
         self.base = Serv_class
-        self.DBfilepath, self.DBfile = os.path.split(DB)
+        
+        self.DBfile = "liquid_ID_database.csv"
+        self.DBfilepath = DBpath
+        # self.DBfilepath, self.DBfile = os.path.split(DB)
         self.fDB = None
         self.headerlines = 0
         # create folder first if it not exist
@@ -761,8 +745,38 @@ class liquid_sample_no_API:
             ret_liquid_sample_no = liquid_sample_no(**liquid_sample_no_jsondict)
             self.base.print_message(f" ... data json content: {ret_liquid_sample_no.dict()}")
             
-            
-            
             return ret_liquid_sample_no.dict()
         else:
             return liquid_sample_no().dict() # will be default empty one
+
+
+def create_md5():
+    pass
+
+
+def create_initial_sqllitedb(dbcur):
+    """create initial sqlite3 db for gas, liquid, assemblies"""
+    dbcur.execute(
+          """CREATE TABLE liquid_sample_no(
+          idx INTEGER PRIMARY KEY AUTOINCREMENT,
+          sample_id INTEGER NOT NULL,
+          action_time VARCHAR(255) NOT NULL,
+          type VARCHAR(255) NOT NULL,
+          machine VARCHAR(255) NOT NULL,
+          global_id TEXT,
+          global_hash_md5 VARCHAR(255),
+          volume_mL REAL NOT NULL,
+          pH REAL,
+          inheritance VARCHAR(255),
+          DUID VARCHAR(255),
+          AUID VARCHAR(255),
+          source TEXT,
+          chemical TEXT,
+          mass TEXT,
+          supplier TEXT,
+          lot_number TEXT,
+          servkey VARCHAR(255),
+          comment TEXT,
+          plate_id INTEGER,
+          last_update VARCHAR(255) NOT NULL,
+          plate_sample_no INTEGER);""")

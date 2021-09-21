@@ -157,13 +157,17 @@ class Action(Decision):
                 liquid = samples_in_dict.get("liquid",None)
                 if liquid is not None:
                     liquid = liquid_sample_no(**liquid)
+                    if liquid.machine == None:
+                        liquid.machine = self.machine_name
                 gas = samples_in_dict.get("gas",None)
                 if gas is not None:
                     gas = gas_sample_no(**gas)
-                machine = samples_in_dict.get("machine",None)
+                    if gas.machine == None:
+                        gas.machine = self.machine_name
+                machine = samples_in_dict.get("machine", None)
                 if machine is None:
                     machine = self.machine_name
-        
+
                 samples_in_retlist.append(samples_inout(
                            sample_type = samples_in_dict.get("sample_type",""),
                            in_out = samples_in_dict.get("in_out",""),

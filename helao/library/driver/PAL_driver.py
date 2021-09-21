@@ -182,10 +182,9 @@ class cPAL:
         asyncio.gather(self.trayDB_load_backup())
 
         self.local_data_dump = self.world_config["save_root"]
-        self.liquid_sample_no_DB_path = self.world_config["liquid_sample_no_DB"]
-
-        self.liquid_sample_no_DB = liquid_sample_no_API(self.base, self.liquid_sample_no_DB_path)
-        self.sqlite_liquid_sample_no_API = sqlite_liquid_sample_no_API(self.base, self.liquid_sample_no_DB_path)
+        self.sample_no_DB_path = self.world_config["local_db_path"]
+        self.liquid_sample_no_DB = liquid_sample_no_API(self.base, self.sample_no_DB_path)
+        self.sqlite_liquid_sample_no_API = sqlite_liquid_sample_no_API(self.base, self.sample_no_DB_path)
 
         self.sshuser = self.config_dict["user"]
         self.sshkey = self.config_dict["key"]
@@ -254,9 +253,6 @@ class cPAL:
         myloop.create_task(self.IOloop())
 
 
-        self.FIFO_PALheader = (
-            ""  # measuement specific, will be reset each measurement
-        )
         self.FIFO_name = ""
         self.FIFO_dir = ""
         self.FIFO_rshs_dir = ""
@@ -271,7 +267,6 @@ class cPAL:
         myactive = await self.base.contain_action(
             A,
             file_type="paltray_helao__file",
-            file_group="helao_files",
             file_data_keys=["tray_no", "slot_no", "content"],
             header=None,
         )
@@ -548,7 +543,6 @@ class cPAL:
         myactive = await self.base.contain_action(
             A,
             file_type="palvialtable_helao__file",
-            file_group="helao_files",
             file_data_keys=["vial_table"],
             header=None,
         )
@@ -829,7 +823,7 @@ class cPAL:
                     )
                 
                     # TODO: check if ID was really created (later)
-                    PALparams.liquid_sample_no_out = liquid_sample_no_out_dict["id"]
+                    PALparams.liquid_sample_no_out = liquid_sample_no_out_dict["sample_id"]
 
                     if PALparams.PAL_method == PALmethods.fill or PALparams.PAL_method == PALmethods.fillfixed:
                         if self.active:
@@ -1020,7 +1014,7 @@ class cPAL:
 
                 await self.active.append_sample(
                     samples_inout(
-                        label = f"{self.action.machine_name}__{liquid_sample_no_dict['action_time']}__{PALparams.PAL_source}",
+                        label = f"{liquid_sample_no_dict['machine']}__{liquid_sample_no_dict['action_time']}__{PALparams.PAL_source}",
                         sample_type = "sample_assembly",
                         liquid = liquid_sample_no(**liquid_sample_no_dict),
                         solid = solid_sample_no(
@@ -1028,7 +1022,7 @@ class cPAL:
                             sample_no = PALparams.PAL_plate_sample_no
                             ),
                         in_out = "in",
-                        machine = self.action.machine_name,
+                        machine = liquid_sample_no_dict["machine"],
                         status = "preserved"
                     )
                 )
@@ -1041,7 +1035,7 @@ class cPAL:
                         liquid = liquid_sample_no(**liquid_sample_no_dict),
                         sample_type = "liquid",
                         in_out = "out",
-                        machine = self.action.machine_name,
+                        machine = liquid_sample_no_dict["machine"],
                         status = "created"
                     )
                 )
@@ -1056,7 +1050,7 @@ class cPAL:
                         liquid = liquid_sample_no(**liquid_sample_no_dict),
                         sample_type = "liquid",
                         in_out = "in",
-                        machine = self.action.machine_name,
+                        machine = liquid_sample_no_dict["machine"],
                         status = "preserved"
                     )
                 )
@@ -1067,7 +1061,7 @@ class cPAL:
                         liquid = liquid_sample_no(**liquid_sample_no_dict),
                         sample_type = "liquid_reservoir",
                         in_out = "in",
-                        machine = self.action.machine_name,
+                        machine = liquid_sample_no_dict["machine"],
                         status = "preserved",
                         inheritance = "give_only"
                     )
@@ -1080,7 +1074,7 @@ class cPAL:
                         sample_type = "liquid",
                         in_out = "out",
                         status = "preserved",
-                        machine = self.action.machine_name
+                        machine = liquid_sample_no_dict["machine"]
                     )
                 )
     
@@ -1097,7 +1091,7 @@ class cPAL:
                         liquid = liquid_sample_no(**liquid_sample_no_dict1),
                         sample_type = "liquid_reservoir",
                         in_out = "in",
-                        machine = self.action.machine_name,
+                        machine = liquid_sample_no_dict1["machine"],
                         status = "preserved",
                         inheritance = "give_only"
                     )
@@ -1109,7 +1103,7 @@ class cPAL:
                         liquid = liquid_sample_no(**liquid_sample_no_dict2),
                         sample_type = "liquid",
                         in_out = "out",
-                        machine = self.action.machine_name,
+                        machine = liquid_sample_no_dict2["machine"],
                         status = ["created", "incorporated"]
                     )
                 )
@@ -1122,14 +1116,14 @@ class cPAL:
                             plate_id = PALparams.PAL_plate_id,
                             sample_no = PALparams.PAL_plate_sample_no
                             ),
-                        machine = self.action.machine_name,
+                        machine = None,
                         status = "incorporated"
                     )
                 )
                 # the electrode assembly
                 await self.active.append_sample(
                     samples_inout(
-                        label = f"{self.action.machine_name}__{liquid_sample_no_dict2['action_time']}__{PALparams.PAL_dest}",
+                        label = f"{liquid_sample_no_dict2['machine']}__{liquid_sample_no_dict2['action_time']}__{PALparams.PAL_dest}",
                         sample_type = "sample_assembly",
                         liquid = liquid_sample_no(**liquid_sample_no_dict2),
                         solid = solid_sample_no(
@@ -1137,7 +1131,7 @@ class cPAL:
                             sample_no = PALparams.PAL_plate_sample_no
                             ),
                         in_out = "out",
-                        machine = self.action.machine_name,
+                        machine = liquid_sample_no_dict2["machine"],
                         status = "created"
                     )
                 )
@@ -1309,19 +1303,11 @@ class cPAL:
                     ]
 
 
-                    self.FIFO_PALheader = {
-                            "technique_name":self.IO_PALparams.PAL_method.name,
-                            # "version":0.2,
-                            "column_headings":self.FIFO_column_headings,
-                    }
-
-
                     self.active = await self.base.contain_action(
                         self.action,
                         file_type="pal_helao__file",
-                        file_group="helao_files",
                         file_data_keys=self.FIFO_column_headings,
-                        header=self.FIFO_PALheader,
+                        header=None,
                     )
                     self.base.print_message(f" ... Active action uuid is {self.active.action.action_uuid}")
                     realtime = await self.active.set_realtime()
@@ -1485,6 +1471,7 @@ class cPAL:
             AUID=AUID,
             source=source,
             volume_mL=volume_mL,
+            machine=self.base.hostname,
             action_time=action_time,
             chemical=chemical,
             mass=mass,
