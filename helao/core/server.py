@@ -31,10 +31,11 @@ from fastapi.openapi.utils import get_flat_params
 from bokeh.io import curdoc
 
 from helao.core.helper import MultisubscriberQueue, dict_to_rcp, eval_val
-from helao.core.helper import print_message
+from helao.core.helper import print_message, cleanupdict
 from helao.core.schema import Action, Decision
 from helao.core.model import return_dec, return_declist, return_act, return_actlist
 from helao.core.model import liquid_sample_no, gas_sample_no, solid_sample_no, samples_inout
+from helao.core.model import rcp_header
 
 
 async_copy = wrap(shutil.copy)
@@ -44,7 +45,7 @@ colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redire
 # colorama.init()
 
 # version number, gets written into every rcp and hlo file
-hlo_version = 0.2
+hlo_version = "2021.09.20"
 
 class action_start_condition(int, Enum):
     no_wait = 0  # orch is dispatching an unconditional action
@@ -602,7 +603,6 @@ class Base(object):
         self,
         action: Action,
         file_type: str = "helao__file",
-        file_group: str = "helao_files",
         file_data_keys: Optional[str] = None, # this is also keyd by file_sample_keys
         file_sample_label: Optional[str] = None, # this is also keyd by file_sample_keys
         file_sample_keys: Optional[list] = None, # I need one key per datafile, but each datafile can still be based on multiple samples
@@ -612,7 +612,6 @@ class Base(object):
             self,
             action=action,
             file_type=file_type,
-            file_group=file_group,
             file_data_keys=file_data_keys,
             file_sample_label=file_sample_label,
             file_sample_keys=file_sample_keys,
@@ -620,6 +619,26 @@ class Base(object):
         )
         await self.actives[action.action_uuid].myinit()
         return self.actives[action.action_uuid]
+
+
+
+    def get_global_sample_label(self, sample):
+        label = None
+        if sample.sample_type == "liquid":
+            if sample.liquid is not None:
+                label = f"{sample.liquid.machine}__liquid__{sample.liquid.sample_id}"
+            
+        elif sample.sample_type == "gas":
+            if sample.gas is not None:
+                label = f"{sample.gas.machine}__gas__{sample.gas.sample_id}"
+        elif sample.sample_type == "solid":
+            if sample.solid is not None:
+                label = f"{sample.solid.plate_id}__{sample.solid.sample_no}"
+
+        elif sample.sample_type == "sample_assembly":
+            label = sample.label
+ 
+        return label
 
 
     def create_file_sample_label(self, samples):
@@ -631,20 +650,7 @@ class Base(object):
 
         file_sample_label={}
         for sample in samples:
-            label = None
-            if sample.sample_type == "liquid":
-                if sample.liquid is not None:
-                    label = f"{sample.machine}__{sample.liquid.sample_id}"
-                
-            elif sample.sample_type == "gas":
-                if sample.gas is not None:
-                    label = f"{sample.machine}__{sample.gas.sample_id}"
-            elif sample.sample_type == "solid":
-                if sample.solid is not None:
-                    label = f"{sample.solid.plate_id}__{sample.solid.sample_no}"
-
-            elif sample.sample_type == "sample_assembly":
-                label = sample.label
+            label = self.get_global_sample_label(sample)
             
             if label is not None:
                 if sample.sample_type in file_sample_label:
@@ -848,7 +854,6 @@ class Base(object):
             base,  # outer instance
             action: Action,
             file_type: str = "helao__file",
-            file_group: str = "helao_files",
             file_data_keys: Optional[str] = None,
             file_sample_label: Optional[str] = None,
             file_sample_keys: Optional[list] = None,
@@ -857,10 +862,11 @@ class Base(object):
             self.base = base
             self.action = action
             self.action.file_type = file_type
-            self.action.file_group = file_group
+            self.action.file_group = "helao_files"
             self.action.file_data_keys = file_data_keys
             self.action.file_sample_label = file_sample_label
             self.action.header = header
+            self.rcp_header = None
             
             # this can be filled in via copy_globals
             # or in the actualizer
@@ -929,41 +935,45 @@ class Base(object):
             self.data_logger = self.base.aloop.create_task(self.log_data_task())
 
 
+        def update_rcp_header(self):
+            # need to remove swagger workaround value if present
+            if "scratch" in self.action.action_params:
+                    del self.action.action_params["scratch"]
+
+            if self.action.action_enum is None:
+                self.action.action_enum = 0.0
+ 
+            self.rcp_header = rcp_header(
+                hlo_version=f"{hlo_version}",
+                technique_name=self.action.technique_name,
+                server_name=self.base.server_name,
+                orchestrator=self.action.orch_name,
+                machine_name=self.action.machine_name,
+                access=self.action.access,
+                output_dir=self.action.output_dir,
+                decision_uuid=self.action.decision_uuid,
+                decision_timestamp=self.action.decision_timestamp,
+                action_uuid=self.action.action_uuid,
+                action_queue_time=self.action.action_queue_time,
+                action_enum=self.action.action_enum,
+                action_name=self.action.action_name,
+                action_abbr=self.action.action_abbr,
+                action_params=self.action.action_params,
+                # samples_in: Optional[List[samples_inout]]
+                # samples_out: Optional[List[samples_inout]]
+                # helao_files: Optional[List[hlo_file]]
+                # aux_files: Optional[List[aux_file]]
+            )
+
+
         async def myinit(self):
             if self.action.save_rcp:
                 os.makedirs(os.path.join(self.base.save_root,self.action.output_dir), exist_ok=True)
                 self.action.actionnum = (
                     f"{self.action.action_abbr}-{self.action.action_enum}"
                 )
-                # self.action.filetech_key = f"files_technique__{self.action.actionnum}"
-                self.action.filetech_key = (
-                    f"{self.base.server_name}_files__{self.action.actionnum}"
-                )
-                initial_dict = {
-                    "hlo_version":hlo_version,
-                    "technique_name": self.action.technique_name,  # self.base.technique_name,
-                    "server_name": self.base.server_name,
-                    "orchestrator": self.action.orch_name,
-                    "machine_name": self.action.machine_name,  # self.base.hostname,
-                    "access": self.action.access,
-                    # "samples_in": self.action.samples_in,
-                    "output_dir": self.action.output_dir,
-                }
-                initial_dict.update(self.base.calibration)
-                # need to remove swagger workaround value if present
-                if "scratch" in self.action.action_params:
-                    del self.action.action_params["scratch"]
-                initial_dict.update(
-                    {
-                        "decision_uuid": self.action.decision_uuid,
-                        "action_uuid": self.action.action_uuid,
-                        "action_enum": self.action.action_enum,
-                        "action_name": self.action.action_name,
-                        f"{self.base.server_name}_params__{self.action.actionnum}": self.action.action_params,
-                    }
-                )
-                await self.write_to_rcp(initial_dict)
-
+                self.update_rcp_header()
+                
                 if self.action.save_data:
                     for i, file_sample_key in enumerate(self.action.file_sample_keys):
                         filename, header, file_info = self.init_datafile(
@@ -978,9 +988,7 @@ class Base(object):
                             filenum=i
                         )
                         
-                        self.action.file_dict[self.action.filetech_key][
-                            self.action.file_group
-                        ].update({filename: file_info})
+                        self.action.file_dict.update({filename: file_info})
                         await self.set_output_file(
                             filename=filename, 
                             header=header, 
@@ -1018,18 +1026,30 @@ class Base(object):
                         header_lines = len(header.split("\n"))
     
             file_info = {"type": file_type}
+            # file_info.update({"keys": file_data_keys})
+            # file_info.update({"sample": file_sample_label})
             if file_data_keys is not None:
                 file_info.update({"keys": file_data_keys})
             if file_sample_label is not None:
                 file_info.update({"sample": file_sample_label})
+
             if filename is None:  # generate filename
                 file_ext = "csv"
                 if file_group == "helao_files":
                     file_ext = "hlo"
+                    
+                    header_dict = {
+                        "hlo_version":hlo_version,
+                        "action_name":self.action.action_abbr,
+                        "column_headings":file_data_keys,
+                        }
+                    
                     if header is None:
-                        header = pyaml.dump({"hlo_version":hlo_version}, sort_dicts=False)
+                        header = pyaml.dump(header_dict, sort_dicts=False)
                     else:
-                        header = pyaml.dump({"hlo_version":hlo_version}, sort_dicts=False)+header
+                        header = pyaml.dump(header_dict, sort_dicts=False)+header
+                else: # aux_files
+                    pass
     
                 if action_enum is not None:
                     filename = f"{action_abbr}-{action_enum:.1f}__{filenum}.{file_ext}"
@@ -1238,7 +1258,7 @@ class Base(object):
                                         )
                                         self.finished_hlo_header[sample] = True
                                         await self.write_live_data(
-                                             output_str="%%",
+                                             output_str=pyaml.dump({"epoch_ns":None})+"%%\n",
                                              file_conn_key=sample
                                         )
                                         
@@ -1292,7 +1312,7 @@ class Base(object):
                 file_instance = await aiofiles.open(output_path, mode="w")
                 await file_instance.write(header + output_str)
                 await file_instance.close()
-                self.action.file_dict[self.action.filetech_key][file_group].update(
+                self.action.file_dict.update(
                     {filename: file_info}
                 )
 
@@ -1326,7 +1346,7 @@ class Base(object):
                 file_instance = open(output_path, mode="w")
                 file_instance.write(header + output_str)
                 file_instance.close()
-                self.action.file_dict[self.action.filetech_key][file_group].update(
+                self.action.file_dict.update(
                     {filename: file_info}
                 )
 
@@ -1412,7 +1432,7 @@ class Base(object):
 
             def append_liquid(liquid, machine, status, inheritance):
                 append_dict = {
-                    "label": f"{machine}__{liquid.sample_id}",
+                    "label": self.base.get_global_sample_label(samples_inout(sample_type="liquid", liquid=liquid)),
                     "machine": machine,
                 }
                 append_dict.update(liquid_to_dict(liquid))
@@ -1421,7 +1441,7 @@ class Base(object):
 
             def append_gas(gas, machine, status, inheritance):
                 append_dict = {
-                    "label": f"{machine}__{gas.sample_id}",
+                    "label": self.base.get_global_sample_label(samples_inout(sample_type="gas", gas=gas)),
                     "machine": machine,
                 }
                 append_dict.update(gas_to_dict(gas))
@@ -1430,7 +1450,7 @@ class Base(object):
 
             def append_solid(solid, machine, status, inheritance):
                 append_dict = {
-                    "label": f"{solid.plate_id}__{solid.sample_no}",
+                    "label": self.base.get_global_sample_label(samples_inout(sample_type="solid", solid=solid)),
                 }
                 append_dict.update(solid_to_dict(solid))
                 append_dict.update(add_subkeys(status, inheritance))
@@ -1469,7 +1489,7 @@ class Base(object):
     
                 elif sample.sample_type == "sample_assembly":
                     append_dict = {
-                        "label": f"{sample.label}",
+                        "label": self.base.get_global_sample_label(sample),
                         "machine": sample.machine,
                     }
                     if sample.liquid is not None:
@@ -1497,17 +1517,23 @@ class Base(object):
                 if self.file_conn[filekey]:
                     await self.file_conn[filekey].close()
             self.file_conn = dict()
-
-            if self.action.samples_in:
-                await self.write_to_rcp({"samples_in": self.action.samples_in})
+            # (1) update sample_in and sample_out
+            if  self.action.samples_in:
+                self.rcp_header.samples_in = self.action.samples_in
             if self.action.samples_out:
-                await self.write_to_rcp({"samples_out": self.action.samples_out})
+                 self.rcp_header.samples_out = self.action.samples_out
+            # (2) update file dict in rcp header
             if self.action.file_dict:
-                await self.write_to_rcp(self.action.file_dict)
+                self.rcp_header.files = self.action.file_dict
+
+            # write full rcp header to file
+            await self.write_to_rcp(cleanupdict(self.rcp_header.dict()))
+
             await self.clear_status()
             self.data_logger.cancel()
             _ = self.base.actives.pop(self.action.action_uuid, None)
             return self.action
+
 
         async def track_file(self, file_type: str, file_path: str, sample_no: str):
             "Add auxiliary files to file dictionary."
@@ -1515,12 +1541,13 @@ class Base(object):
                 self.action.file_paths.append(file_path)
             file_info = f"{file_type};{sample_no}"
             filename = os.path.basename(file_path)
-            self.action.file_dict[self.action.filetech_key]["aux_files"].update(
+            self.action.file_dict.update(
                 {filename: file_info}
             )
             self.base.print_message(
                 f" ... {filename} added to files_technique__{self.action.actionnum} / aux_files list."
             )
+
 
         async def relocate_files(self):
             "Copy auxiliary files from folder path to rcp directory."

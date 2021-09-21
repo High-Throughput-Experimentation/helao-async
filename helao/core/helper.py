@@ -99,7 +99,7 @@ def dict_to_rcp(d: dict, level: int = 0):
     #     else:
     #         lines.append(f"{'    '*level}{k}: {str(v).strip()}")
     # return "\n".join(lines)
-    return pyaml.dump(d, sort_dicts=False)
+    return pyaml.dump(d, sort_dicts=False, indent=level*4)
 
 # multisubscriber queue by Kyle Smith
 # https://github.com/smithk86/asyncio-multisubscriber-queue
@@ -255,3 +255,14 @@ def print_message(server_cfg,server_name,*args,**kwargs):
     for arg in args:
         print(f"{precolor}[{strftime('%H:%M:%S')}_{server_name}]:{Style.RESET_ALL} {style}{arg}{Style.RESET_ALL}")
 
+
+def cleanupdict(d):
+   clean = {}
+   for k, v in d.items():
+      if isinstance(v, dict):
+         nested = cleanupdict(v)
+         if len(nested.keys()) > 0:
+            clean[k] = nested
+      elif v is not None:
+         clean[k] = v
+   return clean

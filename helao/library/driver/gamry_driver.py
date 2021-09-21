@@ -547,17 +547,12 @@ class gamry:
                     {
                     "gamry":self.FIFO_Gamryname,
                     "ierangemode":self.IO_IErange.name,
-                    # "techniqueparamsname":"",
-                    "technique_name":self.IO_meas_mode.name,
-                    # "version":0.2,
-                    "column_headings":self.FIFO_column_headings,
                     }
             )
 
             self.active = await self.base.contain_action(
                 self.action,
                 file_type="pstat_helao__file",
-                file_group="helao_files",
                 file_data_keys=self.FIFO_column_headings,
                 file_sample_label=self.base.create_file_sample_label(self.samples_in),
                 header=self.FIFO_gamryheader,
