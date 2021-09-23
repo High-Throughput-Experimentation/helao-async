@@ -18,8 +18,8 @@ import os
 import pyaml
 
 from helao.core.error import error_codes
-from helao.core.model import liquid_sample_no, gas_sample_no, solid_sample_no, samples_inout
-
+# from helao.core.model import liquid_sample, gas_sample, solid_sample, sample_assembly
+from helao.core.model import sample_list
 
 class Gamry_modes(str, Enum):
     CA = "CA"
@@ -141,7 +141,7 @@ class gamry:
         self.pstat = None
         self.action = None  # for passing action object from technique method to measure loop
         self.active =None  # for holding active action object, clear this at end of measurement
-        self.samples_in=[]
+        self.samples_in=sample_list()
         # status is handled through active, call active.finish()
 
         if not "dev_id" in self.config_dict:
@@ -554,14 +554,16 @@ class gamry:
                 self.action,
                 file_type="pstat_helao__file",
                 file_data_keys=self.FIFO_column_headings,
-                file_sample_label=self.base.create_file_sample_label(self.samples_in),
+                file_sample_label=[sample.get_global_label() for sample in self.samples_in.samples],
                 header=self.FIFO_gamryheader,
             )
             self.base.print_message(f"!!! Active action uuid is {self.active.action.action_uuid}")
             # active object is set so we can set the continue flag
             self.IO_continue = True
-            await self.active.append_sample(self.samples_in)
-
+            await self.active.append_sample(samples = [sample_in for sample_in in self.samples_in.samples],
+                                            IO="in", 
+                                            status="preserved",
+                                            inheritance="allow_both")
 
             # TODO:
             # - I/E range: auto, fixed
@@ -736,7 +738,7 @@ class gamry:
             _ = await self.active.finish()
             self.active = None
             self.action = None
-            self.samples_in=[]
+            self.samples_in=sample_list()
 
             return {"measure": f"done_{self.IO_meas_mode}"}
         else:
@@ -777,7 +779,6 @@ class gamry:
         sigfunc_params, 
         samplerate, 
         eta=0.0,
-        samples_in=[],
         setupargs=[]
     ):
         # open connection, will be closed after measurement in IOloop
@@ -800,7 +801,7 @@ class gamry:
                     self.base.print_message(err_code)
 
                 self.action = act
-                self.samples_in=samples_in
+                self.samples_in=self.action.samples_in
                 # signal the IOloop to start the measrurement
                 await self.IO_signalq.put(True)
                 # wait for data to appear in multisubscriber queue before returning active dict
@@ -845,7 +846,6 @@ class gamry:
         self, A: Action,
     ):
         """LSV definition"""
-        samples_in = A.get_sample_in()
         Vinit = A.action_params["Vinit"]
         Vfinal = A.action_params["Vfinal"]
         ScanRate = A.action_params["ScanRate"]
@@ -886,8 +886,7 @@ class gamry:
             sigfunc=sigfunc,
             sigfunc_params=sigfunc_params,
             samplerate=SampleRate,
-            eta=eta,
-            samples_in=samples_in
+            eta=eta
         )
 
 
@@ -898,7 +897,6 @@ class gamry:
         self, A: Action,
     ):
         """CA definition"""
-        samples_in = A.get_sample_in()
         Vval = A.action_params["Vval"]
         Tval = A.action_params["Tval"]
         SampleRate = A.action_params["SampleRate"]
@@ -930,8 +928,7 @@ class gamry:
             sigfunc=sigfunc,
             sigfunc_params=sigfunc_params,
             samplerate=SampleRate,
-            eta=eta,
-            samples_in=samples_in
+            eta=eta
         )
         return activeDict
 
@@ -939,7 +936,6 @@ class gamry:
         self, A: Action,
     ):
         """CP definition"""
-        samples_in = A.get_sample_in()
         Ival = A.action_params["Ival"]
         Tval = A.action_params["Tval"]
         SampleRate = A.action_params["SampleRate"]
@@ -971,13 +967,11 @@ class gamry:
             sigfunc=sigfunc,
             sigfunc_params=sigfunc_params,
             samplerate=SampleRate,
-            eta=eta,
-            samples_in=samples_in
+            eta=eta
         )
         return activeDict
 
     async def technique_CV(self, A: Action):
-        samples_in = A.get_sample_in()
         Vinit = A.action_params["Vinit"]
         Vapex1 = A.action_params["Vapex1"]
         Vapex2 = A.action_params["Vapex2"]
@@ -1045,14 +1039,12 @@ class gamry:
             sigfunc=sigfunc,
             sigfunc_params=sigfunc_params,
             samplerate=SampleRate,
-            eta=eta,
-            samples_in=samples_in
+            eta=eta
         )
         return activeDict
 
     async def technique_EIS(self, A: Action):
         """EIS definition"""
-        samples_in = A.get_sample_in()
         Vval = A.action_params["Vval"]
         Tval = A.action_params["Tval"]
         Freq = A.action_params["Freq"]
@@ -1092,14 +1084,12 @@ class gamry:
             sigfunc_params=sigfunc_params,
             samplerate=SampleRate,
             eta=eta,
-            samples_in=samples_in,
             setupargs=argv
         )
         return activeDict
 
     async def technique_OCV(self, A: Action):
         """OCV definition"""
-        samples_in = A.get_sample_in()
         Tval = A.action_params["Tval"]
         SampleRate = A.action_params["SampleRate"]
         # runparams = A.action_params['runparams']
@@ -1133,7 +1123,6 @@ class gamry:
             sigfunc=sigfunc,
             sigfunc_params=sigfunc_params,
             samplerate=SampleRate,
-            eta=eta,
-            samples_in=samples_in
+            eta=eta
         )
         return activeDict
