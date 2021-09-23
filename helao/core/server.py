@@ -17,6 +17,7 @@ from typing import Optional, Union, List
 from math import floor
 from enum import Enum
 import colorama
+from pathlib import Path
 
 import numpy as np
 import ntplib
@@ -34,7 +35,7 @@ from helao.core.helper import MultisubscriberQueue, dict_to_rcp, eval_val
 from helao.core.helper import print_message, cleanupdict
 from helao.core.schema import Action, Decision
 from helao.core.model import return_dec, return_declist, return_act, return_actlist
-from helao.core.model import liquid_sample_no, gas_sample_no, solid_sample_no, samples_inout
+from helao.core.model import liquid_sample, gas_sample, solid_sample, sample_assembly, sample_list
 from helao.core.model import rcp_header
 
 
@@ -107,6 +108,15 @@ async def setupAct(request: Request):
     action_dict["action_server"] = servKey
     action_dict["action_name"] = action_name
     A = Action(action_dict)
+    
+    if "fast_samples_in" in A.action_params:
+        tmp_fast_samples_in = A.action_params.get("fast_samples_in",[])
+        del A.action_params["fast_samples_in"]
+        if type(tmp_fast_samples_in) is dict:
+            A.samples_in = sample_list(**tmp_fast_samples_in)
+        elif type(tmp_fast_samples_in) is list:
+            A.samples_in = sample_list(samples=tmp_fast_samples_in)
+    
     # setting some default values of action was notsubmitted via orch
     if A.machine_name is None:
         A.machine_name = gethostname()
@@ -621,48 +631,6 @@ class Base(object):
         return self.actives[action.action_uuid]
 
 
-
-    def get_global_sample_label(self, sample):
-        label = None
-        if sample.sample_type == "liquid":
-            if sample.liquid is not None:
-                label = f"{sample.liquid.machine}__liquid__{sample.liquid.sample_id}"
-            
-        elif sample.sample_type == "gas":
-            if sample.gas is not None:
-                label = f"{sample.gas.machine}__gas__{sample.gas.sample_id}"
-        elif sample.sample_type == "solid":
-            if sample.solid is not None:
-                label = f"{sample.solid.plate_id}__{sample.solid.sample_no}"
-
-        elif sample.sample_type == "sample_assembly":
-            label = sample.label
- 
-        return label
-
-
-    def create_file_sample_label(self, samples):
-        if samples is None:
-            return None
-
-        if type(samples) is not list:
-            samples = [samples]
-
-        file_sample_label={}
-        for sample in samples:
-            label = self.get_global_sample_label(sample)
-            
-            if label is not None:
-                if sample.sample_type in file_sample_label:
-                    file_sample_label[sample.sample_type].append(label)
-                else:
-                    file_sample_label[sample.sample_type]=[label]
-
-        if len(file_sample_label) == 0:
-            file_sample_label = None 
-        return file_sample_label
-
-
     async def get_active_info(self, action_uuid: str):
         if action_uuid in self.actives.keys():
             action_dict = await self.actives[action_uuid].active.as_dict()
@@ -868,14 +836,6 @@ class Base(object):
             self.action.header = header
             self.rcp_header = None
             
-            # this can be filled in via copy_globals
-            # or in the actualizer
-            # but should not be written to rcp
-            # as its filled in to  self.action.samples_in later by the server
-            # this way samples can be action input params, without writing the
-            # complete samples_inout object into the rcp
-            if "samples_in" in self.action.action_params:
-                del self.action.action_params["samples_in"]
             
             if file_sample_keys is None:
                 self.action.file_sample_keys = ["None"]
@@ -950,7 +910,7 @@ class Base(object):
                 orchestrator=self.action.orch_name,
                 machine_name=self.action.machine_name,
                 access=self.action.access,
-                output_dir=self.action.output_dir,
+                output_dir=Path(self.action.output_dir).as_posix(),
                 decision_uuid=self.action.decision_uuid,
                 decision_timestamp=self.action.decision_timestamp,
                 action_uuid=self.action.action_uuid,
@@ -959,10 +919,6 @@ class Base(object):
                 action_name=self.action.action_name,
                 action_abbr=self.action.action_abbr,
                 action_params=self.action.action_params,
-                # samples_in: Optional[List[samples_inout]]
-                # samples_out: Optional[List[samples_inout]]
-                # helao_files: Optional[List[hlo_file]]
-                # aux_files: Optional[List[aux_file]]
             )
 
 
@@ -1026,12 +982,11 @@ class Base(object):
                         header_lines = len(header.split("\n"))
     
             file_info = {"type": file_type}
-            # file_info.update({"keys": file_data_keys})
-            # file_info.update({"sample": file_sample_label})
             if file_data_keys is not None:
                 file_info.update({"keys": file_data_keys})
             if file_sample_label is not None:
-                file_info.update({"sample": file_sample_label})
+                if len(file_sample_label)!=0:
+                    file_info.update({"sample": file_sample_label})
 
             if filename is None:  # generate filename
                 file_ext = "csv"
@@ -1372,7 +1327,10 @@ class Base(object):
 
         async def append_sample(
             self,
-            samples: Union[List[samples_inout],samples_inout]
+            samples,
+            IO: str,
+            status: bool = None,
+            inheritance: bool = None
         ):
             "Add sample to samples_out and samples_in dict"
 
@@ -1389,124 +1347,37 @@ class Base(object):
             # incorporated: the sample was combined with others in the process. E.g. the creation of an electrode assembly from electrodes and electrolytes
             # recovered: the opposite of incorporated. E.g. an electrode assembly is taken apart, and the original electrodes are recovered, and further experiments may be done on those electrodes
 
-            def add_subkeys(status, inheritance):
-                subdict = dict()
-                if inheritance is not None:
-                    subdict.update({"inheritance": inheritance})
-                if status is not None:
-                    if type(status) is not list:
-                        status = [status]
-                    subdict.update({"status": status})
-                return subdict
-
-            def solid_to_dict(solid):
-                solid_dict = dict()
-                if solid is not None:
-                    solid_dict.update({"plate_id": solid.plate_id})
-                    solid_dict.update({"sample_no": solid.sample_no})
-                return solid_dict
-
-            def gas_to_dict(gas):
-                gas_dict = dict()
-                if gas is not None:
-                    gas_dict.update({"sample_no": gas.sample_id})
-                return gas_dict
-
-            def liquid_to_dict(liquid):
-                liquid_dict = dict()
-                if liquid is not None:
-                    liquid_dict.update({"sample_no": liquid.sample_id})
-                return liquid_dict
-
-            def update_dict(self, in_out, sample_type, append_dict):
-                if in_out == "in":
-                    if sample_type in self.action.samples_in:
-                        self.action.samples_in[sample_type].append(append_dict)
-                    else:
-                        self.action.samples_in[sample_type] = [append_dict]
-                if in_out == "out":
-                    if sample_type in self.action.samples_in:
-                        self.action.samples_out[sample_type].append(append_dict)
-                    else:
-                        self.action.samples_out[sample_type] = [append_dict]
-
-            def append_liquid(liquid, machine, status, inheritance):
-                append_dict = {
-                    "label": self.base.get_global_sample_label(samples_inout(sample_type="liquid", liquid=liquid)),
-                    "machine": machine,
-                }
-                append_dict.update(liquid_to_dict(liquid))
-                append_dict.update(add_subkeys(status, inheritance))
-                return append_dict
-
-            def append_gas(gas, machine, status, inheritance):
-                append_dict = {
-                    "label": self.base.get_global_sample_label(samples_inout(sample_type="gas", gas=gas)),
-                    "machine": machine,
-                }
-                append_dict.update(gas_to_dict(gas))
-                append_dict.update(add_subkeys(status, inheritance))
-                return append_dict
-
-            def append_solid(solid, machine, status, inheritance):
-                append_dict = {
-                    "label": self.base.get_global_sample_label(samples_inout(sample_type="solid", solid=solid)),
-                }
-                append_dict.update(solid_to_dict(solid))
-                append_dict.update(add_subkeys(status, inheritance))
-                return append_dict
-
-
             if samples is None:
                 return
 
             if type(samples) is not list:
-                    samples = [samples]
+                   samples = [samples]
                     
             for sample in samples:
-                if sample.inheritance is None:
-                    sample.inheritance = "allow_both"
-                if sample.status is None:
-                    sample.status = "preserved"
-                if sample.machine is None:
-                    sample.machine = self.action.machine_name
+                if inheritance is None:
+                    inheritance = "allow_both"
+                if status is None:
+                    status = "preserved"
     
-                if sample.sample_type == "solid":
-                    append_dict = append_solid(sample.solid, sample.machine, sample.status, sample.inheritance)
-                    update_dict(self, sample.in_out, sample.sample_type, append_dict)
-    
-                elif sample.sample_type == "liquid":
-                    append_dict = append_liquid(sample.liquid, sample.machine, sample.status, sample.inheritance)
-                    update_dict(self, sample.in_out, sample.sample_type, append_dict)
-    
-                elif sample.sample_type == "gas":
-                    append_dict = append_gas(sample.liquid, sample.machine, sample.status, sample.inheritance)
-                    update_dict(self, sample.in_out, sample.sample_type, append_dict)
-    
-                elif sample.sample_type == "liquid_reservoir":
-                    append_dict = append_liquid(sample.liquid, sample.machine, sample.status, sample.inheritance)
-                    update_dict(self, sample.in_out, sample.sample_type, append_dict)
-    
-                elif sample.sample_type == "sample_assembly":
-                    append_dict = {
-                        "label": self.base.get_global_sample_label(sample),
-                        "machine": sample.machine,
-                    }
-                    if sample.liquid is not None:
-                        append_dict["liquid"] = [
-                            append_liquid(sample.liquid, sample.machine, None, None)
-                        ]
-                    if sample.solid is not None:
-                        append_dict["solid"] = [
-                            append_solid(sample.solid, sample.machine, None, None)
-                        ]
-                    if sample.gas is not None:
-                        append_dict["gas"] = [append_gas(sample.gas, sample.machine, None, None)]
-                    append_dict.update(add_subkeys(sample.status, sample.inheritance))
-                    update_dict(self, sample.in_out, sample.sample_type, append_dict)
-    
-                else:
-                    self.base.print_message(f"Type '{sample.sample_type}' is not supported.", error = True)
+                append_dict = sample.rcp_dict()
+                if append_dict is not None:
+                    if inheritance is not None:
+                        append_dict.update({"inheritance": inheritance})
+                    if status is not None:
+                        if type(status) is not list:
+                            status = [status]
+                        append_dict.update({"status": status})            
+        
+                    # check if list for safety reasons
+                    if type(self.action.rcp_samples_in) is not list:
+                        self.action.rcp_samples_in = []
+                    if type(self.action.rcp_samples_out) is not list:
+                        self.action.rcp_samples_out = []
+
+                    if IO == "in":
+                        self.action.rcp_samples_in.append(append_dict)
+                    elif IO == "out":
+                        self.action.rcp_samples_out.append(append_dict)
 
 
         async def finish(self):
@@ -1518,10 +1389,10 @@ class Base(object):
                     await self.file_conn[filekey].close()
             self.file_conn = dict()
             # (1) update sample_in and sample_out
-            if  self.action.samples_in:
-                self.rcp_header.samples_in = self.action.samples_in
-            if self.action.samples_out:
-                 self.rcp_header.samples_out = self.action.samples_out
+            if  self.action.rcp_samples_in:
+                self.rcp_header.samples_in = self.action.rcp_samples_in
+            if self.action.rcp_samples_out:
+                 self.rcp_header.samples_out = self.action.rcp_samples_out
             # (2) update file dict in rcp header
             if self.action.file_dict:
                 self.rcp_header.files = self.action.file_dict

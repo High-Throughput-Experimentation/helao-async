@@ -27,12 +27,14 @@ Manual Bugfixes:
 """
 
 import asyncio
-from typing import Optional
+from typing import Optional, Union, List
 from importlib import import_module
 from fastapi import Request
+
+
 from helao.core.server import makeActServ, setupAct
 from helao.library.driver.gamry_driver import gamry, Gamry_IErange
-
+from helao.core.model import liquid_sample, gas_sample, solid_sample, sample_assembly, sample_list
 
 def makeApp(confPrefix, servKey):
 
@@ -61,6 +63,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/run_LSV")
     async def run_LSV(
         request: Request,
+        fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1})]),
         Vinit: Optional[float] = 0.0,  # Initial value in volts or amps.
         Vfinal: Optional[float] = 1.0,  # Final value in volts or amps.
         ScanRate: Optional[float] = 1.0,  # Scan rate in volts/second or amps/second.
@@ -70,6 +73,7 @@ def makeApp(confPrefix, servKey):
         TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         IErange: Optional[Gamry_IErange] = "auto",
+        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
         """Linear Sweep Voltammetry (unlike CV no backward scan is done)\n
         use 4bit bitmask for triggers\n
@@ -83,6 +87,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/run_CA")
     async def run_CA(
         request: Request,
+        fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1})]),
         Vval: Optional[float] = 0.0,
         Tval: Optional[float] = 10.0,
         SampleRate: Optional[
@@ -91,6 +96,7 @@ def makeApp(confPrefix, servKey):
         TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         IErange: Optional[Gamry_IErange] = "auto",
+        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
         """Chronoamperometry (current response on amplied potential)\n
         use 4bit bitmask for triggers\n
@@ -104,6 +110,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/run_CP")
     async def run_CP(
         request: Request,
+        fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1})]),
         Ival: Optional[float] = 0.0,
         Tval: Optional[float] = 10.0,
         SampleRate: Optional[
@@ -112,6 +119,7 @@ def makeApp(confPrefix, servKey):
         TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         IErange: Optional[Gamry_IErange] = "auto",
+        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
         """Chronopotentiometry (Potential response on controlled current)\n
         use 4bit bitmask for triggers\n
@@ -125,6 +133,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/run_CV")
     async def run_CV(
         request: Request,
+        fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1})]),
         Vinit: Optional[float] = 0.0,  # Initial value in volts or amps.
         Vapex1: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
         Vapex2: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
@@ -137,6 +146,7 @@ def makeApp(confPrefix, servKey):
         TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         IErange: Optional[Gamry_IErange] = "auto",
+        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
         """Cyclic Voltammetry (most widely used technique for acquireing information about electrochemical reactions)\n
         use 4bit bitmask for triggers\n
@@ -150,6 +160,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/run_EIS")
     async def run_EIS(
         request: Request,
+        fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1})]),
         Vval: Optional[float] = 0.0,
         Tval: Optional[float] = 10.0,
         Freq: Optional[float] = 1000.0,
@@ -161,6 +172,7 @@ def makeApp(confPrefix, servKey):
         TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         IErange: Optional[Gamry_IErange] = "auto",
+        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
         """Electrochemical Impendance Spectroscopy\n
         NOT TESTED\n
@@ -175,11 +187,13 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/run_OCV")
     async def run_OCV(
         request: Request,
+        fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1})]),
         Tval: Optional[float] = 10.0,
         SampleRate: Optional[float] = 0.01,
         TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
         IErange: Optional[Gamry_IErange] = "auto",
+        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
         """mesasures open circuit potential\n
         use 4bit bitmask for triggers\n

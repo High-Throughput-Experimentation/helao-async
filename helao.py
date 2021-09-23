@@ -44,6 +44,8 @@ config = import_module(f"helao.config.{confPrefix}").config
 conf = munchify(config)
 
 from helao.core.helper import print_message
+from helao.test.unit_test_sample_models import sample_model_unit_test
+
 colorama.init(strip=not sys.stdout.isatty()) # strip colors if stdout is redirected 
 # print_message({}, "launcher", "test")
 
@@ -340,7 +342,10 @@ def launcher(confPrefix, confDict):
 
 # def main():
 if __name__ == "__main__":
-    print("\x1b[2J") # clear screen
+    if not sample_model_unit_test():
+        quit()
+
+    # print("\x1b[2J") # clear screen
     cprint(figlet_format("HELAO\nV2", font="starwars"),"yellow", "on_red", attrs=["bold"])
     pidd = launcher(confPrefix, config)
     result = None
