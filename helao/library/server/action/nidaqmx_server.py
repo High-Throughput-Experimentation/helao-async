@@ -20,7 +20,7 @@ from typing import Optional, List, Union
 
 from helao.core.server import Action, makeActServ, setupAct
 from helao.library.driver.nidaqmx_driver import cNIMAX, pumpitems
-
+from helao.core.model import liquid_sample, gas_sample, solid_sample, sample_assembly, sample_list
 
 def makeApp(confPrefix, servKey):
 
@@ -125,13 +125,15 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/run_cell_IV")
     async def run_cell_IV(
                               request: Request, 
+                              fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1})]),
                               Tval: Optional[float] = 10.0,
                               SampleRate: Optional[float] = 1.0, 
-                              TTLwait: Optional[int] = -1  # -1 disables, else select TTL channel
+                              TTLwait: Optional[int] = -1,  # -1 disables, else select TTL channel
+                              scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                               ):
         """Runs multi cell IV measurement."""
         A = await setupAct(request)
-        A.action_abbr = "multi_cell_IV"
+        A.action_abbr = "multiCV"
         # A.save_data = True
         active_dict = await app.driver.run_cell_IV(A)
         return active_dict
