@@ -34,7 +34,7 @@ from fastapi import Request
 
 from helao.core.server import makeActServ, setupAct
 from helao.library.driver.gamry_driver import gamry, Gamry_IErange
-from helao.core.model import liquid_sample, gas_sample, solid_sample, sample_assembly, sample_list
+from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
 
 def makeApp(confPrefix, servKey):
 

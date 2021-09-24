@@ -3,7 +3,7 @@ import colorama
 from colorama import Fore, Style
 import sys
 
-from helao.core.model import liquid_sample, gas_sample, solid_sample, sample_assembly, sample_list
+from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
 
 colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
 
@@ -22,10 +22,10 @@ def sample_model_unit_test():
         test_liquid = liquid_sample()
         test_gas = gas_sample()
         test_solid = solid_sample()
-        test_assembly = sample_assembly(parts=[None])
-        test_assembly2 = sample_assembly(parts=[test_gas, test_solid, test_liquid, test_assembly])
-        # test_assembly2 = sample_assembly(parts=33)
-        # test_assembly2 = sample_assembly(myparts=[])
+        test_assembly = assembly_sample(parts=[None])
+        test_assembly2 = assembly_sample(parts=[test_gas, test_solid, test_liquid, test_assembly])
+        # test_assembly2 = assembly_sample(parts=33)
+        # test_assembly2 = assembly_sample(myparts=[])
         
         # testing some basic sampple functions
         try:
@@ -70,19 +70,19 @@ def sample_model_unit_test():
         try:
             print(f"sample_model test {testcounter} ",end = "")
             testcounter+=1
-            assert  test_assembly.sample_type == "sample_assembly",fail_msg
+            assert  test_assembly.sample_type == "assembly",fail_msg
             print(passed_msg)
         except AssertionError:
-            print(fail_msg, "sample_type is not sample_assembly.")
+            print(fail_msg, "sample_type is not assembly.")
             success = False
 
         try:
             print(f"sample_model test {testcounter} ",end = "")
             testcounter+=1
-            assert  test_assembly2.sample_type == "sample_assembly",fail_msg
+            assert  test_assembly2.sample_type == "assembly",fail_msg
             print(passed_msg)
         except AssertionError:
-            print(fail_msg, "sample_type is not sample_assembly.")
+            print(fail_msg, "sample_type is not assembly.")
             success = False        
         
         print(" --- testing sample list ---")
@@ -139,10 +139,10 @@ def sample_model_unit_test():
         try:
             print(f"sample_model test {testcounter} ",end = "")
             testcounter+=1
-            assert  test_sample_list.samples[3].sample_type == "sample_assembly",fail_msg
+            assert  test_sample_list.samples[3].sample_type == "assembly",fail_msg
             print(passed_msg)
         except AssertionError:
-            print(fail_msg, "sample_type is not sample_assembly.")
+            print(fail_msg, "sample_type is not assembly.")
             success = False
         
         try:
@@ -255,10 +255,10 @@ def sample_model_unit_test():
         try:
             print(f"sample_model test {testcounter} ",end = "")
             testcounter+=1
-            assert  test_sample_list.samples[3].sample_type == "sample_assembly",fail_msg
+            assert  test_sample_list.samples[3].sample_type == "assembly",fail_msg
             print(passed_msg)
         except AssertionError:
-            print(fail_msg, "sample_type is not sample_assembly.")
+            print(fail_msg, "sample_type is not assembly.")
             success = False
         
         try:
