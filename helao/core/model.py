@@ -109,6 +109,7 @@ class base_sample(BaseModel):
     # sample_hash: Optional[str] = None
     last_update: Optional[str] = None
     inheritance: Optional[str] = None
+    status: Union[List[str],str] = None
     decision_uuid: Optional[str] = None
     action_uuid: Optional[str] = None
     action_queue_time: Optional[str] = None

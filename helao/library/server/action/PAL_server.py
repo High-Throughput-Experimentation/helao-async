@@ -1,14 +1,18 @@
 from importlib import import_module
+from socket import gethostname
+from time import strftime
 
 from helao.core.server import Action, makeActServ, setupAct
 from helao.library.driver.PAL_driver import cPAL
 from helao.library.driver.PAL_driver import PALmethods
 from helao.library.driver.PAL_driver import Spacingmethod
 from helao.library.driver.PAL_driver import PALtools
+from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
 
 
 from fastapi import Request
 from typing import Optional, List, Union
+import asyncio
 
 def makeApp(confPrefix, servKey):
 
@@ -33,7 +37,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/PAL_run_method")
     async def PAL_run_method(
         request: Request, 
-        liquid_sample_no_in: Optional[int] = None,
+        fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1,"machine_name":gethostname()})]),
         PAL_method: Optional[PALmethods] = PALmethods.fillfixed,
         PAL_tool: Optional[PALtools] = PALtools.LS3,
         PAL_source: Optional[str] = "elec_res1",
@@ -59,7 +63,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/PAL_archive")
     async def PAL_archive(
         request: Request, 
-        liquid_sample_no_in: Optional[int] = None,
+        fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1,"machine_name":gethostname()})]),
         PAL_tool: Optional[PALtools] = PALtools.LS3,
         PAL_source: Optional[str] = "lcfc_res",
         PAL_volume_uL: Optional[int] = 500,  # uL
@@ -85,7 +89,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/PAL_fill")
     async def PAL_fill(
         request: Request, 
-        liquid_sample_no_in: Optional[int] = None,
+        fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1,"machine_name":gethostname()})]),
         PAL_tool: Optional[PALtools] = PALtools.LS3,
         PAL_source: Optional[str] = "elec_res1",
         PAL_volume_uL: Optional[int] = 500,  # uL
@@ -93,6 +97,7 @@ def makeApp(confPrefix, servKey):
         PAL_wash2: Optional[bool] = False,
         PAL_wash3: Optional[bool] = False,
         PAL_wash4: Optional[bool] = False,
+        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
         """fills eche"""
         A = await setupAct(request)
@@ -104,7 +109,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/PAL_fillfixed")
     async def PAL_fillfixed(
         request: Request, 
-        liquid_sample_no_in: Optional[int] = None,
+        fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1,"machine_name":gethostname()})]),
         PAL_tool: Optional[PALtools] = PALtools.LS3,
         PAL_source: Optional[str] = "elec_res1",
         PAL_volume_uL: Optional[int] = 500,  # uL
@@ -112,6 +117,7 @@ def makeApp(confPrefix, servKey):
         PAL_wash2: Optional[bool] = False,
         PAL_wash3: Optional[bool] = False,
         PAL_wash4: Optional[bool] = False,
+        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
         """fills eche with hardcoded volume"""
         A = await setupAct(request)
@@ -128,7 +134,6 @@ def makeApp(confPrefix, servKey):
     ):
         """cleans the PAL tool"""
         A = await setupAct(request)
-        A.action_params["liquid_sample_no_in"] = 0
         A.action_params["PAL_method"] =  PALmethods.deepclean.value
         A.action_params["PAL_wash1"] =  True
         A.action_params["PAL_wash2"] =  True
@@ -141,7 +146,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/PAL_dilute")
     async def PAL_dilute(
         request: Request, 
-        liquid_sample_no_in: Optional[int] = None,
+        fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1,"machine_name":gethostname()})]),
         PAL_tool: Optional[PALtools] = PALtools.LS3,
         PAL_source: Optional[str] = "elec_res2",
         PAL_volume_uL: Optional[int] = 500,  # uL
@@ -155,6 +160,7 @@ def makeApp(confPrefix, servKey):
         PAL_wash2: Optional[bool] = False,
         PAL_wash3: Optional[bool] = False,
         PAL_wash4: Optional[bool] = False,
+        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
         A = await setupAct(request)
         A.action_params["PAL_method"] =  PALmethods.dilute.value
@@ -243,47 +249,55 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
 
-    @app.post(f"/{servKey}/liquid_sample_no_create_new")
-    async def liquid_sample_no_create_new(request: Request, 
-                            source: Optional[str] = None,
-                            # sourcevol_mL: Optional[str] = None,
-                            volume_mL: Optional[float] = None,
-                            action_time: Optional[str] = [],
-                            chemical: Optional[List[str]] = [],  
-                            mass: Optional[List[str]] = [],
-                            supplier: Optional[List[str]] = [],
-                            lot_number: Optional[List[str]] = [],
-                            plate_id: int = None,
-                            sample_no: int = None
-                            ):
-        '''use CAS for chemical if available. Written on bottles of chemicals with all other necessary information.\n
-        For empty DUID and AUID the UID will automatically created. For manual entry leave DUID, AUID, action_time, and action_params empty and servkey on "data".\n
-        If its the very first liquid (no source in database exists) leave source and source_mL empty.'''
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        A.action_params["DUID"] = A.decision_uuid
-        A.action_params["AUID"] = A.action_uuid
-        await active.enqueue_data({'liquid_sample_no': await app.driver.liquid_sample_no_create_new(**A.action_params)})
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+    # @app.post(f"/{servKey}/liquid_sample_no_create_new")
+    # async def liquid_sample_no_create_new(request: Request, 
+    #                                       sample: Optional[liquid_sample] = liquid_sample(**{
+    #                                           "machine_name":gethostname(),
+    #                                           "source": None,
+    #                                           "volume_mL": 0.0,
+    #                                           "action_time": strftime("%Y%m%d.%H%M%S"),
+    #                                           "chemical": [],
+    #                                           "mass": [],
+    #                                           "supplier": [],
+    #                                           "lot_number": [],
+    #                                           }),
+    #                                       scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+    # ):
+    #     '''use CAS for chemical if available. Written on bottles of chemicals with all other necessary information.\n
+    #     For empty DUID and AUID the UID will automatically created. For manual entry leave DUID, AUID, action_time, and action_params empty and servkey on "data".\n
+    #     If its the very first liquid (no source in database exists) leave source and source_mL empty.'''
+    #     A = await setupAct(request)
+    #     active = await app.base.contain_action(A)
+    #     A.action_params["DUID"] = A.decision_uuid
+    #     A.action_params["AUID"] = A.action_uuid
+        
+    #     sample = await app.driver.liquid_sample_no_create_new(sample)
+    #     await active.enqueue_data({'liquid_sample': sample.dict()})
+    #     finished_act = await active.finish()
+    #     return finished_act.as_dict()
 
 
     @app.post(f"/{servKey}/liquid_sample_no_get_last")
     async def liquid_sample_no_get_last(request: Request):
         A = await setupAct(request)
         active = await app.base.contain_action(A)
-        await active.enqueue_data({'liquid_sample_no': await app.driver.liquid_sample_no_get_last()})
+        sample = await app.driver.liquid_sample_no_get_last()
+        await active.enqueue_data({'liquid_sample': sample.dict()})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
 
-    @app.post(f"/{servKey}/liquid_sample_no_get")
-    async def liquid_sample_no_get(request: Request, liquid_sample_no: Optional[int]=None):
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data({'liquid_sample_no': await app.driver.liquid_sample_no_get(**A.action_params)})
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+    # @app.post(f"/{servKey}/liquid_sample_no_get")
+    # async def liquid_sample_no_get(request: Request, 
+    #                                fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1,"machine_name":gethostname()})]),
+    #                                scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+    #                                ):
+    #     A = await setupAct(request)
+    #     active = await app.base.contain_action(A)
+    #     sample = await app.driver.liquid_sample_no_get(sample)
+    #     await active.enqueue_data({'liquid_sample': sample.dict()})
+    #     finished_act = await active.finish()
+    #     return finished_act.as_dict()
 
 
     @app.post("/shutdown")
