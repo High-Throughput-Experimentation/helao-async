@@ -208,22 +208,21 @@ class gas_sample(base_sample):
 def sample_model_list_validator(model_list, values, **kwargs):
     """validates samples models in a list"""
 
-   
     def dict_to_model(model_dict):
         sample_type = model_dict.get("sample_type", None)
         if sample_type is None:
             return None
-        else:
-            model = None
-            if sample_type == "liquid":
-                model = liquid_sample(**model_dict)
-            elif sample_type == "gas":
-                model = gas_sample(**model_dict)
-            elif sample_type == "solid":
-                model = solid_sample(**model_dict)
-            elif sample_type == "sample_assembly":
-                model = sample_assembly(**model_dict)
-            return model
+        elif sample_type == "liquid":
+            return liquid_sample(**model_dict)
+        elif sample_type == "gas":
+            return gas_sample(**model_dict)
+        elif sample_type == "solid":
+            return solid_sample(**model_dict)
+        elif sample_type == "sample_assembly":
+            return sample_assembly(**model_dict)
+ 
+        return None
+
     
     if model_list is None or not isinstance(model_list, list):
         print_message({}, "model", f"validation error, type {type(model_list)} is not a valid sample model list", error = True)
@@ -233,14 +232,19 @@ def sample_model_list_validator(model_list, values, **kwargs):
     for i, model in enumerate(model_list):
         if isinstance(model, dict):
             model_list[i] = dict_to_model(model)
+        elif isinstance(model, liquid_sample):
+            continue
+        elif isinstance(model, solid_sample):
+            continue
+        elif isinstance(model, gas_sample):
+            continue
+        elif isinstance(model, sample_assembly):
+            continue
+        elif model is None:
+            continue
         else:
-            if not isinstance(model, liquid_sample):
-                if not isinstance(model, solid_sample):
-                    if not isinstance(model, gas_sample):
-                        if not isinstance(model, sample_assembly):
-                            if model is not None:
-                                print_message({}, "model", f"validation error, type {type(model)} is not a valid sample model", error = True)
-                                raise ValueError("must be valid sample model")
+            print_message({}, "model", f"validation error, type {type(model)} is not a valid sample model", error = True)
+            raise ValueError("must be valid sample model")
 
     return model_list
 
@@ -250,8 +254,6 @@ class sample_assembly(base_sample):
     parts: Optional[list] = []
     sample_position: Optional[str] = "cell1_we" # overwrite base variable with usual default assembly position
 
-    # class Config:
-    #     arbitrary_types_allowed = True # this just checks if param is of that type
 
     @validator('parts')
     def validate_parts(cls, value, values, **kwargs):
@@ -262,18 +264,18 @@ class sample_assembly(base_sample):
     def validate_sample_type(cls, v):
         if v != "sample_assembly":
             print_message({}, "model", f"validation error in sample_assembly, got type {v}", error = True)
-            # return "gas"
+            # return "sample_assembly"
             raise ValueError('must be sample_assembly')
         return "sample_assembly"            
 
 
     def rcp_dict(self):
-        # self.check_assembly_parts()
         return {
             "global_label":self.get_global_label(),
             "sample_type":self.sample_type,
-            # "sample_no": self.sample_no,
             "machine_name":self.machine_name,
+            "sample_position":self.sample_position,
+            "sample_creation_timecode":self.sample_creation_timecode,
             "assembly_parts":self.get_assembly_parts_rcp_dict()
             }
 
@@ -284,7 +286,7 @@ class sample_assembly(base_sample):
             if part is not None:
                 # return full dict
                 # part_dict_list.append(part.rcp_dict())
-                # return only the label (prefered)
+                # return only the label (preferred)
                 part_dict_list.append(part.get_global_label())
             else:
                 # part_dict_list.append(None)
