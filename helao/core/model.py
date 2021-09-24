@@ -109,10 +109,10 @@ class base_sample(BaseModel):
     # sample_hash: Optional[str] = None
     last_update: Optional[str] = None
     inheritance: Optional[str] = None
-    DUID: Optional[str] = None
-    AUID: Optional[str] = None
-    action_time: Optional[str] = None
-    servkey: Optional[str] = None
+    decision_uuid: Optional[str] = None
+    action_uuid: Optional[str] = None
+    action_queue_time: Optional[str] = None
+    server_name: Optional[str] = None
     plate_id: Optional[int] = None
     chemical: Optional[List[str]] = []
     mass: Optional[List[str]] = []
@@ -132,9 +132,9 @@ class base_sample(BaseModel):
             elif self.sample_type == "solid":
                 machine_name = self.machine_name if self.machine_name is not None else "legacy"
                 label = f"{machine_name}__solid__{self.plate_id}_{self.sample_no}"
-            elif self.sample_type == "sample_assembly":
+            elif self.sample_type == "assembly":
                 machine_name = self.machine_name if self.machine_name is not None else gethostname()
-                label = f"{machine_name}__sample_assembly__{self.sample_position}__{self.sample_creation_timecode}"
+                label = f"{machine_name}__assembly__{self.sample_position}__{self.sample_creation_timecode}"
             return label
         else:
             return self.global_label
@@ -146,6 +146,7 @@ class base_sample(BaseModel):
             "sample_type":self.sample_type,
             "sample_no": self.sample_no,
             "machine_name":self.machine_name if self.machine_name is not None else gethostname(),
+            "sample_creation_timecode": self.sample_creation_timecode
             }
 
 
@@ -162,7 +163,7 @@ class liquid_sample(base_sample):
     @validator('sample_type')
     def validate_sample_type(cls, v):
         if v != "liquid":
-            print_message({}, "model", f"validation liquid in solid_sample, got type {v}", error = True)
+            print_message({}, "model", f"validation liquid in solid_sample, got type '{v}'", error = True)
             # return "liquid"
             raise ValueError('must be liquid')
         return "liquid"
@@ -181,7 +182,7 @@ class solid_sample(base_sample):
     @validator('sample_type')
     def validate_sample_type(cls, v):
         if v != "solid":
-            print_message({}, "model", f"validation error in solid_sample, got type {v}", error = True)
+            print_message({}, "model", f"validation error in solid_sample, got type '{v}'", error = True)
             # return "solid"
             raise ValueError('must be solid')
         return "solid"
@@ -199,7 +200,7 @@ class gas_sample(base_sample):
     @validator('sample_type')
     def validate_sample_type(cls, v):
         if v != "gas":
-            print_message({}, "model", f"validation error in gas_sample, got type {v}", error = True)
+            print_message({}, "model", f"validation error in gas_sample, got type '{v}'", error = True)
             # return "gas"
             raise ValueError('must be gas')
         return "gas"
@@ -218,14 +219,15 @@ def sample_model_list_validator(model_list, values, **kwargs):
             return gas_sample(**model_dict)
         elif sample_type == "solid":
             return solid_sample(**model_dict)
-        elif sample_type == "sample_assembly":
-            return sample_assembly(**model_dict)
- 
-        return None
+        elif sample_type == "assembly":
+            return assembly_sample(**model_dict)
+        else:
+            print_message({}, "model", f"unsupported sample_type '{sample_type}'", error = True)
+            return None
 
     
     if model_list is None or not isinstance(model_list, list):
-        print_message({}, "model", f"validation error, type {type(model_list)} is not a valid sample model list", error = True)
+        print_message({}, "model", f"validation error, type '{type(model_list)}' is not a valid sample model list", error = True)
         raise ValueError("must be valid sample model list")
         return []
     
@@ -238,21 +240,21 @@ def sample_model_list_validator(model_list, values, **kwargs):
             continue
         elif isinstance(model, gas_sample):
             continue
-        elif isinstance(model, sample_assembly):
+        elif isinstance(model, assembly_sample):
             continue
         elif model is None:
             continue
         else:
-            print_message({}, "model", f"validation error, type {type(model)} is not a valid sample model", error = True)
+            print_message({}, "model", f"validation error, type '{type(model)}' is not a valid sample model", error = True)
             raise ValueError("must be valid sample model")
 
     return model_list
 
 
-class sample_assembly(base_sample):
-    sample_type: Optional[str] = "sample_assembly"
+class assembly_sample(base_sample):
+    sample_type: Optional[str] = "assembly"
     parts: Optional[list] = []
-    sample_position: Optional[str] = "cell1_we" # overwrite base variable with usual default assembly position
+    sample_position: Optional[str] = "cell1_we" # usual default assembly position
 
 
     @validator('parts')
@@ -262,11 +264,11 @@ class sample_assembly(base_sample):
 
     @validator('sample_type')
     def validate_sample_type(cls, v):
-        if v != "sample_assembly":
-            print_message({}, "model", f"validation error in sample_assembly, got type {v}", error = True)
-            # return "sample_assembly"
-            raise ValueError('must be sample_assembly')
-        return "sample_assembly"            
+        if v != "assembly":
+            print_message({}, "model", f"validation error in assembly, got type '{v}'", error = True)
+            # return "assembly"
+            raise ValueError('must be assembly')
+        return "assembly"            
 
 
     def rcp_dict(self):
@@ -320,7 +322,7 @@ class rcp_header(BaseModel):
     action_name: str
     action_abbr: Optional[str] = None
     action_params: Union[dict, None] = None
-    samples_in: Optional[Union[dict, None]] = None#Optional[List[samples_inout]]
-    samples_out: Optional[Union[dict, None]] = None#Optional[List[samples_inout]]
-    files: Optional[Union[dict, None]] = None#Optional[List[hlo_file]]
+    samples_in: Optional[Union[dict, None]] = None
+    samples_out: Optional[Union[dict, None]] = None
+    files: Optional[Union[dict, None]] = None
     
