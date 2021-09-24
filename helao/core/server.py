@@ -35,7 +35,7 @@ from helao.core.helper import MultisubscriberQueue, dict_to_rcp, eval_val
 from helao.core.helper import print_message, cleanupdict
 from helao.core.schema import Action, Decision
 from helao.core.model import return_dec, return_declist, return_act, return_actlist
-from helao.core.model import liquid_sample, gas_sample, solid_sample, sample_assembly, sample_list
+from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
 from helao.core.model import rcp_header
 
 

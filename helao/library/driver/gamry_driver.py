@@ -18,7 +18,7 @@ import os
 import pyaml
 
 from helao.core.error import error_codes
-# from helao.core.model import liquid_sample, gas_sample, solid_sample, sample_assembly
+# from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample
 from helao.core.model import sample_list
 
 class Gamry_modes(str, Enum):

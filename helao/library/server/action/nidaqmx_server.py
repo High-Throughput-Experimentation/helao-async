@@ -20,7 +20,7 @@ from typing import Optional, List, Union
 
 from helao.core.server import Action, makeActServ, setupAct
 from helao.library.driver.nidaqmx_driver import cNIMAX, pumpitems
-from helao.core.model import liquid_sample, gas_sample, solid_sample, sample_assembly, sample_list
+from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
 
 def makeApp(confPrefix, servKey):
 

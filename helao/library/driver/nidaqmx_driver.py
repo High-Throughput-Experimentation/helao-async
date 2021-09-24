@@ -17,7 +17,7 @@ from nidaqmx.constants import TriggerType
 from helao.core.schema import Action
 from helao.core.server import Base
 from helao.core.error import error_codes
-from helao.core.model import liquid_sample, gas_sample, solid_sample, sample_assembly, sample_list
+from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
 
 class pumpitems(str, Enum):
     PeriPump = "PeriPump"
