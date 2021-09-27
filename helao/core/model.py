@@ -103,43 +103,23 @@ class base_sample(BaseModel):
     global_label: Optional[str] = None
     sample_type: Optional[str] = None
     sample_no: Optional[int] = None
-    sample_creation_timecode: Optional[str] = None
+    sample_creation_timecode: Optional[int] = None # epoch in ns
     sample_position: Optional[str] = None
     machine_name: Optional[str] = None
-    # sample_hash: Optional[str] = None
-    last_update: Optional[str] = None
-    inheritance: Optional[str] = None
-    status: Union[List[str],str] = None
+    sample_hash: Optional[str] = None
+    last_update: Optional[int] = None # epoch in ns
+    inheritance: Optional[str] = None # only for internal use
+    status: Union[List[str],str] = None # only for internal use
     decision_uuid: Optional[str] = None
     action_uuid: Optional[str] = None
-    action_queue_time: Optional[str] = None
+    action_queue_time: Optional[str] = None # "%Y%m%d.%H%M%S%f"
     server_name: Optional[str] = None
-    plate_id: Optional[int] = None
     chemical: Optional[List[str]] = []
     mass: Optional[List[str]] = []
     supplier: Optional[List[str]] = []
     lot_number: Optional[List[str]] = []
     source: Union[List[str],str] = None
-
-    def get_global_label(self):
-        if self.global_label is None:
-            label = None
-            if self.sample_type == "liquid":
-                machine_name = self.machine_name if self.machine_name is not None else gethostname()
-                label = f"{machine_name}__liquid__{self.sample_no}"
-            elif self.sample_type == "gas":
-                machine_name = self.machine_name if self.machine_name is not None else gethostname()
-                label = f"{machine_name}__gas__{self.sample_no}"
-            elif self.sample_type == "solid":
-                machine_name = self.machine_name if self.machine_name is not None else "legacy"
-                label = f"{machine_name}__solid__{self.plate_id}_{self.sample_no}"
-            elif self.sample_type == "assembly":
-                machine_name = self.machine_name if self.machine_name is not None else gethostname()
-                label = f"{machine_name}__assembly__{self.sample_position}__{self.sample_creation_timecode}"
-            return label
-        else:
-            return self.global_label
-
+    comment: Optional[str] = None
         
     def create_initial_rcp_dict(self):
         return {
@@ -161,6 +141,16 @@ class liquid_sample(base_sample):
         rcp_dict = self.create_initial_rcp_dict()
         return rcp_dict
 
+    def get_global_label(self):
+        if self.global_label is None:
+            label = None
+            machine_name = self.machine_name if self.machine_name is not None else gethostname()
+            label = f"{machine_name}__liquid__{self.sample_no}"
+            return label
+        else:
+            return self.global_label
+
+
     @validator('sample_type')
     def validate_sample_type(cls, v):
         if v != "liquid":
@@ -174,11 +164,21 @@ class solid_sample(base_sample):
     """base class for solid samples"""
     sample_type: Optional[str] = "solid"
     machine_name: Optional[str] = "legacy"
+    plate_id: Optional[int] = None
     
     def rcp_dict(self):
         rcp_dict = self.create_initial_rcp_dict()
         rcp_dict.update({"plate_id":self.plate_id})
         return rcp_dict
+
+    def get_global_label(self):
+        if self.global_label is None:
+            label = None
+            machine_name = self.machine_name if self.machine_name is not None else "legacy"
+            label = f"{machine_name}__solid__{self.plate_id}_{self.sample_no}"
+            return label
+        else:
+            return self.global_label
 
     @validator('sample_type')
     def validate_sample_type(cls, v):
@@ -197,6 +197,15 @@ class gas_sample(base_sample):
     def rcp_dict(self):
         rcp_dict = self.create_initial_rcp_dict()
         return rcp_dict
+
+    def get_global_label(self):
+        if self.global_label is None:
+            label = None
+            machine_name = self.machine_name if self.machine_name is not None else gethostname()
+            label = f"{machine_name}__gas__{self.sample_no}"
+            return label
+        else:
+            return self.global_label
 
     @validator('sample_type')
     def validate_sample_type(cls, v):
@@ -257,6 +266,14 @@ class assembly_sample(base_sample):
     parts: Optional[list] = []
     sample_position: Optional[str] = "cell1_we" # usual default assembly position
 
+    def get_global_label(self):
+        if self.global_label is None:
+            label = None
+            machine_name = self.machine_name if self.machine_name is not None else gethostname()
+            label = f"{machine_name}__assembly__{self.sample_position}__{self.sample_creation_timecode}"
+            return label
+        else:
+            return self.global_label
 
     @validator('parts')
     def validate_parts(cls, value, values, **kwargs):
