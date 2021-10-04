@@ -9,7 +9,7 @@
 # - add wsstatus
 # - test what happens if NImax broswer has nothing configured and only lists the device
 # done - Current and voltage stream with interrut handler?
-# - create tasks for action library
+# - create tasks for process library
 # - handshake as stream with interrupt
 
 from importlib import import_module
@@ -18,7 +18,7 @@ from fastapi import Request
 from typing import Optional, List, Union
 
 
-from helao.core.server import Action, makeActServ, setupAct
+from helao.core.server import Action, make_process_serv, setup_process
 from helao.library.driver.nidaqmx_driver import cNIMAX, pumpitems
 from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
 
@@ -26,7 +26,7 @@ def makeApp(confPrefix, servKey):
 
     config = import_module(f"helao.config.{confPrefix}").config
 
-    app = makeActServ(
+    app = make_process_serv(
         config,
         servKey,
         servKey,
@@ -43,9 +43,9 @@ def makeApp(confPrefix, servKey):
                                     on: Optional[bool] = True
                                     ):
         """Provide list of Valves (number) separated by ,"""
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data({"GasFlowValves": await app.driver.run_task_GasFlowValves(**A.action_params)})
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
+        await active.enqueue_data({"GasFlowValves": await app.driver.run_task_GasFlowValves(**A.process_params)})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -57,9 +57,9 @@ def makeApp(confPrefix, servKey):
                                          on: Optional[bool] = True
                                          ):
         """Provide list of Cells separated by ,"""
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data({"Master_Cell": await app.driver.run_task_Master_Cell_Select(**A.action_params)})
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
+        await active.enqueue_data({"Master_Cell": await app.driver.run_task_Master_Cell_Select(**A.process_params)})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -71,9 +71,9 @@ def makeApp(confPrefix, servKey):
                                              on: Optional[bool] = True
                                              ):
         """Provide list of Cells (number) separated by ,"""
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data({"Active_Cells": await app.driver.run_task_Active_Cells_Selection(**A.action_params)})
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
+        await active.enqueue_data({"Active_Cells": await app.driver.run_task_Active_Cells_Selection(**A.process_params)})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -84,9 +84,9 @@ def makeApp(confPrefix, servKey):
                             pump: Optional[pumpitems] = "PeriPump",
                             on: Optional[bool] = True
                             ):
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data({"pumps": await app.driver.run_task_Pump(**A.action_params)})
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
+        await active.enqueue_data({"pumps": await app.driver.run_task_Pump(**A.process_params)})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -97,17 +97,17 @@ def makeApp(confPrefix, servKey):
                              BCDs: Optional[str] = "",
                              on: Optional[bool] = True
                              ):
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data({"FSWBCD": await app.driver.run_task_FSWBCD(**A.action_params)})
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
+        await active.enqueue_data({"FSWBCD": await app.driver.run_task_FSWBCD(**A.process_params)})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
 
     @app.post(f"/{servKey}/run_task_FSW_error")
     async def run_task_FSW_error(request: Request):
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
         await active.enqueue_data({"FSW_error": await app.driver.run_task_getFSW("Error")})
         finished_act = await active.finish()
         return finished_act.as_dict()
@@ -115,8 +115,8 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/run_task_FSW_done")
     async def run_task_FSW_done(request: Request):
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
         await active.enqueue_data({"FSW_done": await app.driver.run_task_getFSW("Done")})
         finished_act = await active.finish()
         return finished_act.as_dict()
@@ -132,8 +132,8 @@ def makeApp(confPrefix, servKey):
                               scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                               ):
         """Runs multi cell IV measurement."""
-        A = await setupAct(request)
-        A.action_abbr = "multiCV"
+        A = await setup_process(request)
+        A.process_abbr = "multiCV"
         # A.save_data = True
         active_dict = await app.driver.run_cell_IV(A)
         return active_dict
@@ -142,8 +142,8 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/stop")
     async def stop(request: Request):
         """Stops measurement in a controlled way."""
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
         await active.enqueue_data({"stop_result": await app.driver.stop()})
         finished_act = await active.finish()
         return finished_act.as_dict()
@@ -155,9 +155,9 @@ def makeApp(confPrefix, servKey):
                    switch: Optional[bool] = True
                    ):
         """Same as stop, but also sets estop flag."""
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data({"estop_result": await app.driver.estop(**A.action_params)})
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
+        await active.enqueue_data({"estop_result": await app.driver.estop(**A.process_params)})
         finished_act = await active.finish()
         return finished_act.as_dict()
 

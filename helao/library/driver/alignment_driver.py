@@ -2,11 +2,11 @@ import aiohttp
 from helao.core.server import Base
 
 class aligner:
-    def __init__(self, actServ: Base):
+    def __init__(self, process_serv: Base):
         
-        self.base = actServ
-        self.config_dict = actServ.server_cfg["params"]
-        self.C = actServ.world_cfg["servers"]
+        self.base = process_serv
+        self.config_dict = process_serv.server_cfg["params"]
+        self.C = process_serv.world_cfg["servers"]
         # determines if an alignment is currently running
         # needed for visualizer
         # to signal end of alignment

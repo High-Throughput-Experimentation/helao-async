@@ -14,7 +14,7 @@ from importlib import import_module
 from typing import Optional, List, Union
 from fastapi import Request
 from helao.library.driver.galil_driver import move_modes, transformation_mode
-from helao.core.server import makeActServ, setupAct
+from helao.core.server import make_process_serv, setup_process
 from helao.library.driver.galil_driver import galil
 
 
@@ -22,7 +22,7 @@ def makeApp(confPrefix, servKey):
 
     config = import_module(f"helao.config.{confPrefix}").config
 
-    app = makeActServ(
+    app = make_process_serv(
         config, 
         servKey, 
         servKey, 
@@ -39,8 +39,8 @@ def makeApp(confPrefix, servKey):
         (2) set abs zero, 
         (3) moving by center counts back, 
         (4) set abs zero"""
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
         await active.enqueue_data({"setref": await app.driver.setaxisref()})
         finished_act = await active.finish()
         return finished_act.as_dict()
@@ -52,9 +52,9 @@ def makeApp(confPrefix, servKey):
         platexy: Optional[str] = None
     ):
         """Converts plate to motor xy"""
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        motorxy = app.driver.transform.transform_platexy_to_motorxy(**A.action_params)
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
+        motorxy = app.driver.transform.transform_platexy_to_motorxy(**A.process_params)
         await active.enqueue_data(motorxy)
         finished_act = await active.finish()
         return finished_act.as_dict()
@@ -66,9 +66,9 @@ def makeApp(confPrefix, servKey):
         motorxy: Optional[str] = None
     ):
         """Converts motor to plate xy"""
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        platexy = app.driver.transform.transform_motorxy_to_platexy(**A.action_params)
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
+        platexy = app.driver.transform.transform_motorxy_to_platexy(**A.process_params)
         await active.enqueue_data(platexy)
         finished_act = await active.finish()
         return finished_act.as_dict()
@@ -79,9 +79,9 @@ def makeApp(confPrefix, servKey):
         Mxy: Optional[str] = None
     ):
         """removes Minstr from Msystem to obtain Mplate for alignment"""
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        Mplate = app.driver.transform.get_Mplate_Msystem(**A.action_params)
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
+        Mplate = app.driver.transform.get_Mplate_Msystem(**A.process_params)
         await active.enqueue_data(Mplate)
         finished_act = await active.finish()
         return finished_act.as_dict()
@@ -92,9 +92,9 @@ def makeApp(confPrefix, servKey):
         Mxy: Optional[str] = None
     ):
         """Get current in use Alignment from motion server"""
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        updsys = app.driver.transform.update_Mplatexy(**A.action_params)
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
+        updsys = app.driver.transform.update_Mplatexy(**A.process_params)
         await active.enqueue_data(updsys)
         finished_act = await active.finish()
         return finished_act.as_dict()
@@ -103,8 +103,8 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/upload_alignmentmatrix")
     async def upload_alignmentmatrix(request: Request):
         """Send new Alignment to motion server"""
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
         alignmentmatrix = app.driver.transform.get_Mplatexy().tolist()
         await active.enqueue_data(alignmentmatrix)
         finished_act = await active.finish()
@@ -123,9 +123,9 @@ def makeApp(confPrefix, servKey):
         """Move a apecified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
         Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.
         No z, Rx, Ry, Rz when platexy selected."""
-        A = await setupAct(request)
+        A = await setup_process(request)
         app.base.print_message(A.as_dict())
-        active = await app.base.contain_action(A)
+        active = await app.base.contain_process(A)
         move_response = await app.driver.motor_move(A)
         await active.enqueue_data(move_response)
         # if move_response.get("err_code", [])!=[0]:
@@ -136,8 +136,8 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/disconnect")
     async def disconnect(request: Request):
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
         await active.enqueue_data(await app.driver.motor_disconnect())
         finished_act = await active.finish()
         return finished_act.as_dict()
@@ -145,8 +145,8 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/query_positions")
     async def query_positions(request: Request):
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
         await active.enqueue_data(await app.driver.query_axis_position(await app.driver.get_all_axis()))
         finished_act = await active.finish()
         return finished_act.as_dict()
@@ -156,9 +156,9 @@ def makeApp(confPrefix, servKey):
     async def query_position(request: Request, 
         axis: Optional[Union[List[str], str]] = None
     ):
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(await app.driver.query_axis_position(**A.action_params))
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
+        await active.enqueue_data(await app.driver.query_axis_position(**A.process_params))
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -167,9 +167,9 @@ def makeApp(confPrefix, servKey):
     async def query_moving(request: Request, 
         axis: Optional[Union[List[str], str]] = None
     ):
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(await app.driver.query_axis_moving(**A.action_params))
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
+        await active.enqueue_data(await app.driver.query_axis_moving(**A.process_params))
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -177,26 +177,26 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/axis_off")
     async def axis_off(request: Request, axis: Optional[Union[List[str], str]] = None):
         # http://127.0.0.1:8001/motor/set/off?axis=x
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(await app.driver.motor_off(**A.action_params))
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
+        await active.enqueue_data(await app.driver.motor_off(**A.process_params))
         finished_act = await active.finish()
         return finished_act.as_dict()
 
 
     @app.post(f"/{servKey}/axis_on")
     async def axis_on(request: Request, axis: Optional[Union[List[str], str]] = None):
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(await app.driver.motor_on(**A.action_params))
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
+        await active.enqueue_data(await app.driver.motor_on(**A.process_params))
         finished_act = await active.finish()
         return finished_act.as_dict()
 
 
     @app.post(f"/{servKey}/stop")
     async def stop(request: Request):
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
         await active.enqueue_data(
             await app.driver.motor_off(await app.driver.get_all_axis())
         )
@@ -207,8 +207,8 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/reset")
     async def reset(request: Request):
         """resets galil device. only for emergency use!"""
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
         await active.enqueue_data(
             await app.driver.motor_off(await app.driver.reset())
         )
@@ -219,9 +219,9 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/estop")
     async def estop(request: Request, switch: Optional[bool] = True):
         # http://127.0.0.1:8001/motor/set/stop
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(await app.driver.estop_axis(**A.action_params))
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
+        await active.enqueue_data(await app.driver.estop_axis(**A.process_params))
         finished_act = await active.finish()
         return finished_act.as_dict()
 

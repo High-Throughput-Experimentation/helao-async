@@ -242,7 +242,7 @@ def print_message(server_cfg,server_name,*args,**kwargs):
     style = ""
     if srv_type == "orchestrator":
         style = f"{Style.BRIGHT}{Fore.GREEN}"
-    elif srv_type == "action":
+    elif srv_type == "process":
         style = f"{Style.BRIGHT}{Fore.YELLOW}"
     elif srv_type == "operator":
         style = f"{Style.BRIGHT}{Fore.CYAN}"

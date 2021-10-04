@@ -5,7 +5,7 @@ GamryCOM comtypes Win32 module. Class methods are specific to Gamry devices. Dev
 configuration is read from config/config.py. 
 
 """
-from helao.core.schema import Action
+from helao.core.schema import cProcess
 from helao.core.server import Base
 import sys
 import comtypes
@@ -123,12 +123,12 @@ class dummy_sink:
 
 
 # due to async status handling and delayed result paradigm, this gamry class requires an
-# action server to operate
+# process server to operate
 class gamry:
-    def __init__(self, actServ: Base):
+    def __init__(self, process_serv: Base):
 
-        self.base = actServ
-        self.config_dict = actServ.server_cfg["params"]
+        self.base = process_serv
+        self.config_dict = process_serv.server_cfg["params"]
 
         # get Gamry object (Garmry.com)
         # a busy gamrycom can lock up the server
@@ -139,8 +139,8 @@ class gamry:
         # self.GamryCOM = client.GetModule(self.config_dict["path_to_gamrycom"])
 
         self.pstat = None
-        self.action = None  # for passing action object from technique method to measure loop
-        self.active =None  # for holding active action object, clear this at end of measurement
+        self.process = None  # for passing process object from technique method to measure loop
+        self.active =None  # for holding active process object, clear this at end of measurement
         self.samples_in=sample_list()
         # status is handled through active, call active.finish()
 
@@ -195,11 +195,6 @@ class gamry:
         # signals return to endpoint after active was created
         self.IO_continue = False
 
-
-        ### passing Action dict will contain all UID and action paramter information ###
-        # self.runparams = action_runparams
-        # self.def_action_params = Action_params()
-        # self.action_params = self.def_action_params.as_dict()
 
     async def IOloop(self):
         """This is main Gamry measurement loop which always needs to run
@@ -550,14 +545,14 @@ class gamry:
                     }
             )
 
-            self.active = await self.base.contain_action(
-                self.action,
+            self.active = await self.base.contain_process(
+                self.process,
                 file_type="pstat_helao__file",
                 file_data_keys=self.FIFO_column_headings,
                 file_sample_label=[sample.get_global_label() for sample in self.samples_in.samples],
                 header=self.FIFO_gamryheader,
             )
-            self.base.print_message(f"!!! Active action uuid is {self.active.action.action_uuid}")
+            self.base.print_message(f"!!! Active process uuid is {self.active.process.process_uuid}")
             # active object is set so we can set the continue flag
             self.IO_continue = True
             await self.active.append_sample(samples = [sample_in for sample_in in self.samples_in.samples],
@@ -702,7 +697,7 @@ class gamry:
                         tmp_datapoints = tuple(test)
     
                     if self.active:
-                        if self.active.action.save_data:
+                        if self.active.process.save_data:
                             # self.base.print_message(' ... gamry pushing data:', {k: [v] for k, v in zip(self.FIFO_column_headings, tmp_datapoints)})
                             await self.active.enqueue_data(
                                 {
@@ -734,10 +729,10 @@ class gamry:
             # connection will be closed in IOloop
             self.dtaqsink = dummy_sink()
 
-            self.base.print_message(" ... gamry finishes active action")
+            self.base.print_message(" ... gamry finishes active process")
             _ = await self.active.finish()
             self.active = None
-            self.action = None
+            self.process = None
             self.samples_in=sample_list()
 
             return {"measure": f"done_{self.IO_meas_mode}"}
@@ -757,19 +752,19 @@ class gamry:
             # file and Gamry connection will be closed with the meas loop
             await self.IO_signalq.put(False)
 
-    async def estop(self, A: Action):
+    async def estop(self, A: cProcess):
         """same as stop, set or clear estop flag with switch parameter"""
         # should be the same as stop()
-        switch = A.action_params["switch"]
+        switch = A.process_params["switch"]
         
         self.IO_estop = switch
         if self.IO_measuring:
             if switch:
                 await self.IO_signalq.put(False)
                 await self.base.set_estop(
-                    self.active.active.action_name, self.active.active.action_uuid
+                    self.active.active.process_name, self.active.active.process_uuid
                 )
-                # can only set action server estop on a running uuid
+                # can only set process server estop on a running uuid
 
     async def technique_wrapper(
         self, 
@@ -800,20 +795,20 @@ class gamry:
                     err_code = gamry_error_decoder(e)
                     self.base.print_message(err_code)
 
-                self.action = act
-                self.samples_in=self.action.samples_in
+                self.process = act
+                self.samples_in=self.process.samples_in
                 # signal the IOloop to start the measrurement
                 await self.IO_signalq.put(True)
                 # wait for data to appear in multisubscriber queue before returning active dict
                 # async for data_msg in self.base.data_q.subscribe():
                 #     for act_uuid, _ in data_msg.items():
-                #         if act.action_uuid == act_uuid:
-                #             activeDict = self.active.action.as_dict()
+                #         if act.process_uuid == act_uuid:
+                #             activeDict = self.active.process.as_dict()
                 #     if activeDict:
                 #         break
 
                 # need to wait now for the activation of the meas routine
-                # and that the active object is activated and sets action status
+                # and that the active object is activated and sets process status
 
                 while not self.IO_continue:
                     await asyncio.sleep(1)
@@ -824,7 +819,7 @@ class gamry:
                 err_code = "none"
 
                 if self.active:
-                    activeDict = self.active.action.as_dict()
+                    activeDict = self.active.process.as_dict()
                 else:
                     activeDict = act.as_dict()                
 
@@ -843,16 +838,16 @@ class gamry:
         return activeDict
 
     async def technique_LSV(
-        self, A: Action,
+        self, A: cProcess,
     ):
         """LSV definition"""
-        Vinit = A.action_params["Vinit"]
-        Vfinal = A.action_params["Vfinal"]
-        ScanRate = A.action_params["ScanRate"]
-        SampleRate = A.action_params["SampleRate"]
-        TTLwait = A.action_params["TTLwait"]
-        TTLsend = A.action_params["TTLsend"]
-        IErange = A.action_params["IErange"]
+        Vinit = A.process_params["Vinit"]
+        Vfinal = A.process_params["Vfinal"]
+        ScanRate = A.process_params["ScanRate"]
+        SampleRate = A.process_params["SampleRate"]
+        TTLwait = A.process_params["TTLwait"]
+        TTLsend = A.process_params["TTLsend"]
+        IErange = A.process_params["IErange"]
 
         # time expected for measurement to be completed
         eta = abs(Vfinal - Vinit) / ScanRate  # +delay
@@ -894,15 +889,15 @@ class gamry:
         return activeDict
 
     async def technique_CA(
-        self, A: Action,
+        self, A: cProcess,
     ):
         """CA definition"""
-        Vval = A.action_params["Vval"]
-        Tval = A.action_params["Tval"]
-        SampleRate = A.action_params["SampleRate"]
-        TTLwait = A.action_params["TTLwait"]
-        TTLsend = A.action_params["TTLsend"]
-        IErange = A.action_params["IErange"]
+        Vval = A.process_params["Vval"]
+        Tval = A.process_params["Tval"]
+        SampleRate = A.process_params["SampleRate"]
+        TTLwait = A.process_params["TTLwait"]
+        TTLsend = A.process_params["TTLsend"]
+        IErange = A.process_params["IErange"]
 
         # time expected for measurement to be completed
         eta = Tval  # +delay
@@ -933,15 +928,15 @@ class gamry:
         return activeDict
 
     async def technique_CP(
-        self, A: Action,
+        self, A: cProcess,
     ):
         """CP definition"""
-        Ival = A.action_params["Ival"]
-        Tval = A.action_params["Tval"]
-        SampleRate = A.action_params["SampleRate"]
-        TTLwait = A.action_params["TTLwait"]
-        TTLsend = A.action_params["TTLsend"]
-        IErange = A.action_params["IErange"]
+        Ival = A.process_params["Ival"]
+        Tval = A.process_params["Tval"]
+        SampleRate = A.process_params["SampleRate"]
+        TTLwait = A.process_params["TTLwait"]
+        TTLsend = A.process_params["TTLsend"]
+        IErange = A.process_params["IErange"]
 
         # time expected for measurement to be completed
         eta = Tval  # +delay
@@ -971,22 +966,22 @@ class gamry:
         )
         return activeDict
 
-    async def technique_CV(self, A: Action):
-        Vinit = A.action_params["Vinit"]
-        Vapex1 = A.action_params["Vapex1"]
-        Vapex2 = A.action_params["Vapex2"]
-        Vfinal = A.action_params["Vfinal"]
-        ScanInit = A.action_params["ScanInit"]
-        ScanApex = A.action_params["ScanApex"]
-        ScanFinal = A.action_params["ScanFinal"]
-        HoldTime0 = A.action_params["HoldTime0"]
-        HoldTime1 = A.action_params["HoldTime1"]
-        HoldTime2 = A.action_params["HoldTime2"]
-        SampleRate = A.action_params["SampleRate"]
-        Cycles = A.action_params["Cycles"]
-        TTLwait = A.action_params["TTLwait"]
-        TTLsend = A.action_params["TTLsend"]
-        IErange = A.action_params["IErange"]
+    async def technique_CV(self, A: cProcess):
+        Vinit = A.process_params["Vinit"]
+        Vapex1 = A.process_params["Vapex1"]
+        Vapex2 = A.process_params["Vapex2"]
+        Vfinal = A.process_params["Vfinal"]
+        ScanInit = A.process_params["ScanInit"]
+        ScanApex = A.process_params["ScanApex"]
+        ScanFinal = A.process_params["ScanFinal"]
+        HoldTime0 = A.process_params["HoldTime0"]
+        HoldTime1 = A.process_params["HoldTime1"]
+        HoldTime2 = A.process_params["HoldTime2"]
+        SampleRate = A.process_params["SampleRate"]
+        Cycles = A.process_params["Cycles"]
+        TTLwait = A.process_params["TTLwait"]
+        TTLsend = A.process_params["TTLsend"]
+        IErange = A.process_params["IErange"]
 
         # time expected for measurement to be completed
         eta = abs(Vapex1 - Vinit) / ScanInit
@@ -1043,17 +1038,17 @@ class gamry:
         )
         return activeDict
 
-    async def technique_EIS(self, A: Action):
+    async def technique_EIS(self, A: cProcess):
         """EIS definition"""
-        Vval = A.action_params["Vval"]
-        Tval = A.action_params["Tval"]
-        Freq = A.action_params["Freq"]
-        RMS = A.action_params["RMS"]
-        Precision = A.action_params["Precision"]
-        SampleRate = A.action_params["SampleRate"]
-        TTLwait = A.action_params["TTLwait"]
-        TTLsend = A.action_params["TTLsend"]
-        IErange = A.action_params["IErange"]
+        Vval = A.process_params["Vval"]
+        Tval = A.process_params["Tval"]
+        Freq = A.process_params["Freq"]
+        RMS = A.process_params["RMS"]
+        Precision = A.process_params["Precision"]
+        SampleRate = A.process_params["SampleRate"]
+        TTLwait = A.process_params["TTLwait"]
+        TTLsend = A.process_params["TTLsend"]
+        IErange = A.process_params["IErange"]
 
         # time expected for measurement to be completed
         eta = Tval  # +delay
@@ -1088,14 +1083,14 @@ class gamry:
         )
         return activeDict
 
-    async def technique_OCV(self, A: Action):
+    async def technique_OCV(self, A: cProcess):
         """OCV definition"""
-        Tval = A.action_params["Tval"]
-        SampleRate = A.action_params["SampleRate"]
-        # runparams = A.action_params['runparams']
-        TTLwait = A.action_params["TTLwait"]
-        TTLsend = A.action_params["TTLsend"]
-        IErange = A.action_params["IErange"]
+        Tval = A.process_params["Tval"]
+        SampleRate = A.process_params["SampleRate"]
+        # runparams = A.process_params['runparams']
+        TTLwait = A.process_params["TTLwait"]
+        TTLsend = A.process_params["TTLsend"]
+        IErange = A.process_params["IErange"]
         """The OCV class manages data acquisition for a Controlled Voltage I-V curve. However, it is a special purpose curve
         designed for measuring the open circuit voltage over time. The measurement is made in the Potentiostatic mode but with the Cell
         Switch open. The operator may set a voltage stability limit. When this limit is met the Ocv terminates."""
