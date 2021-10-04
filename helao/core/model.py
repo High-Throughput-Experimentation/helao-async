@@ -11,8 +11,8 @@ from datetime import datetime
 
 from helao.core.helper import print_message
 
-class return_dec(BaseModel):
-    """Return class for queried Decision objects."""
+class return_process_group(BaseModel):
+    """Return class for queried cProcess_group objects."""
     index: int
     uid: Union[str, None]
     label: str
@@ -21,12 +21,12 @@ class return_dec(BaseModel):
     access: str
 
 
-class return_declist(BaseModel):
-    """Return class for queried Decision list."""
-    process_groups: List[return_dec]
+class return_process_group_list(BaseModel):
+    """Return class for queried cProcess_group list."""
+    process_groups: List[return_process_group]
 
 
-class return_act(BaseModel):
+class return_process(BaseModel):
     """Return class for queried process objects."""
     index: int
     uid: Union[str, None]
@@ -36,12 +36,12 @@ class return_act(BaseModel):
     preempt: int
 
 
-class return_actlist(BaseModel):
+class return_process_list(BaseModel):
     """Return class for queried process list."""
-    processes: List[return_act]
+    processes: List[return_process]
 
 
-class return_finishedact(BaseModel):
+class return_finished_process(BaseModel):
     """Standard return class for processes that finish with response."""
     technique_name: str
     access: str
@@ -73,7 +73,7 @@ class return_finishedact(BaseModel):
     data: Optional[list]
 
 
-class return_runningact(BaseModel):
+class return_running_process(BaseModel):
     """Standard return class for processes that finish after response."""
     technique_name: str
     access: str
