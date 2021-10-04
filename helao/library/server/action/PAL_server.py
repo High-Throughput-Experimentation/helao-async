@@ -2,7 +2,7 @@ from importlib import import_module
 from socket import gethostname
 from time import strftime
 
-from helao.core.server import Action, makeActServ, setupAct
+from helao.core.server import make_process_serv, setup_process
 from helao.library.driver.PAL_driver import cPAL
 from helao.library.driver.PAL_driver import PALmethods
 from helao.library.driver.PAL_driver import Spacingmethod
@@ -18,7 +18,7 @@ def makeApp(confPrefix, servKey):
 
     config = import_module(f"helao.config.{confPrefix}").config
 
-    app = makeActServ(
+    app = make_process_serv(
         config,
         servKey,
         servKey,
@@ -54,8 +54,8 @@ def makeApp(confPrefix, servKey):
         PAL_wash4: Optional[bool] = False,
         scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
-        """universal pal action"""
-        A = await setupAct(request)
+        """universal pal process"""
+        A = await setup_process(request)
         active_dict = await app.driver.init_PAL_IOloop(A)
         return active_dict
 
@@ -79,8 +79,8 @@ def makeApp(confPrefix, servKey):
         PAL_wash4: Optional[bool] = False,
         scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
-        A = await setupAct(request)
-        A.action_params["PAL_method"] =  PALmethods.archive.value
+        A = await setup_process(request)
+        A.process_params["PAL_method"] =  PALmethods.archive.value
         active_dict = await app.driver.init_PAL_IOloop(A)
         
         return active_dict
@@ -100,8 +100,8 @@ def makeApp(confPrefix, servKey):
         scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
         """fills eche"""
-        A = await setupAct(request)
-        A.action_params["PAL_method"] =  PALmethods.fill.value
+        A = await setup_process(request)
+        A.process_params["PAL_method"] =  PALmethods.fill.value
         active_dict = await app.driver.init_PAL_IOloop(A)
         return active_dict
 
@@ -120,8 +120,8 @@ def makeApp(confPrefix, servKey):
         scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
         """fills eche with hardcoded volume"""
-        A = await setupAct(request)
-        A.action_params["PAL_method"] =  PALmethods.fillfixed.value
+        A = await setup_process(request)
+        A.process_params["PAL_method"] =  PALmethods.fillfixed.value
         active_dict = await app.driver.init_PAL_IOloop(A)
         return active_dict
 
@@ -133,12 +133,12 @@ def makeApp(confPrefix, servKey):
         PAL_volume_uL: Optional[int] = 500,  # uL
     ):
         """cleans the PAL tool"""
-        A = await setupAct(request)
-        A.action_params["PAL_method"] =  PALmethods.deepclean.value
-        A.action_params["PAL_wash1"] =  True
-        A.action_params["PAL_wash2"] =  True
-        A.action_params["PAL_wash3"] =  True
-        A.action_params["PAL_wash4"] =  True
+        A = await setup_process(request)
+        A.process_params["PAL_method"] =  PALmethods.deepclean.value
+        A.process_params["PAL_wash1"] =  True
+        A.process_params["PAL_wash2"] =  True
+        A.process_params["PAL_wash3"] =  True
+        A.process_params["PAL_wash4"] =  True
         active_dict = await app.driver.init_PAL_IOloop(A)
         return active_dict
 
@@ -162,8 +162,8 @@ def makeApp(confPrefix, servKey):
         PAL_wash4: Optional[bool] = False,
         scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
-        A = await setupAct(request)
-        A.action_params["PAL_method"] =  PALmethods.dilute.value
+        A = await setup_process(request)
+        A.process_params["PAL_method"] =  PALmethods.dilute.value
         active_dict = await app.driver.init_PAL_IOloop(A)
         return active_dict
 
@@ -171,7 +171,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/trayDB_reset")
     async def trayDB_reset(request: Request):
         """Resets app.driver vial table. But will make a full dump to CSV first."""
-        A = await setupAct(request)
+        A = await setup_process(request)
         finished_act = await app.driver.trayDB_reset(A)
         return finished_act.as_dict()
 
@@ -184,9 +184,9 @@ def makeApp(confPrefix, servKey):
         """Returns an empty vial position for given max volume.\n
         For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.\n
         It will select the first empty vial which has the smallest volume that still can hold req_vol"""
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data({"vial_position": await app.driver.trayDB_new(**A.action_params)})
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
+        await active.enqueue_data({"vial_position": await app.driver.trayDB_new(**A.process_params)})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -201,9 +201,9 @@ def makeApp(confPrefix, servKey):
         slot: Optional[int] = None
     ):
         """Updates app.driver vial Table. If sucessful (vial-slot was empty) returns True, else it returns False."""
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data({"update": await app.driver.trayDB_update(**A.action_params)})
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
+        await active.enqueue_data({"update": await app.driver.trayDB_update(**A.process_params)})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -214,7 +214,7 @@ def makeApp(confPrefix, servKey):
         tray: Optional[int] = None, 
         slot: Optional[int] = None
     ):
-        A = await setupAct(request)
+        A = await setup_process(request)
         finished_act = await app.driver.trayDB_get_db(A)
         return finished_act.as_dict()
 
@@ -229,9 +229,9 @@ def makeApp(confPrefix, servKey):
         rack: Optional[int] = None,
         dilution_factor: Optional[float] = None
     ):
-        A = await setupAct(request)
-        A.action_abbr = "export"
-        A.action_params["icpms"] = True
+        A = await setup_process(request)
+        A.process_abbr = "export"
+        A.process_params["icpms"] = True
         finished_act = await app.driver.trayDB_get_db(A)
         return finished_act.as_dict()
 
@@ -242,9 +242,9 @@ def makeApp(confPrefix, servKey):
         tray: Optional[int] = None,
         slot: Optional[int] = None
     ):
-        A = await setupAct(request)
-        A.action_abbr = "export"
-        A.action_params["csv"] = True # signal subroutine to create a csv
+        A = await setup_process(request)
+        A.process_abbr = "export"
+        A.process_params["csv"] = True # signal subroutine to create a csv
         finished_act = await app.driver.trayDB_get_db(A)
         return finished_act.as_dict()
 
@@ -255,7 +255,7 @@ def makeApp(confPrefix, servKey):
     #                                           "machine_name":gethostname(),
     #                                           "source": None,
     #                                           "volume_mL": 0.0,
-    #                                           "action_time": strftime("%Y%m%d.%H%M%S"),
+    #                                           "process_time": strftime("%Y%m%d.%H%M%S"),
     #                                           "chemical": [],
     #                                           "mass": [],
     #                                           "supplier": [],
@@ -264,12 +264,12 @@ def makeApp(confPrefix, servKey):
     #                                       scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     # ):
     #     '''use CAS for chemical if available. Written on bottles of chemicals with all other necessary information.\n
-    #     For empty DUID and AUID the UID will automatically created. For manual entry leave DUID, AUID, action_time, and action_params empty and servkey on "data".\n
+    #     For empty DUID and AUID the UID will automatically created. For manual entry leave DUID, AUID, process_time, and process_params empty and servkey on "data".\n
     #     If its the very first liquid (no source in database exists) leave source and source_mL empty.'''
-    #     A = await setupAct(request)
-    #     active = await app.base.contain_action(A)
-    #     A.action_params["DUID"] = A.decision_uuid
-    #     A.action_params["AUID"] = A.action_uuid
+    #     A = await setup_process(request)
+    #     active = await app.base.contain_process(A)
+    #     A.process_params["DUID"] = A.decision_uuid
+    #     A.process_params["AUID"] = A.process_uuid
         
     #     sample = await app.driver.liquid_sample_no_create_new(sample)
     #     await active.enqueue_data({'liquid_sample': sample.dict()})
@@ -279,8 +279,8 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/liquid_sample_no_get_last")
     async def liquid_sample_no_get_last(request: Request):
-        A = await setupAct(request)
-        active = await app.base.contain_action(A)
+        A = await setup_process(request)
+        active = await app.base.contain_process(A)
         sample = await app.driver.liquid_sample_no_get_last()
         await active.enqueue_data({'liquid_sample': sample.dict()})
         finished_act = await active.finish()
@@ -292,8 +292,8 @@ def makeApp(confPrefix, servKey):
     #                                fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1,"machine_name":gethostname()})]),
     #                                scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     #                                ):
-    #     A = await setupAct(request)
-    #     active = await app.base.contain_action(A)
+    #     A = await setup_process(request)
+    #     active = await app.base.contain_process(A)
     #     sample = await app.driver.liquid_sample_no_get(sample)
     #     await active.enqueue_data({'liquid_sample': sample.dict()})
     #     finished_act = await active.finish()

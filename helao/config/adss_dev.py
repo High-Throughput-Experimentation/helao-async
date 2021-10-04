@@ -1,13 +1,12 @@
 hostip = "127.0.0.1"
 config = dict()
 
-# action library provides generator functions which produce action
-# lists from input decision_id grouping
-# config["action_library_path"] = ""
-config["action_libraries"] = ["ADSS"]
+# process library provides generator functions which produce processes
+# lists from input process_group_id grouping
+config["process_libraries"] = ["ADSS"]
 config["technique_name"] = "adss"
 config["save_root"] = r"C:\INST_dev2\RUNS"
-config["liquid_sample_no_DB"] = r"C:\INST_dev2\DATABASE\liquid_ID_database.csv"
+config["local_db_path"] = r"C:\INST_dev2\DATABASE"
 
 
 # we define all the servers here so that the overview is a bit better
@@ -27,7 +26,7 @@ config["servers"] = dict(
     DATA=dict(
         host=hostip,
         port=8002,
-        group="action",
+        group="process",
         fast="HTEdata_server",
         mode="legacy",  # lagcy; modelyst
         params=dict(
@@ -36,7 +35,7 @@ config["servers"] = dict(
     MOTOR=dict(
         host=hostip,
         port=8003,
-        group="action",
+        group="process",
         fast="galil_motion",
         simulate=False, # choose between simulator(default) or real device
         params=dict(
@@ -76,7 +75,7 @@ config["servers"] = dict(
     PSTAT=dict(
         host=hostip,
         port=8004,
-        group="action",
+        group="process",
         fast="gamry_server",
         simulate=False,  # choose between simulator(default) or real device
         params=dict(
@@ -86,7 +85,7 @@ config["servers"] = dict(
     # aligner=dict(
     #     host=hostip,
     #     port=8005,
-    #     group="action",
+    #     group="process",
     #     fast="alignment_server",
     #     params=dict(
     #         data_server="data",  # will use this to get PM_map temporaily, else need to parse it as JSON later
@@ -98,7 +97,7 @@ config["servers"] = dict(
     NI=dict(
         host="127.0.0.1",
         port=8006,
-        group="action",
+        group="process",
         fast="nidaqmx_server",
         params = dict(
             dev_CellCurrent_trigger = 'PFI1', #P1.1
@@ -174,19 +173,19 @@ config["servers"] = dict(
                 'Done':'PXI-6284/port2/line4',  #P2.4
                 'Error':'PXI-6284/port2/line6'  #P2.6
                 },
-#             dev_RSHTTLhandshake = {
-#                 'RSH1':'PXI-6284/port2/line5',  #P2.5
-#                 'RSH2':'PXI-6284/port2/line7',  #P2.7
-#                 'RSH3':'PXI-6284/port2/line3',  #P2.3
-# #                'port':'PXI-6284/ctr0',
-# #                'term':'/PXI-6284/PFI8' #P2.0
-#                 }
+            dev_RSHTTLhandshake = {
+                'RSH1':'PXI-6284/port2/line5',  #P2.5
+                'RSH2':'PXI-6284/port2/line7',  #P2.7
+                'RSH3':'PXI-6284/port2/line3',  #P2.3
+#                'port':'PXI-6284/ctr0',
+#                'term':'/PXI-6284/PFI8' #P2.0
+                }
         )
     ),
     PAL=dict(
         host=hostip,
         port=8007,
-        group="action",
+        group="process",
         fast="PAL_server",
         params = dict(
             user = 'RSHS',
@@ -234,7 +233,7 @@ config["servers"] = dict(
     # aligner_vis=dict(
     #     host=hostip,
     #     port=5003,
-    #     group="action",
+    #     group="process",
     #     bokeh="bokeh_platealigner",
     #     params=dict(
     #         aligner_server="aligner",  # aligner and aligner_vis should be in tandem

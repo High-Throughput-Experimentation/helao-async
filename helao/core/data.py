@@ -446,7 +446,7 @@ class HTE_legacy_API:
         return dlist
     
 
-class sqlite_liquid_sample_API:
+class liquid_sample_API:
     def __init__(self, Serv_class, DBpath):
         self.DBfile = "local_liquid.db"
         self.DBfilepath = DBpath
@@ -495,11 +495,11 @@ class sqlite_liquid_sample_API:
             self.cur = None
 
 
-    async def count_liquid_sample(self):
+    async def count_samples(self):
         return self.count_liquid_sample_nowait()
 
 
-    def count_liquid_sample_nowait(self):
+    def count_samples_nowait(self):
         self.open_DB()
         self.cur.execute("select count(idx) from liquid_sample;")
         counts = self.cur.fetchone()[0]
@@ -508,79 +508,116 @@ class sqlite_liquid_sample_API:
         return counts
 
 
-    async def new_liquid_sample(self, liquid_samples: List[liquid_sample], use_supplied_id: Optional[bool] = False):
-        self.new_liquid_sample_nowait(liquid_samples=liquid_samples, use_supplied_id=use_supplied_id)
+    async def new_sample(self, samples: List[liquid_sample] = [], use_supplied_no: Optional[bool] = False):
+        self.new_sample_nowait(samples=samples, use_supplied_no=use_supplied_no)
 
 
-    def new_liquid_sample_nowait(self, liquid_samples: List[liquid_sample], use_supplied_id: Optional[bool] = False):
-        counts = self.count_liquid_sample_nowait()
+    def new_sample_nowait(self, samples: List[liquid_sample] = [], use_supplied_no: Optional[bool] = False):
+        counts = self.count_samples_nowait()
         dataentry = []
-        if type(liquid_samples) is not list:
-            liquid_samples = [liquid_samples]
+        if type(samples) is not list:
+            samples = [samples]
 
-        for i, liquid_sample in enumerate(liquid_samples):
-            if liquid_sample.machine is None:
-                liquid_sample.machine = self.base.hostname
+        for i, sample in enumerate(samples):
 
-            if liquid_sample.volume_mL is None:
-                liquid_sample.volume_mL = 0.0
+          # global_label TEXT NOT NULL,
+          # sample_type VARCHAR(255) NOT NULL,
+          # sample_no INTEGER NOT NULL,
+          # sample_creation_timecode VARCHAR(255) NOT NULL,
+          # machine_name VARCHAR(255) NOT NULL,
+          # last_update VARCHAR(255) NOT NULL,
+          # volume_mL REAL NOT NULL,
 
-            if liquid_sample.server_name is None:
-                liquid_sample.server_name = self.base.server_name
+            if use_supplied_no == False:
+                liquid_sample.sample_no = counts+1+i
+
+
+            if sample.machine_name is None:
+                sample.machine_name = self.base.hostname
+
+            if sample.volume_mL is None:
+                sample.volume_mL = 0.0
+
+            if sample.server_name is None:
+                sample.server_name = self.base.server_name
                 
-                
-            if liquid_sample.action_time is None:
+            if sample.process_queue_time is None:
                 atime = datetime.fromtimestamp(datetime.now().timestamp() + self.base.ntp_offset)
-                liquid_sample.action_time = atime.strftime("%Y%m%d.%H%M%S%f") 
+                sample.process_queue_time = atime.strftime("%Y%m%d.%H%M%S%f")
 
-            # if liquid_sample.decision_uuid is None:
-            #     liquid_sample.decision_uuid = ""
-            # if liquid_sample.action_uuid is None:
-            #     liquid_sample.action_uuid = ""
+            if sample.sample_creation_timecode is None:
+                sample.sample_creation_timecode = self.base.set_realtime_nowait()
+
+            if sample.last_update is None:
+                sample.last_update = self.base.set_realtime_nowait()
+
+
+
+            # if liquid_sample.process_group_uuid is None:
+            #     liquid_sample.process_group_uuid = ""
+            # if liquid_sample.process_uuid is None:
+            #     liquid_sample.process_uuid = ""
             # if liquid_sample.source is None:
             #     liquid_sample.source = ""
-            if use_supplied_id == False:
-                liquid_sample.sample_no = counts+1+i
+
             
             dataentry.append(
                 (
-                liquid_sample.sample_no,
-                liquid_sample.action_time,
-                "liquid",
-                liquid_sample.machine,
-                liquid_sample.volume_mL,
-                liquid_sample.server_name,
-                json.dumps(liquid_sample.chemical),
-                json.dumps(liquid_sample.mass),
-                json.dumps(liquid_sample.supplier),
-                json.dumps(liquid_sample.lot_number),
-                liquid_sample.decision_uuid,
-                liquid_sample.action_uuid,
-                json.dumps(liquid_sample.source),
-                "",
-                liquid_sample.plate_id,
-                liquid_sample.plate_sample_no
+                  sample.get_global_label(),
+                  "liquid",#sample.sample_type,
+                  sample.sample_no,
+                  sample.sample_creation_timecode,
+                  sample.sample_position,
+                  sample.machine_name,
+                  sample.sample_hash,
+                  sample.last_update,
+                  sample.status,
+                  sample.inheritance,
+                  sample.process_group_uuid,
+                  sample.process_uuid,
+                  sample.process_queue_time,
+                  sample.server_name,
+                  json.dumps(sample.chemical),
+                  json.dumps(sample.mass),
+                  json.dumps(sample.supplier),
+                  json.dumps(sample.lot_number),
+                  json.dumps(sample.source),
+                  sample.comment,
+                  sample.volume_mL,
+                  sample.pH
                 )
             )
 
         self.open_DB()
         self.con.executemany("""INSERT INTO liquid_sample(
-            sample_no,
-            action_time,
-            sample_type,
-            machine,
-            volume_mL,
-            server_name,
-            chemical,
-            mass,
-            supplier,
-            lot_number,
-            decision_uuid,
-            action_uuid,
-            source,
-            comment,
-            plate_id,
+              global_label,
+              sample_type,
+              sample_no,
+              sample_creation_timecode,
+              sample_position,
+              machine_name,
+              sample_hash,
+              last_update,
+              status,
+              inheritance,
+              process_group_uuid,
+              process_uuid,
+              process_queue_time,
+              server_name,
+              chemical,
+              mass,
+              supplier,
+              lot_number,
+              source,
+              comment,
+              volume_mL,
+              pH
             ) VALUES (
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
                 ?,
                 ?,
                 ?,
@@ -606,15 +643,15 @@ class sqlite_liquid_sample_API:
 
 
     async def old_jsondb_to_sqlitedb(self):
-        old_liquid_sample_DB = liquid_sample_API(self.base, os.path.join(self.DBfilepath, self.DBfile))
+        old_liquid_sample_DB = old_liquid_sample_API(self.base, os.path.join(self.DBfilepath, self.DBfile))
         counts = await old_liquid_sample_DB.count_liquid_sample()
         self.base.print_message(f"old db sample count: {counts}", info = True)
         for i in range(counts):
             liquid_sample_jsondict = await old_liquid_sample_DB.get_liquid_sample(i+1)
-            self.new_liquid_sample_nowait(liquid_sample(**liquid_sample_jsondict), use_supplied_id=True)
+            self.new_sample_nowait(liquid_sample(**liquid_sample_jsondict), use_supplied_no=True)
 
 
-class liquid_sample_API:
+class old_liquid_sample_API:
     def __init__(self, Serv_class, DBpath):
         self.base = Serv_class
         
@@ -678,10 +715,10 @@ class liquid_sample_API:
         new_sample.sample_no = await self.count_liquid_sample() + 1
         self.base.print_message(f" ... new liquid sample no: {new_sample.sample_no}")
         # dump dict to separate json file
-        await write_sample_no_jsonfile(f"{new_sample.sample_no:08d}__{new_sample.decision_uuid}__{new_sample.action_uuid}.json",new_sample.dict())
+        await write_sample_no_jsonfile(f"{new_sample.sample_no:08d}__{new_sample.process_group_uuid}__{new_sample.process_uuid}.json",new_sample.dict())
         # add newid to DB csv
         await self.open_DB("a+")
-        await add_line(f"{new_sample.sample_no},{new_sample.decision_uuid},{new_sample.action_uuid}")
+        await add_line(f"{new_sample.sample_no},{new_sample.process_group_uuid},{new_sample.process_uuid}")
         await self.close_DB()
         return new_sample
 
@@ -732,9 +769,9 @@ class liquid_sample_API:
         if data != "":
             data = data.strip("\n").split(",")
             fileID = int(data[0])
-            decision_uuid = data[1]
-            action_uuid = data[2]
-            filename = f"{fileID:08d}__{decision_uuid}__{action_uuid}.json"
+            process_group_uuid = data[1]
+            process_uuid = data[2]
+            filename = f"{fileID:08d}__{process_group_uuid}__{process_uuid}.json"
             self.base.print_message(f" ... data json file: {filename}")
             
             
@@ -752,11 +789,11 @@ class liquid_sample_API:
                 del liquid_sample_jsondict["sample_id"]
                 
             if "AUID" in liquid_sample_jsondict:
-                liquid_sample_jsondict["action_uuid"] = liquid_sample_jsondict["AUID"]
+                liquid_sample_jsondict["process_uuid"] = liquid_sample_jsondict["AUID"]
                 del liquid_sample_jsondict["AUID"]
                 
             if "DUID" in liquid_sample_jsondict:
-                liquid_sample_jsondict["decision_uuid"] = liquid_sample_jsondict["DUID"]
+                liquid_sample_jsondict["process_group_uuid"] = liquid_sample_jsondict["DUID"]
                 del liquid_sample_jsondict["DUID"]
                 
 
@@ -778,24 +815,35 @@ def create_initial_sqllitedb(dbcur):
     dbcur.execute(
           """CREATE TABLE liquid_sample(
           idx INTEGER PRIMARY KEY AUTOINCREMENT,
-          sample_no INTEGER NOT NULL,
-          action_time VARCHAR(255) NOT NULL,
+          global_label TEXT NOT NULL,
           sample_type VARCHAR(255) NOT NULL,
-          machine VARCHAR(255) NOT NULL,
-          global_id TEXT,
-          global_hash_md5 VARCHAR(255),
-          volume_mL REAL NOT NULL,
-          pH REAL,
-          inheritance VARCHAR(255),
-          decision_uuid VARCHAR(255),
-          action_uuid VARCHAR(255),
-          source TEXT,
+          sample_no INTEGER NOT NULL,
+          sample_creation_timecode INTEGER NOT NULL,
+          sample_position VARCHAR(255),
+          machine_name VARCHAR(255) NOT NULL,
+          sample_hash VARCHAR(255),
+          last_update INTEGER NOT NULL,
+          status TEXT,
+          inheritance TEXT,
+          process_group_uuid VARCHAR(255),
+          process_uuid VARCHAR(255),
+          process_queue_time VARCHAR(255),
+          server_name VARCHAR(255),
           chemical TEXT,
           mass TEXT,
           supplier TEXT,
           lot_number TEXT,
-          server_name VARCHAR(255),
+          source TEXT,
           comment TEXT,
-          plate_id INTEGER,
-          last_update VARCHAR(255) NOT NULL,
-          plate_sample_no INTEGER);""")
+          volume_mL REAL NOT NULL,
+          pH REAL
+          );""")
+
+
+
+class unified_sample_data_API():
+    def __init__(self, Serv_class, DBpath):
+        self.base = Serv_class
+        self.DBfilepath = DBpath
+        self.local_liquidDB = liquid_sample_API(self.base, self.DBfilepath)
+        

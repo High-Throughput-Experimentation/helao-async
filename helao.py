@@ -148,7 +148,7 @@ class Pidd:
         print_message({}, "launcher", active)
 
         activeserver = [k for k, _, _, _ in active]
-        KILL_ORDER = ["operator", "visualizer", "action", "orchestrator"]
+        KILL_ORDER = ["operator", "visualizer", "process", "orchestrator"]
         for group in KILL_ORDER:
             print_message({}, "launcher", f"Killing {group} group.", error = True)
             if group in pidd.A:
@@ -254,7 +254,7 @@ def wait_key():
 def launcher(confPrefix, confDict):
 
     # API server launch priority (matches folders in root helao-dev/)
-    LAUNCH_ORDER = ["action", "orchestrator", "visualizer", "operator"]
+    LAUNCH_ORDER = ["process", "orchestrator", "visualizer", "operator"]
 
     pidd = Pidd(f"pids_{confPrefix}.pck")
     if not validateConfig(pidd, confDict):
@@ -361,9 +361,9 @@ if __name__ == "__main__":
             except Exception as e:
                 print_message({}, "launcher", " ... got error: ", e, error = True)
         # in case a /shutdown is added to other FastAPI servers (not the shutdown without '/')
-        # KILL_ORDER = ["visualizer", "action", "server"] # orch are killed above
+        # KILL_ORDER = ["visualizer", "process", "server"] # orch are killed above
         # no /shutdown in visualizers
-        KILL_ORDER = ["action", "server"]  # orch are killed above
+        KILL_ORDER = ["process", "server"]  # orch are killed above
         for group in KILL_ORDER:
             print_message({}, "launcher", f"Shutting down {group} group.")
             if group in pidd.A:

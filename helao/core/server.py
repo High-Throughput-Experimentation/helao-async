@@ -1,5 +1,5 @@
 """ servers.py
-Standard HelaoFastAPI action server and orchestrator classes.
+Standard HelaoFastAPI process server and orchestrator classes.
 
 """
 from importlib import import_module
@@ -33,8 +33,8 @@ from bokeh.io import curdoc
 
 from helao.core.helper import MultisubscriberQueue, dict_to_rcp, eval_val
 from helao.core.helper import print_message, cleanupdict
-from helao.core.schema import Action, Decision
-from helao.core.model import return_dec, return_declist, return_act, return_actlist
+from helao.core.schema import cProcess, cProcess_group
+from helao.core.model import return_process_group, return_process_group_list, return_process, return_process_list
 from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
 from helao.core.model import rcp_header
 
@@ -48,11 +48,11 @@ colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redire
 # version number, gets written into every rcp and hlo file
 hlo_version = "2021.09.20"
 
-class action_start_condition(int, Enum):
-    no_wait = 0  # orch is dispatching an unconditional action
+class process_start_condition(int, Enum):
+    no_wait = 0  # orch is dispatching an unconditional process
     wait_for_endpoint = 1  # orch is waiting for endpoint to become available
     wait_for_server = 2  # orch is waiting for server to become available
-    wait_for_all = 3  #  (or other): orch is waiting for all action_dq to finish
+    wait_for_all = 3  #  (or other): orch is waiting for all process_dq to finish
 
 
 class HelaoFastAPI(FastAPI):
@@ -79,56 +79,56 @@ class HelaoBokehAPI:  # (curdoc):
         self.doc.title = self.doc_name
 
 
-async def setupAct(request: Request):
-    servKey, _, action_name = request.url.path.strip("/").partition("/")
+async def setup_process(request: Request):
+    servKey, _, process_name = request.url.path.strip("/").partition("/")
     body_bytes = await request.body()
     if body_bytes == b"":
         body_params = {}
     else:
         body_params = await request.json()
 
-    action_dict = dict()
-    # action_dict.update(request.query_params)
+    process_dict = dict()
+    # process_dict.update(request.query_params)
     if len(request.query_params) == 0:  # cannot check against {}
         # empty: orch
-        action_dict.update(body_params)
+        process_dict.update(body_params)
     else:
         # not empty: swagger
-        if "action_params" not in action_dict:
-            action_dict.update({"action_params": {}})
-        action_dict["action_params"].update(body_params)
-        # action_dict["action_params"].update(request.query_params)
+        if "process_params" not in process_dict:
+            process_dict.update({"process_params": {}})
+        process_dict["process_params"].update(body_params)
+        # process_dict["process_params"].update(request.query_params)
         for k, v in request.query_params.items():
             try:
                 val = json.loads(v)
             except ValueError:
                 val = v
-            action_dict["action_params"][k] = val
+            process_dict["process_params"][k] = val
 
-    action_dict["action_server"] = servKey
-    action_dict["action_name"] = action_name
-    A = Action(action_dict)
+    process_dict["process_server"] = servKey
+    process_dict["process_name"] = process_name
+    A = cProcess(process_dict)
     
-    if "fast_samples_in" in A.action_params:
-        tmp_fast_samples_in = A.action_params.get("fast_samples_in",[])
-        del A.action_params["fast_samples_in"]
+    if "fast_samples_in" in A.process_params:
+        tmp_fast_samples_in = A.process_params.get("fast_samples_in",[])
+        del A.process_params["fast_samples_in"]
         if type(tmp_fast_samples_in) is dict:
             A.samples_in = sample_list(**tmp_fast_samples_in)
         elif type(tmp_fast_samples_in) is list:
             A.samples_in = sample_list(samples=tmp_fast_samples_in)
     
-    # setting some default values of action was notsubmitted via orch
+    # setting some default values of process was notsubmitted via orch
     if A.machine_name is None:
         A.machine_name = gethostname()
     if A.technique_name is None:
         A.technique_name = "MANUAL"
         A.orch_name = "MANUAL"
-        A.decision_label = "MANUAL"
+        A.process_group_label = "MANUAL"
 
     return A
 
 
-def makeActServ(
+def make_process_serv(
     config, server_key, server_title, description, version, driver_class=None
 ):
     app = HelaoFastAPI(
@@ -184,11 +184,11 @@ def makeOrchServ(
 
     @app.on_event("startup")
     async def startup_event():
-        """Run startup actions.
+        """Run startup processes.
 
         When FastAPI server starts, create a global OrchHandler object, initiate the
-        monitor_states coroutine which runs forever, and append dummy decisions to the
-        decision queue for testing.
+        monitor_states coroutine which runs forever, and append dummy process_groups to the
+        process_group queue for testing.
         """
         app.orch = Orch(app)
         if driver_class:
@@ -197,7 +197,7 @@ def makeOrchServ(
     @app.post("/update_status")
     async def update_status(server: str, status: str):
         return await app.orch.update_status(
-            act_serv=server, status_dict=json.loads(status)
+            process_serv=server, status_dict=json.loads(status)
         )
 
     @app.post("/attach_client")
@@ -215,7 +215,7 @@ def makeOrchServ(
 
     @app.websocket("/ws_data")
     async def websocket_data(websocket: WebSocket):
-        """Subscribe to action server status dicts.
+        """Subscribe to process server status dicts.
 
         Args:
         websocket: a fastapi.WebSocket object
@@ -224,21 +224,21 @@ def makeOrchServ(
 
     @app.post("/start")
     async def start_process():
-        """Begin processing decision and action queues."""
+        """Begin processing process_group and process queues."""
         if app.orch.loop_state == "stopped":
             if (
-                app.orch.action_dq or app.orch.decision_dq
-            ):  # resume actions from a paused run
+                app.orch.process_dq or app.orch.process_group_dq
+            ):  # resume processes from a paused run
                 await app.orch.start_loop()
             else:
-                app.orch.print_message("decision list is empty")
+                app.orch.print_message("process_group list is empty")
         else:
             app.orch.print_message("already running")
         return {}
 
     @app.post("/estop")
     async def estop_process():
-        """Emergency stop decision and action queues, interrupt running actions."""
+        """Emergency stop process_group and process queues, interrupt running processes."""
         if app.orch.loop_state == "started":
             await app.orch.estop_loop()
         elif app.orch.loop_state == "E-STOP":
@@ -249,7 +249,7 @@ def makeOrchServ(
 
     @app.post("/stop")
     async def stop_process():
-        """Stop processing decision and action queues after current actions finish."""
+        """Stop processing process_group and process queues after current processes finish."""
         if app.orch.loop_state == "started":
             await app.orch.intend_stop()
         elif app.orch.loop_state == "E-STOP":
@@ -277,59 +277,59 @@ def makeOrchServ(
             await app.orch.clear_estate(clear_estop=False, clear_error=True)
 
     @app.post("/skip")
-    async def skip_decision():
-        """Clear the present action queue while running."""
+    async def skip_process_group():
+        """Clear the present process queue while running."""
         if app.orch.loop_state == "started":
             await app.orch.intend_skip()
         else:
-            app.orch.print_message("orchestrator not running, clearing action queue")
+            app.orch.print_message("orchestrator not running, clearing process queue")
             await asyncio.sleep(0.001)
-            app.orch.action_dq.clear()
+            app.orch.process_dq.clear()
         return {}
 
-    @app.post("/clear_actions")
-    async def clear_actions():
-        """Clear the present action queue while stopped."""
-        app.orch.print_message("clearing action queue")
+    @app.post("/clear_processes")
+    async def clear_processes():
+        """Clear the present process queue while stopped."""
+        app.orch.print_message("clearing process queue")
         await asyncio.sleep(0.001)
-        app.orch.action_dq.clear()
+        app.orch.process_dq.clear()
         return {}
 
-    @app.post("/clear_decisions")
-    async def clear_decisions():
-        """Clear the present decision queue while stopped."""
-        app.orch.print_message("clearing decision queue")
+    @app.post("/clear_process_groups")
+    async def clear_process_groups():
+        """Clear the present process_group queue while stopped."""
+        app.orch.print_message("clearing process_group queue")
         await asyncio.sleep(0.001)
-        app.orch.decision_dq.clear()
+        app.orch.process_group_dq.clear()
         return {}
 
-    @app.post("/append_decision")
-    async def append_decision(
+    @app.post("/append_process_group")
+    async def append_process_group(
         orch_name: str = None,
-        decision_label: str = None,
+        process_group_label: str = None,
         actualizer: str = None,
         actualizer_pars: dict = {},
         result_dict: dict = {},
         access: str = "hte",
     ):
-        """Add a decision object to the end of the decision queue.
+        """Add a process_group object to the end of the process_group queue.
 
         Args:
-        decision_dict: Decision parameters (optional), as dict.
+        process_group_dict: process_group parameters (optional), as dict.
         orch_name: Orchestrator server key (optional), as str.
         plate_id: The sample's plate id (no checksum), as int.
         sample_no: A sample number, as int.
-        actualizer: The name of the actualizer for building the action list, as str.
+        actualizer: The name of the actualizer for building the process list, as str.
         actualizer_pars: Actualizer parameters, as dict.
-        result_dict: Action responses dict keyed by action_enum.
+        result_dict: process responses dict keyed by process_enum.
         access: Access control group, as str.
 
         Returns:
         Nothing.
         """
-        await app.orch.add_decision(
+        await app.orch.add_process_group(
             orch_name,
-            decision_label,
+            process_group_label,
             actualizer,
             actualizer_pars,
             result_dict,
@@ -338,33 +338,33 @@ def makeOrchServ(
         )
         return {}
 
-    @app.post("/prepend_decision")
-    async def prepend_decision(
+    @app.post("/prepend_process_group")
+    async def prepend_process_group(
         orch_name: str = None,
-        decision_label: str = None,
+        process_group_label: str = None,
         actualizer: str = None,
         actualizer_pars: dict = {},
         result_dict: dict = {},
         access: str = "hte",
     ):
-        """Add a decision object to the start of the decision queue.
+        """Add a process_group object to the start of the process_group queue.
 
         Args:
-        decision_dict: Decision parameters (optional), as dict.
+        process_group_dict: process_group parameters (optional), as dict.
         orch_name: Orchestrator server key (optional), as str.
         plate_id: The sample's plate id (no checksum), as int.
         sample_no: A sample number, as int.
-        actualizer: The name of the actualizer for building the action list, as str.
+        actualizer: The name of the actualizer for building the process list, as str.
         actualizer_pars: Actualizer parameters, as dict.
-        result_dict: Action responses dict keyed by action_enum.
+        result_dict: process responses dict keyed by process_enum.
         access: Access control group, as str.
 
         Returns:
         Nothing.
         """
-        await app.orch.add_decision(
+        await app.orch.add_process_group(
             orch_name,
-            decision_label,
+            process_group_label,
             actualizer,
             actualizer_pars,
             result_dict,
@@ -373,37 +373,37 @@ def makeOrchServ(
         )
         return {}
 
-    @app.post("/insert_decision")
-    async def insert_decision(
+    @app.post("/insert_process_group")
+    async def insert_process_group(
         idx: int,
-        decision_dict: dict = None,
+        process_group_dict: dict = None,
         orch_name: str = None,
-        decision_label: str = None,
+        process_group_label: str = None,
         actualizer: str = None,
         actualizer_pars: dict = {},
         result_dict: dict = {},
         access: str = "hte",
     ):
-        """Insert a decision object at decision queue index.
+        """Insert a process_group object at process_group queue index.
 
         Args:
-        idx: index in decision queue for insertion, as int
-        decision_dict: Decision parameters (optional), as dict.
+        idx: index in process_group queue for insertion, as int
+        process_group_dict: process_group parameters (optional), as dict.
         orch_name: Orchestrator server key (optional), as str.
         plate_id: The sample's plate id (no checksum), as int.
         sample_no: A sample number, as int.
-        actualizer: The name of the actualizer for building the action list, as str.
+        actualizer: The name of the actualizer for building the process list, as str.
         actualizer_pars: Actualizer parameters, as dict.
-        result_dict: Action responses dict keyed by action_enum.
+        result_dict: process responses dict keyed by process_enum.
         access: Access control group, as str.
 
         Returns:
         Nothing.
         """
-        await app.orch.add_decision(
-            decision_dict,
+        await app.orch.add_process_group(
+            process_group_dict,
             orch_name,
-            decision_label,
+            process_group_label,
             actualizer,
             actualizer_pars,
             result_dict,
@@ -412,30 +412,30 @@ def makeOrchServ(
         )
         return {}
 
-    @app.post("/list_decisions")
-    def list_decisions():
-        """Return the current list of decisions."""
-        return app.orch.list_decisions()
+    @app.post("/list_process_groups")
+    def list_process_groups():
+        """Return the current list of process_groups."""
+        return app.orch.list_process_groups()
 
-    @app.post("/active_decision")
-    def active_decision():
-        """Return the active decision."""
-        return app.orch.get_decision(last=False)
+    @app.post("/active_process_group")
+    def active_process_group():
+        """Return the active process_group."""
+        return app.orch.get_process_group(last=False)
 
-    @app.post("/last_decision")
-    def last_decision():
-        """Return the last decision."""
-        return app.orch.get_decision(last=True)
+    @app.post("/last_process_group")
+    def last_process_group():
+        """Return the last process_group."""
+        return app.orch.get_process_group(last=True)
 
-    @app.post("/list_actions")
-    def list_actions():
-        """Return the current list of actions."""
-        return app.orch.list_actions()
+    @app.post("/list_processes")
+    def list_processes():
+        """Return the current list of processes."""
+        return app.orch.list_processes()
 
-    @app.post("/list_active_actions")
-    def list_active_actions():
-        """Return the current list of actions."""
-        return app.orch.list_active_actions()
+    @app.post("/list_active_processes")
+    def list_active_processes():
+        """Return the current list of processes."""
+        return app.orch.list_active_processes()
 
     @app.post("/endpoints")
     def get_all_urls():
@@ -444,7 +444,7 @@ def makeOrchServ(
 
     @app.on_event("shutdown")
     def disconnect():
-        """Run shutdown actions."""
+        """Run shutdown processes."""
         # emergencyStop = True
         time.sleep(0.75)
 
@@ -476,7 +476,7 @@ class Base(object):
     """Base class for all HELAO servers.
 
     Base is a general class which implements message passing, status update, data
-    writing, and data streaming via async tasks. Every instrument and action server
+    writing, and data streaming via async tasks. Every instrument and process server
     should import this class for efficient integration into an orchestrated environment.
 
     A Base initialized within a FastAPI startup event will launch three async tasks
@@ -492,12 +492,12 @@ class Base(object):
 
     The data writing method will update a class attribute with the currently open file.
     For a given root directory, files and folders will be written as follows:
-    {%y.%j}/  # decision_date year.weeknum
-        {%Y%m%d}/  # decision_date
-            {%H%M%S}__{decision_label}/  # decision_time
-                {%Y%m%d.%H%M%S}__{action_server_name}__{action_name}__{action_uuid}/
+    {%y.%j}/  # process_group_date year.weeknum
+        {%Y%m%d}/  # process_group_date
+            {%H%M%S}__{process_group_label}/  # process_group_time
+                {%Y%m%d.%H%M%S}__{process_server_name}__{process_name}__{process_uuid}/
                     {filename}.{ext}
-                    {%Y%m%d.%H%M%S%f}.rcp  # action_datetime
+                    {%Y%m%d.%H%M%S%f}.rcp  # process_datetime
                     (aux_files)
     """
 
@@ -609,35 +609,35 @@ class Base(object):
             url_list.append(routeD)
         return url_list
 
-    async def contain_action(
+    async def contain_process(
         self,
-        action: Action,
+        process: cProcess,
         file_type: str = "helao__file",
         file_data_keys: Optional[str] = None, # this is also keyd by file_sample_keys
         file_sample_label: Optional[str] = None, # this is also keyd by file_sample_keys
         file_sample_keys: Optional[list] = None, # I need one key per datafile, but each datafile can still be based on multiple samples
         header: Optional[str] = None, # this is also keyd by file_sample_keys
     ):
-        self.actives[action.action_uuid] = Base.Active(
+        self.actives[process.process_uuid] = Base.Active(
             self,
-            action=action,
+            process=process,
             file_type=file_type,
             file_data_keys=file_data_keys,
             file_sample_label=file_sample_label,
             file_sample_keys=file_sample_keys,
             header=header,
         )
-        await self.actives[action.action_uuid].myinit()
-        return self.actives[action.action_uuid]
+        await self.actives[process.process_uuid].myinit()
+        return self.actives[process.process_uuid]
 
 
-    async def get_active_info(self, action_uuid: str):
-        if action_uuid in self.actives.keys():
-            action_dict = await self.actives[action_uuid].active.as_dict()
-            return action_dict
+    async def get_active_info(self, process_uuid: str):
+        if process_uuid in self.actives.keys():
+            process_dict = await self.actives[process_uuid].active.as_dict()
+            return process_dict
         else:
             self.print_message(
-                f" ... Specified action uuid {action_uuid} was not found.", error=True
+                f" ... Specified process uuid {process_uuid} was not found.", error=True
             )
             return None
 
@@ -675,7 +675,7 @@ class Base(object):
                     response = await async_private_dispatcher(
                         world_config_dict=self.world_cfg,
                         server=client_servkey,
-                        private_action="update_status",
+                        private_process="update_status",
                         params_dict={
                             "server": self.server_name,
                             "status": json.dumps(current_status),
@@ -757,7 +757,7 @@ class Base(object):
                         response = await async_private_dispatcher(
                             world_config_dict=self.world_cfg,
                             server=client_servkey,
-                            private_action="update_status",
+                            private_process="update_status",
                             params_dict={
                                 "server": self.server_name,
                                 "status": json.dumps(status_msg),
@@ -793,6 +793,30 @@ class Base(object):
         await self.data_q.put(StopAsyncIteration)
         await asyncio.sleep(5)
 
+
+    async def set_realtime(
+        self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
+    ):
+        return self.set_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
+
+
+    def set_realtime_nowait(
+        self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
+    ):
+        if offset is None:
+            if self.ntp_offset is not None:
+                offset_ns = int(np.floor(self.ntp_offset * 1e9))
+            else:
+                offset_ns = 0.0
+        else:
+            offset_ns = int(np.floor(offset * 1e9))
+        if epoch_ns is None:
+            real_time = time_ns() + offset_ns
+        else:
+            real_time = epoch_ns + offset_ns
+        return real_time
+
+
     async def sync_ntp_task(self, resync_time: int = 600):
         "Regularly sync with NTP server."
         try:
@@ -815,12 +839,12 @@ class Base(object):
         self.ntp_syncer.cancel()
 
     class Active(object):
-        """Active action holder which wraps data queing and rcp writing."""
+        """Active process holder which wraps data queing and rcp writing."""
 
         def __init__(
             self,
             base,  # outer instance
-            action: Action,
+            process: cProcess,
             file_type: str = "helao__file",
             file_data_keys: Optional[str] = None,
             file_sample_label: Optional[str] = None,
@@ -828,123 +852,123 @@ class Base(object):
             header: Optional[str] = None,
         ):
             self.base = base
-            self.action = action
-            self.action.file_type = file_type
-            self.action.file_group = "helao_files"
-            self.action.file_data_keys = file_data_keys
-            self.action.file_sample_label = file_sample_label
-            self.action.header = header
+            self.process = process
+            self.process.file_type = file_type
+            self.process.file_group = "helao_files"
+            self.process.file_data_keys = file_data_keys
+            self.process.file_sample_label = file_sample_label
+            self.process.header = header
             self.rcp_header = None
             
             
             if file_sample_keys is None:
-                self.action.file_sample_keys = ["None"]
-                self.action.file_sample_label = {"None":self.action.file_sample_label}
-                self.action.file_data_keys = {"None":self.action.file_data_keys}
-                self.action.header = {"None":self.action.header}
+                self.process.file_sample_keys = ["None"]
+                self.process.file_sample_label = {"None":self.process.file_sample_label}
+                self.process.file_data_keys = {"None":self.process.file_data_keys}
+                self.process.header = {"None":self.process.header}
             else:
-                self.action.file_sample_keys = file_sample_keys
-                if type(self.action.file_sample_keys) is not list:
-                    self.action.file_sample_keys = [self.action.file_sample_keys]
-                if self.action.file_sample_label is None:
-                    self.action.file_sample_label = {f"{file_sample_key}":None for file_sample_key in self.action.file_sample_keys}
-                if self.action.file_data_keys is None:
-                    self.action.file_data_keys = {f"{file_sample_key}":None for file_sample_key in self.action.file_sample_keys}
-                if self.action.header is None:
-                    self.action.header = {f"{file_sample_key}":None for file_sample_key in self.action.file_sample_keys}
+                self.process.file_sample_keys = file_sample_keys
+                if type(self.process.file_sample_keys) is not list:
+                    self.process.file_sample_keys = [self.process.file_sample_keys]
+                if self.process.file_sample_label is None:
+                    self.process.file_sample_label = {f"{file_sample_key}":None for file_sample_key in self.process.file_sample_keys}
+                if self.process.file_data_keys is None:
+                    self.process.file_data_keys = {f"{file_sample_key}":None for file_sample_key in self.process.file_sample_keys}
+                if self.process.header is None:
+                    self.process.header = {f"{file_sample_key}":None for file_sample_key in self.process.file_sample_keys}
                     
 
 
-            self.action.set_atime(offset=self.base.ntp_offset)
-            self.action.gen_uuid_action(self.base.hostname)
+            self.process.set_atime(offset=self.base.ntp_offset)
+            self.process.gen_uuid_process(self.base.hostname)
             # signals the data logger that it got data and hlo header was written or not
             # active.finish_hlo_header should be called within the driver before
             # any data is pushed to avoid a forced header end write
             self.finished_hlo_header = dict()
             self.file_conn = dict()
-            # if Action is not created from Decision+Actualizer, Action is independent
-            if self.action.decision_timestamp is None:
-                self.action.set_dtime(offset=self.base.ntp_offset)
-                self.action.gen_uuid_decision(self.base.hostname)
-            decision_date = self.action.decision_timestamp.split(".")[0]
-            decision_time = self.action.decision_timestamp.split(".")[-1]
-            year_week = strftime("%y.%U", strptime(decision_date, "%Y%m%d"))
+            # if cProcess is not created from process_group+Actualizer, cProcess is independent
+            if self.process.process_group_timestamp is None:
+                self.process.set_dtime(offset=self.base.ntp_offset)
+                self.process.gen_uuid_process_group(self.base.hostname)
+            process_group_date = self.process.process_group_timestamp.split(".")[0]
+            process_group_time = self.process.process_group_timestamp.split(".")[-1]
+            year_week = strftime("%y.%U", strptime(process_group_date, "%Y%m%d"))
             if not self.base.save_root:
                 self.base.print_message(
-                    " ... Root save directory not specified, cannot save action results."
+                    " ... Root save directory not specified, cannot save process results."
                 )
-                self.action.save_data = False
-                self.action.save_rcp = False
-                self.action.output_dir = None
+                self.process.save_data = False
+                self.process.save_rcp = False
+                self.process.output_dir = None
             else:
-                if self.action.save_data is None:
-                    self.action.save_data = False
-                if self.action.save_rcp is None:
-                    self.action.save_rcp = False
+                if self.process.save_data is None:
+                    self.process.save_data = False
+                if self.process.save_rcp is None:
+                    self.process.save_rcp = False
                 # cannot save data without rcp
-                if self.action.save_data is True:
-                    self.action.save_rcp = True
-                # self.action.save_data = True
-                # self.action.save_rcp = True
-                self.action.output_dir = os.path.join(
+                if self.process.save_data is True:
+                    self.process.save_rcp = True
+                # self.process.save_data = True
+                # self.process.save_rcp = True
+                self.process.output_dir = os.path.join(
                     year_week,
-                    decision_date,
-                    f"{decision_time}_{self.action.decision_label}",
-                    f"{self.action.action_queue_time}__{self.action.action_server}__{self.action.action_name}__{self.action.action_uuid}",
+                    process_group_date,
+                    f"{process_group_time}_{self.process.process_group_label}",
+                    f"{self.process.process_queue_time}__{self.process.process_server}__{self.process.process_name}__{self.process.process_uuid}",
                 )
             self.data_logger = self.base.aloop.create_task(self.log_data_task())
 
 
         def update_rcp_header(self):
             # need to remove swagger workaround value if present
-            if "scratch" in self.action.action_params:
-                    del self.action.action_params["scratch"]
+            if "scratch" in self.process.process_params:
+                    del self.process.process_params["scratch"]
 
-            if self.action.action_enum is None:
-                self.action.action_enum = 0.0
+            if self.process.process_enum is None:
+                self.process.process_enum = 0.0
  
             self.rcp_header = rcp_header(
                 hlo_version=f"{hlo_version}",
-                technique_name=self.action.technique_name,
+                technique_name=self.process.technique_name,
                 server_name=self.base.server_name,
-                orchestrator=self.action.orch_name,
-                machine_name=self.action.machine_name,
-                access=self.action.access,
-                output_dir=Path(self.action.output_dir).as_posix(),
-                decision_uuid=self.action.decision_uuid,
-                decision_timestamp=self.action.decision_timestamp,
-                action_uuid=self.action.action_uuid,
-                action_queue_time=self.action.action_queue_time,
-                action_enum=self.action.action_enum,
-                action_name=self.action.action_name,
-                action_abbr=self.action.action_abbr,
-                action_params=self.action.action_params,
+                orchestrator=self.process.orch_name,
+                machine_name=self.process.machine_name,
+                access=self.process.access,
+                output_dir=Path(self.process.output_dir).as_posix(),
+                process_group_uuid=self.process.process_group_uuid,
+                process_group_timestamp=self.process.process_group_timestamp,
+                process_uuid=self.process.process_uuid,
+                process_queue_time=self.process.process_queue_time,
+                process_enum=self.process.process_enum,
+                process_name=self.process.process_name,
+                process_abbr=self.process.process_abbr,
+                process_params=self.process.process_params,
             )
 
 
         async def myinit(self):
-            if self.action.save_rcp:
-                os.makedirs(os.path.join(self.base.save_root,self.action.output_dir), exist_ok=True)
-                self.action.actionnum = (
-                    f"{self.action.action_abbr}-{self.action.action_enum}"
+            if self.process.save_rcp:
+                os.makedirs(os.path.join(self.base.save_root,self.process.output_dir), exist_ok=True)
+                self.process.process_num = (
+                    f"{self.process.process_abbr}-{self.process.process_enum}"
                 )
                 self.update_rcp_header()
                 
-                if self.action.save_data:
-                    for i, file_sample_key in enumerate(self.action.file_sample_keys):
+                if self.process.save_data:
+                    for i, file_sample_key in enumerate(self.process.file_sample_keys):
                         filename, header, file_info = self.init_datafile(
-                            header = self.action.header.get(file_sample_key,None),
-                            file_type = self.action.file_type,
-                            file_data_keys = self.action.file_data_keys.get(file_sample_key,None),
-                            file_sample_label = self.action.file_sample_label.get(file_sample_key,None),
+                            header = self.process.header.get(file_sample_key,None),
+                            file_type = self.process.file_type,
+                            file_data_keys = self.process.file_data_keys.get(file_sample_key,None),
+                            file_sample_label = self.process.file_sample_label.get(file_sample_key,None),
                             filename = None, # always autogen a filename
-                            file_group = self.action.file_group,
-                            action_enum = self.action.action_enum,
-                            action_abbr = self.action.action_abbr,
+                            file_group = self.process.file_group,
+                            process_enum = self.process.process_enum,
+                            process_abbr = self.process.process_abbr,
                             filenum=i
                         )
                         
-                        self.action.file_dict.update({filename: file_info})
+                        self.process.file_dict.update({filename: file_info})
                         await self.set_output_file(
                             filename=filename, 
                             header=header, 
@@ -962,8 +986,8 @@ class Base(object):
                 file_sample_label,
                 filename,
                 file_group,
-                action_enum,
-                action_abbr,
+                process_enum,
+                process_abbr,
                 filenum: Optional[int] = 0
             ):
 
@@ -995,7 +1019,7 @@ class Base(object):
                     
                     header_dict = {
                         "hlo_version":hlo_version,
-                        "action_name":self.action.action_abbr,
+                        "process_name":self.process.process_abbr,
                         "column_headings":file_data_keys,
                         }
                     
@@ -1006,11 +1030,11 @@ class Base(object):
                 else: # aux_files
                     pass
     
-                if action_enum is not None:
-                    filename = f"{action_abbr}-{action_enum:.1f}__{filenum}.{file_ext}"
+                if process_enum is not None:
+                    filename = f"{process_abbr}-{process_enum:.1f}__{filenum}.{file_ext}"
                 else:
                     filename = (
-                        f"{action_abbr}-0.0__{filenum}.{file_ext}"
+                        f"{process_abbr}-0.0__{filenum}.{file_ext}"
                     )
 
             if header:
@@ -1046,89 +1070,91 @@ class Base(object):
             
 
         async def add_status(self):
-            self.base.status[self.action.action_name].append(self.action.action_uuid)
+            self.base.status[self.process.process_name].append(self.process.process_uuid)
             self.base.print_message(
-                f" ... Added {self.action.action_uuid} to {self.action.action_name} status list."
+                f" ... Added {self.process.process_uuid} to {self.process.process_name} status list."
             )
             await self.base.status_q.put(
-                {self.action.action_name: self.base.status[self.action.action_name]}
+                {self.process.process_name: self.base.status[self.process.process_name]}
             )
 
         async def clear_status(self):
-            if self.action.action_uuid in self.base.status[self.action.action_name]:
-                self.base.status[self.action.action_name].remove(
-                    self.action.action_uuid
+            if self.process.process_uuid in self.base.status[self.process.process_name]:
+                self.base.status[self.process.process_name].remove(
+                    self.process.process_uuid
                 )
                 self.base.print_message(
-                    f" ... Removed {self.action.action_uuid} from {self.action.action_name} status list.",
+                    f" ... Removed {self.process.process_uuid} from {self.process.process_name} status list.",
                     info = True
                 )
             else:
                 self.base.print_message(
-                    f" ... {self.action.action_uuid} did not excist in {self.action.action_name} status list.",
+                    f" ... {self.process.process_uuid} did not excist in {self.process.process_name} status list.",
                     error = True
                 )
             await self.base.status_q.put(
-                {self.action.action_name: self.base.status[self.action.action_name]}
+                {self.process.process_name: self.base.status[self.process.process_name]}
             )
 
         async def set_estop(self):
-            self.base.status[self.action.action_name].remove(self.action.action_uuid)
-            self.base.status[self.action.action_name].append(
-                f"{self.action.action_uuid}__estop"
+            self.base.status[self.process.process_name].remove(self.process.process_uuid)
+            self.base.status[self.process.process_name].append(
+                f"{self.process.process_uuid}__estop"
             )
             self.base.print_message(
-                f" ... E-STOP {self.action.action_uuid} on {self.action.action_name} status.",
+                f" ... E-STOP {self.process.process_uuid} on {self.process.process_name} status.",
                 error = True
             )
             await self.base.status_q.put(
-                {self.action.action_name: self.base.status[self.action.action_name]}
+                {self.process.process_name: self.base.status[self.process.process_name]}
             )
 
         async def set_error(self, err_msg: Optional[str] = None):
-            self.base.status[self.action.action_name].remove(self.action.action_uuid)
-            self.base.status[self.action.action_name].append(
-                f"{self.action.action_uuid}__error"
+            self.base.status[self.process.process_name].remove(self.process.process_uuid)
+            self.base.status[self.process.process_name].append(
+                f"{self.process.process_uuid}__error"
             )
             self.base.print_message(
-                f" ... ERROR {self.action.action_uuid} on {self.action.action_name} status.",
+                f" ... ERROR {self.process.process_uuid} on {self.process.process_name} status.",
                 error = True
             )
             if err_msg:
-                self.action.error_code = err_msg
+                self.process.error_code = err_msg
             else:
-                self.action.error_code = "-1 unspecified error"
+                self.process.error_code = "-1 unspecified error"
             await self.base.status_q.put(
-                {self.action.action_name: self.base.status[self.action.action_name]}
+                {self.process.process_name: self.base.status[self.process.process_name]}
             )
 
 
         async def set_realtime(
             self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
         ):
-            return self.set_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
+            # return self.set_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
+            return self.base.set_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
 
 
         def set_realtime_nowait(
             self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
         ):
-            if offset is None:
-                if self.base.ntp_offset is not None:
-                    offset_ns = int(np.floor(self.base.ntp_offset * 1e9))
-                else:
-                    offset_ns = 0.0
-            else:
-                offset_ns = int(np.floor(offset * 1e9))
-            if epoch_ns is None:
-                action_real_time = time_ns() + offset_ns
-            else:
-                action_real_time = epoch_ns + offset_ns
-            return action_real_time
+            return self.base.set_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
+            # if offset is None:
+            #     if self.base.ntp_offset is not None:
+            #         offset_ns = int(np.floor(self.base.ntp_offset * 1e9))
+            #     else:
+            #         offset_ns = 0.0
+            # else:
+            #     offset_ns = int(np.floor(offset * 1e9))
+            # if epoch_ns is None:
+            #     process_real_time = time_ns() + offset_ns
+            # else:
+            #     process_real_time = epoch_ns + offset_ns
+            # return process_real_time
 
 
         async def set_output_file(self, filename: str, file_sample_key: str, header: Optional[str] = None):
             "Set active save_path, write header if supplied."
-            output_path = os.path.join(self.base.save_root,self.action.output_dir, filename)
+            output_path = os.path.join(self.base.save_root,self.process.output_dir, filename)
             self.base.print_message(f" ... writing data to: {output_path}")
             # create output file and set connection
             self.file_conn[file_sample_key] = await aiofiles.open(output_path, mode="a+")
@@ -1179,9 +1205,9 @@ class Base(object):
                     data_dict[file_sample_key] = data.get(file_sample_key,dict())
 
             data_msg = {
-                self.action.action_uuid: {
+                self.process.process_uuid: {
                     "data": data_dict,
-                    "action_name": self.action.action_name,
+                    "process_name": self.process.process_name,
                     "errors": errors,
                 }
             }
@@ -1195,11 +1221,11 @@ class Base(object):
             try:
                 async for data_msg in self.base.data_q.subscribe():
                     if (
-                        self.action.action_uuid in data_msg.keys()
-                    ):  # only write data for this action
-                        data_dict = data_msg[self.action.action_uuid]
+                        self.process.process_uuid in data_msg.keys()
+                    ):  # only write data for this process
+                        data_dict = data_msg[self.process.process_uuid]
                         data_val = data_dict["data"]
-                        self.action.data.append(data_val)
+                        self.process.data.append(data_val)
                         for sample, sample_data in data_val.items():
                             if sample in self.file_conn:
                                 if self.file_conn[sample]:
@@ -1208,7 +1234,7 @@ class Base(object):
                                     # e.g. just write the separator
                                     if not self.finished_hlo_header[sample]:
                                         self.base.print_message(
-                                            f" ... {self.action.action_abbr} data file {sample} is missing hlo separator. Writing it.",
+                                            f" ... {self.process.process_abbr} data file {sample} is missing hlo separator. Writing it.",
                                             error = True
                                         )
                                         self.finished_hlo_header[sample] = True
@@ -1250,7 +1276,7 @@ class Base(object):
             file_data_keys: Optional[str] = None,
         ):
             "Write complete file, not used with queue streaming."
-            if self.action.save_data:
+            if self.process.save_data:
                 filename, header, file_info = self.init_datafile(
                     header = header,
                     file_type = file_type,
@@ -1258,16 +1284,16 @@ class Base(object):
                     file_sample_label = file_sample_label,
                     filename = filename,
                     file_group = file_group,
-                    action_enum = self.action.action_enum,
-                    action_abbr = self.action.action_abbr,
+                    process_enum = self.process.process_enum,
+                    process_abbr = self.process.process_abbr,
                 )
-                output_path = os.path.join(self.base.save_root,self.action.output_dir, filename)
+                output_path = os.path.join(self.base.save_root,self.process.output_dir, filename)
                 self.base.print_message(f" ... writing non stream data to: {output_path}")
 
                 file_instance = await aiofiles.open(output_path, mode="w")
                 await file_instance.write(header + output_str)
                 await file_instance.close()
-                self.action.file_dict.update(
+                self.process.file_dict.update(
                     {filename: file_info}
                 )
 
@@ -1284,7 +1310,7 @@ class Base(object):
             file_data_keys: Optional[str] = None,
         ):
             "Write complete file, not used with queue streaming."
-            if self.action.save_data:
+            if self.process.save_data:
                 filename, header, file_info = self.init_datafile(
                     header = header,
                     file_type = file_type,
@@ -1292,16 +1318,16 @@ class Base(object):
                     file_sample_label = file_sample_label,
                     filename = filename,
                     file_group = file_group,
-                    action_enum = self.action.action_enum,
-                    action_abbr = self.action.action_abbr,
+                    process_enum = self.process.process_enum,
+                    process_abbr = self.process.process_abbr,
                 )
-                output_path = os.path.join(self.base.save_root,self.action.output_dir, filename)
+                output_path = os.path.join(self.base.save_root,self.process.output_dir, filename)
                 self.base.print_message(f" ... writing non stream data to: {output_path}")
 
                 file_instance = open(output_path, mode="w")
                 file_instance.write(header + output_str)
                 file_instance.close()
-                self.action.file_dict.update(
+                self.process.file_dict.update(
                     {filename: file_info}
                 )
 
@@ -1310,8 +1336,8 @@ class Base(object):
             "Create new rcp if it doesn't exist, otherwise append rcp_dict to file."
             output_path = os.path.join(
                 self.base.save_root,
-                self.action.output_dir,
-                f"{self.action.action_queue_time}.rcp"
+                self.process.output_dir,
+                f"{self.process.process_queue_time}.rcp"
             )
             self.base.print_message(f" ... writing to rcp: {output_path}")
             # self.base.print_message(" ... writing:",rcp_dict)
@@ -1369,15 +1395,15 @@ class Base(object):
                         append_dict.update({"status": status})            
         
                     # check if list for safety reasons
-                    if type(self.action.rcp_samples_in) is not list:
-                        self.action.rcp_samples_in = []
-                    if type(self.action.rcp_samples_out) is not list:
-                        self.action.rcp_samples_out = []
+                    if type(self.process.rcp_samples_in) is not list:
+                        self.process.rcp_samples_in = []
+                    if type(self.process.rcp_samples_out) is not list:
+                        self.process.rcp_samples_out = []
 
                     if IO == "in":
-                        self.action.rcp_samples_in.append(append_dict)
+                        self.process.rcp_samples_in.append(append_dict)
                     elif IO == "out":
-                        self.action.rcp_samples_out.append(append_dict)
+                        self.process.rcp_samples_out.append(append_dict)
 
 
         async def finish(self):
@@ -1389,43 +1415,43 @@ class Base(object):
                     await self.file_conn[filekey].close()
             self.file_conn = dict()
             # (1) update sample_in and sample_out
-            if  self.action.rcp_samples_in:
-                self.rcp_header.samples_in = self.action.rcp_samples_in
-            if self.action.rcp_samples_out:
-                 self.rcp_header.samples_out = self.action.rcp_samples_out
+            if  self.process.rcp_samples_in:
+                self.rcp_header.samples_in = self.process.rcp_samples_in
+            if self.process.rcp_samples_out:
+                 self.rcp_header.samples_out = self.process.rcp_samples_out
             # (2) update file dict in rcp header
-            if self.action.file_dict:
-                self.rcp_header.files = self.action.file_dict
+            if self.process.file_dict:
+                self.rcp_header.files = self.process.file_dict
 
             # write full rcp header to file
             await self.write_to_rcp(cleanupdict(self.rcp_header.dict()))
 
             await self.clear_status()
             self.data_logger.cancel()
-            _ = self.base.actives.pop(self.action.action_uuid, None)
-            return self.action
+            _ = self.base.actives.pop(self.process.process_uuid, None)
+            return self.process
 
 
         async def track_file(self, file_type: str, file_path: str, sample_no: str):
             "Add auxiliary files to file dictionary."
-            if os.path.dirname(file_path) != os.path.join(self.base.save_root,self.action.output_dir):
-                self.action.file_paths.append(file_path)
+            if os.path.dirname(file_path) != os.path.join(self.base.save_root,self.process.output_dir):
+                self.process.file_paths.append(file_path)
             file_info = f"{file_type};{sample_no}"
             filename = os.path.basename(file_path)
-            self.action.file_dict.update(
+            self.process.file_dict.update(
                 {filename: file_info}
             )
             self.base.print_message(
-                f" ... {filename} added to files_technique__{self.action.actionnum} / aux_files list."
+                f" ... {filename} added to files_technique__{self.process.process_num} / aux_files list."
             )
 
 
         async def relocate_files(self):
             "Copy auxiliary files from folder path to rcp directory."
-            for x in self.action.file_paths:
+            for x in self.process.file_paths:
                 new_path = os.path.join(
                     self.base.save_root,
-                    self.action.output_dir,
+                    self.process.output_dir,
                     os.path.basename(x)
                 )
                 await async_copy(x, new_path)
@@ -1434,40 +1460,40 @@ class Base(object):
 class Orch(Base):
     """Base class for async orchestrator with trigger support and pushed status update.
 
-    Websockets are not used for critical communications. Orch will attach to all action
+    Websockets are not used for critical communications. Orch will attach to all process
     servers listed in a config and maintain a dict of {serverName: status}, which is
-    updated by POST requests from action servers. Orch will simultaneously dispatch as
-    many action_dq as possible in action queue until it encounters any of the following
+    updated by POST requests from process servers. Orch will simultaneously dispatch as
+    many process_dq as possible in process queue until it encounters any of the following
     conditions:
-      (1) last executed action is final action in queue
-      (2) last executed action is blocking
-      (3) next action to execute is preempted
-      (4) next action is on a busy action server
-    which triggers a temporary async task to monitor the action server status dict until
+      (1) last executed process is final process in queue
+      (2) last executed process is blocking
+      (3) next process to execute is preempted
+      (4) next process is on a busy process server
+    which triggers a temporary async task to monitor the process server status dict until
     all conditions are cleared.
 
-    POST requests from action servers are added to a multisubscriber queue and consumed
-    by a self-subscriber task to update the action server status dict and log changes.
+    POST requests from process servers are added to a multisubscriber queue and consumed
+    by a self-subscriber task to update the process server status dict and log changes.
     """
 
     def __init__(self, fastapp: HelaoFastAPI):
         super().__init__(fastapp)
         # self.import_actualizers()
-        self.action_lib = import_actualizers(
+        self.process_lib = import_actualizers(
             world_config_dict=self.world_cfg,
             library_path=None,
             server_name=self.server_name,
         )
-        # instantiate decision/experiment queue, action queue
-        self.decision_dq = deque([])
-        self.action_dq = deque([])
-        self.dispatched_actions = {}
-        self.active_decision = None
-        self.last_decision = None
+        # instantiate process_group/experiment queue, process queue
+        self.process_group_dq = deque([])
+        self.process_dq = deque([])
+        self.dispatched_processes = {}
+        self.active_process_group = None
+        self.last_process_group = None
 
-        # compilation of action server status dicts
+        # compilation of process server status dicts
         self.global_state_dict = defaultdict(lambda: defaultdict(list))
-        self.global_state_dict["_internal"]["async_action_dispatcher"] = []
+        self.global_state_dict["_internal"]["async_process_dispatcher"] = []
         self.global_q = MultisubscriberQueue()  # passes global_state_dict dicts
         self.dispatch_q = self.global_q.queue()
 
@@ -1497,7 +1523,7 @@ class Orch(Base):
             val = await self.dispatch_q.get()
         return val
 
-    async def check_wait_for_all_actions(self):
+    async def check_wait_for_all_processes(self):
         running_states, _ = await self.check_global_state()
         global_free = len(running_states) == 0
         self.print_message(f" ... check len(running_states): {len(running_states)}")
@@ -1515,7 +1541,7 @@ class Orch(Base):
                     response = await async_private_dispatcher(
                         world_config_dict=self.world_cfg,
                         server=serv_key,
-                        private_action="attach_client",
+                        private_process="attach_client",
                         params_dict={"client_servkey": self.server_name},
                         json_dict={},
                     )
@@ -1539,15 +1565,15 @@ class Orch(Base):
             self.init_success = True
         else:
             self.print_message(
-                " ... Orchestrator cannot process decision_dq unless all FastAPI servers in config file are accessible."
+                " ... Orchestrator cannot process process_group_dq unless all FastAPI servers in config file are accessible."
             )
 
-    async def update_status(self, act_serv: str, status_dict: dict):
-        """Dict update method for action server to push status messages.
+    async def update_status(self, process_serv: str, status_dict: dict):
+        """Dict update method for process server to push status messages.
 
-        Async task for updating orch status dict {act_serv_key: {act_name: [act_uuid]}}
+        Async task for updating orch status dict {process_serv_key: {act_name: [act_uuid]}}
         """
-        last_dict = self.global_state_dict[act_serv]
+        last_dict = self.global_state_dict[process_serv]
         for act_name, acts in status_dict.items():
             if set(acts) != set(last_dict[act_name]):
                 started = set(acts).difference(last_dict[act_name])
@@ -1555,26 +1581,26 @@ class Orch(Base):
                 ongoing = set(acts).intersection(last_dict[act_name])
                 if removed:
                     self.print_message(
-                        f" ... '{act_serv}:{act_name}' finished {','.join(removed)}"
+                        f" ... '{process_serv}:{act_name}' finished {','.join(removed)}"
                     )
                 if started:
                     self.print_message(
-                        f" ... '{act_serv}:{act_name}' started {','.join(started)}"
+                        f" ... '{process_serv}:{act_name}' started {','.join(started)}"
                     )
                 if ongoing:
                     self.print_message(
-                        f" ... '{act_serv}:{act_name}' ongoing {','.join(ongoing)}"
+                        f" ... '{process_serv}:{act_name}' ongoing {','.join(ongoing)}"
                     )
-        self.global_state_dict[act_serv].update(status_dict)
+        self.global_state_dict[process_serv].update(status_dict)
         await self.global_q.put(self.global_state_dict)
         return True
 
     async def update_global_state(self, status_dict: dict):
         _running_uuids = []
-        for act_serv, act_named in status_dict.items():
+        for process_serv, act_named in status_dict.items():
             for act_name, uuids in act_named.items():
                 for myuuid in uuids:
-                    uuid_tup = (act_serv, act_name, myuuid)
+                    uuid_tup = (process_serv, act_name, myuuid)
                     if myuuid.endswith("__estop"):
                         self.estop_uuids.append(uuid_tup)
                     elif myuuid.endswith("__error"):
@@ -1599,67 +1625,67 @@ class Orch(Base):
                 self.print_message(f" ... running_states: {running_states}")
 
     async def check_global_state(self):
-        """Return global state of action servers."""
+        """Return global state of process servers."""
         running_states = []
         idle_states = []
         # self.print_message(" ... checking global state:")
         # self.print_message(self.global_state_dict.items())
-        for act_serv, act_dict in self.global_state_dict.items():
-            self.print_message(f" ... checking {act_serv} state")
+        for process_serv, act_dict in self.global_state_dict.items():
+            self.print_message(f" ... checking {process_serv} state")
             for act_name, act_uuids in act_dict.items():
                 if len(act_uuids) == 0:
-                    idle_states.append(f"{act_serv}:{act_name}")
+                    idle_states.append(f"{process_serv}:{act_name}")
                 else:
-                    running_states.append(f"{act_serv}:{act_name}:{len(act_uuids)}")
+                    running_states.append(f"{process_serv}:{act_name}:{len(act_uuids)}")
             await asyncio.sleep(
                 0.001
-            )  # allows status changes to affect between action_dq, also enforce unique timestamp
+            )  # allows status changes to affect between process_dq, also enforce unique timestamp
         return running_states, idle_states
 
     async def dispatch_loop_task(self):
-        """Parse decision and action queues, and dispatch action_dq while tracking run state flags."""
+        """Parse process_group and process queues, and dispatch process_dq while tracking run state flags."""
         self.print_message(" ... running operator orch")
         self.print_message(f" ... orch status: {self.global_state_str}")
-        # clause for resuming paused action list
-        self.print_message(f" ... orch descisions: {self.decision_dq}")
+        # clause for resuming paused process list
+        self.print_message(f" ... orch descisions: {self.process_group_dq}")
         try:
             self.loop_state = "started"
-            while self.loop_state == "started" and (self.action_dq or self.decision_dq):
+            while self.loop_state == "started" and (self.process_dq or self.process_group_dq):
                 self.print_message(
-                    f" ... current content of action_dq: {self.action_dq}"
+                    f" ... current content of process_dq: {self.process_dq}"
                 )
                 self.print_message(
-                    f" ... current content of decision_dq: {self.decision_dq}"
+                    f" ... current content of process_group_dq: {self.process_group_dq}"
                 )
                 await asyncio.sleep(
                     0.001
-                )  # allows status changes to affect between action_dq, also enforce unique timestamp
-                if not self.action_dq:
-                    self.print_message(" ... getting action_dq from new decision")
+                )  # allows status changes to affect between process_dq, also enforce unique timestamp
+                if not self.process_dq:
+                    self.print_message(" ... getting process_dq from new process_group")
                     # generate uids when populating, generate timestamp when acquring
-                    self.last_decision = copy(self.active_decision)
-                    self.active_decision = self.decision_dq.popleft()
-                    self.active_decision.technique_name = self.technique_name
-                    self.active_decision.machine_name = self.hostname
-                    self.active_decision.set_dtime(offset=self.ntp_offset)
-                    self.active_decision.gen_uuid_decision(self.hostname)
-                    actualizer = self.active_decision.actualizer
-                    # additional actualizer params should be stored in decision.actualizer_pars
-                    unpacked_acts = self.action_lib[actualizer](self.active_decision)
+                    self.last_process_group = copy(self.active_process_group)
+                    self.active_process_group = self.process_group_dq.popleft()
+                    self.active_process_group.technique_name = self.technique_name
+                    self.active_process_group.machine_name = self.hostname
+                    self.active_process_group.set_dtime(offset=self.ntp_offset)
+                    self.active_process_group.gen_uuid_process_group(self.hostname)
+                    actualizer = self.active_process_group.actualizer
+                    # additional actualizer params should be stored in process_group.actualizer_pars
+                    unpacked_acts = self.process_lib[actualizer](self.active_process_group)
                     for i, act in enumerate(unpacked_acts):
-                        act.action_enum = float(i)  # f"{i}"
+                        act.process_enum = float(i)  # f"{i}"
                         # act.gen_uuid()
                     # TODO:update actualizer code
-                    self.action_dq = deque(unpacked_acts)
-                    self.dispatched_actions = {}
-                    self.print_message(f" ... got: {self.action_dq}")
+                    self.process_dq = deque(unpacked_acts)
+                    self.dispatched_processes = {}
+                    self.print_message(f" ... got: {self.process_dq}")
                     self.print_message(
-                        f" ... optional params: {self.active_decision.actualizer_pars}"
+                        f" ... optional params: {self.active_process_group.actualizer_pars}"
                     )
                 else:
                     if self.loop_intent == "stop":
                         self.print_message(" ... stopping orchestrator")
-                        # monitor status of running action_dq, then end loop
+                        # monitor status of running process_dq, then end loop
                         # async for _ in self.global_q.subscribe():
                         while True:
                             _ = await self.check_dispatch_queue()
@@ -1668,26 +1694,26 @@ class Orch(Base):
                                 await self.intend_none()
                                 break
                     elif self.loop_intent == "skip":
-                        # clear action queue, forcing next decision
-                        self.action_dq.clear()
+                        # clear process queue, forcing next process_group
+                        self.process_dq.clear()
                         await self.intend_none()
-                        self.print_message(" ... skipping to next decision")
+                        self.print_message(" ... skipping to next process_group")
                     else:
-                        # all action blocking is handled like preempt, check Action requirements
-                        A = self.action_dq.popleft()
-                        # append previous results to current action
-                        A.result_dict = self.active_decision.result_dict
+                        # all process blocking is handled like preempt, check cProcess requirements
+                        A = self.process_dq.popleft()
+                        # append previous results to current process
+                        A.result_dict = self.active_process_group.result_dict
 
-                        # see async_action_dispatcher for unpacking
+                        # see async_process_dispatcher for unpacking
                         if isinstance(A.start_condition, int):
-                            if A.start_condition == action_start_condition.no_wait:
+                            if A.start_condition == process_start_condition.no_wait:
                                 self.print_message(
-                                    " ... orch is dispatching an unconditional action"
+                                    " ... orch is dispatching an unconditional process"
                                 )
                             else:
                                 if (
                                     A.start_condition
-                                    == action_start_condition.wait_for_endpoint
+                                    == process_start_condition.wait_for_endpoint
                                 ):
                                     self.print_message(
                                         " ... orch is waiting for endpoint to become available"
@@ -1697,8 +1723,8 @@ class Orch(Base):
                                         _ = await self.check_dispatch_queue()
                                         endpoint_free = (
                                             len(
-                                                self.global_state_dict[A.action_server][
-                                                    A.action_name
+                                                self.global_state_dict[A.process_server][
+                                                    A.process_name
                                                 ]
                                             )
                                             == 0
@@ -1707,7 +1733,7 @@ class Orch(Base):
                                             break
                                 elif (
                                     A.start_condition
-                                    == action_start_condition.wait_for_server
+                                    == process_start_condition.wait_for_server
                                 ):
                                     self.print_message(
                                         " ... orch is waiting for server to become available"
@@ -1719,7 +1745,7 @@ class Orch(Base):
                                             [
                                                 len(uuid_list) == 0
                                                 for _, uuid_list in self.global_state_dict[
-                                                    A.action_server
+                                                    A.process_server
                                                 ].items()
                                             ]
                                         )
@@ -1727,12 +1753,12 @@ class Orch(Base):
                                             break
                                 else:  # start_condition is 3 or unsupported value
                                     self.print_message(
-                                        " ... orch is waiting for all action_dq to finish"
+                                        " ... orch is waiting for all process_dq to finish"
                                     )
-                                    if not await self.check_wait_for_all_actions():
+                                    if not await self.check_wait_for_all_processes():
                                         while True:
                                             _ = await self.check_dispatch_queue()
-                                            if await self.check_wait_for_all_actions():
+                                            if await self.check_wait_for_all_processes():
                                                 break
                                     else:
                                         self.print_message(" ... global_free is true")
@@ -1764,53 +1790,53 @@ class Orch(Base):
                                     break
                         else:
                             self.print_message(
-                                " ... invalid start condition, waiting for all action_dq to finish"
+                                " ... invalid start condition, waiting for all process_dq to finish"
                             )
                             # async for _ in self.global_q.subscribe():
                             while True:
                                 _ = await self.check_dispatch_queue()
-                                if await self.check_wait_for_all_actions():
+                                if await self.check_wait_for_all_processes():
                                     break
 
-                        self.print_message(" ... copying global vars to action")
+                        self.print_message(" ... copying global vars to process")
 
-                        # copy requested global param to action params
+                        # copy requested global param to process params
                         for k, v in A.from_global_params.items():
                             self.print_message(f"{k}:{v}")
-                            if k in self.active_decision.global_params.keys():
-                                A.action_params.update(
-                                    {v: self.active_decision.global_params[k]}
+                            if k in self.active_process_group.global_params.keys():
+                                A.process_params.update(
+                                    {v: self.active_process_group.global_params[k]}
                                 )
 
-                        self.print_message(" ... dispatching action", A.as_dict())
+                        self.print_message(" ... dispatching process", A.as_dict())
                         self.print_message(
-                            f" ... dispatching action {A.action_name} on server {A.action_server}"
+                            f" ... dispatching process {A.process_name} on server {A.process_server}"
                         )
-                        # keep running list of dispatched actions
-                        self.dispatched_actions[A.action_enum] = copy(A)
-                        result = await async_action_dispatcher(self.world_cfg, A)
-                        self.active_decision.result_dict[A.action_enum] = result
+                        # keep running list of dispatched processes
+                        self.dispatched_processes[A.process_enum] = copy(A)
+                        result = await async_process_dispatcher(self.world_cfg, A)
+                        self.active_process_group.result_dict[A.process_enum] = result
 
-                        self.print_message(" ... copying global vars back to decision")
+                        self.print_message(" ... copying global vars back to process_group")
                         # self.print_message(result)
                         if "to_global_params" in result:
                             for k in result["to_global_params"]:
-                                if k in result["action_params"].keys():
+                                if k in result["process_params"].keys():
                                     if (
-                                        result["action_params"][k] is None
+                                        result["process_params"][k] is None
                                         and k
-                                        in self.active_decision.global_params.keys()
+                                        in self.active_process_group.global_params.keys()
                                     ):
-                                        self.active_decision.global_params.pop(k)
+                                        self.active_process_group.global_params.pop(k)
                                     else:
-                                        self.active_decision.global_params.update(
-                                            {k: result["action_params"][k]}
+                                        self.active_process_group.global_params.update(
+                                            {k: result["process_params"][k]}
                                         )
                         self.print_message(
-                            " ... done copying global vars back to decision"
+                            " ... done copying global vars back to process_group"
                         )
 
-            self.print_message(" ... decision queue is empty")
+            self.print_message(" ... process_group queue is empty")
             self.print_message(" ... stopping operator orch")
             self.loop_state = "stopped"
             await self.intend_none()
@@ -1837,16 +1863,16 @@ class Orch(Base):
     async def estop_loop(self):
         self.loop_state = "E-STOP"
         self.loop_task.cancel()
-        await self.force_stop_running_action_q()
+        await self.force_stop_running_process_q()
         await self.intend_none()
 
-    async def force_stop_running_action_q(self):
+    async def force_stop_running_process_q(self):
         running_uuids = []
         estop_uuids = []
-        for act_serv, act_named in self.global_state_dict.items():
+        for process_serv, act_named in self.global_state_dict.items():
             for act_name, uuids in act_named.items():
                 for myuuid in uuids:
-                    uuid_tup = (act_serv, act_name, myuuid)
+                    uuid_tup = (process_serv, act_name, myuuid)
                     if myuuid.endswith("__estop"):
                         estop_uuids.append(uuid_tup)
                     else:
@@ -1881,24 +1907,24 @@ class Orch(Base):
             )
         cleared_status = copy(self.global_state_dict)
         if clear_estop:
-            for serv, act, myuuid in self.estop_uuids:
-                self.print_message(f" ... clearing E-STOP {act} on {serv}")
-                cleared_status[serv][act] = cleared_status[serv][act].remove(myuuid)
+            for serv, process, myuuid in self.estop_uuids:
+                self.print_message(f" ... clearing E-STOP {process} on {serv}")
+                cleared_status[serv][process] = cleared_status[serv][process].remove(myuuid)
         if clear_error:
-            for serv, act, myuuid in self.error_uuids:
-                self.print_message(f" ... clearing error {act} on {serv}")
-                cleared_status[serv][act] = cleared_status[serv][act].remove(myuuid)
+            for serv, process, myuuid in self.error_uuids:
+                self.print_message(f" ... clearing error {process} on {serv}")
+                cleared_status[serv][process] = cleared_status[serv][process].remove(myuuid)
         await self.global_q.put(cleared_status)
         self.print_message(" ... resetting dispatch loop state")
         self.loop_state = "stopped"
         self.print_message(
-            f" ... {len(self.running_uuids)} running action_dq did not fully stop after E-STOP/error was raised"
+            f" ... {len(self.running_uuids)} running process_dq did not fully stop after E-STOP/error was raised"
         )
 
-    async def add_decision(
+    async def add_process_group(
         self,
         orch_name: str = None,
-        decision_label: str = None,
+        process_group_label: str = None,
         actualizer: str = None,
         actualizer_pars: dict = {},
         result_dict: dict = {},
@@ -1907,10 +1933,10 @@ class Orch(Base):
         at_index: Optional[int] = None,
     ):
 
-        D = Decision(
+        D = cProcess_group(
             {
                 "orch_name": orch_name,
-                "decision_label": decision_label,
+                "process_group_label": process_group_label,
                 "actualizer": actualizer,
                 "actualizer_pars": actualizer_pars,
                 "result_dict": result_dict,
@@ -1918,74 +1944,74 @@ class Orch(Base):
             }
         )
 
-        # reminder: decision_dict values take precedence over keyword args but we grab
-        # active or last decision label if decision_label is not specified
+        # reminder: process_group_dict values take precedence over keyword args but we grab
+        # active or last process_group label if process_group_label is not specified
         if D.orch_name is None:
             D.orch_name = self.server_name
-        if decision_label is None:
-            if self.active_decision is not None:
-                active_label = self.active_decision.decision_label
+        if process_group_label is None:
+            if self.active_process_group is not None:
+                active_label = self.active_process_group.process_group_label
                 self.print_message(
-                    f" ... decision_label not specified, inheriting {active_label} from active decision"
+                    f" ... process_group_label not specified, inheriting {active_label} from active process_group"
                 )
-                D.decision_label = active_label
-            elif self.last_decision is not None:
-                last_label = self.last_decision.decision_label
+                D.process_group_label = active_label
+            elif self.last_process_group is not None:
+                last_label = self.last_process_group.process_group_label
                 self.print_message(
-                    f" ... decision_label not specified, inheriting {last_label} from previous decision"
+                    f" ... process_group_label not specified, inheriting {last_label} from previous process_group"
                 )
-                D.decision_label = last_label
+                D.process_group_label = last_label
             else:
                 self.print_message(
-                    " ... decision_label not specified, no past decision_dq to inherit so using default 'nolabel"
+                    " ... process_group_label not specified, no past process_group_dq to inherit so using default 'nolabel"
                 )
         await asyncio.sleep(0.001)
         if at_index:
-            self.decision_dq.insert(i=at_index, x=D)
+            self.process_group_dq.insert(i=at_index, x=D)
         elif prepend:
-            self.decision_dq.appendleft(D)
-            self.print_message(f" ... decision {D.decision_uuid} prepended to queue")
+            self.process_group_dq.appendleft(D)
+            self.print_message(f" ... process_group {D.process_group_uuid} prepended to queue")
         else:
-            self.decision_dq.append(D)
-            self.print_message(f" ... decision {D.decision_uuid} appended to queue")
+            self.process_group_dq.append(D)
+            self.print_message(f" ... process_group {D.process_group_uuid} appended to queue")
 
-    def list_decisions(self):
-        """Return the current queue of decision_dq."""
+    def list_process_groups(self):
+        """Return the current queue of process_group_dq."""
 
-        declist = [
-            return_dec(
+        process_group_list = [
+            return_process_group(
                 index=i,
-                uid=dec.decision_uuid,
-                label=dec.decision_label,
-                actualizer=dec.actualizer,
-                pars=dec.actualizer_pars,
-                access=dec.access,
+                uid=process_group.process_group_uuid,
+                label=process_group.process_group_label,
+                actualizer=process_group.actualizer,
+                pars=process_group.actualizer_pars,
+                access=process_group.access,
             )
-            for i, dec in enumerate(self.decision_dq)
+            for i, process_group in enumerate(self.process_group_dq)
         ]
-        retval = return_declist(decisions=declist)
+        retval = return_process_group_list(process_groups=process_group_list)
         return retval
 
-    def get_decision(self, last=False):
-        """Return the active or last decision."""
+    def get_process_group(self, last=False):
+        """Return the active or last process_group."""
         if last:
-            dec = self.last_decision
+            process_group = self.last_process_group
         else:
-            dec = self.active_decision
-        if dec is not None:
-            declist = [
-                return_dec(
+            process_group = self.active_process_group
+        if process_group is not None:
+            process_group_list = [
+                return_process_group(
                     index=-1,
-                    uid=dec.decision_uuid,
-                    label=dec.decision_label,
-                    actualizer=dec.actualizer,
-                    pars=dec.actualizer_pars,
-                    access=dec.access,
+                    uid=process_group.process_group_uuid,
+                    label=process_group.process_group_label,
+                    actualizer=process_group.actualizer,
+                    pars=process_group.actualizer_pars,
+                    access=process_group.access,
                 )
             ]
         else:
-            declist = [
-                return_dec(
+            process_group_list = [
+                return_process_group(
                     index=-1,
                     uid=None,
                     label=None,
@@ -1994,48 +2020,48 @@ class Orch(Base):
                     access=None,
                 )
             ]
-        retval = return_declist(decisions=declist)
+        retval = return_process_group_list(process_groups=process_group_list)
         return retval
 
-    def list_active_actions(self):
-        """Return the current queue running actions."""
-        actlist = []
+    def list_active_processes(self):
+        """Return the current queue running processes."""
+        process_list = []
         index = 0
-        for act_serv, act_dict in self.global_state_dict.items():
-            for act_name, act_uuids in act_dict.items():
-                for act_uuid in act_uuids:
-                    actlist.append(
-                        return_act(
+        for process_serv, process_dict in self.global_state_dict.items():
+            for process_name, process_uuids in process_dict.items():
+                for process_uuid in process_uuids:
+                    process_list.append(
+                        return_process(
                             index=index,
-                            uid=act_uuid,
-                            server=act_serv,
-                            action=act_name,
+                            uid=process_uuid,
+                            server=process_serv,
+                            process=process_name,
                             pars=dict(),
                             preempt=-1,
                         )
                     )
                     index = index + 1
-        retval = return_actlist(actions=actlist)
+        retval = return_process_list(processes=process_list)
         return retval
 
-    def list_actions(self):
-        """Return the current queue of action_dq."""
-        actlist = [
-            return_act(
+    def list_processes(self):
+        """Return the current queue of process_dq."""
+        process_list = [
+            return_process(
                 index=i,
-                uid=act.action_uuid,
-                server=act.action_server,
-                action=act.action_name,
-                pars=act.action_params,
-                preempt=act.start_condition,
+                uid=process.process_uuid,
+                server=process.process_server,
+                process=process.process_name,
+                pars=process.process_params,
+                preempt=process.start_condition,
             )
-            for i, act in enumerate(self.action_dq)
+            for i, process in enumerate(self.process_dq)
         ]
-        retval = return_actlist(actions=actlist)
+        retval = return_process_list(processes=process_list)
         return retval
 
-    def supplement_error_action(self, check_uuid: str, sup_action: Action):
-        """Insert action at front of action queue with subversion of errored action, inherit parameters if desired."""
+    def supplement_error_process(self, check_uuid: str, sup_process: cProcess):
+        """Insert process at front of process queue with subversion of errored process, inherit parameters if desired."""
         if self.error_uuids == []:
             self.print_message("There are no error statuses to replace")
         else:
@@ -2044,82 +2070,82 @@ class Orch(Base):
                 _, _, error_uuid = matching_error[0]
                 EA = [
                     A
-                    for _, A in self.dispatched_actions.items()
-                    if A.action_uuid == error_uuid
+                    for _, A in self.dispatched_processes.items()
+                    if A.process_uuid == error_uuid
                 ][0]
                 # up to 99 supplements
-                new_enum = round(EA.action_enum + 0.01, 2)
-                new_action = sup_action
-                new_action.action_enum = new_enum
-                self.action_dq.appendleft(new_action)
+                new_enum = round(EA.process_enum + 0.01, 2)
+                new_process = sup_process
+                new_process.process_enum = new_enum
+                self.process_dq.appendleft(new_process)
             else:
                 self.print_message(
                     f"uuid {check_uuid} not found in list of error statuses:"
                 )
                 self.print_message(", ".join(self.error_uuids))
 
-    def remove_decision(
+    def remove_process_group(
         self, by_index: Optional[int] = None, by_uuid: Optional[str] = None
     ):
-        """Remove decision in list by enumeration index or uuid."""
+        """Remove process_group in list by enumeration index or uuid."""
         if by_index:
             i = by_index
         elif by_uuid:
             i = [
                 i
-                for i, D in enumerate(list(self.decision_dq))
-                if D.decision_uuid == by_uuid
+                for i, D in enumerate(list(self.process_group_dq))
+                if D.process_group_uuid == by_uuid
             ][0]
         else:
             self.print_message(
-                "No arguments given for locating existing decision to remove."
+                "No arguments given for locating existing process_group to remove."
             )
             return None
-        del self.decision_dq[i]
+        del self.process_group_dq[i]
 
-    def replace_action(
+    def replace_process(
         self,
-        sup_action: Action,
+        sup_process: cProcess,
         by_index: Optional[int] = None,
         by_uuid: Optional[str] = None,
         by_enum: Optional[Union[int, float]] = None,
     ):
-        """Substitute a queued action."""
+        """Substitute a queued process."""
         if by_index:
             i = by_index
         elif by_uuid:
             i = [
                 i
-                for i, A in enumerate(list(self.action_dq))
-                if A.action_uuid == by_uuid
+                for i, A in enumerate(list(self.process_dq))
+                if A.process_uuid == by_uuid
             ][0]
         elif by_enum:
             i = [
                 i
-                for i, A in enumerate(list(self.action_dq))
-                if A.action_enum == by_enum
+                for i, A in enumerate(list(self.process_dq))
+                if A.process_enum == by_enum
             ][0]
         else:
             self.print_message(
-                "No arguments given for locating existing action to replace."
+                "No arguments given for locating existing process to replace."
             )
             return None
-        current_enum = self.action_dq[i].action_enum
-        new_action = sup_action
-        new_action.action_enum = current_enum
-        self.action_dq.insert(i, new_action)
-        del self.action_dq[i + 1]
+        current_enum = self.process_dq[i].process_enum
+        new_process = sup_process
+        new_process.process_enum = current_enum
+        self.process_dq.insert(i, new_process)
+        del self.process_dq[i + 1]
 
-    def append_action(self, sup_action: Action):
-        """Add action to end of current action queue."""
-        if len(self.action_dq) == 0:
-            last_enum = floor(max(list(self.dispatched_actions.keys())))
+    def append_process(self, sup_process: cProcess):
+        """Add process to end of current process queue."""
+        if len(self.process_dq) == 0:
+            last_enum = floor(max(list(self.dispatched_processes.keys())))
         else:
-            last_enum = floor(self.action_dq[-1].action_enum)
+            last_enum = floor(self.process_dq[-1].process_enum)
         new_enum = int(last_enum + 1)
-        new_action = sup_action
-        new_action.action_enum = new_enum
-        self.action_dq.append(new_action)
+        new_process = sup_process
+        new_process.process_enum = new_enum
+        self.process_dq.append(new_process)
 
     async def shutdown(self):
         await self.detach_subscribers()
@@ -2149,10 +2175,10 @@ def import_actualizers(
     world_config_dict: dict, library_path: str = None, server_name: str = ""
 ):
     """Import actualizer functions into environment."""
-    action_lib = {}
+    process_lib = {}
     if library_path is None:
         library_path = world_config_dict.get(
-            "action_library_path", os.path.join("helao", "library", "actualizer")
+            "process_library_path", os.path.join("helao", "library", "actualizer")
         )
     if not os.path.isdir(library_path):
         print_message(
@@ -2160,35 +2186,35 @@ def import_actualizers(
             server_name,
             f" ... library path {library_path} was specified but is not a valid directory",
         )
-        return action_lib  # False
+        return process_lib  # False
     sys.path.append(library_path)
-    for actlib in world_config_dict["action_libraries"]:
+    for actlib in world_config_dict["process_libraries"]:
         tempd = import_module(actlib).__dict__
-        action_lib.update({func: tempd[func] for func in tempd["ACTUALIZERS"]})
+        process_lib.update({func: tempd[func] for func in tempd["ACTUALIZERS"]})
     print_message(
         world_config_dict,
         server_name,
-        f" ... imported {len(world_config_dict['action_libraries'])} actualizers specified by config.",
+        f" ... imported {len(world_config_dict['process_libraries'])} actualizers specified by config.",
     )
-    return action_lib  # True
+    return process_lib  # True
 
 
-async def async_action_dispatcher(world_config_dict: dict, A: Action):
-    """Request non-blocking action_dq which may run concurrently.
+async def async_process_dispatcher(world_config_dict: dict, A: cProcess):
+    """Request non-blocking process_dq which may run concurrently.
 
-    Send action object to action server for processing.
+    Send process object to process server for processing.
 
     Args:
-        A: an action type object contain action server name, endpoint, parameters
+        A: an process type object contain process server name, endpoint, parameters
 
     Returns:
-        Response string from http POST request to action server
+        Response string from http POST request to process server
     """
-    actd = world_config_dict["servers"][A.action_server]
+    actd = world_config_dict["servers"][A.process_server]
     act_addr = actd["host"]
     act_port = actd["port"]
-    url = f"http://{act_addr}:{act_port}/{A.action_server}/{A.action_name}"
-    # splits action dict into suitable params and json parts
+    url = f"http://{act_addr}:{act_port}/{A.process_server}/{A.process_name}"
+    # splits process dict into suitable params and json parts
     # params_dict, json_dict = A.fastdict()
     params_dict = {}
     json_dict = A.as_dict()
@@ -2211,21 +2237,21 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action):
 async def async_private_dispatcher(
     world_config_dict: dict,
     server: str,
-    private_action: str,
+    private_process: str,
     params_dict: dict,
     json_dict: dict,
 ):
-    """Request non-blocking private action which may run concurrently.
+    """Request non-blocking private process which may run concurrently.
 
     Returns:
-        Response string from http POST request to action server
+        Response string from http POST request to process server
     """
 
     actd = world_config_dict["servers"][server]
     act_addr = actd["host"]
     act_port = actd["port"]
 
-    url = f"http://{act_addr}:{act_port}/{private_action}"
+    url = f"http://{act_addr}:{act_port}/{private_process}"
 
     # print(" ... params_dict", params_dict)
     # print(" ... json_dict", json_dict)

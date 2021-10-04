@@ -104,9 +104,9 @@ class LocalDataHandler:
 
 
 class HTEdata:
-    def __init__(self, actServ: Base):
-        self.base = actServ
-        self.config_dict = actServ.server_cfg["params"]
+    def __init__(self, process_serv: Base):
+        self.base = process_serv
+        self.config_dict = process_serv.server_cfg["params"]
 
 
         self.dataAPI = HTE_legacy_API(self.base)

@@ -220,13 +220,13 @@ async def finish_alignment(newTransfermatrix,errorcode):
             host = C[S.params.aligner_server].host,
             port = C[S.params.aligner_server].port,
             server = S.params.aligner_server,
-            action = 'private/send_alignment',
+            process = 'private/send_alignment',
             pars = {'Transfermatrix':f"{newTransfermatrix}",
                     'oldTransfermatrix':f"{initialTransferMatrix}",
                     'errorcode':f"{errorcode}"
                     }
             )
-        url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['action']}"
+        url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['process']}"
         async with aiohttp.ClientSession() as session:
             async with session.post(url, params=A['pars']) as resp:
                 response = await resp.json()
@@ -242,12 +242,12 @@ async def motor_ismoving():
             host = C[S.params.aligner_server].host,
             port = C[S.params.aligner_server].port,
             server = S.params.aligner_server,
-            action = 'private/ismoving',
+            process = 'private/ismoving',
 #            pars = {'axis':f"{C[S.params.aligner_server].params.x},{C[S.params.aligner_server].params.y}"}
             pars = {'axis':"x,y"}
             )
 
-        url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['action']}"
+        url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['process']}"
         async with aiohttp.ClientSession() as session:
             async with session.post(url, params=A['pars']) as resp:
                 response = await resp.json()
@@ -275,12 +275,12 @@ async def motor_move(mode, x, y):
             host = C[S.params.aligner_server].host,
             port = C[S.params.aligner_server].port,
             server = S.params.aligner_server,
-            action = 'private/align_move',
+            process = 'private/align_move',
             pars = {'d_mm':f"{newxy[0]},{newxy[1]}",
                     'axis':"x,y",
                     'mode': mode}
             )
-        url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['action']}"
+        url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['process']}"
         async with aiohttp.ClientSession() as session:
             async with session.post(url, params=A['pars']) as resp:
                 _ = await resp.text() # todo need timeout or increase it
@@ -303,10 +303,10 @@ async def motor_getxy():
             host = C[S.params.aligner_server].host,
             port = C[S.params.aligner_server].port,
             server = S.params.aligner_server,
-            action = 'private/align_get_position',
+            process = 'private/align_get_position',
             pars = {}
             )
-        url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['action']}"
+        url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['process']}"
         async with aiohttp.ClientSession() as session:
             async with session.post(url, params=A['pars']) as resp:
                 response = await resp.json()
@@ -335,10 +335,10 @@ async def get_pm():
             host = C[S.params.aligner_server].host,
             port = C[S.params.aligner_server].port,
             server = S.params.aligner_server,
-            action = 'private/align_get_PM',
+            process = 'private/align_get_PM',
             pars = {}
             )
-        url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['action']}"
+        url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['process']}"
         async with aiohttp.ClientSession() as session:
             async with session.post(url, params=A['pars']) as resp:
                 response = await resp.json()
@@ -392,10 +392,10 @@ async def align_getstatus():
         host = C[S.params.aligner_server].host,
         port = C[S.params.aligner_server].port,
         server = S.params.aligner_server,
-        action = 'align_status',
+        process = 'align_status',
         pars = {}
         )
-    url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['action']}"
+    url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['process']}"
     async with aiohttp.ClientSession() as session:
         async with session.post(url, params=A['pars']) as resp:
             response = await resp.json()
@@ -546,10 +546,10 @@ async def transform_platexy_to_motorxy(platexy):
         host = C[S.params.aligner_server].host,
         port = C[S.params.aligner_server].port,
         server = S.params.aligner_server,
-        action = 'private/toMotorXY',
+        process = 'private/toMotorXY',
         pars = {'platexy':json.dumps(np.array(platexy).tolist())}
         )
-    url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['action']}"
+    url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['process']}"
     async with aiohttp.ClientSession() as session:
         async with session.post(url, params=A['pars']) as resp:
             response = await resp.text()
@@ -566,10 +566,10 @@ async def transform_motorxy_to_platexy(motorxy):
         host = C[S.params.aligner_server].host,
         port = C[S.params.aligner_server].port,
         server = S.params.aligner_server,
-        action = 'private/toPlateXY',
+        process = 'private/toPlateXY',
         pars = {'motorxy':json.dumps(np.array(motorxy).tolist())}
         )
-    url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['action']}"
+    url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['process']}"
     async with aiohttp.ClientSession() as session:
         async with session.post(url, params=A['pars']) as resp:
             # response = await resp.json()
@@ -582,10 +582,10 @@ async def transform_MxytoMPlate(Mxy):
         host = C[S.params.aligner_server].host,
         port = C[S.params.aligner_server].port,
         server = S.params.aligner_server,
-        action = 'private/MxytoMPlate',
+        process = 'private/MxytoMPlate',
         pars = {'Mxy':json.dumps(Mxy.tolist())}
         )
-    url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['action']}"
+    url = f"http://{A['host']}:{A['port']}/{A['server']}/{A['process']}"
     async with aiohttp.ClientSession() as session:
         async with session.post(url, params=A['pars']) as resp:
             # response = await resp.json()

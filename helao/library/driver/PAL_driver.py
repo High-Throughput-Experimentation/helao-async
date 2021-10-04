@@ -14,12 +14,11 @@ from socket import gethostname
 from pydantic import BaseModel
 from typing import List
 
-from helao.core.schema import Action
+from helao.core.schema import cProcess
 from helao.core.server import Base
 from helao.core.error import error_codes
 from helao.library.driver.HTEdata_legacy import LocalDataHandler
-from helao.core.data import liquid_sample_API
-from helao.core.data import sqlite_liquid_sample_API
+from helao.core.data import liquid_sample_API, old_liquid_sample_API
 
 from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
 
@@ -171,11 +170,11 @@ class cPALparams(BaseModel):
 
 class cPAL:
     # def __init__(self, config_dict, stat, C, servkey):
-    def __init__(self, actServ: Base):
+    def __init__(self, process_serv: Base):
         
-        self.base = actServ
-        self.config_dict = actServ.server_cfg["params"]
-        self.world_config = actServ.world_cfg
+        self.base = process_serv
+        self.config_dict = process_serv.server_cfg["params"]
+        self.world_config = process_serv.world_cfg
 
         
         # configure the tray
@@ -190,8 +189,8 @@ class cPAL:
 
         self.local_data_dump = self.world_config["save_root"]
         self.sample_no_DB_path = self.world_config["local_db_path"]
-        self.liquid_sample_DB = liquid_sample_API(self.base, self.sample_no_DB_path)
-        self.sqlite_liquid_sample_API = sqlite_liquid_sample_API(self.base, self.sample_no_DB_path)
+        self.liquid_sample_DB = old_liquid_sample_API(self.base, self.sample_no_DB_path)
+        self.sqlite_liquid_sample_API = liquid_sample_API(self.base, self.sample_no_DB_path)
 
         self.sshuser = self.config_dict["user"]
         self.sshkey = self.config_dict["key"]
@@ -232,12 +231,12 @@ class cPAL:
             self.triggers = True
 
 
-        self.action = (
-            None  # for passing action object from technique method to measure loop
+        self.process = (
+            None  # for passing process object from technique method to measure loop
         )
 
         self.active = (
-            None  # for holding active action object, clear this at end of measurement
+            None  # for holding active process object, clear this at end of measurement
         )
 
 
@@ -252,7 +251,7 @@ class cPAL:
         # self.IO_datafile = LocalDataHandler()
         # self.liquid_sample_rcp = LocalDataHandler()
 
-        # self.runparams = action_runparams
+        # self.runparams = process_runparams
 
         myloop = asyncio.get_event_loop()
         # add meas IOloop
@@ -288,7 +287,7 @@ class cPAL:
 
 
     async def trayDB_reset(self, A):
-        myactive = await self.base.contain_action(
+        myactive = await self.base.contain_process(
             A,
             file_type="paltray_helao__file",
             file_data_keys=["tray_no", "slot_no", "content"],
@@ -558,12 +557,12 @@ class cPAL:
 
     async def trayDB_get_db(self, A):
         """Returns vial tray sample table"""
-        tray =  A.action_params["tray"]
-        slot =  A.action_params["slot"]
-        csv = A.action_params.get("csv", False)
-        icpms = A.action_params.get("icpms", False)
+        tray =  A.process_params["tray"]
+        slot =  A.process_params["slot"]
+        csv = A.process_params.get("csv", False)
+        icpms = A.process_params.get("icpms", False)
 
-        myactive = await self.base.contain_action(
+        myactive = await self.base.contain_process(
             A,
             file_type="palvialtable_helao__file",
             file_data_keys=["vial_table"],
@@ -584,10 +583,10 @@ class cPAL:
                                                  tray = tray,
                                                  slot = slot,
                                                  myactive = myactive,
-                                                 survey_runs = A.action_params.get("survey_runs", 1),
-                                                 main_runs = A.action_params.get("main_runs", 3),
-                                                 rack = A.action_params.get("rack", 2),
-                                                 dilution_factor = A.action_params.get("dilution_factor", None),
+                                                 survey_runs = A.process_params.get("survey_runs", 1),
+                                                 main_runs = A.process_params.get("main_runs", 3),
+                                                 rack = A.process_params.get("rack", 2),
+                                                 dilution_factor = A.process_params.get("dilution_factor", None),
                                                 )
                 table = self.trays[tray - 1].slots[slot - 1].as_dict()
         await myactive.enqueue_data({"vial_table": table})
@@ -731,16 +730,16 @@ class cPAL:
         return True
 
 
-    async def init_PAL_IOloop(self, A: Action):
+    async def init_PAL_IOloop(self, A: cProcess):
         activeDict = dict()
-        PALparams = cPALparams(**A.action_params)
+        PALparams = cPALparams(**A.process_params)
         PALparams.PAL_sample_in = A.samples_in
-        A.action_abbr = PALparams.PAL_method.name
+        A.process_abbr = PALparams.PAL_method.name
 
         if not self.IO_do_meas:
             self.IO_error = error_codes.none
             self.IO_PALparams = PALparams
-            self.action = A
+            self.process = A
             self.FIFO_AUX_name = (
                 f"AUX__PAL__{strftime('%Y%m%d_%H%M%S%z.txt')}"  # need to be txt at end
             )
@@ -759,7 +758,7 @@ class cPAL:
                 await asyncio.sleep(1)
             error = self.IO_error
             if self.active:
-                activeDict = self.active.action.as_dict()
+                activeDict = self.active.process.as_dict()
             else:
                 activeDict = A.as_dict()
         else:
@@ -818,11 +817,11 @@ class cPAL:
                     
                     # this is a sample reference, it needs to be added to the db later
                     PAL_sample_out_ref = liquid_sample(
-                            decision_uuid=self.action.decision_uuid,
-                            action_uuid=self.action.action_uuid,
+                            process_group_uuid=self.process.process_group_uuid,
+                            process_uuid=self.process.process_uuid,
                             source=source,
                             volume_mL=PALparams.PAL_volume_uL / 1000.0,
-                            action_queue_time=self.action.action_queue_time,
+                            process_queue_time=self.process.process_queue_time,
                             chemical=source_chemical,
                             mass=source_mass,
                             supplier=source_supplier,
@@ -859,18 +858,18 @@ class cPAL:
     
     
                     # # update sample in and out
-                    # await self.sendcommand_update_action_sampleinout(PALparams)
+                    # await self.sendcommand_update_process_sampleinout(PALparams)
                     
                     
                     # if PALparams.PAL_method == PALmethods.fill or PALparams.PAL_method == PALmethods.fillfixed:
                     #     if self.active:
                     #         #TODO, change it to different key
-                    #         self.active.action.action_params.update({"_eche_sample_no":PALparams.PAL_sample_out})
+                    #         self.active.process.process_params.update({"_eche_sample_no":PALparams.PAL_sample_out})
                     
 
                     # write data
                     if self.active:
-                        if self.active.action.save_data:
+                        if self.active.process.save_data:
                             logdata = [
                                 [sample.get_global_label() for sample in PALparams.PAL_sample_out.samples],
                                 [sample.get_global_label() for sample in PALparams.PAL_sample_in.samples],
@@ -947,9 +946,9 @@ class cPAL:
         elif PALparams.PAL_method == PALmethods.fill or PALparams.PAL_method == PALmethods.fillfixed:
             PALparams.PAL_dest = "lcfc_res"
             # PALparams.PAL_source = ""
-            # PALparams.PAL_plate_id =  self.action.plate_id
-            PALparams.PAL_plate_id =  self.action.actualizer_pars.get("plate_id", None)
-            PALparams.PAL_plate_sample_no =  self.action.actualizer_pars.get("plate_sample_no", None)
+            # PALparams.PAL_plate_id =  self.process.plate_id
+            PALparams.PAL_plate_id =  self.process.actualizer_pars.get("plate_id", None)
+            PALparams.PAL_plate_sample_no =  self.process.actualizer_pars.get("plate_sample_no", None)
         else:
             PALparams.PAL_dest = ""
             PALparams.PAL_source = ""
@@ -1010,8 +1009,8 @@ class cPAL:
         return error
 
 
-    async def sendcommand_update_action_sampleinout(self, PALparams: cPALparams):
-        """Updates action sample_in and sample_out"""
+    async def sendcommand_update_process_sampleinout(self, PALparams: cPALparams):
+        """Updates process sample_in and sample_out"""
 
 
 
@@ -1212,13 +1211,13 @@ class cPAL:
             if self.IO_do_meas:
                 if not self.IO_estop:
 
-                    self.active = await self.base.contain_action(
-                        self.action,
+                    self.active = await self.base.contain_process(
+                        self.process,
                         file_type="pal_helao__file",
                         file_data_keys=self.FIFO_column_headings,
                         header=None,
                     )
-                    self.base.print_message(f" ... Active action uuid is {self.active.action.action_uuid}")
+                    self.base.print_message(f" ... Active process uuid is {self.active.process.process_uuid}")
                     if self.active:
                         self.active.finish_hlo_header(realtime=await self.active.set_realtime())
 
@@ -1329,7 +1328,7 @@ class cPAL:
         self.IO_do_meas = False
 
         # add sample in and out to rcp
-        await self.sendcommand_update_action_sampleinout(self.IO_PALparams)
+        await self.sendcommand_update_process_sampleinout(self.IO_PALparams)
 
 
         # need to check here again in case estop was triggered during
@@ -1337,7 +1336,7 @@ class cPAL:
         # need to set the current meas to idle first
         _ = await self.active.finish()
         self.active = None
-        self.action = None
+        self.process = None
 
         if self.IO_estop:
             self.base.print_message(" ... PAL is in estop.")

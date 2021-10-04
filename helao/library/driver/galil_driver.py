@@ -15,7 +15,7 @@ from typing import List
 
 from helao.core.server import Base
 from helao.core.error import error_codes
-from helao.core.schema import Action
+from helao.core.schema import cProcess
 # from helao.core.server import import_actualizers, async_private_dispatcher
 
 
@@ -34,10 +34,10 @@ class cmd_exception(ValueError):
 
 
 class galil:
-    def __init__(self, actServ: Base):
+    def __init__(self, process_serv: Base):
 
-        self.base = actServ
-        self.config_dict = actServ.server_cfg["params"]
+        self.base = process_serv
+        self.config_dict = process_serv.server_cfg["params"]
 
         self.config_dict["estop_motor"] = False
         self.config_dict["estop_io"] = False
@@ -182,8 +182,8 @@ class galil:
             # go slow to find the same position every time
             # first a fast move to find the switch
             retc1 = await self.motor_move(
-                Action({
-                        "action_params": {
+                cProcess({
+                        "process_params": {
                                 "d_mm": [0 for ax in axis],
                                 "axis": axis,
                                 "speed": None,
@@ -194,8 +194,8 @@ class galil:
             )
             # move back 2mm
             retc1 = await self.motor_move(
-                Action({
-                        "action_params": {
+                cProcess({
+                        "process_params": {
                                 "d_mm": [2 for ax in axis],
                                 "axis": axis,
                                 "speed": None,
@@ -206,8 +206,8 @@ class galil:
             )
             # approach switch again very slow to get better zero position
             retc1 = await self.motor_move(
-                Action({
-                        "action_params": {
+                cProcess({
+                        "process_params": {
                                 "d_mm": [0 for ax in axis],
                                 "axis": axis,
                                 "speed": 1000,
@@ -218,8 +218,8 @@ class galil:
             )
 
             retc2 = await self.motor_move(
-                Action({
-                        "action_params": {
+                cProcess({
+                        "process_params": {
                                 "d_mm":[
                     self.config_dict["axis_zero"][self.config_dict["axis_id"][ax]]
                     for ax in axis
@@ -269,16 +269,16 @@ class galil:
         # self.wsmotordata_buffer["platexy"] = [platexy[0], platexy[1], 1]
 
 
-    async def motor_move(self, A: Action):
-        d_mm = A.action_params.get("d_mm",[])
-        axis = A.action_params.get("axis",[])
-        speed = A.action_params.get("speed", None)
-        mode = A.action_params.get("mode",move_modes.absolute)
-        transformation = A.action_params.get("transformation",transformation_mode.motorxy)
+    async def motor_move(self, A: cProcess):
+        d_mm = A.process_params.get("d_mm",[])
+        axis = A.process_params.get("axis",[])
+        speed = A.process_params.get("speed", None)
+        mode = A.process_params.get("mode",move_modes.absolute)
+        transformation = A.process_params.get("transformation",transformation_mode.motorxy)
         
         error =  error_codes.none
 
-        stopping = False  # no stopping of any movement by other actions
+        stopping = False  # no stopping of any movement by other processs
         mode = move_modes(mode)
         transformation = transformation_mode(transformation)
         # this function moves the motor by a set amount of milimeters
@@ -1009,8 +1009,8 @@ class transformation_mode(str, Enum):
 class transformxy:
     # Updating plate calibration will automatically update the system transformation
     # matrix. When angles are changed updated them also here and run update_Msystem
-    def __init__(self, actServ: Base, Minstr, seq=None):
-        self.base = actServ
+    def __init__(self, process_serv: Base, Minstr, seq=None):
+        self.base = process_serv
         # instrument specific matrix
         # motor to instrument
         self.Minstrxyz = np.asmatrix(Minstr)  # np.asmatrix(np.identity(4))
