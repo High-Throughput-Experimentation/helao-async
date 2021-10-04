@@ -112,7 +112,7 @@ class C_async_operator:
         self.process_group_table = DataTable(source=self.process_group_source, columns=self.columns_dec, width=620, height=200)
 
         self.process_source = ColumnDataSource(data=self.process_list)
-        self.columns_process_ = [TableColumn(field=key, title=key) for key in self.process_list.keys()]
+        self.columns_process = [TableColumn(field=key, title=key) for key in self.process_list.keys()]
         self.process_table = DataTable(source=self.process_source, columns=self.columns_process, width=620, height=200)
 
         self.active_process_source = ColumnDataSource(data=self.active_process_list)

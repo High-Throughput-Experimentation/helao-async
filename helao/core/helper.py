@@ -90,12 +90,12 @@ def rcp_to_dict(rcppath: str):  # read common info/rcp/exp/ana structure into di
     return ttree_to_json(dlist)
 
 
-def dict_to_rcp(d: dict, level: int = 0):
+def dict_to_prc(d: dict, level: int = 0):
     # lines = []
     # for k, v in d.items():
     #     if isinstance(v, dict):
     #         lines.append(f"{'    '*level}{k}:")
-    #         lines.append(dict_to_rcp(v, level + 1))
+    #         lines.append(dict_to_prc(v, level + 1))
     #     else:
     #         lines.append(f"{'    '*level}{k}: {str(v).strip()}")
     # return "\n".join(lines)

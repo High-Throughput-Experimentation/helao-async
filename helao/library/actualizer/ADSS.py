@@ -89,7 +89,7 @@ def debug(process_group_Obj: cProcess_group,
                             liquid_sample(**{"sample_no":9}),
                             ]).dict()
                         },
-        # "save_rcp": False,
+        # "save_prc": False,
         # "save_data": False,
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         })
@@ -128,7 +128,7 @@ def ADSS_slave_startup(process_group_Obj: cProcess_group,
                         "mode": move_modes.absolute,
                         "transformation": transformation_mode.platexy,
                         },
-        # "save_rcp": True,
+        # "save_prc": True,
         "start_condition": process_start_condition.wait_for_all,
         # "plate_id": None,
         })
@@ -170,7 +170,7 @@ def ADSS_slave_shutdown(process_group_Obj: cProcess_group):
     #                       "PAL_wash3": 1,
     #                       "PAL_wash4": 1,
     #                       },
-    #     # "save_rcp": True,
+    #     # "save_prc": True,
     #     # "save_data": True,
     #     "start_condition": process_start_condition.wait_for_all,
     #     # "plate_id": None,
@@ -186,7 +186,7 @@ def ADSS_slave_shutdown(process_group_Obj: cProcess_group):
                          "pump":"Direction",
                          "on": 1,
                          },
-        # "save_rcp": True,
+        # "save_prc": True,
         "start_condition": process_start_condition.wait_for_all,
         # "plate_id": None,
         })
@@ -200,7 +200,7 @@ def ADSS_slave_shutdown(process_group_Obj: cProcess_group):
         "process_params": {
                          "waittime":120,
                          },
-        # "save_rcp": True,
+        # "save_prc": True,
         "start_condition": process_start_condition.wait_for_all,
         # "plate_id": None,
         })
@@ -220,7 +220,7 @@ def ADSS_slave_shutdown(process_group_Obj: cProcess_group):
                          "pump":"PeriPump",
                          "on": 0,
                          },
-        # "save_rcp": True,
+        # "save_prc": True,
         "start_condition": process_start_condition.wait_for_all,
         # "plate_id": None,
         })
@@ -235,7 +235,7 @@ def ADSS_slave_shutdown(process_group_Obj: cProcess_group):
                          "pump":"Direction",
                          "on": 0,
                          },
-        "save_rcp": True,
+        "save_prc": True,
         "start_condition": process_start_condition.wait_for_all,
         "plate_id": None,
         })
@@ -277,7 +277,7 @@ def ADSS_slave_engage(process_group_Obj: cProcess_group):
                         "mode": move_modes.absolute,
                         "transformation": transformation_mode.instrxy,
                         },
-        # "save_rcp": True,
+        # "save_prc": True,
         "start_condition": process_start_condition.wait_for_all,
         # "plate_id": None,
         })
@@ -294,7 +294,7 @@ def ADSS_slave_engage(process_group_Obj: cProcess_group):
                         "mode": move_modes.absolute,
                         "transformation": transformation_mode.instrxy,
                         },
-        # "save_rcp": True,
+        # "save_prc": True,
         "start_condition": process_start_condition.wait_for_all,
         # "plate_id": None,
         })
@@ -319,7 +319,7 @@ def ADSS_slave_disengage(process_group_Obj: cProcess_group):
                         "mode": move_modes.absolute,
                         "transformation": transformation_mode.instrxy,
                         },
-        # "save_rcp": True,
+        # "save_prc": True,
         "start_condition": process_start_condition.wait_for_all,
         # "plate_id": None,
         })
@@ -361,7 +361,7 @@ def ADSS_slave_clean_PALtool(process_group_Obj: cProcess_group,
                           # "PAL_wash3": 1,
                           # "PAL_wash4": 1,
                           },
-        # "save_rcp": True,
+        # "save_prc": True,
         # "save_data": True,
         "start_condition": process_start_condition.wait_for_all,
         # "plate_id": None,
@@ -440,7 +440,7 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
                                  "PAL_spacingfactor": 1.0,
                                  },
                 "to_global_params":["_eche_sample_no"], # save new liquid_sample_no of eche cell to globals
-                "save_rcp": True,
+                "save_prc": True,
                 "save_data": True,
                 "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
                 # "plate_id": None,
@@ -457,7 +457,7 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
                                  "pump":"Direction",
                                  "on": 0,
                                  },
-                "save_rcp": True,
+                "save_prc": True,
                 "start_condition": process_start_condition.wait_for_all,
                 "plate_id": None,
                 })
@@ -472,7 +472,7 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
                                  "pump":"PeriPump",
                                  "on": 1,
                                  },
-                "save_rcp": True,
+                "save_prc": True,
                 "start_condition": process_start_condition.wait_for_all,
                 "plate_id": None,
                 })
@@ -487,7 +487,7 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
                 "process_params": {
                                  "waittime":filltime_sec,
                                  },
-                "save_rcp": True,
+                "save_prc": True,
                 "start_condition": process_start_condition.wait_for_all,
                 "plate_id": None,
                 })
@@ -511,7 +511,7 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
                                  "PAL_spacingfactor": 1.0,
                                  },
                 "to_global_params":["_eche_sample_no"],
-                "save_rcp": True,
+                "save_prc": True,
                 "save_data": True,
                 "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
                 # "plate_id": None,
@@ -568,7 +568,7 @@ def ADSS_slave_single_CA(process_group_Obj: cProcess_group,
                         "TTLsend": -1,  # -1 disables, else select TTL 0-3
                         "IErange": "auto",
                         },
-        "save_rcp": True,
+        "save_prc": True,
         "save_data": True,
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         # "plate_id": None,
@@ -597,7 +597,7 @@ def ADSS_slave_single_CA(process_group_Obj: cProcess_group,
         "from_global_params":{
                     "_eche_sample_no":"liquid_sample_no_in"
                     },
-        "save_rcp": True,
+        "save_prc": True,
         "save_data": True,
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         # "plate_id": None,
@@ -618,7 +618,7 @@ def ADSS_slave_single_CA(process_group_Obj: cProcess_group,
                         "TTLsend": -1,  # -1 disables, else select TTL 0-3
                         "IErange": "auto",
                         },
-        "save_rcp": True,
+        "save_prc": True,
         "save_data": True,
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         # "plate_id": None,
@@ -647,7 +647,7 @@ def ADSS_slave_single_CA(process_group_Obj: cProcess_group,
         "from_global_params":{
                     "_eche_sample_no":"liquid_sample_no_in"
                     },
-        "save_rcp": True,
+        "save_prc": True,
         "save_data": True,
         "start_condition": process_start_condition.wait_for_endpoint, # orch is waiting for all process_dq to finish
         # "plate_id": None,
@@ -680,7 +680,7 @@ def ADSS_slave_single_CA(process_group_Obj: cProcess_group,
         "from_global_params":{
                     "_eche_sample_no":"liquid_sample_no_in"
                     },
-        "save_rcp": True,
+        "save_prc": True,
         "save_data": True,
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         # "plate_id": None,
