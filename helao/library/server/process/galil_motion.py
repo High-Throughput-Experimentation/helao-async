@@ -42,8 +42,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data({"setref": await app.driver.setaxisref()})
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     # parse as {'M':json.dumps(np.matrix(M).tolist()),'platexy':json.dumps(np.array(platexy).tolist())}
@@ -56,8 +56,8 @@ def makeApp(confPrefix, servKey):
         active = await app.base.contain_process(A)
         motorxy = app.driver.transform.transform_platexy_to_motorxy(**A.process_params)
         await active.enqueue_data(motorxy)
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     # parse as {'M':json.dumps(np.matrix(M).tolist()),'platexy':json.dumps(np.array(motorxy).tolist())}
@@ -70,8 +70,8 @@ def makeApp(confPrefix, servKey):
         active = await app.base.contain_process(A)
         platexy = app.driver.transform.transform_motorxy_to_platexy(**A.process_params)
         await active.enqueue_data(platexy)
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/MxytoMPlate")
@@ -83,8 +83,8 @@ def makeApp(confPrefix, servKey):
         active = await app.base.contain_process(A)
         Mplate = app.driver.transform.get_Mplate_Msystem(**A.process_params)
         await active.enqueue_data(Mplate)
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/download_alignmentmatrix")
@@ -96,8 +96,8 @@ def makeApp(confPrefix, servKey):
         active = await app.base.contain_process(A)
         updsys = app.driver.transform.update_Mplatexy(**A.process_params)
         await active.enqueue_data(updsys)
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/upload_alignmentmatrix")
@@ -107,8 +107,8 @@ def makeApp(confPrefix, servKey):
         active = await app.base.contain_process(A)
         alignmentmatrix = app.driver.transform.get_Mplatexy().tolist()
         await active.enqueue_data(alignmentmatrix)
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/move")
@@ -131,16 +131,16 @@ def makeApp(confPrefix, servKey):
         # if move_response.get("err_code", [])!=[0]:
         #     app.base.print_message(move_response)
         #     await active.set_error(f"{move_response['err_code']}")
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
     @app.post(f"/{servKey}/disconnect")
     async def disconnect(request: Request):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(await app.driver.motor_disconnect())
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/query_positions")
@@ -148,8 +148,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(await app.driver.query_axis_position(await app.driver.get_all_axis()))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/query_position")
@@ -159,8 +159,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(await app.driver.query_axis_position(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/query_moving")
@@ -170,8 +170,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(await app.driver.query_axis_moving(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/axis_off")
@@ -180,8 +180,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(await app.driver.motor_off(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/axis_on")
@@ -189,8 +189,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(await app.driver.motor_on(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/stop")
@@ -200,8 +200,8 @@ def makeApp(confPrefix, servKey):
         await active.enqueue_data(
             await app.driver.motor_off(await app.driver.get_all_axis())
         )
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/reset")
@@ -212,8 +212,8 @@ def makeApp(confPrefix, servKey):
         await active.enqueue_data(
             await app.driver.motor_off(await app.driver.reset())
         )
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/estop")
@@ -222,8 +222,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(await app.driver.estop_axis(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post("/shutdown")

@@ -18,7 +18,7 @@ from fastapi import Request
 from typing import Optional, List, Union
 
 
-from helao.core.server import Action, make_process_serv, setup_process
+from helao.core.server import make_process_serv, setup_process
 from helao.library.driver.nidaqmx_driver import cNIMAX, pumpitems
 from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
 
