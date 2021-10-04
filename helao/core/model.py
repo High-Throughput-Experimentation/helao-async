@@ -62,7 +62,7 @@ class return_finished_process(BaseModel):
     process_abbr: str
     process_num: str
     start_condition: Union[int, dict]
-    save_rcp: bool
+    save_prc: bool
     save_data: bool
     samples_in: Optional[dict]
     samples_out: Optional[dict]
@@ -94,7 +94,7 @@ class return_running_process(BaseModel):
     process_abbr: str
     process_num: str
     start_condition: Union[int, dict]
-    save_rcp: bool
+    save_prc: bool
     save_data: bool
     samples_in: Optional[dict]
     samples_out: Optional[dict]
@@ -135,7 +135,7 @@ class base_sample(BaseModel):
         else:
             return None
         
-    def create_initial_rcp_dict(self):
+    def create_initial_prc_dict(self):
         return {
             "global_label":self.get_global_label(),
             "sample_type":self.sample_type,
@@ -151,9 +151,9 @@ class liquid_sample(base_sample):
     volume_mL: Optional[float] = None
     ph: Optional[float]=None
 
-    def rcp_dict(self):
-        rcp_dict = self.create_initial_rcp_dict()
-        return rcp_dict
+    def prc_dict(self):
+        prc_dict = self.create_initial_prc_dict()
+        return prc_dict
 
     def get_global_label(self):
         if self.global_label is None:
@@ -180,10 +180,10 @@ class solid_sample(base_sample):
     machine_name: Optional[str] = "legacy"
     plate_id: Optional[int] = None
     
-    def rcp_dict(self):
-        rcp_dict = self.create_initial_rcp_dict()
-        rcp_dict.update({"plate_id":self.plate_id})
-        return rcp_dict
+    def prc_dict(self):
+        prc_dict = self.create_initial_prc_dict()
+        prc_dict.update({"plate_id":self.plate_id})
+        return prc_dict
 
     def get_global_label(self):
         if self.global_label is None:
@@ -208,9 +208,9 @@ class gas_sample(base_sample):
     sample_type: Optional[str] = "gas"
     volume_mL: Optional[float] = None
 
-    def rcp_dict(self):
-        rcp_dict = self.create_initial_rcp_dict()
-        return rcp_dict
+    def prc_dict(self):
+        prc_dict = self.create_initial_prc_dict()
+        return prc_dict
 
     def get_global_label(self):
         if self.global_label is None:
@@ -303,23 +303,23 @@ class assembly_sample(base_sample):
         return "assembly"            
 
 
-    def rcp_dict(self):
+    def prc_dict(self):
         return {
             "global_label":self.get_global_label(),
             "sample_type":self.sample_type,
             "machine_name":self.machine_name,
             "sample_position":self.sample_position,
             "sample_creation_timecode":self.sample_creation_timecode,
-            "assembly_parts":self.get_assembly_parts_rcp_dict()
+            "assembly_parts":self.get_assembly_parts_prc_dict()
             }
 
 
-    def get_assembly_parts_rcp_dict(self):
+    def get_assembly_parts_prc_dict(self):
         part_dict_list = []
         for part in self.parts:
             if part is not None:
                 # return full dict
-                # part_dict_list.append(part.rcp_dict())
+                # part_dict_list.append(part.prc_dict())
                 # return only the label (preferred)
                 part_dict_list.append(part.get_global_label())
             else:
@@ -338,7 +338,7 @@ class sample_list(BaseModel):
         return sample_model_list_validator(value, values, **kwargs)
 
 
-class rcp_header(BaseModel):
+class prc_header(BaseModel):
     hlo_version: str = "2021.09.20"
     technique_name: str
     server_name: str

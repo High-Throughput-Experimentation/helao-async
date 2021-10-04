@@ -268,7 +268,7 @@ def makeApp(confPrefix, servKey):
     #     If its the very first liquid (no source in database exists) leave source and source_mL empty.'''
     #     A = await setup_process(request)
     #     active = await app.base.contain_process(A)
-    #     A.process_params["DUID"] = A.decision_uuid
+    #     A.process_params["DUID"] = A.process_group_uuid
     #     A.process_params["AUID"] = A.process_uuid
         
     #     sample = await app.driver.liquid_sample_no_create_new(sample)

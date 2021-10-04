@@ -469,8 +469,8 @@ class liquid_sample_API:
 
         self.close_DB()
         
-        self.count_liquid_sample_nowait()        
-        # self.new_liquid_sample_nowait(liquid_sample())
+        self.count_samples_nowait()
+        # self.new_sample_nowait(liquid_sample())
 
 
     def create_init_db(self):
@@ -496,7 +496,7 @@ class liquid_sample_API:
 
 
     async def count_samples(self):
-        return self.count_liquid_sample_nowait()
+        return self.count_samples_nowait()
 
 
     def count_samples_nowait(self):
@@ -638,16 +638,16 @@ class liquid_sample_API:
         self.close_DB()
 
 
-    # async def get_liquid_sample(self, sample_no = None, global_hash: Optional[str] = None):
+    # async def get_sample(self, sample_no = None, global_hash: Optional[str] = None):
     #     pass
 
 
     async def old_jsondb_to_sqlitedb(self):
         old_liquid_sample_DB = old_liquid_sample_API(self.base, os.path.join(self.DBfilepath, self.DBfile))
-        counts = await old_liquid_sample_DB.count_liquid_sample()
+        counts = await old_liquid_sample_DB.count_samples()
         self.base.print_message(f"old db sample count: {counts}", info = True)
         for i in range(counts):
-            liquid_sample_jsondict = await old_liquid_sample_DB.get_liquid_sample(i+1)
+            liquid_sample_jsondict = await old_liquid_sample_DB.get_sample(i+1)
             self.new_sample_nowait(liquid_sample(**liquid_sample_jsondict), use_supplied_no=True)
 
 
@@ -688,7 +688,7 @@ class old_liquid_sample_API:
         await self.fDB.close()
 
 
-    async def count_liquid_sample(self):
+    async def count_samples(self):
         # TODO: faster way?
         _ = await self.open_DB("a+")
         counter = 0
@@ -699,7 +699,7 @@ class old_liquid_sample_API:
         return counter - self.headerlines
 
 
-    async def new_liquid_sample(self, new_sample: liquid_sample):
+    async def new_sample(self, new_sample: liquid_sample):
         async def write_sample_no_jsonfile(filename, datadict):
             """write a separate json file for each new sample_no"""
             self.fjson = await aiofiles.open(os.path.join(self.DBfilepath, filename), "a+")
@@ -712,7 +712,7 @@ class old_liquid_sample_API:
             await self.fDB.write(line)
                 
         self.base.print_message(f" ... new entry dict: {new_sample.dict()}")
-        new_sample.sample_no = await self.count_liquid_sample() + 1
+        new_sample.sample_no = await self.count_samples() + 1
         self.base.print_message(f" ... new liquid sample no: {new_sample.sample_no}")
         # dump dict to separate json file
         await write_sample_no_jsonfile(f"{new_sample.sample_no:08d}__{new_sample.process_group_uuid}__{new_sample.process_uuid}.json",new_sample.dict())
@@ -723,7 +723,7 @@ class old_liquid_sample_API:
         return new_sample
 
 
-    async def get_liquid_sample(self, sample: liquid_sample):
+    async def get_sample(self, sample: liquid_sample):
         """accepts a liquid sample model with minimum information to find it in the db
         and returns its full information
         """
@@ -742,7 +742,7 @@ class old_liquid_sample_API:
             retval = json.loads(retval)
             return retval
 
-        async def get_liquid_sample_details(sample_no):
+        async def get_sample_details(sample_no):
             # need to add headerline count
             sample_no = sample_no + self.headerlines
             await self.open_DB("r+")
@@ -765,7 +765,7 @@ class old_liquid_sample_API:
 
         
 
-        data = await get_liquid_sample_details(sample.sample_no)
+        data = await get_sample_details(sample.sample_no)
         if data != "":
             data = data.strip("\n").split(",")
             fileID = int(data[0])

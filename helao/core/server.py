@@ -31,12 +31,12 @@ from fastapi.openapi.utils import get_flat_params
 
 from bokeh.io import curdoc
 
-from helao.core.helper import MultisubscriberQueue, dict_to_rcp, eval_val
+from helao.core.helper import MultisubscriberQueue
 from helao.core.helper import print_message, cleanupdict
 from helao.core.schema import cProcess, cProcess_group
 from helao.core.model import return_process_group, return_process_group_list, return_process, return_process_list
 from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
-from helao.core.model import rcp_header
+from helao.core.model import prc_header
 
 
 async_copy = wrap(shutil.copy)
@@ -45,7 +45,7 @@ async_copy = wrap(shutil.copy)
 colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
 # colorama.init()
 
-# version number, gets written into every rcp and hlo file
+# version number, gets written into every prc/prg and hlo file
 hlo_version = "2021.09.20"
 
 class process_start_condition(int, Enum):
@@ -497,7 +497,7 @@ class Base(object):
             {%H%M%S}__{process_group_label}/  # process_group_time
                 {%Y%m%d.%H%M%S}__{process_server_name}__{process_name}__{process_uuid}/
                     {filename}.{ext}
-                    {%Y%m%d.%H%M%S%f}.rcp  # process_datetime
+                    {%Y%m%d.%H%M%S%f}.prc  # process_datetime
                     (aux_files)
     """
 
@@ -541,7 +541,7 @@ class Base(object):
                 os.makedirs(self.save_root)
         else:
             raise ValueError(
-                " ... Warning: root save directory was not defined. Logs, RCPs, and data will not be written.",
+                " ... Warning: root save directory was not defined. Logs, PRCs, PRGs, and data will not be written.",
                 error=True,
             )
         self.actives = {}
@@ -839,7 +839,7 @@ class Base(object):
         self.ntp_syncer.cancel()
 
     class Active(object):
-        """Active process holder which wraps data queing and rcp writing."""
+        """Active process holder which wraps data queing and prc writing."""
 
         def __init__(
             self,
@@ -858,7 +858,7 @@ class Base(object):
             self.process.file_data_keys = file_data_keys
             self.process.file_sample_label = file_sample_label
             self.process.header = header
-            self.rcp_header = None
+            self.prc_header = None
             
             
             if file_sample_keys is None:
@@ -898,18 +898,18 @@ class Base(object):
                     " ... Root save directory not specified, cannot save process results."
                 )
                 self.process.save_data = False
-                self.process.save_rcp = False
+                self.process.save_prc = False
                 self.process.output_dir = None
             else:
                 if self.process.save_data is None:
                     self.process.save_data = False
-                if self.process.save_rcp is None:
-                    self.process.save_rcp = False
-                # cannot save data without rcp
+                if self.process.save_prc is None:
+                    self.process.save_prc = False
+                # cannot save data without prc
                 if self.process.save_data is True:
-                    self.process.save_rcp = True
+                    self.process.save_prc = True
                 # self.process.save_data = True
-                # self.process.save_rcp = True
+                # self.process.save_prc = True
                 self.process.output_dir = os.path.join(
                     year_week,
                     process_group_date,
@@ -919,7 +919,7 @@ class Base(object):
             self.data_logger = self.base.aloop.create_task(self.log_data_task())
 
 
-        def update_rcp_header(self):
+        def update_prc_header(self):
             # need to remove swagger workaround value if present
             if "scratch" in self.process.process_params:
                     del self.process.process_params["scratch"]
@@ -927,7 +927,7 @@ class Base(object):
             if self.process.process_enum is None:
                 self.process.process_enum = 0.0
  
-            self.rcp_header = rcp_header(
+            self.prc_header = prc_header(
                 hlo_version=f"{hlo_version}",
                 technique_name=self.process.technique_name,
                 server_name=self.base.server_name,
@@ -947,12 +947,12 @@ class Base(object):
 
 
         async def myinit(self):
-            if self.process.save_rcp:
+            if self.process.save_prc:
                 os.makedirs(os.path.join(self.base.save_root,self.process.output_dir), exist_ok=True)
                 self.process.process_num = (
                     f"{self.process.process_abbr}-{self.process.process_enum}"
                 )
-                self.update_rcp_header()
+                self.update_prc_header()
                 
                 if self.process.save_data:
                     for i, file_sample_key in enumerate(self.process.file_sample_keys):
@@ -1332,16 +1332,16 @@ class Base(object):
                 )
 
 
-        async def write_to_rcp(self, rcp_dict: dict):
-            "Create new rcp if it doesn't exist, otherwise append rcp_dict to file."
+        async def write_to_prc(self, prc_dict: dict):
+            "Create new prc if it doesn't exist, otherwise append prc_dict to file."
             output_path = os.path.join(
                 self.base.save_root,
                 self.process.output_dir,
-                f"{self.process.process_queue_time}.rcp"
+                f"{self.process.process_queue_time}.prc"
             )
-            self.base.print_message(f" ... writing to rcp: {output_path}")
-            # self.base.print_message(" ... writing:",rcp_dict)
-            output_str = pyaml.dump(rcp_dict, sort_dicts=False)
+            self.base.print_message(f" ... writing to prc: {output_path}")
+            # self.base.print_message(" ... writing:",prc_dict)
+            output_str = pyaml.dump(prc_dict, sort_dicts=False)
             file_instance = await aiofiles.open(output_path, mode="a+")
 
             if not output_str.endswith("\n"):
@@ -1385,7 +1385,7 @@ class Base(object):
                 if status is None:
                     status = "preserved"
     
-                append_dict = sample.rcp_dict()
+                append_dict = sample.prc_dict()
                 if append_dict is not None:
                     if inheritance is not None:
                         append_dict.update({"inheritance": inheritance})
@@ -1395,19 +1395,19 @@ class Base(object):
                         append_dict.update({"status": status})            
         
                     # check if list for safety reasons
-                    if type(self.process.rcp_samples_in) is not list:
-                        self.process.rcp_samples_in = []
-                    if type(self.process.rcp_samples_out) is not list:
-                        self.process.rcp_samples_out = []
+                    if type(self.process.prc_samples_in) is not list:
+                        self.process.prc_samples_in = []
+                    if type(self.process.prc_samples_out) is not list:
+                        self.process.prc_samples_out = []
 
                     if IO == "in":
-                        self.process.rcp_samples_in.append(append_dict)
+                        self.process.prc_samples_in.append(append_dict)
                     elif IO == "out":
-                        self.process.rcp_samples_out.append(append_dict)
+                        self.process.prc_samples_out.append(append_dict)
 
 
         async def finish(self):
-            "Close file_conn, finish rcp, copy aux, set endpoint status, and move active dict to past."
+            "Close file_conn, finish prc, copy aux, set endpoint status, and move active dict to past."
             await asyncio.sleep(1)
             self.base.print_message(" ... finishing data logging.")
             for filekey in self.file_conn.keys():
@@ -1415,16 +1415,16 @@ class Base(object):
                     await self.file_conn[filekey].close()
             self.file_conn = dict()
             # (1) update sample_in and sample_out
-            if  self.process.rcp_samples_in:
-                self.rcp_header.samples_in = self.process.rcp_samples_in
-            if self.process.rcp_samples_out:
-                 self.rcp_header.samples_out = self.process.rcp_samples_out
-            # (2) update file dict in rcp header
+            if  self.process.prc_samples_in:
+                self.prc_header.samples_in = self.process.prc_samples_in
+            if self.process.prc_samples_out:
+                 self.prc_header.samples_out = self.process.prc_samples_out
+            # (2) update file dict in prc header
             if self.process.file_dict:
-                self.rcp_header.files = self.process.file_dict
+                self.prc_header.files = self.process.file_dict
 
-            # write full rcp header to file
-            await self.write_to_rcp(cleanupdict(self.rcp_header.dict()))
+            # write full prc header to file
+            await self.write_to_prc(cleanupdict(self.prc_header.dict()))
 
             await self.clear_status()
             self.data_logger.cancel()
@@ -1447,7 +1447,7 @@ class Base(object):
 
 
         async def relocate_files(self):
-            "Copy auxiliary files from folder path to rcp directory."
+            "Copy auxiliary files from folder path to prc directory."
             for x in self.process.file_paths:
                 new_path = os.path.join(
                     self.base.save_root,

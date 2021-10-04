@@ -95,13 +95,13 @@ class cProcess(cProcess_group):
         self.process_params = imports.get("process_params", {})
         self.process_enum = imports.get("process_enum", None)
         self.process_abbr = imports.get("process_abbr", None)
-        self.save_rcp = imports.get("save_rcp", True)
+        self.save_prc = imports.get("save_prc", True)
         self.save_data = imports.get("save_data", True)
         self.start_condition = imports.get("start_condition", 3)
         self.plate_id = imports.get("plate_id", None)
-        # holds sample list of dict for rcp writing
-        self.rcp_samples_in = []
-        self.rcp_samples_out = []
+        # holds sample list of dict for prc writing
+        self.prc_samples_in = []
+        self.prc_samples_out = []
 
         # holds samples basemodel for parsing between processes etc
         self.samples_in: sample_list = []

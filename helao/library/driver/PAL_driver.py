@@ -249,7 +249,7 @@ class cPAL:
         self.IO_continue = False
         self.IO_error = error_codes.none
         # self.IO_datafile = LocalDataHandler()
-        # self.liquid_sample_rcp = LocalDataHandler()
+        # self.liquid_sample_prc = LocalDataHandler()
 
         # self.runparams = process_runparams
 
@@ -1327,7 +1327,7 @@ class cPAL:
         # done sending all PAL commands
         self.IO_do_meas = False
 
-        # add sample in and out to rcp
+        # add sample in and out to prc
         await self.sendcommand_update_process_sampleinout(self.IO_PALparams)
 
 
@@ -1357,14 +1357,14 @@ class cPAL:
         # but will return it as a sample_list (that one does full type checking)
         if sample.sample_no == None:
             sample.sample_no = -1 # signals to get the last one
-        lastno = await self.liquid_sample_DB.count_liquid_sample()
+        lastno = await self.liquid_sample_DB.count_samples()
         sample.sample_no += lastno+1
-        sample = await self.liquid_sample_DB.get_liquid_sample(sample)
+        sample = await self.liquid_sample_DB.get_sample(sample)
         return sample_list(samples=[sample])
 
 
     async def liquid_sample_get(self, sample: liquid_sample,*args,**kwargs):
-        sample = await self.liquid_sample_DB.get_liquid_sample(sample)
+        sample = await self.liquid_sample_DB.get_sample(sample)
         return sample_list(samples=[sample])
 
 
@@ -1375,7 +1375,7 @@ class cPAL:
     ):
         sample.machine_name=self.base.hostname
         sample.server_name = self.base.server_name
-        sample = await self.liquid_sample_DB.new_liquid_sample(sample)
+        sample = await self.liquid_sample_DB.new_sample(sample)
         return sample_list(samples=[sample])
 
 
