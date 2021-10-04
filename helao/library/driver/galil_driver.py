@@ -278,7 +278,7 @@ class galil:
         
         error =  error_codes.none
 
-        stopping = False  # no stopping of any movement by other processs
+        stopping = False  # no stopping of any movement by other processes
         mode = move_modes(mode)
         transformation = transformation_mode(transformation)
         # this function moves the motor by a set amount of milimeters

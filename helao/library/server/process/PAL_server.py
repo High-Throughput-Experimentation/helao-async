@@ -172,8 +172,8 @@ def makeApp(confPrefix, servKey):
     async def trayDB_reset(request: Request):
         """Resets app.driver vial table. But will make a full dump to CSV first."""
         A = await setup_process(request)
-        finished_act = await app.driver.trayDB_reset(A)
-        return finished_act.as_dict()
+        finished_process = await app.driver.trayDB_reset(A)
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/trayDB_new")
@@ -187,8 +187,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data({"vial_position": await app.driver.trayDB_new(**A.process_params)})
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/trayDB_update")
@@ -204,8 +204,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data({"update": await app.driver.trayDB_update(**A.process_params)})
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/trayDB_get_db")
@@ -215,8 +215,8 @@ def makeApp(confPrefix, servKey):
         slot: Optional[int] = None
     ):
         A = await setup_process(request)
-        finished_act = await app.driver.trayDB_get_db(A)
-        return finished_act.as_dict()
+        finished_process = await app.driver.trayDB_get_db(A)
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/trayDB_export_icpms")
@@ -232,8 +232,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         A.process_abbr = "export"
         A.process_params["icpms"] = True
-        finished_act = await app.driver.trayDB_get_db(A)
-        return finished_act.as_dict()
+        finished_process = await app.driver.trayDB_get_db(A)
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/trayDB_export_csv")
@@ -245,8 +245,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         A.process_abbr = "export"
         A.process_params["csv"] = True # signal subroutine to create a csv
-        finished_act = await app.driver.trayDB_get_db(A)
-        return finished_act.as_dict()
+        finished_process = await app.driver.trayDB_get_db(A)
+        return finished_process.as_dict()
 
 
     # @app.post(f"/{servKey}/liquid_sample_no_create_new")
@@ -273,8 +273,8 @@ def makeApp(confPrefix, servKey):
         
     #     sample = await app.driver.liquid_sample_no_create_new(sample)
     #     await active.enqueue_data({'liquid_sample': sample.dict()})
-    #     finished_act = await active.finish()
-    #     return finished_act.as_dict()
+    #     finished_process = await active.finish()
+    #     return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/liquid_sample_no_get_last")
@@ -283,8 +283,8 @@ def makeApp(confPrefix, servKey):
         active = await app.base.contain_process(A)
         sample = await app.driver.liquid_sample_no_get_last()
         await active.enqueue_data({'liquid_sample': sample.dict()})
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     # @app.post(f"/{servKey}/liquid_sample_no_get")
@@ -296,8 +296,8 @@ def makeApp(confPrefix, servKey):
     #     active = await app.base.contain_process(A)
     #     sample = await app.driver.liquid_sample_no_get(sample)
     #     await active.enqueue_data({'liquid_sample': sample.dict()})
-    #     finished_act = await active.finish()
-    #     return finished_act.as_dict()
+    #     finished_process = await active.finish()
+    #     return finished_process.as_dict()
 
 
     @app.post("/shutdown")

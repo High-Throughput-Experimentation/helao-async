@@ -40,8 +40,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.get_elements_plateid(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/get_platemap_plateid")
@@ -50,8 +50,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.get_platemap_plateid(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/get_platexycalibration") 
@@ -60,8 +60,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.get_platexycalibration(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/save_platexycalibration")
@@ -70,8 +70,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.save_platexycalibration(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/check_plateid")
@@ -80,8 +80,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.check_plateid(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/check_printrecord_plateid")
@@ -90,8 +90,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.check_printrecord_plateid(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/check_annealrecord_plateid")
@@ -100,8 +100,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.check_annealrecord_plateid(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/get_info_plateid")
@@ -109,8 +109,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.get_info_plateid(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/get_rcp_plateid")
@@ -118,8 +118,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.get_rcp_plateid(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post("/shutdown")

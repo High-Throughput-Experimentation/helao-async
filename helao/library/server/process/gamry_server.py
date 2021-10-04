@@ -57,8 +57,8 @@ def makeApp(confPrefix, servKey):
         active = await app.base.contain_process(A)
         driver_status = await app.driver.status()
         await active.enqueue_data({"status": driver_status})
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
     @app.post(f"/{servKey}/run_LSV")
     async def run_LSV(
@@ -211,8 +211,8 @@ def makeApp(confPrefix, servKey):
         A.process_abbr = "stop"
         active = await app.base.contain_process(A)
         await active.enqueue_data({"stop_result": await app.driver.stop()})
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/estop")
@@ -225,8 +225,8 @@ def makeApp(confPrefix, servKey):
         A.process_abbr = "estop"
         active = await app.base.contain_process(A)
         await active.enqueue_data({"estop_result": await app.driver.estop(A)})
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
     @app.post("/shutdown")
     def post_shutdown():

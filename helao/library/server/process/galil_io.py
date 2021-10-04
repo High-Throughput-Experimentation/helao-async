@@ -37,8 +37,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.read_analog_in(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/query_digital_in")
@@ -48,8 +48,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.read_digital_in(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
     @app.post(f"/{servKey}/query_digital_out")
     async def read_digital_out(
@@ -58,8 +58,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.read_digital_out(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
     @app.post(f"/{servKey}/digital_out_on")
     async def set_digital_out_on(
@@ -68,8 +68,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.digital_out_on(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
     @app.post(f"/{servKey}/digital_out_off")
     async def set_digital_out_off(
@@ -78,8 +78,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.digital_out_off(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
     @app.post(f"/{servKey}/set_triggered_cycles")
     async def set_triggered_cycles(
@@ -91,8 +91,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.set_digital_cycle(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
     @app.post(f"/{servKey}/analog_out")
     async def set_analog_out(
@@ -105,8 +105,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.set_analog_out(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
     @app.post(f"/{servKey}/inf_digi_cycles")
     async def inf_cycles(
@@ -119,16 +119,16 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.infinite_digital_cycles(**A.process_params))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
     @app.post(f"/{servKey}/break_inf_digi_cycles")
     async def break_inf_cycles(request: Request):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(app.driver.break_infinite_digital_cycles())
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
     @app.post(f"/{servKey}/reset")
     async def reset(request: Request):
@@ -136,8 +136,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(await app.driver.reset())
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
     @app.post(f"/{servKey}/estop")
     async def estop(request: Request, switch: Optional[bool] = True):
@@ -145,8 +145,8 @@ def makeApp(confPrefix, servKey):
         A = await setup_process(request)
         active = await app.base.contain_process(A)
         await active.enqueue_data(await app.driver.estop_io(switch))
-        finished_act = await active.finish()
-        return finished_act.as_dict()
+        finished_process = await active.finish()
+        return finished_process.as_dict()
 
     @app.post("/shutdown")
     def post_shutdown():

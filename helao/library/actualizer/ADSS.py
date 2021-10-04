@@ -64,7 +64,7 @@ def debug(process_group_Obj: cProcess_group,
     # 2: orch is waiting for server to become available
     # 3: (or other): orch is waiting for all process_dq to finish
     
-    # holds all processs for this actualizer  
+    # holds all processes for this actualizer  
     process_list = []
 
 
@@ -410,11 +410,11 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
     cycles = len(CA_potentials_vsRHE)
 
 
-    # list to hold all processs
+    # list to hold all processes
     process_list = []
 
 
-    # add startup processs to list
+    # add startup processes to list
     process_list.append(ADSS_slave_startup(process_group_Obj, x_mm, y_mm))
 
 

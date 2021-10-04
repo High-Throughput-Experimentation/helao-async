@@ -56,14 +56,14 @@ from helao.core.server import makeVisServ
 from helao.core.server import import_actualizers, async_private_dispatcher
 # from helao.core.data import liquid_sample_no_API
 from helao.core.data import HTE_legacy_API
-from helao.core.schema import Action, Decision
+from helao.core.schema import cProcess_group
 from helao.core.server import Vis
 
 
-class return_actlib(BaseModel):
+class return_actualizer_lib(BaseModel):
     """Return class for queried actualizer objects."""
     index: int
-    action: str
+    actualizer: str
     doc: str
     args: list
     defaults: list
@@ -90,39 +90,39 @@ class C_async_operator:
         self.param_layout = []
         self.param_input = []
 
-        self.decision_list = dict()
-        self.action_list = dict()
-        self.active_action_list = dict()
+        self.process_group_list = dict()
+        self.process_list = dict()
+        self.active_process_list = dict()
 
-        self.act_select_list = []
+        self.actualizer_select_list = []
         self.actualizers = []
-        self.action_lib = import_actualizers(world_config_dict = self.vis.world_cfg, library_path = None, server_name=self.vis.server_name)
+        self.actualizer_lib = import_actualizers(world_config_dict = self.vis.world_cfg, library_path = None, server_name=self.vis.server_name)
 
 
 
         # FastAPI calls
         self.get_actualizers()
-        self.vis.doc.add_next_tick_callback(partial(self.get_decisions))
-        self.vis.doc.add_next_tick_callback(partial(self.get_actions))
-        self.vis.doc.add_next_tick_callback(partial(self.get_active_actions))
+        self.vis.doc.add_next_tick_callback(partial(self.get_process_groups))
+        self.vis.doc.add_next_tick_callback(partial(self.get_processes))
+        self.vis.doc.add_next_tick_callback(partial(self.get_active_processes))
 
-        #self.vis.print_message([key for key in self.decision_list.keys()])
-        self.decision_source = ColumnDataSource(data=self.decision_list)
-        self.columns_dec = [TableColumn(field=key, title=key) for key in self.decision_list.keys()]
-        self.decision_table = DataTable(source=self.decision_source, columns=self.columns_dec, width=620, height=200)
+        #self.vis.print_message([key for key in self.process_group_list.keys()])
+        self.process_group_source = ColumnDataSource(data=self.process_group_list)
+        self.columns_dec = [TableColumn(field=key, title=key) for key in self.process_group_list.keys()]
+        self.process_group_table = DataTable(source=self.process_group_source, columns=self.columns_dec, width=620, height=200)
 
-        self.action_source = ColumnDataSource(data=self.action_list)
-        self.columns_act = [TableColumn(field=key, title=key) for key in self.action_list.keys()]
-        self.action_table = DataTable(source=self.action_source, columns=self.columns_act, width=620, height=200)
+        self.process_source = ColumnDataSource(data=self.process_list)
+        self.columns_process_ = [TableColumn(field=key, title=key) for key in self.process_list.keys()]
+        self.process_table = DataTable(source=self.process_source, columns=self.columns_process, width=620, height=200)
 
-        self.active_action_source = ColumnDataSource(data=self.active_action_list)
-        self.columns_active_act = [TableColumn(field=key, title=key) for key in self.active_action_list.keys()]
-        self.active_action_table = DataTable(source=self.active_action_source, columns=self.columns_active_act, width=620, height=200)
+        self.active_process_source = ColumnDataSource(data=self.active_process_list)
+        self.columns_active_process = [TableColumn(field=key, title=key) for key in self.active_process_list.keys()]
+        self.active_process_table = DataTable(source=self.active_process_source, columns=self.columns_active_process, width=620, height=200)
 
 
 
-        self.actions_dropdown = Select(title="Select actualizer:", value = None, options=self.act_select_list)
-        self.actions_dropdown.on_change('value', self.callback_act_select)
+        self.actualizer_dropdown = Select(title="Select actualizer:", value = None, options=self.actualizer_select_list)
+        self.actualizer_dropdown.on_change('value', self.callback_process_select)
 
         self.button_load_sample_list = FileInput(accept=".csv,.txt", width = 300)
         self.button_load_sample_list.on_change('value', self.get_sample_list)
@@ -138,10 +138,10 @@ class C_async_operator:
         self.button_update = Button(label="update tables", button_type="default", width=120)
         self.button_update.on_event(ButtonClick, self.callback_update_tables)
 
-        self.button_clear_dec = Button(label="clear decisions", button_type="danger", width=100)
-        self.button_clear_dec.on_event(ButtonClick, self.callback_clear_decisions)
-        self.button_clear_act = Button(label="clear actions", button_type="danger", width=100)
-        self.button_clear_act.on_event(ButtonClick, self.callback_clear_actions)
+        self.button_clear_dec = Button(label="clear process_groups", button_type="danger", width=100)
+        self.button_clear_dec.on_event(ButtonClick, self.callback_clear_process_groups)
+        self.button_clear_process = Button(label="clear processes", button_type="danger", width=100)
+        self.button_clear_process.on_event(ButtonClick, self.callback_clear_processes)
 
         self.button_prepend = Button(label="prepend", button_type="default", width=150)
         self.button_prepend.on_event(ButtonClick, self.callback_prepend)
@@ -151,8 +151,8 @@ class C_async_operator:
 
 
 
-#        self.act_descr_txt = Paragraph(text="""select item""", width=600, height=30)
-        self.act_descr_txt = Div(text="""select item""", width=600, height=30)
+#        self.process_descr_txt = Paragraph(text="""select item""", width=600, height=30)
+        self.process_descr_txt = Div(text="""select item""", width=600, height=30)
         self.error_txt = Paragraph(text="""no error""", width=600, height=30, style={'font-size': '100%', 'color': 'black'})
 
 
@@ -179,9 +179,9 @@ class C_async_operator:
                 [Spacer(width=20), Div(text=f"<b>{self.config_dict['doc_name']}</b>", width=200+50, height=32, style={'font-size': '200%', 'color': 'red'})],
                 background="#C0C0C0",width=640),
             layout([
-                [self.actions_dropdown],
+                [self.actualizer_dropdown],
                 [Spacer(width=10), Div(text="<b>Actualizer description:</b>", width=200+50, height=15)],
-                [self.act_descr_txt],
+                [self.process_descr_txt],
                 Spacer(height=10),
                 [Spacer(width=10), Div(text="<b>Error message:</b>", width=200+50, height=15, style={'font-size': '100%', 'color': 'black'})],
                 [Spacer(width=10), self.error_txt],
@@ -206,14 +206,14 @@ class C_async_operator:
                     [self.button_append, self.button_prepend, self.button_start, self.button_stop],
                     ]),
                 layout([
-                [Spacer(width=20), Div(text="<b>queued Decisions:</b>", width=200+50, height=15)],
-                [self.decision_table],
-                [Spacer(width=20), Div(text="<b>queued Actions:</b>", width=200+50, height=15)],
-                [self.action_table],
-                [Spacer(width=20), Div(text="<b>Active Actions:</b>", width=200+50, height=15)],
-                [self.active_action_table],
+                [Spacer(width=20), Div(text="<b>queued process_groups:</b>", width=200+50, height=15)],
+                [self.process_group_table],
+                [Spacer(width=20), Div(text="<b>queued processes:</b>", width=200+50, height=15)],
+                [self.process_table],
+                [Spacer(width=20), Div(text="<b>Active processes:</b>", width=200+50, height=15)],
+                [self.active_process_table],
                 Spacer(height=10),
-                [self.button_skip, Spacer(width=5), self.button_clear_dec, Spacer(width=5), self.button_clear_act, self.button_update],
+                [self.button_skip, Spacer(width=5), self.button_clear_dec, Spacer(width=5), self.button_clear_process, self.button_update],
                 Spacer(height=10),
                 ],background="#7fdbff",width=640),
             ])
@@ -224,90 +224,90 @@ class C_async_operator:
 
 
         # select the first item to force an update of the layout
-        if self.act_select_list:
-            self.actions_dropdown.value = self.act_select_list[0]
+        if self.actualizer_select_list:
+            self.actualizer_dropdown.value = self.actualizer_select_list[0]
 
 
 
     def get_actualizers(self):
         """Return the current list of ACTUALIZERS."""
         self.actualizers = []
-        self.vis.print_message(f" ... found actualizer: {[act for act in self.action_lib.keys()]}")
-        for i, act in enumerate(self.action_lib):
-            # self.vis.print_message('full',inspect.getfullargspec(self.action_lib[act]))
-            #self.vis.print_message('anno',inspect.getfullargspec(self.action_lib[act]).annotations)
-            #self.vis.print_message('def',inspect.getfullargspec(self.action_lib[act]).defaults)
-            tmpdoc = self.action_lib[act].__doc__ 
+        self.vis.print_message(f" ... found actualizer: {[actualizer for actualizer in self.actualizer_lib.keys()]}")
+        for i, actualizer in enumerate(self.actualizer_lib):
+            # self.vis.print_message('full',inspect.getfullargspec(self.actualizer_lib[actualizer]))
+            #self.vis.print_message('anno',inspect.getfullargspec(self.actualizer_lib[actualizer]).annotations)
+            #self.vis.print_message('def',inspect.getfullargspec(self.actualizer_lib[actualizer]).defaults)
+            tmpdoc = self.actualizer_lib[actualizer].__doc__ 
             # self.vis.print_message("... doc:", tmpdoc)
             if tmpdoc == None:
                 tmpdoc = ""
-            tmpargs = inspect.getfullargspec(self.action_lib[act]).args
-            tmpdef = inspect.getfullargspec(self.action_lib[act]).defaults
+            tmpargs = inspect.getfullargspec(self.actualizer_lib[actualizer]).args
+            tmpdef = inspect.getfullargspec(self.actualizer_lib[actualizer]).defaults
             if tmpdef == None:
                 tmpdef = []
             # if not tmpargs:
             #     tmpargs = ['']
             
             
-            self.actualizers.append(return_actlib(
+            self.actualizers.append(return_actualizer_lib(
                 index=i,
-                action = act,
-                doc = tmpdoc,#self.action_lib[act].__doc__ if self.action_lib[act].__doc__ not None else "",
+                actualizer = actualizer,
+                doc = tmpdoc,#self.actualizer_lib[actualizer].__doc__ if self.actualizer_lib[actualizer].__doc__ not None else "",
                 args = tmpargs,#{},
                 defaults = tmpdef,
-                #annotations = inspect.getfullargspec(self.action_lib[act]).annotations,
-                # defaults = inspect.getfullargspec(self.action_lib[act]).defaults,
+                #annotations = inspect.getfullargspec(self.actualizer_lib[actualizer]).annotations,
+                # defaults = inspect.getfullargspec(self.actualizer_lib[actualizer]).defaults,
                #params = '',
             ).dict()
                 )
 
         for item in self.actualizers:
-            self.act_select_list.append(item['action'])
+            self.actualizer_select_list.append(item['actualizer'])
 
 
-    async def get_decisions(self):
-        '''get decision list from orch'''
-        response = await self.do_orch_request(action_name = "list_decisions")
-        response = response["decisions"]
-        self.decision_list = dict()
+    async def get_process_groups(self):
+        '''get process_group list from orch'''
+        response = await self.do_orch_request(process_name = "list_process_groups")
+        response = response["process_groups"]
+        self.process_group_list = dict()
         if len(response):
             for key in response[0].keys():
-                self.decision_list[key] = []
+                self.process_group_list[key] = []
             for line in response:
                 for key, value in line.items():
-                    self.decision_list[key].append(value)
-        self.vis.print_message(' ... current queued decisions:',self.decision_list)
+                    self.process_group_list[key].append(value)
+        self.vis.print_message(' ... current queued process_groups:',self.process_group_list)
 
 
-    async def get_actions(self):
-        '''get action list from orch'''
-        response = await self.do_orch_request(action_name = "list_actions")
-        response = response["actions"]
-        self.action_list = dict()
+    async def get_processes(self):
+        '''get process list from orch'''
+        response = await self.do_orch_request(process_name = "list_processes")
+        response = response["processes"]
+        self.process_list = dict()
         if len(response):
             for key in response[0].keys():
-                self.action_list[key] = []
+                self.process_list[key] = []
             for line in response:
                 for key, value in line.items():
-                    self.action_list[key].append(value)
-        self.vis.print_message(' ... current queued actions:',self.action_list)
+                    self.process_list[key].append(value)
+        self.vis.print_message(' ... current queued processes:',self.process_list)
 
 
-    async def get_active_actions(self):
-        '''get action list from orch'''
-        response = await self.do_orch_request(action_name = "list_active_actions")
-        response = response["actions"]
-        self.active_action_list = dict()
+    async def get_active_processes(self):
+        '''get process list from orch'''
+        response = await self.do_orch_request(process_name = "list_active_processes")
+        response = response["processes"]
+        self.active_process_list = dict()
         if len(response):
             for key in response[0].keys():
-                self.active_action_list[key] = []
+                self.active_process_list[key] = []
             for line in response:
                 for key, value in line.items():
-                    self.active_action_list[key].append(value)
-        self.vis.print_message(' ... current active actions:',self.active_action_list)
+                    self.active_process_list[key].append(value)
+        self.vis.print_message(' ... current active processes:',self.active_process_list)
 
 
-    async def do_orch_request(self,action_name, 
+    async def do_orch_request(self,process_name, 
                               params_dict: dict = {},
                               json_dict: dict = {}
                               ):
@@ -317,7 +317,7 @@ class C_async_operator:
         response = await async_private_dispatcher(
             world_config_dict = self.vis.world_cfg, 
             server = self.orch_name,
-            private_action = action_name,
+            private_process = process_name,
             params_dict = params_dict,
             json_dict = json_dict
             )
@@ -326,13 +326,13 @@ class C_async_operator:
 
 
 
-    def callback_act_select(self, attr, old, new):
-        idx = self.act_select_list.index(new)
-        act_doc = self.actualizers[idx]['doc']
+    def callback_process_select(self, attr, old, new):
+        idx = self.actualizer_select_list.index(new)
+        process_doc = self.actualizers[idx]['doc']
         # for arg in self.actualizers[idx]['args']:
         #     self.vis.print_message(arg)
         self.update_param_layout(self.actualizers[idx]['args'], self.actualizers[idx]['defaults'])
-        self.vis.doc.add_next_tick_callback(partial(self.update_doc,act_doc))
+        self.vis.doc.add_next_tick_callback(partial(self.update_doc,process_doc))
 
 
     def callback_clicked_pmplot(self, event):
@@ -391,31 +391,31 @@ class C_async_operator:
 
 
     def callback_skip_dec(self, event):
-        self.vis.print_message(" ... skipping decision")
+        self.vis.print_message(" ... skipping process_group")
         self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"skip"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
-    def callback_clear_decisions(self, event):
-        self.vis.print_message(" ... clearing decisions")
-        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_decisions"))
+    def callback_clear_process_groups(self, event):
+        self.vis.print_message(" ... clearing process_groups")
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_process_groups"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
-    def callback_clear_actions(self, event):
-        self.vis.print_message(" ... clearing actions")
-        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_actions"))
+    def callback_clear_processes(self, event):
+        self.vis.print_message(" ... clearing processes")
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_processes"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_prepend(self, event):
-        self.prepend_decision()
+        self.prepend_process_group()
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
 
     def callback_append(self, event):
-        self.append_decision()
+        self.append_process_group()
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
@@ -423,19 +423,19 @@ class C_async_operator:
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
-    def append_decision(self):
-        params_dict, json_dict = self.populate_action()
+    def append_process_group(self):
+        params_dict, json_dict = self.populate_process()
         # submit decission to orchestrator
-        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"append_decision", params_dict, json_dict))
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"append_process_group", params_dict, json_dict))
 
 
-    def prepend_decision(self):
-        params_dict, json_dict = self.populate_action()
+    def prepend_process_group(self):
+        params_dict, json_dict = self.populate_process()
         # submit decission to orchestrator
-        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"prepend_decision", params_dict, json_dict))
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"prepend_process_group", params_dict, json_dict))
 
 
-    def populate_action(self):
+    def populate_process(self):
         def to_json(v):
             try:
                 val = json.loads(v)
@@ -443,7 +443,7 @@ class C_async_operator:
                 val = v
             return val
         
-        selaction = self.actions_dropdown.value
+        selected_actualizer = self.actualizer_dropdown.value
         selplateid = self.input_plateid.value
         selsample = self.input_sampleno.value
         sellabel = self.input_label.value
@@ -451,21 +451,21 @@ class C_async_operator:
         # code  = self.input_code.value
         # composition = self.input_composition.value
 
-        self.vis.print_message(f" ... selected action from list: {selaction}")
+        self.vis.print_message(f" ... selected process from list: {selected_actualizer}")
         self.vis.print_message(f" ... selected plateid: {selplateid}")
         self.vis.print_message(f" ... selected sample: {selsample}")
         self.vis.print_message(f" ... selected label: {sellabel}")
 
 
-        actparams = {paraminput.title: to_json(paraminput.value) for paraminput in self.param_input}
-        actparams["plate_id"] = selplateid
-        actparams["plate_sample_no"] = selsample
+        actualizer_params = {paraminput.title: to_json(paraminput.value) for paraminput in self.param_input}
+        actualizer_params["plate_id"] = selplateid
+        actualizer_params["plate_sample_no"] = selsample
 
-        D = Decision(inputdict={
+        D = cProcess_group(inputdict={
             # "orch_name":orch_name,
-            "decision_label":sellabel,
-            "actualizer":selaction,
-            "actualizer_pars":actparams,
+            "process_group_label":sellabel,
+            "actualizer":selected_actualizer,
+            "actualizer_pars":actualizer_params,
             # "result_dict":result_dict,
             # "access":access,
         })
@@ -486,9 +486,9 @@ class C_async_operator:
         item = 0
         for idx in range(len(args)):
             buf = f'{defaults[idx]}'
-            # self.vis.print_message(' ... action parameter:',args[idx])
-            # skip the decisionObj parameter
-            if args[idx] == 'decisionObj':
+            # self.vis.print_message(' ... process parameter:',args[idx])
+            # skip the process_group_Obj parameter
+            if args[idx] == 'process_group_Obj':
                 continue
 
             disabled = False
@@ -508,7 +508,7 @@ class C_async_operator:
 
 
     def update_doc(self, value):
-        self.act_descr_txt.text = value.replace("\n", "<br>")
+        self.process_descr_txt.text = value.replace("\n", "<br>")
 
 
     def update_error(self, value):
@@ -650,23 +650,23 @@ class C_async_operator:
 
 
     async def update_tables(self):
-        await self.get_decisions()
-        await self.get_actions()
-        await self.get_active_actions()
+        await self.get_process_groups()
+        await self.get_processes()
+        await self.get_active_processes()
 
 
 
-        self.columns_dec = [TableColumn(field=key, title=key) for key in self.decision_list.keys()]
-        self.decision_table.source.data = self.decision_list
-        self.decision_table.columns=self.columns_dec
+        self.columns_dec = [TableColumn(field=key, title=key) for key in self.process_group_list.keys()]
+        self.process_group_table.source.data = self.process_group_list
+        self.process_group_table.columns=self.columns_dec
 
-        self.columns_act = [TableColumn(field=key, title=key) for key in self.action_list.keys()]
-        self.action_table.source.data=self.action_list
-        self.action_table.columns=self.columns_act
+        self.columns_process = [TableColumn(field=key, title=key) for key in self.process_list.keys()]
+        self.process_table.source.data=self.process_list
+        self.process_table.columns=self.columns_process
 
-        self.columns_active_act = [TableColumn(field=key, title=key) for key in self.active_action_list.keys()]
-        self.active_action_table.source.data=self.active_action_list
-        self.active_action_table.columns=self.columns_active_act
+        self.columns_active_process = [TableColumn(field=key, title=key) for key in self.active_process_list.keys()]
+        self.active_process_table.source.data=self.active_process_list
+        self.active_process_table.columns=self.columns_active_process
 
 
 
@@ -698,7 +698,7 @@ def makeBokehApp(doc, confPrefix, servKey):
     # get the event loop
     # operatorloop = asyncio.get_event_loop()
 
-    # this periodically updates the GUI (action and decision tables)
+    # this periodically updates the GUI (process and process_group tables)
     # operator.vis.doc.add_periodic_callback(operator.IOloop,2000) # time in ms
 
     return doc

@@ -1,7 +1,6 @@
 from importlib import import_module
 
 from helao.core.server import makeVisServ
-# from helao.core.server import Action, setupAct
 
 
 from helao.core.server import Vis
@@ -154,8 +153,8 @@ class C_nidaqmxvis:
         self.sourceIV = ColumnDataSource(data=datadict)
         self.sourceIV_prev = ColumnDataSource(data=datadict)
 
-        self.cur_action_id = ""
-        self.prev_action_id = ""
+        self.cur_process_id = ""
+        self.prev_process_id = ""
 
         # create visual elements
         self.layout = []
@@ -192,14 +191,14 @@ class C_nidaqmxvis:
 
 
     def add_points(self, new_data):
-        new_action_id = list(new_data)[0]
+        new_process_id = list(new_data)[0]
 
-        if (new_action_id != self.cur_action_id):
-            self.prev_action_id = self.cur_action_id
-            self.cur_action_id = new_action_id
+        if (new_process_id != self.cur_process_id):
+            self.prev_process_id = self.cur_process_id
+            self.cur_process_id = new_process_id
             self.reset_plot()
 
-        data_dict = new_data[new_action_id]["data"]
+        data_dict = new_data[new_process_id]["data"]
         if type(data_dict) is not dict:
             return
 
@@ -231,8 +230,8 @@ class C_nidaqmxvis:
             while self.IOloop_data_run:
                 try:
                     new_data = json.loads(await ws.recv())
-                    new_action_id = list(new_data)[0]
-                    if new_data[new_action_id]["action_name"] == "run_cell_IV":
+                    new_process_id = list(new_data)[0]
+                    if new_data[new_process_id]["process_name"] == "run_cell_IV":
                         self.vis.doc.add_next_tick_callback(partial(self.add_points, new_data))
                 except Exception:
                     self.IOloop_data_run = False
@@ -260,10 +259,10 @@ class C_nidaqmxvis:
         self.plot_CURRENT_prev.renderers = []
         
 
-        self.plot_VOLT.title.text = ("Action_ID: "+self.cur_action_id)
-        self.plot_VOLT.title.text = ("Action_ID: "+self.cur_action_id)
-        # self.plot_VOLT_prev.title.text = ("Action_ID: "+self.prev_action_id)
-        # self.plot_VOLT_prev.title.text = ("Action_ID: "+self.prev_action_id)
+        self.plot_VOLT.title.text = ("process_ID: "+self.cur_process_id)
+        self.plot_VOLT.title.text = ("process_ID: "+self.cur_process_id)
+        # self.plot_VOLT_prev.title.text = ("process_ID: "+self.prev_process_id)
+        # self.plot_VOLT_prev.title.text = ("process_ID: "+self.prev_process_id)
 
 
         colors = small_palettes["Category10"][9]
@@ -299,8 +298,8 @@ class C_potvis:
 
         self.datasource = ColumnDataSource(data=dict(pt=[], t_s=[], Ewe_V=[], Ach_V=[], I_A=[]))
         self.datasource_prev = ColumnDataSource(data=dict(pt=[], t_s=[], Ewe_V=[], Ach_V=[], I_A=[]))
-        self.cur_action_id = ""
-        self.prev_action_id = ""
+        self.cur_process_id = ""
+        self.prev_process_id = ""
  
         # create visual elements
         self.layout = []
@@ -333,7 +332,7 @@ class C_potvis:
         self.xselect = self.radio_button_group.active
         self.yselect = self.checkbox_button_group.active
 
-        self.reset_plot(self.cur_action_id, forceupdate= True)
+        self.reset_plot(self.cur_process_id, forceupdate= True)
 
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
@@ -341,7 +340,7 @@ class C_potvis:
 
     def add_points(self, new_data):
         # if len(new_data):
-        new_action_id = list(new_data)[0]
+        new_process_id = list(new_data)[0]
 
         # detect if plot selection changed
         if  (self.xselect != self.radio_button_group.active) or (self.yselect != self.checkbox_button_group.active):
@@ -349,15 +348,15 @@ class C_potvis:
             self.yselect = self.checkbox_button_group.active
             # use current(old) timestamp but force update via optional
             # second parameter
-            self.reset_plot(new_action_id,True)
+            self.reset_plot(new_process_id,True)
         else:
-            self.reset_plot(new_action_id)
+            self.reset_plot(new_process_id)
         
         
         tmpdata = {"pt":[0]}
         # for some techniques not all data is present
         # we should only get one data point at the time
-        data_dict = new_data[new_action_id]["data"]
+        data_dict = new_data[new_process_id]["data"]
         if type(data_dict) is not dict:
             return
 
@@ -387,13 +386,13 @@ class C_potvis:
                     self.IOloop_data_run = False
 
     
-    def reset_plot(self, new_action_id, forceupdate: bool = False):
-        if (new_action_id != self.cur_action_id) or forceupdate:
+    def reset_plot(self, new_process_id, forceupdate: bool = False):
+        if (new_process_id != self.cur_process_id) or forceupdate:
             self.vis.print_message(" ... reseting Gamry graph")
             # copy old data to "prev" plot
-            self.prev_action_id = self.cur_action_id
+            self.prev_process_id = self.cur_process_id
             self.datasource_prev.data = {key: val for key, val in self.datasource.data.items()}
-            self.cur_action_id = new_action_id
+            self.cur_process_id = new_process_id
         
             self.datasource.data = {k: [] for k in self.datasource.data}
             # remove all old lines
@@ -401,8 +400,8 @@ class C_potvis:
             self.plot_prev.renderers = []
     
             
-            self.plot.title.text = ("Action_ID: "+self.cur_action_id)
-            self.plot_prev.title.text = ("Action_ID: "+self.prev_action_id)
+            self.plot.title.text = ("process_ID: "+self.cur_process_id)
+            self.plot_prev.title.text = ("process_ID: "+self.prev_process_id)
             xstr = ""
             if(self.radio_button_group.active == 0):
                 xstr = "t_s"
@@ -416,17 +415,17 @@ class C_potvis:
             color_count = 0
             for i in self.checkbox_button_group.active:
                 if i == 0:
-                    self.plot.line(x=xstr, y="t_s", line_color=colors[color_count], source=self.datasource, name=self.cur_action_id, legend_label="t_s")
-                    self.plot_prev.line(x=xstr, y="t_s", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_id, legend_label="t_s")
+                    self.plot.line(x=xstr, y="t_s", line_color=colors[color_count], source=self.datasource, name=self.cur_process_id, legend_label="t_s")
+                    self.plot_prev.line(x=xstr, y="t_s", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_process_id, legend_label="t_s")
                 elif i == 1:
-                    self.plot.line(x=xstr, y="Ewe_V", line_color=colors[color_count], source=self.datasource, name=self.cur_action_id, legend_label="Ewe_V")
-                    self.plot_prev.line(x=xstr, y="Ewe_V", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_id, legend_label="Ewe_V")
+                    self.plot.line(x=xstr, y="Ewe_V", line_color=colors[color_count], source=self.datasource, name=self.cur_process_id, legend_label="Ewe_V")
+                    self.plot_prev.line(x=xstr, y="Ewe_V", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_process_id, legend_label="Ewe_V")
                 elif i == 2:
-                    self.plot.line(x=xstr, y="Ach_V", line_color=colors[color_count], source=self.datasource, name=self.cur_action_id, legend_label="Ach_V")
-                    self.plot_prev.line(x=xstr, y="Ach_V", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_id, legend_label="Ach_V")
+                    self.plot.line(x=xstr, y="Ach_V", line_color=colors[color_count], source=self.datasource, name=self.cur_process_id, legend_label="Ach_V")
+                    self.plot_prev.line(x=xstr, y="Ach_V", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_process_id, legend_label="Ach_V")
                 else:
-                    self.plot.line(x=xstr, y="I_A", line_color=colors[color_count], source=self.datasource, name=self.cur_action_id, legend_label="I_A")
-                    self.plot_prev.line(x=xstr, y="I_A", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_id, legend_label="I_A")
+                    self.plot.line(x=xstr, y="I_A", line_color=colors[color_count], source=self.datasource, name=self.cur_process_id, legend_label="I_A")
+                    self.plot_prev.line(x=xstr, y="I_A", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_process_id, legend_label="I_A")
                 color_count += 1
    
 
