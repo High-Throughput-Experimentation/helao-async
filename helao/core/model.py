@@ -7,6 +7,8 @@ from collections import defaultdict
 from enum import Enum
 from pydantic import BaseModel, ValidationError, validator
 from socket import gethostname
+from datetime import datetime
+
 from helao.core.helper import print_message
 
 class return_dec(BaseModel):
@@ -21,44 +23,44 @@ class return_dec(BaseModel):
 
 class return_declist(BaseModel):
     """Return class for queried Decision list."""
-    decisions: List[return_dec]
+    process_groups: List[return_dec]
 
 
 class return_act(BaseModel):
-    """Return class for queried Action objects."""
+    """Return class for queried process objects."""
     index: int
     uid: Union[str, None]
     server: str
-    action: str
+    process: str
     pars: dict
     preempt: int
 
 
 class return_actlist(BaseModel):
-    """Return class for queried Action list."""
-    actions: List[return_act]
+    """Return class for queried process list."""
+    processes: List[return_act]
 
 
 class return_finishedact(BaseModel):
-    """Standard return class for actions that finish with response."""
+    """Standard return class for processes that finish with response."""
     technique_name: str
     access: str
     orch_name: str
-    decision_timestamp: str
-    decision_uuid: str
-    decision_label: str
+    process_group_timestamp: str
+    process_group_uuid: str
+    process_group_label: str
     actualizer: str
     actualizer_pars: dict
     result_dict: dict
-    action_server: str
-    action_queue_time: str
-    action_real_time: Optional[str]
-    action_name: str
-    action_params: dict
-    action_uuid: str
-    action_enum: str
-    action_abbr: str
-    actionnum: str
+    process_server: str
+    process_queue_time: str
+    process_real_time: Optional[str]
+    process_name: str
+    process_params: dict
+    process_uuid: str
+    process_enum: str
+    process_abbr: str
+    process_num: str
     start_condition: Union[int, dict]
     save_rcp: bool
     save_data: bool
@@ -72,25 +74,25 @@ class return_finishedact(BaseModel):
 
 
 class return_runningact(BaseModel):
-    """Standard return class for actions that finish after response."""
+    """Standard return class for processes that finish after response."""
     technique_name: str
     access: str
     orch_name: str
-    decision_timestamp: str
-    decision_uuid: str
-    decision_label: str
+    process_group_timestamp: str
+    process_group_uuid: str
+    process_group_label: str
     actualizer: str
     actualizer_pars: dict
     result_dict: dict
-    action_server: str
-    action_queue_time: str
-    action_real_time: Optional[str]
-    action_name: str
-    action_params: dict
-    action_uuid: str
-    action_enum: str
-    action_abbr: str
-    actionnum: str
+    process_server: str
+    process_queue_time: str
+    process_real_time: Optional[str]
+    process_name: str
+    process_params: dict
+    process_uuid: str
+    process_enum: str
+    process_abbr: str
+    process_num: str
     start_condition: Union[int, dict]
     save_rcp: bool
     save_data: bool
@@ -110,9 +112,9 @@ class base_sample(BaseModel):
     last_update: Optional[int] = None # epoch in ns
     inheritance: Optional[str] = None # only for internal use
     status: Union[List[str],str] = None # only for internal use
-    decision_uuid: Optional[str] = None
-    action_uuid: Optional[str] = None
-    action_queue_time: Optional[str] = None # "%Y%m%d.%H%M%S%f"
+    process_group_uuid: Optional[str] = None
+    process_uuid: Optional[str] = None
+    process_queue_time: Optional[str] = None # "%Y%m%d.%H%M%S%f"
     server_name: Optional[str] = None
     chemical: Optional[List[str]] = []
     mass: Optional[List[str]] = []
@@ -120,14 +122,26 @@ class base_sample(BaseModel):
     lot_number: Optional[List[str]] = []
     source: Union[List[str],str] = None
     comment: Optional[str] = None
+
+    @validator("process_queue_time")
+    def validate_process_queue_time(cls, v):
+        if v is not None:
+            try:
+                atime = datetime.strptime(v, "%Y%m%d.%H%M%S%f")
+            except ValueError:
+                print_message({}, "model", f"invalid 'process_queue_time': {v}", error = True)
+                raise ValueError("invalid 'process_queue_time'")
+            return atime.strftime("%Y%m%d.%H%M%S%f")
+        else:
+            return None
         
     def create_initial_rcp_dict(self):
         return {
             "global_label":self.get_global_label(),
             "sample_type":self.sample_type,
-            "sample_no": self.sample_no,
+            "sample_no":self.sample_no,
             "machine_name":self.machine_name if self.machine_name is not None else gethostname(),
-            "sample_creation_timecode": self.sample_creation_timecode
+            "sample_creation_timecode":self.sample_creation_timecode
             }
 
 
@@ -151,12 +165,12 @@ class liquid_sample(base_sample):
             return self.global_label
 
 
-    @validator('sample_type')
+    @validator("sample_type")
     def validate_sample_type(cls, v):
         if v != "liquid":
             print_message({}, "model", f"validation liquid in solid_sample, got type '{v}'", error = True)
             # return "liquid"
-            raise ValueError('must be liquid')
+            raise ValueError("must be liquid")
         return "liquid"
 
 
@@ -180,12 +194,12 @@ class solid_sample(base_sample):
         else:
             return self.global_label
 
-    @validator('sample_type')
+    @validator("sample_type")
     def validate_sample_type(cls, v):
         if v != "solid":
             print_message({}, "model", f"validation error in solid_sample, got type '{v}'", error = True)
             # return "solid"
-            raise ValueError('must be solid')
+            raise ValueError("must be solid")
         return "solid"
         
 
@@ -207,12 +221,12 @@ class gas_sample(base_sample):
         else:
             return self.global_label
 
-    @validator('sample_type')
+    @validator("sample_type")
     def validate_sample_type(cls, v):
         if v != "gas":
             print_message({}, "model", f"validation error in gas_sample, got type '{v}'", error = True)
             # return "gas"
-            raise ValueError('must be gas')
+            raise ValueError("must be gas")
         return "gas"
 
 
@@ -275,17 +289,17 @@ class assembly_sample(base_sample):
         else:
             return self.global_label
 
-    @validator('parts')
+    @validator("parts")
     def validate_parts(cls, value, values, **kwargs):
         return sample_model_list_validator(value, values, **kwargs)
 
 
-    @validator('sample_type')
+    @validator("sample_type")
     def validate_sample_type(cls, v):
         if v != "assembly":
             print_message({}, "model", f"validation error in assembly, got type '{v}'", error = True)
             # return "assembly"
-            raise ValueError('must be assembly')
+            raise ValueError("must be assembly")
         return "assembly"            
 
 
@@ -319,7 +333,7 @@ class sample_list(BaseModel):
     Its also a list and we should enforce samples as being a list"""
     samples: Optional[list] = [] # don't use union of models, that does not work here
 
-    @validator('samples')
+    @validator("samples")
     def validate_samples(cls, value, values, **kwargs):
         return sample_model_list_validator(value, values, **kwargs)
 
@@ -332,14 +346,14 @@ class rcp_header(BaseModel):
     machine_name: str
     access: str
     output_dir: str
-    decision_uuid: str
-    decision_timestamp: str
-    action_uuid: str
-    action_queue_time: str
-    action_enum: Optional[float] = 0.0
-    action_name: str
-    action_abbr: Optional[str] = None
-    action_params: Union[dict, None] = None
+    process_group_uuid: str
+    process_group_timestamp: str
+    process_uuid: str
+    process_queue_time: str
+    process_enum: Optional[float] = 0.0
+    process_name: str
+    process_abbr: Optional[str] = None
+    process_params: Union[dict, None] = None
     samples_in: Optional[Union[dict, None]] = None
     samples_out: Optional[Union[dict, None]] = None
     files: Optional[Union[dict, None]] = None
