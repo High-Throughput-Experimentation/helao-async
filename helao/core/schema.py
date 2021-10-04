@@ -29,8 +29,8 @@ class cProcess_group(object):
         self.process_group_timestamp = imports.get("process_group_timestamp", None)
         self.process_group_label = imports.get("process_group_label", "noLabel")
         self.access = imports.get("access", "hte")
-        self.actualizer = imports.get("actualizer", None)
-        self.actualizer_pars = imports.get("actualizer_pars", {})
+        self.sequence = imports.get("sequence", None)
+        self.sequence_pars = imports.get("sequence_pars", {})
         # this gets big really fast, bad for debugging
         self.result_dict = {}#imports.get("result_dict", {})
         self.global_params = {}

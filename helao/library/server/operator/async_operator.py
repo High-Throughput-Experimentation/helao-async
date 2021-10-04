@@ -53,17 +53,17 @@ from typing import Optional, List, Union
 
 
 from helao.core.server import makeVisServ
-from helao.core.server import import_actualizers, async_private_dispatcher
+from helao.core.server import import_sequences, async_private_dispatcher
 # from helao.core.data import liquid_sample_no_API
 from helao.core.data import HTE_legacy_API
 from helao.core.schema import cProcess_group
 from helao.core.server import Vis
 
 
-class return_actualizer_lib(BaseModel):
-    """Return class for queried actualizer objects."""
+class return_sequence_lib(BaseModel):
+    """Return class for queried sequence objects."""
     index: int
-    actualizer: str
+    sequence: str
     doc: str
     args: list
     defaults: list
@@ -94,14 +94,14 @@ class C_async_operator:
         self.process_list = dict()
         self.active_process_list = dict()
 
-        self.actualizer_select_list = []
-        self.actualizers = []
-        self.actualizer_lib = import_actualizers(world_config_dict = self.vis.world_cfg, library_path = None, server_name=self.vis.server_name)
+        self.sequence_select_list = []
+        self.sequences = []
+        self.sequence_lib = import_sequences(world_config_dict = self.vis.world_cfg, library_path = None, server_name=self.vis.server_name)
 
 
 
         # FastAPI calls
-        self.get_actualizers()
+        self.get_sequences()
         self.vis.doc.add_next_tick_callback(partial(self.get_process_groups))
         self.vis.doc.add_next_tick_callback(partial(self.get_processes))
         self.vis.doc.add_next_tick_callback(partial(self.get_active_processes))
@@ -121,8 +121,8 @@ class C_async_operator:
 
 
 
-        self.actualizer_dropdown = Select(title="Select actualizer:", value = None, options=self.actualizer_select_list)
-        self.actualizer_dropdown.on_change('value', self.callback_process_select)
+        self.sequence_dropdown = Select(title="Select sequence:", value = None, options=self.sequence_select_list)
+        self.sequence_dropdown.on_change('value', self.callback_process_select)
 
         self.button_load_sample_list = FileInput(accept=".csv,.txt", width = 300)
         self.button_load_sample_list.on_change('value', self.get_sample_list)
@@ -179,8 +179,8 @@ class C_async_operator:
                 [Spacer(width=20), Div(text=f"<b>{self.config_dict['doc_name']}</b>", width=200+50, height=32, style={'font-size': '200%', 'color': 'red'})],
                 background="#C0C0C0",width=640),
             layout([
-                [self.actualizer_dropdown],
-                [Spacer(width=10), Div(text="<b>Actualizer description:</b>", width=200+50, height=15)],
+                [self.sequence_dropdown],
+                [Spacer(width=10), Div(text="<b>sequence description:</b>", width=200+50, height=15)],
                 [self.process_descr_txt],
                 Spacer(height=10),
                 [Spacer(width=10), Div(text="<b>Error message:</b>", width=200+50, height=15, style={'font-size': '100%', 'color': 'black'})],
@@ -224,45 +224,45 @@ class C_async_operator:
 
 
         # select the first item to force an update of the layout
-        if self.actualizer_select_list:
-            self.actualizer_dropdown.value = self.actualizer_select_list[0]
+        if self.sequence_select_list:
+            self.sequence_dropdown.value = self.sequence_select_list[0]
 
 
 
-    def get_actualizers(self):
-        """Return the current list of ACTUALIZERS."""
-        self.actualizers = []
-        self.vis.print_message(f" ... found actualizer: {[actualizer for actualizer in self.actualizer_lib.keys()]}")
-        for i, actualizer in enumerate(self.actualizer_lib):
-            # self.vis.print_message('full',inspect.getfullargspec(self.actualizer_lib[actualizer]))
-            #self.vis.print_message('anno',inspect.getfullargspec(self.actualizer_lib[actualizer]).annotations)
-            #self.vis.print_message('def',inspect.getfullargspec(self.actualizer_lib[actualizer]).defaults)
-            tmpdoc = self.actualizer_lib[actualizer].__doc__ 
+    def get_sequences(self):
+        """Return the current list of sequences."""
+        self.sequences = []
+        self.vis.print_message(f" ... found sequence: {[sequence for sequence in self.sequence_lib.keys()]}")
+        for i, sequence in enumerate(self.sequence_lib):
+            # self.vis.print_message('full',inspect.getfullargspec(self.sequence_lib[sequence]))
+            #self.vis.print_message('anno',inspect.getfullargspec(self.sequence_lib[sequence]).annotations)
+            #self.vis.print_message('def',inspect.getfullargspec(self.sequence_lib[sequence]).defaults)
+            tmpdoc = self.sequence_lib[sequence].__doc__ 
             # self.vis.print_message("... doc:", tmpdoc)
             if tmpdoc == None:
                 tmpdoc = ""
-            tmpargs = inspect.getfullargspec(self.actualizer_lib[actualizer]).args
-            tmpdef = inspect.getfullargspec(self.actualizer_lib[actualizer]).defaults
+            tmpargs = inspect.getfullargspec(self.sequence_lib[sequence]).args
+            tmpdef = inspect.getfullargspec(self.sequence_lib[sequence]).defaults
             if tmpdef == None:
                 tmpdef = []
             # if not tmpargs:
             #     tmpargs = ['']
             
             
-            self.actualizers.append(return_actualizer_lib(
+            self.sequences.append(return_sequence_lib(
                 index=i,
-                actualizer = actualizer,
-                doc = tmpdoc,#self.actualizer_lib[actualizer].__doc__ if self.actualizer_lib[actualizer].__doc__ not None else "",
+                sequence = sequence,
+                doc = tmpdoc,#self.sequence_lib[sequence].__doc__ if self.sequence_lib[sequence].__doc__ not None else "",
                 args = tmpargs,#{},
                 defaults = tmpdef,
-                #annotations = inspect.getfullargspec(self.actualizer_lib[actualizer]).annotations,
-                # defaults = inspect.getfullargspec(self.actualizer_lib[actualizer]).defaults,
+                #annotations = inspect.getfullargspec(self.sequence_lib[sequence]).annotations,
+                # defaults = inspect.getfullargspec(self.sequence_lib[sequence]).defaults,
                #params = '',
             ).dict()
                 )
 
-        for item in self.actualizers:
-            self.actualizer_select_list.append(item['actualizer'])
+        for item in self.sequences:
+            self.sequence_select_list.append(item['sequence'])
 
 
     async def get_process_groups(self):
@@ -327,11 +327,11 @@ class C_async_operator:
 
 
     def callback_process_select(self, attr, old, new):
-        idx = self.actualizer_select_list.index(new)
-        process_doc = self.actualizers[idx]['doc']
-        # for arg in self.actualizers[idx]['args']:
+        idx = self.sequence_select_list.index(new)
+        process_doc = self.sequences[idx]['doc']
+        # for arg in self.sequences[idx]['args']:
         #     self.vis.print_message(arg)
-        self.update_param_layout(self.actualizers[idx]['args'], self.actualizers[idx]['defaults'])
+        self.update_param_layout(self.sequences[idx]['args'], self.sequences[idx]['defaults'])
         self.vis.doc.add_next_tick_callback(partial(self.update_doc,process_doc))
 
 
@@ -443,7 +443,7 @@ class C_async_operator:
                 val = v
             return val
         
-        selected_actualizer = self.actualizer_dropdown.value
+        selected_sequence = self.sequence_dropdown.value
         selplateid = self.input_plateid.value
         selsample = self.input_sampleno.value
         sellabel = self.input_label.value
@@ -451,21 +451,21 @@ class C_async_operator:
         # code  = self.input_code.value
         # composition = self.input_composition.value
 
-        self.vis.print_message(f" ... selected process from list: {selected_actualizer}")
+        self.vis.print_message(f" ... selected process from list: {selected_sequence}")
         self.vis.print_message(f" ... selected plateid: {selplateid}")
         self.vis.print_message(f" ... selected sample: {selsample}")
         self.vis.print_message(f" ... selected label: {sellabel}")
 
 
-        actualizer_params = {paraminput.title: to_json(paraminput.value) for paraminput in self.param_input}
-        actualizer_params["plate_id"] = selplateid
-        actualizer_params["plate_sample_no"] = selsample
+        sequence_params = {paraminput.title: to_json(paraminput.value) for paraminput in self.param_input}
+        sequence_params["plate_id"] = selplateid
+        sequence_params["plate_sample_no"] = selsample
 
         D = cProcess_group(inputdict={
             # "orch_name":orch_name,
             "process_group_label":sellabel,
-            "actualizer":selected_actualizer,
-            "actualizer_pars":actualizer_params,
+            "sequence":selected_sequence,
+            "sequence_pars":sequence_params,
             # "result_dict":result_dict,
             # "access":access,
         })

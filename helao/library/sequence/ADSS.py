@@ -16,8 +16,8 @@ from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_s
 
 
 
-# list valid actualizer functions 
-ACTUALIZERS = [
+# list valid sequence functions 
+SEQUENCES = [
               "debug", 
               "ADSS_master_CA", 
               "ADSS_slave_startup", 
@@ -53,7 +53,7 @@ def debug(process_group_Obj: cProcess_group,
     """Test process for ORCH debugging
     simple plate is e.g. 4534"""
     
-     # additional actualizer params should be stored in process_group.actualizer_pars
+     # additional sequence params should be stored in process_group.sequence_pars
      # these are duplicates of the function parameters (currently the op uses functions 
      # parameters to display them in the webUI)
      
@@ -64,7 +64,7 @@ def debug(process_group_Obj: cProcess_group,
     # 2: orch is waiting for server to become available
     # 3: (or other): orch is waiting for all process_dq to finish
     
-    # holds all processes for this actualizer  
+    # holds all processes for this sequence  
     process_list = []
 
 
@@ -102,14 +102,14 @@ def ADSS_slave_startup(process_group_Obj: cProcess_group,
               x_mm: Optional[float] = 0.0, 
               y_mm: Optional[float] = 0.0,
               ):
-    """Slave Actualizer
+    """Slave sequence
     (1) Move to position
     (2) Engages cell"""
 
     
     
-    x_mm = process_group_Obj.actualizer_pars.get("x_mm", x_mm)
-    y_mm = process_group_Obj.actualizer_pars.get("y_mm", y_mm)
+    x_mm = process_group_Obj.sequence_pars.get("x_mm", x_mm)
+    y_mm = process_group_Obj.sequence_pars.get("y_mm", y_mm)
     
     
     process_list = []
@@ -141,7 +141,7 @@ def ADSS_slave_startup(process_group_Obj: cProcess_group,
 
 
 def ADSS_slave_shutdown(process_group_Obj: cProcess_group):
-    """Slave Actualizer
+    """Slave sequence
     (1) Deep clean PAL tool
     (2) pump liquid out off cell
     (3) Drain cell
@@ -252,7 +252,7 @@ def ADSS_slave_shutdown(process_group_Obj: cProcess_group):
 
 
 def ADSS_slave_drain(process_group_Obj: cProcess_group):
-    """DUMMY Slave Actualizer
+    """DUMMY Slave sequence
     Drains electrochemical cell."""
 
     process_list = []
@@ -261,7 +261,7 @@ def ADSS_slave_drain(process_group_Obj: cProcess_group):
 
 
 def ADSS_slave_engage(process_group_Obj: cProcess_group):
-    """Slave Actualizer
+    """Slave sequence
     Engages and seals electrochemical cell."""
     
     process_list = []
@@ -304,7 +304,7 @@ def ADSS_slave_engage(process_group_Obj: cProcess_group):
 
 
 def ADSS_slave_disengage(process_group_Obj: cProcess_group):
-    """Slave Actualizer
+    """Slave sequence
     Disengages and seals electrochemical cell."""
 
     process_list = []
@@ -332,14 +332,14 @@ def ADSS_slave_clean_PALtool(process_group_Obj: cProcess_group,
                              clean_PAL_tool: Optional[str] = PALtools.LS3, 
                              clean_PAL_volume_uL: Optional[int] = 500
                              ):
-    """Slave Actualizer
+    """Slave sequence
     Performs deep clean of selected PAL tool."""
 
 
     process_list = []
 
-    clean_PAL_volume_uL = process_group_Obj.actualizer_pars.get("clean_PAL_volume_uL", clean_PAL_volume_uL)
-    clean_PAL_tool = process_group_Obj.actualizer_pars.get("clean_PAL_tool", clean_PAL_tool)
+    clean_PAL_volume_uL = process_group_Obj.sequence_pars.get("clean_PAL_volume_uL", clean_PAL_volume_uL)
+    clean_PAL_tool = process_group_Obj.sequence_pars.get("clean_PAL_tool", clean_PAL_tool)
     
     # deep clean
     process_dict = process_group_Obj.as_dict()
@@ -394,17 +394,17 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
 
 
 
-    x_mm = process_group_Obj.actualizer_pars.get("x_mm", x_mm)
-    y_mm = process_group_Obj.actualizer_pars.get("y_mm", y_mm)
-    liquid_sample_no = process_group_Obj.actualizer_pars.get("liquid_sample_no", liquid_sample_no)
-    CA_potentials_vsRHE = process_group_Obj.actualizer_pars.get("CA_potentials_vsRHE", CA_potentials_vsRHE)
-    ref_vs_nhe = process_group_Obj.actualizer_pars.get("ref_vs_nhe", ref_vs_nhe)
-    pH = process_group_Obj.actualizer_pars.get("pH", pH)
-    CA_duration_sec = process_group_Obj.actualizer_pars.get("CA_duration_sec", CA_duration_sec)
-    aliquot_times_sec = process_group_Obj.actualizer_pars.get("aliquot_times_sec", aliquot_times_sec)
-    OCV_duration_sec = process_group_Obj.actualizer_pars.get("OCV_duration_sec", OCV_duration_sec)
-    samplerate_sec = process_group_Obj.actualizer_pars.get("samplerate_sec", samplerate_sec)
-    filltime_sec = process_group_Obj.actualizer_pars.get("filltime_sec", filltime_sec)
+    x_mm = process_group_Obj.sequence_pars.get("x_mm", x_mm)
+    y_mm = process_group_Obj.sequence_pars.get("y_mm", y_mm)
+    liquid_sample_no = process_group_Obj.sequence_pars.get("liquid_sample_no", liquid_sample_no)
+    CA_potentials_vsRHE = process_group_Obj.sequence_pars.get("CA_potentials_vsRHE", CA_potentials_vsRHE)
+    ref_vs_nhe = process_group_Obj.sequence_pars.get("ref_vs_nhe", ref_vs_nhe)
+    pH = process_group_Obj.sequence_pars.get("pH", pH)
+    CA_duration_sec = process_group_Obj.sequence_pars.get("CA_duration_sec", CA_duration_sec)
+    aliquot_times_sec = process_group_Obj.sequence_pars.get("aliquot_times_sec", aliquot_times_sec)
+    OCV_duration_sec = process_group_Obj.sequence_pars.get("OCV_duration_sec", OCV_duration_sec)
+    samplerate_sec = process_group_Obj.sequence_pars.get("samplerate_sec", samplerate_sec)
+    filltime_sec = process_group_Obj.sequence_pars.get("filltime_sec", filltime_sec)
     
     toNHE = -1.0*ref_vs_nhe-0.059*pH
     cycles = len(CA_potentials_vsRHE)
@@ -546,12 +546,12 @@ def ADSS_slave_single_CA(process_group_Obj: cProcess_group,
               ):
 
 
-    x_mm = process_group_Obj.actualizer_pars.get("x_mm", x_mm)
-    y_mm = process_group_Obj.actualizer_pars.get("y_mm", y_mm)
-    samplerate_sec = process_group_Obj.actualizer_pars.get("samplerate_sec", samplerate_sec)
-    CA_single_potential = process_group_Obj.actualizer_pars.get("CA_single_potential", CA_single_potential)
-    OCV_duration_sec = process_group_Obj.actualizer_pars.get("OCV_duration_sec", OCV_duration_sec)
-    CA_duration_sec = process_group_Obj.actualizer_pars.get("CA_duration_sec", CA_duration_sec)
+    x_mm = process_group_Obj.sequence_pars.get("x_mm", x_mm)
+    y_mm = process_group_Obj.sequence_pars.get("y_mm", y_mm)
+    samplerate_sec = process_group_Obj.sequence_pars.get("samplerate_sec", samplerate_sec)
+    CA_single_potential = process_group_Obj.sequence_pars.get("CA_single_potential", CA_single_potential)
+    OCV_duration_sec = process_group_Obj.sequence_pars.get("OCV_duration_sec", OCV_duration_sec)
+    CA_duration_sec = process_group_Obj.sequence_pars.get("CA_duration_sec", CA_duration_sec)
     
     
     process_list = []
