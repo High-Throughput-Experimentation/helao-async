@@ -947,8 +947,8 @@ class cPAL:
             PALparams.PAL_dest = "lcfc_res"
             # PALparams.PAL_source = ""
             # PALparams.PAL_plate_id =  self.process.plate_id
-            PALparams.PAL_plate_id =  self.process.actualizer_pars.get("plate_id", None)
-            PALparams.PAL_plate_sample_no =  self.process.actualizer_pars.get("plate_sample_no", None)
+            PALparams.PAL_plate_id =  self.process.sequence_pars.get("plate_id", None)
+            PALparams.PAL_plate_sample_no =  self.process.sequence_pars.get("plate_sample_no", None)
         else:
             PALparams.PAL_dest = ""
             PALparams.PAL_source = ""

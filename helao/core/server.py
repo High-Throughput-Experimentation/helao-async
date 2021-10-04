@@ -307,8 +307,8 @@ def makeOrchServ(
     async def append_process_group(
         orch_name: str = None,
         process_group_label: str = None,
-        actualizer: str = None,
-        actualizer_pars: dict = {},
+        sequence: str = None,
+        sequence_pars: dict = {},
         result_dict: dict = {},
         access: str = "hte",
     ):
@@ -319,8 +319,8 @@ def makeOrchServ(
         orch_name: Orchestrator server key (optional), as str.
         plate_id: The sample's plate id (no checksum), as int.
         sample_no: A sample number, as int.
-        actualizer: The name of the actualizer for building the process list, as str.
-        actualizer_pars: Actualizer parameters, as dict.
+        sequence: The name of the sequence for building the process list, as str.
+        sequence_pars: sequence parameters, as dict.
         result_dict: process responses dict keyed by process_enum.
         access: Access control group, as str.
 
@@ -330,8 +330,8 @@ def makeOrchServ(
         await app.orch.add_process_group(
             orch_name,
             process_group_label,
-            actualizer,
-            actualizer_pars,
+            sequence,
+            sequence_pars,
             result_dict,
             access,
             prepend=False,
@@ -342,8 +342,8 @@ def makeOrchServ(
     async def prepend_process_group(
         orch_name: str = None,
         process_group_label: str = None,
-        actualizer: str = None,
-        actualizer_pars: dict = {},
+        sequence: str = None,
+        sequence_pars: dict = {},
         result_dict: dict = {},
         access: str = "hte",
     ):
@@ -354,8 +354,8 @@ def makeOrchServ(
         orch_name: Orchestrator server key (optional), as str.
         plate_id: The sample's plate id (no checksum), as int.
         sample_no: A sample number, as int.
-        actualizer: The name of the actualizer for building the process list, as str.
-        actualizer_pars: Actualizer parameters, as dict.
+        sequence: The name of the sequence for building the process list, as str.
+        sequence_pars: sequence parameters, as dict.
         result_dict: process responses dict keyed by process_enum.
         access: Access control group, as str.
 
@@ -365,8 +365,8 @@ def makeOrchServ(
         await app.orch.add_process_group(
             orch_name,
             process_group_label,
-            actualizer,
-            actualizer_pars,
+            sequence,
+            sequence_pars,
             result_dict,
             access,
             prepend=True,
@@ -379,8 +379,8 @@ def makeOrchServ(
         process_group_dict: dict = None,
         orch_name: str = None,
         process_group_label: str = None,
-        actualizer: str = None,
-        actualizer_pars: dict = {},
+        sequence: str = None,
+        sequence_pars: dict = {},
         result_dict: dict = {},
         access: str = "hte",
     ):
@@ -392,8 +392,8 @@ def makeOrchServ(
         orch_name: Orchestrator server key (optional), as str.
         plate_id: The sample's plate id (no checksum), as int.
         sample_no: A sample number, as int.
-        actualizer: The name of the actualizer for building the process list, as str.
-        actualizer_pars: Actualizer parameters, as dict.
+        sequence: The name of the sequence for building the process list, as str.
+        sequence_pars: sequence parameters, as dict.
         result_dict: process responses dict keyed by process_enum.
         access: Access control group, as str.
 
@@ -404,8 +404,8 @@ def makeOrchServ(
             process_group_dict,
             orch_name,
             process_group_label,
-            actualizer,
-            actualizer_pars,
+            sequence,
+            sequence_pars,
             result_dict,
             access,
             at_index=idx,
@@ -886,7 +886,7 @@ class Base(object):
             # any data is pushed to avoid a forced header end write
             self.finished_hlo_header = dict()
             self.file_conn = dict()
-            # if cProcess is not created from process_group+Actualizer, cProcess is independent
+            # if cProcess is not created from process_group+sequence, cProcess is independent
             if self.process.process_group_timestamp is None:
                 self.process.set_dtime(offset=self.base.ntp_offset)
                 self.process.gen_uuid_process_group(self.base.hostname)
@@ -1478,8 +1478,7 @@ class Orch(Base):
 
     def __init__(self, fastapp: HelaoFastAPI):
         super().__init__(fastapp)
-        # self.import_actualizers()
-        self.process_lib = import_actualizers(
+        self.process_lib = import_sequences(
             world_config_dict=self.world_cfg,
             library_path=None,
             server_name=self.server_name,
@@ -1669,18 +1668,18 @@ class Orch(Base):
                     self.active_process_group.machine_name = self.hostname
                     self.active_process_group.set_dtime(offset=self.ntp_offset)
                     self.active_process_group.gen_uuid_process_group(self.hostname)
-                    actualizer = self.active_process_group.actualizer
-                    # additional actualizer params should be stored in process_group.actualizer_pars
-                    unpacked_acts = self.process_lib[actualizer](self.active_process_group)
+                    sequence = self.active_process_group.sequence
+                    # additional sequence params should be stored in process_group.sequence_pars
+                    unpacked_acts = self.process_lib[sequence](self.active_process_group)
                     for i, act in enumerate(unpacked_acts):
                         act.process_enum = float(i)  # f"{i}"
                         # act.gen_uuid()
-                    # TODO:update actualizer code
+                    # TODO:update sequence code
                     self.process_dq = deque(unpacked_acts)
                     self.dispatched_processes = {}
                     self.print_message(f" ... got: {self.process_dq}")
                     self.print_message(
-                        f" ... optional params: {self.active_process_group.actualizer_pars}"
+                        f" ... optional params: {self.active_process_group.sequence_pars}"
                     )
                 else:
                     if self.loop_intent == "stop":
@@ -1925,8 +1924,8 @@ class Orch(Base):
         self,
         orch_name: str = None,
         process_group_label: str = None,
-        actualizer: str = None,
-        actualizer_pars: dict = {},
+        sequence: str = None,
+        sequence_pars: dict = {},
         result_dict: dict = {},
         access: str = "hte",
         prepend: Optional[bool] = False,
@@ -1937,8 +1936,8 @@ class Orch(Base):
             {
                 "orch_name": orch_name,
                 "process_group_label": process_group_label,
-                "actualizer": actualizer,
-                "actualizer_pars": actualizer_pars,
+                "sequence": sequence,
+                "sequence_pars": sequence_pars,
                 "result_dict": result_dict,
                 "access": access,
             }
@@ -1983,8 +1982,8 @@ class Orch(Base):
                 index=i,
                 uid=process_group.process_group_uuid,
                 label=process_group.process_group_label,
-                actualizer=process_group.actualizer,
-                pars=process_group.actualizer_pars,
+                sequence=process_group.sequence,
+                pars=process_group.sequence_pars,
                 access=process_group.access,
             )
             for i, process_group in enumerate(self.process_group_dq)
@@ -2004,8 +2003,8 @@ class Orch(Base):
                     index=-1,
                     uid=process_group.process_group_uuid,
                     label=process_group.process_group_label,
-                    actualizer=process_group.actualizer,
-                    pars=process_group.actualizer_pars,
+                    sequence=process_group.sequence,
+                    pars=process_group.sequence_pars,
                     access=process_group.access,
                 )
             ]
@@ -2015,7 +2014,7 @@ class Orch(Base):
                     index=-1,
                     uid=None,
                     label=None,
-                    actualizer=None,
+                    sequence=None,
                     pars=None,
                     access=None,
                 )
@@ -2171,14 +2170,14 @@ class Vis(object):
         print_message(self.server_cfg, self.server_name, *args, **kwargs)
 
 
-def import_actualizers(
+def import_sequences(
     world_config_dict: dict, library_path: str = None, server_name: str = ""
 ):
-    """Import actualizer functions into environment."""
+    """Import sequence functions into environment."""
     process_lib = {}
     if library_path is None:
         library_path = world_config_dict.get(
-            "process_library_path", os.path.join("helao", "library", "actualizer")
+            "process_library_path", os.path.join("helao", "library", "sequence")
         )
     if not os.path.isdir(library_path):
         print_message(
@@ -2190,11 +2189,11 @@ def import_actualizers(
     sys.path.append(library_path)
     for actlib in world_config_dict["process_libraries"]:
         tempd = import_module(actlib).__dict__
-        process_lib.update({func: tempd[func] for func in tempd["ACTUALIZERS"]})
+        process_lib.update({func: tempd[func] for func in tempd["SEQUENCES"]})
     print_message(
         world_config_dict,
         server_name,
-        f" ... imported {len(world_config_dict['process_libraries'])} actualizers specified by config.",
+        f" ... imported {len(world_config_dict['process_libraries'])} sequences specified by config.",
     )
     return process_lib  # True
 

@@ -16,7 +16,7 @@ class return_process_group(BaseModel):
     index: int
     uid: Union[str, None]
     label: str
-    actualizer: str
+    sequence: str
     pars: dict
     access: str
 
@@ -49,8 +49,8 @@ class return_finished_process(BaseModel):
     process_group_timestamp: str
     process_group_uuid: str
     process_group_label: str
-    actualizer: str
-    actualizer_pars: dict
+    sequence: str
+    sequence_pars: dict
     result_dict: dict
     process_server: str
     process_queue_time: str
@@ -81,8 +81,8 @@ class return_running_process(BaseModel):
     process_group_timestamp: str
     process_group_uuid: str
     process_group_label: str
-    actualizer: str
-    actualizer_pars: dict
+    sequence: str
+    sequence_pars: dict
     result_dict: dict
     process_server: str
     process_queue_time: str
