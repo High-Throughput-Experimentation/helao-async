@@ -117,13 +117,18 @@ async def setup_process(request: Request):
         elif type(tmp_fast_samples_in) is list:
             A.samples_in = sample_list(samples=tmp_fast_samples_in)
     
-    # setting some default values of process was notsubmitted via orch
+    # setting some default values if process was not submitted via orch
     if A.machine_name is None:
         A.machine_name = gethostname()
     if A.technique_name is None:
         A.technique_name = "MANUAL"
         A.orch_name = "MANUAL"
         A.process_group_label = "MANUAL"
+    # sample_list cannot be serialized so needs to be updated here
+    if A.samples_in == []:
+        A.samples_in = sample_list()
+    if A.samples_out == []:
+        A.samples_out = sample_list()
 
     return A
 
