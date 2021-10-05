@@ -281,7 +281,8 @@ class gamry:
             # this will lock up the potentiostat server
             # happens when a not activated Gamry is connected and turned on
             # TODO: find a way to avoid it
-            self.base.print_message(" ... fatal error initializing Gamry:", e)
+            self.base.print_message(" ... fatal error initializing Gamry:", error=True)
+            self.base.print_message(f"{e}", error=True)
 
     async def open_connection(self):
         """Open connection to Gamry"""
@@ -292,13 +293,17 @@ class gamry:
         try:
             if self.pstat:
                 self.pstat.Open()
-                return {"potentiostat_connection": "connected"}
+                return error_codes.none
             else:
-                return {"potentiostat_connection": "not initialized"}
+                self.base.print_message(" ... open_connection: Gamry not initialized!", error=True)
+                return error_codes.not_initialized
 
-        except Exception:
+        except Exception as e:
             # self.pstat = None
-            return {"potentiostat_connection": "error"}
+            self.base.print_message("Gamry error init!", error=True)
+            self.base.print_message(f"{e}", error=True)
+            return error_codes.critical
+
 
     async def close_connection(self):
         """Close connection to Gamry"""
@@ -307,229 +312,244 @@ class gamry:
         try:
             if self.pstat:
                 self.pstat.Close()
-                return {"potentiostat_connection": "closed"}
+                return error_codes.none
             else:
-                return {"potentiostat_connection": "not initialized"}
+                self.base.print_message(" ... close_connection: Gamry not initialized!", error=True)
+                return error_codes.not_initialized
         except Exception:
             # self.pstat = None
-            return {"potentiostat_connection": "error"}
+            return error_codes.critical
+
 
     async def measurement_setup(self, AcqFreq, mode: Gamry_modes = None, *argv):
         """setting up the measurement parameters
         need to initialize and open connection to gamry first"""
         await asyncio.sleep(0.001)
+        error =  error_codes.none
         if self.pstat:
-            IErangesdict = dict(
-                mode0=0,
-                mode1=1,
-                mode2=2,
-                mode3=3,
-                mode4=4,
-                mode5=5,
-                mode6=6,
-                mode7=7,
-                mode8=8,
-                mode9=9,
-                mode10=10,
-                mode11=11,
-                mode12=12,
-                mode13=13,
-                mode14=14,
-                mode15=15,
-            )
-
-            # InitializePstat (from exp script)
-            # https://www.gamry.com/application-notes/instrumentation/changing-potentiostat-speed-settings/
-            self.pstat.SetCell(self.GamryCOM.CellOff)
-            #####pstat.InstrumentSpecificInitialize ()
-            self.pstat.SetPosFeedEnable(False)  # False
-
-            # pstat.SetStability (StabilityFast)
-            self.pstat.SetIEStability(self.GamryCOM.StabilityFast)
-            # Fast (0), Medium (1), Slow (2)
-            # StabilityFast (0), StabilityNorm (1), StabilityMed (1), StabilitySlow (2)
-            # pstat.SetCASpeed(1)#GamryCOM.CASpeedNorm)
-            # CASpeedFast (0), CASpeedNorm (1), CASpeedMed (2), CASpeedSlow (3)
-            self.pstat.SetSenseSpeedMode(True)
-            # pstat.SetConvention (PHE200_IConvention)
-            # anodic currents are positive
-            self.pstat.SetIConvention(self.GamryCOM.Anodic)
-
-            self.pstat.SetGround(self.GamryCOM.Float)
-
-            # Set current channel range.
-            # Setting the IchRange using a voltage is preferred. The measured current is converted into a voltage on the I channel using the I/E converter.
-            # 0 0.03 V range, 1 0.30 V range, 2 3.00 V range, 3 30.00 V (PCI4) 12V (PC5)
-            # The floating point number is the maximum anticipated voltage (in Volts).
-            self.pstat.SetIchRange(12.0)
-            self.pstat.SetIchRangeMode(True)  # auto-set
-            self.pstat.SetIchOffsetEnable(False)
-            self.pstat.SetIchFilter(AcqFreq)
-
-            # Set voltage channel range.
-            self.pstat.SetVchRange(12.0)
-            self.pstat.SetVchRangeMode(True)
-            self.pstat.SetVchOffsetEnable(False)
-            self.pstat.SetVchFilter(AcqFreq)
-
-            # Sets the range of the Auxiliary A/D input.
-            self.pstat.SetAchRange(3.0)
-
-            # pstat.SetIERangeLowerLimit(None)
-
-            # Sets the I/E Range of the potentiostat.
-            self.pstat.SetIERange(0.03)
-            # Enable or disable current measurement auto-ranging.
-            self.pstat.SetIERangeMode(True)
-
-            if self.IO_IErange == Gamry_IErange.auto:
-                self.base.print_message(" ... auto I range selected")
-                self.pstat.SetIERange(0.03)
-                self.pstat.SetIERangeMode(True)
-            else:
-                self.base.print_message(f" ... {self.IO_IErange.value} I range selected")
-                self.base.print_message(f" ... {IErangesdict[self.IO_IErange.name]} I range selected")
-                self.pstat.SetIERange(IErangesdict[self.IO_IErange.name])
-                self.pstat.SetIERangeMode(False)
-            # elif self.IO_IErange == Gamry_IErange.mode0:
-            #     self.pstat.SetIERangeMode(False)
-            #     self.pstat.SetIERange(0)
-
-            # Sets the voltage of the auxiliary DAC output.
-            self.pstat.SetAnalogOut(0.0)
-
-            # Set the cell voltage of the Pstat.
-            # self.pstat.SetVoltage(0.0)
-
-            # Set the current interrupt IR compensation mode.
-            self.pstat.SetIruptMode(self.GamryCOM.IruptOff)
-
-            # the format of the data array is dependent upon the specific Dtaq
-            # e.g. which subheader to use
-
-            if mode == Gamry_modes.CA:
-                Dtaqmode = "GamryCOM.GamryDtaqChrono"
-                Dtaqtype = self.GamryCOM.ChronoAmp
-                self.FIFO_column_headings = [
-                    "t_s",
-                    "Ewe_V",
-                    "Vu",
-                    "I_A",
-                    "Q",
-                    "Vsig",
-                    "Ach_V",
-                    "IERange",
-                    "Overload_HEX",
-                    "StopTest",
-                ]
-                self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
-            elif mode == Gamry_modes.CP:
-                Dtaqmode = "GamryCOM.GamryDtaqChrono"
-                Dtaqtype = self.GamryCOM.ChronoPot
-                self.FIFO_column_headings = [
-                    "t_s",
-                    "Ewe_V",
-                    "Vu",
-                    "I_A",
-                    "Q",
-                    "Vsig",
-                    "Ach_V",
-                    "IERange",
-                    "Overload_HEX",
-                    "StopTest",
-                ]
-                self.pstat.SetCtrlMode(self.GamryCOM.GstatMode)
-            elif mode == Gamry_modes.CV:
-                Dtaqmode = "GamryCOM.GamryDtaqRcv"
-                Dtaqtype = None
-                self.FIFO_column_headings = [
-                    "t_s",
-                    "Ewe_V",
-                    "Vu",
-                    "I_A",
-                    "Vsig",
-                    "Ach_V",
-                    "IERange",
-                    "Overload_HEX",
-                    "StopTest",
-                    "Cycle",
-                    "unknown1",
-                ]
-                self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
-            elif mode == Gamry_modes.LSV:
-                Dtaqmode = "GamryCOM.GamryDtaqCpiv"
-                Dtaqtype = None
-                self.FIFO_column_headings = [
-                    "t_s",
-                    "Ewe_V",
-                    "Vu",
-                    "I_A",
-                    "Vsig",
-                    "Ach_V",
-                    "IERange",
-                    "Overload_HEX",
-                    "StopTest",
-                    "unknown1",
-                ]
-                self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
-            elif mode == Gamry_modes.EIS:
-                #                Dtaqmode = "GamryCOM.GamryReadZ"
-                Dtaqmode = "GamryCOM.GamryDtaqEis"
-                Dtaqtype = None
-                # this needs to be manualy extended, default are only I and V (I hope that this is Ewe_V)
-                self.FIFO_column_headings = [
-                    "I_A",
-                    "Ewe_V",
-                    "Zreal",
-                    "Zimag",
-                    "Zsig",
-                    "Zphz",
-                    "Zfreq",
-                    "Zmod",
-                ]
-                self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
-            elif mode == Gamry_modes.OCV:
-                Dtaqmode = "GamryCOM.GamryDtaqOcv"
-                Dtaqtype = None
-                self.FIFO_column_headings = [
-                    "t_s",
-                    "Ewe_V",
-                    "Vm",
-                    "Vsig",
-                    "Ach_V",
-                    "Overload_HEX",
-                    "StopTest",
-                    "unknown1",
-                    "unknown2",
-                    "unknown3",
-                ]
-                self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
-            else:
-                return {"measurement_setup": f"mode_{mode}_not_supported"}
-
             try:
-                self.dtaq = client.CreateObject(Dtaqmode)
-                if Dtaqtype:
-                    self.dtaq.Init(self.pstat, Dtaqtype, *argv)
+                IErangesdict = dict(
+                    mode0=0,
+                    mode1=1,
+                    mode2=2,
+                    mode3=3,
+                    mode4=4,
+                    mode5=5,
+                    mode6=6,
+                    mode7=7,
+                    mode8=8,
+                    mode9=9,
+                    mode10=10,
+                    mode11=11,
+                    mode12=12,
+                    mode13=13,
+                    mode14=14,
+                    mode15=15,
+                )
+    
+                # InitializePstat (from exp script)
+                # https://www.gamry.com/application-notes/instrumentation/changing-potentiostat-speed-settings/
+                self.pstat.SetCell(self.GamryCOM.CellOff)
+                #####pstat.InstrumentSpecificInitialize ()
+                self.pstat.SetPosFeedEnable(False)  # False
+    
+                # pstat.SetStability (StabilityFast)
+                self.pstat.SetIEStability(self.GamryCOM.StabilityFast)
+                # Fast (0), Medium (1), Slow (2)
+                # StabilityFast (0), StabilityNorm (1), StabilityMed (1), StabilitySlow (2)
+                # pstat.SetCASpeed(1)#GamryCOM.CASpeedNorm)
+                # CASpeedFast (0), CASpeedNorm (1), CASpeedMed (2), CASpeedSlow (3)
+                self.pstat.SetSenseSpeedMode(True)
+                # pstat.SetConvention (PHE200_IConvention)
+                # anodic currents are positive
+                self.pstat.SetIConvention(self.GamryCOM.Anodic)
+    
+                self.pstat.SetGround(self.GamryCOM.Float)
+    
+                # Set current channel range.
+                # Setting the IchRange using a voltage is preferred. The measured current is converted into a voltage on the I channel using the I/E converter.
+                # 0 0.03 V range, 1 0.30 V range, 2 3.00 V range, 3 30.00 V (PCI4) 12V (PC5)
+                # The floating point number is the maximum anticipated voltage (in Volts).
+                self.pstat.SetIchRange(12.0)
+                self.pstat.SetIchRangeMode(True)  # auto-set
+                self.pstat.SetIchOffsetEnable(False)
+                self.pstat.SetIchFilter(AcqFreq)
+    
+                # Set voltage channel range.
+                self.pstat.SetVchRange(12.0)
+                self.pstat.SetVchRangeMode(True)
+                self.pstat.SetVchOffsetEnable(False)
+                self.pstat.SetVchFilter(AcqFreq)
+    
+                # Sets the range of the Auxiliary A/D input.
+                self.pstat.SetAchRange(3.0)
+    
+                # pstat.SetIERangeLowerLimit(None)
+    
+                # Sets the I/E Range of the potentiostat.
+                self.pstat.SetIERange(0.03)
+                # Enable or disable current measurement auto-ranging.
+                self.pstat.SetIERangeMode(True)
+    
+                if self.IO_IErange == Gamry_IErange.auto:
+                    self.base.print_message(" ... auto I range selected")
+                    self.pstat.SetIERange(0.03)
+                    self.pstat.SetIERangeMode(True)
                 else:
-                    self.dtaq.Init(self.pstat, *argv)
-            except Exception as e:
-                self.base.print_message(" ... Gamry Error:", gamry_error_decoder(e))
+                    self.base.print_message(f" ... {self.IO_IErange.value} I range selected")
+                    self.base.print_message(f" ... {IErangesdict[self.IO_IErange.name]} I range selected")
+                    self.pstat.SetIERange(IErangesdict[self.IO_IErange.name])
+                    self.pstat.SetIERangeMode(False)
+                # elif self.IO_IErange == Gamry_IErange.mode0:
+                #     self.pstat.SetIERangeMode(False)
+                #     self.pstat.SetIERange(0)
+    
+                # Sets the voltage of the auxiliary DAC output.
+                self.pstat.SetAnalogOut(0.0)
+    
+                # Set the cell voltage of the Pstat.
+                # self.pstat.SetVoltage(0.0)
+    
+                # Set the current interrupt IR compensation mode.
+                self.pstat.SetIruptMode(self.GamryCOM.IruptOff)
+    
+                # the format of the data array is dependent upon the specific Dtaq
+                # e.g. which subheader to use
+    
+                if mode == Gamry_modes.CA:
+                    Dtaqmode = "GamryCOM.GamryDtaqChrono"
+                    Dtaqtype = self.GamryCOM.ChronoAmp
+                    self.FIFO_column_headings = [
+                        "t_s",
+                        "Ewe_V",
+                        "Vu",
+                        "I_A",
+                        "Q",
+                        "Vsig",
+                        "Ach_V",
+                        "IERange",
+                        "Overload_HEX",
+                        "StopTest",
+                    ]
+                    self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
+                elif mode == Gamry_modes.CP:
+                    Dtaqmode = "GamryCOM.GamryDtaqChrono"
+                    Dtaqtype = self.GamryCOM.ChronoPot
+                    self.FIFO_column_headings = [
+                        "t_s",
+                        "Ewe_V",
+                        "Vu",
+                        "I_A",
+                        "Q",
+                        "Vsig",
+                        "Ach_V",
+                        "IERange",
+                        "Overload_HEX",
+                        "StopTest",
+                    ]
+                    self.pstat.SetCtrlMode(self.GamryCOM.GstatMode)
+                elif mode == Gamry_modes.CV:
+                    Dtaqmode = "GamryCOM.GamryDtaqRcv"
+                    Dtaqtype = None
+                    self.FIFO_column_headings = [
+                        "t_s",
+                        "Ewe_V",
+                        "Vu",
+                        "I_A",
+                        "Vsig",
+                        "Ach_V",
+                        "IERange",
+                        "Overload_HEX",
+                        "StopTest",
+                        "Cycle",
+                        "unknown1",
+                    ]
+                    self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
+                elif mode == Gamry_modes.LSV:
+                    Dtaqmode = "GamryCOM.GamryDtaqCpiv"
+                    Dtaqtype = None
+                    self.FIFO_column_headings = [
+                        "t_s",
+                        "Ewe_V",
+                        "Vu",
+                        "I_A",
+                        "Vsig",
+                        "Ach_V",
+                        "IERange",
+                        "Overload_HEX",
+                        "StopTest",
+                        "unknown1",
+                    ]
+                    self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
+                elif mode == Gamry_modes.EIS:
+                    #                Dtaqmode = "GamryCOM.GamryReadZ"
+                    Dtaqmode = "GamryCOM.GamryDtaqEis"
+                    Dtaqtype = None
+                    # this needs to be manualy extended, default are only I and V (I hope that this is Ewe_V)
+                    self.FIFO_column_headings = [
+                        "I_A",
+                        "Ewe_V",
+                        "Zreal",
+                        "Zimag",
+                        "Zsig",
+                        "Zphz",
+                        "Zfreq",
+                        "Zmod",
+                    ]
+                    self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
+                elif mode == Gamry_modes.OCV:
+                    Dtaqmode = "GamryCOM.GamryDtaqOcv"
+                    Dtaqtype = None
+                    self.FIFO_column_headings = [
+                        "t_s",
+                        "Ewe_V",
+                        "Vm",
+                        "Vsig",
+                        "Ach_V",
+                        "Overload_HEX",
+                        "StopTest",
+                        "unknown1",
+                        "unknown2",
+                        "unknown3",
+                    ]
+                    self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
+                else:
+                    self.base.print_message(f" ... 'mode {mode} not supported'", error=True)
+                    error = error_codes.not_available
 
-            # This method, when enabled,
-            # allows for longer experiments with fewer points,
-            # but still acquires data quickly around each step.
-            if mode == Gamry_modes.CA:
-                self.dtaq.SetDecimation(False)
-            elif mode == Gamry_modes.CP:
-                self.dtaq.SetDecimation(False)
 
-            self.dtaqsink = GamryDtaqEvents(self.dtaq)
-            self.base.print_message(f"!!! initialized dtaqsink with status {self.dtaqsink.status}")
-            return {"measurement_setup": f"setup_{mode}"}
+                if error is error_codes.none:  
+                    try:
+                        self.dtaq = client.CreateObject(Dtaqmode)
+                        if Dtaqtype:
+                            self.dtaq.Init(self.pstat, Dtaqtype, *argv)
+                        else:
+                            self.dtaq.Init(self.pstat, *argv)
+                    except Exception as e:
+                        self.base.print_message(" ... Gamry Error:", error=True)
+                        self.base.print_message(f"{gamry_error_decoder(e)}", error=True)
+        
+                    # This method, when enabled,
+                    # allows for longer experiments with fewer points,
+                    # but still acquires data quickly around each step.
+                    if mode == Gamry_modes.CA:
+                        self.dtaq.SetDecimation(False)
+                    elif mode == Gamry_modes.CP:
+                        self.dtaq.SetDecimation(False)
+        
+                    self.dtaqsink = GamryDtaqEvents(self.dtaq)
+                    self.base.print_message(f"!!! initialized dtaqsink with status {self.dtaqsink.status} in mode setup_{mode}")
+                    
+
+            except comtypes.COMError as e:
+                self.base.print_message("Gamry error during measurement setup!!", error=True)
+                self.base.print_message(f"{e}", error=True)
+                error = error_codes.critical
         else:
-            return {"measurement_setup": "not initialized"}
+            self.base.print_message(" ... measurement_setup: Gamry not initialized!", error=True)
+            error = error_codes.not_initialized
 
+        return error
 
     async def measure(self):
         """performing a measurement with the Gamry
@@ -777,61 +797,66 @@ class gamry:
         setupargs=[]
     ):
         # open connection, will be closed after measurement in IOloop
-        retval = await self.open_connection()
+        err_code = await self.open_connection()
         activeDict = dict()
-        if retval["potentiostat_connection"] == "connected":
+        if err_code is error_codes.none:
             if self.pstat and not self.IO_do_meas:
                 # set parameters for IOloop meas
                 self.IO_meas_mode = measmode
-                await self.measurement_setup(
+                err_code = await self.measurement_setup(
                     1.0 / samplerate, self.IO_meas_mode, *setupargs
                 )
-                # setup the experiment specific signal ramp
-                self.IO_sigramp = client.CreateObject(sigfunc)
-                try:
-                    self.IO_sigramp.Init(*sigfunc_params)
-                    err_code = "0"
-                except Exception as e:
-                    err_code = gamry_error_decoder(e)
-                    self.base.print_message(err_code)
-
-                self.process = act
-                self.samples_in=self.process.samples_in
-                # signal the IOloop to start the measrurement
-                await self.IO_signalq.put(True)
-                # wait for data to appear in multisubscriber queue before returning active dict
-                # async for data_msg in self.base.data_q.subscribe():
-                #     for act_uuid, _ in data_msg.items():
-                #         if act.process_uuid == act_uuid:
-                #             activeDict = self.active.process.as_dict()
-                #     if activeDict:
-                #         break
-
-                # need to wait now for the activation of the meas routine
-                # and that the active object is activated and sets process status
-
-                while not self.IO_continue:
-                    await asyncio.sleep(1)
-
-                # reset continue flag
-                self.IO_continue = False
-
-                err_code = "none"
-
-                if self.active:
-                    activeDict = self.active.process.as_dict()
+                if err_code is error_codes.none:
+                        
+                    # setup the experiment specific signal ramp
+                    self.IO_sigramp = client.CreateObject(sigfunc)
+                    try:
+                        self.IO_sigramp.Init(*sigfunc_params)
+                        err_code = error_codes.none
+                    except Exception as e:
+                        err_code = gamry_error_decoder(e)
+                        self.base.print_message(err_code)
+    
+                    self.process = act
+                    self.samples_in=self.process.samples_in
+                    # signal the IOloop to start the measrurement
+                    await self.IO_signalq.put(True)
+                    # wait for data to appear in multisubscriber queue before returning active dict
+                    # async for data_msg in self.base.data_q.subscribe():
+                    #     for act_uuid, _ in data_msg.items():
+                    #         if act.process_uuid == act_uuid:
+                    #             activeDict = self.active.process.as_dict()
+                    #     if activeDict:
+                    #         break
+    
+                    # need to wait now for the activation of the meas routine
+                    # and that the active object is activated and sets process status
+    
+                    while not self.IO_continue:
+                        await asyncio.sleep(1)
+    
+                    # reset continue flag
+                    self.IO_continue = False
+    
+                    err_code = error_codes.none
+    
+                    if self.active:
+                        activeDict = self.active.process.as_dict()
+                    else:
+                        activeDict = act.as_dict()   
                 else:
                     activeDict = act.as_dict()                
+                    
 
             elif self.IO_measuring:
                 activeDict = act.as_dict()                
-                err_code = "meas already in progress"
+                err_code = error_codes.in_progress
             else:
                 activeDict = act.as_dict()                
-                err_code = "not initialized"
+                err_code = error_codes.not_initialized
         else:
             activeDict = act.as_dict()                
-            err_code = retval["potentiostat_connection"]
+
 
         
         activeDict["data"] = {"err_code": err_code, "eta": eta}
