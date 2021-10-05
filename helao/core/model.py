@@ -338,7 +338,7 @@ class sample_list(BaseModel):
         return sample_model_list_validator(value, values, **kwargs)
 
 
-class prc_header(BaseModel):
+class prc_file(BaseModel):
     hlo_version: str = "2021.09.20"
     technique_name: str
     server_name: str
@@ -357,4 +357,17 @@ class prc_header(BaseModel):
     samples_in: Optional[Union[dict, None]] = None
     samples_out: Optional[Union[dict, None]] = None
     files: Optional[Union[dict, None]] = None
+
     
+class prg_file(BaseModel):
+    hlo_version: str = "2021.09.20"
+    orchestrator: str
+    access: str
+    process_group_uuid: str
+    process_group_timestamp: str
+    process_group_label: str
+    technique_name: str
+    sequence_name: str
+    sequence_params: Union[dict, None] = None
+    sequence_model: Union[dict, None] = None
+

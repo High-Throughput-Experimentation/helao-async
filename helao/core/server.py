@@ -36,7 +36,7 @@ from helao.core.helper import print_message, cleanupdict
 from helao.core.schema import cProcess, cProcess_group
 from helao.core.model import return_process_group, return_process_group_list, return_process, return_process_list
 from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
-from helao.core.model import prc_header
+from helao.core.model import prc_file, prg_file
 
 
 async_copy = wrap(shutil.copy)
@@ -838,6 +838,38 @@ class Base(object):
         self.status_logger.cancel()
         self.ntp_syncer.cancel()
 
+
+    async def write_to_prg(self, prg_dict: dict, process_group):
+        process_group_timestamp = process_group.process_group_timestamp
+        process_group_dir = self.get_process_group_dir(process_group)
+        output_path = os.path.join(
+            self.save_root,
+            process_group_dir,
+            f"{process_group_timestamp}.prg"
+        )
+        self.print_message(f" ... writing to prg: {output_path}")
+        output_str = pyaml.dump(prg_dict, sort_dicts=False)
+        file_instance = await aiofiles.open(output_path, mode="a+")
+
+        if not output_str.endswith("\n"):
+            output_str += "\n"
+
+        await file_instance.write(output_str)
+        await file_instance.close()
+
+        
+    def get_process_group_dir(self, process_group):
+        """accepts process or process_group object"""
+        process_group_date = process_group.process_group_timestamp.split(".")[0]
+        process_group_time = process_group.process_group_timestamp.split(".")[-1]
+        year_week = strftime("%y.%U", strptime(process_group_date, "%Y%m%d"))
+        return os.path.join(
+            year_week,
+            process_group_date,
+            f"{process_group_time}_{process_group.process_group_label}",
+        )
+
+
     class Active(object):
         """Active process holder which wraps data queing and prc writing."""
 
@@ -858,7 +890,10 @@ class Base(object):
             self.process.file_data_keys = file_data_keys
             self.process.file_sample_label = file_sample_label
             self.process.header = header
-            self.prc_header = None
+            self.prc_file = None
+            self.manual_prg_file = None
+            self.manual = False
+            self.process_group_dir = None
             
             
             if file_sample_keys is None:
@@ -888,11 +923,13 @@ class Base(object):
             self.file_conn = dict()
             # if cProcess is not created from process_group+sequence, cProcess is independent
             if self.process.process_group_timestamp is None:
+                self.manual = True
+                self.base.print_message(
+                    " ... Manual Process.", info = True
+                )
                 self.process.set_dtime(offset=self.base.ntp_offset)
                 self.process.gen_uuid_process_group(self.base.hostname)
-            process_group_date = self.process.process_group_timestamp.split(".")[0]
-            process_group_time = self.process.process_group_timestamp.split(".")[-1]
-            year_week = strftime("%y.%U", strptime(process_group_date, "%Y%m%d"))
+
             if not self.base.save_root:
                 self.base.print_message(
                     " ... Root save directory not specified, cannot save process results."
@@ -908,18 +945,17 @@ class Base(object):
                 # cannot save data without prc
                 if self.process.save_data is True:
                     self.process.save_prc = True
-                # self.process.save_data = True
-                # self.process.save_prc = True
+                
+                self.process_group_dir = self.base.get_process_group_dir(self.process)
                 self.process.output_dir = os.path.join(
-                    year_week,
-                    process_group_date,
-                    f"{process_group_time}_{self.process.process_group_label}",
+                    self.process_group_dir,
                     f"{self.process.process_queue_time}__{self.process.process_server}__{self.process.process_name}__{self.process.process_uuid}",
                 )
+                
             self.data_logger = self.base.aloop.create_task(self.log_data_task())
 
 
-        def update_prc_header(self):
+        def update_prc_file(self):
             # need to remove swagger workaround value if present
             if "scratch" in self.process.process_params:
                     del self.process.process_params["scratch"]
@@ -927,7 +963,7 @@ class Base(object):
             if self.process.process_enum is None:
                 self.process.process_enum = 0.0
  
-            self.prc_header = prc_header(
+            self.prc_file = prc_file(
                 hlo_version=f"{hlo_version}",
                 technique_name=self.process.technique_name,
                 server_name=self.base.server_name,
@@ -952,7 +988,24 @@ class Base(object):
                 self.process.process_num = (
                     f"{self.process.process_abbr}-{self.process.process_enum}"
                 )
-                self.update_prc_header()
+                self.update_prc_file()
+
+                if self.manual:
+                    # create and write prg file for manual process
+                    self.manual_prg_file = prg_file(
+                        hlo_version=f"{hlo_version}",
+                        orchestrator=self.process.orch_name,
+                        access=self.process.access,
+                        process_group_uuid=self.process.process_group_uuid,
+                        process_group_timestamp=self.process.process_group_timestamp,
+                        process_group_label=self.process.process_group_label,
+                        technique_name=self.process.technique_name,
+                        sequence_name="MANUAL",
+                        sequence_params=None,
+                        sequence_model=None
+                    )
+                    
+                    
                 
                 if self.process.save_data:
                     for i, file_sample_key in enumerate(self.process.file_sample_keys):
@@ -1349,7 +1402,7 @@ class Base(object):
 
             await file_instance.write(output_str)
             await file_instance.close()
-           
+
 
         async def append_sample(
             self,
@@ -1416,15 +1469,20 @@ class Base(object):
             self.file_conn = dict()
             # (1) update sample_in and sample_out
             if  self.process.prc_samples_in:
-                self.prc_header.samples_in = self.process.prc_samples_in
+                self.prc_file.samples_in = self.process.prc_samples_in
             if self.process.prc_samples_out:
-                 self.prc_header.samples_out = self.process.prc_samples_out
+                 self.prc_file.samples_out = self.process.prc_samples_out
             # (2) update file dict in prc header
             if self.process.file_dict:
-                self.prc_header.files = self.process.file_dict
+                self.prc_file.files = self.process.file_dict
 
             # write full prc header to file
-            await self.write_to_prc(cleanupdict(self.prc_header.dict()))
+            await self.write_to_prc(cleanupdict(self.prc_file.dict()))
+            if self.manual:
+                await self.base.write_to_prg(
+                    cleanupdict(self.manual_prg_file.dict()),
+                    self.process
+                    )
 
             await self.clear_status()
             self.data_logger.cancel()
@@ -1489,6 +1547,7 @@ class Orch(Base):
         self.dispatched_processes = {}
         self.active_process_group = None
         self.last_process_group = None
+        self.prg_file = None
 
         # compilation of process server status dicts
         self.global_state_dict = defaultdict(lambda: defaultdict(list))
@@ -1662,6 +1721,7 @@ class Orch(Base):
                 if not self.process_dq:
                     self.print_message(" ... getting process_dq from new process_group")
                     # generate uids when populating, generate timestamp when acquring
+                    await self.finish_active_process_group_prg()
                     self.last_process_group = copy(self.active_process_group)
                     self.active_process_group = self.process_group_dq.popleft()
                     self.active_process_group.technique_name = self.technique_name
@@ -1681,6 +1741,20 @@ class Orch(Base):
                     self.print_message(
                         f" ... optional params: {self.active_process_group.sequence_pars}"
                     )
+                    
+                    self.prg_file = prg_file(
+                        hlo_version=f"{hlo_version}",
+                        orchestrator=self.active_process_group.orch_name,
+                        access="hte",
+                        process_group_uuid=self.active_process_group.process_group_uuid,
+                        process_group_timestamp=self.active_process_group.process_group_timestamp,
+                        process_group_label=self.active_process_group.process_group_label,
+                        technique_name=self.active_process_group.technique_name,
+                        sequence_name=self.active_process_group.sequence,
+                        sequence_params=self.active_process_group.sequence_pars,
+                        sequence_model=None
+                    )
+                    
                 else:
                     if self.loop_intent == "stop":
                         self.print_message(" ... stopping orchestrator")
@@ -1838,6 +1912,7 @@ class Orch(Base):
             self.print_message(" ... process_group queue is empty")
             self.print_message(" ... stopping operator orch")
             self.loop_state = "stopped"
+            await self.finish_active_process_group_prg()
             await self.intend_none()
             return True
         # except asyncio.CancelledError:
@@ -2145,6 +2220,16 @@ class Orch(Base):
         new_process = sup_process
         new_process.process_enum = new_enum
         self.process_dq.append(new_process)
+
+
+    async def finish_active_process_group_prg(self):
+        if self.prg_file is not None:
+            await self.write_to_prg(
+                cleanupdict(self.prg_file.dict()),
+                self.active_process_group
+            )
+        self.prg_file = None
+
 
     async def shutdown(self):
         await self.detach_subscribers()
