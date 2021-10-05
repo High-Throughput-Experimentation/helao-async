@@ -40,9 +40,6 @@ class galil:
 
         self.config_dict["estop_motor"] = False
         self.config_dict["estop_io"] = False
-        if not "tbroadcast" in self.config_dict:
-            self.config_dict["tbroadcast"] = 2  # sec
-        self.tbroadcast = self.config_dict["tbroadcast"]
 
         # need to check if config settings exist
         # else need to create empty ones
