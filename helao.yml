@@ -96,5 +96,6 @@ dependencies:
   - ntplib
   - termcolor
   - pyfiglet
- 
-  
+  - pandas
+  - sqlalchemy
+  - databases
