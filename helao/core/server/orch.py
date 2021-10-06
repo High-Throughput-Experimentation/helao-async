@@ -31,7 +31,7 @@ from helao.core.model import (
     return_process_list,
 )
 from helao.core.schema import cProcess, cProcess_group
-from helao.core.server import (
+from .server import (
     Base,
     HelaoFastAPI,
     async_private_dispatcher,
@@ -250,7 +250,6 @@ class Orch(Base):
                 if not self.process_dq:
                     self.print_message(" ... getting process_dq from new process_group")
                     # generate uids when populating, generate timestamp when acquring
-                    await self.finish_active_process_group_prg()
                     self.last_process_group = copy(self.active_process_group)
                     self.active_process_group = self.process_group_dq.popleft()
                     self.active_process_group.technique_name = self.technique_name
@@ -285,6 +284,7 @@ class Orch(Base):
                         sequence_params=self.active_process_group.sequence_pars,
                         sequence_model=None,
                     )
+                    await self.write_active_process_group_prg()
 
                 else:
                     if self.loop_intent == "stop":
@@ -447,7 +447,6 @@ class Orch(Base):
             self.print_message(" ... process_group queue is empty")
             self.print_message(" ... stopping operator orch")
             self.loop_state = "stopped"
-            await self.finish_active_process_group_prg()
             await self.intend_none()
             return True
         # except asyncio.CancelledError:
@@ -764,7 +763,7 @@ class Orch(Base):
         new_process.process_enum = new_enum
         self.process_dq.append(new_process)
 
-    async def finish_active_process_group_prg(self):
+    async def write_active_process_group_prg(self):
         if self.prg_file is not None:
             await self.write_to_prg(
                 cleanupdict(self.prg_file.dict()), self.active_process_group

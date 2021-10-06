@@ -253,7 +253,6 @@ def sample_model_list_validator(model_list, values, **kwargs):
     if model_list is None or not isinstance(model_list, list):
         print_message({}, "model", f"validation error, type '{type(model_list)}' is not a valid sample model list", error = True)
         raise ValueError("must be valid sample model list")
-        return []
     
     for i, model in enumerate(model_list):
         if isinstance(model, dict):
