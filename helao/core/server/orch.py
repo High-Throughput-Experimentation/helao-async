@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import sys
 from collections import defaultdict, deque
 from copy import copy
 from math import floor
@@ -11,6 +12,7 @@ from typing import Optional, Union
 
 import aiofiles
 import aiohttp
+import colorama
 import ntplib
 import numpy as np
 import pyaml
@@ -31,15 +33,17 @@ from helao.core.model import (
     return_process_list,
 )
 from helao.core.schema import cProcess, cProcess_group
-from .server import (
-    Base,
-    HelaoFastAPI,
-    async_private_dispatcher,
-    async_process_dispatcher,
-    hlo_version,
-    import_sequences,
-    process_start_condition,
-)
+
+from .api import HelaoFastAPI
+from .base import Base
+from .dispatcher import async_private_dispatcher, async_process_dispatcher
+from .import_sequences import import_sequences
+from .process_start_condition import process_start_condition
+from .version import hlo_version
+
+# ANSI color codes converted to the Windows versions
+colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
+# colorama.init()
 
 
 class Orch(Base):

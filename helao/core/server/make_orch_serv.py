@@ -3,7 +3,9 @@ import json
 import time
 
 from fastapi import WebSocket
-from .server import HelaoFastAPI, Orch
+
+from .api import HelaoFastAPI
+from .orch import Orch
 
 
 def makeOrchServ(
