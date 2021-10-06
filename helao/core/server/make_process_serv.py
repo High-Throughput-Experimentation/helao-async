@@ -1,5 +1,5 @@
 from fastapi import WebSocket
-from helao.core.server import Base, HelaoFastAPI
+from .server import Base, HelaoFastAPI
 
 
 def make_process_serv(

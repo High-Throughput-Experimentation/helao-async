@@ -1,4 +1,4 @@
-from helao.core.server import HelaoBokehAPI, Vis
+from .server import HelaoBokehAPI, Vis
 
 
 def makeVisServ(

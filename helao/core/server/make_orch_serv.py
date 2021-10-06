@@ -3,7 +3,7 @@ import json
 import time
 
 from fastapi import WebSocket
-from helao.core.server import HelaoFastAPI, Orch
+from .server import HelaoFastAPI, Orch
 
 
 def makeOrchServ(

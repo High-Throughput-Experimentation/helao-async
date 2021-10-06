@@ -1,7 +1,8 @@
 from socket import gethostname
 
 from helao.core.helper import print_message
-from helao.core.server import HelaoBokehAPI
+
+from .server import HelaoBokehAPI
 
 
 class Vis(object):

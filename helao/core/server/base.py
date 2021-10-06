@@ -21,7 +21,7 @@ from helao.core.helper import (
 )
 from helao.core.model import prc_file, prg_file
 from helao.core.schema import cProcess
-from helao.core.server import HelaoFastAPI, async_private_dispatcher, hlo_version
+from .server import HelaoFastAPI, async_private_dispatcher, hlo_version
 
 
 class Base(object):
@@ -558,6 +558,9 @@ class Base(object):
                         sequence_params=None,
                         sequence_model=None,
                     )
+                    await self.base.write_to_prg(
+                        cleanupdict(self.manual_prg_file.dict()), self.process
+                )
 
                 if self.process.save_data:
                     for i, file_sample_key in enumerate(self.process.file_sample_keys):
@@ -1025,10 +1028,6 @@ class Base(object):
 
             # write full prc header to file
             await self.write_to_prc(cleanupdict(self.prc_file.dict()))
-            if self.manual:
-                await self.base.write_to_prg(
-                    cleanupdict(self.manual_prg_file.dict()), self.process
-                )
 
             await self.clear_status()
             self.data_logger.cancel()
