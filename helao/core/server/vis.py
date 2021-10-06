@@ -1,8 +1,14 @@
+import sys
 from socket import gethostname
 
+import colorama
 from helao.core.helper import print_message
 
-from .server import HelaoBokehAPI
+from .api import HelaoBokehAPI
+
+# ANSI color codes converted to the Windows versions
+colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
+# colorama.init()
 
 
 class Vis(object):

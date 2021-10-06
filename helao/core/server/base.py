@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import sys
 from copy import copy
 from pathlib import Path
 from socket import gethostname
@@ -8,6 +9,7 @@ from time import ctime, strftime, strptime, time, time_ns
 from typing import Optional
 
 import aiofiles
+import colorama
 import ntplib
 import numpy as np
 import pyaml
@@ -21,7 +23,14 @@ from helao.core.helper import (
 )
 from helao.core.model import prc_file, prg_file
 from helao.core.schema import cProcess
-from .server import HelaoFastAPI, async_private_dispatcher, hlo_version
+
+from .api import HelaoFastAPI
+from .dispatcher import async_private_dispatcher
+from .version import hlo_version
+
+# ANSI color codes converted to the Windows versions
+colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
+# colorama.init()
 
 
 class Base(object):
@@ -560,7 +569,7 @@ class Base(object):
                     )
                     await self.base.write_to_prg(
                         cleanupdict(self.manual_prg_file.dict()), self.process
-                )
+                    )
 
                 if self.process.save_data:
                     for i, file_sample_key in enumerate(self.process.file_sample_keys):

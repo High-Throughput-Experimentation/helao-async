@@ -1,4 +1,5 @@
-from .server import HelaoBokehAPI, Vis
+from .api import HelaoBokehAPI
+from .vis import Vis
 
 
 def makeVisServ(
