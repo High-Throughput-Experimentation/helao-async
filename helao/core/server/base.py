@@ -65,7 +65,7 @@ class Base(object):
     def __init__(
         self,
         fastapp: HelaoFastAPI,
-        calibration: dict = {},
+        calibration: dict = {}
     ):
         self.server_name = fastapp.helao_srv
         self.server_cfg = fastapp.helao_cfg["servers"][self.server_name]
@@ -117,11 +117,10 @@ class Base(object):
         self.ntp_last_sync = None
         if os.path.exists("ntpLastSync.txt"):
             time_inst = open("ntpLastSync.txt", "r")
-            tmps = time_inst.readlines()
+            tmps = time_inst.readline()
             time_inst.close()
-            if len(tmps) > 0:
-                self.ntp_last_sync, self.ntp_offset = tmps[0].strip().split(",")
-                self.ntp_offset = float(self.ntp_offset)
+            self.ntp_last_sync, self.ntp_offset = tmps.strip().split(",")
+            self.ntp_offset = float(self.ntp_offset)
         elif self.ntp_last_sync is None:
             asyncio.gather(self.get_ntp_time())
         self.init_endpoint_status(fastapp)
@@ -207,19 +206,22 @@ class Base(object):
 
     async def get_ntp_time(self):
         "Check system clock against NIST clock for trigger operations."
-        c = ntplib.NTPClient()
-        response = c.request(self.ntp_server, version=3)
-        self.ntp_response = response
-        self.ntp_last_sync = response.orig_time
-        self.ntp_offset = response.offset
-        self.print_message(f" ... ntp_offset: {self.ntp_offset}")
-
-        time_inst = await aiofiles.open("ntpLastSync.txt", "w")
-        await time_inst.write(f"{self.ntp_last_sync},{self.ntp_offset}")
-        await time_inst.close()
-        self.print_message(
-            f" ... retrieved time at {ctime(self.ntp_response.tx_timestamp)} from {self.ntp_server}"
-        )
+        lock = asyncio.Lock()
+        async with lock:
+            c = ntplib.NTPClient()
+            response = c.request(self.ntp_server, version=3)
+            self.ntp_response = response
+            self.ntp_last_sync = response.orig_time
+            self.ntp_offset = response.offset
+            self.print_message(f" ... ntp_offset: {self.ntp_offset}")
+            self.print_message(f" ... ntp_last_sync: {self.ntp_last_sync}")
+    
+            time_inst = await aiofiles.open("ntpLastSync.txt", "w")
+            await time_inst.write(f"{self.ntp_last_sync},{self.ntp_offset}")
+            await time_inst.close()
+            self.print_message(
+                f" ... retrieved time at {ctime(self.ntp_response.tx_timestamp)} from {self.ntp_server}"
+            )
 
     async def attach_client(self, client_servkey: str, retry_limit=5):
         "Add client for pushing status updates via HTTP POST."
@@ -382,15 +384,27 @@ class Base(object):
         "Regularly sync with NTP server."
         try:
             while True:
-                time_inst = await aiofiles.open("ntpLastSync.txt", "r")
-                ntp_last_sync = await time_inst.readline()
-                await time_inst.close()
-                self.ntp_last_sync = float(ntp_last_sync.strip())
-                if time() - self.ntp_last_sync > resync_time:
-                    await self.get_ntp_time()
-                else:
-                    wait_time = time() - self.ntp_last_sync
-                    await asyncio.sleep(wait_time)
+                await asyncio.sleep(0.001)
+                print("checking time")
+                lock = asyncio.Lock()
+                async with lock:
+                    time_inst = await aiofiles.open("ntpLastSync.txt", "r")
+                    ntp_last_sync = await time_inst.readline()
+                    await time_inst.close()
+                    parts = ntp_last_sync.strip().split(",")
+                    if len(parts) == 2:
+                        self.ntp_last_sync = float(parts[0])
+                        self.ntp_offset = float(parts[1])
+                    else:
+                        self.ntp_last_sync = float(parts[0])
+                        self.ntp_offset = 0.0
+                    if time() - self.ntp_last_sync > resync_time:
+                        self.print_message(f" ... last time check was more then { resync_time} ago, syncing time again.", error=True)
+                        await self.get_ntp_time()
+                    else:
+                        wait_time = time() - self.ntp_last_sync
+                        self.print_message(f" ... waiting {wait_time} until next time check", info=True)
+                        await asyncio.sleep(wait_time)
         except asyncio.CancelledError:
             self.print_message(" ... ntp sync task was cancelled", error=True)
 
