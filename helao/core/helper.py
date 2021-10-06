@@ -2,17 +2,23 @@
 Miscellaneous helper functions.
 
 """
-import os
-# import uuid
-import time
 import datetime
-import shortuuid
+import os
+
+# import uuid
+import shutil
+import time
 import zipfile
-from typing import Any, Optional
 from asyncio import Queue
-from colorama import Fore, Back, Style
 from time import strftime
+from typing import Any, Optional
+
 import pyaml
+import shortuuid
+from aiofiles.os import wrap
+from colorama import Back, Fore, Style
+
+async_copy = wrap(shutil.copy)
 
 
 def gen_uuid(label: str, timestamp: Optional[str] = None, trunc: int = 8):
@@ -99,7 +105,8 @@ def dict_to_prc(d: dict, level: int = 0):
     #     else:
     #         lines.append(f"{'    '*level}{k}: {str(v).strip()}")
     # return "\n".join(lines)
-    return pyaml.dump(d, sort_dicts=False, indent=level*4)
+    return pyaml.dump(d, sort_dicts=False, indent=level * 4)
+
 
 # multisubscriber queue by Kyle Smith
 # https://github.com/smithk86/asyncio-multisubscriber-queue
@@ -171,7 +178,6 @@ class MultisubscriberQueue(object):
         for q in self.subscribers:
             await q.put(data)
 
-
     def put_nowait(self, data: Any):
         """
         Put new data on all subscriber queues
@@ -180,7 +186,6 @@ class MultisubscriberQueue(object):
         """
         for q in self.subscribers:
             q.put_nowait(data)
-
 
     async def close(self):
         """
@@ -214,21 +219,21 @@ def eval_val(x):
     if isinstance(x, list):
         nv = eval_array(x)
     elif isinstance(x, dict):
-        nv = {k: eval_val(dk) for k,dk in x.items()}
+        nv = {k: eval_val(dk) for k, dk in x.items()}
     elif isinstance(x, str):
-        if x.replace('.','',1).lstrip("-").isdigit():
-            if '.' in x:
+        if x.replace(".", "", 1).lstrip("-").isdigit():
+            if "." in x:
                 nv = float(x)
             else:
                 nv = int(x)
         else:
             nv = x
     else:
-        nv = x 
+        nv = x
     return nv
 
 
-def print_message(server_cfg,server_name,*args,**kwargs):
+def print_message(server_cfg, server_name, *args, **kwargs):
     precolor = ""
     if "error" in kwargs:
         precolor = f"{Style.BRIGHT}{Fore.RED}"
@@ -236,9 +241,8 @@ def print_message(server_cfg,server_name,*args,**kwargs):
         precolor = f"{Style.BRIGHT}{Fore.YELLOW}"
     if "info" in kwargs:
         precolor = f"{Style.BRIGHT}{Fore.GREEN}"
-        
 
-    srv_type = server_cfg.get("group","")
+    srv_type = server_cfg.get("group", "")
     style = ""
     if srv_type == "orchestrator":
         style = f"{Style.BRIGHT}{Fore.GREEN}"
@@ -251,18 +255,20 @@ def print_message(server_cfg,server_name,*args,**kwargs):
     else:
         style = ""
     # style = server_cfg.get("msg_color",style)
-    
+
     for arg in args:
-        print(f"{precolor}[{strftime('%H:%M:%S')}_{server_name}]:{Style.RESET_ALL} {style}{arg}{Style.RESET_ALL}")
+        print(
+            f"{precolor}[{strftime('%H:%M:%S')}_{server_name}]:{Style.RESET_ALL} {style}{arg}{Style.RESET_ALL}"
+        )
 
 
 def cleanupdict(d):
-   clean = {}
-   for k, v in d.items():
-      if isinstance(v, dict):
-         nested = cleanupdict(v)
-         if len(nested.keys()) > 0:
-            clean[k] = nested
-      elif v is not None:
-         clean[k] = v
-   return clean
+    clean = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            nested = cleanupdict(v)
+            if len(nested.keys()) > 0:
+                clean[k] = nested
+        elif v is not None:
+            clean[k] = v
+    return clean
