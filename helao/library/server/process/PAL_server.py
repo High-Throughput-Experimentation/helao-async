@@ -258,7 +258,7 @@ def makeApp(confPrefix, servKey):
     #                                       sample: Optional[liquid_sample] = liquid_sample(**{
     #                                           "machine_name":gethostname(),
     #                                           "source": None,
-    #                                           "volume_mL": 0.0,
+    #                                           "volume_ml": 0.0,
     #                                           "process_time": strftime("%Y%m%d.%H%M%S"),
     #                                           "chemical": [],
     #                                           "mass": [],
