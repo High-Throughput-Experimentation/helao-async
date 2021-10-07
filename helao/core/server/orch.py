@@ -72,7 +72,7 @@ class Orch(Base):
         super().__init__(fastapp)
         self.process_lib = import_sequences(
             world_config_dict=self.world_cfg,
-            library_path=None,
+            sequence_path=None,
             server_name=self.server_name,
         )
         # instantiate process_group/experiment queue, process queue
