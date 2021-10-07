@@ -7,7 +7,7 @@ import aiofiles
 
 
 from helao.core.server import Base
-from helao.core.data import HTE_legacy_API
+from helao.core.data import HTELegacyAPI
 
 
 class LocalDataHandler:
@@ -112,7 +112,7 @@ class HTEdata:
         self.config_dict = process_serv.server_cfg["params"]
 
 
-        self.dataAPI = HTE_legacy_API(self.base)
+        self.dataAPI = HTELegacyAPI(self.base)
 
 
     def get_platexycalibration(self, plateid: int,*args,**kwargs):

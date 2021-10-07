@@ -58,7 +58,7 @@ from typing import Optional, List, Union
 from helao.core.server import makeVisServ
 from helao.core.server import import_sequences, async_private_dispatcher
 # from helao.core.data import liquid_sample_no_API
-from helao.core.data import HTE_legacy_API
+from helao.core.data import HTELegacyAPI
 from helao.core.schema import cProcess_group
 from helao.core.server import Vis
 
@@ -80,7 +80,7 @@ class C_async_operator:
     def __init__(self, visServ: Vis):
         self.vis = visServ
 
-        self.dataAPI = HTE_legacy_API(self.vis)
+        self.dataAPI = HTELegacyAPI(self.vis)
 
         self.config_dict = self.vis.server_cfg["params"]
         self.orch_name = self.config_dict["orch"]

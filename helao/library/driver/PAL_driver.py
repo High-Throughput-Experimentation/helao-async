@@ -24,11 +24,9 @@ from helao.core.schema import cProcess
 from helao.core.server import Base
 from helao.core.error import error_codes
 from helao.library.driver.HTEdata_legacy import LocalDataHandler
-from helao.core.data import liquid_sample_API, old_liquid_sample_API
+from helao.core.data import LiquidSampleAPI, OldLiquidSampleAPI
 
-from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
-
-
+import helao.core.model.sample as hcms
 
 
 import nidaqmx
@@ -64,7 +62,7 @@ class VT_template:
         self.max_vol_mL: float = max_vol_mL
         self.vials: List[bool] = [False for i in range(positions)]
         self.vol_mL: List[float] = [0.0 for i in range(positions)]
-        self.sample: List[sample_list] = [None for i in range(positions)]
+        self.sample: List[hcms.SampleList] = [None for i in range(positions)]
         self.dilution_factor: List[float] = [1.0 for i in range(positions)]
 
 
@@ -138,8 +136,8 @@ class PALtray:
 
 
 class cPALparams(BaseModel):
-    PAL_sample_in: sample_list = sample_list()
-    PAL_sample_out: sample_list = sample_list()
+    PAL_sample_in: hcms.SampleList = hcms.SampleList()
+    PAL_sample_out: hcms.SampleList = hcms.SampleList()
     PAL_method: PALmethods = PALmethods.none
     PAL_tool: str = ""
     PAL_volume_uL: int = 0  # uL
@@ -191,12 +189,12 @@ class cPAL:
 
         self.PAL_file = "PAL_holder_DB.json"
         # load backup of vial table, if file does not exist it will use the default one from above
-        asyncio.gather(self.trayDB_load_backup())
+        asyncio.gather(self.traydb_load_backup())
 
         self.local_data_dump = self.world_config["save_root"]
-        self.sample_no_DB_path = self.world_config["local_db_path"]
-        self.liquid_sample_DB = old_liquid_sample_API(self.base, self.sample_no_DB_path)
-        self.sqlite_liquid_sample_API = liquid_sample_API(self.base, self.sample_no_DB_path)
+        self.sample_no_db_path = self.world_config["local_db_path"]
+        self.liquid_sample_db = OldLiquidSampleAPI(self.base, self.sample_no_db_path)
+        self.sqlite_liquid_sample_API = LiquidSampleAPI(self.base, self.sample_no_db_path)
 
         self.sshuser = self.config_dict["user"]
         self.sshkey = self.config_dict["key"]
@@ -288,11 +286,12 @@ class cPAL:
             "PAL_method",
         ]
 
-    async def convert_oldDB_to_sqllite(self):
+
+    async def convert_olddb_to_sqllite(self):
         await self.sqlite_liquid_sample_API.old_jsondb_to_sqlitedb()
 
 
-    async def trayDB_reset(self, A):
+    async def traydb_reset(self, A):
         myactive = await self.base.contain_process(
             A,
             file_type="paltray_helao__file",
@@ -303,11 +302,11 @@ class cPAL:
             myactive.finish_hlo_header(realtime=await myactive.set_realtime())
 
         # backup to json
-        await self.trayDB_backup(reset=True, myactive = myactive)
+        await self.traydb_backup(reset=True, myactive = myactive)
         # full backup to csv
         for tray in range(len(self.trays)):
             for slot in range(3):  # each tray has 3 slots
-                await self.trayDB_export_csv(tray + 1, slot + 1, myactive)
+                await self.traydb_export_csv(tray + 1, slot + 1, myactive)
         # reset PAL table
         # todo change that to a config config
         self.trays = [
@@ -315,11 +314,11 @@ class cPAL:
             PALtray(slot1=VT54(max_vol_mL=2.0), slot2=VT54(max_vol_mL=2.0), slot3=None),
         ]
         # save new one so it can be loaded of Program startup
-        await self.trayDB_backup(reset=False)
+        await self.traydb_backup(reset=False)
         return await myactive.finish()
 
 
-    async def trayDB_load_backup(self):
+    async def traydb_load_backup(self):
         file_path = os.path.join(self.local_data_dump, self.PAL_file)
         self.base.print_message(f" ... loading PAL table from: {file_path}")
         if not os.path.exists(file_path):
@@ -345,7 +344,7 @@ class cPAL:
         # load back into self.trays
         # this does not care about the sequence
         # (double entries will be overwritten by the last one in the dict)
-        # reset old tray DB
+        # reset old tray db
         self.trays = []
         for traynum, trayitem in trays_dict.items():
             # self.base.print_message(" ... tray num", traynum)
@@ -392,7 +391,7 @@ class cPAL:
 
 
 
-    async def trayDB_backup(self, reset: bool = False, myactive = None):
+    async def traydb_backup(self, reset: bool = False, myactive = None):
         datafile = LocalDataHandler()
         datafile.filepath = self.local_data_dump
         if reset:
@@ -436,7 +435,7 @@ class cPAL:
         await datafile.close_file_async()
 
 
-    async def trayDB_update(
+    async def traydb_update(
         self, 
         tray: int, 
         slot: int, 
@@ -456,7 +455,7 @@ class cPAL:
                     self.trays[tray].slots[slot].vol_mL[vial] = vol_mL
                     self.trays[tray].slots[slot].sample[vial] = sample
                     # backup file
-                    await self.trayDB_backup()
+                    await self.traydb_backup()
                     return True
                 else:
                     if dilute is True:
@@ -468,7 +467,7 @@ class cPAL:
                         self.trays[tray].slots[slot].vol_mL[vial] = tot_vol
                         self.trays[tray].slots[slot].dilution_factor[vial] = new_df
                         
-                        await self.trayDB_backup()
+                        await self.traydb_backup()
                         return True
                     else:
                         return False            
@@ -479,9 +478,9 @@ class cPAL:
         pass
 
 
-    async def trayDB_export_csv(self, tray, slot, myactive):
+    async def traydb_export_csv(self, tray, slot, myactive):
         # save full table as backup too
-        await self.trayDB_backup()
+        await self.traydb_backup()
 
         if self.trays[tray - 1] is not None:
             if self.trays[tray - 1].slots[slot - 1] is not None:
@@ -512,7 +511,7 @@ class cPAL:
                     )
 
 
-    async def trayDB_export_icpms(self, 
+    async def traydb_export_icpms(self, 
                                   tray: int, 
                                   slot: int, 
                                   myactive, 
@@ -522,7 +521,7 @@ class cPAL:
                                   dilution_factor: float = None,
 ):
         # save full table as backup too
-        await self.trayDB_backup()
+        await self.traydb_backup()
 
         if self.trays[tray - 1] is not None:
             if self.trays[tray - 1].slots[slot - 1] is not None:
@@ -561,7 +560,7 @@ class cPAL:
                     )
 
 
-    async def trayDB_get_db(self, A):
+    async def traydb_get_db(self, A):
         """Returns vial tray sample table"""
         tray =  A.process_params["tray"]
         slot =  A.process_params["slot"]
@@ -583,9 +582,9 @@ class cPAL:
         if self.trays[tray - 1] is not None:
             if self.trays[tray - 1].slots[slot - 1] is not None:
                 if csv:
-                    await self.trayDB_export_csv(tray, slot, myactive)
+                    await self.traydb_export_csv(tray, slot, myactive)
                 if icpms:
-                    await self.trayDB_export_icpms(
+                    await self.traydb_export_icpms(
                                                  tray = tray,
                                                  slot = slot,
                                                  myactive = myactive,
@@ -600,7 +599,7 @@ class cPAL:
         return await myactive.finish()
                 
 
-    async def trayDB_get_first_full(self, vialtable = None):
+    async def traydb_get_first_full(self, vialtable = None):
         new_tray = None
         new_slot = None
         new_vial = None
@@ -627,7 +626,7 @@ class cPAL:
                 "vial": new_vial}
 
 
-    async def trayDB_new(self, req_vol: float = 2.0,*args,**kwargs):
+    async def traydb_new(self, req_vol: float = 2.0,*args,**kwargs):
         """Returns an empty vial position for given max volume.\n
         For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.\n
         It will select the first empty vial which has the smallest volume that still can hold req_vol"""
@@ -657,7 +656,7 @@ class cPAL:
         return {"tray": new_tray, "slot": new_slot, "vial": new_vial}
 
 
-    async def trayDB_get_vial_sample(self, tray: int, slot: int, vial: int):
+    async def traydb_get_vial_sample(self, tray: int, slot: int, vial: int):
         tray -= 1
         slot -= 1
         vial -= 1
@@ -822,7 +821,7 @@ class cPAL:
                     self.base.print_message(f" ... source_lotnumber: {source_lotnumber}")
                     
                     # this is a sample reference, it needs to be added to the db later
-                    PAL_sample_out_ref = liquid_sample(
+                    PAL_sample_out_ref = hcms.LiquidSample(
                             process_group_uuid=self.process.process_group_uuid,
                             process_uuid=self.process.process_uuid,
                             source=source,
@@ -852,14 +851,14 @@ class cPAL:
                     # update sample creation time
                     PAL_sample_out_ref.sample_creation_timecode = PALparams.PAL_continue_time
 
-                    # add sample to DB
+                    # add sample to db
                     PAL_sample_out = await self.liquid_sample_create_new(PAL_sample_out_ref)
 
                     # TODO: check if ID was really created (later)
                     # add sample out to main PALparams
                     self.IO_PALparams.PAL_sample_out.samples.append(PAL_sample_out.samples[0])
     
-                    # update PAL tray DB
+                    # update PAL tray db
                     error = await self.sendcommand_update_tray_helper(PALparams)
     
     
@@ -919,7 +918,7 @@ class cPAL:
         error =  error_codes.none
 
         if PALparams.PAL_method == PALmethods.archive:
-            newvialpos = await self.trayDB_new(
+            newvialpos = await self.traydb_new(
                             req_vol = PALparams.PAL_volume_uL/1000.0
                             )
             if newvialpos["tray"] is not None:
@@ -934,13 +933,13 @@ class cPAL:
                 error = error_codes.not_available
         elif PALparams.PAL_method == PALmethods.dilute:
             PALparams.PAL_dest = "tray"
-            oldvial = await self.trayDB_get_vial_liquid_sample(
+            oldvial = await self.traydb_get_vial_liquid_sample(
                             PALparams.PAL_dest_tray,
                             PALparams.PAL_dest_slot,
                             PALparams.PAL_dest_vial
                             )
             if oldvial["sample"] is not None:
-                PALparams.PAL_sample_out = sample_list(samples=[oldvial["sample"]])
+                PALparams.PAL_sample_out = hcms.SampleList(samples=[oldvial["sample"]])
             else:
                 error = error_codes.not_available
                 self.base.print_message(" ... old liquid_sample is None.", error= True)
@@ -1188,7 +1187,7 @@ class cPAL:
         # only needs to be updated if
         if  PALparams.PAL_dest_tray is not None:
             if PALparams.PAL_method == PALmethods.dilute:
-                retval = await self.trayDB_update(
+                retval = await self.traydb_update(
                                                   tray = PALparams.PAL_dest_tray,
                                                   slot = PALparams.PAL_dest_slot,
                                                   vial = PALparams.PAL_dest_vial,
@@ -1199,7 +1198,7 @@ class cPAL:
             elif PALparams.PAL_method == PALmethods.deepclean:
                 retval = True
             else:
-                retval = await self.trayDB_update(
+                retval = await self.traydb_update(
                                                   tray = PALparams.PAL_dest_tray,
                                                   slot = PALparams.PAL_dest_slot,
                                                   vial = PALparams.PAL_dest_vial,
@@ -1238,7 +1237,7 @@ class cPAL:
                             self.IO_PALparams.PAL_sample_in = await self.liquid_sample_get_last(self.IO_PALparams.PAL_sample_in.samples[0])
                             self.base.print_message(f" ... correct PAL_sample_in is now: {self.IO_PALparams.PAL_sample_in.samples[0]}")
                         else:
-                            # update inforation of sample from DB
+                            # update inforation of sample from db
                             # TODO also for other sample types
                             self.IO_PALparams.PAL_sample_in = await self.liquid_sample_get(self.IO_PALparams.PAL_sample_in.samples[0])
 
@@ -1266,7 +1265,7 @@ class cPAL:
         
         
                                 if self.IO_PALparams.PAL_method == PALmethods.dilute:
-                                    newvialpos = await self.trayDB_get_first_full(vialtable = backuptrays)
+                                    newvialpos = await self.traydb_get_first_full(vialtable = backuptrays)
                                     if newvialpos["tray"] is not None:
                                         # mark this spot as False now so 
                                         # it won't be found again next time
@@ -1358,31 +1357,31 @@ class cPAL:
         pass
 
 
-    async def liquid_sample_get_last(self, sample: liquid_sample,*args,**kwargs):
+    async def liquid_sample_get_last(self, sample: hcms.LiquidSample,*args,**kwargs):
         # we work only with "sample_lists" but the request asks for a single sample
         # but will return it as a sample_list (that one does full type checking)
         if sample.sample_no == None:
             sample.sample_no = -1 # signals to get the last one
-        lastno = await self.liquid_sample_DB.count_samples()
+        lastno = await self.liquid_sample_db.count_samples()
         sample.sample_no += lastno+1
-        sample = await self.liquid_sample_DB.get_sample(sample)
-        return sample_list(samples=[sample])
+        sample = await self.liquid_sample_db.get_sample(sample)
+        return hcms.SampleList(samples=[sample])
 
 
-    async def liquid_sample_get(self, sample: liquid_sample,*args,**kwargs):
-        sample = await self.liquid_sample_DB.get_sample(sample)
-        return sample_list(samples=[sample])
+    async def liquid_sample_get(self, sample: hcms.LiquidSample,*args,**kwargs):
+        sample = await self.liquid_sample_db.get_sample(sample)
+        return hcms.SampleList(samples=[sample])
 
 
     async def liquid_sample_create_new(
         self,
-        sample: liquid_sample,
+        sample: hcms.LiquidSample,
         *args,**kwargs
     ):
         sample.machine_name=self.base.hostname
         sample.server_name = self.base.server_name
-        sample = await self.liquid_sample_DB.new_sample(sample)
-        return sample_list(samples=[sample])
+        sample = await self.liquid_sample_db.new_sample(sample)
+        return hcms.SampleList(samples=[sample])
 
 
     def check_for_empty_samples(self, samples):

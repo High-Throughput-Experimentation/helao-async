@@ -1,107 +1,65 @@
-""" models.py
-Standard classes for HelaoFastAPI server response objects.
 
-"""
-from typing import Optional, List, Union
-from collections import defaultdict
-from enum import Enum
-from pydantic import BaseModel, ValidationError, validator
+__all__ = ["LiquidSample",
+           "GasSample",
+           "SolidSample",
+           "AssemblySample",
+           "SampleList"]
+
+from pydantic import BaseModel
+from pydantic import validator
+from typing import Union, List, Optional
 from socket import gethostname
 from datetime import datetime
 
+
 from helao.core.helper import print_message
 
-class return_process_group(BaseModel):
-    """Return class for queried cProcess_group objects."""
-    index: int
-    uid: Union[str, None]
-    label: str
-    sequence: str
-    pars: dict
-    access: str
+
+def _sample_model_list_validator(model_list, values, **kwargs):
+    """validates samples models in a list"""
+
+    def dict_to_model(model_dict):
+        sample_type = model_dict.get("sample_type", None)
+        if sample_type is None:
+            return None
+        elif sample_type == "liquid":
+            return LiquidSample(**model_dict)
+        elif sample_type == "gas":
+            return GasSample(**model_dict)
+        elif sample_type == "solid":
+            return SolidSample(**model_dict)
+        elif sample_type == "assembly":
+            return AssemblySample(**model_dict)
+        else:
+            print_message({}, "model", f"unsupported sample_type '{sample_type}'", error = True)
+            raise ValueError("model", f"unsupported sample_type '{sample_type}'")
+
+    
+    if model_list is None or not isinstance(model_list, list):
+        print_message({}, "model", f"validation error, type '{type(model_list)}' is not a valid sample model list", error = True)
+        raise ValueError("must be valid sample model list")
+    
+    for i, model in enumerate(model_list):
+        if isinstance(model, dict):
+            model_list[i] = dict_to_model(model)
+        elif isinstance(model, LiquidSample):
+            continue
+        elif isinstance(model, SolidSample):
+            continue
+        elif isinstance(model, GasSample):
+            continue
+        elif isinstance(model, AssemblySample):
+            continue
+        elif model is None:
+            continue
+        else:
+            print_message({}, "model", f"validation error, type '{type(model)}' is not a valid sample model", error = True)
+            raise ValueError("must be valid sample model")
+
+    return model_list
 
 
-class return_process_group_list(BaseModel):
-    """Return class for queried cProcess_group list."""
-    process_groups: List[return_process_group]
-
-
-class return_process(BaseModel):
-    """Return class for queried process objects."""
-    index: int
-    uid: Union[str, None]
-    server: str
-    process: str
-    pars: dict
-    preempt: int
-
-
-class return_process_list(BaseModel):
-    """Return class for queried process list."""
-    processes: List[return_process]
-
-
-class return_finished_process(BaseModel):
-    """Standard return class for processes that finish with response."""
-    technique_name: str
-    access: str
-    orch_name: str
-    process_group_timestamp: str
-    process_group_uuid: str
-    process_group_label: str
-    sequence: str
-    sequence_pars: dict
-    result_dict: dict
-    process_server: str
-    process_queue_time: str
-    process_real_time: Optional[str]
-    process_name: str
-    process_params: dict
-    process_uuid: str
-    process_enum: str
-    process_abbr: str
-    process_num: str
-    start_condition: Union[int, dict]
-    save_prc: bool
-    save_data: bool
-    samples_in: Optional[dict]
-    samples_out: Optional[dict]
-    output_dir: Optional[str]
-    file_dict: Optional[dict]
-    column_names: Optional[list]
-    header: Optional[str]
-    data: Optional[list]
-
-
-class return_running_process(BaseModel):
-    """Standard return class for processes that finish after response."""
-    technique_name: str
-    access: str
-    orch_name: str
-    process_group_timestamp: str
-    process_group_uuid: str
-    process_group_label: str
-    sequence: str
-    sequence_pars: dict
-    result_dict: dict
-    process_server: str
-    process_queue_time: str
-    process_real_time: Optional[str]
-    process_name: str
-    process_params: dict
-    process_uuid: str
-    process_enum: str
-    process_abbr: str
-    process_num: str
-    start_condition: Union[int, dict]
-    save_prc: bool
-    save_data: bool
-    samples_in: Optional[dict]
-    samples_out: Optional[dict]
-    output_dir: Optional[str]
-
-
-class base_sample(BaseModel):
+class _BaseSample(BaseModel):
     global_label: Optional[str] = None
     sample_type: Optional[str] = None
     sample_no: Optional[int] = None
@@ -145,7 +103,7 @@ class base_sample(BaseModel):
             }
 
 
-class liquid_sample(base_sample):
+class LiquidSample(_BaseSample):
     """base class for liquid samples"""
     sample_type: Optional[str] = "liquid"
     volume_mL: Optional[float] = None
@@ -174,7 +132,7 @@ class liquid_sample(base_sample):
         return "liquid"
 
 
-class solid_sample(base_sample):
+class SolidSample(_BaseSample):
     """base class for solid samples"""
     sample_type: Optional[str] = "solid"
     machine_name: Optional[str] = "legacy"
@@ -203,7 +161,7 @@ class solid_sample(base_sample):
         return "solid"
         
 
-class gas_sample(base_sample):
+class GasSample(_BaseSample):
     """base class for gas samples"""
     sample_type: Optional[str] = "gas"
     volume_mL: Optional[float] = None
@@ -230,51 +188,7 @@ class gas_sample(base_sample):
         return "gas"
 
 
-def sample_model_list_validator(model_list, values, **kwargs):
-    """validates samples models in a list"""
-
-    def dict_to_model(model_dict):
-        sample_type = model_dict.get("sample_type", None)
-        if sample_type is None:
-            return None
-        elif sample_type == "liquid":
-            return liquid_sample(**model_dict)
-        elif sample_type == "gas":
-            return gas_sample(**model_dict)
-        elif sample_type == "solid":
-            return solid_sample(**model_dict)
-        elif sample_type == "assembly":
-            return assembly_sample(**model_dict)
-        else:
-            print_message({}, "model", f"unsupported sample_type '{sample_type}'", error = True)
-            raise ValueError("model", f"unsupported sample_type '{sample_type}'")
-
-    
-    if model_list is None or not isinstance(model_list, list):
-        print_message({}, "model", f"validation error, type '{type(model_list)}' is not a valid sample model list", error = True)
-        raise ValueError("must be valid sample model list")
-    
-    for i, model in enumerate(model_list):
-        if isinstance(model, dict):
-            model_list[i] = dict_to_model(model)
-        elif isinstance(model, liquid_sample):
-            continue
-        elif isinstance(model, solid_sample):
-            continue
-        elif isinstance(model, gas_sample):
-            continue
-        elif isinstance(model, assembly_sample):
-            continue
-        elif model is None:
-            continue
-        else:
-            print_message({}, "model", f"validation error, type '{type(model)}' is not a valid sample model", error = True)
-            raise ValueError("must be valid sample model")
-
-    return model_list
-
-
-class assembly_sample(base_sample):
+class AssemblySample(_BaseSample):
     sample_type: Optional[str] = "assembly"
     parts: Optional[list] = []
     sample_position: Optional[str] = "cell1_we" # usual default assembly position
@@ -290,7 +204,7 @@ class assembly_sample(base_sample):
 
     @validator("parts")
     def validate_parts(cls, value, values, **kwargs):
-        return sample_model_list_validator(value, values, **kwargs)
+        return _sample_model_list_validator(value, values, **kwargs)
 
 
     @validator("sample_type")
@@ -327,46 +241,11 @@ class assembly_sample(base_sample):
         return part_dict_list
 
 
-class sample_list(BaseModel):
+class SampleList(BaseModel):
     """ a combi basemodel which can contain all possible samples
     Its also a list and we should enforce samples as being a list"""
     samples: Optional[list] = [] # don't use union of models, that does not work here
 
     @validator("samples")
     def validate_samples(cls, value, values, **kwargs):
-        return sample_model_list_validator(value, values, **kwargs)
-
-
-class prc_file(BaseModel):
-    hlo_version: str = "2021.09.20"
-    technique_name: str
-    server_name: str
-    orchestrator: str
-    machine_name: str
-    access: str
-    output_dir: str
-    process_group_uuid: str
-    process_group_timestamp: str
-    process_uuid: str
-    process_queue_time: str
-    process_enum: Optional[float] = 0.0
-    process_name: str
-    process_abbr: Optional[str] = None
-    process_params: Union[dict, None] = None
-    samples_in: Optional[Union[dict, None]] = None
-    samples_out: Optional[Union[dict, None]] = None
-    files: Optional[Union[dict, None]] = None
-
-    
-class prg_file(BaseModel):
-    hlo_version: str = "2021.09.20"
-    orchestrator: str
-    access: str
-    process_group_uuid: str
-    process_group_timestamp: str
-    process_group_label: str
-    technique_name: str
-    sequence_name: str
-    sequence_params: Union[dict, None] = None
-    sequence_model: Union[dict, None] = None
-
+        return _sample_model_list_validator(value, values, **kwargs)

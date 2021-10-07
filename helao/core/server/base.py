@@ -24,7 +24,11 @@ from helao.core.helper import (
     cleanupdict,
     print_message,
 )
-from helao.core.model import prc_file, prg_file
+
+
+# from helao.core.model import prc_file, prg_file
+import helao.core.model.file as hcmf
+
 from helao.core.schema import cProcess
 
 from .api import HelaoFastAPI
@@ -394,7 +398,7 @@ class Base(object):
         "Regularly sync with NTP server."
         try:
             while True:
-                await asyncio.sleep(0.001)
+                await asyncio.sleep(10)
                 lock = asyncio.Lock()
                 async with lock:
                     time_inst = await aiofiles.open("ntpLastSync.txt", "r")
@@ -411,7 +415,8 @@ class Base(object):
                         self.print_message(f" ... last time check was more then { resync_time} ago, syncing time again.", error=True)
                         await self.get_ntp_time()
                     else:
-                        wait_time = time() - self.ntp_last_sync
+                        # wait_time = time() - self.ntp_last_sync
+                        wait_time = resync_time
                         self.print_message(f" ... waiting {wait_time} until next time check", info=True)
                         await asyncio.sleep(wait_time)
         except asyncio.CancelledError:
@@ -547,7 +552,7 @@ class Base(object):
             if self.process.process_enum is None:
                 self.process.process_enum = 0.0
 
-            self.prc_file = prc_file(
+            self.prc_file = hcmf.PrcFile(
                 hlo_version=f"{hlo_version}",
                 technique_name=self.process.technique_name,
                 server_name=self.base.server_name,
@@ -578,7 +583,7 @@ class Base(object):
 
                 if self.manual:
                     # create and write prg file for manual process
-                    self.manual_prg_file = prg_file(
+                    self.manual_prg_file = hcmf.PrgFile(
                         hlo_version=f"{hlo_version}",
                         orchestrator=self.process.orch_name,
                         access=self.process.access,

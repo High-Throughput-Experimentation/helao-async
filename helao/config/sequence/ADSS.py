@@ -22,9 +22,8 @@ from helao.core.schema import cProcess, cProcess_group
 from helao.core.server import process_start_condition
 from helao.library.driver.galil_driver import move_modes, transformation_mode
 
-from helao.library.driver.PAL_driver import PALmethods, Spacingmethod, PALtools
-from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
-
+from helao.library.driver.pal_driver import PALmethods, Spacingmethod, PALtools
+import helao.core.model.sample as hcms
 
 
 # list valid sequence functions 
@@ -90,16 +89,16 @@ def debug(process_group_Obj: cProcess_group,
                         "Tval": 10,
                         "SampleRate": 1.0,
                         "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                        "fast_samples_in":sample_list(samples=[
-                            liquid_sample(**{"sample_no":1}),
-                            liquid_sample(**{"sample_no":2}),
-                            liquid_sample(**{"sample_no":3}),
-                            liquid_sample(**{"sample_no":4}),
-                            liquid_sample(**{"sample_no":5}),
-                            liquid_sample(**{"sample_no":6}),
-                            liquid_sample(**{"sample_no":7}),
-                            liquid_sample(**{"sample_no":8}),
-                            liquid_sample(**{"sample_no":9}),
+                        "fast_samples_in":hcms.SampleList(samples=[
+                            hcms.LiquidSample(**{"sample_no":1}),
+                            hcms.LiquidSample(**{"sample_no":2}),
+                            hcms.LiquidSample(**{"sample_no":3}),
+                            hcms.LiquidSample(**{"sample_no":4}),
+                            hcms.LiquidSample(**{"sample_no":5}),
+                            hcms.LiquidSample(**{"sample_no":6}),
+                            hcms.LiquidSample(**{"sample_no":7}),
+                            hcms.LiquidSample(**{"sample_no":8}),
+                            hcms.LiquidSample(**{"sample_no":9}),
                             ]).dict()
                         },
         # "save_prc": False,
