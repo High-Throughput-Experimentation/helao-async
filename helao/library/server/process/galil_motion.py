@@ -116,8 +116,8 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/move")
     async def move(
         request: Request, 
-        d_mm: Optional[List[float]] = [],
-        axis: Optional[List[str]] = [],
+        d_mm: Optional[List[float]] = [0,0],
+        axis: Optional[List[str]] = ["x","y"],
         speed: Optional[int] = None,
         mode: Optional[move_modes] = "relative",
         transformation: Optional[transformation_mode] = "motorxy"  # default, nothing to do
