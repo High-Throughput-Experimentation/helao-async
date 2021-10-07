@@ -23,8 +23,12 @@ from helao.core.server import Base
 from helao.core.error import error_codes
 import helao.core.model.sample as hcms
 
+
+#TODO, FIXME, remove items not in config
 class pumpitems(str, Enum):
     PeriPump = "PeriPump"
+    PeriPump1 = "PeriPump1"
+    PeriPump2 = "PeriPump2"
     # MultiPeriPump = 'MultiPeriPump'
     Direction = "Direction"
 

@@ -148,3 +148,24 @@ class cProcess(cProcess_group):
         if offset is not None:
             atime = datetime.fromtimestamp(atime.timestamp() + offset)
         self.process_queue_time = atime.strftime("%Y%m%d.%H%M%S%f")
+
+
+class Sequencer(object):
+    def __init__(
+        self,
+        process_group_Obj: cProcess_group,
+        local_vars,
+    ):
+        self.process_group_Obj = process_group_Obj
+        self.process_list = []
+        self.local_vars = local_vars
+        
+    def update_locals(self):
+        print(self.local_vars)
+        pass
+    
+    
+    def add_process(self, process_dict: dict):
+        new_process_dict = self.process_group_Obj.as_dict()
+        new_process_dict.update(process_dict)
+        self.process_list.append(cProcess(inputdict=new_process_dict))
