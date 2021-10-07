@@ -26,14 +26,13 @@ from helao.core.helper import (
 )
 
 
-# from helao.core.model import prc_file, prg_file
 import helao.core.model.file as hcmf
 
 from helao.core.schema import cProcess
 
 from .api import HelaoFastAPI
 from .dispatcher import async_private_dispatcher
-from .version import hlo_version
+import helao.core.server.version as version
 
 # ANSI color codes converted to the Windows versions
 colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
@@ -431,11 +430,19 @@ class Base(object):
         process_group_timestamp = process_group.process_group_timestamp
         process_group_dir = self.get_process_group_dir(process_group)
         output_path = os.path.join(
-            self.save_root, process_group_dir, f"{process_group_timestamp}.prg"
+            self.save_root, process_group_dir
         )
+        output_file = os.path.join(
+            output_path, f"{process_group_timestamp}.prg"
+        )
+        
         self.print_message(f" ... writing to prg: {output_path}")
         output_str = pyaml.dump(prg_dict, sort_dicts=False)
-        file_instance = await aiofiles.open(output_path, mode="a+")
+
+        if not os.path.exists(output_path):
+                os.makedirs(output_path, exist_ok=True)
+        
+        file_instance = await aiofiles.open(output_file, mode="a+")
 
         if not output_str.endswith("\n"):
             output_str += "\n"
@@ -553,7 +560,7 @@ class Base(object):
                 self.process.process_enum = 0.0
 
             self.prc_file = hcmf.PrcFile(
-                hlo_version=f"{hlo_version}",
+                hlo_version=f"{version.hlo_version}",
                 technique_name=self.process.technique_name,
                 server_name=self.base.server_name,
                 orchestrator=self.process.orch_name,
@@ -584,7 +591,7 @@ class Base(object):
                 if self.manual:
                     # create and write prg file for manual process
                     self.manual_prg_file = hcmf.PrgFile(
-                        hlo_version=f"{hlo_version}",
+                        hlo_version=f"{version.hlo_version}",
                         orchestrator=self.process.orch_name,
                         access=self.process.access,
                         process_group_uuid=self.process.process_group_uuid,
@@ -664,7 +671,7 @@ class Base(object):
                     file_ext = "hlo"
 
                     header_dict = {
-                        "hlo_version": hlo_version,
+                        "hlo_version": version.hlo_version,
                         "process_name": self.process.process_abbr,
                         "column_headings": file_data_keys,
                     }
@@ -776,22 +783,12 @@ class Base(object):
             # return self.set_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
             return self.base.set_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
 
+
         def set_realtime_nowait(
             self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
         ):
             return self.base.set_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
-            # if offset is None:
-            #     if self.base.ntp_offset is not None:
-            #         offset_ns = int(np.floor(self.base.ntp_offset * 1e9))
-            #     else:
-            #         offset_ns = 0.0
-            # else:
-            #     offset_ns = int(np.floor(offset * 1e9))
-            # if epoch_ns is None:
-            #     process_real_time = time_ns() + offset_ns
-            # else:
-            #     process_real_time = epoch_ns + offset_ns
-            # return process_real_time
+
 
         async def set_output_file(
             self, filename: str, file_sample_key: str, header: Optional[str] = None
