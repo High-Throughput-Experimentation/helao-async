@@ -106,8 +106,8 @@ class _BaseSample(BaseModel):
 class LiquidSample(_BaseSample):
     """base class for liquid samples"""
     sample_type: Optional[str] = "liquid"
-    volume_mL: Optional[float] = None
-    pH: Optional[float]=None
+    volume_ml: Optional[float] = None
+    ph: Optional[float]=None
 
     def prc_dict(self):
         prc_dict = self.create_initial_prc_dict()
@@ -164,7 +164,7 @@ class SolidSample(_BaseSample):
 class GasSample(_BaseSample):
     """base class for gas samples"""
     sample_type: Optional[str] = "gas"
-    volume_mL: Optional[float] = None
+    volume_ml: Optional[float] = None
 
     def prc_dict(self):
         prc_dict = self.create_initial_prc_dict()
@@ -190,7 +190,7 @@ class GasSample(_BaseSample):
 
 class AssemblySample(_BaseSample):
     sample_type: Optional[str] = "assembly"
-    parts: Optional[list] = []
+    parts: Optional[Union[list, None]] = []
     sample_position: Optional[str] = "cell1_we" # usual default assembly position
 
     def get_global_label(self):
@@ -204,7 +204,10 @@ class AssemblySample(_BaseSample):
 
     @validator("parts")
     def validate_parts(cls, value, values, **kwargs):
-        return _sample_model_list_validator(value, values, **kwargs)
+        if value is None:
+            return []
+        else:
+            return _sample_model_list_validator(value, values, **kwargs)
 
 
     @validator("sample_type")
