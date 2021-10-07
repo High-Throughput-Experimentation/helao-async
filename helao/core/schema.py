@@ -10,8 +10,7 @@ import json
 
 from helao.core.helper import gen_uuid
 from helao.core.helper import print_message
-from helao.core.model import sample_list
-
+import helao.core.model.sample as hcms
 
 class cProcess_group(object):
     "Sample-process grouping class."
@@ -104,8 +103,8 @@ class cProcess(cProcess_group):
         self.prc_samples_out = []
 
         # holds samples basemodel for parsing between processes etc
-        self.samples_in: sample_list = []
-        self.samples_out: sample_list = []
+        self.samples_in: hcms.SampleList = []
+        self.samples_out: hcms.SampleList = []
 
         # self.samples_in = imports.get("samples_in", [])
         # the following attributes are set during process dispatch but can be imported

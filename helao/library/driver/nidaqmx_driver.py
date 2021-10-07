@@ -21,7 +21,7 @@ from nidaqmx.constants import TriggerType
 from helao.core.schema import cProcess
 from helao.core.server import Base
 from helao.core.error import error_codes
-from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
+import helao.core.model.sample as hcms
 
 class pumpitems(str, Enum):
     PeriPump = "PeriPump"
@@ -42,7 +42,7 @@ class cNIMAX:
 
         self.process = None  # for passing process object from technique method to measure loop
         self.active = None  # for holding active process object, clear this at end of measurement
-        self.samples_in = sample_list()
+        self.samples_in = hcms.SampleList()
 
         # seems to work by just defining the scale and then only using its name
         try:
@@ -304,7 +304,7 @@ class cNIMAX:
                         _ = await self.active.finish()
                         self.active = None
                         self.process = None
-                        self.samples_in = sample_list()
+                        self.samples_in = hcms.SampleList()
 
 
                         if self.IO_estop:

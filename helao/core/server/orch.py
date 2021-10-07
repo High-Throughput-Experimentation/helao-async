@@ -27,14 +27,15 @@ from helao.core.helper import (
     cleanupdict,
     print_message,
 )
-from helao.core.model import (
-    prc_file,
-    prg_file,
-    return_process,
-    return_process_group,
-    return_process_group_list,
-    return_process_list,
-)
+# from helao.core.model import (
+#     return_process,
+#     ReturnProcessGroup,
+#     ReturnProcessGroupList,
+#     return_process_list,
+# )
+import helao.core.model.file as hcmf
+import helao.core.model.returnmodel as hcmr
+
 from helao.core.schema import cProcess, cProcess_group
 
 from .api import HelaoFastAPI
@@ -42,7 +43,8 @@ from .base import Base
 from .dispatcher import async_private_dispatcher, async_process_dispatcher
 from .import_sequences import import_sequences
 from .process_start_condition import process_start_condition
-from .version import hlo_version
+import helao.core.server.version as version
+
 
 # ANSI color codes converted to the Windows versions
 colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
@@ -279,8 +281,8 @@ class Orch(Base):
                         f" ... optional params: {self.active_process_group.sequence_pars}"
                     )
 
-                    self.prg_file = prg_file(
-                        hlo_version=f"{hlo_version}",
+                    self.prg_file = hcmf.PrgFile(
+                        hlo_version=f"{version.hlo_version}",
                         orchestrator=self.active_process_group.orch_name,
                         access="hte",
                         process_group_uuid=self.active_process_group.process_group_uuid,
@@ -602,7 +604,7 @@ class Orch(Base):
         """Return the current queue of process_group_dq."""
 
         process_group_list = [
-            return_process_group(
+            hcmr.ReturnProcessGroup(
                 index=i,
                 uid=process_group.process_group_uuid,
                 label=process_group.process_group_label,
@@ -612,7 +614,7 @@ class Orch(Base):
             )
             for i, process_group in enumerate(self.process_group_dq)
         ]
-        retval = return_process_group_list(process_groups=process_group_list)
+        retval = hcmr.ReturnProcessGroupList(process_groups=process_group_list)
         return retval
 
     def get_process_group(self, last=False):
@@ -623,7 +625,7 @@ class Orch(Base):
             process_group = self.active_process_group
         if process_group is not None:
             process_group_list = [
-                return_process_group(
+                hcmr.ReturnProcessGroup(
                     index=-1,
                     uid=process_group.process_group_uuid,
                     label=process_group.process_group_label,
@@ -634,7 +636,7 @@ class Orch(Base):
             ]
         else:
             process_group_list = [
-                return_process_group(
+                hcmr.ReturnProcessGroup(
                     index=-1,
                     uid=None,
                     label=None,
@@ -643,7 +645,7 @@ class Orch(Base):
                     access=None,
                 )
             ]
-        retval = return_process_group_list(process_groups=process_group_list)
+        retval = hcmr.ReturnProcessGroupList(process_groups=process_group_list)
         return retval
 
     def list_active_processes(self):
@@ -654,7 +656,7 @@ class Orch(Base):
             for process_name, process_uuids in process_dict.items():
                 for process_uuid in process_uuids:
                     process_list.append(
-                        return_process(
+                        hcmr.ReturnProcess(
                             index=index,
                             uid=process_uuid,
                             server=process_serv,
@@ -664,13 +666,13 @@ class Orch(Base):
                         )
                     )
                     index = index + 1
-        retval = return_process_list(processes=process_list)
+        retval = hcmr.ReturnProcessList(processes=process_list)
         return retval
 
     def list_processes(self):
         """Return the current queue of process_dq."""
         process_list = [
-            return_process(
+            hcmr.ReturnProcess(
                 index=i,
                 uid=process.process_uuid,
                 server=process.process_server,
@@ -680,7 +682,7 @@ class Orch(Base):
             )
             for i, process in enumerate(self.process_dq)
         ]
-        retval = return_process_list(processes=process_list)
+        retval = hcmr.ReturnProcessList(processes=process_list)
         return retval
 
     def supplement_error_process(self, check_uuid: str, sup_process: cProcess):

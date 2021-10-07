@@ -7,11 +7,11 @@ from socket import gethostname
 from time import strftime
 
 from helao.core.server import make_process_serv, setup_process
-from helao.library.driver.PAL_driver import cPAL
-from helao.library.driver.PAL_driver import PALmethods
-from helao.library.driver.PAL_driver import Spacingmethod
-from helao.library.driver.PAL_driver import PALtools
-from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
+from helao.library.driver.pal_driver import cPAL
+from helao.library.driver.pal_driver import PALmethods
+from helao.library.driver.pal_driver import Spacingmethod
+from helao.library.driver.pal_driver import PALtools
+import helao.core.model.sample as hcms
 
 
 from fastapi import Request
@@ -41,7 +41,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/PAL_run_method")
     async def PAL_run_method(
         request: Request, 
-        fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1,"machine_name":gethostname()})]),
+        fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
         PAL_method: Optional[PALmethods] = PALmethods.fillfixed,
         PAL_tool: Optional[PALtools] = PALtools.LS3,
         PAL_source: Optional[str] = "elec_res1",
@@ -67,7 +67,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/PAL_archive")
     async def PAL_archive(
         request: Request, 
-        fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1,"machine_name":gethostname()})]),
+        fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
         PAL_tool: Optional[PALtools] = PALtools.LS3,
         PAL_source: Optional[str] = "lcfc_res",
         PAL_volume_uL: Optional[int] = 500,  # uL
@@ -93,7 +93,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/PAL_fill")
     async def PAL_fill(
         request: Request, 
-        fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1,"machine_name":gethostname()})]),
+        fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
         PAL_tool: Optional[PALtools] = PALtools.LS3,
         PAL_source: Optional[str] = "elec_res1",
         PAL_volume_uL: Optional[int] = 500,  # uL
@@ -113,7 +113,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/PAL_fillfixed")
     async def PAL_fillfixed(
         request: Request, 
-        fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1,"machine_name":gethostname()})]),
+        fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
         PAL_tool: Optional[PALtools] = PALtools.LS3,
         PAL_source: Optional[str] = "elec_res1",
         PAL_volume_uL: Optional[int] = 500,  # uL
@@ -150,7 +150,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/PAL_dilute")
     async def PAL_dilute(
         request: Request, 
-        fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1,"machine_name":gethostname()})]),
+        fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
         PAL_tool: Optional[PALtools] = PALtools.LS3,
         PAL_source: Optional[str] = "elec_res2",
         PAL_volume_uL: Optional[int] = 500,  # uL

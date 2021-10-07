@@ -23,8 +23,7 @@ import os
 import pyaml
 
 from helao.core.error import error_codes
-# from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample
-from helao.core.model import sample_list
+import helao.core.model.sample as hcms
 
 class Gamry_modes(str, Enum):
     CA = "CA"
@@ -146,7 +145,7 @@ class gamry:
         self.pstat = None
         self.process = None  # for passing process object from technique method to measure loop
         self.active =None  # for holding active process object, clear this at end of measurement
-        self.samples_in=sample_list()
+        self.samples_in=hcms.SampleList()
         # status is handled through active, call active.finish()
 
         if not "dev_id" in self.config_dict:
@@ -758,7 +757,7 @@ class gamry:
             _ = await self.active.finish()
             self.active = None
             self.process = None
-            self.samples_in=sample_list()
+            self.samples_in=hcms.SampleList()
 
             return {"measure": f"done_{self.IO_meas_mode}"}
         else:

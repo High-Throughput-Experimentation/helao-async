@@ -5,7 +5,8 @@ import colorama
 from colorama import Fore, Style
 import sys
 
-from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
+
+import helao.core.model.sample as hcms
 
 colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
 
@@ -21,11 +22,11 @@ def sample_model_unit_test():
         print(" --- testing single sample models ---")
         
         
-        test_liquid = liquid_sample()
-        test_gas = gas_sample()
-        test_solid = solid_sample()
-        test_assembly = assembly_sample(parts=[None])
-        test_assembly2 = assembly_sample(parts=[test_gas, test_solid, test_liquid, test_assembly])
+        test_liquid = hcms.LiquidSample()
+        test_gas = hcms.GasSample()
+        test_solid = hcms.SolidSample()
+        test_assembly = hcms.AssemblySample(parts=[None])
+        test_assembly2 = hcms.AssemblySample(parts=[test_gas, test_solid, test_liquid, test_assembly])
         # test_assembly2 = assembly_sample(parts=33)
         # test_assembly2 = assembly_sample(myparts=[])
         
@@ -92,7 +93,7 @@ def sample_model_unit_test():
         
         try:
             print(f"sample_model test {testcounter} ",end = "")
-            test_sample_list = sample_list(samples=[test_liquid,test_gas,test_solid,test_assembly,test_assembly2])
+            test_sample_list = hcms.SampleList(samples=[test_liquid,test_gas,test_solid,test_assembly,test_assembly2])
             print(passed_msg)
         except Exception as e:
             print(fail_msg, "cannot convert list of model dicts to model list")
@@ -208,7 +209,7 @@ def sample_model_unit_test():
         # testing sample list basemodel functions
         try:
             print(f"sample_model test {testcounter} ",end = "")
-            test_sample_list = sample_list(samples=[test_liquid.dict(),test_gas.dict(),test_solid.dict(),test_assembly.dict(), test_assembly2.dict()])
+            test_sample_list = hcms.SampleList(samples=[test_liquid.dict(),test_gas.dict(),test_solid.dict(),test_assembly.dict(), test_assembly2.dict()])
             print(passed_msg)
         except Exception as e:
             print(fail_msg, "cannot convert list of model dicts to model list")

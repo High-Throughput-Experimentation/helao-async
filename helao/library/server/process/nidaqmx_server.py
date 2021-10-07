@@ -23,7 +23,7 @@ from typing import Optional, List, Union
 
 from helao.core.server import make_process_serv, setup_process
 from helao.library.driver.nidaqmx_driver import cNIMAX, pumpitems
-from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
+import helao.core.model.sample as hcms
 
 def makeApp(confPrefix, servKey):
 
@@ -128,7 +128,8 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/run_cell_IV")
     async def run_cell_IV(
                               request: Request, 
-                              fast_samples_in: Optional[sample_list] = sample_list(samples=[liquid_sample(**{"sample_no":1})]),
+                              fast_samples_in: Optional[hcms.SampleList] = \
+                                  hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
                               Tval: Optional[float] = 10.0,
                               SampleRate: Optional[float] = 1.0, 
                               TTLwait: Optional[int] = -1,  # -1 disables, else select TTL channel

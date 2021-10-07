@@ -5,7 +5,7 @@ import json
 from socket import gethostname
 
 from fastapi import Request
-from helao.core.model import sample_list
+import helao.core.model.sample as hcms
 from helao.core.schema import cProcess
 
 
@@ -43,9 +43,9 @@ async def setup_process(request: Request):
         tmp_fast_samples_in = A.process_params.get("fast_samples_in", [])
         del A.process_params["fast_samples_in"]
         if type(tmp_fast_samples_in) is dict:
-            A.samples_in = sample_list(**tmp_fast_samples_in)
+            A.samples_in = hcms.SampleList(**tmp_fast_samples_in)
         elif type(tmp_fast_samples_in) is list:
-            A.samples_in = sample_list(samples=tmp_fast_samples_in)
+            A.samples_in = hcms.SampleList(samples=tmp_fast_samples_in)
 
     # setting some default values if process was not submitted via orch
     if A.machine_name is None:
@@ -56,8 +56,8 @@ async def setup_process(request: Request):
         A.process_group_label = "MANUAL"
     # sample_list cannot be serialized so needs to be updated here
     if A.samples_in == []:
-        A.samples_in = sample_list()
+        A.samples_in = hcms.SampleList()
     if A.samples_out == []:
-        A.samples_out = sample_list()
+        A.samples_out = hcms.SampleList()
 
     return A
