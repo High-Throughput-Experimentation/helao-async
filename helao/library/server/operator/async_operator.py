@@ -10,7 +10,7 @@ import json
 # import collections
 from functools import partial
 from importlib import import_module
-
+from socket import gethostname
 # import aiohttp
 # from collections import deque
 
@@ -141,9 +141,9 @@ class C_async_operator:
         self.button_update = Button(label="update tables", button_type="default", width=120)
         self.button_update.on_event(ButtonClick, self.callback_update_tables)
 
-        self.button_clear_dec = Button(label="clear process_groups", button_type="danger", width=100)
+        self.button_clear_dec = Button(label="clear prg", button_type="danger", width=100)
         self.button_clear_dec.on_event(ButtonClick, self.callback_clear_process_groups)
-        self.button_clear_process = Button(label="clear processes", button_type="danger", width=100)
+        self.button_clear_process = Button(label="clear prc", button_type="danger", width=100)
         self.button_clear_process.on_event(ButtonClick, self.callback_clear_processes)
 
         self.button_prepend = Button(label="prepend", button_type="default", width=150)
@@ -179,7 +179,7 @@ class C_async_operator:
 
         self.layout0 = layout([
             layout(
-                [Spacer(width=20), Div(text=f"<b>{self.config_dict['doc_name']}</b>", width=200+50, height=32, style={'font-size': '200%', 'color': 'red'})],
+                [Spacer(width=20), Div(text=f"<b>{self.config_dict.get('doc_name', 'Operator')} on {gethostname()}</b>", width=620, height=32, style={'font-size': '200%', 'color': 'red'})],
                 background="#C0C0C0",width=640),
             layout([
                 [self.sequence_dropdown],

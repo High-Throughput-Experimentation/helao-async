@@ -19,6 +19,7 @@ import collections
 from functools import partial
 # from importlib import import_module
 # from functools import partial
+from socket import gethostname
 
 
 from bokeh.models import ColumnDataSource, CheckboxButtonGroup, RadioButtonGroup
@@ -163,31 +164,31 @@ class C_nidaqmxvis:
         self.layout = []
         
         self.paragraph1 = Paragraph(text="""cells:""", width=50, height=15)
-        self.checkbox_button_group = CheckboxButtonGroup(
+        self.yaxis_selector_group = CheckboxButtonGroup(
                                     labels=[f"{i+1}" for i in range(9)], 
                                     active=[i for i in range(9)]
                                     )
         
         
-        self.plot_VOLT = figure(title="CELL VOLTs", height=300)
-        self.plot_CURRENT = figure(title="CELL CURRENTs", height=300)
+        self.plot_VOLT = figure(title="CELL VOLTs", height=300, width=500)
+        self.plot_CURRENT = figure(title="CELL CURRENTs", height=300, width=500)
 
-        self.plot_VOLT_prev = figure(title="prev. CELL VOLTs", height=300)
-        self.plot_CURRENT_prev = figure(title="prev. CELL CURRENTs", height=300)
+        self.plot_VOLT_prev = figure(title="prev. CELL VOLTs", height=300, width=500)
+        self.plot_CURRENT_prev = figure(title="prev. CELL CURRENTs", height=300, width=500)
 
         self.reset_plot()
 
         # combine all sublayouts into a single one
         self.layout = layout([
-            [Spacer(width=20), Div(text="<b>NImax Visualizer module</b>", width=200+50, height=15)],
+            [Spacer(width=20), Div(text="<b>NImax Visualizer module</b>", width=1004, height=15)],
             [self.paragraph1],
-            [self.checkbox_button_group],
+            [self.yaxis_selector_group],
             Spacer(height=10),
             [self.plot_VOLT, self.plot_VOLT_prev],
             Spacer(height=10),
             [self.plot_CURRENT, self.plot_CURRENT_prev],
             Spacer(height=10)
-            ],background="#C0C0C0")
+            ],background="#C0C0C0",width=1024)
 
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
@@ -269,7 +270,7 @@ class C_nidaqmxvis:
 
 
         colors = small_palettes["Category10"][9]
-        for i in self.checkbox_button_group.active:
+        for i in self.yaxis_selector_group.active:
             _ = self.plot_VOLT.line(x="t_s", y=f"Ecell{i+1}_V", source=self.sourceIV, name=f"Ecell{i+1}_V", line_color=colors[i], legend_label=f"Ecell{i+1}_V")
             _ = self.plot_CURRENT.line(x="t_s", y=f"Icell{i+1}_A", source=self.sourceIV, name=f"Icell{i+1}_A", line_color=colors[i], legend_label=f"Icell{i+1}_A")
             _ = self.plot_VOLT_prev.line(x="t_s", y=f"Ecell{i+1}_V", source=self.sourceIV_prev, name=f"Ecell{i+1}_V", line_color=colors[i], legend_label=f"Ecell{i+1}_V")
@@ -308,32 +309,28 @@ class C_potvis:
         self.layout = []
 
 
-        self.paragraph1 = Paragraph(text="""x-axis:""", width=50, height=15)
-        self.radio_button_group = RadioButtonGroup(labels=["t_s", "Ewe_V", "Ach_V", "I_A"], active=0)
-        self.paragraph2 = Paragraph(text="""y-axis:""", width=50, height=15)
-        self.checkbox_button_group = CheckboxButtonGroup(labels=["t_s", "Ewe_V", "Ach_V", "I_A"], active=[1,3])
+        self.xaxis_selector_group = RadioButtonGroup(labels=["t_s", "Ewe_V", "Ach_V", "I_A"], active=0, width = 500)
+        self.yaxis_selector_group = CheckboxButtonGroup(labels=["t_s", "Ewe_V", "Ach_V", "I_A"], active=[1,3], width = 500)
         
         
-        self.plot = figure(title="Title", height=300)
+        self.plot = figure(title="Title", height=300, width=500)
 
 
-        self.plot_prev = figure(title="Title", height=300)
+        self.plot_prev = figure(title="Title", height=300, width=500)
 
         # combine all sublayouts into a single one
         self.layout = layout([
-            [Spacer(width=20), Div(text="<b>Potentiostat Visualizer module</b>", width=200+50, height=15)],
-            [self.paragraph1],
-            [self.radio_button_group],
-            [self.paragraph2],
-            [self.checkbox_button_group],
+            [Spacer(width=20), Div(text="<b>Potentiostat Visualizer module</b>", width=1004, height=15)],
+            [Paragraph(text="""x-axis:""", width=500, height=15), Paragraph(text="""y-axis:""", width=500, height=15)],
+            [self.xaxis_selector_group, self.yaxis_selector_group],
             Spacer(height=10),
-            [self.plot, self.plot_prev],
+            [self.plot, Spacer(width=20), self.plot_prev],
             Spacer(height=10)
-            ],background="#C0C0C0")
+            ],background="#C0C0C0",width=1024)
 
         # to check if selection changed during ploting
-        self.xselect = self.radio_button_group.active
-        self.yselect = self.checkbox_button_group.active
+        self.xselect = self.xaxis_selector_group.active
+        self.yselect = self.yaxis_selector_group.active
 
         self.reset_plot(self.cur_process_id, forceupdate= True)
 
@@ -346,9 +343,9 @@ class C_potvis:
         new_process_id = list(new_data)[0]
 
         # detect if plot selection changed
-        if  (self.xselect != self.radio_button_group.active) or (self.yselect != self.checkbox_button_group.active):
-            self.xselect = self.radio_button_group.active
-            self.yselect = self.checkbox_button_group.active
+        if  (self.xselect != self.xaxis_selector_group.active) or (self.yselect != self.yaxis_selector_group.active):
+            self.xselect = self.xaxis_selector_group.active
+            self.yselect = self.yaxis_selector_group.active
             # use current(old) timestamp but force update via optional
             # second parameter
             self.reset_plot(new_process_id,True)
@@ -403,20 +400,20 @@ class C_potvis:
             self.plot_prev.renderers = []
     
             
-            self.plot.title.text = ("process_ID: "+self.cur_process_id)
-            self.plot_prev.title.text = ("process_ID: "+self.prev_process_id)
+            self.plot.title.text = ("active process_ID: "+self.cur_process_id)
+            self.plot_prev.title.text = ("previous process_ID: "+self.prev_process_id)
             xstr = ""
-            if(self.radio_button_group.active == 0):
+            if(self.xaxis_selector_group.active == 0):
                 xstr = "t_s"
-            elif(self.radio_button_group.active == 1):
+            elif(self.xaxis_selector_group.active == 1):
                 xstr = "Ewe_V"
-            elif(self.radio_button_group.active == 2):
+            elif(self.xaxis_selector_group.active == 2):
                 xstr = "Ach_V"
             else:
                 xstr = "I_A"
             colors = ["red", "blue", "yellow", "green"]
             color_count = 0
-            for i in self.checkbox_button_group.active:
+            for i in self.yaxis_selector_group.active:
                 if i == 0:
                     self.plot.line(x=xstr, y="t_s", line_color=colors[color_count], source=self.datasource, name=self.cur_process_id, legend_label="t_s")
                     self.plot_prev.line(x=xstr, y="t_s", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_process_id, legend_label="t_s")
@@ -565,7 +562,11 @@ def makeBokehApp(doc, confPrefix, servKey):
 
     visoloop = asyncio.get_event_loop()
     
-
+                
+    app.vis.doc.add_root(layout(
+        [Spacer(width=20), Div(text=f"<b>{app.vis.server_cfg['params'].get('doc_name','visualizer')} on {gethostname()}</b>", width=1004, height=32, style={'font-size': '200%', 'color': 'red'})],
+        background="#C0C0C0",width=1024))
+    app.vis.doc.add_root(Spacer(height=10))
 
     # create visualizer objects for defined instruments
 
