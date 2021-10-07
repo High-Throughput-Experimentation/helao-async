@@ -1,3 +1,9 @@
+
+__all__ = ["liquid_sample_API",
+           "gas_sample_API",
+           "assembly_sample_API",
+           "HTE_legacy_API"]
+
 import os
 import aiofiles
 import json
@@ -491,12 +497,12 @@ class base_sample_API(object):
         self.cur = None
 
 
-    def __open_DB__(self):
+    def _open_DB(self):
         self.con = sqlite3.connect(self.DB)
         self.cur = self.con.cursor()
 
 
-    def __close_DB__(self):
+    def _close_DB(self):
         if self.con is not None:
             # commit any changes
             self.con.commit()
@@ -505,7 +511,7 @@ class base_sample_API(object):
             self.cur = None
 
 
-    def __df_to_dict__(self, df):
+    def _df_to_dict(self, df):
         sampledict = dict(df.iloc[-1, :])
         if "parts" in sampledict:
             if sampledict["parts"] is not None:
@@ -526,7 +532,7 @@ class base_sample_API(object):
             return None
 
 
-    def __create_init_db__(self):
+    def _create_init_db(self):
         self.cur.execute(
               f"""CREATE TABLE {self.sample_type}(
               idx INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -541,7 +547,7 @@ class base_sample_API(object):
     async def init_db(self):
         lock = asyncio.Lock()
         async with lock:
-            self.__open_DB__()
+            self._open_DB()
             # check if table exists
             listOfTables = self.cur.execute(
               f"""SELECT name FROM sqlite_master WHERE type='table'
@@ -549,11 +555,11 @@ class base_sample_API(object):
              
             if listOfTables == []:
                 self.base.print_message(f" ... {self.sample_type} table not found, creating it.", error = True)
-                self.__create_init_db__()
+                self._create_init_dbsssss()
             else:
                 self.base.print_message(f" ... {self.sample_type} table found!")
     
-            self.__close_DB__()
+            self._close_DB()
         await self.count_samples() # has also a separate lock
 
 
@@ -561,11 +567,11 @@ class base_sample_API(object):
         await asyncio.sleep(0.001)
         lock = asyncio.Lock()
         async with lock:
-            self.__open_DB__()
+            self._open_DB()
             self.cur.execute(f"select count(idx) from {self.sample_type};")
             counts = self.cur.fetchone()[0]
             self.base.print_message(f"sqlite db {self.sample_type} count: {counts}", info = True)
-            self.__close_DB__()
+            self._close_DB()
             return counts
 
     
@@ -582,22 +588,22 @@ class base_sample_API(object):
         ret_samples = []
         lock = asyncio.Lock()
         async with lock:
-            self.__open_DB__()
+            self._open_DB()
 
             for i, sample in enumerate(samples):
                 await asyncio.sleep(0.001)
                 retdf = pd.read_sql_query(f"""select * from {self.sample_type} where idx={sample.sample_no};""", con=self.con)
-                retsample = self.__df_to_dict__(retdf)
+                retsample = self._df_to_dict(retdf)
             ret_samples.append(retsample)
-            self.__close_DB__()
+            self._close_DB()
         return sample_list(samples = ret_samples)
 
 
-    async def append_sample(self,sample, extra_dict: dict = {}):
+    async def _append_sample(self,sample, extra_dict: dict = {}):
         await asyncio.sleep(0.001)
         lock = asyncio.Lock()
         async with lock:
-            self.__open_DB__()
+            self._open_DB()
             self.cur.execute(f"select count(idx) from {self.sample_type};")
             counts = self.cur.fetchone()[0]
 
@@ -645,8 +651,8 @@ class base_sample_API(object):
             
             # now read back the sample and compare and return it
             retdf = pd.read_sql_query(f"""select * from {self.sample_type} ORDER BY idx DESC LIMIT 1;""", con=self.con)
-            self.__close_DB__()
-            retsample = self.__df_to_dict__(retdf)
+            self._close_DB()
+            retsample = self._df_to_dict(retdf)
             return retsample
 
 
@@ -671,7 +677,7 @@ class liquid_sample_API(base_sample_API):
                 if sample.volume_mL is None:
                     sample.volume_mL = 0.0
                 
-                added_sample = await self.append_sample(sample=sample,
+                added_sample = await self._append_sample(sample=sample,
                                          extra_dict={
                                                      "volume_mL":[sample.volume_mL],
                                                      "pH":[sample.pH]
@@ -713,7 +719,7 @@ class gas_sample_API(base_sample_API):
                 if sample.volume_mL is None:
                     sample.volume_mL = 0.0
                 
-                added_sample = await self.append_sample(sample=sample,
+                added_sample = await self._append_sample(sample=sample,
                                          extra_dict={
                                                      "volume_mL":[sample.volume_mL],
                                                     }
@@ -742,7 +748,7 @@ class assembly_sample_API(base_sample_API):
             if isinstance(sample, assembly_sample):
                 await asyncio.sleep(0.001)
                 
-                added_sample = await self.append_sample(sample=sample,
+                added_sample = await self._append_sample(sample=sample,
                                           extra_dict={
                                                       "parts":[json.dumps(sample.parts)],
                                                      }
@@ -776,7 +782,7 @@ class old_liquid_sample_API:
         )
 
 
-    async def __open_DB__(self, mode):
+    async def _open_DB(self, mode):
         if os.path.exists(self.DBfilepath):
             self.fDB = await aiofiles.open(
                 os.path.join(self.DBfilepath, self.DBfile), mode
@@ -786,18 +792,18 @@ class old_liquid_sample_API:
             return False
 
 
-    async def __close_DB__(self):
+    async def _close_DB(self):
         await self.fDB.close()
 
 
     async def count_samples(self):
         # TODO: faster way?
-        _ = await self.__open_DB__("a+")
+        _ = await self._open_DB("a+")
         counter = 0
         await self.fDB.seek(0)
         async for line in self.fDB:
             counter += 1
-        await self.__close_DB__()
+        await self._close_DB()
         return counter - self.headerlines
 
 
@@ -819,9 +825,9 @@ class old_liquid_sample_API:
         # dump dict to separate json file
         await write_sample_no_jsonfile(f"{new_sample.sample_no:08d}__{new_sample.process_group_uuid}__{new_sample.process_uuid}.json",new_sample.dict())
         # add newid to DB csv
-        await self.__open_DB__("a+")
+        await self._open_DB("a+")
         await add_line(f"{new_sample.sample_no},{new_sample.process_group_uuid},{new_sample.process_uuid}")
-        await self.__close_DB__()
+        await self._close_DB()
         return new_sample
 
 
@@ -847,7 +853,7 @@ class old_liquid_sample_API:
         async def get_sample_details(sample_no):
             # need to add headerline count
             sample_no = sample_no + self.headerlines
-            await self.__open_DB__("r+")
+            await self._open_DB("r+")
             counter = 0
             retval = ""
             await self.fDB.seek(0)
@@ -856,7 +862,7 @@ class old_liquid_sample_API:
                 if counter == sample_no:
                     retval = line
                     break
-            await self.__close_DB__()
+            await self._close_DB()
             return retval
 
 
