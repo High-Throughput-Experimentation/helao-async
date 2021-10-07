@@ -47,6 +47,7 @@ conf = munchify(config)
 
 from helao.core.helper import print_message
 from helao.test.unit_test_sample_models import sample_model_unit_test
+import helao.core.server.version as version
 
 colorama.init(strip=not sys.stdout.isatty()) # strip colors if stdout is redirected 
 # print_message({}, "launcher", "test")
@@ -348,7 +349,7 @@ if __name__ == "__main__":
         quit()
 
     # print("\x1b[2J") # clear screen
-    cprint(figlet_format("HELAO\nV2", font="starwars"),"yellow", "on_red", attrs=["bold"])
+    cprint(figlet_format(f"HELAO-V2\n{version.hlo_version}", font="starwars"),"yellow", "on_red", attrs=["bold"])
     pidd = launcher(confPrefix, config)
     result = None
     while result not in [b"\x18", b"\x04"]:
