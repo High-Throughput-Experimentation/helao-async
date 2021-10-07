@@ -1,3 +1,7 @@
+
+__all__ = ["HelaoFastAPI",
+           "HelaoBokehAPI"]
+
 from fastapi import FastAPI
 
 class HelaoFastAPI(FastAPI):

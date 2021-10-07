@@ -1,3 +1,6 @@
+
+__all__ = ["make_process_serv"]
+
 from fastapi import WebSocket
 
 from .api import HelaoFastAPI

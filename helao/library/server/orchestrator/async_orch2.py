@@ -34,6 +34,8 @@ a OrchHandler class object, the core functionality of an async orchestrator.
 
 """
 
+__all__ = ["makeApp"]
+
 from importlib import import_module
 from fastapi import Request
 from typing import Optional

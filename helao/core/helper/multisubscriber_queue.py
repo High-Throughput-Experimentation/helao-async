@@ -1,3 +1,7 @@
+
+__all__ = ["MultisubscriberQueue"]
+
+
 from asyncio import Queue
 from typing import Any
 

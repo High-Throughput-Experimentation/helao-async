@@ -26,6 +26,9 @@ Manual Bugfixes:
 
 """
 
+__all__ = ["makeApp"]
+
+
 import asyncio
 from typing import Optional, Union, List
 from importlib import import_module

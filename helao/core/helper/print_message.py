@@ -1,3 +1,6 @@
+
+__all__ = ["print_message"]
+
 from time import strftime
 
 from colorama import Back, Fore, Style

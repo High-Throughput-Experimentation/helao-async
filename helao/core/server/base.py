@@ -1,3 +1,6 @@
+
+__all__ = ["Base"]
+
 import asyncio
 import json
 import os

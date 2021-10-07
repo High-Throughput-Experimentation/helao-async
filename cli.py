@@ -6,6 +6,8 @@ launch via 'python cli.py {config_prefix}'
 TODO: refactor parse_input, load_config, and hotkey_control into Class
 """
 
+__all__ = []
+
 import os
 import sys
 import requests
