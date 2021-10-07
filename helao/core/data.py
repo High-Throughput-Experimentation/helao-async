@@ -6,15 +6,14 @@ from re import compile as regexcompile
 import numpy
 import asyncio
 from pydantic import BaseModel
-from typing import List
 from datetime import datetime
 from typing import Optional, Union, List
 from socket import gethostname
 
 import sqlite3
+import pandas as pd
 
 from helao.core.model import liquid_sample
-from helao.core.server import Base
 from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
 
 class HTE_legacy_API:
@@ -444,49 +443,60 @@ class HTE_legacy_API:
         if returnfiducials:
             return dlist, fid
         return dlist
-    
 
-class liquid_sample_API:
-    def __init__(self, Serv_class, DBpath):
-        self.DBfile = "local_liquid.db"
+
+class base_sample_API(object):
+    def __init__(
+            self, 
+            Serv_class, 
+            DBpath: str, 
+            sample_type: str,
+            extra_columns: str):
+
+        self.extra_columns = extra_columns
+        self.columns = f"""global_label TEXT NOT NULL,
+              sample_type VARCHAR(255) NOT NULL,
+              sample_no INTEGER NOT NULL,
+              sample_creation_timecode INTEGER NOT NULL,
+              sample_position VARCHAR(255),
+              machine_name VARCHAR(255) NOT NULL,
+              sample_hash VARCHAR(255),
+              last_update INTEGER NOT NULL,
+              inheritance TEXT,
+              status TEXT,
+              process_group_uuid VARCHAR(255),
+              process_uuid VARCHAR(255),
+              process_queue_time VARCHAR(255),
+              server_name VARCHAR(255),
+              chemical TEXT,
+              mass TEXT,
+              supplier TEXT,
+              lot_number TEXT,
+              source TEXT,
+              comment TEXT,
+              {self.extra_columns}"""
+
+
+        self.column_names = self.columns.replace("\n","").strip().split(",")
+        for i, name in enumerate(self.column_names):
+            self.column_names[i] = name.strip().split(" ")[0]
+        self.column_count = len(self.column_names)
+        
+        self.sample_type = sample_type
+        self.DBfilename = gethostname()+f"__{self.sample_type}.db"
         self.DBfilepath = DBpath
         self.base = Serv_class
-        self.DB = os.path.join(self.DBfilepath, self.DBfile)
+        self.DB = os.path.join(self.DBfilepath, self.DBfilename)
         self.con = None
         self.cur = None
-        self.open_DB()
-        
-        # check if table exists
-        listOfTables = self.cur.execute(
-          """SELECT name FROM sqlite_master WHERE type='table'
-          AND name='liquid_sample'; """).fetchall()
-         
-        if listOfTables == []:
-            self.base.print_message(' ... Liquid_sample table not found, creating it.', error = True)
-            self.create_init_db()
-        else:
-            self.base.print_message(' ... Liquid_sample table found!')
-
-        self.close_DB()
-        
-        self.count_samples_nowait()
-        # self.new_sample_nowait(liquid_sample())
 
 
-    def create_init_db(self):
-        # create tables
-        create_initial_sqllitedb(dbcur=self.cur)
-        self.base.print_message('Liquid_sample table created', info = True)
-        # commit changes
-        self.con.commit()
-
-
-    def open_DB(self):
+    def __open_DB__(self):
         self.con = sqlite3.connect(self.DB)
         self.cur = self.con.cursor()
 
 
-    def close_DB(self):
+    def __close_DB__(self):
         if self.con is not None:
             # commit any changes
             self.con.commit()
@@ -495,160 +505,252 @@ class liquid_sample_API:
             self.cur = None
 
 
+    def __df_to_dict__(self, df):
+        sampledict = dict(df.iloc[-1, :])
+        if "parts" in sampledict:
+            if sampledict["parts"] is not None:
+                sampledict["parts"] = json.loads(sampledict["parts"])
+                # sampledict["parts"] = sample_list()
+            else:
+                sampledict["parts"] = []
+        sampledict["chemical"] = json.loads(sampledict["chemical"])
+        sampledict["mass"] = json.loads(sampledict["mass"])
+        sampledict["supplier"] = json.loads(sampledict["supplier"])
+        sampledict["lot_number"] = json.loads(sampledict["lot_number"])
+        if sampledict["idx"] != sampledict["sample_no"]: # safety check
+            raise ValueError(f"sampledict['idx'] != sampledict['sample_no']: {sampledict['idx']} != {sampledict['sample_no']}")
+        retsample = sample_list(samples=[sampledict])
+        if len(retsample.samples):
+            return retsample.samples[0]
+        else:
+            return None
+
+
+    def __create_init_db__(self):
+        self.cur.execute(
+              f"""CREATE TABLE {self.sample_type}(
+              idx INTEGER PRIMARY KEY AUTOINCREMENT,
+              {self.columns}
+              );""")
+        
+        self.base.print_message(f"{self.sample_type} table created", info = True)
+        # commit changes
+        self.con.commit()
+
+
+    async def init_db(self):
+        lock = asyncio.Lock()
+        async with lock:
+            self.__open_DB__()
+            # check if table exists
+            listOfTables = self.cur.execute(
+              f"""SELECT name FROM sqlite_master WHERE type='table'
+              AND name='{self.sample_type}';""").fetchall()
+             
+            if listOfTables == []:
+                self.base.print_message(f" ... {self.sample_type} table not found, creating it.", error = True)
+                self.__create_init_db__()
+            else:
+                self.base.print_message(f" ... {self.sample_type} table found!")
+    
+            self.__close_DB__()
+        await self.count_samples() # has also a separate lock
+
+
     async def count_samples(self):
-        return self.count_samples_nowait()
+        await asyncio.sleep(0.001)
+        lock = asyncio.Lock()
+        async with lock:
+            self.__open_DB__()
+            self.cur.execute(f"select count(idx) from {self.sample_type};")
+            counts = self.cur.fetchone()[0]
+            self.base.print_message(f"sqlite db {self.sample_type} count: {counts}", info = True)
+            self.__close_DB__()
+            return counts
 
+    
+    async def get_sample(self,samples: sample_list = []):
+        """this will only use the sample_no for local sample, or global_label for external samples
+        and fills in the rest from the db and returns the list again.
+        We expect to not have mixed sample types here.
+        """
 
-    def count_samples_nowait(self):
-        self.open_DB()
-        self.cur.execute("select count(idx) from liquid_sample;")
-        counts = self.cur.fetchone()[0]
-        self.base.print_message(f"sqlite db liquid sample count: {counts}", info = True)
-        self.close_DB()
-        return counts
-
-
-    async def new_sample(self, samples: List[liquid_sample] = [], use_supplied_no: Optional[bool] = False):
-        self.new_sample_nowait(samples=samples, use_supplied_no=use_supplied_no)
-
-
-    def new_sample_nowait(self, samples: List[liquid_sample] = [], use_supplied_no: Optional[bool] = False):
-        counts = self.count_samples_nowait()
-        dataentry = []
+        await asyncio.sleep(0.001)
         if type(samples) is not list:
             samples = [samples]
+        
+        ret_samples = []
+        lock = asyncio.Lock()
+        async with lock:
+            self.__open_DB__()
 
-        for i, sample in enumerate(samples):
-
-          # global_label TEXT NOT NULL,
-          # sample_type VARCHAR(255) NOT NULL,
-          # sample_no INTEGER NOT NULL,
-          # sample_creation_timecode VARCHAR(255) NOT NULL,
-          # machine_name VARCHAR(255) NOT NULL,
-          # last_update VARCHAR(255) NOT NULL,
-          # volume_mL REAL NOT NULL,
-
-            if use_supplied_no == False:
-                liquid_sample.sample_no = counts+1+i
+            for i, sample in enumerate(samples):
+                await asyncio.sleep(0.001)
+                retdf = pd.read_sql_query(f"""select * from {self.sample_type} where idx={sample.sample_no};""", con=self.con)
+                retsample = self.__df_to_dict__(retdf)
+            ret_samples.append(retsample)
+            self.__close_DB__()
+        return sample_list(samples = ret_samples)
 
 
+    async def append_sample(self,sample, extra_dict: dict = {}):
+        await asyncio.sleep(0.001)
+        lock = asyncio.Lock()
+        async with lock:
+            self.__open_DB__()
+            self.cur.execute(f"select count(idx) from {self.sample_type};")
+            counts = self.cur.fetchone()[0]
+
+            sample.sample_no = counts+1
             if sample.machine_name is None:
                 sample.machine_name = self.base.hostname
-
-            if sample.volume_mL is None:
-                sample.volume_mL = 0.0
-
             if sample.server_name is None:
                 sample.server_name = self.base.server_name
-                
             if sample.process_queue_time is None:
                 atime = datetime.fromtimestamp(datetime.now().timestamp() + self.base.ntp_offset)
                 sample.process_queue_time = atime.strftime("%Y%m%d.%H%M%S%f")
-
             if sample.sample_creation_timecode is None:
                 sample.sample_creation_timecode = self.base.set_realtime_nowait()
-
             if sample.last_update is None:
                 sample.last_update = self.base.set_realtime_nowait()
 
-
-
-            # if liquid_sample.process_group_uuid is None:
-            #     liquid_sample.process_group_uuid = ""
-            # if liquid_sample.process_uuid is None:
-            #     liquid_sample.process_uuid = ""
-            # if liquid_sample.source is None:
-            #     liquid_sample.source = ""
-
+            dfdict = {
+                "global_label":[sample.get_global_label()],
+                "sample_type":[sample.sample_type],
+                "sample_no":[sample.sample_no],
+                "sample_creation_timecode":[sample.sample_creation_timecode],
+                "sample_position":[sample.sample_position],
+                "machine_name":[sample.machine_name],
+                "sample_hash":[sample.sample_hash],
+                "last_update":[sample.last_update],
+                "inheritance":[sample.inheritance],
+                "status":[sample.status],
+                "process_group_uuid":[sample.process_group_uuid],
+                "process_uuid":[sample.process_uuid],
+                "process_queue_time":[sample.process_queue_time],
+                "server_name":[sample.server_name],
+                "chemical":[json.dumps(sample.chemical)],
+                "mass":[json.dumps(sample.mass)],
+                "supplier":[json.dumps(sample.supplier)],
+                "lot_number":[json.dumps(sample.lot_number)],
+                "source":[json.dumps(sample.source)],
+                "comment":[sample.comment],
+                }
+    
+    
+            dfdict.update(extra_dict)
+            df = pd.DataFrame(data=dfdict)
+            df.to_sql(name=self.sample_type, con=self.con, if_exists='append', index=False)
             
-            dataentry.append(
-                (
-                  sample.get_global_label(),
-                  "liquid",#sample.sample_type,
-                  sample.sample_no,
-                  sample.sample_creation_timecode,
-                  sample.sample_position,
-                  sample.machine_name,
-                  sample.sample_hash,
-                  sample.last_update,
-                  sample.status,
-                  sample.inheritance,
-                  sample.process_group_uuid,
-                  sample.process_uuid,
-                  sample.process_queue_time,
-                  sample.server_name,
-                  json.dumps(sample.chemical),
-                  json.dumps(sample.mass),
-                  json.dumps(sample.supplier),
-                  json.dumps(sample.lot_number),
-                  json.dumps(sample.source),
-                  sample.comment,
-                  sample.volume_mL,
-                  sample.pH
-                )
+            
+            # now read back the sample and compare and return it
+            retdf = pd.read_sql_query(f"""select * from {self.sample_type} ORDER BY idx DESC LIMIT 1;""", con=self.con)
+            self.__close_DB__()
+            retsample = self.__df_to_dict__(retdf)
+            return retsample
+
+
+
+class liquid_sample_API(base_sample_API):
+    def __init__(self, Serv_class, DBpath: str):
+        super().__init__(
+            Serv_class=Serv_class, 
+            DBpath=DBpath, 
+            sample_type="liquid_sample",
+            extra_columns="volume_mL REAL NOT NULL, pH REAL"
             )
 
-        self.open_DB()
-        self.con.executemany("""INSERT INTO liquid_sample(
-              global_label,
-              sample_type,
-              sample_no,
-              sample_creation_timecode,
-              sample_position,
-              machine_name,
-              sample_hash,
-              last_update,
-              status,
-              inheritance,
-              process_group_uuid,
-              process_uuid,
-              process_queue_time,
-              server_name,
-              chemical,
-              mass,
-              supplier,
-              lot_number,
-              source,
-              comment,
-              volume_mL,
-              pH
-            ) VALUES (
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?
-                )""", dataentry)        
-        self.close_DB()
 
-
-    # async def get_sample(self, sample_no = None, global_hash: Optional[str] = None):
-    #     pass
+    async def new_sample(self, samples: List[liquid_sample] = [], use_supplied_no: Optional[bool] = False):
+        if type(samples) is not list:
+            samples = [samples]
+        ret_samples = []
+        for i, sample in enumerate(samples):
+            if isinstance(sample, liquid_sample):
+                await asyncio.sleep(0.001)
+                if sample.volume_mL is None:
+                    sample.volume_mL = 0.0
+                
+                added_sample = await self.append_sample(sample=sample,
+                                         extra_dict={
+                                                     "volume_mL":[sample.volume_mL],
+                                                     "pH":[sample.pH]
+                                                    }
+                                         )
+                ret_samples.append(added_sample)
+            else:
+                self.base.print_message(f"wrong sample type {type(sample)}!=liquid_sample, skipping it", info = True)
+        return sample_list(samples = ret_samples)
 
 
     async def old_jsondb_to_sqlitedb(self):
-        old_liquid_sample_DB = old_liquid_sample_API(self.base, os.path.join(self.DBfilepath, self.DBfile))
+        old_liquid_sample_DB = old_liquid_sample_API(self.base, self.DBfilepath)
         counts = await old_liquid_sample_DB.count_samples()
         self.base.print_message(f"old db sample count: {counts}", info = True)
         for i in range(counts):
             liquid_sample_jsondict = await old_liquid_sample_DB.get_sample(i+1)
             self.new_sample_nowait(liquid_sample(**liquid_sample_jsondict), use_supplied_no=True)
+
+
+
+class gas_sample_API(base_sample_API):
+    def __init__(self, Serv_class, DBpath: str):
+        super().__init__(
+            Serv_class=Serv_class, 
+            DBpath=DBpath, 
+            sample_type="gas_sample",
+            extra_columns="volume_mL REAL NOT NULL"
+            )
+
+
+    async def new_sample(self, samples: List[gas_sample] = []):
+        if type(samples) is not list:
+            samples = [samples]
+        ret_samples = []
+        for i, sample in enumerate(samples):
+            if isinstance(sample, gas_sample):
+                await asyncio.sleep(0.001)
+                if sample.volume_mL is None:
+                    sample.volume_mL = 0.0
+                
+                added_sample = await self.append_sample(sample=sample,
+                                         extra_dict={
+                                                     "volume_mL":[sample.volume_mL],
+                                                    }
+                                         )
+                ret_samples.append(added_sample)
+            else:
+                self.base.print_message(f"wrong sample type {type(sample)}!=gas_sample, skipping it", info = True)
+        return sample_list(samples = ret_samples)
+
+
+
+class assembly_sample_API(base_sample_API):
+    def __init__(self, Serv_class, DBpath: str):
+        super().__init__(
+            Serv_class=Serv_class, 
+            DBpath=DBpath, 
+            sample_type="assembly_sample",
+            extra_columns="parts TEXT"
+            )
+
+    async def new_sample(self, samples: List[gas_sample] = []):
+        if type(samples) is not list:
+            samples = [samples]
+        ret_samples = []
+        for i, sample in enumerate(samples):
+            if isinstance(sample, assembly_sample):
+                await asyncio.sleep(0.001)
+                
+                added_sample = await self.append_sample(sample=sample,
+                                          extra_dict={
+                                                      "parts":[json.dumps(sample.parts)],
+                                                     }
+                                         )
+                ret_samples.append(added_sample)
+            else:
+                self.base.print_message(f"wrong sample type {type(sample)}!=assembly_sample, skipping it", info = True)
+        return sample_list(samples = ret_samples)
 
 
 class old_liquid_sample_API:
@@ -674,7 +776,7 @@ class old_liquid_sample_API:
         )
 
 
-    async def open_DB(self, mode):
+    async def __open_DB__(self, mode):
         if os.path.exists(self.DBfilepath):
             self.fDB = await aiofiles.open(
                 os.path.join(self.DBfilepath, self.DBfile), mode
@@ -684,18 +786,18 @@ class old_liquid_sample_API:
             return False
 
 
-    async def close_DB(self):
+    async def __close_DB__(self):
         await self.fDB.close()
 
 
     async def count_samples(self):
         # TODO: faster way?
-        _ = await self.open_DB("a+")
+        _ = await self.__open_DB__("a+")
         counter = 0
         await self.fDB.seek(0)
         async for line in self.fDB:
             counter += 1
-        await self.close_DB()
+        await self.__close_DB__()
         return counter - self.headerlines
 
 
@@ -717,9 +819,9 @@ class old_liquid_sample_API:
         # dump dict to separate json file
         await write_sample_no_jsonfile(f"{new_sample.sample_no:08d}__{new_sample.process_group_uuid}__{new_sample.process_uuid}.json",new_sample.dict())
         # add newid to DB csv
-        await self.open_DB("a+")
+        await self.__open_DB__("a+")
         await add_line(f"{new_sample.sample_no},{new_sample.process_group_uuid},{new_sample.process_uuid}")
-        await self.close_DB()
+        await self.__close_DB__()
         return new_sample
 
 
@@ -745,7 +847,7 @@ class old_liquid_sample_API:
         async def get_sample_details(sample_no):
             # need to add headerline count
             sample_no = sample_no + self.headerlines
-            await self.open_DB("r+")
+            await self.__open_DB__("r+")
             counter = 0
             retval = ""
             await self.fDB.seek(0)
@@ -754,7 +856,7 @@ class old_liquid_sample_API:
                 if counter == sample_no:
                     retval = line
                     break
-            await self.close_DB()
+            await self.__close_DB__()
             return retval
 
 
@@ -804,41 +906,6 @@ class old_liquid_sample_API:
             return ret_liquid_sample
         else:
             return None # will be default empty one
-
-
-def create_md5():
-    pass
-
-
-def create_initial_sqllitedb(dbcur):
-    """create initial sqlite3 db for gas, liquid, assemblies"""
-    dbcur.execute(
-          """CREATE TABLE liquid_sample(
-          idx INTEGER PRIMARY KEY AUTOINCREMENT,
-          global_label TEXT NOT NULL,
-          sample_type VARCHAR(255) NOT NULL,
-          sample_no INTEGER NOT NULL,
-          sample_creation_timecode INTEGER NOT NULL,
-          sample_position VARCHAR(255),
-          machine_name VARCHAR(255) NOT NULL,
-          sample_hash VARCHAR(255),
-          last_update INTEGER NOT NULL,
-          status TEXT,
-          inheritance TEXT,
-          process_group_uuid VARCHAR(255),
-          process_uuid VARCHAR(255),
-          process_queue_time VARCHAR(255),
-          server_name VARCHAR(255),
-          chemical TEXT,
-          mass TEXT,
-          supplier TEXT,
-          lot_number TEXT,
-          source TEXT,
-          comment TEXT,
-          volume_mL REAL NOT NULL,
-          pH REAL
-          );""")
-
 
 
 class unified_sample_data_API():

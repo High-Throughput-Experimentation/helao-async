@@ -149,7 +149,7 @@ class liquid_sample(base_sample):
     """base class for liquid samples"""
     sample_type: Optional[str] = "liquid"
     volume_mL: Optional[float] = None
-    ph: Optional[float]=None
+    pH: Optional[float]=None
 
     def prc_dict(self):
         prc_dict = self.create_initial_prc_dict()
@@ -247,7 +247,7 @@ def sample_model_list_validator(model_list, values, **kwargs):
             return assembly_sample(**model_dict)
         else:
             print_message({}, "model", f"unsupported sample_type '{sample_type}'", error = True)
-            return None
+            raise ValueError("model", f"unsupported sample_type '{sample_type}'")
 
     
     if model_list is None or not isinstance(model_list, list):
