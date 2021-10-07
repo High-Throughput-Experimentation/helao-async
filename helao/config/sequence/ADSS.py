@@ -17,6 +17,9 @@ __all__ = ["debug",
            "ADSS_slave_clean_PALtool",
            "ADSS_slave_single_CA"]
 
+
+from typing import Optional, List, Union
+
 from helao.core.schema import cProcess, cProcess_group
 
 from helao.core.server import process_start_condition
@@ -54,7 +57,6 @@ z_engage = 2.5
 # moves it up to put pressure on seal
 z_seal = 4.5
 
-from typing import Optional, List, Union
 
 
 def debug(process_group_Obj: cProcess_group, 
