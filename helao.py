@@ -24,6 +24,8 @@ Requirements:
      initialization by an API server's @app.startup method.
 """
 
+__all__ = []
+
 import os
 import sys
 import pickle

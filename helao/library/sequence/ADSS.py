@@ -6,6 +6,17 @@ process tuples take the form:
 
 server_key must be a FastAPI process server defined in config
 """
+
+__all__ = ["debug", 
+           "ADSS_master_CA", 
+           "ADSS_slave_startup", 
+           "ADSS_slave_shutdown",
+           "ADSS_slave_engage", 
+           "ADSS_slave_disengage",
+           "ADSS_slave_drain",
+           "ADSS_slave_clean_PALtool",
+           "ADSS_slave_single_CA"]
+
 from helao.core.schema import cProcess, cProcess_group
 
 from helao.core.server import process_start_condition
@@ -17,17 +28,19 @@ from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_s
 
 
 # list valid sequence functions 
-SEQUENCES = [
-              "debug", 
-              "ADSS_master_CA", 
-              "ADSS_slave_startup", 
-              "ADSS_slave_shutdown",
-              "ADSS_slave_engage", 
-              "ADSS_slave_disengage",
-              "ADSS_slave_drain",
-              "ADSS_slave_clean_PALtool",
-              "ADSS_slave_single_CA",
-              ]
+# SEQUENCES = [
+#               "debug", 
+#               "ADSS_master_CA", 
+#               "ADSS_slave_startup", 
+#               "ADSS_slave_shutdown",
+#               "ADSS_slave_engage", 
+#               "ADSS_slave_disengage",
+#               "ADSS_slave_drain",
+#               "ADSS_slave_clean_PALtool",
+#               "ADSS_slave_single_CA",
+#               ]
+
+SEQUENCES = __all__
 
 PSTAT_name = "PSTAT"
 MOTOR_name = "MOTOR"

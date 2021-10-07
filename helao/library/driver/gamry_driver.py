@@ -5,6 +5,11 @@ GamryCOM comtypes Win32 module. Class methods are specific to Gamry devices. Dev
 configuration is read from config/config.py. 
 
 """
+
+__all__ = ["gamry",
+           "Gamry_modes",
+           "Gamry_IErange"]
+
 from helao.core.schema import cProcess
 from helao.core.server import Base
 import sys

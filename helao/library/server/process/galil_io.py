@@ -9,6 +9,8 @@ calls to 'motion.*' are not device-specific. Currently inherits configuration fr
 driver code, and hard-coded to use 'galil' class (see "__main__").
 """
 
+__all__ = ["makeApp"]
+
 from typing import Optional, Union, List
 from importlib import import_module
 from fastapi import Request

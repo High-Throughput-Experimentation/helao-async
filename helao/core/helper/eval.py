@@ -1,3 +1,7 @@
+
+__all__ = ["eval_array",
+           "eval_val"]
+
 def eval_array(x):
     ret = []
     for y in x:

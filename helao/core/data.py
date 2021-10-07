@@ -160,7 +160,7 @@ class HTE_legacy_API:
     def rcp_to_dict(self, rcppath):  # read standard rcp/exp/ana/info structure to dict
         dlist = []
 
-        def tab_level(astr):
+        def _tab_level(astr):
             """Count number of leading tabs in a string
             """
             return (len(astr) - len(astr.lstrip("    "))) / 4
@@ -177,13 +177,13 @@ class HTE_legacy_API:
             with archive.open(rcpfn, "r") as f:
                 for l in f:
                     k, v = l.decode("ascii").split(":", 1)
-                    lvl = tab_level(l.decode("ascii"))
+                    lvl = _tab_level(l.decode("ascii"))
                     dlist.append({"name": k.strip(), "value": v.strip(), "level": lvl})
         else:
             with open(rcppath, "r") as f:
                 for l in f:
                     k, v = l.split(":", 1)
-                    lvl = tab_level(l)
+                    lvl = _tab_level(l)
                     dlist.append({"name": k.strip(), "value": v.strip(), "level": lvl})
 
     def getplatemappath_plateid(

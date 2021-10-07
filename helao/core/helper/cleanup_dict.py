@@ -1,3 +1,6 @@
+
+__all__ = ["cleanupdict"]
+
 def cleanupdict(d):
     clean = {}
     for k, v in d.items():

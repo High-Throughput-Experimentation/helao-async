@@ -1,3 +1,7 @@
+
+__all__ = ["makeApp"]
+
+
 # Instrument Alignment server
 # talks with specified motor server and provides input to separate user interface server
 

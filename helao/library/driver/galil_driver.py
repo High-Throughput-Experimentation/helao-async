@@ -5,6 +5,10 @@ library. Class methods are specific to Galil devices. Device configuration is re
 config/config.py. 
 """
 
+__all__ = ["galil",
+           "move_modes",
+           "transformation_mode"]
+
 import os
 import numpy as np
 import time

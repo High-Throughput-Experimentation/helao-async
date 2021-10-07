@@ -1,3 +1,6 @@
+
+__all__ = ["Vis"]
+
 import sys
 from socket import gethostname
 

@@ -1,4 +1,6 @@
 
+__all__ = ["sample_model_unit_test"]
+
 import colorama
 from colorama import Fore, Style
 import sys

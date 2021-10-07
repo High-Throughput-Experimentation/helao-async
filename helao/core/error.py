@@ -1,3 +1,6 @@
+
+__all__ = ["error_codes"]
+
 from enum import Enum
 
 class error_codes(str, Enum):

@@ -5,6 +5,8 @@ launch via 'python append.py {running_config_prefix} {append_config_prefix}'
 
 """
 
+__all__ = ["appender"]
+
 import os
 import sys
 from importlib import import_module
