@@ -673,11 +673,11 @@ class galil:
         ax_abc_to_xyz = {l: inv_axis_id[l] for i, l in enumerate(axlett) if l in inv_axis_id.keys()}
         # this puts the counts back to motor mm
         pos = {
-            axl: float(r) * self.config_dict["count_to_mm"][axl]
+            axl: float(r) * self.config_dict["count_to_mm"].get(axl,0)
             for axl, r in zip(axlett, q.split(", "))
         }
         # return the results through calculating things into mm
-        axpos = {ax_abc_to_xyz[k]: p for k, p in pos.items()}
+        axpos = {ax_abc_to_xyz.get(k,None): p for k, p in pos.items()}
         ret_ax = []
         ret_position = []
         for ax in axis:
@@ -704,7 +704,7 @@ class galil:
         qdict = dict(zip(axlett, q.split(", ")))
         for ax in axis:
             if ax in self.config_dict["axis_id"].keys():
-                axl = self.config_dict["axis_id"][ax]
+                axl = self.config_dict["axis_id"].get(ax, None)
                 if axl in qdict:
                     r = qdict[axl]
                     if int(r) == 0:
