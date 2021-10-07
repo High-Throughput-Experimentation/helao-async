@@ -825,7 +825,7 @@ class cPAL:
                             process_group_uuid=self.process.process_group_uuid,
                             process_uuid=self.process.process_uuid,
                             source=source,
-                            volume_mL=PALparams.PAL_volume_uL / 1000.0,
+                            volume_ml=PALparams.PAL_volume_uL / 1000.0,
                             process_queue_time=self.process.process_queue_time,
                             chemical=source_chemical,
                             mass=source_mass,
