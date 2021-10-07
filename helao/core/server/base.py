@@ -209,19 +209,26 @@ class Base(object):
         lock = asyncio.Lock()
         async with lock:
             c = ntplib.NTPClient()
-            response = c.request(self.ntp_server, version=3)
-            self.ntp_response = response
-            self.ntp_last_sync = response.orig_time
-            self.ntp_offset = response.offset
+            try:
+                response = c.request(self.ntp_server, version=3)
+                self.ntp_response = response
+                self.ntp_last_sync = response.orig_time
+                self.ntp_offset = response.offset
+                self.print_message(
+                    f" ... retrieved time at {ctime(self.ntp_response.tx_timestamp)} from {self.ntp_server}",
+                    info = True
+                )
+            except ntplib.NTPException:
+                self.print_message(f" ... {self.ntp_server} ntp timeout", error=True)
+                self.ntp_last_sync = time()
+                self.ntp_offset = 0.0
+                
             self.print_message(f" ... ntp_offset: {self.ntp_offset}")
             self.print_message(f" ... ntp_last_sync: {self.ntp_last_sync}")
     
             time_inst = await aiofiles.open("ntpLastSync.txt", "w")
             await time_inst.write(f"{self.ntp_last_sync},{self.ntp_offset}")
             await time_inst.close()
-            self.print_message(
-                f" ... retrieved time at {ctime(self.ntp_response.tx_timestamp)} from {self.ntp_server}"
-            )
 
     async def attach_client(self, client_servkey: str, retry_limit=5):
         "Add client for pushing status updates via HTTP POST."
@@ -385,7 +392,6 @@ class Base(object):
         try:
             while True:
                 await asyncio.sleep(0.001)
-                print("checking time")
                 lock = asyncio.Lock()
                 async with lock:
                     time_inst = await aiofiles.open("ntpLastSync.txt", "r")
