@@ -99,7 +99,7 @@ class C_async_operator:
 
         self.sequence_select_list = []
         self.sequences = []
-        self.sequence_lib = import_sequences(world_config_dict = self.vis.world_cfg, library_path = None, server_name=self.vis.server_name)
+        self.sequence_lib = import_sequences(world_config_dict = self.vis.world_cfg, sequence_path = None, server_name=self.vis.server_name)
 
 
 
