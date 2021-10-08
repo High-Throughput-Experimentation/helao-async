@@ -1,18 +1,15 @@
 """
-Process library for ADSS (RSHS and ANEC2)
-
-process tuples take the form:
-(process_group__id, server_key, process, param_dict, preemptive, blocking)
+Process library for ANEC
 
 server_key must be a FastAPI process server defined in config
 """
 
 __all__ = ["debug", 
-           "CA"]
+           "CA",
+           "OCV_sqtest"]
 
 
 from typing import Optional, List, Union
-
 
 from helao.core.schema import cProcess, cProcess_group, Sequencer
 from helao.core.server import process_start_condition
@@ -37,7 +34,7 @@ z_seal = 4.5
 
 
 
-def debug(process_group_Obj: cProcess_group, 
+def debug(pg_Obj: cProcess_group, 
              d_mm: Optional[str] = "1.0", 
              x_mm: Optional[float] = 0.0, 
              y_mm: Optional[float] = 0.0
@@ -61,7 +58,7 @@ def debug(process_group_Obj: cProcess_group,
 
 
 
-    process_dict = process_group_Obj.as_dict()
+    process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{NI_name}",
         "process_name": "run_cell_IV",
@@ -90,7 +87,7 @@ def debug(process_group_Obj: cProcess_group,
     return process_list
 
 
-def CA(process_group_Obj: cProcess_group,
+def CA(pg_Obj: cProcess_group,
        CA_potential_V: Optional[float] = 0.0,
        CA_duration_sec: Optional[float] = 10.0,
        samplerate_sec: Optional[float] = 1.0,
@@ -100,9 +97,9 @@ def CA(process_group_Obj: cProcess_group,
     
     # todo, I will try to write a function which will do this later
     # I assume we need a base sequence class for this
-    CA_potential_V = process_group_Obj.sequence_pars.get("CA_potential_V", CA_potential_V)
-    CA_duration_sec = process_group_Obj.sequence_pars.get("CA_duration_sec", CA_duration_sec)
-    samplerate_sec = process_group_Obj.sequence_pars.get("samplerate_sec", samplerate_sec)
+    CA_potential_V = pg_Obj.sequence_pars.get("CA_potential_V", CA_potential_V)
+    CA_duration_sec = pg_Obj.sequence_pars.get("CA_duration_sec", CA_duration_sec)
+    samplerate_sec = pg_Obj.sequence_pars.get("samplerate_sec", samplerate_sec)
 
 
 
@@ -111,7 +108,7 @@ def CA(process_group_Obj: cProcess_group,
     
     
     # apply potential
-    process_dict = process_group_Obj.as_dict()
+    process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{PSTAT_name}",
         "process_name": "run_CA",
@@ -133,44 +130,33 @@ def CA(process_group_Obj: cProcess_group,
     return process_list
 
 
-def CA_test(process_group_Obj: cProcess_group,
-        CA_potential_V: Optional[float] = 0.0,
-        CA_duration_sec: Optional[float] = 10.0,
-        samplerate_sec: Optional[float] = 1.0,
-       
-        ):
+def OCV_sqtest(pg_Obj: cProcess_group,
+               OCV_duration_sec: Optional[float] = 10.0,
+               samplerate_sec: Optional[float] = 1.0,
+              ):
 
-
-
-
-    
-    # todo, I will try to write a function which will do this later
-    # I assume we need a base sequence class for this
-    CA_potential_V = process_group_Obj.sequence_pars.get("CA_potential_V", CA_potential_V)
-    CA_duration_sec = process_group_Obj.sequence_pars.get("CA_duration_sec", CA_duration_sec)
-    samplerate_sec = process_group_Obj.sequence_pars.get("samplerate_sec", samplerate_sec)
-
-    sequence = Sequencer(process_group_Obj, locals())
+    """This is the description of the sequence which will be displayed
+       in the operator webgui. For all function parameters (except pg_Obj)
+       a input field will be (dynamically) presented in the OP webgui.""" 
     
     
-    sequence.add_process(
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+
+    sq.add_process(
         {
-            "process_server": f"{PSTAT_name}",
-            "process_name": "run_CA",
-            "process_params": {
-                            "Vval": CA_potential_V,
-                            "Tval": CA_duration_sec,
-                            "SampleRate": samplerate_sec,
-                            "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                            "TTLsend": -1,  # -1 disables, else select TTL 0-3
-                            "IErange": "auto",
-                            },
-            "save_prc": True,
-            "save_data": True,
-            "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
-            # "plate_id": None,
-            }
-        )
-    
-    
-    return sequence.process_list
+        "process_server": f"{PSTAT_name}",
+        "process_name": "run_OCV",
+        "process_params": {
+                        "Tval": sq.pars.OCV_duration_sec,
+                        "SampleRate": sq.pars.samplerate_sec,
+                        "TTLwait": -1,  # -1 disables, else select TTL 0-3
+                        "TTLsend": -1,  # -1 disables, else select TTL 0-3
+                        "IErange": "auto",
+                        },
+        "save_prc": True,
+        "save_data": True,
+        "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
+        }
+    )
+
+    return sq.process_list # returns complete process list to orch

@@ -284,6 +284,7 @@ class Orch(Base):
                     self.prg_file = hcmf.PrgFile(
                         hlo_version=f"{version.hlo_version}",
                         orchestrator=self.active_process_group.orch_name,
+                        machine_name=gethostname(),
                         access="hte",
                         process_group_uuid=self.active_process_group.process_group_uuid,
                         process_group_timestamp=self.active_process_group.process_group_timestamp,

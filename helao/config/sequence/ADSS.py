@@ -15,12 +15,13 @@ __all__ = ["debug",
            "ADSS_slave_disengage",
            "ADSS_slave_drain",
            "ADSS_slave_clean_PALtool",
-           "ADSS_slave_single_CA"]
+           "ADSS_slave_single_CA",
+           "OCV_sqtest"]
 
 
 from typing import Optional, List, Union
 
-from helao.core.schema import cProcess, cProcess_group
+from helao.core.schema import cProcess, cProcess_group, Sequencer
 
 from helao.core.server import process_start_condition
 from helao.library.driver.galil_driver import move_modes, transformation_mode
@@ -59,7 +60,7 @@ z_seal = 4.5
 
 
 
-def debug(process_group_Obj: cProcess_group, 
+def debug(pg_Obj: cProcess_group, 
              d_mm: Optional[str] = "1.0", 
              x_mm: Optional[float] = 0.0, 
              y_mm: Optional[float] = 0.0
@@ -83,7 +84,7 @@ def debug(process_group_Obj: cProcess_group,
 
 
 
-    process_dict = process_group_Obj.as_dict()
+    process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{NI_name}",
         "process_name": "run_cell_IV",
@@ -112,7 +113,7 @@ def debug(process_group_Obj: cProcess_group,
     return process_list
 
 
-def ADSS_slave_startup(process_group_Obj: cProcess_group,
+def ADSS_slave_startup(pg_Obj: cProcess_group,
               x_mm: Optional[float] = 0.0, 
               y_mm: Optional[float] = 0.0,
               ):
@@ -122,17 +123,17 @@ def ADSS_slave_startup(process_group_Obj: cProcess_group,
 
     
     
-    x_mm = process_group_Obj.sequence_pars.get("x_mm", x_mm)
-    y_mm = process_group_Obj.sequence_pars.get("y_mm", y_mm)
+    x_mm = pg_Obj.sequence_pars.get("x_mm", x_mm)
+    y_mm = pg_Obj.sequence_pars.get("y_mm", y_mm)
     
     
     process_list = []
 
     # move z to home
-    process_list.append(ADSS_slave_disengage(process_group_Obj))
+    process_list.append(ADSS_slave_disengage(pg_Obj))
 
     # move to position
-    process_dict = process_group_Obj.as_dict()
+    process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{MOTOR_name}",
         "process_name": "move",
@@ -149,12 +150,12 @@ def ADSS_slave_startup(process_group_Obj: cProcess_group,
     process_list.append(cProcess(inputdict=process_dict))
 
     # seal cell
-    process_list.append(ADSS_slave_engage(process_group_Obj))
+    process_list.append(ADSS_slave_engage(pg_Obj))
 
     return process_list
 
 
-def ADSS_slave_shutdown(process_group_Obj: cProcess_group):
+def ADSS_slave_shutdown(pg_Obj: cProcess_group):
     """Slave sequence
     (1) Deep clean PAL tool
     (2) pump liquid out off cell
@@ -164,8 +165,8 @@ def ADSS_slave_shutdown(process_group_Obj: cProcess_group):
     process_list = []
 
     # deep clean
-    process_list.append(ADSS_slave_clean_PALtool(process_group_Obj, clean_PAL_tool = PALtools.LS3, clean_PAL_volume_uL = 500))
-    # process_dict = process_group_Obj.as_dict()
+    process_list.append(ADSS_slave_clean_PALtool(pg_Obj, clean_PAL_tool = PALtools.LS3, clean_PAL_volume_uL = 500))
+    # process_dict = pg_Obj.as_dict()
     # process_dict.update({
     #     "process_server": f"{PAL_name}",
     #     "process_name": "PAL_run_method",
@@ -192,7 +193,7 @@ def ADSS_slave_shutdown(process_group_Obj: cProcess_group):
     # process_list.append(cProcess(inputdict=process_dict))
 
     # set pump flow backward
-    process_dict = process_group_Obj.as_dict()
+    process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{NI_name}",
         "process_name": "run_task_pump",
@@ -207,7 +208,7 @@ def ADSS_slave_shutdown(process_group_Obj: cProcess_group):
     process_list.append(cProcess(inputdict=process_dict))
 
     # wait some time to pump out the liquid
-    process_dict = process_group_Obj.as_dict()
+    process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{ORCH_name}",
         "process_name": "wait",
@@ -222,11 +223,11 @@ def ADSS_slave_shutdown(process_group_Obj: cProcess_group):
 
 
     # drain, TODO
-    # process_list.append(ADSS_slave_drain(process_group_Obj))
+    # process_list.append(ADSS_slave_drain(pg_Obj))
 
 
     # turn pump off
-    process_dict = process_group_Obj.as_dict()
+    process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{NI_name}",
         "process_name": "run_task_pump",
@@ -241,7 +242,7 @@ def ADSS_slave_shutdown(process_group_Obj: cProcess_group):
     process_list.append(cProcess(inputdict=process_dict))
 
     # set pump flow forward
-    process_dict = process_group_Obj.as_dict()
+    process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{NI_name}",
         "process_name": "run_task_pump",
@@ -259,13 +260,13 @@ def ADSS_slave_shutdown(process_group_Obj: cProcess_group):
 
     # move z to home
     # cannot do this without proper drain for now
-    # process_list.append(ADSS_slave_disengage(process_group_Obj))
+    # process_list.append(ADSS_slave_disengage(pg_Obj))
 
 
     return process_list
 
 
-def ADSS_slave_drain(process_group_Obj: cProcess_group):
+def ADSS_slave_drain(pg_Obj: cProcess_group):
     """DUMMY Slave sequence
     Drains electrochemical cell."""
 
@@ -274,14 +275,14 @@ def ADSS_slave_drain(process_group_Obj: cProcess_group):
     return process_list
 
 
-def ADSS_slave_engage(process_group_Obj: cProcess_group):
+def ADSS_slave_engage(pg_Obj: cProcess_group):
     """Slave sequence
     Engages and seals electrochemical cell."""
     
     process_list = []
 
     # engage
-    process_dict = process_group_Obj.as_dict()
+    process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{MOTOR_name}",
         "process_name": "move",
@@ -298,7 +299,7 @@ def ADSS_slave_engage(process_group_Obj: cProcess_group):
     process_list.append(cProcess(inputdict=process_dict))
 
     # seal
-    process_dict = process_group_Obj.as_dict()
+    process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{MOTOR_name}",
         "process_name": "move",
@@ -317,13 +318,13 @@ def ADSS_slave_engage(process_group_Obj: cProcess_group):
     return process_list
 
 
-def ADSS_slave_disengage(process_group_Obj: cProcess_group):
+def ADSS_slave_disengage(pg_Obj: cProcess_group):
     """Slave sequence
     Disengages and seals electrochemical cell."""
 
     process_list = []
 
-    process_dict = process_group_Obj.as_dict()
+    process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{MOTOR_name}",
         "process_name": "move",
@@ -342,7 +343,7 @@ def ADSS_slave_disengage(process_group_Obj: cProcess_group):
     return process_list
 
 
-def ADSS_slave_clean_PALtool(process_group_Obj: cProcess_group, 
+def ADSS_slave_clean_PALtool(pg_Obj: cProcess_group, 
                              clean_PAL_tool: Optional[str] = PALtools.LS3, 
                              clean_PAL_volume_uL: Optional[int] = 500
                              ):
@@ -352,11 +353,11 @@ def ADSS_slave_clean_PALtool(process_group_Obj: cProcess_group,
 
     process_list = []
 
-    clean_PAL_volume_uL = process_group_Obj.sequence_pars.get("clean_PAL_volume_uL", clean_PAL_volume_uL)
-    clean_PAL_tool = process_group_Obj.sequence_pars.get("clean_PAL_tool", clean_PAL_tool)
+    clean_PAL_volume_uL = pg_Obj.sequence_pars.get("clean_PAL_volume_uL", clean_PAL_volume_uL)
+    clean_PAL_tool = pg_Obj.sequence_pars.get("clean_PAL_tool", clean_PAL_tool)
     
     # deep clean
-    process_dict = process_group_Obj.as_dict()
+    process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{PAL_name}",
         "process_name": "PAL_deepclean",
@@ -385,7 +386,7 @@ def ADSS_slave_clean_PALtool(process_group_Obj: cProcess_group,
     return process_list
 
 
-def ADSS_master_CA(process_group_Obj: cProcess_group,
+def ADSS_master_CA(pg_Obj: cProcess_group,
               x_mm: Optional[float] = 0.0, 
               y_mm: Optional[float] = 0.0,
               liquid_sample_no: Optional[int] = 3,
@@ -408,17 +409,17 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
 
 
 
-    x_mm = process_group_Obj.sequence_pars.get("x_mm", x_mm)
-    y_mm = process_group_Obj.sequence_pars.get("y_mm", y_mm)
-    liquid_sample_no = process_group_Obj.sequence_pars.get("liquid_sample_no", liquid_sample_no)
-    CA_potentials_vsRHE = process_group_Obj.sequence_pars.get("CA_potentials_vsRHE", CA_potentials_vsRHE)
-    ref_vs_nhe = process_group_Obj.sequence_pars.get("ref_vs_nhe", ref_vs_nhe)
-    pH = process_group_Obj.sequence_pars.get("pH", pH)
-    CA_duration_sec = process_group_Obj.sequence_pars.get("CA_duration_sec", CA_duration_sec)
-    aliquot_times_sec = process_group_Obj.sequence_pars.get("aliquot_times_sec", aliquot_times_sec)
-    OCV_duration_sec = process_group_Obj.sequence_pars.get("OCV_duration_sec", OCV_duration_sec)
-    samplerate_sec = process_group_Obj.sequence_pars.get("samplerate_sec", samplerate_sec)
-    filltime_sec = process_group_Obj.sequence_pars.get("filltime_sec", filltime_sec)
+    x_mm = pg_Obj.sequence_pars.get("x_mm", x_mm)
+    y_mm = pg_Obj.sequence_pars.get("y_mm", y_mm)
+    liquid_sample_no = pg_Obj.sequence_pars.get("liquid_sample_no", liquid_sample_no)
+    CA_potentials_vsRHE = pg_Obj.sequence_pars.get("CA_potentials_vsRHE", CA_potentials_vsRHE)
+    ref_vs_nhe = pg_Obj.sequence_pars.get("ref_vs_nhe", ref_vs_nhe)
+    pH = pg_Obj.sequence_pars.get("pH", pH)
+    CA_duration_sec = pg_Obj.sequence_pars.get("CA_duration_sec", CA_duration_sec)
+    aliquot_times_sec = pg_Obj.sequence_pars.get("aliquot_times_sec", aliquot_times_sec)
+    OCV_duration_sec = pg_Obj.sequence_pars.get("OCV_duration_sec", OCV_duration_sec)
+    samplerate_sec = pg_Obj.sequence_pars.get("samplerate_sec", samplerate_sec)
+    filltime_sec = pg_Obj.sequence_pars.get("filltime_sec", filltime_sec)
     
     toNHE = -1.0*ref_vs_nhe-0.059*pH
     cycles = len(CA_potentials_vsRHE)
@@ -429,7 +430,7 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
 
 
     # add startup processes to list
-    process_list.append(ADSS_slave_startup(process_group_Obj, x_mm, y_mm))
+    process_list.append(ADSS_slave_startup(pg_Obj, x_mm, y_mm))
 
 
     for cycle in range(cycles):
@@ -438,7 +439,7 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
         if cycle == 0:
         
             # fill liquid, no wash (assume it was cleaned before)
-            process_dict = process_group_Obj.as_dict()
+            process_dict = pg_Obj.as_dict()
             process_dict.update({
                 "process_server": f"{PAL_name}",
                 "process_name": "PAL_run_method",
@@ -463,7 +464,7 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
 
         
             # set pump flow forward
-            process_dict = process_group_Obj.as_dict()
+            process_dict = pg_Obj.as_dict()
             process_dict.update({
                 "process_server": f"{NI_name}",
                 "process_name": "run_task_pump",
@@ -478,7 +479,7 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
             process_list.append(cProcess(inputdict=process_dict))
         
             # turn on pump
-            process_dict = process_group_Obj.as_dict()
+            process_dict = pg_Obj.as_dict()
             process_dict.update({
                 "process_server": f"{NI_name}",
                 "process_name": "run_task_pump",
@@ -494,7 +495,7 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
 
         
             # wait some time to pump in the liquid
-            process_dict = process_group_Obj.as_dict()
+            process_dict = pg_Obj.as_dict()
             process_dict.update({
                 "process_server": f"{ORCH_name}",
                 "process_name": "wait",
@@ -509,7 +510,7 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
             
         else:    
             # fill liquid, no wash (assume it was cleaned before)
-            process_dict = process_group_Obj.as_dict()
+            process_dict = pg_Obj.as_dict()
             process_dict.update({
                 "process_server": f"{PAL_name}",
                 "process_name": "PAL_run_method",
@@ -534,7 +535,7 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
 
 
     
-        process_list.append(ADSS_slave_single_CA(process_group_Obj,
+        process_list.append(ADSS_slave_single_CA(pg_Obj,
                                                 x_mm = x_mm,
                                                 y_mm = y_mm,
                                                 CA_single_potential = potential,
@@ -544,12 +545,12 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
                                                 aliquot_times_sec = aliquot_times_sec
                                                 ))
 
-    process_list.append(ADSS_slave_shutdown(process_group_Obj))
+    process_list.append(ADSS_slave_shutdown(pg_Obj))
 
     return process_list
 
 
-def ADSS_slave_single_CA(process_group_Obj: cProcess_group,
+def ADSS_slave_single_CA(pg_Obj: cProcess_group,
               x_mm: Optional[float] = 0.0, 
               y_mm: Optional[float] = 0.0,
               CA_single_potential: Optional[float] = 0.0,
@@ -560,18 +561,18 @@ def ADSS_slave_single_CA(process_group_Obj: cProcess_group,
               ):
 
 
-    x_mm = process_group_Obj.sequence_pars.get("x_mm", x_mm)
-    y_mm = process_group_Obj.sequence_pars.get("y_mm", y_mm)
-    samplerate_sec = process_group_Obj.sequence_pars.get("samplerate_sec", samplerate_sec)
-    CA_single_potential = process_group_Obj.sequence_pars.get("CA_single_potential", CA_single_potential)
-    OCV_duration_sec = process_group_Obj.sequence_pars.get("OCV_duration_sec", OCV_duration_sec)
-    CA_duration_sec = process_group_Obj.sequence_pars.get("CA_duration_sec", CA_duration_sec)
+    x_mm = pg_Obj.sequence_pars.get("x_mm", x_mm)
+    y_mm = pg_Obj.sequence_pars.get("y_mm", y_mm)
+    samplerate_sec = pg_Obj.sequence_pars.get("samplerate_sec", samplerate_sec)
+    CA_single_potential = pg_Obj.sequence_pars.get("CA_single_potential", CA_single_potential)
+    OCV_duration_sec = pg_Obj.sequence_pars.get("OCV_duration_sec", OCV_duration_sec)
+    CA_duration_sec = pg_Obj.sequence_pars.get("CA_duration_sec", CA_duration_sec)
     
     
     process_list = []
     
     # OCV
-    process_dict = process_group_Obj.as_dict()
+    process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{PSTAT_name}",
         "process_name": "run_OCV",
@@ -592,7 +593,7 @@ def ADSS_slave_single_CA(process_group_Obj: cProcess_group,
 
 
     # take liquid sample
-    process_dict = process_group_Obj.as_dict()
+    process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{PAL_name}",
         "process_name": "PAL_run_method",
@@ -620,7 +621,7 @@ def ADSS_slave_single_CA(process_group_Obj: cProcess_group,
 
 
     # apply potential
-    process_dict = process_group_Obj.as_dict()
+    process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{PSTAT_name}",
         "process_name": "run_CA",
@@ -641,7 +642,7 @@ def ADSS_slave_single_CA(process_group_Obj: cProcess_group,
 
 
     # take multiple scheduled liquid samples
-    process_dict = process_group_Obj.as_dict()
+    process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{PAL_name}",
         "process_name": "PAL_run_method",
@@ -670,7 +671,7 @@ def ADSS_slave_single_CA(process_group_Obj: cProcess_group,
 
 
     # take last liquid sample and clean
-    process_dict = process_group_Obj.as_dict()
+    process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{PAL_name}",
         "process_name": "PAL_run_method",
@@ -702,3 +703,35 @@ def ADSS_slave_single_CA(process_group_Obj: cProcess_group,
     process_list.append(cProcess(inputdict=process_dict))
 
     return process_list
+
+
+def OCV_sqtest(pg_Obj: cProcess_group,
+               OCV_duration_sec: Optional[float] = 10.0,
+               samplerate_sec: Optional[float] = 1.0,
+              ):
+
+    """This is the description of the sequence which will be displayed
+       in the operator webgui. For all function parameters (except pg_Obj)
+       a input field will be (dynamically) presented in the OP webgui.""" 
+    
+    additional_local_var = 12
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+
+    sq.add_process(
+        {
+        "process_server": f"{PSTAT_name}",
+        "process_name": "run_OCV",
+        "process_params": {
+                        "Tval": sq.pars.OCV_duration_sec,
+                        "SampleRate": sq.pars.samplerate_sec,
+                        "TTLwait": -1,  # -1 disables, else select TTL 0-3
+                        "TTLsend": -1,  # -1 disables, else select TTL 0-3
+                        "IErange": "auto",
+                        },
+        "save_prc": True,
+        "save_data": True,
+        "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
+        }
+    )
+
+    return sq.process_list # returns complete process list to orch

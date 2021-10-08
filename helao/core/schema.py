@@ -2,6 +2,13 @@
 Standard classes for experiment queue objects.
 
 """
+
+__all__ = ["cProcess_group",
+           "cProcess",
+           "Sequencer"]
+
+
+import inspect
 from collections import defaultdict
 from datetime import datetime
 from typing import Optional, Union
@@ -11,6 +18,8 @@ import json
 from helao.core.helper import gen_uuid
 from helao.core.helper import print_message
 import helao.core.model.sample as hcms
+from helao.core.helper import print_message
+
 
 class cProcess_group(object):
     "Sample-process grouping class."
@@ -153,19 +162,29 @@ class cProcess(cProcess_group):
 class Sequencer(object):
     def __init__(
         self,
-        process_group_Obj: cProcess_group,
-        local_vars,
+        pg: cProcess_group,
     ):
-        self.process_group_Obj = process_group_Obj
+        frame = inspect.currentframe().f_back
+        _args, _varargs, _keywords, _locals = inspect.getargvalues(frame)
+        print(_args, _varargs, _keywords, _locals)
+        self._pg = pg
         self.process_list = []
-        self.local_vars = local_vars
-        
-    def update_locals(self):
-        print(self.local_vars)
-        pass
-    
-    
+        self.pars = self._C()
+        for key, val in self._pg.sequence_pars.items():
+            print(key, val)
+            setattr(self.pars, key, val)
+
+        for key, val in _locals.items():
+            if key != "pg_Obj" and key not in self._pg.sequence_pars.keys():
+                print(" ... key not found in pg:",key, val) # remove later
+                print_message({}, "sequencer", f"local var '{key}' not found in pg_Obj, addding it to sq.pars", error = True)
+                setattr(self.pars, key, val)
+
+
+    class _C: pass
+
+
     def add_process(self, process_dict: dict):
-        new_process_dict = self.process_group_Obj.as_dict()
+        new_process_dict = self._pg.as_dict()
         new_process_dict.update(process_dict)
         self.process_list.append(cProcess(inputdict=new_process_dict))
