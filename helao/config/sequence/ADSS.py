@@ -195,7 +195,7 @@ def ADSS_slave_shutdown(process_group_Obj: cProcess_group):
     process_dict = process_group_Obj.as_dict()
     process_dict.update({
         "process_server": f"{NI_name}",
-        "process_name": "run_task_Pump",
+        "process_name": "run_task_pump",
         "process_params": {
                          "pump":"Direction",
                          "on": 1,
@@ -229,7 +229,7 @@ def ADSS_slave_shutdown(process_group_Obj: cProcess_group):
     process_dict = process_group_Obj.as_dict()
     process_dict.update({
         "process_server": f"{NI_name}",
-        "process_name": "run_task_Pump",
+        "process_name": "run_task_pump",
         "process_params": {
                          "pump":"PeriPump",
                          "on": 0,
@@ -244,7 +244,7 @@ def ADSS_slave_shutdown(process_group_Obj: cProcess_group):
     process_dict = process_group_Obj.as_dict()
     process_dict.update({
         "process_server": f"{NI_name}",
-        "process_name": "run_task_Pump",
+        "process_name": "run_task_pump",
         "process_params": {
                          "pump":"Direction",
                          "on": 0,
@@ -466,7 +466,7 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
             process_dict = process_group_Obj.as_dict()
             process_dict.update({
                 "process_server": f"{NI_name}",
-                "process_name": "run_task_Pump",
+                "process_name": "run_task_pump",
                 "process_params": {
                                  "pump":"Direction",
                                  "on": 0,
@@ -481,7 +481,7 @@ def ADSS_master_CA(process_group_Obj: cProcess_group,
             process_dict = process_group_Obj.as_dict()
             process_dict.update({
                 "process_server": f"{NI_name}",
-                "process_name": "run_task_Pump",
+                "process_name": "run_task_pump",
                 "process_params": {
                                  "pump":"PeriPump",
                                  "on": 1,
