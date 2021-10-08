@@ -74,12 +74,12 @@ def makeApp(confPrefix, servKey):
                                      on: Optional[bool] = True
                                     ):
             A = await setup_process(request)
-            active = await app.base.contain_process(A)
             # some additional params in order to call the same driver functions 
             # for all DO actions
             A.process_abbr = "mcell"
             A.process_params["do_port"] = dev_MasterCellSelect[A.process_params["cell"]]
             A.process_params["do_name"] = A.process_params["cell"]
+            active = await app.base.contain_process(A, file_data_keys="cell")
             await active.enqueue_data({"cell": await app.driver.digital_out(**A.process_params)})
             finished_act = await active.finish()
             return finished_act.as_dict()
@@ -93,12 +93,12 @@ def makeApp(confPrefix, servKey):
                                on: Optional[bool] = True
                               ):
             A = await setup_process(request)
-            active = await app.base.contain_process(A)
             # some additional params in order to call the same driver functions 
             # for all DO actions
             A.process_abbr = "acell"
             A.process_params["do_port"] = dev_ActiveCellsSelection[A.process_params["cell"]]
             A.process_params["do_name"] = A.process_params["cell"]
+            active = await app.base.contain_process(A, file_data_keys="cell")
             await active.enqueue_data({"cell": await app.driver.digital_out(**A.process_params)})
             finished_act = await active.finish()
             return finished_act.as_dict()
@@ -112,12 +112,12 @@ def makeApp(confPrefix, servKey):
                        on: Optional[bool] = True
                       ):
             A = await setup_process(request)
-            active = await app.base.contain_process(A)
             # some additional params in order to call the same driver functions 
             # for all DO actions
             A.process_abbr = "pump"
             A.process_params["do_port"] = dev_pump[A.process_params["pump"]]
             A.process_params["do_name"] = A.process_params["pump"]
+            active = await app.base.contain_process(A, file_data_keys="pump")
             await active.enqueue_data({"pump": await app.driver.digital_out(**A.process_params)})
             finished_act = await active.finish()
             return finished_act.as_dict()
@@ -131,12 +131,12 @@ def makeApp(confPrefix, servKey):
                                 on: Optional[bool] = True
                                 ):
             A = await setup_process(request)
-            active = await app.base.contain_process(A)
             # some additional params in order to call the same driver functions 
             # for all DO actions
             A.process_abbr = "gfv"
             A.process_params["do_port"] = dev_gasflowvalve[A.process_params["gasflowvalve"]]
             A.process_params["do_name"] = A.process_params["gasflowvalve"]
+            active = await app.base.contain_process(A, file_data_keys="gasflowvalve")
             await active.enqueue_data({"gasflowvalve": await app.driver.digital_out(**A.process_params)})
             finished_act = await active.finish()
             return finished_act.as_dict()
@@ -150,12 +150,12 @@ def makeApp(confPrefix, servKey):
                                     on: Optional[bool] = True
                                    ):
             A = await setup_process(request)
-            active = await app.base.contain_process(A)
             # some additional params in order to call the same driver functions 
             # for all DO actions
             A.process_abbr = "lfv"
             A.process_params["do_port"] = dev_liquidflowvalve[A.process_params["liquidflowvalve"]]
             A.process_params["do_name"] = A.process_params["liquidflowvalve"]
+            active = await app.base.contain_process(A, file_data_keys="liquidflowvalve")
             await active.enqueue_data({"liquidflowvalve": await app.driver.digital_out(**A.process_params)})
             finished_act = await active.finish()
             return finished_act.as_dict()
@@ -169,12 +169,12 @@ def makeApp(confPrefix, servKey):
                          on: Optional[bool] = True
                         ):
             A = await setup_process(request)
-            active = await app.base.contain_process(A)
             # some additional params in order to call the same driver functions 
             # for all DO actions
             A.process_abbr = "FSWBCD"
             A.process_params["do_port"] = dev_FSWBCDCmd[A.process_params["BCDs"]]
             A.process_params["do_name"] = A.process_params["BCDs"]
+            active = await app.base.contain_process(A, file_data_keys="BCDs")
             await active.enqueue_data({"BCDs": await app.driver.digital_out(**A.process_params)})
             finished_act = await active.finish()
             return finished_act.as_dict()
@@ -187,12 +187,12 @@ def makeApp(confPrefix, servKey):
                       FSW: Optional[dev_FSWitems],
                      ):
             A = await setup_process(request)
-            active = await app.base.contain_process(A)
             # some additional params in order to call the same driver functions 
             # for all DI actions
             A.process_abbr = "FSW"
             A.process_params["di_port"] = dev_FSW[A.process_params["FSW"]]
             A.process_params["di_name"] = A.process_params["FSW"]
+            active = await app.base.contain_process(A, file_data_keys="FSW")
             await active.enqueue_data({"FSW": await app.driver.digital_in(**A.process_params)})
             finished_act = await active.finish()
             return finished_act.as_dict()
@@ -212,7 +212,6 @@ def makeApp(confPrefix, servKey):
             """Runs multi cell IV measurement."""
             A = await setup_process(request)
             A.process_abbr = "multiCV"
-            # A.save_data = True
             active_dict = await app.driver.run_cell_IV(A)
             return active_dict
 
