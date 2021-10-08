@@ -487,6 +487,9 @@ class Base(object):
             self.manual = False
             self.process_group_dir = None
 
+            if self.process.process_abbr is None:
+               self.process.process_abbr = self.process.process_name
+
             if file_sample_keys is None:
                 self.process.file_sample_keys = ["None"]
                 self.process.file_sample_label = {
@@ -674,7 +677,7 @@ class Base(object):
 
                     header_dict = {
                         "hlo_version": version.hlo_version,
-                        "process_name": self.process.process_abbr,
+                        "process_name": self.process.process_abbr if self.process.process_abbr is not None else self.process.process_name,
                         "column_headings": file_data_keys,
                     }
 
@@ -882,7 +885,7 @@ class Base(object):
                                         )
                                         self.finished_hlo_header[sample] = True
                                         await self.write_live_data(
-                                            output_str=pyaml.dump({"epoch_ns": None})
+                                            output_str=pyaml.dump({"epoch_ns": self.set_realtime_nowait()})
                                             + "%%\n",
                                             file_conn_key=sample,
                                         )
