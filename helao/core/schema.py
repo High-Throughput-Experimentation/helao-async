@@ -171,14 +171,12 @@ class Sequencer(object):
         self.process_list = []
         self.pars = self._C()
         for key, val in self._pg.sequence_pars.items():
-            print(key, val)
-            setattr(self.pars, key, val)
+            setattr(self.pars, key, val) # we could also add it direcly to the class root by just using self
 
         for key, val in _locals.items():
             if key != "pg_Obj" and key not in self._pg.sequence_pars.keys():
-                print(" ... key not found in pg:",key, val) # remove later
                 print_message({}, "sequencer", f"local var '{key}' not found in pg_Obj, addding it to sq.pars", error = True)
-                setattr(self.pars, key, val)
+                setattr(self.pars, key, val) # we could also add it direcly to the class root by just using self
 
 
     class _C: pass
