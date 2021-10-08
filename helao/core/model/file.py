@@ -31,6 +31,7 @@ class PrcFile(BaseModel):
 class PrgFile(BaseModel):
     hlo_version: str = version.hlo_version
     orchestrator: str
+    machine_name: str
     access: str
     process_group_uuid: str
     process_group_timestamp: str

@@ -55,12 +55,10 @@ from pydantic import BaseModel
 from typing import Optional, List, Union
 
 
-from helao.core.server import makeVisServ
-from helao.core.server import import_sequences, async_private_dispatcher
-# from helao.core.data import liquid_sample_no_API
+
+import helao.core.server as hcs
 from helao.core.data import HTELegacyAPI
 from helao.core.schema import cProcess_group
-from helao.core.server import Vis
 
 
 class return_sequence_lib(BaseModel):
@@ -77,7 +75,7 @@ class return_sequence_lib(BaseModel):
 
 
 class C_async_operator:
-    def __init__(self, visServ: Vis):
+    def __init__(self, visServ: hcs.Vis):
         self.vis = visServ
 
         self.dataAPI = HTELegacyAPI(self.vis)
@@ -99,7 +97,7 @@ class C_async_operator:
 
         self.sequence_select_list = []
         self.sequences = []
-        self.sequence_lib = import_sequences(world_config_dict = self.vis.world_cfg, sequence_path = None, server_name=self.vis.server_name)
+        self.sequence_lib = hcs.import_sequences(world_config_dict = self.vis.world_cfg, sequence_path = None, server_name=self.vis.server_name)
 
 
 
@@ -132,11 +130,11 @@ class C_async_operator:
 
 
         # buttons to control orch
-        self.button_start = Button(label="Start", button_type="default", width=70)
+        self.button_start = Button(label="Start Orch", button_type="default", width=70)
         self.button_start.on_event(ButtonClick, self.callback_start)
-        self.button_stop = Button(label="Stop", button_type="default", width=70)
+        self.button_stop = Button(label="Stop Orch", button_type="default", width=70)
         self.button_stop.on_event(ButtonClick, self.callback_stop)
-        self.button_skip = Button(label="Skip", button_type="danger", width=70)
+        self.button_skip = Button(label="Skip prc", button_type="danger", width=70)
         self.button_skip.on_event(ButtonClick, self.callback_skip_dec)
         self.button_update = Button(label="update tables", button_type="default", width=120)
         self.button_update.on_event(ButtonClick, self.callback_update_tables)
@@ -146,9 +144,9 @@ class C_async_operator:
         self.button_clear_process = Button(label="clear prc", button_type="danger", width=100)
         self.button_clear_process.on_event(ButtonClick, self.callback_clear_processes)
 
-        self.button_prepend = Button(label="prepend", button_type="default", width=150)
+        self.button_prepend = Button(label="prepend sq", button_type="default", width=150)
         self.button_prepend.on_event(ButtonClick, self.callback_prepend)
-        self.button_append = Button(label="append", button_type="default", width=150)
+        self.button_append = Button(label="append sq", button_type="default", width=150)
         self.button_append.on_event(ButtonClick, self.callback_append)
 
 
@@ -185,7 +183,7 @@ class C_async_operator:
                 [self.sequence_dropdown],
                 [Spacer(width=10), Div(text="<b>sequence description:</b>", width=200+50, height=15)],
                 [self.process_descr_txt],
-                Spacer(height=10),
+                Spacer(height=20),
                 [Spacer(width=10), Div(text="<b>Error message:</b>", width=200+50, height=15, style={'font-size': '100%', 'color': 'black'})],
                 [Spacer(width=10), self.error_txt],
                 Spacer(height=10),
@@ -317,7 +315,7 @@ class C_async_operator:
         """submit a FastAPI request to orch"""
     
 
-        response = await async_private_dispatcher(
+        response = await hcs.async_private_dispatcher(
             world_config_dict = self.vis.world_cfg, 
             server = self.orch_name,
             private_process = process_name,
@@ -484,14 +482,19 @@ class C_async_operator:
             defaults.insert(0,"")
 
         self.param_input = []
-        self.param_layout = []
-        
+        # self.param_layout = []
+        self.param_layout = [
+            layout([
+                [Spacer(width=10), Div(text="<b>Optional sequence parameters:</b>", width=200+50, height=15, style={'font-size': '100%', 'color': 'black'})],
+                ],background="#BDB76B",width=640),
+            ]
+
         item = 0
         for idx in range(len(args)):
             buf = f'{defaults[idx]}'
             # self.vis.print_message(' ... process parameter:',args[idx])
             # skip the process_group_Obj parameter
-            if args[idx] == 'process_group_Obj':
+            if args[idx] == 'pg_Obj':
                 continue
 
             disabled = False
@@ -504,7 +507,7 @@ class C_async_operator:
             self.param_layout.append(layout([
                         [self.param_input[item]],
                         Spacer(height=10),
-                        ]))
+                        ],background="#BDB76B",width=640))
             item = item + 1
 
         self.dynamic_col.children.insert(-1, layout(self.param_layout))
@@ -686,7 +689,7 @@ def makeBokehApp(doc, confPrefix, servKey):
 
     config = import_module(f"helao.config.{confPrefix}").config
 
-    app = makeVisServ(
+    app = hcs.makeVisServ(
         config,
         servKey,
         doc,

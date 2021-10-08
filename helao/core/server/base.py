@@ -594,6 +594,7 @@ class Base(object):
                     self.manual_prg_file = hcmf.PrgFile(
                         hlo_version=f"{version.hlo_version}",
                         orchestrator=self.process.orch_name,
+                        machine_name=gethostname(),
                         access=self.process.access,
                         process_group_uuid=self.process.process_group_uuid,
                         process_group_timestamp=self.process.process_group_timestamp,
