@@ -11,7 +11,9 @@ class HelaoFastAPI(FastAPI):
         super().__init__(*args, **kwargs)
         self.helao_cfg = helao_cfg
         self.helao_srv = helao_srv
-
+        self.server_cfg = self.helao_cfg["servers"][self.helao_srv]
+        self.server_params = self.server_cfg.get("params",dict())
+        
 
 class HelaoBokehAPI:  # (curdoc):
     """Standard Bokeh class with HELAO config attached for simpler import."""

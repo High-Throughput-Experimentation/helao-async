@@ -11,5 +11,6 @@ from .gen_uuid import gen_uuid
 from .multisubscriber_queue import MultisubscriberQueue
 from .print_message import print_message
 from .rcp_to_dict import rcp_to_dict
+from .make_str_enum import make_str_enum
 
 async_copy = wrap(shutil.copy)

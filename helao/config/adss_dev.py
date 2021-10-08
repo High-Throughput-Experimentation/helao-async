@@ -145,7 +145,7 @@ config["servers"] = dict(
                 '3':'PXI-6284/port0/line2', #P0.2
                 '4':'PXI-6284/port0/line3'  #P0.3
                 },
-            dev_GasFlowValves = {
+            dev_gasflowvalve = {
                 '1':'PXI-6284/port1/line2', #P1.2
                 '2':'PXI-6284/port1/line3', #P1.3
                 '3':'PXI-6284/port1/line4', #P1.4
@@ -168,7 +168,7 @@ config["servers"] = dict(
                 '9':'PXI-6284/port0/line31', #P0.31
                 'X':'PXI-6284/port0/line22'  #P0.22, two electrode
                 },
-            dev_Pumps = {
+            dev_pump = {
                 'PeriPump':'PXI-6284/port0/line4	', #P0.4
 #                'MultiPeriPump':'PXI-6284/port0/line0' #P0.0
                 'Direction':'PXI-6284/port0/line0' #P0.0

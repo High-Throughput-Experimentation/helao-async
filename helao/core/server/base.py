@@ -75,6 +75,7 @@ class Base(object):
     ):
         self.server_name = fastapp.helao_srv
         self.server_cfg = fastapp.helao_cfg["servers"][self.server_name]
+        self.server_params = fastapp.helao_cfg["servers"][self.server_name].get("params", dict())
         self.world_cfg = fastapp.helao_cfg
         self.hostname = gethostname()
         self.save_root = None

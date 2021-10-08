@@ -1,6 +1,5 @@
 
-__all__ = ["cNIMAX",
-           "pumpitems"]
+__all__ = ["cNIMAX"]
 
 from enum import Enum
 import time
@@ -22,15 +21,7 @@ from helao.core.schema import cProcess
 from helao.core.server import Base
 from helao.core.error import error_codes
 import helao.core.model.sample as hcms
-
-
-#TODO, FIXME, remove items not in config
-class pumpitems(str, Enum):
-    PeriPump = "PeriPump"
-    PeriPump1 = "PeriPump1"
-    PeriPump2 = "PeriPump2"
-    # MultiPeriPump = 'MultiPeriPump'
-    Direction = "Direction"
+from helao.core.helper import make_str_enum
 
 
 class cNIMAX:
@@ -40,6 +31,16 @@ class cNIMAX:
         self.base = process_serv
         self.config_dict = process_serv.server_cfg["params"]
         self.world_config = process_serv.world_cfg
+
+
+        self.dev_pump = self.config_dict.get("dev_pump",dict())
+        self.dev_pumpitems = make_str_enum("dev_pump",{key:key for key in self.dev_pump.keys()})
+        
+        self.dev_gasflowvalve = self.config_dict.get("dev_gasflowvalve",dict())
+        self.dev_gasflowvalveitems = make_str_enum("dev_gasflowvalve",{key:key for key in self.dev_gasflowvalve.keys()})
+        
+        self.dev_liquidflowvalve = self.config_dict.get("dev_liquidflowvalve",dict())
+        self.dev_liquidflowvalveitems = make_str_enum("dev_liquidflowvalve",{key:key for key in self.dev_liquidflowvalve.keys()})
 
 
         self.base.print_message(" ... init NI-MAX")
@@ -361,15 +362,15 @@ class cNIMAX:
                 return {"err_code": error_codes.not_available}
 
 
-    async def run_task_Pump(self, pump:pumpitems, on:bool,*args,**kwargs):
+    async def run_task_Pump(self, pump, on:bool,*args,**kwargs):
         self.base.print_message(" ... NIMAX pump:", pump, on)
         on = bool(on)
         cmds = []
         with nidaqmx.Task() as task_Pumps:
             # for pump in pumps:
-            if pump in self.config_dict["dev_Pumps"].keys():
+            if pump in self.config_dict["dev_pump"].keys():
                 task_Pumps.do_channels.add_do_chan(
-                    self.config_dict["dev_Pumps"][pump],
+                    self.config_dict["dev_pump"][pump],
                     line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
                 )
                 cmds.append(on)
@@ -380,14 +381,52 @@ class cNIMAX:
                 return {"err_code": error_codes.not_available}
 
 
-    async def run_task_GasFlowValves(self, valves:List[int], on:bool,*args,**kwargs):
+    async def run_task_gasflowvalve(self, gasflowvalve, on:bool,*args,**kwargs):
+        self.base.print_message(" ... NIMAX gasflowvalve:", gasflowvalve, on)
+        on = bool(on)
+        cmds = []
+        with nidaqmx.Task() as task_gasflowvalve:
+            # for pump in pumps:
+            if gasflowvalve in self.config_dict["dev_gasflowvalve"].keys():
+                task_gasflowvalve.do_channels.add_do_chan(
+                    self.config_dict["dev_gasflowvalve"][gasflowvalve],
+                    line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
+                )
+                cmds.append(on)
+            if cmds:
+                task_gasflowvalve.write(cmds)
+                return {"err_code": error_codes.none}
+            else:
+                return {"err_code": error_codes.not_available}
+
+
+    async def run_task_liquidflowvalve(self, liquidflowvalve, on:bool,*args,**kwargs):
+        self.base.print_message(" ... NIMAX liquidflowvalve:", liquidflowvalve, on)
+        on = bool(on)
+        cmds = []
+        with nidaqmx.Task() as task_liquidflowvalve:
+            # for pump in pumps:
+            if liquidflowvalve in self.config_dict["dev_liquidflowvalve"].keys():
+                task_liquidflowvalve.do_channels.add_do_chan(
+                    self.config_dict["dev_liquidflowvalve"][liquidflowvalve],
+                    line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
+                )
+                cmds.append(on)
+            if cmds:
+                task_liquidflowvalve.write(cmds)
+                return {"err_code": error_codes.none}
+            else:
+                return {"err_code": error_codes.not_available}
+
+
+    async def run_task_gasflowvalves(self, valves:List[int], on:bool,*args,**kwargs):
         on = bool(on)
         cmds = []
         with nidaqmx.Task() as task_GasFlowValves:
             for valve in valves:
-                if valve in self.config_dict["dev_GasFlowValves"].keys():
+                if valve in self.config_dict["dev_gasflowvalve"].keys():
                     task_GasFlowValves.do_channels.add_do_chan(
-                        self.config_dict["dev_GasFlowValves"][valve],
+                        self.config_dict["dev_gasflowvalve"][valve],
                         line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
                     )
                     cmds.append(on)
