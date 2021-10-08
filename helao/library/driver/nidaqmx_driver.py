@@ -333,155 +333,65 @@ class cNIMAX:
             self.base.print_message("IOloop task was cancelled")
 
 
-    async def run_task_getFSW(self, FSW:str):
-        with nidaqmx.Task() as task_FSW:
-            if FSW in self.config_dict["dev_FSW"].keys():
-                task_FSW.di_channels.add_di_chan(
-                    self.config_dict["dev_FSW"][FSW],
+    async def digital_out(self, 
+                          do_port = None, 
+                          do_name: str = "", 
+                          on:bool = False,
+                          *args,**kwargs
+                         ):
+        self.base.print_message(f" ... do_port '{do_name}': {do_port} is {on}")
+        on = bool(on)
+        cmds = []
+        err_code = error_codes.none
+        if do_port is not None:
+            with nidaqmx.Task() as task_do_port:
+                # for pump in pumps:
+                task_do_port.do_channels.add_do_chan(do_port,
+                    line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
+                )
+                cmds.append(on)
+                if cmds:
+                    task_do_port.write(cmds)
+                    err_code = error_codes.none
+                else:
+                    err_code = error_codes.not_available
+        else:
+            err_code = error_codes.not_available
+
+        return {
+                "err_code": err_code,
+                "do_port": do_port,
+                "do_name": do_name,
+                "on": on
+               }
+
+
+    async def digital_in(self, 
+                          di_port = None, 
+                          di_name: str = "", 
+                          on:bool = False,
+                          *args,**kwargs
+                         ):
+        self.base.print_message(f" ... di_port '{di_name}': {di_port}")
+        on = None
+        err_code = error_codes.none
+        if di_port is not None:
+            with nidaqmx.Task() as task_di_port:
+
+                task_di_port.di_channels.add_di_chan(
+                    di_port,
                     line_grouping=LineGrouping.CHAN_PER_LINE,
                 )
-                data = task_FSW.read(number_of_samples_per_channel=1)
-                return {"name": [FSW], "status": data}
+                on = task_di_port.read(number_of_samples_per_channel=1)
+        else:
+            err_code = error_codes.not_available
 
-
-    async def run_task_FSWBCD(self, BCDs:str, on:bool,*args,**kwargs):
-        on = bool(on)
-        cmds = []
-        with nidaqmx.Task() as task_FSWBCD:
-            for BCD in BCDs:
-                if BCD in self.config_dict["dev_FSWBCDCmd"].keys():
-                    task_FSWBCD.do_channels.add_do_chan(
-                        self.config_dict["dev_FSWBCDCmd"][BCD],
-                        line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
-                    )
-                    cmds.append(on)
-            if cmds:
-                task_FSWBCD.write(cmds)
-                return {"err_code": error_codes.none}
-            else:
-                return {"err_code": error_codes.not_available}
-
-
-    async def run_task_Pump(self, pump, on:bool,*args,**kwargs):
-        self.base.print_message(" ... NIMAX pump:", pump, on)
-        on = bool(on)
-        cmds = []
-        with nidaqmx.Task() as task_Pumps:
-            # for pump in pumps:
-            if pump in self.config_dict["dev_pump"].keys():
-                task_Pumps.do_channels.add_do_chan(
-                    self.config_dict["dev_pump"][pump],
-                    line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
-                )
-                cmds.append(on)
-            if cmds:
-                task_Pumps.write(cmds)
-                return {"err_code": error_codes.none}
-            else:
-                return {"err_code": error_codes.not_available}
-
-
-    async def run_task_gasflowvalve(self, gasflowvalve, on:bool,*args,**kwargs):
-        self.base.print_message(" ... NIMAX gasflowvalve:", gasflowvalve, on)
-        on = bool(on)
-        cmds = []
-        with nidaqmx.Task() as task_gasflowvalve:
-            # for pump in pumps:
-            if gasflowvalve in self.config_dict["dev_gasflowvalve"].keys():
-                task_gasflowvalve.do_channels.add_do_chan(
-                    self.config_dict["dev_gasflowvalve"][gasflowvalve],
-                    line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
-                )
-                cmds.append(on)
-            if cmds:
-                task_gasflowvalve.write(cmds)
-                return {"err_code": error_codes.none}
-            else:
-                return {"err_code": error_codes.not_available}
-
-
-    async def run_task_liquidflowvalve(self, liquidflowvalve, on:bool,*args,**kwargs):
-        self.base.print_message(" ... NIMAX liquidflowvalve:", liquidflowvalve, on)
-        on = bool(on)
-        cmds = []
-        with nidaqmx.Task() as task_liquidflowvalve:
-            # for pump in pumps:
-            if liquidflowvalve in self.config_dict["dev_liquidflowvalve"].keys():
-                task_liquidflowvalve.do_channels.add_do_chan(
-                    self.config_dict["dev_liquidflowvalve"][liquidflowvalve],
-                    line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
-                )
-                cmds.append(on)
-            if cmds:
-                task_liquidflowvalve.write(cmds)
-                return {"err_code": error_codes.none}
-            else:
-                return {"err_code": error_codes.not_available}
-
-
-    async def run_task_gasflowvalves(self, valves:List[int], on:bool,*args,**kwargs):
-        on = bool(on)
-        cmds = []
-        with nidaqmx.Task() as task_GasFlowValves:
-            for valve in valves:
-                if valve in self.config_dict["dev_gasflowvalve"].keys():
-                    task_GasFlowValves.do_channels.add_do_chan(
-                        self.config_dict["dev_gasflowvalve"][valve],
-                        line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
-                    )
-                    cmds.append(on)
-            if cmds:
-                task_GasFlowValves.write(cmds)
-                return {"err_code": error_codes.none}
-            else:
-                return {"err_code": error_codes.not_available}
-
-
-    async def run_task_Master_Cell_Select(self, cells:List[int], on: bool,*args,**kwargs):
-        on = bool(on)
-        if len(cells) > 1:
-            self.base.print_message(
-                " ... Multiple cell selected. Only one can be Master cell. Using first one!"
-            )
-            self.base.print_message(cells)
-            cells = [cells[0]]
-            self.base.print_message(cells)
-        cmds = []
-        with nidaqmx.Task() as task_MasterCell:
-            for cell in cells:
-                if cell in self.config_dict["dev_MasterCellSelect"].keys():
-                    task_MasterCell.do_channels.add_do_chan(
-                        self.config_dict["dev_MasterCellSelect"][cell],
-                        line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
-                    )
-                    cmds.append(on)
-            if cmds:
-                task_MasterCell.write(cmds)
-                return {"err_code": error_codes.none}
-            else:
-                return {"err_code": error_codes.not_available}
-
-
-    async def run_task_Active_Cells_Selection(self, cells:List[int], on:bool,*args,**kwargs):
-        on = bool(on)
-        cmds = []
-        with nidaqmx.Task() as task_ActiveCell:
-            for cell in cells:
-                if cell in self.config_dict["dev_ActiveCellsSelection"].keys():
-                    task_ActiveCell.do_channels.add_do_chan(
-                        self.config_dict["dev_ActiveCellsSelection"][cell],
-                        line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
-                    )
-                    cmds.append(on)
-
-                self.activeCell[int(cell) - 1] = on
-
-
-            if cmds:
-                task_ActiveCell.write(cmds)
-                return {"err_code": error_codes.none}
-            else:
-                return {"err_code": error_codes.not_available}
+        return {
+                "err_code": err_code,
+                "di_port": di_port,
+                "di_name": di_name,
+                "on": on
+               }
 
 
     async def run_cell_IV(self, A: cProcess):
