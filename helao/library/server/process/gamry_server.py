@@ -59,28 +59,29 @@ def makeApp(confPrefix, servKey):
         """Will return 'idle' or 'measuring'. 
         Should be used in conjuction with eta to async.sleep loop poll"""
         A = await setup_process(request)
-        active = await app.base.contain_process(A)
+        active = await app.base.contain_process(A, file_data_keys="status")
         driver_status = await app.driver.status()
         await active.enqueue_data({"status": driver_status})
         finished_process = await active.finish()
         return finished_process.as_dict()
 
+
     @app.post(f"/{servKey}/run_LSV")
     async def run_LSV(
-        request: Request,
-        fast_samples_in: Optional[hcms.SampleList] = \
-            hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
-        Vinit: Optional[float] = 0.0,  # Initial value in volts or amps.
-        Vfinal: Optional[float] = 1.0,  # Final value in volts or amps.
-        ScanRate: Optional[float] = 1.0,  # Scan rate in volts/second or amps/second.
-        SampleRate: Optional[
-            float
-        ] = 0.01,  # Time between data acquisition samples in seconds.
-        TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-        TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-        IErange: Optional[Gamry_IErange] = "auto",
-        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
-    ):
+                      request: Request,
+                      fast_samples_in: Optional[hcms.SampleList] = \
+               hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
+                      Vinit: Optional[float] = 0.0,  # Initial value in volts or amps.
+                      Vfinal: Optional[float] = 1.0,  # Final value in volts or amps.
+                      ScanRate: Optional[float] = 1.0,  # Scan rate in volts/second or amps/second.
+                      SampleRate: Optional[
+                                           float
+                                          ] = 0.01,  # Time between data acquisition samples in seconds.
+                      TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                      TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                      IErange: Optional[Gamry_IErange] = "auto",
+                      scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+                     ):
         """Linear Sweep Voltammetry (unlike CV no backward scan is done)
         use 4bit bitmask for triggers
         IErange depends on gamry model used (test actual limit before using)"""
@@ -90,21 +91,22 @@ def makeApp(confPrefix, servKey):
         active_dict = await app.driver.technique_LSV(A)
         return active_dict
 
+
     @app.post(f"/{servKey}/run_CA")
     async def run_CA(
-        request: Request,
-        fast_samples_in: Optional[hcms.SampleList] = \
-            hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
-        Vval: Optional[float] = 0.0,
-        Tval: Optional[float] = 10.0,
-        SampleRate: Optional[
-            float
-        ] = 0.01,  # Time between data acquisition samples in seconds.
-        TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-        TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-        IErange: Optional[Gamry_IErange] = "auto",
-        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
-    ):
+                     request: Request,
+                     fast_samples_in: Optional[hcms.SampleList] = \
+               hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
+                     Vval: Optional[float] = 0.0,
+                     Tval: Optional[float] = 10.0,
+                     SampleRate: Optional[
+                                          float
+                     ] = 0.01,  # Time between data acquisition samples in seconds.
+                     TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                     TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                     IErange: Optional[Gamry_IErange] = "auto",
+                     scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+                    ):
         """Chronoamperometry (current response on amplied potential)
         use 4bit bitmask for triggers
         IErange depends on gamry model used 
@@ -115,21 +117,22 @@ def makeApp(confPrefix, servKey):
         active_dict = await app.driver.technique_CA(A)
         return active_dict
 
+
     @app.post(f"/{servKey}/run_CP")
     async def run_CP(
-        request: Request,
-        fast_samples_in: Optional[hcms.SampleList] = \
+                     request: Request,
+                     fast_samples_in: Optional[hcms.SampleList] = \
             hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
-        Ival: Optional[float] = 0.0,
-        Tval: Optional[float] = 10.0,
-        SampleRate: Optional[
-            float
-        ] = 1.0,  # Time between data acquisition samples in seconds.
-        TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-        TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-        IErange: Optional[Gamry_IErange] = "auto",
-        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
-    ):
+                     Ival: Optional[float] = 0.0,
+                     Tval: Optional[float] = 10.0,
+                     SampleRate: Optional[
+                                          float
+                                         ] = 1.0,  # Time between data acquisition samples in seconds.
+                     TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                     TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                     IErange: Optional[Gamry_IErange] = "auto",
+                     scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+                    ):
         """Chronopotentiometry (Potential response on controlled current)
         use 4bit bitmask for triggers
         IErange depends on gamry model used (test actual limit before using)"""
@@ -139,25 +142,26 @@ def makeApp(confPrefix, servKey):
         active_dict = await app.driver.technique_CP(A)
         return active_dict
 
+
     @app.post(f"/{servKey}/run_CV")
     async def run_CV(
-        request: Request,
-        fast_samples_in: Optional[hcms.SampleList] = \
-            hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
-        Vinit: Optional[float] = 0.0,  # Initial value in volts or amps.
-        Vapex1: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
-        Vapex2: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
-        Vfinal: Optional[float] = 0.0,  # Final value in volts or amps.
-        ScanRate: Optional[
-            float
-        ] = 1.0,  # Apex scan rate in volts/second or amps/second.
-        SampleRate: Optional[float] = 0.01,  # Time between data acquisition steps.
-        Cycles: Optional[int] = 1,
-        TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-        TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-        IErange: Optional[Gamry_IErange] = "auto",
-        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
-    ):
+                     request: Request,
+                     fast_samples_in: Optional[hcms.SampleList] = \
+               hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
+                     Vinit: Optional[float] = 0.0,  # Initial value in volts or amps.
+                     Vapex1: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
+                     Vapex2: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
+                     Vfinal: Optional[float] = 0.0,  # Final value in volts or amps.
+                     ScanRate: Optional[
+                                        float
+                     ] = 1.0,  # Apex scan rate in volts/second or amps/second.
+                     SampleRate: Optional[float] = 0.01,  # Time between data acquisition steps.
+                     Cycles: Optional[int] = 1,
+                     TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                     TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                     IErange: Optional[Gamry_IErange] = "auto",
+                     scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+                    ):
         """Cyclic Voltammetry (most widely used technique 
         for acquireing information about electrochemical reprocesss)
         use 4bit bitmask for triggers
@@ -170,22 +174,22 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/run_EIS")
     async def run_EIS(
-        request: Request,
-        fast_samples_in: Optional[hcms.SampleList] = \
-            hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
-        Vval: Optional[float] = 0.0,
-        Tval: Optional[float] = 10.0,
-        Freq: Optional[float] = 1000.0,
-        RMS: Optional[float] = 0.02,
-        Precision: Optional[
-            float
-        ] = 0.001,  # The precision is used in a Correlation Coefficient (residual power) based test to determine whether or not to measure another cycle.
-        SampleRate: Optional[float] = 0.01,
-        TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-        TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-        IErange: Optional[Gamry_IErange] = "auto",
-        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
-    ):
+                      request: Request,
+                      fast_samples_in: Optional[hcms.SampleList] = \
+                            hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
+                      Vval: Optional[float] = 0.0,
+                      Tval: Optional[float] = 10.0,
+                      Freq: Optional[float] = 1000.0,
+                      RMS: Optional[float] = 0.02,
+                      Precision: Optional[
+                                          float
+                                         ] = 0.001,  # The precision is used in a Correlation Coefficient (residual power) based test to determine whether or not to measure another cycle.
+                      SampleRate: Optional[float] = 0.01,
+                      TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                      TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                      IErange: Optional[Gamry_IErange] = "auto",
+                      scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+                     ):
         """Electrochemical Impendance Spectroscopy
         NOT TESTED
         use 4bit bitmask for triggers
@@ -198,16 +202,16 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/run_OCV")
     async def run_OCV(
-        request: Request,
-        fast_samples_in: Optional[hcms.SampleList] = \
-            hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
-        Tval: Optional[float] = 10.0,
-        SampleRate: Optional[float] = 0.01,
-        TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-        TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-        IErange: Optional[Gamry_IErange] = "auto",
-        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
-    ):
+                      request: Request,
+                      fast_samples_in: Optional[hcms.SampleList] = \
+                      hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
+                      Tval: Optional[float] = 10.0,
+                      SampleRate: Optional[float] = 0.01,
+                      TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                      TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                      IErange: Optional[Gamry_IErange] = "auto",
+                      scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+                     ):
         """mesasures open circuit potential
         use 4bit bitmask for triggers
         IErange depends on gamry model used (test actual limit before using)"""
@@ -217,29 +221,31 @@ def makeApp(confPrefix, servKey):
         active_dict = await app.driver.technique_OCV(A)
         return active_dict
 
+
     @app.post(f"/{servKey}/stop")
     async def stop(request: Request):
         """Stops measurement in a controlled way."""
         A = await setup_process(request)
         A.process_abbr = "stop"
-        active = await app.base.contain_process(A)
-        await active.enqueue_data({"stop_result": await app.driver.stop()})
+        active = await app.base.contain_process(A, file_data_keys="stop")
+        await active.enqueue_data({"stop": await app.driver.stop()})
         finished_process = await active.finish()
         return finished_process.as_dict()
 
 
     @app.post(f"/{servKey}/estop")
     async def estop(
-        request: Request,
-        switch: Optional[bool] = True,
-        ):
+                    request: Request,
+                    switch: Optional[bool] = True,
+                   ):
         """Same as stop, but also sets estop flag."""
         A = await setup_process(request)
         A.process_abbr = "estop"
-        active = await app.base.contain_process(A)
-        await active.enqueue_data({"estop_result": await app.driver.estop(A)})
+        active = await app.base.contain_process(A, file_data_keys="estop")
+        await active.enqueue_data({"estop": await app.driver.estop(A)})
         finished_process = await active.finish()
         return finished_process.as_dict()
+
 
     @app.post("/shutdown")
     def post_shutdown():
@@ -247,6 +253,7 @@ def makeApp(confPrefix, servKey):
         app.driver.kill_GamryCom()
 
     #    shutdown_event()
+
 
     @app.on_event("shutdown")
     def shutdown_event():

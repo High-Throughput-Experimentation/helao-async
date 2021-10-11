@@ -41,7 +41,6 @@ config["servers"] = dict(
         port=8003,
         group="process",
         fast="galil_motion",
-        simulate=False, # choose between simulator(default) or real device
         params=dict(
             Transfermatrix = [[1,0,0],[0,1,0],[0,0,1]], # default Transfermatrix for plate calibration
             
@@ -73,7 +72,6 @@ config["servers"] = dict(
                 D=0.0, #Rz
                 ),
             timeout = 10*60, # timeout for axis stop in sec
-            tbroadcast = 2, # frequency of websocket broadcast (only broadcasts if something changes but need to reduce the frequeny of that if necessary)
         )
     ),
     PSTAT=dict(
@@ -104,9 +102,9 @@ config["servers"] = dict(
         group="process",
         fast="nidaqmx_server",
         params = dict(
-            dev_CellCurrent_trigger = 'PFI1', #P1.1
-            dev_CellVoltage_trigger = 'PFI1', #P1.1
-            dev_CellCurrent = {
+            dev_cellcurrent_trigger = 'PFI1', #P1.1
+            dev_cellvoltage_trigger = 'PFI1', #P1.1
+            dev_cellcurrent = {
                 '1':'PXI-6289/ai16',
                 '2':'PXI-6289/ai17',
                 '3':'PXI-6289/ai18',
@@ -117,7 +115,7 @@ config["servers"] = dict(
                 '8':'PXI-6289/ai23',
                 '9':'PXI-6289/ai0'
                 },
-            dev_CellVoltage = {
+            dev_cellvoltage = {
                 '1':'PXI-6284/ai16',
                 '2':'PXI-6284/ai17',
                 '3':'PXI-6284/ai18',
@@ -128,7 +126,7 @@ config["servers"] = dict(
                 '8':'PXI-6284/ai23',
                 '9':'PXI-6284/ai0'
                 },
-            # dev_ActiveCellsSelection = {
+            # dev_activecell = {
             #     '1':'PXI-6289/port0/line23', #P0.23
             #     '2':'PXI-6289/port0/line24', #P0.24
             #     '3':'PXI-6289/port0/line25', #P0.25
@@ -139,13 +137,13 @@ config["servers"] = dict(
             #     '8':'PXI-6289/port0/line30', #P0.30
             #     '9':'PXI-6289/port0/line31'  #P0.31
             #     },
-            # dev_FSWBCDCmd = {
+            # dev_fswbcd = {
             #     '1':'PXI-6284/port0/line5', #P0.5
             #     '2':'PXI-6284/port0/line1', #P0.1
             #     '3':'PXI-6284/port0/line2', #P0.2
             #     '4':'PXI-6284/port0/line3'  #P0.3
             #     },
-            dev_gasflowvalve = {
+            dev_gasvalve = {
                 '1':'PXI-6284/port1/line2', #P1.2
                 '2':'PXI-6284/port1/line3', #P1.3
                 '3':'PXI-6284/port1/line4', #P1.4
@@ -156,7 +154,7 @@ config["servers"] = dict(
                 '8':'PXI-6284/port2/line1', #P2.1
                 '9':'PXI-6284/port2/line2'  #P2.2
                 },
-            # dev_MasterCellSelect = {
+            # dev_mastercell = {
             #     '1':'PXI-6284/port0/line23', #P0.23
             #     '2':'PXI-6284/port0/line24', #P0.24
             #     '3':'PXI-6284/port0/line25', #P0.25
@@ -173,9 +171,9 @@ config["servers"] = dict(
 #                'MultiPeriPump':'PXI-6284/port0/line0' #P0.0
                 'Direction':'PXI-6284/port0/line0' #P0.0
                 },
-            dev_FSW = {
-                'Done':'PXI-6284/port2/line4',  #P2.4
-                'Error':'PXI-6284/port2/line6'  #P2.6
+            dev_fsw = {
+                'done':'PXI-6284/port2/line4',  #P2.4
+                'error':'PXI-6284/port2/line6'  #P2.6
                 },
 #             dev_RSHTTLhandshake = {
 #                 'RSH1':'PXI-6284/port2/line5',  #P2.5
@@ -199,9 +197,6 @@ config["servers"] = dict(
             log_file = r'C:\Users\rshs\Desktop\ADSS\adss_logfile\210512_lcfc_manualwatertest\210512_LCFC_manualwatertest_logfile.txt',
             timeout = 30*60, # 30min timeout for waiting for TTL
             dev_NImax = { # TTL handshake via NImax
-                # 'start':'PFI13',#'PXI-6284/port2/line5',  #P2.5, #PFI13
-                # 'continue':'PFI15',#'PXI-6284/port2/line7',  #P2.7 #PFI15
-                # 'done':'PFI11',#'PXI-6284/port2/line3',  #P2.3 #PFI11
                 'start':'PXI-6284/port2/line5',  #P2.5, #PFI13
                 'continue':'PXI-6284/port2/line7',  #P2.7 #PFI15
                 'done':'PXI-6284/port2/line3',  #P2.3 #PFI11

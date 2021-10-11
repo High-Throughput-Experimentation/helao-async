@@ -42,7 +42,6 @@ class cNIMAX:
         self.dev_liquidvalve = self.config_dict.get("dev_liquidvalve",dict())
         self.dev_liquidvalveitems = make_str_enum("dev_liquidvalve",{key:key for key in self.dev_liquidvalve.keys()})
 
-
         self.base.print_message(" ... init NI-MAX")
 
         self.process = None  # for passing process object from technique method to measure loop

@@ -42,7 +42,7 @@ def makeApp(confPrefix, servKey):
         (3) moving by center counts back, 
         (4) set abs zero"""
         A = await setup_process(request)
-        active = await app.base.contain_process(A)
+        active = await app.base.contain_process(A, file_data_keys="setref")
         await active.enqueue_data({"setref": await app.driver.setaxisref()})
         finished_process = await active.finish()
         return finished_process.as_dict()
@@ -198,9 +198,9 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/stop")
     async def stop(request: Request):
         A = await setup_process(request)
-        active = await app.base.contain_process(A)
+        active = await app.base.contain_process(A, file_data_keys="stop")
         await active.enqueue_data(
-            await app.driver.motor_off(await app.driver.get_all_axis())
+            await app.driver.motor_off({"stop":await app.driver.get_all_axis()})
         )
         finished_process = await active.finish()
         return finished_process.as_dict()
@@ -210,9 +210,9 @@ def makeApp(confPrefix, servKey):
     async def reset(request: Request):
         """resets galil device. only for emergency use!"""
         A = await setup_process(request)
-        active = await app.base.contain_process(A)
+        active = await app.base.contain_process(A, file_data_keys="reset")
         await active.enqueue_data(
-            await app.driver.motor_off(await app.driver.reset())
+            await app.driver.motor_off({"reset":await app.driver.reset()})
         )
         finished_process = await active.finish()
         return finished_process.as_dict()
@@ -222,8 +222,8 @@ def makeApp(confPrefix, servKey):
     async def estop(request: Request, switch: Optional[bool] = True):
         # http://127.0.0.1:8001/motor/set/stop
         A = await setup_process(request)
-        active = await app.base.contain_process(A)
-        await active.enqueue_data(await app.driver.estop_axis(**A.process_params))
+        active = await app.base.contain_process(A, file_data_keys="estop")
+        await active.enqueue_data({"estop":await app.driver.estop_axis(**A.process_params)})
         finished_process = await active.finish()
         return finished_process.as_dict()
 
