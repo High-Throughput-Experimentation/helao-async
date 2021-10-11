@@ -69,10 +69,10 @@ def makeApp(confPrefix, servKey):
     if dev_mastercell:
         @app.post(f"/{servKey}/mastercell")
         async def mastercell(
-                                     request: Request, 
-                                     cell: Optional[dev_mastercellitems],
-                                     on: Optional[bool] = True
-                                    ):
+                             request: Request, 
+                             cell: Optional[dev_mastercellitems],
+                             on: Optional[bool] = True
+                            ):
             A = await setup_process(request)
             # some additional params in order to call the same driver functions 
             # for all DO actions
@@ -89,10 +89,10 @@ def makeApp(confPrefix, servKey):
     if dev_activecell:
         @app.post(f"/{servKey}/activecell")
         async def activecell(
-                               request: Request,
-                               cell: Optional[dev_activecellitems],
-                               on: Optional[bool] = True
-                              ):
+                             request: Request,
+                             cell: Optional[dev_activecellitems],
+                             on: Optional[bool] = True
+                            ):
             A = await setup_process(request)
             # some additional params in order to call the same driver functions 
             # for all DO actions
@@ -129,10 +129,10 @@ def makeApp(confPrefix, servKey):
     if dev_gasvalve:
         @app.post(f"/{servKey}/gasvalve")
         async def gasvalve(
-                                request: Request, 
-                                gasvalve: Optional[dev_gasvalveitems],
-                                on: Optional[bool] = True
-                                ):
+                           request: Request, 
+                           gasvalve: Optional[dev_gasvalveitems],
+                           on: Optional[bool] = True
+                          ):
             A = await setup_process(request)
             # some additional params in order to call the same driver functions 
             # for all DO actions
@@ -149,10 +149,10 @@ def makeApp(confPrefix, servKey):
     if dev_liquidvalve:
         @app.post(f"/{servKey}/liquidvalve")
         async def liquidvalve(
-                                    request: Request, 
-                                    liquidvalve: Optional[dev_liquidvalveitems],
-                                    on: Optional[bool] = True
-                                   ):
+                              request: Request, 
+                              liquidvalve: Optional[dev_liquidvalveitems],
+                              on: Optional[bool] = True
+                             ):
             A = await setup_process(request)
             # some additional params in order to call the same driver functions 
             # for all DO actions
@@ -208,14 +208,14 @@ def makeApp(confPrefix, servKey):
     if dev_cellcurrent and dev_cellvoltage:
         @app.post(f"/{servKey}/cellIV")
         async def cellIV(
-                                  request: Request, 
-                                  fast_samples_in: Optional[hcms.SampleList] = \
-                                      hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
-                                  Tval: Optional[float] = 10.0,
-                                  SampleRate: Optional[float] = 1.0, 
-                                  TTLwait: Optional[int] = -1,  # -1 disables, else select TTL channel
-                                  scratch: Optional[List[None]] = [None], # temp fix so swagger still works
-                                  ):
+                         request: Request, 
+                         fast_samples_in: Optional[hcms.SampleList] = \
+                             hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
+                         Tval: Optional[float] = 10.0,
+                         SampleRate: Optional[float] = 1.0, 
+                         TTLwait: Optional[int] = -1,  # -1 disables, else select TTL channel
+                         scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+                        ):
             """Runs multi cell IV measurement."""
             A = await setup_process(request)
             A.process_abbr = "multiCV"

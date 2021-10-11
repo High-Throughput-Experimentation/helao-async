@@ -37,7 +37,6 @@ config["servers"] = dict(
         port=8003,
         group="process",
         fast="galil_motion",
-        simulate=False, # choose between simulator(default) or real device
         params=dict(
             Transfermatrix = [[1,0,0],[0,1,0],[0,0,1]], # default Transfermatrix for plate calibration
             
@@ -100,41 +99,39 @@ config["servers"] = dict(
                 'PeriPump1':'cDAQ1Mod1/port0/line9',
                 'PeriPump2':'cDAQ1Mod1/port0/line7',
                 'Direction':'cDAQ1Mod1/port0/line8',
-                # 'PeriPump2':'cDAQ1Mod1/port0/line4',
                 },
 
-            dev_gasflowvalve = {
+            dev_gasvalve = {
                 "CO2":"cDAQ1Mod1/port0/line0",
                 "Ar":"cDAQ1Mod1/port0/line2",
                 "atm":"cDAQ1Mod1/port0/line5",
                 },
-            dev_liquidflowvalve = {
+            dev_liquidvalve = {
                 "liquid":"cDAQ1Mod1/port0/line1",
+                "up":"cDAQ1Mod1/port0/line4",
+                "down":"cDAQ1Mod1/port0/line3",
                 },
         )
     ),
-    # PAL=dict(
-    #     host=hostip,
-    #     port=8007,
-    #     group="process",
-    #     fast="PAL_server",
-    #     params = dict(
-    #         user = 'RSHS',
-    #         key = r'c:\helao\sshkeys\rshs_private3.ppk', # needs to be in new openssh file format
-    #         host = "10.231.100.169",#r'hte-rshs-01.htejcap.caltech.edu',
-    #         method_path = r'C:\Users\rshs\Desktop\ADSS\adss_psc_methods\lcfc',
-    #         log_file = r'C:\Users\rshs\Desktop\ADSS\adss_logfile\210512_lcfc_manualwatertest\210512_LCFC_manualwatertest_logfile.txt',
-    #         timeout = 30*60, # 30min timeout for waiting for TTL
-    #         dev_NImax = { # TTL handshake via NImax
-    #             # 'start':'PFI13',#'PXI-6284/port2/line5',  #P2.5, #PFI13
-    #             # 'continue':'PFI15',#'PXI-6284/port2/line7',  #P2.7 #PFI15
-    #             # 'done':'PFI11',#'PXI-6284/port2/line3',  #P2.3 #PFI11
-    #             'start':'cDAQ1Mod2/port2/line5', #TTL1
-    #             'continue':'cDAQ1Mod2/port2/line7',  #TTL2
-    #             'done':'cDAQ1Mod2/port2/line3',  #TTL3
-    #             },
-    #     )
-    # ),
+    PAL=dict(
+        host=hostip,
+        port=8007,
+        group="process",
+        fast="PAL_server",
+        params = dict(
+            #user = 'RSHS',
+            #key = r'c:\helao\sshkeys\rshs_private3.ppk', # needs to be in new openssh file format
+            host = "localhost",
+            method_path = r'C:\Users\rshs\Desktop\ADSS\adss_psc_methods\lcfc',
+            log_file = r'C:\Users\rshs\Desktop\ADSS\adss_logfile\210512_lcfc_manualwatertest\210512_LCFC_manualwatertest_logfile.txt',
+            timeout = 30*60, # 30min timeout for waiting for TTL
+            dev_NImax = { # TTL handshake via NImax
+                'start':'cDAQ1Mod2/port2/line5', #TTL1
+                'continue':'cDAQ1Mod2/port2/line7',  #TTL2
+                'done':'cDAQ1Mod2/port2/line3',  #TTL3
+                },
+        )
+    ),
     # #########################################################################
     # Visualizers (bokeh servers)
     # #########################################################################

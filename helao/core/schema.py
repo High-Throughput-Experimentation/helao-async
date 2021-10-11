@@ -166,7 +166,6 @@ class Sequencer(object):
     ):
         frame = inspect.currentframe().f_back
         _args, _varargs, _keywords, _locals = inspect.getargvalues(frame)
-        print(_args, _varargs, _keywords, _locals)
         self._pg = pg
         self.process_list = []
         self.pars = self._C()

@@ -189,7 +189,7 @@ def makeApp(confPrefix, servKey):
         For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.\n
         It will select the first empty vial which has the smallest volume that still can hold req_vol"""
         A = await setup_process(request)
-        active = await app.base.contain_process(A)
+        active = await app.base.contain_process(A, file_data_keys="vial_position")
         await active.enqueue_data({"vial_position": await app.driver.trayDB_new(**A.process_params)})
         finished_process = await active.finish()
         return finished_process.as_dict()
@@ -206,7 +206,7 @@ def makeApp(confPrefix, servKey):
     ):
         """Updates app.driver vial Table. If sucessful (vial-slot was empty) returns True, else it returns False."""
         A = await setup_process(request)
-        active = await app.base.contain_process(A)
+        active = await app.base.contain_process(A, file_data_keys="update")
         await active.enqueue_data({"update": await app.driver.trayDB_update(**A.process_params)})
         finished_process = await active.finish()
         return finished_process.as_dict()
@@ -284,9 +284,9 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/liquid_sample_no_get_last")
     async def liquid_sample_no_get_last(request: Request):
         A = await setup_process(request)
-        active = await app.base.contain_process(A)
+        active = await app.base.contain_process(A, file_data_keys="sample")
         sample = await app.driver.liquid_sample_no_get_last()
-        await active.enqueue_data({'liquid_sample': sample.dict()})
+        await active.enqueue_data({'sample': sample.dict()})
         finished_process = await active.finish()
         return finished_process.as_dict()
 

@@ -47,6 +47,9 @@ async def setup_process(request: Request):
         elif type(tmp_fast_samples_in) is list:
             A.samples_in = hcms.SampleList(samples=tmp_fast_samples_in)
 
+    if A.process_abbr is None:
+       A.process_abbr = A.process_name
+
     # setting some default values if process was not submitted via orch
     if A.machine_name is None:
         A.machine_name = gethostname()

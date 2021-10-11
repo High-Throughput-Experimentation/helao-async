@@ -87,7 +87,7 @@ def debug(pg_Obj: cProcess_group,
     process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{NI_name}",
-        "process_name": "run_cell_IV",
+        "process_name": "cellIV",
         "process_params": {
                         "Tval": 10,
                         "SampleRate": 1.0,

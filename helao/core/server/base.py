@@ -487,8 +487,6 @@ class Base(object):
             self.manual = False
             self.process_group_dir = None
 
-            if self.process.process_abbr is None:
-               self.process.process_abbr = self.process.process_name
 
             if file_sample_keys is None:
                 self.process.file_sample_keys = ["None"]
