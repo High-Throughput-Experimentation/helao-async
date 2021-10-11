@@ -20,6 +20,7 @@ from typing import List
 from helao.core.server import Base
 from helao.core.error import error_codes
 from helao.core.schema import cProcess
+from helao.core.error import error_codes
 
 
 driver_path = os.path.dirname(__file__)
@@ -768,6 +769,7 @@ class galil:
         else:
             # need only to set the flag
             self.config_dict["estop_io"] = False
+        return switch
 
     async def stop_axis(self, axis):
         # this will stop the current motion of the axis
@@ -848,51 +850,77 @@ class galil:
         ret.update(await self.query_axis_position(axis))
         return ret
 
-    async def read_analog_in(self, ports:List[int],*args,**kwargs):
-        # this reads the value of an analog in port
-        # http://127.0.0.1:8000/
-        if type(ports) is not list:
-            ports = [ports]
-        ret = []
-        for port in ports:
-            if port in self.config_dict["Ain_id"].keys():
-                pID = self.config_dict["Ain_id"][port]
-                ret.append(self.c(f"@AN[{int(pID)}]"))
-            else:
-                ret.append("AI ERROR")
-        return {"ports": ports, "value": ret, "type": "analog_in"}
 
-    async def read_digital_in(self, ports:List[int],*args,**kwargs):
-        # this reads the value of a digital in port
-        # http://127.0.0.1:8000/
-        if type(ports) is not list:
-            ports = [ports]
-        ret = []
-        for port in ports:
-            if port in self.config_dict["Din_id"].keys():
-                pID = self.config_dict["Din_id"][port]
-                ret.append(self.c(f"@IN[{int(pID)}]"))
-            else:
-                ret.append("DI ERROR")
-        return {"ports": ports, "value": ret, "type": "digital_in"}
+    async def get_analog_in(self, 
+                            port:int,
+                            ai_name:str="analog_in",
+                            *args,**kwargs):
+        err_code = error_codes.none
+        ret = None
+        if port in self.config_dict["Ain_id"].keys():
+            pID = self.config_dict["Ain_id"][port]
+            ret = self.c(f"@AN[{int(pID)}]")
+        else:
+            err_code = error_codes.not_available
 
-    async def read_digital_out(self, ports:List[int],*args,**kwargs):
-        # this reads the value of an digital out port i.e. what is
-        # actuallybeing put out (for checking)
-        # http://127.0.0.1:8000/
-        if type(ports) is not list:
-            ports = [ports]
-        ret = []
-        for port in ports:
-            if port in self.config_dict["Dout_id"].keys():
-                pID = self.config_dict["Dout_id"][port]
-                ret.append(self.c(f"@OUT[{int(pID)}]"))
-            else:
-                ret.append("DO ERROR")
-        return {"ports": ports, "value": ret, "type": "digital_out"}
+        return {
+                "error_code": err_code,
+                "port": port,
+                "name": ai_name,
+                "type": "analog_in",
+                "value": ret
+               }
+
+
+    async def get_digital_in(self, 
+                             port:int, 
+                             di_name:str="digital_in",
+                             *args,**kwargs):
+        err_code = error_codes.none
+        ret = None
+        if port in self.config_dict["Din_id"].keys():
+            pID = self.config_dict["Din_id"][port]
+            ret = self.c(f"@IN[{int(pID)}]")
+        else:
+            err_code = error_codes.not_available
+
+        return {
+                "error_code": err_code,
+                "port": port,
+                "name": di_name,
+                "type": "digital_in",
+                "value": ret
+               }
+
+
+    async def get_digital_out(self, 
+                              port:int,
+                              do_name:str="digital_out",
+                              *args,**kwargs):
+        err_code = error_codes.none
+        ret = None
+        if port in self.config_dict["Dout_id"].keys():
+            pID = self.config_dict["Dout_id"][port]
+            ret = self.c(f"@OUT[{int(pID)}]")
+        else:
+            err_code = error_codes.not_available
+
+        return {
+                "error_code": err_code,
+                "port": port,
+                "name": do_name,
+                "type": "digital_out",
+                "value": ret
+               }
+
 
     # def set_analog_out(self, ports, handle: int, module: int, bitnum: int, multi_value):
-    async def set_analog_out(self, ports:List[int], multi_value:List[float],*args,**kwargs):
+    async def set_analog_out(self, 
+                             port:int, 
+                             value:float,
+                             ao_name:str="analog_out",
+                             *args,**kwargs):
+        err_code = error_codes.not_available
         # this is essentially a placeholder for now since the DMC-4143 does not support
         # analog out but I believe it is worthwhile to have this in here for the RIO
         # Handle num is A-H and must be on port 502 for the modbus commons
@@ -901,34 +929,41 @@ class galil:
         # the fist value n_0
         # n_0 = handle * 1000 + (module - 1) * 4 + bitnum
         # _ = self.c("AO {},{}".format(port, value))
-        return {"ports": ports, "value": multi_value, "type": "analog_out"}
+        return {
+                "error_code": err_code,
+                "port": port,
+                "name": ao_name,
+                "type": "analog_out",
+                "value": None
+               }
 
-    async def digital_out_on(self, ports:List[int],*args,**kwargs):
-        if type(ports) is not list:
-            ports = [ports]
-        for port in ports:
-            if port in self.config_dict["Dout_id"].keys():
-                pID = self.config_dict["Dout_id"][port]
+
+    async def set_digital_out(self, 
+                              port:int, 
+                              on:bool, 
+                              do_name:str="digital_out",
+                              *args,**kwargs):
+        err_code = error_codes.none
+        on = bool(on)
+        ret = None
+        if port in self.config_dict["Dout_id"].keys():
+            pID = self.config_dict["Dout_id"][port]
+            if on:
                 _ = self.c(f"SB {int(pID)}")
-        return {
-            "ports": ports,
-            "value": await self.read_digital_out(ports),
-            "type": "digital_out",
-        }
-
-    async def digital_out_off(self, ports:List[int],*args,**kwargs):
-        if type(ports) is not list:
-            ports = [ports]
-
-        for port in ports:
-            if port in self.config_dict["Dout_id"].keys():
-                pID = self.config_dict["Dout_id"][port]
+            else:
                 _ = self.c(f"CB {int(pID)}")
+            ret = self.c(f"@OUT[{int(pID)}]")
+        else:
+            err_code = error_codes.not_available
+
         return {
-            "ports": ports,
-            "value": await self.read_digital_out(ports),
-            "type": "digital_out",
-        }
+                "error_code": err_code,
+                "port": port,
+                "name": do_name,
+                "type": "digital_out",
+                "value": ret
+               }
+
 
     async def upload_DMC(self, DMC_prog):
         self.c("UL;")  # begin upload
@@ -948,21 +983,23 @@ class galil:
         # self.c("XQ")
         self.c("XQ #main")  # excecute main routine
 
+
     async def infinite_digital_cycles(
         self, on_time:float=0.2, off_time:float=0.2, port:int=0, init_time:float=0,*args,**kwargs
     ):
         self.cycle_lights = True
         time.sleep(init_time)
         while self.cycle_lights:
-            await self.digital_out_on(port)
+            await self.set_digital_out(port, True)
             time.sleep(on_time)
-            await self.digital_out_off(port)
+            await self.set_digital_out(port, False)
             time.sleep(off_time)
         return {
             "ports": port,
             "value": "ran_infinite_light_cycles",
             "type": "digital_out",
         }
+
 
     async def break_infinite_digital_cycles(
         self, on_time=0.2, off_time=0.2, port=0, init_time=0
