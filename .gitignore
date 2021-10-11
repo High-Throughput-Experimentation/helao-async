@@ -11,3 +11,4 @@ outputs/*
 ntpLastSync.txt
 data/*
 bugreports/*
+helao/core/*
