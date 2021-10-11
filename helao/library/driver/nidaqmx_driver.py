@@ -36,11 +36,11 @@ class cNIMAX:
         self.dev_pump = self.config_dict.get("dev_pump",dict())
         self.dev_pumpitems = make_str_enum("dev_pump",{key:key for key in self.dev_pump.keys()})
         
-        self.dev_gasflowvalve = self.config_dict.get("dev_gasflowvalve",dict())
-        self.dev_gasflowvalveitems = make_str_enum("dev_gasflowvalve",{key:key for key in self.dev_gasflowvalve.keys()})
+        self.dev_gasvalve = self.config_dict.get("dev_gasvalve",dict())
+        self.dev_gasvalveitems = make_str_enum("dev_gasvalve",{key:key for key in self.dev_gasvalve.keys()})
         
-        self.dev_liquidflowvalve = self.config_dict.get("dev_liquidflowvalve",dict())
-        self.dev_liquidflowvalveitems = make_str_enum("dev_liquidflowvalve",{key:key for key in self.dev_liquidflowvalve.keys()})
+        self.dev_liquidvalve = self.config_dict.get("dev_liquidvalve",dict())
+        self.dev_liquidvalveitems = make_str_enum("dev_liquidvalve",{key:key for key in self.dev_liquidvalve.keys()})
 
 
         self.base.print_message(" ... init NI-MAX")
@@ -71,8 +71,8 @@ class cNIMAX:
 
 
         self.IO_signalq = asyncio.Queue(1)
-        self.task_CellCurrent = None
-        self.task_CellVoltage = None
+        self.task_cellcurrent = None
+        self.task_cellvoltage = None
         self.IO_do_meas = False  # signal flag for intent (start/stop)
         self.IO_measuring = False  # status flag of measurement
         self.IO_estop = False
@@ -113,7 +113,7 @@ class cNIMAX:
     def create_IVtask(self):
         """configures a NImax task for multi cell IV measurements"""
         # Voltage reading is MASTER
-        self.task_CellCurrent = nidaqmx.Task()
+        self.task_cellcurrent = nidaqmx.Task()
         for myname, mydev in self.config_dict["dev_CellCurrent"].items():
             self.task_CellCurrent.ai_channels.add_ai_current_chan(
                 mydev,
@@ -126,8 +126,8 @@ class cNIMAX:
                 ext_shunt_resistor_val=5.0,
                 custom_scale_name="NEGATE3",  # TODO: this can be a per channel calibration
             )
-        self.task_CellCurrent.ai_channels.all.ai_lowpass_enable = True
-        self.task_CellCurrent.timing.cfg_samp_clk_timing(
+        self.task_cellcurrent.ai_channels.all.ai_lowpass_enable = True
+        self.task_cellcurrent.timing.cfg_samp_clk_timing(
             self.samplingrate,
             source="",
             active_edge=Edge.RISING,
@@ -135,17 +135,17 @@ class cNIMAX:
             samps_per_chan=self.buffersize,
         )
         # TODO can increase the callbackbuffersize if needed
-        # self.task_CellCurrent.register_every_n_samples_acquired_into_buffer_event(10,self.streamCURRENT_callback)
-        self.task_CellCurrent.register_every_n_samples_acquired_into_buffer_event(
+        # self.task_cellcurrent.register_every_n_samples_acquired_into_buffer_event(10,self.streamCURRENT_callback)
+        self.task_cellcurrent.register_every_n_samples_acquired_into_buffer_event(
             self.buffersizeread, self.streamIV_callback
         )
 
         # Voltage reading is SLAVE
         # we cannot combine both tasks into one as they run on different DAQs
         # define the VOLT and CURRENT task as they need to stay in memory
-        self.task_CellVoltage = nidaqmx.Task()
-        for myname, mydev in self.config_dict["dev_CellVoltage"].items():
-            self.task_CellVoltage.ai_channels.add_ai_voltage_chan(
+        self.task_cellvoltage = nidaqmx.Task()
+        for myname, mydev in self.config_dict["dev_cellvoltage"].items():
+            self.task_cellvoltage.ai_channels.add_ai_voltage_chan(
                 mydev,
                 name_to_assign_to_channel="Cell_" + myname,
                 terminal_config=TerminalConfiguration.DIFFERENTIAL,
@@ -155,9 +155,9 @@ class cNIMAX:
             )
 
         # does this globally enable lowpass or only for channels in task?
-        self.task_CellVoltage.ai_channels.all.ai_lowpass_enable = True
-        # self.task_CellVoltage.ai_lowpass_enable = True
-        self.task_CellVoltage.timing.cfg_samp_clk_timing(
+        self.task_cellvoltage.ai_channels.all.ai_lowpass_enable = True
+        # self.task_cellvoltage.ai_lowpass_enable = True
+        self.task_cellvoltage.timing.cfg_samp_clk_timing(
             self.samplingrate,
             source="",
             active_edge=Edge.RISING,
@@ -167,23 +167,23 @@ class cNIMAX:
         
         # each card need its own physical trigger input
         if (
-            self.config_dict["dev_CellVoltage_trigger"] != ""
-            and self.config_dict["dev_CellCurrent_trigger"] != ""
+            self.config_dict["dev_cellvoltage_trigger"] != ""
+            and self.config_dict["dev_cellcurrent_trigger"] != ""
             and self.ttlwait != -1
         ):
-            self.task_CellVoltage.triggers.start_trigger.trig_type = (
+            self.task_cellvoltage.triggers.start_trigger.trig_type = (
                 TriggerType.DIGITAL_EDGE
             )
-            self.task_CellVoltage.triggers.start_trigger.cfg_dig_edge_start_trig(
-                trigger_source=self.config_dict["dev_CellVoltage_trigger"],
+            self.task_cellvoltage.triggers.start_trigger.cfg_dig_edge_start_trig(
+                trigger_source=self.config_dict["dev_cellvoltage_trigger"],
                 trigger_edge=Edge.RISING,
             )
 
-            self.task_CellCurrent.triggers.start_trigger.trig_type = (
+            self.task_cellcurrent.triggers.start_trigger.trig_type = (
                 TriggerType.DIGITAL_EDGE
             )
-            self.task_CellCurrent.triggers.start_trigger.cfg_dig_edge_start_trig(
-                trigger_source=self.config_dict["dev_CellCurrent_trigger"],
+            self.task_cellcurrent.triggers.start_trigger.cfg_dig_edge_start_trig(
+                trigger_source=self.config_dict["dev_cellcurrent_trigger"],
                 trigger_edge=Edge.RISING,
             )
 
@@ -207,10 +207,10 @@ class cNIMAX:
                 # start seq: V then current, so read current first then Volt
                 # put callback only on current (Volt should the always have enough points)
                 # readout is requested-1 when callback is on requested
-                dataI = self.task_CellCurrent.read(
+                dataI = self.task_cellcurrent.read(
                     number_of_samples_per_channel=number_of_samples
                 )
-                dataV = self.task_CellVoltage.read(
+                dataV = self.task_cellvoltage.read(
                     number_of_samples_per_channel=number_of_samples
                 )
                 # this is also what NImax seems to do
@@ -242,29 +242,29 @@ class cNIMAX:
                 self.base.print_message(" ... canceling NImax IV stream")
 
         elif self.IO_estop and self.IO_do_meas:
-            _ = self.task_CellCurrent.read(
+            _ = self.task_cellcurrent.read(
                 number_of_samples_per_channel=number_of_samples
             )
-            _ = self.task_CellVoltage.read(
+            _ = self.task_cellvoltage.read(
                 number_of_samples_per_channel=number_of_samples
             )
             self.IO_measuring = False
-            self.task_CellCurrent.close()
-            self.task_CellVoltage.close()
+            self.task_cellcurrent.close()
+            self.task_cellvoltage.close()
 
         else:
             # NImax has data but measurement was already turned off
             # just pull data from buffer and turn task off
-            _ = self.task_CellCurrent.read(
+            _ = self.task_cellcurrent.read(
                 number_of_samples_per_channel=number_of_samples
             )
-            _ = self.task_CellVoltage.read(
+            _ = self.task_cellvoltage.read(
                 number_of_samples_per_channel=number_of_samples
             )
             # task should be already off or should be closed soon
             self.base.print_message(" ... meas was turned off but NImax IV task is still running ...")
-            # self.task_CellCurrent.close()
-            # self.task_CellVoltage.close()
+            # self.task_cellcurrent.close()
+            # self.task_cellvoltage.close()
 
         return 0
 
@@ -283,9 +283,9 @@ class cNIMAX:
 
 
                         # start slave first
-                        self.task_CellVoltage.start()
+                        self.task_cellvoltage.start()
                         # then start master to trigger slave
-                        self.task_CellCurrent.start()
+                        self.task_cellcurrent.start()
 
 
                         # wait for first callback interrupt 
@@ -304,8 +304,8 @@ class cNIMAX:
                         # await self.IO_signalq.put(False)
                         self.IO_do_meas = False
                         self.IO_measuring = False
-                        self.task_CellCurrent.close()
-                        self.task_CellVoltage.close()
+                        self.task_cellcurrent.close()
+                        self.task_cellvoltage.close()
                         _ = await self.active.finish()
                         self.active = None
                         self.process = None
@@ -333,7 +333,7 @@ class cNIMAX:
             self.base.print_message("IOloop task was cancelled")
 
 
-    async def digital_out(self, 
+    async def set_digital_out(self, 
                           do_port = None, 
                           do_name: str = "", 
                           on:bool = False,
@@ -359,14 +359,14 @@ class cNIMAX:
             err_code = error_codes.not_available
 
         return {
-                "err_code": err_code,
-                "do_port": do_port,
-                "do_name": do_name,
-                "on": on
+                "error_code": err_code,
+                "port": do_port,
+                "name": do_name,
+                "type": "digital_out",
+                "value": on
                }
 
-
-    async def digital_in(self, 
+    async def get_digital_in(self, 
                           di_port = None, 
                           di_name: str = "", 
                           on:bool = False,
@@ -387,10 +387,11 @@ class cNIMAX:
             err_code = error_codes.not_available
 
         return {
-                "err_code": err_code,
-                "di_port": di_port,
-                "di_name": di_name,
-                "on": on
+                "error_code": err_code,
+                "port": di_port,
+                "name": di_name,
+                "type": "digital_in",
+                "value": on
                }
 
 
