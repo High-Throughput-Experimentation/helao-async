@@ -193,14 +193,23 @@ config["servers"] = dict(
             user = 'RSHS',
             key = r'c:\helao\sshkeys\rshs_private3.ppk', # needs to be in new openssh file format
             host = "10.231.100.169",#r'hte-rshs-01.htejcap.caltech.edu',
-            method_path = r'C:\Users\rshs\Desktop\ADSS\adss_psc_methods\lcfc',
             log_file = r'C:\Users\rshs\Desktop\ADSS\adss_logfile\210512_lcfc_manualwatertest\210512_LCFC_manualwatertest_logfile.txt',
             timeout = 30*60, # 30min timeout for waiting for TTL
-            dev_NImax = { # TTL handshake via NImax
+            dev_trigger = "NImax",
+            trigger = { # TTL handshake via NImax
                 'start':'PXI-6284/port2/line5',  #P2.5, #PFI13
                 'continue':'PXI-6284/port2/line7',  #P2.7 #PFI15
                 'done':'PXI-6284/port2/line3',  #P2.3 #PFI11
                 },
+            cam_file_path = r'C:\Users\rshs\Desktop\ADSS\adss_psc_methods\lcfc',
+            cams = {
+                    "archive":"lcfc_archive.cam",
+                    "fillfixed":"lcfc_fill_hardcodedvolume.cam",
+                    "fill":"lcfc_fill.cam",
+                    "test":"relay_actuation_test2.cam",
+                    "dilute":"lcfc_dilute.cam",
+                    "deepclean":"lcfc_deep_clean.cam",
+                   },
         )
     ),
     # #########################################################################
