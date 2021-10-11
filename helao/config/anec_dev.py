@@ -111,6 +111,9 @@ config["servers"] = dict(
                 "up":"cDAQ1Mod1/port0/line4",
                 "down":"cDAQ1Mod1/port0/line3",
                 },
+            dev_led = {
+                "led":"cDAQ1Mod1/port0/line11",
+                }
         )
     ),
     PAL=dict(

@@ -51,6 +51,9 @@ def makeApp(confPrefix, servKey):
     dev_liquidvalve = app.server_params.get("dev_liquidvalve",dict())
     dev_liquidvalveitems = make_str_enum("dev_liquidvalve",{key:key for key in dev_liquidvalve.keys()})
     
+    dev_led = app.server_params.get("dev_led",dict())
+    dev_leditems = make_str_enum("dev_led",{key:key for key in dev_led.keys()})
+    
     dev_fswbcd = app.server_params.get("dev_fswbcd",dict())
     dev_fswbcditems = make_str_enum("dev_fswbcd",{key:key for key in dev_fswbcd.keys()})
     dev_cellcurrent = app.server_params.get("dev_cellcurrent",dict())
@@ -159,6 +162,26 @@ def makeApp(confPrefix, servKey):
             A.process_abbr = "lfv"
             A.process_params["do_port"] = dev_liquidvalve[A.process_params["liquidvalve"]]
             A.process_params["do_name"] = A.process_params["liquidvalve"]
+            active = await app.base.contain_process(A,
+                file_data_keys=["error_code", "port", "name", "type", "value"])
+            await active.enqueue_data(await app.driver.set_digital_out(**A.process_params))
+            finished_act = await active.finish()
+            return finished_act.as_dict()
+
+
+    if dev_led:
+        @app.post(f"/{servKey}/led")
+        async def led(
+                              request: Request, 
+                              led: Optional[dev_leditems],
+                              on: Optional[bool] = True
+                             ):
+            A = await setup_process(request)
+            # some additional params in order to call the same driver functions 
+            # for all DO actions
+            A.process_abbr = "lfv"
+            A.process_params["do_port"] = dev_led[A.process_params["led"]]
+            A.process_params["do_name"] = A.process_params["led"]
             active = await app.base.contain_process(A,
                 file_data_keys=["error_code", "port", "name", "type", "value"])
             await active.enqueue_data(await app.driver.set_digital_out(**A.process_params))
