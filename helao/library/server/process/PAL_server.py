@@ -6,17 +6,19 @@ from importlib import import_module
 from socket import gethostname
 from time import strftime
 
+from fastapi import Request
+from typing import Optional, List, Union
+import asyncio
+
 from helao.core.server import make_process_serv, setup_process
 from helao.library.driver.pal_driver import cPAL
 from helao.library.driver.pal_driver import PALmethods
 from helao.library.driver.pal_driver import Spacingmethod
 from helao.library.driver.pal_driver import PALtools
 import helao.core.model.sample as hcms
+from helao.core.helper import make_str_enum
 
 
-from fastapi import Request
-from typing import Optional, List, Union
-import asyncio
 
 def makeApp(confPrefix, servKey):
 
@@ -32,144 +34,150 @@ def makeApp(confPrefix, servKey):
     )
 
 
+    _cams = app.server_params.get("cams",dict())
+    _camsitems = make_str_enum("cams",{key:key for key in _cams.keys()})
+
+
+
     @app.post(f"/{servKey}/convert_DB")
     async def convert_DB(request: Request):
         await app.driver.convert_oldDB_to_sqllite()
         return {}
 
-
-    @app.post(f"/{servKey}/PAL_run_method")
-    async def PAL_run_method(
-        request: Request, 
-        fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
-        PAL_method: Optional[PALmethods] = PALmethods.fillfixed,
-        PAL_tool: Optional[PALtools] = PALtools.LS3,
-        PAL_source: Optional[str] = "elec_res1",
-        PAL_volume_uL: Optional[int] = 500,  # uL
-        PAL_totalvials: Optional[int] = 1,
-        # its a necessary param, but as its the only dict, it partially breaks swagger
-        PAL_sampleperiod: Optional[List[float]] = [0.0],
-        PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
-        PAL_spacingfactor: Optional[float] = 1.0,
-        PAL_timeoffset: Optional[float] = 0.0,
-        PAL_wash1: Optional[bool] = False,
-        PAL_wash2: Optional[bool] = False,
-        PAL_wash3: Optional[bool] = False,
-        PAL_wash4: Optional[bool] = False,
-        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
-    ):
-        """universal pal process"""
-        A = await setup_process(request)
-        active_dict = await app.driver.init_PAL_IOloop(A)
-        return active_dict
-
-
-    @app.post(f"/{servKey}/PAL_archive")
-    async def PAL_archive(
-        request: Request, 
-        fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
-        PAL_tool: Optional[PALtools] = PALtools.LS3,
-        PAL_source: Optional[str] = "lcfc_res",
-        PAL_volume_uL: Optional[int] = 500,  # uL
-        PAL_totalvials: Optional[int] = 1,
-        # its a necessary param, but as its the only dict, it partially breaks swagger
-        PAL_sampleperiod: Optional[List[float]] = [0.0],
-        PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
-        PAL_spacingfactor: Optional[float] = 1.0,
-        PAL_timeoffset: Optional[float] = 0.0,
-        PAL_wash1: Optional[bool] = False,
-        PAL_wash2: Optional[bool] = False,
-        PAL_wash3: Optional[bool] = False,
-        PAL_wash4: Optional[bool] = False,
-        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
-    ):
-        A = await setup_process(request)
-        A.process_params["PAL_method"] =  PALmethods.archive.value
-        active_dict = await app.driver.init_PAL_IOloop(A)
-        
-        return active_dict
+    if _cams:
+        @app.post(f"/{servKey}/PAL_run_method")
+        async def PAL_run_method(
+            request: Request, 
+            PAL_method: Optional[_camsitems],
+            fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
+            PAL_tool: Optional[PALtools] = PALtools.LS3,
+            PAL_source: Optional[str] = "elec_res1",
+            PAL_volume_uL: Optional[int] = 500,  # uL
+            PAL_totalvials: Optional[int] = 1,
+            # its a necessary param, but as its the only dict, it partially breaks swagger
+            PAL_sampleperiod: Optional[List[float]] = [0.0],
+            PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
+            PAL_spacingfactor: Optional[float] = 1.0,
+            PAL_timeoffset: Optional[float] = 0.0,
+            PAL_wash1: Optional[bool] = False,
+            PAL_wash2: Optional[bool] = False,
+            PAL_wash3: Optional[bool] = False,
+            PAL_wash4: Optional[bool] = False,
+            scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+        ):
+            """universal pal process"""
+            A = await setup_process(request)
+            active_dict = await app.driver.init_PAL_IOloop(A)
+            return active_dict
 
 
-    @app.post(f"/{servKey}/PAL_fill")
-    async def PAL_fill(
-        request: Request, 
-        fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
-        PAL_tool: Optional[PALtools] = PALtools.LS3,
-        PAL_source: Optional[str] = "elec_res1",
-        PAL_volume_uL: Optional[int] = 500,  # uL
-        PAL_wash1: Optional[bool] = False,
-        PAL_wash2: Optional[bool] = False,
-        PAL_wash3: Optional[bool] = False,
-        PAL_wash4: Optional[bool] = False,
-        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
-    ):
-        """fills eche"""
-        A = await setup_process(request)
-        A.process_params["PAL_method"] =  PALmethods.fill.value
-        active_dict = await app.driver.init_PAL_IOloop(A)
-        return active_dict
+    if "archive" in _cams:
+        @app.post(f"/{servKey}/PAL_archive")
+        async def PAL_archive(
+            request: Request, 
+            fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
+            PAL_tool: Optional[PALtools] = PALtools.LS3,
+            PAL_source: Optional[str] = "lcfc_res",
+            PAL_volume_uL: Optional[int] = 500,  # uL
+            PAL_totalvials: Optional[int] = 1,
+            # its a necessary param, but as its the only dict, it partially breaks swagger
+            PAL_sampleperiod: Optional[List[float]] = [0.0],
+            PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
+            PAL_spacingfactor: Optional[float] = 1.0,
+            PAL_timeoffset: Optional[float] = 0.0,
+            PAL_wash1: Optional[bool] = False,
+            PAL_wash2: Optional[bool] = False,
+            PAL_wash3: Optional[bool] = False,
+            PAL_wash4: Optional[bool] = False,
+            scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+        ):
+            A = await setup_process(request)
+            A.process_params["PAL_method"] =  "archive"
+            active_dict = await app.driver.init_PAL_IOloop(A)
+            
+            return active_dict
 
 
-    @app.post(f"/{servKey}/PAL_fillfixed")
-    async def PAL_fillfixed(
-        request: Request, 
-        fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
-        PAL_tool: Optional[PALtools] = PALtools.LS3,
-        PAL_source: Optional[str] = "elec_res1",
-        PAL_volume_uL: Optional[int] = 500,  # uL
-        PAL_wash1: Optional[bool] = False,
-        PAL_wash2: Optional[bool] = False,
-        PAL_wash3: Optional[bool] = False,
-        PAL_wash4: Optional[bool] = False,
-        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
-    ):
-        """fills eche with hardcoded volume"""
-        A = await setup_process(request)
-        A.process_params["PAL_method"] =  PALmethods.fillfixed.value
-        active_dict = await app.driver.init_PAL_IOloop(A)
-        return active_dict
+    if "fill" in _cams:
+        @app.post(f"/{servKey}/PAL_fill")
+        async def PAL_fill(
+            request: Request, 
+            fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
+            PAL_tool: Optional[PALtools] = PALtools.LS3,
+            PAL_source: Optional[str] = "elec_res1",
+            PAL_volume_uL: Optional[int] = 500,  # uL
+            PAL_wash1: Optional[bool] = False,
+            PAL_wash2: Optional[bool] = False,
+            PAL_wash3: Optional[bool] = False,
+            PAL_wash4: Optional[bool] = False,
+            scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+        ):
+            """fills eche"""
+            A = await setup_process(request)
+            A.process_params["PAL_method"] =  "fill"
+            active_dict = await app.driver.init_PAL_IOloop(A)
+            return active_dict
 
 
-    @app.post(f"/{servKey}/PAL_deepclean")
-    async def PAL_deepclean(
-        request: Request, 
-        PAL_tool: Optional[PALtools] = PALtools.LS3,
-        PAL_volume_uL: Optional[int] = 500,  # uL
-    ):
-        """cleans the PAL tool"""
-        A = await setup_process(request)
-        A.process_params["PAL_method"] =  PALmethods.deepclean.value
-        A.process_params["PAL_wash1"] =  True
-        A.process_params["PAL_wash2"] =  True
-        A.process_params["PAL_wash3"] =  True
-        A.process_params["PAL_wash4"] =  True
-        active_dict = await app.driver.init_PAL_IOloop(A)
-        return active_dict
+    if "fillfixed" in _cams:
+        @app.post(f"/{servKey}/PAL_fillfixed")
+        async def PAL_fillfixed(
+            request: Request, 
+            fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
+            PAL_tool: Optional[PALtools] = PALtools.LS3,
+            PAL_source: Optional[str] = "elec_res1",
+            PAL_volume_uL: Optional[int] = 500,  # uL
+            PAL_wash1: Optional[bool] = False,
+            PAL_wash2: Optional[bool] = False,
+            PAL_wash3: Optional[bool] = False,
+            PAL_wash4: Optional[bool] = False,
+            scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+        ):
+            """fills eche with hardcoded volume"""
+            A = await setup_process(request)
+            A.process_params["PAL_method"] =  "fillfixed"
+            active_dict = await app.driver.init_PAL_IOloop(A)
+            return active_dict
 
 
-    @app.post(f"/{servKey}/PAL_dilute")
-    async def PAL_dilute(
-        request: Request, 
-        fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
-        PAL_tool: Optional[PALtools] = PALtools.LS3,
-        PAL_source: Optional[str] = "elec_res2",
-        PAL_volume_uL: Optional[int] = 500,  # uL
-        PAL_totalvials: Optional[int] = 1,
-        # its a necessary param, but as its the only dict, it partially breaks swagger
-        # PAL_sampleperiod: Optional[List[float]] = [0.0],
-        # PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
-        # PAL_spacingfactor: Optional[float] = 1.0,
-        PAL_timeoffset: Optional[float] = 0.0,
-        PAL_wash1: Optional[bool] = False,
-        PAL_wash2: Optional[bool] = False,
-        PAL_wash3: Optional[bool] = False,
-        PAL_wash4: Optional[bool] = False,
-        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
-    ):
-        A = await setup_process(request)
-        A.process_params["PAL_method"] =  PALmethods.dilute.value
-        active_dict = await app.driver.init_PAL_IOloop(A)
-        return active_dict
+    if "deepclean" in _cams:
+        @app.post(f"/{servKey}/PAL_deepclean")
+        async def PAL_deepclean(
+            request: Request, 
+            PAL_tool: Optional[PALtools] = PALtools.LS3,
+            PAL_volume_uL: Optional[int] = 500,  # uL
+        ):
+            """cleans the PAL tool"""
+            A = await setup_process(request)
+            A.process_params["PAL_method"] =  PALmethods.deepclean.value
+            A.process_params["PAL_wash1"] =  True
+            A.process_params["PAL_wash2"] =  True
+            A.process_params["PAL_wash3"] =  True
+            A.process_params["PAL_wash4"] =  True
+            active_dict = await app.driver.init_PAL_IOloop(A)
+            return active_dict
+
+
+    if "dilute" in _cams:
+        @app.post(f"/{servKey}/PAL_dilute")
+        async def PAL_dilute(
+            request: Request, 
+            fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
+            PAL_tool: Optional[PALtools] = PALtools.LS3,
+            PAL_source: Optional[str] = "elec_res2",
+            PAL_volume_uL: Optional[int] = 500,  # uL
+            PAL_totalvials: Optional[int] = 1,
+            PAL_timeoffset: Optional[float] = 0.0,
+            PAL_wash1: Optional[bool] = False,
+            PAL_wash2: Optional[bool] = False,
+            PAL_wash3: Optional[bool] = False,
+            PAL_wash4: Optional[bool] = False,
+            scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+        ):
+            A = await setup_process(request)
+            A.process_params["PAL_method"] =  "dilute"
+            active_dict = await app.driver.init_PAL_IOloop(A)
+            return active_dict
 
 
     @app.post(f"/{servKey}/trayDB_reset")
