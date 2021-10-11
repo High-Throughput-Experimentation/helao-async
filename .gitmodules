@@ -1,0 +1,3 @@
+[submodule "helao/core"]
+	path = helao/core
+	url = git@github.com:High-Throughput-Experimentation/helao-core.git
