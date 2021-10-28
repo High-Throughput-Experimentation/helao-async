@@ -10,8 +10,8 @@ __all__ = ["gamry",
            "Gamry_modes",
            "Gamry_IErange"]
 
-from helao.core.schema import cProcess
-from helao.core.server import Base
+from helaocore.schema import cProcess
+from helaocore.server import Base
 import sys
 import comtypes
 import comtypes.client as client
@@ -22,8 +22,8 @@ import psutil
 import os
 import pyaml
 
-from helao.core.error import error_codes
-import helao.core.model.sample as hcms
+from helaocore.error import error_codes
+import helaocore.model.sample as hcms
 
 class Gamry_modes(str, Enum):
     CA = "CA"

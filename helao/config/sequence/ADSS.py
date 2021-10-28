@@ -21,13 +21,13 @@ __all__ = ["debug",
 
 from typing import Optional, List, Union
 
-from helao.core.schema import cProcess, cProcess_group, Sequencer
+from helaocore.schema import cProcess, cProcess_group, Sequencer
 
-from helao.core.server import process_start_condition
+from helaocore.server import process_start_condition
 from helao.library.driver.galil_driver import move_modes, transformation_mode
 
 from helao.library.driver.pal_driver import PALmethods, Spacingmethod, PALtools
-import helao.core.model.sample as hcms
+import helaocore.model.sample as hcms
 
 
 # list valid sequence functions 

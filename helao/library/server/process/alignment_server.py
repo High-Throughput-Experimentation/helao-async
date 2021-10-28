@@ -10,7 +10,7 @@ __all__ = ["makeApp"]
 from typing import Optional, List, Union
 from importlib import import_module
 from fastapi import Request
-from helao.core.server import make_process_serv, setup_process
+from helaocore.server import make_process_serv, setup_process
 from helao.library.driver.alignment_driver import aligner
 from helao.library.driver.galil_driver import move_modes
 

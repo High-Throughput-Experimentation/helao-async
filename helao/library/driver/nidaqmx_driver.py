@@ -17,11 +17,11 @@ from nidaqmx.constants import CurrentShuntResistorLocation
 from nidaqmx.constants import UnitsPreScaled
 from nidaqmx.constants import TriggerType
 
-from helao.core.schema import cProcess
-from helao.core.server import Base
-from helao.core.error import error_codes
-import helao.core.model.sample as hcms
-from helao.core.helper import make_str_enum
+from helaocore.schema import cProcess
+from helaocore.server import Base
+from helaocore.error import error_codes
+import helaocore.model.sample as hcms
+from helaocore.helper import make_str_enum
 
 
 class cNIMAX:

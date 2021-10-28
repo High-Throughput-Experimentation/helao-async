@@ -6,7 +6,7 @@ __all__ = ["makeApp"]
 from typing import Optional
 from importlib import import_module
 from fastapi import Request
-from helao.core.server import make_process_serv, setup_process
+from helaocore.server import make_process_serv, setup_process
 
 
 def makeApp(confPrefix, servKey):

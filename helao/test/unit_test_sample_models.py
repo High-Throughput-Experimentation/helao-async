@@ -6,7 +6,7 @@ from colorama import Fore, Style
 import sys
 
 
-import helao.core.model.sample as hcms
+import helaocore.model.sample as hcms
 
 colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
 

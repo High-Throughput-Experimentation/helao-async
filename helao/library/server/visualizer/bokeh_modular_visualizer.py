@@ -3,10 +3,10 @@ __all__ = ["makeBokehApp"]
 
 from importlib import import_module
 
-from helao.core.server import makeVisServ
+from helaocore.server import makeVisServ
 
 
-from helao.core.server import Vis
+from helaocore.server import Vis
 
 
 
