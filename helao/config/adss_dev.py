@@ -210,6 +210,23 @@ config["servers"] = dict(
                     "dilute":"lcfc_dilute.cam",
                     "deepclean":"lcfc_deep_clean.cam",
                    },
+            positions = {
+                         "tray1":{
+                                  "slot1":None,
+                                  "slot2":None,
+                                  "slot3":None,
+                                 },
+                         "tray2":{
+                                  "slot1":"VT54",
+                                  "slot2":"VT54",
+                                  "slot3":"VT54",
+                                 },
+                         "custom":{
+                                   "elec_res1":"reservoir",
+                                   "elec_res2":"reservoir",
+                                   "lcfc_res":"cell",
+                                  }
+                        },
         )
     ),
     # #########################################################################
