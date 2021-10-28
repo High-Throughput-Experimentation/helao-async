@@ -6,8 +6,8 @@ import asyncio
 import aiofiles
 
 
-from helao.core.server import Base
-from helao.core.data import HTELegacyAPI
+from helaocore.server import Base
+from helaocore.data import HTELegacyAPI
 
 
 class LocalDataHandler:

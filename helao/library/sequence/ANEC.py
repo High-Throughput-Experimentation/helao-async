@@ -6,13 +6,13 @@ process tuples take the form:
 
 server_key must be a FastAPI process server defined in config
 """
-from helao.core.schema import cProcess, cProcess_group, sequencer
+from helaocore.schema import cProcess, cProcess_group, sequencer
 
-from helao.core.server import process_start_condition
+from helaocore.server import process_start_condition
 from helao.library.driver.galil_driver import move_modes, transformation_mode
 
 from helao.library.driver.PAL_driver import PALmethods, Spacingmethod, PALtools
-from helao.core.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
+from helaocore.model import liquid_sample, gas_sample, solid_sample, assembly_sample, sample_list
 
 
 

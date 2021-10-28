@@ -23,14 +23,14 @@ import re
 
 
 
-from helao.core.server import Base
-from helao.core.error import error_codes
+from helaocore.server import Base
+from helaocore.error import error_codes
 # from helao.library.driver.HTEdata_legacy import LocalDataHandler
-# from helao.core.data import LiquidSampleAPI, OldLiquidSampleAPI
+# from helaocore.data import LiquidSampleAPI, OldLiquidSampleAPI
 
-import helao.core.data as hcd
-import helao.core.model.sample as hcms
-from helao.core.helper import print_message
+import helaocore.data as hcd
+import helaocore.model.sample as hcms
+from helaocore.helper import print_message
 
 
 class Custom:

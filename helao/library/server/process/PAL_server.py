@@ -10,14 +10,14 @@ from fastapi import Request
 from typing import Optional, List, Union
 import asyncio
 
-from helao.core.server import make_process_serv, setup_process
+from helaocore.server import make_process_serv, setup_process
 from helao.library.driver.pal_driver import cPAL
 from helao.library.driver.pal_driver import PALmethods
 from helao.library.driver.pal_driver import Spacingmethod
 from helao.library.driver.pal_driver import PALtools
 from helao.library.driver.pal_driver import MicroPalParams
-import helao.core.model.sample as hcms
-from helao.core.helper import make_str_enum
+import helaocore.model.sample as hcms
+from helaocore.helper import make_str_enum
 
 
 

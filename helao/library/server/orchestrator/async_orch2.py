@@ -43,7 +43,7 @@ import asyncio
 import time
 
 
-from helao.core.server import makeOrchServ, setup_process
+from helaocore.server import makeOrchServ, setup_process
 
 
 def makeApp(confPrefix, servKey):

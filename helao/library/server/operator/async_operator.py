@@ -56,9 +56,9 @@ from typing import Optional, List, Union
 
 
 
-import helao.core.server as hcs
-from helao.core.data import HTELegacyAPI
-from helao.core.schema import cProcess_group
+import helaocore.server as hcs
+from helaocore.data import HTELegacyAPI
+from helaocore.schema import cProcess_group
 
 
 class return_sequence_lib(BaseModel):

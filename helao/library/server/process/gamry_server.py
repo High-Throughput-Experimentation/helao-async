@@ -35,9 +35,9 @@ from importlib import import_module
 from fastapi import Request
 
 
-from helao.core.server import make_process_serv, setup_process
+from helaocore.server import make_process_serv, setup_process
 from helao.library.driver.gamry_driver import gamry, Gamry_IErange
-import helao.core.model.sample as hcms
+import helaocore.model.sample as hcms
 
 
 def makeApp(confPrefix, servKey):

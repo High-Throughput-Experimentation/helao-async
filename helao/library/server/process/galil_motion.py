@@ -16,7 +16,7 @@ from importlib import import_module
 from typing import Optional, List, Union
 from fastapi import Request
 from helao.library.driver.galil_driver import move_modes, transformation_mode
-from helao.core.server import make_process_serv, setup_process
+from helaocore.server import make_process_serv, setup_process
 from helao.library.driver.galil_driver import galil
 
 

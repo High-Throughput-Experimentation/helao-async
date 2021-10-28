@@ -3,7 +3,7 @@ __all__ = ["aligner"]
 
 
 import aiohttp
-from helao.core.server import Base
+from helaocore.server import Base
 
 class aligner:
     def __init__(self, process_serv: Base):

@@ -45,9 +45,9 @@ confPrefix = sys.argv[1]
 config = import_module(f"helao.config.{confPrefix}").config
 conf = munchify(config)
 
-from helao.core.helper import print_message
+from helaocore.helper import print_message
 from helao.test.unit_test_sample_models import sample_model_unit_test
-import helao.core.server.version as version
+import helaocore.server.version as version
 
 colorama.init(strip=not sys.stdout.isatty()) # strip colors if stdout is redirected 
 # print_message({}, "launcher", "test")
