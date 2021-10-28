@@ -1,4 +1,0 @@
-[submodule "helao/core"]
-	path = helao/core
-	url = ../helao-core.git
-	branch = main
