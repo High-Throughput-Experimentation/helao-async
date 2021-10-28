@@ -70,11 +70,15 @@ class Pidd:
             self.write_global()
 
     def load_global(self):
-        self.d = pickle.load(open(self.pidFile, "rb"))
+        filehandler = open(self.pidFile, "rb")
+        self.d = pickle.load(filehandler)
         # print_message({}, "launcher", f"Succesfully loaded '{self.pidFile}'.")
-
+        filehandler.close()
+        
     def write_global(self):
-        pickle.dump(self.d, open(self.pidFile, "wb"))
+        filehandler = open(self.pidFile, "wb")
+        pickle.dump(self.d, filehandler)
+        filehandler.close()
 
     def list_pids(self):
         self.load_global()
