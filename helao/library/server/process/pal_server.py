@@ -7,12 +7,10 @@ from socket import gethostname
 from time import strftime
 
 from fastapi import Request
-from typing import Optional, List, Union
-import asyncio
+from typing import Optional, List
 
 from helaocore.server import make_process_serv, setup_process
 from helao.library.driver.pal_driver import cPAL
-from helao.library.driver.pal_driver import PALmethods
 from helao.library.driver.pal_driver import Spacingmethod
 from helao.library.driver.pal_driver import PALtools
 from helao.library.driver.pal_driver import MicroPalParams

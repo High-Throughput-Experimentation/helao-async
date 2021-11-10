@@ -49,7 +49,7 @@ class _cam(BaseModel):
     dest:str = None
 
 
-class _sourcedest(Enum, str):
+class _sourcedest(str, Enum):
     tray = "tray"
     custom = "custom"
     next_empty_vial = "next_empty_vial"
@@ -61,7 +61,7 @@ class _palcmd(BaseModel):
     method: str = ""
     params: str = ""
 
-class _sampletype(Enum, str):
+class _sampletype(str, Enum):
     liquid = "liquid"
     gas = "gas"
     solid = "solid"
@@ -71,7 +71,6 @@ class _sampletype(Enum, str):
 class CAMS(Enum):
     archive_liquid = _cam(name="archive_liquid",
                           file_name = "lcfc_archive.cam", # from config later
-                          file_path = "", # from config later
                           sample_type = _sampletype.liquid,
                           source = _sourcedest.custom,
                           dest = _sourcedest.next_empty_vial,
@@ -80,7 +79,6 @@ class CAMS(Enum):
 
     archive = _cam(name="archive",
                    file_name = "lcfc_archive.cam", # from config later
-                   file_path = "", # from config later
                    sample_type = _sampletype.liquid,
                    source = _sourcedest.custom,
                    dest = _sourcedest.next_empty_vial,
@@ -89,7 +87,6 @@ class CAMS(Enum):
 
     fillfixed = _cam(name="fillfixed",
                       file_name = "lcfc_fill_hardcodedvolume.cam", # from config later
-                      file_path = "", # from config later
                       sample_type = _sampletype.liquid,
                       source = _sourcedest.custom,
                       dest = _sourcedest.custom,
@@ -97,7 +94,6 @@ class CAMS(Enum):
     
     fill = _cam(name="fill",
                 file_name = "lcfc_fill.cam", # from config later
-                file_path = "", # from config later
                 sample_type = _sampletype.liquid,
                 source = _sourcedest.custom,
                 dest = _sourcedest.next_empty_vial,
@@ -105,13 +101,10 @@ class CAMS(Enum):
 
     test = _cam(name="test",
                 file_name = "relay_actuation_test2.cam", # from config later
-                file_path = "", # from config later
-                sample_type = []
                )
 
     autodilute = _cam(name="autodilute",
                   file_name = "lcfc_dilute.cam", # from config later
-                  file_path = "", # from config later
                   sample_type = _sampletype.liquid,
                   source = _sourcedest.custom,
                   dest = _sourcedest.next_full_vial,
@@ -119,7 +112,6 @@ class CAMS(Enum):
 
     dilute = _cam(name="dilute",
                   file_name = "lcfc_dilute.cam", # from config later
-                  file_path = "", # from config later
                   sample_type = _sampletype.liquid,
                   source = _sourcedest.custom,
                   dest = _sourcedest.tray,
@@ -127,11 +119,10 @@ class CAMS(Enum):
 
     deepclean = _cam(name="deepclean",
                      file_name = "lcfc_deep_clean.cam", # from config later
-                     file_path = "", # from config later
                     )
+
     none = _cam(name="",
                 file_name = "",
-                file_path = "",
                )
 
 
