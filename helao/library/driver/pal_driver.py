@@ -337,10 +337,6 @@ class cPAL:
                 self.cams[cam].value.file_name = self.cam_config.get(cam, None)
         else:
             self.cams = None
-        print("#############################################################")
-        for cam in [e.name for e in self.cams]:
-            print(self.cams[cam].value)
-        print("#############################################################")
 
         self.palauxheader = ["Date", "Method", "Tool", "Source", "DestinationTray", "DestinationSlot", "DestinationVial", "Volume"]
 
@@ -360,7 +356,6 @@ class cPAL:
             )
             while self.trigger_start == False:
                 data = task.read(number_of_samples_per_channel=1)
-                # self.base.print_message("...................... start port status:", data)
                 if any(data) == True:
                     self.base.print_message(" ... got PAL start trigger poll")
                     self.trigger_start_epoch = self.active.set_realtime_nowait()
@@ -381,7 +376,6 @@ class cPAL:
             )
             while self.trigger_continue == False:
                 data = task.read(number_of_samples_per_channel=1)
-                # self.base.print_message("...................... continue port status:", data)
                 if any(data) == True:
                     self.base.print_message(" ... got PAL continue trigger poll")
                     self.trigger_continue_epoch = self.active.set_realtime_nowait()
@@ -402,7 +396,6 @@ class cPAL:
             )
             while self.trigger_done == False:
                 data = task.read(number_of_samples_per_channel=1)
-                # self.base.print_message("...................... done port status:", data)
                 if any(data) == True:
                     self.base.print_message(" ... got PAL done trigger poll")
                     self.trigger_done_epoch = self.active.set_realtime_nowait()
@@ -943,8 +936,6 @@ class cPAL:
                     if sample.inheritance is not None:
                         sample.inheritance = "give_only"
                         sample.status = "preserved"
-
-
 
         micropal.PAL_dest = dest
         micropal.PAL_dest_tray.append(dest_tray)
