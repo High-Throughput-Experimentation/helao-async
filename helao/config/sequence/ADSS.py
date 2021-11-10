@@ -26,7 +26,7 @@ from helaocore.schema import cProcess, cProcess_group, Sequencer
 from helaocore.server import process_start_condition
 from helao.library.driver.galil_driver import move_modes, transformation_mode
 
-from helao.library.driver.pal_driver import PALmethods, Spacingmethod, PALtools
+from helao.library.driver.pal_driver import Spacingmethod, PALtools
 import helaocore.model.sample as hcms
 
 
@@ -169,21 +169,10 @@ def ADSS_slave_shutdown(pg_Obj: cProcess_group):
     # process_dict = pg_Obj.as_dict()
     # process_dict.update({
     #     "process_server": f"{PAL_name}",
-    #     "process_name": "PAL_run_method",
+    #     "process_name": "PAL_deepclean",
     #     "process_params": {
-    #                       "liquid_sample_no_in": 0,
-    #                       "PAL_method": PALmethods.deepclean,
     #                       "PAL_tool": PALtools.LS3,
-    #                       "PAL_source": "elec_res1",
     #                       "PAL_volume_uL": 500,
-    #                       "PAL_totalruns": 1,
-    #                       "PAL_sampleperiod": [0.0],
-    #                       "PAL_spacingmethod": Spacingmethod.linear,
-    #                       "PAL_spacingfactor": 1.0,
-    #                       "PAL_wash1": 1, # dont use True or False but 0 AND 1
-    #                       "PAL_wash2": 1,
-    #                       "PAL_wash3": 1,
-    #                       "PAL_wash4": 1,
     #                       },
     #     # "save_prc": True,
     #     # "save_data": True,
@@ -442,17 +431,11 @@ def ADSS_master_CA(pg_Obj: cProcess_group,
             process_dict = pg_Obj.as_dict()
             process_dict.update({
                 "process_server": f"{PAL_name}",
-                "process_name": "PAL_run_method",
+                "process_name": "PAL_fillfixed",
                 "process_params": {
-                                 "liquid_sample_no_in": liquid_sample_no,
-                                 "PAL_method": PALmethods.fillfixed,
                                  "PAL_tool": PALtools.LS3,
                                  "PAL_source": "elec_res1",
                                  "PAL_volume_uL": 10000,
-                                 "PAL_totalruns": 1,
-                                 "PAL_sampleperiod": [0.0],
-                                 "PAL_spacingmethod": Spacingmethod.linear,
-                                 "PAL_spacingfactor": 1.0,
                                  },
                 "to_global_params":["_eche_sample_no"], # save new liquid_sample_no of eche cell to globals
                 "save_prc": True,
@@ -513,17 +496,11 @@ def ADSS_master_CA(pg_Obj: cProcess_group,
             process_dict = pg_Obj.as_dict()
             process_dict.update({
                 "process_server": f"{PAL_name}",
-                "process_name": "PAL_run_method",
+                "process_name": "PAL_fill",
                 "process_params": {
-                                 "liquid_sample_no_in": liquid_sample_no,
-                                 "PAL_method": PALmethods.fill,
                                  "PAL_tool": PALtools.LS3,
                                  "PAL_source": "elec_res1",
                                  "PAL_volume_uL": 1000,
-                                 "PAL_totalruns": 1,
-                                 "PAL_sampleperiod": [0.0],
-                                 "PAL_spacingmethod": Spacingmethod.linear,
-                                 "PAL_spacingfactor": 1.0,
                                  },
                 "to_global_params":["_eche_sample_no"],
                 "save_prc": True,
@@ -596,17 +573,11 @@ def ADSS_slave_single_CA(pg_Obj: cProcess_group,
     process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{PAL_name}",
-        "process_name": "PAL_run_method",
+        "process_name": "PAL_archive",
         "process_params": {
-                          "liquid_sample_no_in": -1,
-                          "PAL_method": PALmethods.archive,
                           "PAL_tool": PALtools.LS3,
                           "PAL_source": "lcfc_res",
                           "PAL_volume_uL": 200,
-                          "PAL_totalruns": 1,
-                          "PAL_sampleperiod": [0.0],
-                          "PAL_spacingmethod": Spacingmethod.linear,
-                          "PAL_spacingfactor": 1.0,
                           },
         # "to_global_params":["_eche_sample_no"],
         "from_global_params":{
@@ -645,10 +616,8 @@ def ADSS_slave_single_CA(pg_Obj: cProcess_group,
     process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{PAL_name}",
-        "process_name": "PAL_run_method",
+        "process_name": "PAL_archive",
         "process_params": {
-                          "liquid_sample_no_in": -2, # signals to use second last item in liquid sample DB
-                          "PAL_method": PALmethods.archive,
                           "PAL_tool": PALtools.LS3,
                           "PAL_source": "lcfc_res",
                           "PAL_volume_uL": 200,
@@ -674,18 +643,11 @@ def ADSS_slave_single_CA(pg_Obj: cProcess_group,
     process_dict = pg_Obj.as_dict()
     process_dict.update({
         "process_server": f"{PAL_name}",
-        "process_name": "PAL_run_method",
+        "process_name": "PAL_archive",
         "process_params": {
-                          "liquid_sample_no_in": -5, # signals to use fifth last item in liquid sample DB
-                          "PAL_method": PALmethods.archive,
                           "PAL_tool": PALtools.LS3,
                           "PAL_source": "lcfc_res",
                           "PAL_volume_uL": 200,
-                          "PAL_totalruns": 1,
-                          "PAL_sampleperiod": [0.0],
-                          "PAL_spacingmethod": Spacingmethod.custom,
-                          "PAL_spacingfactor": 1.0,
-                          "PAL_timeoffset": 60.0,
                           "PAL_wash1": 1, # dont use True or False but 0 AND 1
                           "PAL_wash2": 1,
                           "PAL_wash3": 1,
