@@ -14,6 +14,7 @@ from helao.library.driver.pal_driver import cPAL
 from helao.library.driver.pal_driver import Spacingmethod
 from helao.library.driver.pal_driver import PALtools
 from helao.library.driver.pal_driver import MicroPalParams
+from helao.library.driver.pal_driver import PAL_position
 import helaocore.model.sample as hcms
 from helaocore.helper import make_str_enum
 
@@ -34,8 +35,13 @@ def makeApp(confPrefix, servKey):
 
 
     _cams = app.server_params.get("cams",dict())
-    _camsitems = make_str_enum("cams",{key:key for key in _cams.keys()})
+    #_camsitems = make_str_enum("cams",{key:key for key in _cams.keys()})
 
+    if "positions" in app.server_params:
+        dev_custom = app.server_params["positions"].get("custom",dict())
+    else:
+        dev_custom = dict()
+    dev_customitems = make_str_enum("dev_custom",{key:key for key in dev_custom.keys()})
 
 
     @app.post(f"/{servKey}/convert_DB")
@@ -47,13 +53,23 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_run_method")
         async def PAL_run_method(
             request: Request,
-            fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
             micropal: Optional[list] = [
                 MicroPalParams(**{
                 "PAL_method":"fillfixed",
                 "PAL_tool":"LS3",
                 "PAL_volume_uL":500,
-                "PAL_source":"elec_res1",  # source can be cust. or tray
+                "PAL_requested_source":PAL_position(**{
+                    "position":"elec_res1",
+                    "tray":None,
+                    "slot":None,
+                    "vial":None,
+                    }),
+                "PAL_requested_dest":PAL_position(**{
+                    "position":"lcfc_res",
+                    "tray":None,
+                    "slot":None,
+                    "vial":None,
+                    }),
                 "PAL_wash1":0,
                 "PAL_wash2":0,
                 "PAL_wash3":0,
@@ -63,12 +79,23 @@ def makeApp(confPrefix, servKey):
                 "PAL_method":"fillfixed",
                 "PAL_tool":"LS3",
                 "PAL_volume_uL":500,
-                "PAL_source":"elec_res1",  # source can be cust. or tray
+                "PAL_requested_source":PAL_position(**{
+                    "position":"elec_res1",
+                    "tray":None,
+                    "slot":None,
+                    "vial":None,
+                    }),
+                "PAL_requested_dest":PAL_position(**{
+                    "position":"lcfc_res",
+                    "tray":None,
+                    "slot":None,
+                    "vial":None,
+                    }),
                 "PAL_wash1":0,
                 "PAL_wash2":0,
                 "PAL_wash3":0,
                 "PAL_wash4":0,
-                })
+                }),
                 ],
             PAL_totalruns: Optional[int] = 1,
             # its a necessary param, but as its the only dict, it partially breaks swagger
@@ -76,9 +103,7 @@ def makeApp(confPrefix, servKey):
             PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
             PAL_spacingfactor: Optional[float] = 1.0,
             PAL_timeoffset: Optional[float] = 0.0,
-            scratch: Optional[List[None]] = [None], # temp fix so swagger still works
-
-
+            # scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             """universal pal process"""
             A = await setup_process(request)
@@ -89,47 +114,58 @@ def makeApp(confPrefix, servKey):
     if "archive" in _cams:
         @app.post(f"/{servKey}/PAL_archive")
         async def PAL_archive(
-            request: Request, 
-            fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
-            PAL_tool: Optional[PALtools] = PALtools.LS3,
-            PAL_source: Optional[str] = "lcfc_res",
-            PAL_volume_uL: Optional[int] = 500,  # uL
+            request: Request,
+            micropal: Optional[list] = [
+                MicroPalParams(**{
+                "PAL_method":"archive",
+                "PAL_tool":"LS3",
+                "PAL_volume_uL":500,
+                "PAL_requested_source":PAL_position(**{
+                    "position":"lcfc_res",
+                    }),
+                "PAL_wash1":0,
+                "PAL_wash2":0,
+                "PAL_wash3":0,
+                "PAL_wash4":0,
+                }),
+                ],
             PAL_totalruns: Optional[int] = 1,
             # its a necessary param, but as its the only dict, it partially breaks swagger
             PAL_sampleperiod: Optional[List[float]] = [0.0],
             PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
             PAL_spacingfactor: Optional[float] = 1.0,
             PAL_timeoffset: Optional[float] = 0.0,
-            PAL_wash1: Optional[bool] = False,
-            PAL_wash2: Optional[bool] = False,
-            PAL_wash3: Optional[bool] = False,
-            PAL_wash4: Optional[bool] = False,
-            scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             A = await setup_process(request)
-            A.process_params["PAL_method"] =  ["archive"]
             active_dict = await app.driver.init_PAL_IOloop(A)
-            
             return active_dict
 
 
     if "fill" in _cams:
         @app.post(f"/{servKey}/PAL_fill")
         async def PAL_fill(
-            request: Request, 
-            fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
-            PAL_tool: Optional[PALtools] = PALtools.LS3,
-            PAL_source: Optional[str] = "elec_res1",
-            PAL_volume_uL: Optional[int] = 500,  # uL
-            PAL_wash1: Optional[bool] = False,
-            PAL_wash2: Optional[bool] = False,
-            PAL_wash3: Optional[bool] = False,
-            PAL_wash4: Optional[bool] = False,
+            request: Request,
+            micropal: Optional[list] = [
+                MicroPalParams(**{
+                "PAL_method":"fill",
+                "PAL_tool":"LS3",
+                "PAL_volume_uL":500,
+                "PAL_requested_source":PAL_position(**{
+                    "position":"elec_res1",
+                    }),
+                "PAL_requested_dest":PAL_position(**{
+                    "position":"lcfc_res",
+                    }),
+                "PAL_wash1":0,
+                "PAL_wash2":0,
+                "PAL_wash3":0,
+                "PAL_wash4":0,
+                }),
+                ],
             scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             """fills eche"""
             A = await setup_process(request)
-            A.process_params["PAL_method"] =  ["fill"]
             active_dict = await app.driver.init_PAL_IOloop(A)
             return active_dict
 
@@ -137,20 +173,28 @@ def makeApp(confPrefix, servKey):
     if "fillfixed" in _cams:
         @app.post(f"/{servKey}/PAL_fillfixed")
         async def PAL_fillfixed(
-            request: Request, 
-            fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
-            PAL_tool: Optional[PALtools] = PALtools.LS3,
-            PAL_source: Optional[str] = "elec_res1",
-            PAL_volume_uL: Optional[int] = 500,  # uL
-            PAL_wash1: Optional[bool] = False,
-            PAL_wash2: Optional[bool] = False,
-            PAL_wash3: Optional[bool] = False,
-            PAL_wash4: Optional[bool] = False,
+            request: Request,
+            micropal: Optional[list] = [
+                MicroPalParams(**{
+                "PAL_method":"fillfixed",
+                "PAL_tool":"LS3",
+                "PAL_volume_uL":500,
+                "PAL_requested_source":PAL_position(**{
+                    "position":"elec_res1",
+                    }),
+                "PAL_requested_dest":PAL_position(**{
+                    "position":"lcfc_res",
+                    }),
+                "PAL_wash1":0,
+                "PAL_wash2":0,
+                "PAL_wash3":0,
+                "PAL_wash4":0,
+                }),
+                ],
             scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             """fills eche with hardcoded volume"""
             A = await setup_process(request)
-            A.process_params["PAL_method"] =  ["fillfixed"]
             active_dict = await app.driver.init_PAL_IOloop(A)
             return active_dict
 
@@ -159,16 +203,21 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_deepclean")
         async def PAL_deepclean(
             request: Request, 
-            PAL_tool: Optional[PALtools] = PALtools.LS3,
-            PAL_volume_uL: Optional[int] = 500,  # uL
+            micropal: Optional[list] = [
+                MicroPalParams(**{
+                "PAL_method":"deepclean",
+                "PAL_tool":"LS3",
+                "PAL_volume_uL":500,
+                "PAL_wash1":1,
+                "PAL_wash2":1,
+                "PAL_wash3":1,
+                "PAL_wash4":1,
+                }),
+                ],
+            scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             """cleans the PAL tool"""
             A = await setup_process(request)
-            A.process_params["PAL_method"] =  ["deepclean"]
-            A.process_params["PAL_wash1"] =  True
-            A.process_params["PAL_wash2"] =  True
-            A.process_params["PAL_wash3"] =  True
-            A.process_params["PAL_wash4"] =  True
             active_dict = await app.driver.init_PAL_IOloop(A)
             return active_dict
 
@@ -177,20 +226,24 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_dilute")
         async def PAL_dilute(
             request: Request, 
-            fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
-            PAL_tool: Optional[PALtools] = PALtools.LS3,
-            PAL_source: Optional[str] = "elec_res2",
-            PAL_volume_uL: Optional[int] = 500,  # uL
-            PAL_totalruns: Optional[int] = 1,
-            PAL_timeoffset: Optional[float] = 0.0,
-            PAL_wash1: Optional[bool] = False,
-            PAL_wash2: Optional[bool] = False,
-            PAL_wash3: Optional[bool] = False,
-            PAL_wash4: Optional[bool] = False,
+            micropal: Optional[list] = [
+                MicroPalParams(**{
+                "PAL_method":"dilute",
+                "PAL_tool":"LS3",
+                "PAL_volume_uL":500,
+                "PAL_requested_source":PAL_position(**{
+                    "position":"elec_res2",
+                    }),
+                "repeat":1,
+                "PAL_wash1":1,
+                "PAL_wash2":1,
+                "PAL_wash3":1,
+                "PAL_wash4":1,
+                }),
+                ],
             scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             A = await setup_process(request)
-            A.process_params["PAL_method"] =  ["dilute"]
             active_dict = await app.driver.init_PAL_IOloop(A)
             return active_dict
 
@@ -301,22 +354,38 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/archive_load_custom")
     async def archive_load_custom(
                                   request: Request,
-                                  custom: Optional[str] = "",
+                                  custom: Optional[dev_customitems],
+                                  # custom: Optional[str] = "",
                                   vol_mL: Optional[float] = 0.0,
-                                  fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
+                                  load_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
+                                  scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                                  ):
         A = await setup_process(request)
         active = await app.base.contain_process(A, file_data_keys="loaded")
-        await active.enqueue_data({"loaded": await app.driver.archive.custom_load(**A.process_params)})
+        loaded, sample = await app.driver.archive.custom_load(**A.process_params)
+        if loaded:
+            await active.append_sample(samples = [sample for sample in sample.samples],
+                                IO="in"
+                               )
+        await active.enqueue_data({"loaded":loaded})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
 
     @app.post(f"/{servKey}/archive_unload_custom")
-    async def archive_unload_custom(request: Request, custom: Optional[str] = ""):
+    async def archive_unload_custom(
+                                    request: Request,
+                                    custom: Optional[dev_customitems],
+                                    # custom: Optional[str] = ""
+                                   ):
         A = await setup_process(request)
         active = await app.base.contain_process(A, file_data_keys="unloaded")
-        await active.enqueue_data({"unloaded": await app.driver.archive.custom_unload(**A.process_params)})
+        unloaded, sample = await app.driver.archive.custom_unload(**A.process_params)
+        if unloaded:
+            await active.append_sample(samples = [sample for sample in sample.samples],
+                                IO="out"
+                               )
+        await active.enqueue_data({"unloaded": unloaded})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -325,7 +394,12 @@ def makeApp(confPrefix, servKey):
     async def archive_unloadall_custom(request: Request):
         A = await setup_process(request)
         active = await app.base.contain_process(A, file_data_keys="unloaded")
-        await active.enqueue_data({"unloaded": await app.driver.archive.custom_unloadall(**A.process_params)})
+        unloaded, sample = await app.driver.archive.custom_unloadall(**A.process_params)
+        if unloaded:
+            await active.append_sample(samples = [sample for sample in sample.samples],
+                                IO="out"
+                               )
+        await active.enqueue_data({"unloaded": unloaded})
         finished_act = await active.finish()
         return finished_act.as_dict()
 

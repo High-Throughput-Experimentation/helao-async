@@ -2,40 +2,25 @@
 
 __all__ = ["Archive"]
 
-from enum import Enum
 import asyncio
 import os
-import paramiko
-import time
 from datetime import datetime
-from time import strftime
-import json
-import aiofiles
 import copy
-import pyaml
-from typing import Optional, List, Union
-from socket import gethostname
-from pydantic import BaseModel
-from pydantic import validator
 from typing import List
+from socket import gethostname
 import pickle
 import re
 
-
-
 from helaocore.server import Base
 from helaocore.error import error_codes
-# from helao.library.driver.HTEdata_legacy import LocalDataHandler
-# from helaocore.data import LiquidSampleAPI, OldLiquidSampleAPI
 
-import helaocore.data as hcd
 import helaocore.model.sample as hcms
 from helaocore.helper import print_message
 
 
 class Custom:
     def __init__(self, custom_name, custom_type):
-        self.sample = hcms.SampleList
+        self.sample = hcms.SampleList()
         self.custom_name = custom_name
         self.custom_type = custom_type
         self.blocked = False
@@ -52,6 +37,15 @@ class Custom:
         else:
             print_message({}, "model", f"invalid 'custom_type': {self.custom_type}", error = True)                
             return False
+
+    def unload(self):
+        ret_sample = self.sample
+        self.blocked = False
+        self.vol_mL = 0.0
+        self.max_vol_mL = None
+        self.dilution_factor = 1.0
+        self.sample = hcms.SampleList()
+        return ret_sample
 
     def as_dict(self):
         return vars(self)
@@ -589,10 +583,10 @@ class Archive():
 
         if custom in self.custom_positions:
             if len(sample.samples) > 1:
-                return False
+                return False, hcms.SampleList()
             if sample.samples[0].sample_type == "assembly" \
             and not self.custom_positions[custom].assembly_allowed():
-                return False
+                return False, hcms.SampleList()
 
             if dilute:
                 old_vol = self.custom_positions[custom].vol_mL
@@ -609,7 +603,7 @@ class Archive():
             
             self.write_config()
 
-        return False
+        return True, sample
     
 
     async def customs_to_dict(self):
@@ -620,28 +614,38 @@ class Archive():
 
     
     async def custom_unloadall(self, *args, **kwargs):
-        ret = await self.customs_to_dict()
-        self.custom_positions = copy.deepcopy(self.startup_custom_positions)
-        return ret
+        samples = hcms.SampleList()
+        for custom in self.custom_positions:
+            _samples = custom.unload()
+            for sample in _samples.samples:
+                samples.samples.append(sample)
+        # ret = await self.customs_to_dict()
+        # self.custom_positions = copy.deepcopy(self.startup_custom_positions)
+        return True, samples
 
 
     async def custom_unload(self, custom: str = "", *args, **kwargs):
-        ret = dict()
         if custom in self.custom_positions:
-            ret = self.custom_positions[custom].as_dict()
-        return ret
-    
+            sample = self.custom_positions[custom].unload()
+            return True, sample
+        return False, hcms.hcms.SampleList()
+
+
     async def custom_load(
                           self,
                           custom: str,
                           vol_mL: float,
-                          fast_samples_in: hcms.SampleList,
+                          load_samples_in: hcms.SampleList,
                           *args, **kwargs
                          ):
+
+        if type(load_samples_in) is dict:
+            load_samples_in = hcms.SampleList(**load_samples_in)
+
 
         return await self.custom_update_position(
                                      custom = custom,
                                      vol_mL = vol_mL,
-                                     sample = fast_samples_in,
+                                     sample = load_samples_in,
                                      dilute = False
                                     )
