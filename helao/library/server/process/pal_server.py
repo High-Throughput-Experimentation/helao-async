@@ -44,10 +44,12 @@ def makeApp(confPrefix, servKey):
     dev_customitems = make_str_enum("dev_custom",{key:key for key in dev_custom.keys()})
 
 
-    @app.post(f"/{servKey}/convert_DB")
-    async def convert_DB(request: Request):
-        await app.driver.convert_oldDB_to_sqllite()
+    @app.post(f"/{servKey}/convert_v1DB")
+    async def convert_v1DB(request: Request):
+        # await app.driver.convert_oldDB_to_sqllite()
+        await app.driver.unified_db.liquidAPI.old_jsondb_to_sqlitedb()
         return {}
+
 
     if _cams:
         @app.post(f"/{servKey}/PAL_run_method")
@@ -277,7 +279,7 @@ def makeApp(confPrefix, servKey):
     async def archive_tray_update_position(
         request: Request, 
         vial: Optional[int] = None,
-        vol_mL: Optional[float] = None,
+        vol_ml: Optional[float] = None,
         liquid_sample_no: Optional[int] = None,
         tray: Optional[int] = None,
         slot: Optional[int] = None
@@ -355,19 +357,20 @@ def makeApp(confPrefix, servKey):
     async def archive_load_custom(
                                   request: Request,
                                   custom: Optional[dev_customitems],
-                                  # custom: Optional[str] = "",
-                                  vol_mL: Optional[float] = 0.0,
+                                  vol_ml: Optional[float] = 0.0,
                                   load_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
                                   scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                                  ):
         A = await setup_process(request)
-        active = await app.base.contain_process(A, file_data_keys="loaded")
-        loaded, sample = await app.driver.archive.custom_load(**A.process_params)
+        active = await app.base.contain_process(A, file_data_keys=
+                                                ["loaded","customs_dict"])
+        loaded, loaded_sample, customs_dict = await app.driver.archive.custom_load(**A.process_params)
         if loaded:
-            await active.append_sample(samples = [sample for sample in sample.samples],
+            await active.append_sample(samples = [sample for sample in loaded_sample.samples],
                                 IO="in"
                                )
-        await active.enqueue_data({"loaded":loaded})
+        await active.enqueue_data({"loaded":loaded,
+                                   "customs_dict": customs_dict})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -376,16 +379,18 @@ def makeApp(confPrefix, servKey):
     async def archive_unload_custom(
                                     request: Request,
                                     custom: Optional[dev_customitems],
-                                    # custom: Optional[str] = ""
                                    ):
         A = await setup_process(request)
-        active = await app.base.contain_process(A, file_data_keys="unloaded")
-        unloaded, sample = await app.driver.archive.custom_unload(**A.process_params)
+        active = await app.base.contain_process(A, file_data_keys=
+                                                ["unloaded","customs_dict"])
+        unloaded, unloaded_sample, customs_dict = \
+            await app.driver.archive.custom_unload(**A.process_params)
         if unloaded:
-            await active.append_sample(samples = [sample for sample in sample.samples],
-                                IO="out"
-                               )
-        await active.enqueue_data({"unloaded": unloaded})
+            await active.append_sample(
+                  samples = [sample for sample in unloaded_sample.samples],
+                  IO="out")
+        await active.enqueue_data({"unloaded": unloaded,
+                                   "customs_dict": customs_dict})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -393,13 +398,16 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/archive_unloadall_custom")
     async def archive_unloadall_custom(request: Request):
         A = await setup_process(request)
-        active = await app.base.contain_process(A, file_data_keys="unloaded")
-        unloaded, sample = await app.driver.archive.custom_unloadall(**A.process_params)
+        active = await app.base.contain_process(A, file_data_keys=
+                                                ["unloaded","customs_dict"])
+        unloaded, unloaded_sample, customs_dict = \
+            await app.driver.archive.custom_unloadall(**A.process_params)
         if unloaded:
-            await active.append_sample(samples = [sample for sample in sample.samples],
-                                IO="out"
-                               )
-        await active.enqueue_data({"unloaded": unloaded})
+            await active.append_sample(
+                  samples = [sample for sample in unloaded_sample.samples],
+                  IO="out")
+        await active.enqueue_data({"unloaded": unloaded,
+                                   "customs_dict": customs_dict})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -439,7 +447,7 @@ def makeApp(confPrefix, servKey):
         For manual entry leave DUID, AUID, process_time, 
         and process_params empty and servkey on "data".
         If its the very first liquid (no source in database exists) 
-        leave source and source_mL empty."""
+        leave source and source_ml empty."""
         A = await setup_process(request)
         active = await app.base.contain_process(A, file_data_keys="sample")
         sample = await app.driver.new_sample(A.samples_in)

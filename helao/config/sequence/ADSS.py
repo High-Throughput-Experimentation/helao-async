@@ -165,14 +165,14 @@ def ADSS_slave_shutdown(pg_Obj: cProcess_group):
     process_list = []
 
     # deep clean
-    process_list.append(ADSS_slave_clean_PALtool(pg_Obj, clean_PAL_tool = PALtools.LS3, clean_PAL_volume_uL = 500))
+    process_list.append(ADSS_slave_clean_PALtool(pg_Obj, clean_PAL_tool = PALtools.LS3, clean_PAL_volume_ul = 500))
     # process_dict = pg_Obj.as_dict()
     # process_dict.update({
     #     "process_server": f"{PAL_name}",
     #     "process_name": "PAL_deepclean",
     #     "process_params": {
     #                       "PAL_tool": PALtools.LS3,
-    #                       "PAL_volume_uL": 500,
+    #                       "PAL_volume_ul": 500,
     #                       },
     #     # "save_prc": True,
     #     # "save_data": True,
@@ -334,7 +334,7 @@ def ADSS_slave_disengage(pg_Obj: cProcess_group):
 
 def ADSS_slave_clean_PALtool(pg_Obj: cProcess_group, 
                              clean_PAL_tool: Optional[str] = PALtools.LS3, 
-                             clean_PAL_volume_uL: Optional[int] = 500
+                             clean_PAL_volume_ul: Optional[int] = 500
                              ):
     """Slave sequence
     Performs deep clean of selected PAL tool."""
@@ -342,7 +342,7 @@ def ADSS_slave_clean_PALtool(pg_Obj: cProcess_group,
 
     process_list = []
 
-    clean_PAL_volume_uL = pg_Obj.sequence_pars.get("clean_PAL_volume_uL", clean_PAL_volume_uL)
+    clean_PAL_volume_ul = pg_Obj.sequence_pars.get("clean_PAL_volume_ul", clean_PAL_volume_ul)
     clean_PAL_tool = pg_Obj.sequence_pars.get("clean_PAL_tool", clean_PAL_tool)
     
     # deep clean
@@ -355,7 +355,7 @@ def ADSS_slave_clean_PALtool(pg_Obj: cProcess_group,
                           # "PAL_method": PALmethods.deepclean,
                           "PAL_tool": clean_PAL_tool,
                           # "PAL_source": "elec_res1",
-                          "PAL_volume_uL": clean_PAL_volume_uL,
+                          "PAL_volume_ul": clean_PAL_volume_ul,
                           # "PAL_totalruns": 1,
                           # "PAL_sampleperiod": [0.0],
                           # "PAL_spacingmethod": Spacingmethod.linear,
@@ -435,7 +435,7 @@ def ADSS_master_CA(pg_Obj: cProcess_group,
                 "process_params": {
                                  "PAL_tool": PALtools.LS3,
                                  "PAL_source": "elec_res1",
-                                 "PAL_volume_uL": 10000,
+                                 "PAL_volume_ul": 10000,
                                  },
                 "to_global_params":["_eche_sample_no"], # save new liquid_sample_no of eche cell to globals
                 "save_prc": True,
@@ -500,7 +500,7 @@ def ADSS_master_CA(pg_Obj: cProcess_group,
                 "process_params": {
                                  "PAL_tool": PALtools.LS3,
                                  "PAL_source": "elec_res1",
-                                 "PAL_volume_uL": 1000,
+                                 "PAL_volume_ul": 1000,
                                  },
                 "to_global_params":["_eche_sample_no"],
                 "save_prc": True,
@@ -577,7 +577,7 @@ def ADSS_slave_single_CA(pg_Obj: cProcess_group,
         "process_params": {
                           "PAL_tool": PALtools.LS3,
                           "PAL_source": "lcfc_res",
-                          "PAL_volume_uL": 200,
+                          "PAL_volume_ul": 200,
                           },
         # "to_global_params":["_eche_sample_no"],
         "from_global_params":{
@@ -620,7 +620,7 @@ def ADSS_slave_single_CA(pg_Obj: cProcess_group,
         "process_params": {
                           "PAL_tool": PALtools.LS3,
                           "PAL_source": "lcfc_res",
-                          "PAL_volume_uL": 200,
+                          "PAL_volume_ul": 200,
                           "PAL_totalruns": len(aliquot_times_sec),
                           "PAL_sampleperiod": aliquot_times_sec, #1min, 10min, 10min
                           "PAL_spacingmethod": Spacingmethod.custom,
@@ -647,7 +647,7 @@ def ADSS_slave_single_CA(pg_Obj: cProcess_group,
         "process_params": {
                           "PAL_tool": PALtools.LS3,
                           "PAL_source": "lcfc_res",
-                          "PAL_volume_uL": 200,
+                          "PAL_volume_ul": 200,
                           "PAL_wash1": 1, # dont use True or False but 0 AND 1
                           "PAL_wash2": 1,
                           "PAL_wash3": 1,
