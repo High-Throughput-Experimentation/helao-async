@@ -59,7 +59,7 @@ def makeApp(confPrefix, servKey):
                 MicroPalParams(**{
                 "PAL_method":"fillfixed",
                 "PAL_tool":"LS3",
-                "PAL_volume_uL":500,
+                "PAL_volume_ul":500,
                 "PAL_requested_source":PAL_position(**{
                     "position":"elec_res1",
                     "tray":None,
@@ -80,7 +80,7 @@ def makeApp(confPrefix, servKey):
                 MicroPalParams(**{
                 "PAL_method":"fillfixed",
                 "PAL_tool":"LS3",
-                "PAL_volume_uL":500,
+                "PAL_volume_ul":500,
                 "PAL_requested_source":PAL_position(**{
                     "position":"elec_res1",
                     "tray":None,
@@ -109,7 +109,7 @@ def makeApp(confPrefix, servKey):
         ):
             """universal pal process"""
             A = await setup_process(request)
-            active_dict = await app.driver.init_PAL_IOloop(A)
+            active_dict = await app.driver.method_arbitrary(A)
             return active_dict
 
 
@@ -117,29 +117,22 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_archive")
         async def PAL_archive(
             request: Request,
-            micropal: Optional[list] = [
-                MicroPalParams(**{
-                "PAL_method":"archive",
-                "PAL_tool":"LS3",
-                "PAL_volume_uL":500,
-                "PAL_requested_source":PAL_position(**{
-                    "position":"lcfc_res",
-                    }),
-                "PAL_wash1":0,
-                "PAL_wash2":0,
-                "PAL_wash3":0,
-                "PAL_wash4":0,
-                }),
-                ],
-            PAL_totalruns: Optional[int] = 1,
-            # its a necessary param, but as its the only dict, it partially breaks swagger
-            PAL_sampleperiod: Optional[List[float]] = [0.0],
+            PAL_tool: Optional[PALtools],
+            PAL_source: Optional[dev_customitems],
+            PAL_volume_ul: Optional[int] = 200,
+            PAL_sampleperiod: Optional[List[float]] =  [0.0],
             PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
             PAL_spacingfactor: Optional[float] = 1.0,
             PAL_timeoffset: Optional[float] = 0.0,
+            PAL_wash1: Optional[bool] = False,
+            PAL_wash2: Optional[bool] = False,
+            PAL_wash3: Optional[bool] = False,
+            PAL_wash4: Optional[bool] = False,
+            scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             A = await setup_process(request)
-            active_dict = await app.driver.init_PAL_IOloop(A)
+            A.process_abbr = "archive"
+            active_dict = await app.driver.method_archive(A)
             return active_dict
 
 
@@ -151,7 +144,7 @@ def makeApp(confPrefix, servKey):
                 MicroPalParams(**{
                 "PAL_method":"fill",
                 "PAL_tool":"LS3",
-                "PAL_volume_uL":500,
+                "PAL_volume_ul":500,
                 "PAL_requested_source":PAL_position(**{
                     "position":"elec_res1",
                     }),
@@ -180,7 +173,7 @@ def makeApp(confPrefix, servKey):
                 MicroPalParams(**{
                 "PAL_method":"fillfixed",
                 "PAL_tool":"LS3",
-                "PAL_volume_uL":500,
+                "PAL_volume_ul":500,
                 "PAL_requested_source":PAL_position(**{
                     "position":"elec_res1",
                     }),
@@ -209,7 +202,7 @@ def makeApp(confPrefix, servKey):
                 MicroPalParams(**{
                 "PAL_method":"deepclean",
                 "PAL_tool":"LS3",
-                "PAL_volume_uL":500,
+                "PAL_volume_ul":500,
                 "PAL_wash1":1,
                 "PAL_wash2":1,
                 "PAL_wash3":1,
@@ -232,7 +225,7 @@ def makeApp(confPrefix, servKey):
                 MicroPalParams(**{
                 "PAL_method":"dilute",
                 "PAL_tool":"LS3",
-                "PAL_volume_uL":500,
+                "PAL_volume_ul":500,
                 "PAL_requested_source":PAL_position(**{
                     "position":"elec_res2",
                     }),

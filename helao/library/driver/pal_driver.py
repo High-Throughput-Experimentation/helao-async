@@ -408,20 +408,8 @@ class cPAL:
         return True
 
 
-    async def init_PAL_IOloop(self, A: cProcess):
+    async def _init_PAL_IOloop(self, A: cProcess, PALparams: cPALparams):
         activeDict = dict()
-        
-        # if "PAL_method" in A.process_params:
-        #     if type(A.process_params["PAL_method"]) is not list:
-        #         A.process_params["PAL_method"] = [A.process_params["PAL_method"]]
-        PALparams = cPALparams(**A.process_params)
-        PALparams.PAL_sample_in = A.samples_in
-        # A.process_abbr = PALparams.PAL_method.name
-        print("---------------------")
-        print(PALparams)
-        print("---------------------")
-
-
         if not self.IO_do_meas:
             self.IO_error = error_codes.none
             self.IO_PALparams = PALparams
@@ -754,7 +742,7 @@ class cPAL:
                 self.base.print_message("Innvalid PAL source 'NONE' for 'custom' position method.", error = True)
                 return error_codes.not_available
 
-            error, sample_in = await self.archive.custom_get_sample(micropal.PAL_source)
+            error, sample_in = await self.archive.custom_get_sample(micropal.PAL_requested_source.position)
             if error != error_codes.none:
                 self.base.print_message("Requested custom position does not exist.", error = True)
                 return error_codes.critical
@@ -877,7 +865,7 @@ class cPAL:
                 
                 
                 
-                error, sample_out = self._sendcommand_new_ref_sample(
+                error, sample_out = await self._sendcommand_new_ref_sample(
                                           sample_in = micropal.PAL_sample_in[-1], # this should hold a sample already from "check source call"
                                           sample_out_type =  micropal.cam.sample_out_type
                                          )
@@ -936,7 +924,7 @@ class cPAL:
                     return error_codes.bug
 
                 # this should actually never create an assembly
-                error, sample_out = self._sendcommand_new_ref_sample(
+                error, sample_out = await self._sendcommand_new_ref_sample(
                                           sample_in = micropal.PAL_sample_in[-1],
                                           sample_out_type =  micropal.cam.sample_out_type
                                          )
@@ -1015,7 +1003,7 @@ class cPAL:
                         
                         # first create a new sample from the source sample 
                         # which is then incoporarted into the assembly
-                        error, sample_out = self._sendcommand_new_ref_sample(
+                        error, sample_out = await self._sendcommand_new_ref_sample(
                                                   sample_in = micropal.PAL_sample_in[-1], # this should hold a sample already from "check source call"
                                                   sample_out_type =  micropal.cam.sample_out_type
                                                  )
@@ -1082,7 +1070,7 @@ class cPAL:
                     dest_sample = sample_in
                     # first create a new sample from the source sample 
                     # which is then incoporarted into the assembly
-                    error, sample_out = self._sendcommand_new_ref_sample(
+                    error, sample_out = await self._sendcommand_new_ref_sample(
                                               sample_in = micropal.PAL_sample_in[-1],
                                               sample_out_type =  micropal.cam.sample_out_type
                                              )
@@ -1102,7 +1090,7 @@ class cPAL:
                     tmp_sample_in = hcms.SampleList(samples = [sample for sample in sample_in.samples])
                     # and also add the newly created sample ref to it
                     tmp_sample_in.samples.append(sample_out.samples[0])
-                    error, sample_out2 = self._sendcommand_new_ref_sample(
+                    error, sample_out2 = await self._sendcommand_new_ref_sample(
                           sample_in = tmp_sample_in,
                           sample_out_type =  "assembly"
                          )
@@ -1131,20 +1119,13 @@ class cPAL:
                 self.base.print_message(" ... empty vial slot is not available", error= True)
                 return error_codes.not_available
 
-            if len(sample_in.samples) > 1:
-                self.base.print_message("More then one sample in destination position. This is not allowed.", error = True)
-                return error_codes.critical
-
-
             dest = _positiontype.tray
             dest_tray = newvialpos["tray"]
             dest_slot = newvialpos["slot"]
             dest_vial = newvialpos["vial"]
-            self.base.print_message(f" ... archiving liquid sample to tray {micropal.PAL_dest_tray}, slot {micropal.PAL_dest_slot}, vial {micropal.PAL_dest_vial}")
+            self.base.print_message(f" ... archiving liquid sample to tray {dest_tray}, slot {dest_slot}, vial {dest_vial}")
 
-
-
-            error, sample_out = self._sendcommand_new_ref_sample(
+            error, sample_out = await self._sendcommand_new_ref_sample(
                                       sample_in = micropal.PAL_sample_in[-1], # this should hold a sample already from "check source call"
                                       sample_out_type =  micropal.cam.sample_out_type
                                      )
@@ -1288,13 +1269,14 @@ class cPAL:
                 micropal.PAL_rshs_pal_logfile = PALparams.aux_output_filepath
                 micropal.PAL_path_methodfile = camfile
 
-                PAL_dest_tray = micropal.PAL_dest_tray[-1] if len(micropal.PAL_dest_tray) !=0 else None
-                PAL_dest_slot = micropal.PAL_dest_slot[-1] if len(micropal.PAL_dest_slot) !=0 else None
-                PAL_dest_vial = micropal.PAL_dest_vial[-1] if len(micropal.PAL_dest_vial) !=0 else None
+                PAL_source = micropal.PAL_runtime_source[-1].position
+                PAL_dest_tray = micropal.PAL_runtime_dest[-1].tray
+                PAL_dest_slot = micropal.PAL_runtime_dest[-1].slot
+                PAL_dest_vial = micropal.PAL_runtime_dest[-1].vial
 
 
                 PALparams.joblist.append(_palcmd(method=f"{camfile}",
-                                       params=f"{micropal.PAL_tool};{micropal.PAL_source};{micropal.PAL_volume_ul};{PAL_dest_tray};{PAL_dest_slot};{PAL_dest_vial};{wash1};{wash2};{wash3};{wash4};{micropal.PAL_rshs_pal_logfile}"))
+                                       params=f"{micropal.PAL_tool};{PAL_source};{micropal.PAL_volume_ul};{PAL_dest_tray};{PAL_dest_slot};{PAL_dest_vial};{wash1};{wash2};{wash3};{wash4};{micropal.PAL_rshs_pal_logfile}"))
 
  
         return error
@@ -1641,3 +1623,39 @@ class cPAL:
 
     async def new_sample(self, samples: hcms.SampleList = hcms.SampleList()):
         return await self.unified_db.new_sample(samples)
+    
+    
+    async def method_arbitrary(self, A: cProcess):
+        PALparams = cPALparams(**A.process_params)
+        PALparams.PAL_sample_in = A.samples_in
+        return await self._init_PAL_IOloop(
+            A = A,
+            PALparams = PALparams
+        )
+    
+    
+    async def method_archive(self, A: cProcess):
+        PALparams = cPALparams(
+            PAL_sample_in = A.samples_in,
+            PAL_totalruns = len(A.process_params.get("PAL_sampleperiod",[])),
+            PAL_sampleperiod = A.process_params.get("PAL_sampleperiod",[]),
+            PAL_spacingmethod = A.process_params.get("PAL_spacingmethod",Spacingmethod.linear),
+            PAL_spacingfactor = A.process_params.get("PAL_spacingfactor",1.0),
+            PAL_timeoffset = A.process_params.get("PAL_timeoffset",0.0),
+            micropal = MicroPalParams(**{
+                    "PAL_method":"archive",
+                    "PAL_tool":A.process_params.get("PAL_tool",None),
+                    "PAL_volume_ul":A.process_params.get("PAL_volume_ul",0),
+                    "PAL_requested_source":PAL_position(**{
+                        "position":A.process_params.get("PAL_source",None),
+                        }),
+                    "PAL_wash1":A.process_params.get("PAL_wash1",0),
+                    "PAL_wash2":A.process_params.get("PAL_wash2",0),
+                    "PAL_wash3":A.process_params.get("PAL_wash3",0),
+                    "PAL_wash4":A.process_params.get("PAL_wash4",0),
+                    })
+        )
+        return await self._init_PAL_IOloop(
+            A = A,
+            PALparams = PALparams,
+        )
