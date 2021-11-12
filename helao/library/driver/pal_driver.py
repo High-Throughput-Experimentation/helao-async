@@ -162,7 +162,7 @@ class MicroPalParams(BaseModel):
 
     PAL_method: str = None # name of methods
     PAL_tool: str = None 
-    PAL_volume_uL: int = 0  # uL
+    PAL_volume_ul: int = 0  # uL
 
     # this holds a single resuested source and destination
     PAL_requested_dest: PAL_position = PAL_position()
@@ -315,7 +315,7 @@ class cPAL:
             "epoch_done",
             "PAL_tool",
             "PAL_source",
-            "PAL_volume_uL",
+            "PAL_volume_ul",
             "PAL_source_tray",
             "PAL_source_slot",
             "PAL_source_vial",
@@ -469,10 +469,6 @@ class cPAL:
             self.base.print_message(f" ... Got error after sendcommand_ssh_helper: '{error}'", error = True)
             return error
 
-
-
-
-
         if error is error_codes.none:
             # wait for each micropal cam
             for i_micropal, micropal in enumerate(PALparams.micropal):
@@ -502,15 +498,6 @@ class cPAL:
 
                         
                     error = await self._sendcommand_update_archive_helper(micropal, i_repeat)
-   
-                    # PAL_source_tray = micropal.PAL_source_tray[i_repeat] if len(micropal.PAL_source_tray) >=i_repeat else None
-                    # PAL_source_slot = micropal.PAL_source_slot[i_repeat] if len(micropal.PAL_source_slot) >=i_repeat else None
-                    # PAL_source_vial = micropal.PAL_source_vial[i_repeat] if len(micropal.PAL_source_vial) >=i_repeat else None
-
-                    # PAL_dest_tray = micropal.PAL_dest_tray[i_repeat] if len(micropal.PAL_dest_tray) >=i_repeat else None
-                    # PAL_dest_slot = micropal.PAL_dest_slot[i_repeat] if len(micropal.PAL_dest_slot) >=i_repeat else None
-                    # PAL_dest_vial = micropal.PAL_dest_vial[i_repeat] if len(micropal.PAL_dest_vial) >=i_repeat else None
-
 
 
                     # write data
@@ -525,7 +512,7 @@ class cPAL:
                                 str(micropal.PAL_done_time),
                                 micropal.PAL_tool,
                                 micropal.PAL_runtime_source[i_repeat].position,
-                                str(micropal.PAL_volume_uL),
+                                str(micropal.PAL_volume_ul),
                                 str(micropal.PAL_runtime_source[i_repeat].tray),
                                 str(micropal.PAL_runtime_source[i_repeat].slot),
                                 str(micropal.PAL_runtime_source[i_repeat].vial),
@@ -548,13 +535,9 @@ class cPAL:
                             self.base.print_message(f" ... PAL data: {tmpdata}")
 
 
-                # wait another 20sec for program to close
-
-
-
+        # wait another 20sec for program to close
         # after final done
         await asyncio.sleep(20)
- 
         return error
 
 
@@ -590,7 +573,7 @@ class cPAL:
                         process_group_uuid=self.process.process_group_uuid,
                         process_uuid=self.process.process_uuid,
                         source=source,
-                        #volume_ml=micropal.PAL_volume_uL / 1000.0,
+                        #volume_ml=micropal.PAL_volume_ul / 1000.0,
                         process_queue_time=self.process.process_queue_time,
                         chemical=source_chemical,
                         mass=source_mass,
@@ -604,7 +587,7 @@ class cPAL:
                         process_group_uuid=self.process.process_group_uuid,
                         process_uuid=self.process.process_uuid,
                         source=source,
-                        #volume_ml=micropal.PAL_volume_uL / 1000.0,
+                        #volume_ml=micropal.PAL_volume_ul / 1000.0,
                         process_queue_time=self.process.process_queue_time,
                         chemical=source_chemical,
                         mass=source_mass,
@@ -620,7 +603,7 @@ class cPAL:
                         process_group_uuid=self.process.process_group_uuid,
                         process_uuid=self.process.process_uuid,
                         source=source,
-                        # volume_ml=micropal.PAL_volume_uL / 1000.0,
+                        # volume_ml=micropal.PAL_volume_ul / 1000.0,
                         process_queue_time=self.process.process_queue_time,
                         # chemical=source_chemical,
                         # mass=source_mass,
@@ -902,7 +885,7 @@ class cPAL:
                 if error != error_codes.none:
                     return error
 
-                sample_out.samples[0].volume_ml = micropal.PAL_volume_uL / 1000.0
+                sample_out.samples[0].volume_ml = micropal.PAL_volume_ul / 1000.0
                 sample_out.samples[0].sample_position = dest
                 sample_out.samples[0].inheritance = "receive_only"
                 sample_out.samples[0].status = "created"
@@ -961,7 +944,7 @@ class cPAL:
                 if error != error_codes.none:
                     return error
 
-                sample_out.samples[0].volume_ml = micropal.PAL_volume_uL / 1000.0
+                sample_out.samples[0].volume_ml = micropal.PAL_volume_ul / 1000.0
                 sample_out.samples[0].sample_position = dest
                 sample_out.samples[0].inheritance = "receive_only"
                 sample_out.samples[0].status = "created"
@@ -1040,7 +1023,7 @@ class cPAL:
                         if error != error_codes.none:
                             return error
 
-                        sample_out.samples[0].volume_ml = micropal.PAL_volume_uL / 1000.0
+                        sample_out.samples[0].volume_ml = micropal.PAL_volume_ul / 1000.0
                         sample_out.samples[0].sample_position = dest
                         sample_out.samples[0].inheritance = "allow_both"
                         sample_out.samples[0].status = ["created", "incorporated"]
@@ -1107,7 +1090,7 @@ class cPAL:
                     if error != error_codes.none:
                         return error
 
-                    sample_out.samples[0].volume_ml = micropal.PAL_volume_uL / 1000.0
+                    sample_out.samples[0].volume_ml = micropal.PAL_volume_ul / 1000.0
                     sample_out.samples[0].sample_position = dest
                     sample_out.samples[0].inheritance = "allow_both"
                     sample_out.samples[0].status = ["created", "incorporated"]
@@ -1127,7 +1110,7 @@ class cPAL:
                     
                     if error != error_codes.none:
                         return error
-                    # sample_out2.samples[0].volume_ml = micropal.PAL_volume_uL / 1000.0
+                    # sample_out2.samples[0].volume_ml = micropal.PAL_volume_ul / 1000.0
                     sample_out2.samples[0].sample_position = dest
                     sample_out2.samples[0].inheritance = "allow_both"
                     sample_out2.samples[0].status = "created"
@@ -1142,7 +1125,7 @@ class cPAL:
         elif micropal.cam.dest == _positiontype.next_empty_vial:
             dest = _positiontype.tray
             newvialpos = await self.archive.tray_new_position(
-                            req_vol = micropal.PAL_volume_uL/1000.0)
+                            req_vol = micropal.PAL_volume_ul/1000.0)
 
             if newvialpos["tray"] is None:
                 self.base.print_message(" ... empty vial slot is not available", error= True)
@@ -1169,7 +1152,7 @@ class cPAL:
             if error != error_codes.none:
                 return error
 
-            sample_out.samples[0].volume_ml = micropal.PAL_volume_uL / 1000.0
+            sample_out.samples[0].volume_ml = micropal.PAL_volume_ul / 1000.0
             sample_out.samples[0].sample_position = dest
             sample_out.samples[0].inheritance = "receive_only"
             sample_out.samples[0].status = "created"
@@ -1311,7 +1294,7 @@ class cPAL:
 
 
                 PALparams.joblist.append(_palcmd(method=f"{camfile}",
-                                       params=f"{micropal.PAL_tool};{micropal.PAL_source};{micropal.PAL_volume_uL};{PAL_dest_tray};{PAL_dest_slot};{PAL_dest_vial};{wash1};{wash2};{wash3};{wash4};{micropal.PAL_rshs_pal_logfile}"))
+                                       params=f"{micropal.PAL_tool};{micropal.PAL_source};{micropal.PAL_volume_ul};{PAL_dest_tray};{PAL_dest_slot};{PAL_dest_vial};{wash1};{wash2};{wash3};{wash4};{micropal.PAL_rshs_pal_logfile}"))
 
  
         return error
@@ -1433,7 +1416,7 @@ class cPAL:
                 cmd_to_execute = f"tmux new-window PAL {tmpjob} /start /quit"
                 
 
-                # cmd_to_execute = f"tmux new-window PAL  /loadmethod '{PALparams.PAL_path_methodfile}' '{PALparams.PAL_tool};{PALparams.PAL_source};{PALparams.PAL_volume_uL};{PALparams.PAL_dest_tray};{PALparams.PAL_dest_slot};{PALparams.PAL_dest_vial};{wash1};{wash2};{wash3};{wash4};{PALparams.PAL_rshs_pal_logfile}' /start /quit"
+                # cmd_to_execute = f"tmux new-window PAL  /loadmethod '{PALparams.PAL_path_methodfile}' '{PALparams.PAL_tool};{PALparams.PAL_source};{PALparams.PAL_volume_ul};{PALparams.PAL_dest_tray};{PALparams.PAL_dest_slot};{PALparams.PAL_dest_vial};{wash1};{wash2};{wash3};{wash4};{PALparams.PAL_rshs_pal_logfile}' /start /quit"
                 self.base.print_message(f" ... PAL command: {cmd_to_execute}")
             
     
@@ -1487,14 +1470,14 @@ class cPAL:
                                               tray = micropal.PAL_runtime_dest[num].tray,
                                               slot = micropal.PAL_runtime_dest[num].slot,
                                               vial = micropal.PAL_runtime_dest[num].vial,
-                                              vol_mL = micropal.PAL_volume_uL/1000.0,
+                                              vol_ml = micropal.PAL_volume_ul/1000.0,
                                               sample = micropal.PAL_sample_out[num],
                                               dilute = micropal.dilute
                                               )
         else: # custom postion
             retval, sample = await self.archive.custom_update_position(
                                               custom = micropal.PAL_dest,
-                                              vol_mL = micropal.PAL_volume_uL/1000.0,
+                                              vol_ml = micropal.PAL_volume_ul/1000.0,
                                               sample = micropal.PAL_sample_out[num],
                                               dilute = micropal.dilute
                                               )

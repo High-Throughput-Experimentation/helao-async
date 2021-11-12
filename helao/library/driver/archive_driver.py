@@ -15,6 +15,7 @@ from helaocore.server import Base
 from helaocore.error import error_codes
 
 import helaocore.model.sample as hcms
+import helaocore.data as hcd
 from helaocore.helper import print_message
 
 
@@ -35,11 +36,12 @@ class Custom:
         elif self.custom_type == "reservoir":
             return True
         else:
-            print_message({}, "model", f"invalid 'custom_type': {self.custom_type}", error = True)                
+            print_message({}, "archive", f"invalid 'custom_type': {self.custom_type}", error = True)                
             return False
 
+
     def unload(self):
-        ret_sample = self.sample
+        ret_sample = copy.deepcopy(self.sample)
         self.blocked = False
         self.vol_mL = 0.0
         self.max_vol_mL = None
@@ -47,8 +49,29 @@ class Custom:
         self.sample = hcms.SampleList()
         return ret_sample
 
+    
+    def load(self, vol_mL, sample_in:  hcms.SampleList):
+        if len(self.sample.samples) != 0:
+            print_message({}, "archive", "sample already loaded. Unload first to load new one.", error = True) 
+            return False, hcms.SampleList()
+
+        if len(sample_in.samples) > 1:
+            print_message({}, "archive", "Can only load one sample", error = True) 
+            return False, hcms.SampleList()
+        
+        self.sample = sample_in
+        self.blocked = False
+        self.vol_mL = vol_mL
+        self.dilution_factor = 1.0
+        return True, sample_in
+
+
     def as_dict(self):
-        return vars(self)
+        ret_dict = copy.deepcopy(vars(self)) # it needs a deepcopy
+                                             # else the next line will
+                                             # overwrite self.sample too
+        ret_dict["sample"] = self.sample.dict()
+        return ret_dict
 
     
 class VT_template:
@@ -106,7 +129,11 @@ class VT_template:
 
 
     def as_dict(self):
-        return vars(self)
+        ret_dict = copy.deepcopy(vars(self)) # it needs a deepcopy
+                                             # else the next line will
+                                             # overwrite self.sample too
+        ret_dict["sample"] = [sample.dict() for sample in self.sample]
+        return ret_dict
 
 
 class VT15(VT_template):
@@ -138,13 +165,15 @@ class Archive():
         self.base = process_serv
         self.config_dict = process_serv.server_cfg["params"]
         self.world_config = process_serv.world_cfg
-
-
         
         self.position_config = self.config_dict.get("positions", None)
         self.local_data_dump = self.world_config["save_root"]
         self.archivepck = os.path.join(self.local_data_dump, f"{gethostname()}_archive.pck")
         self.config = {}
+
+        self.sample_no_db_path = self.world_config["local_db_path"]
+        self.unified_db = hcd.UnifiedSampleDataAPI(self.base, self.sample_no_db_path)
+        asyncio.gather(self.unified_db.init_db())
 
         # configure the tray
         self.trays = dict()
@@ -207,7 +236,7 @@ class Archive():
 
         # check custom positions
         failed = False
-        if len(self.custom_positions) != len(self.startup_custom_positions):
+        if len(self.custom_positions) == len(self.startup_custom_positions):
             for key, val in self.custom_positions.items():
                 if key not in self.startup_custom_positions:
                     
@@ -226,7 +255,6 @@ class Archive():
             self.custom_positions = copy.deepcopy(self.startup_custom_positions)
         else:
             self.base.print_message("customs matched", info = True)
-        
 
         self.write_config()
 
@@ -615,20 +643,27 @@ class Archive():
     
     async def custom_unloadall(self, *args, **kwargs):
         samples = hcms.SampleList()
+        customs_dict = await self.customs_to_dict()
         for custom in self.custom_positions:
-            _samples = custom.unload()
+            _samples = self.custom_positions[custom].unload()
             for sample in _samples.samples:
                 samples.samples.append(sample)
-        # ret = await self.customs_to_dict()
-        # self.custom_positions = copy.deepcopy(self.startup_custom_positions)
-        return True, samples
+        
+        self.write_config() # save current state of table
+        return True, samples, customs_dict
 
 
     async def custom_unload(self, custom: str = "", *args, **kwargs):
+        sample = hcms.SampleList()
+        unloaded = False
+        customs_dict = dict()
         if custom in self.custom_positions:
+            customs_dict = self.custom_positions[custom].as_dict()
             sample = self.custom_positions[custom].unload()
-            return True, sample
-        return False, hcms.hcms.SampleList()
+            unloaded = True
+        
+        self.write_config() # save current state of table
+        return unloaded, sample, customs_dict
 
 
     async def custom_load(
@@ -639,13 +674,28 @@ class Archive():
                           *args, **kwargs
                          ):
 
+        sample = hcms.SampleList()
+        loaded = False
+        customs_dict = dict()
+
         if type(load_samples_in) is dict:
             load_samples_in = hcms.SampleList(**load_samples_in)
 
+        # check if sample actually exists
+        load_samples_in = await self.unified_db.get_sample(load_samples_in)
+        if load_samples_in.samples[0] is None:
+            print_message({}, "archive", "Sample does not exist in DB.", error = True) 
+            return False, hcms.SampleList(), dict()
 
-        return await self.custom_update_position(
-                                     custom = custom,
-                                     vol_mL = vol_mL,
-                                     sample = load_samples_in,
-                                     dilute = False
-                                    )
+
+        if len(load_samples_in.samples) > 1:
+            self.base.print_message("custom_load: sample is empty", error = True)
+            loaded = False
+        else:
+            if custom in self.custom_positions:
+                loaded, sample = \
+                self.custom_positions[custom].load(vol_mL, load_samples_in)
+                customs_dict = self.custom_positions[custom].as_dict()
+
+        self.write_config() # save current state of table
+        return loaded, sample, customs_dict
