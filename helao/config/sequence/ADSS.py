@@ -68,7 +68,7 @@ def debug(pg_Obj: cProcess_group,
     """Test process for ORCH debugging
     simple plate is e.g. 4534"""
     
-     # additional sequence params should be stored in process_group.sequence_pars
+     # additional sequence params should be stored in process_group.sequence_params
      # these are duplicates of the function parameters (currently the op uses functions 
      # parameters to display them in the webUI)
      
@@ -123,8 +123,8 @@ def ADSS_slave_startup(pg_Obj: cProcess_group,
 
     
     
-    x_mm = pg_Obj.sequence_pars.get("x_mm", x_mm)
-    y_mm = pg_Obj.sequence_pars.get("y_mm", y_mm)
+    x_mm = pg_Obj.sequence_params.get("x_mm", x_mm)
+    y_mm = pg_Obj.sequence_params.get("y_mm", y_mm)
     
     
     process_list = []
@@ -342,8 +342,8 @@ def ADSS_slave_clean_PALtool(pg_Obj: cProcess_group,
 
     process_list = []
 
-    clean_PAL_volume_ul = pg_Obj.sequence_pars.get("clean_PAL_volume_ul", clean_PAL_volume_ul)
-    clean_PAL_tool = pg_Obj.sequence_pars.get("clean_PAL_tool", clean_PAL_tool)
+    clean_PAL_volume_ul = pg_Obj.sequence_params.get("clean_PAL_volume_ul", clean_PAL_volume_ul)
+    clean_PAL_tool = pg_Obj.sequence_params.get("clean_PAL_tool", clean_PAL_tool)
     
     # deep clean
     process_dict = pg_Obj.as_dict()
@@ -398,17 +398,17 @@ def ADSS_master_CA(pg_Obj: cProcess_group,
 
 
 
-    x_mm = pg_Obj.sequence_pars.get("x_mm", x_mm)
-    y_mm = pg_Obj.sequence_pars.get("y_mm", y_mm)
-    liquid_sample_no = pg_Obj.sequence_pars.get("liquid_sample_no", liquid_sample_no)
-    CA_potentials_vsRHE = pg_Obj.sequence_pars.get("CA_potentials_vsRHE", CA_potentials_vsRHE)
-    ref_vs_nhe = pg_Obj.sequence_pars.get("ref_vs_nhe", ref_vs_nhe)
-    pH = pg_Obj.sequence_pars.get("pH", pH)
-    CA_duration_sec = pg_Obj.sequence_pars.get("CA_duration_sec", CA_duration_sec)
-    aliquot_times_sec = pg_Obj.sequence_pars.get("aliquot_times_sec", aliquot_times_sec)
-    OCV_duration_sec = pg_Obj.sequence_pars.get("OCV_duration_sec", OCV_duration_sec)
-    samplerate_sec = pg_Obj.sequence_pars.get("samplerate_sec", samplerate_sec)
-    filltime_sec = pg_Obj.sequence_pars.get("filltime_sec", filltime_sec)
+    x_mm = pg_Obj.sequence_params.get("x_mm", x_mm)
+    y_mm = pg_Obj.sequence_params.get("y_mm", y_mm)
+    liquid_sample_no = pg_Obj.sequence_params.get("liquid_sample_no", liquid_sample_no)
+    CA_potentials_vsRHE = pg_Obj.sequence_params.get("CA_potentials_vsRHE", CA_potentials_vsRHE)
+    ref_vs_nhe = pg_Obj.sequence_params.get("ref_vs_nhe", ref_vs_nhe)
+    pH = pg_Obj.sequence_params.get("pH", pH)
+    CA_duration_sec = pg_Obj.sequence_params.get("CA_duration_sec", CA_duration_sec)
+    aliquot_times_sec = pg_Obj.sequence_params.get("aliquot_times_sec", aliquot_times_sec)
+    OCV_duration_sec = pg_Obj.sequence_params.get("OCV_duration_sec", OCV_duration_sec)
+    samplerate_sec = pg_Obj.sequence_params.get("samplerate_sec", samplerate_sec)
+    filltime_sec = pg_Obj.sequence_params.get("filltime_sec", filltime_sec)
     
     toNHE = -1.0*ref_vs_nhe-0.059*pH
     cycles = len(CA_potentials_vsRHE)
@@ -538,12 +538,12 @@ def ADSS_slave_single_CA(pg_Obj: cProcess_group,
               ):
 
 
-    x_mm = pg_Obj.sequence_pars.get("x_mm", x_mm)
-    y_mm = pg_Obj.sequence_pars.get("y_mm", y_mm)
-    samplerate_sec = pg_Obj.sequence_pars.get("samplerate_sec", samplerate_sec)
-    CA_single_potential = pg_Obj.sequence_pars.get("CA_single_potential", CA_single_potential)
-    OCV_duration_sec = pg_Obj.sequence_pars.get("OCV_duration_sec", OCV_duration_sec)
-    CA_duration_sec = pg_Obj.sequence_pars.get("CA_duration_sec", CA_duration_sec)
+    x_mm = pg_Obj.sequence_params.get("x_mm", x_mm)
+    y_mm = pg_Obj.sequence_params.get("y_mm", y_mm)
+    samplerate_sec = pg_Obj.sequence_params.get("samplerate_sec", samplerate_sec)
+    CA_single_potential = pg_Obj.sequence_params.get("CA_single_potential", CA_single_potential)
+    OCV_duration_sec = pg_Obj.sequence_params.get("OCV_duration_sec", OCV_duration_sec)
+    CA_duration_sec = pg_Obj.sequence_params.get("CA_duration_sec", CA_duration_sec)
     
     
     process_list = []
@@ -621,7 +621,7 @@ def ADSS_slave_single_CA(pg_Obj: cProcess_group,
                           "PAL_tool": PALtools.LS3,
                           "PAL_source": "lcfc_res",
                           "PAL_volume_ul": 200,
-                          "PAL_totalruns": len(aliquot_times_sec),
+                          # "PAL_totalruns": len(aliquot_times_sec),
                           "PAL_sampleperiod": aliquot_times_sec, #1min, 10min, 10min
                           "PAL_spacingmethod": Spacingmethod.custom,
                           "PAL_spacingfactor": 1.0,

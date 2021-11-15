@@ -5,7 +5,7 @@ __all__ = ["makeBokehApp"]
 # import os
 # import sys
 # import websockets
-import asyncio
+# import asyncio
 import json
 # import collections
 from functools import partial
@@ -466,7 +466,7 @@ class C_async_operator:
             # "orch_name":orch_name,
             "process_group_label":sellabel,
             "sequence":selected_sequence,
-            "sequence_pars":sequence_params,
+            "sequence_params":sequence_params,
             # "result_dict":result_dict,
             # "access":access,
         })
