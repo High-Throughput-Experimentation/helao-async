@@ -464,7 +464,7 @@ class C_async_operator:
 
         D = cProcess_group(inputdict={
             # "orch_name":orch_name,
-            "process_group_label":sellabel,
+            "sequence_label":sellabel,
             "sequence":selected_sequence,
             "sequence_params":sequence_params,
             # "result_dict":result_dict,
