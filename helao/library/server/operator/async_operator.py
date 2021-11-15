@@ -64,7 +64,7 @@ from helaocore.schema import cProcess_group
 class return_sequence_lib(BaseModel):
     """Return class for queried sequence objects."""
     index: int
-    sequence: str
+    sequence_name: str
     doc: str
     args: list
     defaults: list
@@ -252,7 +252,7 @@ class C_async_operator:
             
             self.sequences.append(return_sequence_lib(
                 index=i,
-                sequence = sequence,
+                sequence_name = sequence,
                 doc = tmpdoc,#self.sequence_lib[sequence].__doc__ if self.sequence_lib[sequence].__doc__ not None else "",
                 args = tmpargs,#{},
                 defaults = tmpdef,
