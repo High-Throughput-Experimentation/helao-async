@@ -43,7 +43,7 @@ def debug(pg_Obj: cProcess_group,
     """Test process for ORCH debugging
     simple plate is e.g. 4534"""
     
-     # additional sequence params should be stored in process_group.sequence_params
+     # additional sequence params should be stored in sequence.sequence_params
      # these are duplicates of the function parameters (currently the op uses functions 
      # parameters to display them in the webUI)
      

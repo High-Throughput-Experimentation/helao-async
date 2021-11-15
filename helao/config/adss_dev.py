@@ -6,7 +6,7 @@ hostip = "127.0.0.1"
 config = dict()
 
 # process library provides generator functions which produce processes
-# lists from input process_group_id grouping
+# lists from input sequence_id grouping
 config["process_libraries"] = ["ADSS"]
 config["technique_name"] = "adss"
 config["save_root"] = r"C:\INST_dev2\RUNS"
@@ -208,6 +208,7 @@ config["servers"] = dict(
                     "fill":"lcfc_fill.cam",
                     "test":"relay_actuation_test2.cam",
                     "dilute":"lcfc_dilute.cam",
+                    "autodilute":"lcfc_dilute.cam",
                     "deepclean":"lcfc_deep_clean.cam",
                    },
             positions = {

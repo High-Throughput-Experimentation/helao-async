@@ -2,7 +2,7 @@ hostip = "127.0.0.1"
 config = dict()
 
 # process library provides generator functions which produce processes
-# lists from input process_group_id grouping
+# lists from input sequence_id grouping
 config["process_libraries"] = ["ANEC"]
 config["technique_name"] = "anec"
 config["save_root"] = r"C:\INST_dev2\RUNS"
