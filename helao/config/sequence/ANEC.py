@@ -43,7 +43,7 @@ def debug(pg_Obj: cProcess_group,
     """Test process for ORCH debugging
     simple plate is e.g. 4534"""
     
-     # additional sequence params should be stored in process_group.sequence_pars
+     # additional sequence params should be stored in process_group.sequence_params
      # these are duplicates of the function parameters (currently the op uses functions 
      # parameters to display them in the webUI)
      
@@ -98,9 +98,9 @@ def CA(pg_Obj: cProcess_group,
     
     # todo, I will try to write a function which will do this later
     # I assume we need a base sequence class for this
-    CA_potential_V = pg_Obj.sequence_pars.get("CA_potential_V", CA_potential_V)
-    CA_duration_sec = pg_Obj.sequence_pars.get("CA_duration_sec", CA_duration_sec)
-    samplerate_sec = pg_Obj.sequence_pars.get("samplerate_sec", samplerate_sec)
+    CA_potential_V = pg_Obj.sequence_params.get("CA_potential_V", CA_potential_V)
+    CA_duration_sec = pg_Obj.sequence_params.get("CA_duration_sec", CA_duration_sec)
+    samplerate_sec = pg_Obj.sequence_params.get("samplerate_sec", samplerate_sec)
 
 
 
