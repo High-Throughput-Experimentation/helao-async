@@ -558,7 +558,7 @@ class cPAL:
             if sample_out_type == "liquid":
                 # this is a sample reference, it needs to be added to the db later
                 sample.samples.append(hcms.LiquidSample(
-                        process_group_uuid=self.process.process_group_uuid,
+                        sequence_uuid=self.process.sequence_uuid,
                         process_uuid=self.process.process_uuid,
                         source=source,
                         #volume_ml=micropal.PAL_volume_ul / 1000.0,
@@ -572,7 +572,7 @@ class cPAL:
                         ))
             elif sample_out_type == "gas":
                 sample.samples.append(hcms.GasSample(
-                        process_group_uuid=self.process.process_group_uuid,
+                        sequence_uuid=self.process.sequence_uuid,
                         process_uuid=self.process.process_uuid,
                         source=source,
                         #volume_ml=micropal.PAL_volume_ul / 1000.0,
@@ -588,7 +588,7 @@ class cPAL:
                 sample.samples.append(hcms.AssemblySample(
                         parts = [sample for sample in sample_in.samples],
                         #sample_position = micropal.PAL_dest, # no vial slot can be an assembly, only custom positions
-                        process_group_uuid=self.process.process_group_uuid,
+                        sequence_uuid=self.process.sequence_uuid,
                         process_uuid=self.process.process_uuid,
                         source=source,
                         # volume_ml=micropal.PAL_volume_ul / 1000.0,
@@ -616,7 +616,7 @@ class cPAL:
                 status="created",
                 inheritance="receive_only",
                 source = [sample.get_global_label() for sample in sample_in.samples],
-                process_group_uuid=self.process.process_group_uuid,
+                sequence_uuid=self.process.sequence_uuid,
                 process_uuid=self.process.process_uuid,
                 process_queue_time=self.process.process_queue_time,
                 ))
