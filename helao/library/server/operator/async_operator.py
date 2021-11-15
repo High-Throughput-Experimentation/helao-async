@@ -91,7 +91,7 @@ class C_async_operator:
         self.param_layout = []
         self.param_input = []
 
-        self.process_group_list = dict()
+        self.sequence_list = dict()
         self.process_list = dict()
         self.active_process_list = dict()
 
@@ -103,14 +103,14 @@ class C_async_operator:
 
         # FastAPI calls
         self.get_sequences()
-        self.vis.doc.add_next_tick_callback(partial(self.get_process_groups))
+        self.vis.doc.add_next_tick_callback(partial(self.get_sequences))
         self.vis.doc.add_next_tick_callback(partial(self.get_processes))
         self.vis.doc.add_next_tick_callback(partial(self.get_active_processes))
 
-        #self.vis.print_message([key for key in self.process_group_list.keys()])
-        self.process_group_source = ColumnDataSource(data=self.process_group_list)
-        self.columns_dec = [TableColumn(field=key, title=key) for key in self.process_group_list.keys()]
-        self.process_group_table = DataTable(source=self.process_group_source, columns=self.columns_dec, width=620, height=200)
+        #self.vis.print_message([key for key in self.sequence_list.keys()])
+        self.sequence_source = ColumnDataSource(data=self.sequence_list)
+        self.columns_dec = [TableColumn(field=key, title=key) for key in self.sequence_list.keys()]
+        self.sequence_table = DataTable(source=self.sequence_source, columns=self.columns_dec, width=620, height=200)
 
         self.process_source = ColumnDataSource(data=self.process_list)
         self.columns_process = [TableColumn(field=key, title=key) for key in self.process_list.keys()]
@@ -140,7 +140,7 @@ class C_async_operator:
         self.button_update.on_event(ButtonClick, self.callback_update_tables)
 
         self.button_clear_dec = Button(label="clear prg", button_type="danger", width=100)
-        self.button_clear_dec.on_event(ButtonClick, self.callback_clear_process_groups)
+        self.button_clear_dec.on_event(ButtonClick, self.callback_clear_sequences)
         self.button_clear_process = Button(label="clear prc", button_type="danger", width=100)
         self.button_clear_process.on_event(ButtonClick, self.callback_clear_processes)
 
@@ -207,8 +207,8 @@ class C_async_operator:
                     [self.button_append, self.button_prepend, self.button_start, self.button_stop],
                     ]),
                 layout([
-                [Spacer(width=20), Div(text="<b>queued process_groups:</b>", width=200+50, height=15)],
-                [self.process_group_table],
+                [Spacer(width=20), Div(text="<b>queued sequences:</b>", width=200+50, height=15)],
+                [self.sequence_table],
                 [Spacer(width=20), Div(text="<b>queued processes:</b>", width=200+50, height=15)],
                 [self.process_table],
                 [Spacer(width=20), Div(text="<b>Active processes:</b>", width=200+50, height=15)],
@@ -266,18 +266,18 @@ class C_async_operator:
             self.sequence_select_list.append(item['sequence'])
 
 
-    async def get_process_groups(self):
-        '''get process_group list from orch'''
-        response = await self.do_orch_request(process_name = "list_process_groups")
-        response = response["process_groups"]
-        self.process_group_list = dict()
+    async def get_sequences(self):
+        '''get sequence list from orch'''
+        response = await self.do_orch_request(process_name = "list_sequences")
+        response = response["sequences"]
+        self.sequence_list = dict()
         if len(response):
             for key in response[0].keys():
-                self.process_group_list[key] = []
+                self.sequence_list[key] = []
             for line in response:
                 for key, value in line.items():
-                    self.process_group_list[key].append(value)
-        self.vis.print_message(' ... current queued process_groups:',self.process_group_list)
+                    self.sequence_list[key].append(value)
+        self.vis.print_message(' ... current queued sequences:',self.sequence_list)
 
 
     async def get_processes(self):
@@ -392,14 +392,14 @@ class C_async_operator:
 
 
     def callback_skip_dec(self, event):
-        self.vis.print_message(" ... skipping process_group")
+        self.vis.print_message(" ... skipping sequence")
         self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"skip"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
-    def callback_clear_process_groups(self, event):
-        self.vis.print_message(" ... clearing process_groups")
-        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_process_groups"))
+    def callback_clear_sequences(self, event):
+        self.vis.print_message(" ... clearing sequences")
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_sequences"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
@@ -410,13 +410,13 @@ class C_async_operator:
 
 
     def callback_prepend(self, event):
-        self.prepend_process_group()
+        self.prepend_sequence()
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
 
     def callback_append(self, event):
-        self.append_process_group()
+        self.append_sequence()
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
@@ -424,16 +424,16 @@ class C_async_operator:
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
-    def append_process_group(self):
+    def append_sequence(self):
         params_dict, json_dict = self.populate_process()
         # submit decission to orchestrator
-        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"append_process_group", params_dict, json_dict))
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"append_sequence", params_dict, json_dict))
 
 
-    def prepend_process_group(self):
+    def prepend_sequence(self):
         params_dict, json_dict = self.populate_process()
         # submit decission to orchestrator
-        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"prepend_process_group", params_dict, json_dict))
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"prepend_sequence", params_dict, json_dict))
 
 
     def populate_process(self):
@@ -493,7 +493,7 @@ class C_async_operator:
         for idx in range(len(args)):
             buf = f'{defaults[idx]}'
             # self.vis.print_message(' ... process parameter:',args[idx])
-            # skip the process_group_Obj parameter
+            # skip the sequence_Obj parameter
             if args[idx] == 'pg_Obj':
                 continue
 
@@ -656,15 +656,15 @@ class C_async_operator:
 
 
     async def update_tables(self):
-        await self.get_process_groups()
+        await self.get_sequences()
         await self.get_processes()
         await self.get_active_processes()
 
 
 
-        self.columns_dec = [TableColumn(field=key, title=key) for key in self.process_group_list.keys()]
-        self.process_group_table.source.data = self.process_group_list
-        self.process_group_table.columns=self.columns_dec
+        self.columns_dec = [TableColumn(field=key, title=key) for key in self.sequence_list.keys()]
+        self.sequence_table.source.data = self.sequence_list
+        self.sequence_table.columns=self.columns_dec
 
         self.columns_process = [TableColumn(field=key, title=key) for key in self.process_list.keys()]
         self.process_table.source.data=self.process_list
@@ -704,7 +704,7 @@ def makeBokehApp(doc, confPrefix, servKey):
     # get the event loop
     # operatorloop = asyncio.get_event_loop()
 
-    # this periodically updates the GUI (process and process_group tables)
+    # this periodically updates the GUI (process and sequence tables)
     # operator.vis.doc.add_periodic_callback(operator.IOloop,2000) # time in ms
 
     return doc
