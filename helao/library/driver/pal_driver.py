@@ -23,7 +23,7 @@ from pydantic import validator
 # import pickle
 # import re
 
-from helaocore.schema import cProcess
+from helaocore.schema import Process
 from helaocore.server import Base
 from helaocore.error import error_codes
 from helao.library.driver.HTEdata_legacy import LocalDataHandler
@@ -408,7 +408,7 @@ class cPAL:
         return True
 
 
-    async def _init_PAL_IOloop(self, A: cProcess, PALparams: cPALparams):
+    async def _init_PAL_IOloop(self, A: Process, PALparams: cPALparams):
         activeDict = dict()
         if not self.IO_do_meas:
             self.IO_error = error_codes.none
@@ -1625,7 +1625,7 @@ class cPAL:
         return await self.unified_db.new_sample(samples)
     
     
-    async def method_arbitrary(self, A: cProcess):
+    async def method_arbitrary(self, A: Process):
         PALparams = cPALparams(**A.process_params)
         PALparams.PAL_sample_in = A.samples_in
         return await self._init_PAL_IOloop(
@@ -1634,7 +1634,7 @@ class cPAL:
         )
     
     
-    async def method_archive(self, A: cProcess):
+    async def method_archive(self, A: Process):
         PALparams = cPALparams(
             PAL_sample_in = A.samples_in,
             PAL_totalruns = len(A.process_params.get("PAL_sampleperiod",[])),
@@ -1661,7 +1661,7 @@ class cPAL:
         )
 
 
-    async def method_fill(self, A: cProcess):
+    async def method_fill(self, A: Process):
         PALparams = cPALparams(
             PAL_sample_in = A.samples_in,
             PAL_totalruns = 1,
@@ -1691,7 +1691,7 @@ class cPAL:
         )
 
 
-    async def method_fillfixed(self, A: cProcess):
+    async def method_fillfixed(self, A: Process):
         PALparams = cPALparams(
             PAL_sample_in = A.samples_in,
             PAL_totalruns = 1,
@@ -1721,7 +1721,7 @@ class cPAL:
         )
 
 
-    async def method_deepclean(self, A: cProcess):
+    async def method_deepclean(self, A: Process):
         PALparams = cPALparams(
             PAL_sample_in = A.samples_in,
             PAL_totalruns = 1,
@@ -1745,7 +1745,7 @@ class cPAL:
         )
 
 
-    async def method_dilute(self, A: cProcess):
+    async def method_dilute(self, A: Process):
         PALparams = cPALparams(
             PAL_sample_in = A.samples_in,
             PAL_totalruns = len(A.process_params.get("PAL_sampleperiod",[])),
@@ -1778,7 +1778,7 @@ class cPAL:
         )
 
 
-    async def method_autodilute(self, A: cProcess):
+    async def method_autodilute(self, A: Process):
         PALparams = cPALparams(
             PAL_sample_in = A.samples_in,
             PAL_totalruns = len(A.process_params.get("PAL_sampleperiod",[])),

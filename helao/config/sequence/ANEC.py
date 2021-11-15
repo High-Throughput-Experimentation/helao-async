@@ -12,7 +12,7 @@ __all__ = ["debug",
 
 from typing import Optional, List, Union
 
-from helaocore.schema import cProcess, Sequence, Sequencer
+from helaocore.schema import Process, Sequence, Sequencer
 from helaocore.server import process_start_condition
 from helao.library.driver.pal_driver import PALmethods, Spacingmethod, PALtools
 import helaocore.model.sample as hcms
@@ -83,7 +83,7 @@ def debug(pg_Obj: Sequence,
         # "save_data": False,
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
     return process_list
 
@@ -126,7 +126,7 @@ def CA(pg_Obj: Sequence,
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         # "plate_id": None,
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
     return process_list
 
