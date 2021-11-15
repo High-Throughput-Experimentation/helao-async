@@ -17,7 +17,7 @@ from nidaqmx.constants import CurrentShuntResistorLocation
 from nidaqmx.constants import UnitsPreScaled
 from nidaqmx.constants import TriggerType
 
-from helaocore.schema import cProcess
+from helaocore.schema import Process
 from helaocore.server import Base
 from helaocore.error import error_codes
 import helaocore.model.sample as hcms
@@ -394,7 +394,7 @@ class cNIMAX:
                }
 
 
-    async def run_cell_IV(self, A: cProcess):
+    async def run_cell_IV(self, A: Process):
         activeDict = dict()
         
         samplerate = A.process_params["SampleRate"]

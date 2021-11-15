@@ -19,7 +19,7 @@ from typing import List
 
 from helaocore.server import Base
 from helaocore.error import error_codes
-from helaocore.schema import cProcess
+from helaocore.schema import Process
 from helaocore.error import error_codes
 
 
@@ -183,7 +183,7 @@ class galil:
             # go slow to find the same position every time
             # first a fast move to find the switch
             retc1 = await self.motor_move(
-                cProcess({
+                Process({
                         "process_params": {
                                 "d_mm": [0 for ax in axis],
                                 "axis": axis,
@@ -195,7 +195,7 @@ class galil:
             )
             # move back 2mm
             retc1 = await self.motor_move(
-                cProcess({
+                Process({
                         "process_params": {
                                 "d_mm": [2 for ax in axis],
                                 "axis": axis,
@@ -207,7 +207,7 @@ class galil:
             )
             # approach switch again very slow to get better zero position
             retc1 = await self.motor_move(
-                cProcess({
+                Process({
                         "process_params": {
                                 "d_mm": [0 for ax in axis],
                                 "axis": axis,
@@ -219,7 +219,7 @@ class galil:
             )
 
             retc2 = await self.motor_move(
-                cProcess({
+                Process({
                         "process_params": {
                                 "d_mm":[
                     self.config_dict["axis_zero"][self.config_dict["axis_id"][ax]]
@@ -270,7 +270,7 @@ class galil:
         # self.wsmotordata_buffer["platexy"] = [platexy[0], platexy[1], 1]
 
 
-    async def motor_move(self, A: cProcess):
+    async def motor_move(self, A: Process):
         d_mm = A.process_params.get("d_mm",[])
         axis = A.process_params.get("axis",[])
         speed = A.process_params.get("speed", None)

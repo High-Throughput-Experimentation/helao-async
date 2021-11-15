@@ -17,7 +17,7 @@ __all__ = ["debug",
 
 from typing import Optional, List, Union
 
-from helaocore.schema import cProcess, Sequence, Sequencer
+from helaocore.schema import Process, Sequence, Sequencer
 
 from helaocore.server import process_start_condition
 from helao.library.driver.galil_driver import move_modes, transformation_mode
@@ -104,7 +104,7 @@ def debug(pg_Obj: Sequence,
         # "save_data": False,
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
     return process_list
 
@@ -143,7 +143,7 @@ def ADSS_slave_startup(pg_Obj: Sequence,
         "start_condition": process_start_condition.wait_for_all,
         # "plate_id": None,
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
     # seal cell
     process_list.append(ADSS_slave_engage(pg_Obj))
@@ -175,7 +175,7 @@ def ADSS_slave_shutdown(pg_Obj: Sequence):
     #     "start_condition": process_start_condition.wait_for_all,
     #     # "plate_id": None,
     #     })
-    # process_list.append(cProcess(inputdict=process_dict))
+    # process_list.append(Process(inputdict=process_dict))
 
     # set pump flow backward
     process_dict = pg_Obj.as_dict()
@@ -190,7 +190,7 @@ def ADSS_slave_shutdown(pg_Obj: Sequence):
         "start_condition": process_start_condition.wait_for_all,
         # "plate_id": None,
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
     # wait some time to pump out the liquid
     process_dict = pg_Obj.as_dict()
@@ -204,7 +204,7 @@ def ADSS_slave_shutdown(pg_Obj: Sequence):
         "start_condition": process_start_condition.wait_for_all,
         # "plate_id": None,
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
 
     # drain, TODO
@@ -224,7 +224,7 @@ def ADSS_slave_shutdown(pg_Obj: Sequence):
         "start_condition": process_start_condition.wait_for_all,
         # "plate_id": None,
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
     # set pump flow forward
     process_dict = pg_Obj.as_dict()
@@ -239,7 +239,7 @@ def ADSS_slave_shutdown(pg_Obj: Sequence):
         "start_condition": process_start_condition.wait_for_all,
         "plate_id": None,
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
 
 
@@ -281,7 +281,7 @@ def ADSS_slave_engage(pg_Obj: Sequence):
         "start_condition": process_start_condition.wait_for_all,
         # "plate_id": None,
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
     # seal
     process_dict = pg_Obj.as_dict()
@@ -298,7 +298,7 @@ def ADSS_slave_engage(pg_Obj: Sequence):
         "start_condition": process_start_condition.wait_for_all,
         # "plate_id": None,
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
     return process_list
 
@@ -323,7 +323,7 @@ def ADSS_slave_disengage(pg_Obj: Sequence):
         "start_condition": process_start_condition.wait_for_all,
         # "plate_id": None,
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
     return process_list
 
@@ -366,7 +366,7 @@ def ADSS_slave_clean_PALtool(pg_Obj: Sequence,
         "start_condition": process_start_condition.wait_for_all,
         # "plate_id": None,
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
     return process_list
 
@@ -439,7 +439,7 @@ def ADSS_master_CA(pg_Obj: Sequence,
                 "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
                 # "plate_id": None,
                 })
-            process_list.append(cProcess(inputdict=process_dict))
+            process_list.append(Process(inputdict=process_dict))
 
         
             # set pump flow forward
@@ -455,7 +455,7 @@ def ADSS_master_CA(pg_Obj: Sequence,
                 "start_condition": process_start_condition.wait_for_all,
                 "plate_id": None,
                 })
-            process_list.append(cProcess(inputdict=process_dict))
+            process_list.append(Process(inputdict=process_dict))
         
             # turn on pump
             process_dict = pg_Obj.as_dict()
@@ -470,7 +470,7 @@ def ADSS_master_CA(pg_Obj: Sequence,
                 "start_condition": process_start_condition.wait_for_all,
                 "plate_id": None,
                 })
-            process_list.append(cProcess(inputdict=process_dict))
+            process_list.append(Process(inputdict=process_dict))
 
         
             # wait some time to pump in the liquid
@@ -485,7 +485,7 @@ def ADSS_master_CA(pg_Obj: Sequence,
                 "start_condition": process_start_condition.wait_for_all,
                 "plate_id": None,
                 })
-            process_list.append(cProcess(inputdict=process_dict))
+            process_list.append(Process(inputdict=process_dict))
             
         else:    
             # fill liquid, no wash (assume it was cleaned before)
@@ -504,7 +504,7 @@ def ADSS_master_CA(pg_Obj: Sequence,
                 "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
                 # "plate_id": None,
                 })
-            process_list.append(cProcess(inputdict=process_dict))
+            process_list.append(Process(inputdict=process_dict))
 
 
     
@@ -562,7 +562,7 @@ def ADSS_slave_single_CA(pg_Obj: Sequence,
         # "plate_id": None,
 
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
 
     # take liquid sample
@@ -584,7 +584,7 @@ def ADSS_slave_single_CA(pg_Obj: Sequence,
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         # "plate_id": None,
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
 
     # apply potential
@@ -605,7 +605,7 @@ def ADSS_slave_single_CA(pg_Obj: Sequence,
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         # "plate_id": None,
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
 
     # take multiple scheduled liquid samples
@@ -632,7 +632,7 @@ def ADSS_slave_single_CA(pg_Obj: Sequence,
         "start_condition": process_start_condition.wait_for_endpoint, # orch is waiting for all process_dq to finish
         # "plate_id": None,
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
 
     # take last liquid sample and clean
@@ -658,7 +658,7 @@ def ADSS_slave_single_CA(pg_Obj: Sequence,
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         # "plate_id": None,
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
     return process_list
 

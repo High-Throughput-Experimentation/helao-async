@@ -10,7 +10,7 @@ __all__ = ["gamry",
            "Gamry_modes",
            "Gamry_IErange"]
 
-from helaocore.schema import cProcess
+from helaocore.schema import Process
 from helaocore.server import Base
 import sys
 import comtypes
@@ -776,7 +776,7 @@ class gamry:
             # file and Gamry connection will be closed with the meas loop
             await self.IO_signalq.put(False)
 
-    async def estop(self, A: cProcess):
+    async def estop(self, A: Process):
         """same as stop, set or clear estop flag with switch parameter"""
         # should be the same as stop()
         switch = A.process_params["switch"]
@@ -867,7 +867,7 @@ class gamry:
         return activeDict
 
     async def technique_LSV(
-        self, A: cProcess,
+        self, A: Process,
     ):
         """LSV definition"""
         Vinit = A.process_params["Vinit"]
@@ -918,7 +918,7 @@ class gamry:
         return activeDict
 
     async def technique_CA(
-        self, A: cProcess,
+        self, A: Process,
     ):
         """CA definition"""
         Vval = A.process_params["Vval"]
@@ -957,7 +957,7 @@ class gamry:
         return activeDict
 
     async def technique_CP(
-        self, A: cProcess,
+        self, A: Process,
     ):
         """CP definition"""
         Ival = A.process_params["Ival"]
@@ -995,7 +995,7 @@ class gamry:
         )
         return activeDict
 
-    async def technique_CV(self, A: cProcess):
+    async def technique_CV(self, A: Process):
         Vinit = A.process_params["Vinit"]
         Vapex1 = A.process_params["Vapex1"]
         Vapex2 = A.process_params["Vapex2"]
@@ -1067,7 +1067,7 @@ class gamry:
         )
         return activeDict
 
-    async def technique_EIS(self, A: cProcess):
+    async def technique_EIS(self, A: Process):
         """EIS definition"""
         Vval = A.process_params["Vval"]
         Tval = A.process_params["Tval"]
@@ -1112,7 +1112,7 @@ class gamry:
         )
         return activeDict
 
-    async def technique_OCV(self, A: cProcess):
+    async def technique_OCV(self, A: Process):
         """OCV definition"""
         Tval = A.process_params["Tval"]
         SampleRate = A.process_params["SampleRate"]
