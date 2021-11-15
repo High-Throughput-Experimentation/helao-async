@@ -58,7 +58,7 @@ from typing import Optional, List, Union
 
 import helaocore.server as hcs
 from helaocore.data import HTELegacyAPI
-from helaocore.schema import cProcess_group
+from helaocore.schema import Sequence
 
 
 class return_sequence_lib(BaseModel):
@@ -462,7 +462,7 @@ class C_async_operator:
         sequence_params["plate_id"] = selplateid
         sequence_params["plate_sample_no"] = selsample
 
-        D = cProcess_group(inputdict={
+        D = Sequence(inputdict={
             # "orch_name":orch_name,
             "sequence_label":sellabel,
             "sequence":selected_sequence,

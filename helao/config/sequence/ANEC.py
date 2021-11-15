@@ -12,7 +12,7 @@ __all__ = ["debug",
 
 from typing import Optional, List, Union
 
-from helaocore.schema import cProcess, cProcess_group, Sequencer
+from helaocore.schema import cProcess, Sequence, Sequencer
 from helaocore.server import process_start_condition
 from helao.library.driver.pal_driver import PALmethods, Spacingmethod, PALtools
 import helaocore.model.sample as hcms
@@ -35,7 +35,7 @@ z_seal = 4.5
 
 
 
-def debug(pg_Obj: cProcess_group, 
+def debug(pg_Obj: Sequence, 
              d_mm: Optional[str] = "1.0", 
              x_mm: Optional[float] = 0.0, 
              y_mm: Optional[float] = 0.0
@@ -88,7 +88,7 @@ def debug(pg_Obj: cProcess_group,
     return process_list
 
 
-def CA(pg_Obj: cProcess_group,
+def CA(pg_Obj: Sequence,
        CA_potential_V: Optional[float] = 0.0,
        CA_duration_sec: Optional[float] = 10.0,
        samplerate_sec: Optional[float] = 1.0,
@@ -131,7 +131,7 @@ def CA(pg_Obj: cProcess_group,
     return process_list
 
 
-def OCV_sqtest(pg_Obj: cProcess_group,
+def OCV_sqtest(pg_Obj: Sequence,
                OCV_duration_sec: Optional[float] = 10.0,
                samplerate_sec: Optional[float] = 1.0,
               ):
@@ -163,7 +163,7 @@ def OCV_sqtest(pg_Obj: cProcess_group,
     return sq.process_list # returns complete process list to orch
 
 
-def CA_sqtest(pg_Obj: cProcess_group,
+def CA_sqtest(pg_Obj: Sequence,
               Ewe_vs_RHE: Optional[float] = 0.0,
               Eref: Optional[float] = 0.2,
               pH: Optional[float] = 10.0,

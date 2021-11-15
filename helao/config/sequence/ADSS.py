@@ -21,7 +21,7 @@ __all__ = ["debug",
 
 from typing import Optional, List, Union
 
-from helaocore.schema import cProcess, cProcess_group, Sequencer
+from helaocore.schema import cProcess, Sequence, Sequencer
 
 from helaocore.server import process_start_condition
 from helao.library.driver.galil_driver import move_modes, transformation_mode
@@ -60,7 +60,7 @@ z_seal = 4.5
 
 
 
-def debug(pg_Obj: cProcess_group, 
+def debug(pg_Obj: Sequence, 
              d_mm: Optional[str] = "1.0", 
              x_mm: Optional[float] = 0.0, 
              y_mm: Optional[float] = 0.0
@@ -113,7 +113,7 @@ def debug(pg_Obj: cProcess_group,
     return process_list
 
 
-def ADSS_slave_startup(pg_Obj: cProcess_group,
+def ADSS_slave_startup(pg_Obj: Sequence,
               x_mm: Optional[float] = 0.0, 
               y_mm: Optional[float] = 0.0,
               ):
@@ -155,7 +155,7 @@ def ADSS_slave_startup(pg_Obj: cProcess_group,
     return process_list
 
 
-def ADSS_slave_shutdown(pg_Obj: cProcess_group):
+def ADSS_slave_shutdown(pg_Obj: Sequence):
     """Slave sequence
     (1) Deep clean PAL tool
     (2) pump liquid out off cell
@@ -255,7 +255,7 @@ def ADSS_slave_shutdown(pg_Obj: cProcess_group):
     return process_list
 
 
-def ADSS_slave_drain(pg_Obj: cProcess_group):
+def ADSS_slave_drain(pg_Obj: Sequence):
     """DUMMY Slave sequence
     Drains electrochemical cell."""
 
@@ -264,7 +264,7 @@ def ADSS_slave_drain(pg_Obj: cProcess_group):
     return process_list
 
 
-def ADSS_slave_engage(pg_Obj: cProcess_group):
+def ADSS_slave_engage(pg_Obj: Sequence):
     """Slave sequence
     Engages and seals electrochemical cell."""
     
@@ -307,7 +307,7 @@ def ADSS_slave_engage(pg_Obj: cProcess_group):
     return process_list
 
 
-def ADSS_slave_disengage(pg_Obj: cProcess_group):
+def ADSS_slave_disengage(pg_Obj: Sequence):
     """Slave sequence
     Disengages and seals electrochemical cell."""
 
@@ -332,7 +332,7 @@ def ADSS_slave_disengage(pg_Obj: cProcess_group):
     return process_list
 
 
-def ADSS_slave_clean_PALtool(pg_Obj: cProcess_group, 
+def ADSS_slave_clean_PALtool(pg_Obj: Sequence, 
                              clean_PAL_tool: Optional[str] = PALtools.LS3, 
                              clean_PAL_volume_ul: Optional[int] = 500
                              ):
@@ -375,7 +375,7 @@ def ADSS_slave_clean_PALtool(pg_Obj: cProcess_group,
     return process_list
 
 
-def ADSS_master_CA(pg_Obj: cProcess_group,
+def ADSS_master_CA(pg_Obj: Sequence,
               x_mm: Optional[float] = 0.0, 
               y_mm: Optional[float] = 0.0,
               liquid_sample_no: Optional[int] = 3,
@@ -527,7 +527,7 @@ def ADSS_master_CA(pg_Obj: cProcess_group,
     return process_list
 
 
-def ADSS_slave_single_CA(pg_Obj: cProcess_group,
+def ADSS_slave_single_CA(pg_Obj: Sequence,
               x_mm: Optional[float] = 0.0, 
               y_mm: Optional[float] = 0.0,
               CA_single_potential: Optional[float] = 0.0,
@@ -667,7 +667,7 @@ def ADSS_slave_single_CA(pg_Obj: cProcess_group,
     return process_list
 
 
-def OCV_sqtest(pg_Obj: cProcess_group,
+def OCV_sqtest(pg_Obj: Sequence,
                OCV_duration_sec: Optional[float] = 10.0,
                samplerate_sec: Optional[float] = 1.0,
               ):
