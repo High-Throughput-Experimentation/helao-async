@@ -140,28 +140,19 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_fill")
         async def PAL_fill(
             request: Request,
-            micropal: Optional[list] = [
-                MicroPalParams(**{
-                "PAL_method":"fill",
-                "PAL_tool":"LS3",
-                "PAL_volume_ul":500,
-                "PAL_requested_source":PAL_position(**{
-                    "position":"elec_res1",
-                    }),
-                "PAL_requested_dest":PAL_position(**{
-                    "position":"lcfc_res",
-                    }),
-                "PAL_wash1":0,
-                "PAL_wash2":0,
-                "PAL_wash3":0,
-                "PAL_wash4":0,
-                }),
-                ],
+            PAL_tool: Optional[PALtools],
+            PAL_source: Optional[dev_customitems],
+            PAL_dest: Optional[dev_customitems],
+            PAL_volume_ul: Optional[int] = 200,
+            PAL_wash1: Optional[bool] = False,
+            PAL_wash2: Optional[bool] = False,
+            PAL_wash3: Optional[bool] = False,
+            PAL_wash4: Optional[bool] = False,
             scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
-            """fills eche"""
             A = await setup_process(request)
-            active_dict = await app.driver.init_PAL_IOloop(A)
+            A.process_abbr = "fill"
+            active_dict = await app.driver.method_fill(A)
             return active_dict
 
 
@@ -169,78 +160,84 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_fillfixed")
         async def PAL_fillfixed(
             request: Request,
-            micropal: Optional[list] = [
-                MicroPalParams(**{
-                "PAL_method":"fillfixed",
-                "PAL_tool":"LS3",
-                "PAL_volume_ul":500,
-                "PAL_requested_source":PAL_position(**{
-                    "position":"elec_res1",
-                    }),
-                "PAL_requested_dest":PAL_position(**{
-                    "position":"lcfc_res",
-                    }),
-                "PAL_wash1":0,
-                "PAL_wash2":0,
-                "PAL_wash3":0,
-                "PAL_wash4":0,
-                }),
-                ],
+            PAL_tool: Optional[PALtools],
+            PAL_source: Optional[dev_customitems],
+            PAL_dest: Optional[dev_customitems],
+            PAL_volume_ul: Optional[int] = 200, # this value is only for prc, a fixed value is used
+            PAL_wash1: Optional[bool] = False,
+            PAL_wash2: Optional[bool] = False,
+            PAL_wash3: Optional[bool] = False,
+            PAL_wash4: Optional[bool] = False,
             scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
-            """fills eche with hardcoded volume"""
             A = await setup_process(request)
-            active_dict = await app.driver.init_PAL_IOloop(A)
+            A.process_abbr = "fillfixed"
+            active_dict = await app.driver.method_fillfixed(A)
             return active_dict
 
 
     if "deepclean" in _cams:
         @app.post(f"/{servKey}/PAL_deepclean")
         async def PAL_deepclean(
-            request: Request, 
-            micropal: Optional[list] = [
-                MicroPalParams(**{
-                "PAL_method":"deepclean",
-                "PAL_tool":"LS3",
-                "PAL_volume_ul":500,
-                "PAL_wash1":1,
-                "PAL_wash2":1,
-                "PAL_wash3":1,
-                "PAL_wash4":1,
-                }),
-                ],
+            request: Request,
+            PAL_tool: Optional[PALtools],
+            PAL_volume_ul: Optional[int] = 200, # this value is only for prc, a fixed value is used
             scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
-            """cleans the PAL tool"""
             A = await setup_process(request)
-            active_dict = await app.driver.init_PAL_IOloop(A)
+            A.process_abbr = "deepclean"
+            active_dict = await app.driver.method_deepclean(A)
             return active_dict
 
 
     if "dilute" in _cams:
         @app.post(f"/{servKey}/PAL_dilute")
         async def PAL_dilute(
-            request: Request, 
-            micropal: Optional[list] = [
-                MicroPalParams(**{
-                "PAL_method":"dilute",
-                "PAL_tool":"LS3",
-                "PAL_volume_ul":500,
-                "PAL_requested_source":PAL_position(**{
-                    "position":"elec_res2",
-                    }),
-                "repeat":1,
-                "PAL_wash1":1,
-                "PAL_wash2":1,
-                "PAL_wash3":1,
-                "PAL_wash4":1,
-                }),
-                ],
+            request: Request,
+            PAL_tool: Optional[PALtools],
+            PAL_source: Optional[dev_customitems],
+            PAL_volume_ul: Optional[int] = 200,
+            PAL_dest_tray: Optional[int] = 0,
+            PAL_dest_slot: Optional[int] = 0,
+            PAL_dest_vial: Optional[int] = 0,
+            PAL_sampleperiod: Optional[List[float]] =  [0.0],
+            PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
+            PAL_spacingfactor: Optional[float] = 1.0,
+            PAL_timeoffset: Optional[float] = 0.0,
+            PAL_wash1: Optional[bool] = True,
+            PAL_wash2: Optional[bool] = True,
+            PAL_wash3: Optional[bool] = True,
+            PAL_wash4: Optional[bool] = True,
             scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             A = await setup_process(request)
-            active_dict = await app.driver.init_PAL_IOloop(A)
+            A.process_abbr = "dilute"
+            active_dict = await app.driver.method_dilute(A)
             return active_dict
+
+
+    if "autodilute" in _cams:
+        @app.post(f"/{servKey}/PAL_autodilute")
+        async def PAL_autodilute(
+            request: Request,
+            PAL_tool: Optional[PALtools],
+            PAL_source: Optional[dev_customitems],
+            PAL_volume_ul: Optional[int] = 200,
+            PAL_sampleperiod: Optional[List[float]] =  [0.0],
+            PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
+            PAL_spacingfactor: Optional[float] = 1.0,
+            PAL_timeoffset: Optional[float] = 0.0,
+            PAL_wash1: Optional[bool] = True,
+            PAL_wash2: Optional[bool] = True,
+            PAL_wash3: Optional[bool] = True,
+            PAL_wash4: Optional[bool] = True,
+            scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+        ):
+            A = await setup_process(request)
+            A.process_abbr = "autodilute"
+            active_dict = await app.driver.method_autodilute(A)
+            return active_dict
+
 
 
     @app.post(f"/{servKey}/archive_tray_reset")

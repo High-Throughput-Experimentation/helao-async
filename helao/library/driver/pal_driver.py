@@ -1659,3 +1659,147 @@ class cPAL:
             A = A,
             PALparams = PALparams,
         )
+
+
+    async def method_fill(self, A: cProcess):
+        PALparams = cPALparams(
+            PAL_sample_in = A.samples_in,
+            PAL_totalruns = 1,
+            PAL_sampleperiod = [],
+            PAL_spacingmethod = Spacingmethod.linear,
+            PAL_spacingfactor = 1.0,
+            PAL_timeoffset = 0.0,
+            micropal = MicroPalParams(**{
+                    "PAL_method":"fill",
+                    "PAL_tool":A.process_params.get("PAL_tool",None),
+                    "PAL_volume_ul":A.process_params.get("PAL_volume_ul",0),
+                    "PAL_requested_source":PAL_position(**{
+                        "position":A.process_params.get("PAL_source",None),
+                        }),
+                    "PAL_requested_dest":PAL_position(**{
+                        "position":A.process_params.get("PAL_dest",None),
+                        }),
+                    "PAL_wash1":A.process_params.get("PAL_wash1",0),
+                    "PAL_wash2":A.process_params.get("PAL_wash2",0),
+                    "PAL_wash3":A.process_params.get("PAL_wash3",0),
+                    "PAL_wash4":A.process_params.get("PAL_wash4",0),
+                    })
+        )
+        return await self._init_PAL_IOloop(
+            A = A,
+            PALparams = PALparams,
+        )
+
+
+    async def method_fillfixed(self, A: cProcess):
+        PALparams = cPALparams(
+            PAL_sample_in = A.samples_in,
+            PAL_totalruns = 1,
+            PAL_sampleperiod = [],
+            PAL_spacingmethod = Spacingmethod.linear,
+            PAL_spacingfactor = 1.0,
+            PAL_timeoffset = 0.0,
+            micropal = MicroPalParams(**{
+                    "PAL_method":"fillfixed",
+                    "PAL_tool":A.process_params.get("PAL_tool",None),
+                    "PAL_volume_ul":A.process_params.get("PAL_volume_ul",0),
+                    "PAL_requested_source":PAL_position(**{
+                        "position":A.process_params.get("PAL_source",None),
+                        }),
+                    "PAL_requested_dest":PAL_position(**{
+                        "position":A.process_params.get("PAL_dest",None),
+                        }),
+                    "PAL_wash1":A.process_params.get("PAL_wash1",0),
+                    "PAL_wash2":A.process_params.get("PAL_wash2",0),
+                    "PAL_wash3":A.process_params.get("PAL_wash3",0),
+                    "PAL_wash4":A.process_params.get("PAL_wash4",0),
+                    })
+        )
+        return await self._init_PAL_IOloop(
+            A = A,
+            PALparams = PALparams,
+        )
+
+
+    async def method_deepclean(self, A: cProcess):
+        PALparams = cPALparams(
+            PAL_sample_in = A.samples_in,
+            PAL_totalruns = 1,
+            PAL_sampleperiod = [],
+            PAL_spacingmethod = Spacingmethod.linear,
+            PAL_spacingfactor = 1.0,
+            PAL_timeoffset = 0.0,
+            micropal = MicroPalParams(**{
+                    "PAL_method":"deepclean",
+                    "PAL_tool":A.process_params.get("PAL_tool",None),
+                    "PAL_volume_ul":A.process_params.get("PAL_volume_ul",0),
+                    "PAL_wash1":1,
+                    "PAL_wash2":1,
+                    "PAL_wash3":1,
+                    "PAL_wash4":1,
+                    })
+        )
+        return await self._init_PAL_IOloop(
+            A = A,
+            PALparams = PALparams,
+        )
+
+
+    async def method_dilute(self, A: cProcess):
+        PALparams = cPALparams(
+            PAL_sample_in = A.samples_in,
+            PAL_totalruns = len(A.process_params.get("PAL_sampleperiod",[])),
+            PAL_sampleperiod = A.process_params.get("PAL_sampleperiod",[]),
+            PAL_spacingmethod = A.process_params.get("PAL_spacingmethod",Spacingmethod.linear),
+            PAL_spacingfactor = A.process_params.get("PAL_spacingfactor",1.0),
+            PAL_timeoffset = A.process_params.get("PAL_timeoffset",0.0),
+            micropal = MicroPalParams(**{
+                    "PAL_method":"dilute",
+                    "PAL_tool":A.process_params.get("PAL_tool",None),
+                    "PAL_volume_ul":A.process_params.get("PAL_volume_ul",0),
+                    "PAL_requested_source":PAL_position(**{
+                        "position":A.process_params.get("PAL_source",None),
+                        }),
+                    "PAL_requested_dest":PAL_position(**{
+                        "position":_positiontype.tray,
+                        "tray":A.process_params.get("PAL_dest_tray",0),
+                        "slot":A.process_params.get("PAL_dest_slot",0),
+                        "vial":A.process_params.get("PAL_dest_vial",0),
+                        }),
+                    "PAL_wash1":A.process_params.get("PAL_wash1",1),
+                    "PAL_wash2":A.process_params.get("PAL_wash2",1),
+                    "PAL_wash3":A.process_params.get("PAL_wash3",1),
+                    "PAL_wash4":A.process_params.get("PAL_wash4",1),
+                    })
+        )
+        return await self._init_PAL_IOloop(
+            A = A,
+            PALparams = PALparams,
+        )
+
+
+    async def method_autodilute(self, A: cProcess):
+        PALparams = cPALparams(
+            PAL_sample_in = A.samples_in,
+            PAL_totalruns = len(A.process_params.get("PAL_sampleperiod",[])),
+            PAL_sampleperiod = A.process_params.get("PAL_sampleperiod",[]),
+            PAL_spacingmethod = A.process_params.get("PAL_spacingmethod",Spacingmethod.linear),
+            PAL_spacingfactor = A.process_params.get("PAL_spacingfactor",1.0),
+            PAL_timeoffset = A.process_params.get("PAL_timeoffset",0.0),
+            micropal = MicroPalParams(**{
+                    "PAL_method":"autodilute",
+                    "PAL_tool":A.process_params.get("PAL_tool",None),
+                    "PAL_volume_ul":A.process_params.get("PAL_volume_ul",0),
+                    "PAL_requested_source":PAL_position(**{
+                        "position":A.process_params.get("PAL_source",None),
+                        }),
+                    "PAL_wash1":A.process_params.get("PAL_wash1",1),
+                    "PAL_wash2":A.process_params.get("PAL_wash2",1),
+                    "PAL_wash3":A.process_params.get("PAL_wash3",1),
+                    "PAL_wash4":A.process_params.get("PAL_wash4",1),
+                    })
+        )
+        return await self._init_PAL_IOloop(
+            A = A,
+            PALparams = PALparams,
+        )
