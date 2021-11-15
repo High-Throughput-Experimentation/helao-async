@@ -1,9 +1,5 @@
 """
-Process library for ADSS (RSHS and ANEC2)
-
-process tuples take the form:
-(process_group__id, server_key, process, param_dict, preemptive, blocking)
-
+Process library for ADSS
 server_key must be a FastAPI process server defined in config
 """
 
