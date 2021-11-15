@@ -562,7 +562,7 @@ class cPAL:
                         process_uuid=self.process.process_uuid,
                         source=source,
                         #volume_ml=micropal.PAL_volume_ul / 1000.0,
-                        process_queue_time=self.process.process_queue_time,
+                        process_timestamp=self.process.process_timestamp,
                         chemical=source_chemical,
                         mass=source_mass,
                         supplier=source_supplier,
@@ -576,7 +576,7 @@ class cPAL:
                         process_uuid=self.process.process_uuid,
                         source=source,
                         #volume_ml=micropal.PAL_volume_ul / 1000.0,
-                        process_queue_time=self.process.process_queue_time,
+                        process_timestamp=self.process.process_timestamp,
                         chemical=source_chemical,
                         mass=source_mass,
                         supplier=source_supplier,
@@ -592,7 +592,7 @@ class cPAL:
                         process_uuid=self.process.process_uuid,
                         source=source,
                         # volume_ml=micropal.PAL_volume_ul / 1000.0,
-                        process_queue_time=self.process.process_queue_time,
+                        process_timestamp=self.process.process_timestamp,
                         # chemical=source_chemical,
                         # mass=source_mass,
                         # supplier=source_supplier,
@@ -618,7 +618,7 @@ class cPAL:
                 source = [sample.get_global_label() for sample in sample_in.samples],
                 sequence_uuid=self.process.sequence_uuid,
                 process_uuid=self.process.process_uuid,
-                process_queue_time=self.process.process_queue_time,
+                process_timestamp=self.process.process_timestamp,
                 ))
         else:
             # this should never happen, else we found a bug
