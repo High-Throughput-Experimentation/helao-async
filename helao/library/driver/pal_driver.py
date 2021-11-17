@@ -130,7 +130,7 @@ class CAMS(Enum):
 class Spacingmethod(str, Enum):
     linear = "linear" # 1, 2, 3, 4, 5, ...
     geometric = "gemoetric" # 1, 2, 4, 8, 16
-    custom = "custom"
+    custom = "custom" # list of absolute times for each run
 #    power = "power"
 #    exponential = "exponential"
 
@@ -488,8 +488,10 @@ class cPAL:
                         self.IO_PALparams.PAL_sample_out.samples.append(sample_out)
 
                     # add sample in to main PALparams
-                    for sample_in in micropal.PAL_sample_in[i_repeat].samples:
-                        self.IO_PALparams.PAL_sample_in.samples.append(sample_in)
+                    if i_repeat == 0 and PALparams.PAL_cur_run == 0:
+                        # only add it for the first run to avoid duplicates
+                        for sample_in in micropal.PAL_sample_in[i_repeat].samples:
+                            self.IO_PALparams.PAL_sample_in.samples.append(sample_in)
 
                     # update the sample volumes
                     await self._sendcommand_update_sample_volume(
@@ -500,9 +502,7 @@ class cPAL:
                     )
 
                     # update all samples also in the local sample sqlite db
-                    if i_repeat == 0 and PALparams.PAL_cur_run == 0:
-                        # only add it for the first run to avoid duplicates
-                        await self.unified_db.update_sample(samples=micropal.PAL_sample_in[i_repeat])
+                    await self.unified_db.update_sample(samples=micropal.PAL_sample_in[i_repeat])
                     await self.unified_db.update_sample(samples=micropal.PAL_sample_out[i_repeat])
 
                     # update the sample position db
@@ -1545,8 +1545,10 @@ class cPAL:
                     await self._PAL_IOloop_meas_start_helper()
 
                     # gets some internal timing references
-                    start_time = time.time()# this is only interal 
-                    last_time = start_time
+                    start_time = time.time() # this is only internal 
+                                             # time when the io loop was
+                                             # started
+                    last_PAL_run_time = start_time # the time of the last PAL run
                     prev_timepoint = 0.0
                     diff_time = 0.0
                     
@@ -1570,17 +1572,21 @@ class cPAL:
                         if self.IO_PALparams.PAL_spacingmethod == Spacingmethod.linear:
                             self.base.print_message(" ... PAL linear scheduling")
                             cur_time = time.time()
-                            diff_time = self.IO_PALparams.PAL_sampleperiod[0]-(cur_time-last_time)-self.IO_PALparams.PAL_timeoffset
+                            self.base.print_message(f"time since last PAL run {(cur_time-last_PAL_run_time)}", info= True)
+                            self.base.print_message(f"requested time between PAL runs {self.IO_PALparams.PAL_sampleperiod[run]-self.IO_PALparams.PAL_timeoffset}", info = True)
+                            diff_time = self.IO_PALparams.PAL_sampleperiod[0]-(cur_time-last_PAL_run_time)-self.IO_PALparams.PAL_timeoffset
                         elif self.IO_PALparams.PAL_spacingmethod == Spacingmethod.geometric:
                             self.base.print_message(" ... PAL geometric scheduling")
                             timepoint = (self.IO_PALparams.PAL_spacingfactor ** run) * self.IO_PALparams.PAL_sampleperiod[0]
-                            diff_time = timepoint-prev_timepoint-(cur_time-last_time)-self.IO_PALparams.PAL_timeoffset
+                            self.base.print_message(f"time since last PAL run {(cur_time-last_PAL_run_time)}", info= True)
+                            self.base.print_message(f"requested time between PAL runs {timepoint-prev_timepoint-self.IO_PALparams.PAL_timeoffset}", info = True)
+                            diff_time = timepoint-prev_timepoint-(cur_time-last_PAL_run_time)-self.IO_PALparams.PAL_timeoffset
                             prev_timepoint = timepoint # todo: consider time lag
                         elif self.IO_PALparams.PAL_spacingmethod == Spacingmethod.custom:
                             self.base.print_message(" ... PAL custom scheduling")
                             cur_time = time.time()
-                            self.base.print_message(f"time since last PAL run {(cur_time-last_time)}", info= True)
-                            self.base.print_message(f"requested wait time until next PAL run {self.IO_PALparams.PAL_sampleperiod[run]-self.IO_PALparams.PAL_timeoffset}", info = True)
+                            self.base.print_message(f"time since PAL start {(cur_time-start_time)}", info= True)
+                            self.base.print_message(f"time for next PAL run since start {self.IO_PALparams.PAL_sampleperiod[run]-self.IO_PALparams.PAL_timeoffset}", info = True)
                             diff_time = self.IO_PALparams.PAL_sampleperiod[run]-(cur_time-start_time)-self.IO_PALparams.PAL_timeoffset
 
 
@@ -1591,7 +1597,7 @@ class cPAL:
 
 
                         # finally submit a single PAL run
-                        last_time = time.time()
+                        last_PAL_run_time = time.time()
                         self.base.print_message(" ... PAL sendcommmand def start")
                         self.IO_error = await self._sendcommand_main(run_PALparams)
                         self.base.print_message(" ... PAL sendcommmand def end")
