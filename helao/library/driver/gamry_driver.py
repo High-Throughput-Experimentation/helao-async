@@ -579,10 +579,14 @@ class gamry:
             self.base.print_message(f"!!! Active process uuid is {self.active.process.process_uuid}")
             # active object is set so we can set the continue flag
             self.IO_continue = True
+            
+            for sample in self.samples_in.samples:
+                sample.status = "preserved"
+                sample.inheritance="allow_both"
+            
             await self.active.append_sample(samples = [sample_in for sample_in in self.samples_in.samples],
-                                            IO="in", 
-                                            status="preserved",
-                                            inheritance="allow_both")
+                                            IO="in"
+                                            )
 
             # TODO:
             # - I/E range: auto, fixed

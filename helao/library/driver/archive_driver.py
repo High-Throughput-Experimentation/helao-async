@@ -25,9 +25,7 @@ class Custom:
         self.custom_name = custom_name
         self.custom_type = custom_type
         self.blocked = False
-        self.vol_ml = 0.0
         self.max_vol_ml = None
-        self.dilution_factor = 1.0
         
         
     def assembly_allowed(self):
@@ -43,14 +41,12 @@ class Custom:
     def unload(self):
         ret_sample = copy.deepcopy(self.sample)
         self.blocked = False
-        self.vol_ml = 0.0
         self.max_vol_ml = None
-        self.dilution_factor = 1.0
         self.sample = hcms.SampleList()
         return ret_sample
 
     
-    def load(self, vol_ml, sample_in:  hcms.SampleList):
+    def load(self, sample_in:  hcms.SampleList):
         if len(self.sample.samples) != 0:
             print_message({}, "archive", "sample already loaded. Unload first to load new one.", error = True) 
             return False, hcms.SampleList()
@@ -61,8 +57,6 @@ class Custom:
         
         self.sample = sample_in
         self.blocked = False
-        self.vol_ml = vol_ml
-        self.dilution_factor = 1.0
         return True, sample_in
 
 
@@ -80,9 +74,7 @@ class VT_template:
         self.max_vol_ml: float = max_vol_ml
         self.vials: List[bool] = [False for i in range(positions)]
         self.blocked: List[bool] = [False for i in range(positions)]
-        self.vol_ml: List[float] = [0.0 for i in range(positions)]
         self.sample: List[hcms.SampleList] = [hcms.SampleList() for i in range(positions)]
-        self.dilution_factor: List[float] = [1.0 for i in range(positions)]
 
 
     def first_empty(self):
@@ -105,27 +97,12 @@ class VT_template:
             except Exception:
                 self.vials[i] = False
 
-    def update_vol(self, vol_dict):
-        for i, vol in enumerate(vol_dict):
-            try:
-                self.vol_ml[i] = float(vol)
-            except Exception:
-                self.vol_ml[i] = 0.0
-
     def update_sample(self, samples):
         for i, sample in enumerate(samples):
             try:
                 self.sample[i] = sample
             except Exception:
                 self.sample[i] = None
-
-
-    def update_dilution_factor(self, samples):
-        for i, df in enumerate(samples):
-            try:
-                self.dilution_factor[i] = float(df)
-            except Exception:
-                self.dilution_factor[i] = 1.0
 
 
     def as_dict(self):
@@ -379,17 +356,22 @@ class Archive():
                         for i, vial in enumerate(self.trays[tray][slot].vials):
                             if tmp_output_str != "":
                                 tmp_output_str += "\n"
+
+                            label = "None"
+                            vol = 0.0
+                            if len(self.trays[tray][slot].sample[i].samples) == 1:
+                                label = self.trays[tray][slot].sample[i].samples[0].get_global_label()
+                                vol = self.trays[tray][slot].sample[i].samples[0].get_vol_ml()
+
                             tmp_output_str += ",".join(
                                 [
                                     str(i + 1),
-                                    str(
-                                        self.trays[tray]
-                                        .slots[slot]
-                                        .sample[i].get_global_label()
-                                    ),
-                                    str(self.trays[tray].slots[slot].vol_ml[i]),
+                                    str(label),
+                                    str(vol),
                                 ]
                             )
+
+
                 await myactive.write_file(
                     file_type = "pal_vialtable_file",
                     filename = f"VialTable__tray{tray}__slot{slot}__{datetime.now().strftime('%Y%m%d.%H%M%S%f')}.csv",
@@ -418,15 +400,17 @@ class Archive():
                         for i, vial in enumerate(self.trays[tray][slot].vials):
                             if tmp_output_str != "":
                                 tmp_output_str += "\n"
-                            if vial is True:
+                            if vial is True \
+                            and len(self.trays[tray][slot].sample[i].samples) == 1:
+
                                 if dilution_factor is None:
-                                    temp_dilution_factor = self.trays[tray][slot].dilution_factor[i]
+                                    temp_dilution_factor = \
+                                    self.trays[tray][slot].sample[i].samples[0].get_dilution_factor()
                                 tmp_output_str += ";".join(
                                     [
                                         str(
-                                            self.trays[tray]
-                                            .slots[slot]
-                                            .sample[i].get_global_label()
+                                            self.trays[tray][slot]
+                                            .sample[i].samples[0].get_global_label()
                                         ),
                                         str(survey_runs),
                                         str(main_runs),
@@ -545,38 +529,25 @@ class Archive():
                                    tray: int, 
                                    slot: int, 
                                    vial: int, 
-                                   vol_ml: float, 
                                    sample: hcms.SampleList,
                                    dilute: bool = False,
                                    *args,**kwargs
                                   ):
+
+        if type(sample) is dict:
+            sample = hcms.SampleList(**sample)
+
+
         vial -= 1
         if tray in self.trays:
             if self.trays[tray] is not None:
                 if slot in self.trays[tray]:
                     if self.trays[tray][slot] is not None:
-                        if self.trays[tray][slot].vials[vial] is not True:
-                            self.trays[tray][slot].vials[vial] = True
-                            self.trays[tray][slot].vol_ml[vial] = vol_ml
-                            self.trays[tray][slot].sample[vial] = sample
-                            self.trays[tray][slot].dilution_factor[vial]  = 1.0
-                            # backup file
-                            self.write_config()
-                            return True
-                        else:
-                            if dilute is True:
-                                self.trays[tray][slot].vials[vial] = True
-                                old_vol = self.trays[tray][slot].vol_ml[vial]
-                                old_df = self.trays[tray][slot].dilution_factor[vial]
-                                tot_vol = old_vol + vol_ml
-                                new_df = tot_vol/(old_vol/old_df)
-                                self.trays[tray][slot].vol_ml[vial] = tot_vol
-                                self.trays[tray][slot].dilution_factor[vial] = new_df
-                                
-                                self.write_config()
-                                return True
-
+                        self.trays[tray][slot].vials[vial] = True
+                        self.trays[tray][slot].sample[vial] = sample
+                        # backup file
                         self.write_config()
+                        return True
 
         return False
 
@@ -588,7 +559,7 @@ class Archive():
             return False
 
 
-    async def custom_get_sample(self, custom: str):
+    async def custom_get_sample(self,custom: str = "", *args, **kwargs):
         sample = hcms.SampleList()
         error = error_codes.none
         
@@ -603,7 +574,6 @@ class Archive():
     async def custom_update_position(
                                      self,
                                      custom: str,
-                                     vol_ml: float,
                                      sample: hcms.SampleList,
                                      dilute: bool = False,
                                      *args,**kwargs
@@ -616,19 +586,7 @@ class Archive():
             and not self.custom_positions[custom].assembly_allowed():
                 return False, hcms.SampleList()
 
-            if dilute:
-                old_vol = self.custom_positions[custom].vol_ml
-                old_df = self.custom_positions[custom].dilution_factor
-                tot_vol = old_vol + vol_ml
-                new_df = tot_vol/(old_vol/old_df)
-                self.custom_positions[custom].dilution_factor = new_df
-                self.custom_positions[custom].vol_ml = tot_vol
-                self.custom_positions[custom].sample = sample
-            else:
-                self.custom_positions[custom].sample = sample
-                self.custom_positions[custom].vol_ml = 0.0
-                self.custom_positions[custom].dilution_factor = 1.0
-            
+            self.custom_positions[custom].sample = sample
             self.write_config()
 
         return True, sample
@@ -669,7 +627,6 @@ class Archive():
     async def custom_load(
                           self,
                           custom: str,
-                          vol_ml: float,
                           load_samples_in: hcms.SampleList,
                           *args, **kwargs
                          ):
@@ -694,7 +651,7 @@ class Archive():
         else:
             if custom in self.custom_positions:
                 loaded, sample = \
-                self.custom_positions[custom].load(vol_ml, load_samples_in)
+                self.custom_positions[custom].load(load_samples_in)
                 customs_dict = self.custom_positions[custom].as_dict()
 
         self.write_config() # save current state of table

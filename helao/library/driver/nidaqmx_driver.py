@@ -434,10 +434,14 @@ class cNIMAX:
                 file_sample_label=file_sample_label,
                 header=None,
             )
+
+            for sample in self.samples_in.samples:
+                sample.status = "preserved"
+                sample.inheritance="allow_both"
+
             await self.active.append_sample(samples = [sample_in for sample_in in self.samples_in.samples],
-                                            IO="in", 
-                                            status="preserved",
-                                            inheritance="allow_both")
+                                            IO="in"
+                                           )
 
             self.base.print_message(f"!!! Active process uuid is {self.active.process.process_uuid}")
 
