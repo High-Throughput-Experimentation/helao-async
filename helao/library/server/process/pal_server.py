@@ -239,6 +239,23 @@ def makeApp(confPrefix, servKey):
             return active_dict
 
 
+    @app.post(f"/{servKey}/archive_tray_get_sample")
+    async def archive_tray_get_sample(request: Request, 
+                                      tray: Optional[int] = None,
+                                      slot: Optional[int] = None,
+                                      vial: Optional[int] = None,
+                                     ):
+        A = await setup_process(request)
+        active = await app.base.contain_process(A, 
+                                       file_data_keys=["sample", "error_code"])
+        error, sample = \
+            await app.driver.archive.tray_get_sample(**A.process_params)
+        await active.enqueue_data({'sample': sample.dict(),
+                                   'error_code':error})
+        finished_process = await active.finish()
+        return finished_process.as_dict()
+
+
 
     @app.post(f"/{servKey}/archive_tray_reset")
     async def archive_tray_reset(request: Request):
@@ -268,11 +285,11 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/archive_tray_update_position")
     async def archive_tray_update_position(
         request: Request, 
-        vial: Optional[int] = None,
-        vol_ml: Optional[float] = None,
-        liquid_sample_no: Optional[int] = None,
+        sample: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
         tray: Optional[int] = None,
-        slot: Optional[int] = None
+        slot: Optional[int] = None,
+        vial: Optional[int] = None,
+        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
         """Updates app.driver vial Table. If sucessful (vial-slot was empty) returns True, else it returns False."""
         A = await setup_process(request)
@@ -343,11 +360,10 @@ def makeApp(confPrefix, servKey):
         return finished_process.as_dict()
 
 
-    @app.post(f"/{servKey}/archive_load_custom")
-    async def archive_load_custom(
+    @app.post(f"/{servKey}/archive_custom_load")
+    async def archive_custom_load(
                                   request: Request,
                                   custom: Optional[dev_customitems],
-                                  vol_ml: Optional[float] = 0.0,
                                   load_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
                                   scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                                  ):
@@ -365,8 +381,8 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
 
-    @app.post(f"/{servKey}/archive_unload_custom")
-    async def archive_unload_custom(
+    @app.post(f"/{servKey}/archive_custom_unload")
+    async def archive_custom_unload(
                                     request: Request,
                                     custom: Optional[dev_customitems],
                                    ):
@@ -385,8 +401,8 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
 
-    @app.post(f"/{servKey}/archive_unloadall_custom")
-    async def archive_unloadall_custom(request: Request):
+    @app.post(f"/{servKey}/archive_custom_unloadall")
+    async def archive_custom_unloadall(request: Request):
         A = await setup_process(request)
         active = await app.base.contain_process(A, file_data_keys=
                                                 ["unloaded","customs_dict"])
@@ -400,6 +416,23 @@ def makeApp(confPrefix, servKey):
                                    "customs_dict": customs_dict})
         finished_act = await active.finish()
         return finished_act.as_dict()
+
+
+    @app.post(f"/{servKey}/archive_custom_get_sample")
+    async def archive_custom_get_sample(request: Request, 
+                                        custom: Optional[dev_customitems],
+                                        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+                                       ):
+        A = await setup_process(request)
+        active = await app.base.contain_process(A, 
+                                       file_data_keys=["sample", "error_code"])
+        error, sample = \
+            await app.driver.archive.custom_get_sample(**A.process_params)
+        await active.enqueue_data({'sample': sample.dict(),
+                                   'error_code':error})
+        finished_process = await active.finish()
+        return finished_process.as_dict()
+
 
 
     @app.post(f"/{servKey}/get_sample")
