@@ -42,30 +42,30 @@ def makeApp(confPrefix, servKey):
 
 
     dev_pump = app.server_params.get("dev_pump",dict())
-    dev_pumpitems = make_str_enum("dev_pump",{key:key for key in dev_pump.keys()})
+    dev_pumpitems = make_str_enum("dev_pump",{key:key for key in dev_pump})
 
 
     dev_gasvalve = app.server_params.get("dev_gasvalve",dict())
-    dev_gasvalveitems = make_str_enum("dev_gasvalve",{key:key for key in dev_gasvalve.keys()})
+    dev_gasvalveitems = make_str_enum("dev_gasvalve",{key:key for key in dev_gasvalve})
     
     dev_liquidvalve = app.server_params.get("dev_liquidvalve",dict())
-    dev_liquidvalveitems = make_str_enum("dev_liquidvalve",{key:key for key in dev_liquidvalve.keys()})
+    dev_liquidvalveitems = make_str_enum("dev_liquidvalve",{key:key for key in dev_liquidvalve})
     
     dev_led = app.server_params.get("dev_led",dict())
-    dev_leditems = make_str_enum("dev_led",{key:key for key in dev_led.keys()})
+    dev_leditems = make_str_enum("dev_led",{key:key for key in dev_led})
     
     dev_fswbcd = app.server_params.get("dev_fswbcd",dict())
-    dev_fswbcditems = make_str_enum("dev_fswbcd",{key:key for key in dev_fswbcd.keys()})
+    dev_fswbcditems = make_str_enum("dev_fswbcd",{key:key for key in dev_fswbcd})
     dev_cellcurrent = app.server_params.get("dev_cellcurrent",dict())
-    # dev_cellcurrentitems = make_str_enum("dev_cellcurrent",{key:key for key in dev_cellcurrent.keys()})
+    # dev_cellcurrentitems = make_str_enum("dev_cellcurrent",{key:key for key in dev_cellcurrent})
     dev_cellvoltage = app.server_params.get("dev_cellvoltage",dict())
-    # dev_cellvoltageitems = make_str_enum("dev_cellvoltage",{key:key for key in dev_cellvoltage.keys()})
+    # dev_cellvoltageitems = make_str_enum("dev_cellvoltage",{key:key for key in dev_cellvoltage})
     dev_activecell = app.server_params.get("dev_activecell",dict())
-    dev_activecellitems = make_str_enum("dev_activecell",{key:key for key in dev_activecell.keys()})
+    dev_activecellitems = make_str_enum("dev_activecell",{key:key for key in dev_activecell})
     dev_mastercell = app.server_params.get("dev_mastercell",dict())
-    dev_mastercellitems = make_str_enum("dev_mastercell",{key:key for key in dev_mastercell.keys()})
+    dev_mastercellitems = make_str_enum("dev_mastercell",{key:key for key in dev_mastercell})
     dev_fsw = app.server_params.get("dev_fsw",dict())
-    dev_fswitems = make_str_enum("dev_fsw",{key:key for key in dev_fsw.keys()})
+    dev_fswitems = make_str_enum("dev_fsw",{key:key for key in dev_fsw})
     # dev_RSHTTLhandshake = app.server_params.get("dev_RSHTTLhandshake",dict())
     
 
