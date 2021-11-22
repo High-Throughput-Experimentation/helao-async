@@ -121,7 +121,7 @@ class Pidd:
 
     def kill_server(self, k):
         self.load_global()  # reload in case any servers were appended
-        if k not in self.d.keys():
+        if k not in self.d:
             print_message({}, "launcher", f"Server '{k}' not found in pid dict.")
             return True
         else:
@@ -180,16 +180,16 @@ class Pidd:
 
 
 def validateConfig(PIDD, confDict):
-    if len(confDict["servers"].keys()) != len(set(confDict["servers"].keys())):
+    if len(confDict["servers"]) != len(set(confDict["servers"])):
         print_message({}, "launcher", "Server keys are not unique.")
         return False
-    if "servers" not in confDict.keys():
+    if "servers" not in confDict:
         print_message({}, "launcher", "'servers' key not defined in config dictionary.")
         return False
-    for server in confDict["servers"].keys():
+    for server in confDict["servers"]:
         serverDict = confDict["servers"][server]
-        hasKeys = [k in serverDict.keys() for k in PIDD.reqKeys]
-        hasCode = [k for k in serverDict.keys() if k in PIDD.codeKeys]
+        hasKeys = [k in serverDict for k in PIDD.reqKeys]
+        hasCode = [k for k in serverDict if k in PIDD.codeKeys]
         if not all(hasKeys):
             print_message({}, "launcher", 
                 f"{server} config is missing {[k for k,b in zip(PIDD.reqKeys, hasKeys) if b]}."
@@ -285,7 +285,7 @@ def launcher(confPrefix, confDict):
             G = pidd.A[group]
             for server in G:
                 S = G[server]
-                codeKey = [k for k in S.keys() if k in pidd.codeKeys]
+                codeKey = [k for k in S if k in pidd.codeKeys]
                 if codeKey:
                     codeKey = codeKey[0]
                     servPy = S[codeKey]

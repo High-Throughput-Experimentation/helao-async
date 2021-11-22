@@ -239,7 +239,7 @@ class gamry:
             if p.info["name"].startswith("GamryCom")
         }
 
-        for pid in pyPids.keys():
+        for pid in pyPids:
             self.base.print_message(f" ... killing GamryCom on PID: {pid}")
             p = psutil.Process(pid)
             for _ in range(3):

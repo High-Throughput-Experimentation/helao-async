@@ -16,7 +16,7 @@ def makeApp(confPrefix, servKey):
     S = C[servKey]
 
     # check if 'mode' setting is present
-    if not 'mode' in S.keys():
+    if not 'mode' in S:
         print('"mode" not defined, switching to legacy mode.')
         S['mode']= "legacy"
 

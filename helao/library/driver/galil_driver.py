@@ -124,18 +124,18 @@ class galil:
         # local buffer for motion data streaming
         # nees to be upated by every motion function
         # self.wsmotordata_buffer = dict(
-        #     axis=[ax for ax in self.config_dict["axis_id"].keys()],
+        #     axis=[ax for ax in self.config_dict["axis_id"]],
         #     axisid=[axisid for _, axisid in self.config_dict["axis_id"].items()],
-        #     motor_status=["stopped" for ax in self.config_dict["axis_id"].keys()],
-        #     err_code=[0 for ax in self.config_dict["axis_id"].keys()],
-        #     position=[0.0 for ax in self.config_dict["axis_id"].keys()],
+        #     motor_status=["stopped" for ax in self.config_dict["axis_id"]],
+        #     err_code=[0 for ax in self.config_dict["axis_id"]],
+        #     position=[0.0 for ax in self.config_dict["axis_id"]],
         #     platexy=[0.0, 0.0, 1],
         # )
 
 
     # def update_wsmotorbufferall(self, datakey, dataitems):
     #     pass
-        # if datakey in self.wsmotordata_buffer.keys():
+        # if datakey in self.wsmotordata_buffer:
         #     self.wsmotordata_buffer[datakey] = dataitems
 
         # # update plateposition
@@ -150,7 +150,7 @@ class galil:
 
     # def update_wsmotorbuffersingle(self, datakey, ax, item):
     #     pass
-        # if datakey in self.wsmotordata_buffer.keys():
+        # if datakey in self.wsmotordata_buffer:
         #     if ax in self.wsmotordata_buffer["axis"]:
         #         idx = self.wsmotordata_buffer["axis"].index(ax)
         #         self.wsmotordata_buffer[datakey][idx] = item
@@ -467,7 +467,7 @@ class galil:
 
             # first we check if we have the right axis specified
             # if 1:
-            if ax in self.config_dict["axis_id"].keys():
+            if ax in self.config_dict["axis_id"]:
                 axl = self.config_dict["axis_id"][ax]
             else:
                 ret_moved_axis.append(None)
@@ -671,7 +671,7 @@ class galil:
         axlett = "ABCDEFGH"
         axlett = axlett[0 : len(q.split(","))]
         inv_axis_id = {d: v for v, d in self.config_dict["axis_id"].items()}
-        ax_abc_to_xyz = {l: inv_axis_id[l] for i, l in enumerate(axlett) if l in inv_axis_id.keys()}
+        ax_abc_to_xyz = {l: inv_axis_id[l] for i, l in enumerate(axlett) if l in inv_axis_id}
         # this puts the counts back to motor mm
         pos = {
             axl: float(r) * self.config_dict["count_to_mm"].get(axl,0)
@@ -682,7 +682,7 @@ class galil:
         ret_ax = []
         ret_position = []
         for ax in axis:
-            if ax in axpos.keys():
+            if ax in axpos:
                 # self.update_wsmotorbuffersingle("position", ax, axpos[ax])
                 ret_ax.append(ax)
                 ret_position.append(axpos[ax])
@@ -704,7 +704,7 @@ class galil:
         ret_err_code = []
         qdict = dict(zip(axlett, q.split(", ")))
         for ax in axis:
-            if ax in self.config_dict["axis_id"].keys():
+            if ax in self.config_dict["axis_id"]:
                 axl = self.config_dict["axis_id"].get(ax, None)
                 if axl in qdict:
                     r = qdict[axl]
@@ -780,7 +780,7 @@ class galil:
         if type(axis) is not list:
             axis = [axis]
         for ax in axis:
-            if ax in self.config_dict["axis_id"].keys():
+            if ax in self.config_dict["axis_id"]:
                 axl = self.config_dict["axis_id"][ax]
                 self.c(f"ST{axl}")
 
@@ -803,7 +803,7 @@ class galil:
 
         for ax in axis:
 
-            if ax in self.config_dict["axis_id"].keys():
+            if ax in self.config_dict["axis_id"]:
                 axl = self.config_dict["axis_id"][ax]
             else:
                 continue
@@ -834,7 +834,7 @@ class galil:
 
         for ax in axis:
 
-            if ax in self.config_dict["axis_id"].keys():
+            if ax in self.config_dict["axis_id"]:
                 axl = self.config_dict["axis_id"][ax]
             else:
                 continue
@@ -857,7 +857,7 @@ class galil:
                             *args,**kwargs):
         err_code = error_codes.none
         ret = None
-        if port in self.config_dict["Ain_id"].keys():
+        if port in self.config_dict["Ain_id"]:
             pID = self.config_dict["Ain_id"][port]
             ret = self.c(f"@AN[{int(pID)}]")
         else:
@@ -878,7 +878,7 @@ class galil:
                              *args,**kwargs):
         err_code = error_codes.none
         ret = None
-        if port in self.config_dict["Din_id"].keys():
+        if port in self.config_dict["Din_id"]:
             pID = self.config_dict["Din_id"][port]
             ret = self.c(f"@IN[{int(pID)}]")
         else:
@@ -899,7 +899,7 @@ class galil:
                               *args,**kwargs):
         err_code = error_codes.none
         ret = None
-        if port in self.config_dict["Dout_id"].keys():
+        if port in self.config_dict["Dout_id"]:
             pID = self.config_dict["Dout_id"][port]
             ret = self.c(f"@OUT[{int(pID)}]")
         else:
@@ -946,7 +946,7 @@ class galil:
         err_code = error_codes.none
         on = bool(on)
         ret = None
-        if port in self.config_dict["Dout_id"].keys():
+        if port in self.config_dict["Dout_id"]:
             pID = self.config_dict["Dout_id"][port]
             if on:
                 _ = self.c(f"SB {int(pID)}")
@@ -1007,19 +1007,19 @@ class galil:
         self.cycle_lights = False
 
     async def get_all_axis(self):
-        return [ax for ax in self.config_dict["axis_id"].keys()]
+        return [ax for ax in self.config_dict["axis_id"]]
 
     async def get_all_digital_out(self):
-        return [port for port in self.config_dict["Dout_id"].keys()]
+        return [port for port in self.config_dict["Dout_id"]]
 
     async def get_all_digital_in(self):
-        return [port for port in self.config_dict["Din_id"].keys()]
+        return [port for port in self.config_dict["Din_id"]]
 
     async def get_all_analog_out(self):
-        return [port for port in self.config_dict["Aout_id"].keys()]
+        return [port for port in self.config_dict["Aout_id"]]
 
     async def get_all_analog_in(self):
-        return [port for port in self.config_dict["Ain_id"].keys()]
+        return [port for port in self.config_dict["Ain_id"]]
 
     def shutdown_event(self):
         # this gets called when the server is shut down or reloaded to ensure a clean
@@ -1262,7 +1262,7 @@ class transformxy:
                 False  # to check against when common combinations are already found
             )
             axstr = ""
-            for ax in self.seq.keys():
+            for ax in self.seq:
                 axstr += ax
             # check for xyz or xy (with no z)
             # sequence does not matter so should define it like this in the config
@@ -1272,7 +1272,7 @@ class transformxy:
                 self.Minstr = self.Minstrxyz
                 Mcommon1 = True
 
-            for ax in self.seq.keys():
+            for ax in self.seq:
                 if ax == "x" and not Mcommon1:
                     self.base.print_message(" ... got x seq")
                     self.Minstr = np.dot(self.Minstr, self.Mx())

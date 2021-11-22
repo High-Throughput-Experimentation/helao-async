@@ -107,17 +107,17 @@ class C_async_operator:
         self.vis.doc.add_next_tick_callback(partial(self.get_processes))
         self.vis.doc.add_next_tick_callback(partial(self.get_active_processes))
 
-        #self.vis.print_message([key for key in self.sequence_list.keys()])
+        #self.vis.print_message([key for key in self.sequence_list])
         self.sequence_source = ColumnDataSource(data=self.sequence_list)
-        self.columns_dec = [TableColumn(field=key, title=key) for key in self.sequence_list.keys()]
+        self.columns_dec = [TableColumn(field=key, title=key) for key in self.sequence_list]
         self.sequence_table = DataTable(source=self.sequence_source, columns=self.columns_dec, width=620, height=200)
 
         self.process_source = ColumnDataSource(data=self.process_list)
-        self.columns_process = [TableColumn(field=key, title=key) for key in self.process_list.keys()]
+        self.columns_process = [TableColumn(field=key, title=key) for key in self.process_list]
         self.process_table = DataTable(source=self.process_source, columns=self.columns_process, width=620, height=200)
 
         self.active_process_source = ColumnDataSource(data=self.active_process_list)
-        self.columns_active_process = [TableColumn(field=key, title=key) for key in self.active_process_list.keys()]
+        self.columns_active_process = [TableColumn(field=key, title=key) for key in self.active_process_list]
         self.active_process_table = DataTable(source=self.active_process_source, columns=self.columns_active_process, width=620, height=200)
 
 
@@ -233,7 +233,7 @@ class C_async_operator:
     def get_sequences(self):
         """Return the current list of sequences."""
         self.sequences = []
-        self.vis.print_message(f" ... found sequence: {[sequence for sequence in self.sequence_lib.keys()]}")
+        self.vis.print_message(f" ... found sequence: {[sequence for sequence in self.sequence_lib]}")
         for i, sequence in enumerate(self.sequence_lib):
             # self.vis.print_message('full',inspect.getfullargspec(self.sequence_lib[sequence]))
             #self.vis.print_message('anno',inspect.getfullargspec(self.sequence_lib[sequence]).annotations)
@@ -272,7 +272,7 @@ class C_async_operator:
         response = response["sequences"]
         self.sequence_list = dict()
         if len(response):
-            for key in response[0].keys():
+            for key in response[0]:
                 self.sequence_list[key] = []
             for line in response:
                 for key, value in line.items():
@@ -286,7 +286,7 @@ class C_async_operator:
         response = response["processes"]
         self.process_list = dict()
         if len(response):
-            for key in response[0].keys():
+            for key in response[0]:
                 self.process_list[key] = []
             for line in response:
                 for key, value in line.items():
@@ -300,7 +300,7 @@ class C_async_operator:
         response = response["processes"]
         self.active_process_list = dict()
         if len(response):
-            for key in response[0].keys():
+            for key in response[0]:
                 self.active_process_list[key] = []
             for line in response:
                 for key, value in line.items():
@@ -662,15 +662,15 @@ class C_async_operator:
 
 
 
-        self.columns_dec = [TableColumn(field=key, title=key) for key in self.sequence_list.keys()]
+        self.columns_dec = [TableColumn(field=key, title=key) for key in self.sequence_list]
         self.sequence_table.source.data = self.sequence_list
         self.sequence_table.columns=self.columns_dec
 
-        self.columns_process = [TableColumn(field=key, title=key) for key in self.process_list.keys()]
+        self.columns_process = [TableColumn(field=key, title=key) for key in self.process_list]
         self.process_table.source.data=self.process_list
         self.process_table.columns=self.columns_process
 
-        self.columns_active_process = [TableColumn(field=key, title=key) for key in self.active_process_list.keys()]
+        self.columns_active_process = [TableColumn(field=key, title=key) for key in self.active_process_list]
         self.active_process_table.source.data=self.active_process_list
         self.active_process_table.columns=self.columns_active_process
 

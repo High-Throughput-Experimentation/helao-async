@@ -34,13 +34,13 @@ class cNIMAX:
 
 
         self.dev_pump = self.config_dict.get("dev_pump",dict())
-        self.dev_pumpitems = make_str_enum("dev_pump",{key:key for key in self.dev_pump.keys()})
+        self.dev_pumpitems = make_str_enum("dev_pump",{key:key for key in self.dev_pump})
         
         self.dev_gasvalve = self.config_dict.get("dev_gasvalve",dict())
-        self.dev_gasvalveitems = make_str_enum("dev_gasvalve",{key:key for key in self.dev_gasvalve.keys()})
+        self.dev_gasvalveitems = make_str_enum("dev_gasvalve",{key:key for key in self.dev_gasvalve})
         
         self.dev_liquidvalve = self.config_dict.get("dev_liquidvalve",dict())
-        self.dev_liquidvalveitems = make_str_enum("dev_liquidvalve",{key:key for key in self.dev_liquidvalve.keys()})
+        self.dev_liquidvalveitems = make_str_enum("dev_liquidvalve",{key:key for key in self.dev_liquidvalve})
 
         self.base.print_message(" ... init NI-MAX")
 

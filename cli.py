@@ -52,7 +52,7 @@ def load_config(confPrefix):
         for server in G:
             cmdDict[server] = {}
             S = G[server]
-            codeKey = [k for k in S.keys() if k == "fast"]
+            codeKey = [k for k in S if k == "fast"]
             if codeKey:
                 codeKey = codeKey[0]
                 endpoints = requests.post(
@@ -75,10 +75,10 @@ def parse_input(string, cmdDict, confDict, pidd):
     if head == 'help':
         server = body.partition(" ")[0]
         command = body.partition(" ")[-1]
-        if server in cmdDict.keys():
-            if command in cmdDict[server].keys():
+        if server in cmdDict:
+            if command in cmdDict[server]:
                 print(Fore.YELLOW + f"'{command}' calls {cmdDict[server][command]['path']}")
-                if 'params' in cmdDict[server][command].keys():
+                if 'params' in cmdDict[server][command]:
                     print(Fore.YELLOW + f" with 'params' json dict: ")
                     print(Style.RESET_ALL)
                     pprint(cmdDict[server][command]['params'])
@@ -103,11 +103,11 @@ def parse_input(string, cmdDict, confDict, pidd):
         if server == '':
             print(Fore.YELLOW + f"valid server commands for '{confPrefix}':")
             print(Fore.RESET + "\n".join(sorted(
-                [f"{srv} {cmd}" for srv in cmdDict.keys() for cmd in cmdDict[srv].keys()])))
-        elif server in cmdDict.keys():
+                [f"{srv} {cmd}" for srv in cmdDict for cmd in cmdDict[srv]])))
+        elif server in cmdDict:
             print(Fore.YELLOW + f"valid '{server}' processes:")
             print(Fore.RESET + "\n".join(sorted(
-                [f"{server} {cmd}" for cmd in cmdDict[server].keys()])))
+                [f"{server} {cmd}" for cmd in cmdDict[server]])))
         else:
             print(Fore.YELLOW +
                   f"'{server}' not listed in configuration '{confPrefix}'")
@@ -128,9 +128,9 @@ def parse_input(string, cmdDict, confDict, pidd):
             print(Fore.YELLOW + f"'hotkey requires 1 or 2 motor|I/O servers to control'")
         else:
             ioServ = [k for k in cmdDict.keys(
-            ) if 'set_digital_out_on' in cmdDict[k].keys() and k in [server1, server2]]
+            ) if 'set_digital_out_on' in cmdDict[k] and k in [server1, server2]]
             motorServ = [k for k in cmdDict.keys(
-            ) if 'move_live' in cmdDict[k].keys() and k in [server1, server2]]
+            ) if 'move_live' in cmdDict[k] and k in [server1, server2]]
             if ioServ:
                 ioServ = ioServ[0]
                 print(Fore.YELLOW +
@@ -146,11 +146,11 @@ def parse_input(string, cmdDict, confDict, pidd):
             hotkey_control(motorServ, ioServ)
     else:
         server = head
-        if server in cmdDict.keys():
+        if server in cmdDict:
             command = body.partition(" ")[0]
             pars = body.partition(" ")[-1]
             paramDict = json.loads(pars)
-            if command in cmdDict[server].keys():
+            if command in cmdDict[server]:
                 S = munchify(confDict["servers"][server])
                 resp = requests.post(
                     cmdDict[server][command]['path'], params=paramDict).json()
