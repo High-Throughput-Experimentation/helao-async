@@ -1,4 +1,3 @@
-
 __all__ = ["makeApp"]
 
 
@@ -105,7 +104,6 @@ def makeApp(confPrefix, servKey):
             PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
             PAL_spacingfactor: Optional[float] = 1.0,
             PAL_timeoffset: Optional[float] = 0.0,
-            # scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             """universal pal process"""
             A = await setup_process(request)
@@ -148,7 +146,6 @@ def makeApp(confPrefix, servKey):
             PAL_wash2: Optional[bool] = False,
             PAL_wash3: Optional[bool] = False,
             PAL_wash4: Optional[bool] = False,
-            scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             A = await setup_process(request)
             A.process_abbr = "fill"
@@ -168,7 +165,6 @@ def makeApp(confPrefix, servKey):
             PAL_wash2: Optional[bool] = False,
             PAL_wash3: Optional[bool] = False,
             PAL_wash4: Optional[bool] = False,
-            scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             A = await setup_process(request)
             A.process_abbr = "fillfixed"
@@ -182,7 +178,6 @@ def makeApp(confPrefix, servKey):
             request: Request,
             PAL_tool: Optional[PALtools],
             PAL_volume_ul: Optional[int] = 200, # this value is only for prc, a fixed value is used
-            scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             A = await setup_process(request)
             A.process_abbr = "deepclean"
@@ -239,30 +234,73 @@ def makeApp(confPrefix, servKey):
             return active_dict
 
 
-    @app.post(f"/{servKey}/archive_tray_get_sample")
-    async def archive_tray_get_sample(request: Request, 
+    @app.post(f"/{servKey}/archive_tray_query_sample")
+    async def archive_tray_query_sample(request: Request, 
                                       tray: Optional[int] = None,
                                       slot: Optional[int] = None,
                                       vial: Optional[int] = None,
                                      ):
         A = await setup_process(request)
+        A.process_abbr = "query_sample"
         active = await app.base.contain_process(A, 
                                        file_data_keys=["sample", "error_code"])
         error, sample = \
-            await app.driver.archive.tray_get_sample(**A.process_params)
+            await app.driver.archive.tray_query_sample(**A.process_params)
+
+        await active.append_sample(samples = [sample for sample in sample.samples],
+                            IO="in"
+                           )
         await active.enqueue_data({'sample': sample.dict(),
                                    'error_code':error})
         finished_process = await active.finish()
         return finished_process.as_dict()
 
 
-
-    @app.post(f"/{servKey}/archive_tray_reset")
-    async def archive_tray_reset(request: Request):
+    @app.post(f"/{servKey}/archive_tray_unloadall")
+    async def archive_tray_unloadall(request: Request):
         """Resets app.driver vial table."""
         A = await setup_process(request)
-        active = await app.base.contain_process(A, file_data_keys="trays")
-        await active.enqueue_data({"trays": await app.driver.archive.reset_trays(**A.process_params)})
+        A.process_abbr = "unload_sample"
+        active = await app.base.contain_process(A, file_data_keys=
+                                                ["unloaded","tray_dict"])
+        unloaded, sample_in, sample_out, tray_dict = \
+            await app.driver.archive.tray_unloadall(**A.process_params)
+        if unloaded:
+            await active.append_sample(
+                  samples = [sample for sample in sample_in.samples],
+                  IO="in")
+            await active.append_sample(
+                  samples = [sample for sample in sample_out.samples],
+                  IO="out")
+        await active.enqueue_data({"unloaded": unloaded,
+                                   "tray_dict": tray_dict})
+        finished_act = await active.finish()
+        return finished_act.as_dict()
+
+
+
+    @app.post(f"/{servKey}/archive_tray_unload")
+    async def archive_tray_unload(
+                                  request: Request,
+                                  tray: Optional[int] = None, 
+                                  slot: Optional[int] = None
+                                 ):
+        """Resets app.driver vial table."""
+        A = await setup_process(request)
+        A.process_abbr = "unload_sample"
+        active = await app.base.contain_process(A, file_data_keys=
+                                                ["unloaded","tray_dict"])
+        unloaded, sample_in, sample_out, tray_dict = \
+            await app.driver.archive.tray_unload(**A.process_params)
+        if unloaded:
+            await active.append_sample(
+                  samples = [sample for sample in sample_in.samples],
+                  IO="in")
+            await active.append_sample(
+                  samples = [sample for sample in sample_out.samples],
+                  IO="out")
+        await active.enqueue_data({"unloaded": unloaded,
+                                   "tray_dict": tray_dict})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -368,6 +406,7 @@ def makeApp(confPrefix, servKey):
                                   scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                                  ):
         A = await setup_process(request)
+        A.process_abbr = "load_sample"
         active = await app.base.contain_process(A, file_data_keys=
                                                 ["loaded","customs_dict"])
         loaded, loaded_sample, customs_dict = await app.driver.archive.custom_load(**A.process_params)
@@ -387,13 +426,17 @@ def makeApp(confPrefix, servKey):
                                     custom: Optional[dev_customitems],
                                    ):
         A = await setup_process(request)
+        A.process_abbr = "unload_sample"
         active = await app.base.contain_process(A, file_data_keys=
                                                 ["unloaded","customs_dict"])
-        unloaded, unloaded_sample, customs_dict = \
+        unloaded, sample_in, sample_out, customs_dict = \
             await app.driver.archive.custom_unload(**A.process_params)
         if unloaded:
             await active.append_sample(
-                  samples = [sample for sample in unloaded_sample.samples],
+                  samples = [sample for sample in sample_in.samples],
+                  IO="in")
+            await active.append_sample(
+                  samples = [sample for sample in sample_out.samples],
                   IO="out")
         await active.enqueue_data({"unloaded": unloaded,
                                    "customs_dict": customs_dict})
@@ -404,13 +447,17 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/archive_custom_unloadall")
     async def archive_custom_unloadall(request: Request):
         A = await setup_process(request)
+        A.process_abbr = "unload_sample"
         active = await app.base.contain_process(A, file_data_keys=
                                                 ["unloaded","customs_dict"])
-        unloaded, unloaded_sample, customs_dict = \
+        unloaded, sample_in, sample_out, customs_dict = \
             await app.driver.archive.custom_unloadall(**A.process_params)
         if unloaded:
             await active.append_sample(
-                  samples = [sample for sample in unloaded_sample.samples],
+                  samples = [sample for sample in sample_in.samples],
+                  IO="in")
+            await active.append_sample(
+                  samples = [sample for sample in sample_out.samples],
                   IO="out")
         await active.enqueue_data({"unloaded": unloaded,
                                    "customs_dict": customs_dict})
@@ -418,21 +465,23 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
 
-    @app.post(f"/{servKey}/archive_custom_get_sample")
-    async def archive_custom_get_sample(request: Request, 
+    @app.post(f"/{servKey}/archive_custom_query_sample")
+    async def archive_custom_query_sample(request: Request, 
                                         custom: Optional[dev_customitems],
-                                        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                                        ):
         A = await setup_process(request)
+        A.process_abbr = "query_sample"
         active = await app.base.contain_process(A, 
                                        file_data_keys=["sample", "error_code"])
         error, sample = \
-            await app.driver.archive.custom_get_sample(**A.process_params)
+            await app.driver.archive.custom_query_sample(**A.process_params)
+        await active.append_sample(samples = [sample for sample in sample.samples],
+                            IO="in"
+                           )
         await active.enqueue_data({'sample': sample.dict(),
                                    'error_code':error})
         finished_process = await active.finish()
         return finished_process.as_dict()
-
 
 
     @app.post(f"/{servKey}/get_sample")

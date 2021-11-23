@@ -1,5 +1,3 @@
-
-
 __all__ = ["Archive"]
 
 import asyncio
@@ -32,7 +30,27 @@ class Custom:
         if self.custom_type == "cell":
             return True
         elif self.custom_type == "reservoir":
+            return False
+        else:
+            print_message({}, "archive", f"invalid 'custom_type': {self.custom_type}", error = True)                
+            return False
+
+
+    def dilution_allowed(self):
+        if self.custom_type == "cell":
             return True
+        elif self.custom_type == "reservoir":
+            return False
+        else:
+            print_message({}, "archive", f"invalid 'custom_type': {self.custom_type}", error = True)                
+            return False
+
+
+    def dest_allowed(self):
+        if self.custom_type == "cell":
+            return True
+        elif self.custom_type == "reservoir":
+            return False
         else:
             print_message({}, "archive", f"invalid 'custom_type': {self.custom_type}", error = True)                
             return False
@@ -47,7 +65,7 @@ class Custom:
 
     
     def load(self, sample_in:  hcms.SampleList):
-        if len(self.sample.samples) != 0:
+        if self.sample.samples:
             print_message({}, "archive", "sample already loaded. Unload first to load new one.", error = True) 
             return False, hcms.SampleList()
 
@@ -55,9 +73,10 @@ class Custom:
             print_message({}, "archive", "Can only load one sample", error = True) 
             return False, hcms.SampleList()
         
-        self.sample = sample_in
+        self.sample = copy.deepcopy(sample_in)
         self.blocked = False
-        return True, sample_in
+        print_message({}, "archive", f"loaded sample {sample_in.samples[0].global_label}", info = True) 
+        return True, copy.deepcopy(sample_in)
 
 
     def as_dict(self):
@@ -70,23 +89,26 @@ class Custom:
     
 class VT_template:
     def __init__(self, max_vol_ml: float = 0.0, VTtype: str = "", positions: int = 0):
-        self.type: str = VTtype
-        self.max_vol_ml: float = max_vol_ml
-        self.vials: List[bool] = [False for i in range(positions)]
-        self.blocked: List[bool] = [False for i in range(positions)]
-        self.sample: List[hcms.SampleList] = [hcms.SampleList() for i in range(positions)]
+        self.init_max_vol_ml = max_vol_ml
+        self.init_VTtype = VTtype
+        self.init_positions = positions
+        self.reset_tray()
+
+    def reset_tray(self):
+        self.type = self.init_VTtype
+        self.max_vol_ml: float = self.init_max_vol_ml
+        self.vials: List[bool] = [False for i in range(self.init_positions)]
+        self.blocked: List[bool] = [False for i in range(self.init_positions)]
+        self.sample: List[hcms.SampleList] = [hcms.SampleList() for i in range(self.init_positions)]
 
 
     def first_empty(self):
-        # res = next((i for i, j in enumerate(self.vials) if not j), None)
         res = next((i for i, j in enumerate(self.vials) if not j and not self.blocked[i]), None)
-        # print ("The values till first True value : " + str(res))
         return res
     
 
     def first_full(self):
         res = next((i for i, j in enumerate(self.vials) if j), None)
-        # print ("The values till first False value : " + str(res))
         return res
 
 
@@ -100,7 +122,7 @@ class VT_template:
     def update_sample(self, samples):
         for i, sample in enumerate(samples):
             try:
-                self.sample[i] = sample
+                self.sample[i] = copy.deepcopy(sample)
             except Exception:
                 self.sample[i] = None
 
@@ -112,6 +134,16 @@ class VT_template:
         ret_dict["sample"] = [sample.dict() for sample in self.sample]
         return ret_dict
 
+    def unload(self):
+        ret_sample = hcms.SampleList()
+        for samplelist in self.sample:
+            for sample in samplelist.samples:
+                ret_sample.samples.append(copy.deepcopy(sample))
+        
+        self.reset_tray()
+        return ret_sample
+
+        
 
 class VT15(VT_template):
     def __init__(self, max_vol_ml: float = 10.0):
@@ -182,7 +214,7 @@ class Archive():
                     break
                 else:
                     if len(tray) == len(self.startup_trays[i]):
-                        for slot in tray.keys():
+                        for slot in tray:
                             if slot not in self.startup_trays[i]:
                                 self.base.print_message("slot not present", error = True)
                                 failed = True
@@ -200,9 +232,6 @@ class Archive():
         else:
             self.base.print_message("not the same length", error = True)
             failed = True
-
-
-
 
         if failed:
             self.base.print_message("trays did not match", error = True)
@@ -297,47 +326,66 @@ class Archive():
         
 
     def load_config(self):
-        filehandler = open(self.archivepck, "rb")
-        data = pickle.load(filehandler)
-        self.trays = data.get("trays", [])
-        self.custom_positions = data.get("customs", {})
-        filehandler.close()
+        with open(self.archivepck, "rb") as f:
+            data = pickle.load(f)
+            self.trays = data.get("trays", [])
+            self.custom_positions = data.get("customs", {})
         
 
         
     def write_config(self):
         data = {"customs":self.custom_positions, "trays":self.trays}
-        filehandler = open(self.archivepck, "wb")
-        pickle.dump(data, filehandler)
-        filehandler.close()
+        with open(self.archivepck, "wb") as f:
+            pickle.dump(data, f)
 
 
-    async def trays_to_dict(self):
-        traydict = copy.deepcopy(self.trays)
-        for tray_key, tray_item in traydict.items():
-            self.base.print_message(tray_key, tray_item)
+    async def tray_unload(self, tray, slot, *args, **kwargs):
+        samples = hcms.SampleList()
+        unloaded = False
+        tray_dict = dict()
+
+        if tray in self.trays:
+            if self.trays[tray] is not None:
+                if slot in self.trays[tray]:
+                    if self.trays[tray][slot] is not None:
+                        unloaded = True
+                        tray_dict[tray] = dict()
+                        tray_dict[tray].update({slot:self.trays[tray][slot].as_dict()})
+                        samples = self.trays[tray][slot].unload()
+        self.write_config() # save current state of table
+        sample_in, sample_out = await self.unpack_samples(samples = samples)
+        return unloaded, sample_in, sample_out, tray_dict
+
+
+    async def tray_unloadall(self, *args, **kwargs):
+        tray_dict = dict()#copy.deepcopy(self.trays)
+        samples = hcms.SampleList()
+        for tray_key, tray_item in self.trays.items():
             if tray_item is not None:
                 for slot_key, slot_item in tray_item.items():
-                    self.base.print_message(slot_key, slot_item)
                     if slot_item is not None:
-                        tray_item[slot_key] = slot_item.as_dict()
-        return traydict
+                        # first get content as dicy
+                        tray_dict[tray_key] = dict()
+                        tray_dict[tray_key].update({slot_key:slot_item.as_dict()})
+                        # then unload (which resets the slot)
+                        _samples = slot_item.unload()
+                        for sample in _samples.samples:
+                            samples.samples.append(sample)
+                    
+        self.write_config() # save current state of table
+        sample_in, sample_out = await self.unpack_samples(samples = samples)
+        return True, sample_in, sample_out, tray_dict
 
-
-    async def reset_trays(self, *args, **kwargs):
-        # resets PAL table
-        ret = await self.trays_to_dict()
-        self.trays = copy.deepcopy(self.startup_trays)
-        return ret
     
     
     async def tray_export_json(self, tray, slot, *args,**kwargs):
         self.write_config()
 
         if tray in self.trays:
-            if slot in self.trays[tray]:
-                if self.trays[tray][slot] is not None:
-                    return self.trays[tray][slot].as_dict()
+            if self.trays[tray] is not None:
+                if slot in self.trays[tray]:
+                    if self.trays[tray][slot] is not None:
+                        return self.trays[tray][slot].as_dict()
 
     
     async def tray_export_csv(
@@ -429,7 +477,7 @@ class Archive():
                     )
                 
                 
-    async def tray_get_sample(self, tray: int, slot: int, vial: int):
+    async def tray_query_sample(self, tray: int, slot: int, vial: int):
         vial -= 1
         sample = hcms.SampleList()
         error = error_codes.not_available
@@ -441,7 +489,7 @@ class Archive():
                     if self.trays[tray][slot] is not None:
                         error = error_codes.none
                         if self.trays[tray][slot].vials[vial] is not False:
-                            sample = self.trays[tray][slot].sample[vial]
+                            sample = copy.deepcopy(self.trays[tray][slot].sample[vial])
                             
 
         return error, sample
@@ -462,7 +510,7 @@ class Archive():
             new_vial_vol = float("inf")
             
             
-            for tray_no in sorted(self.trays.keys()):
+            for tray_no in sorted(self.trays):
                 if self.trays[tray_no] is not None:
                     for slot_no in sorted(self.trays[tray_no]):
                         if self.trays[tray_no][slot_no] is not None:
@@ -483,18 +531,25 @@ class Archive():
 
 
     async def tray_get_next_full(self, 
-                                 after_tray: int = -1, 
-                                 after_slot: int = -1, 
-                                 after_vial: int = -1
+                                 after_tray: int = None, 
+                                 after_slot: int = None, 
+                                 after_vial: int = None
                                 ):
 
         """Finds the next full vial after the current vial position
         defined in micropal."""
+        if after_tray is None:
+            after_tray = -1
+        if after_slot is None:
+            after_slot = -1
+        if after_vial is None:
+            after_vial = -1
+            
         new_tray = None
         new_slot = None
         new_vial = None
         after_vial -= 1;
-        for tray_no in sorted(self.trays.keys()):
+        for tray_no in sorted(self.trays):
             if self.trays[tray_no] is not None:
                 if tray_no < after_tray:
                     continue
@@ -537,6 +592,9 @@ class Archive():
         if type(sample) is dict:
             sample = hcms.SampleList(**sample)
 
+        if len(sample.samples) > 1:
+            print_message({}, "archive", "tray_update_position: sample_list contains more than one sample. Only using first one.", error = True)
+            sample = hcms.SampleList(samples = [sample.samples[0]])
 
         vial -= 1
         if tray in self.trays:
@@ -559,12 +617,26 @@ class Archive():
             return False
 
 
-    async def custom_get_sample(self,custom: str = "", *args, **kwargs):
+    def custom_dest_allowed(self, custom: str):
+        if custom in self.custom_positions:
+            return self.custom_positions[custom].dest_allowed()
+        else:
+            return False
+
+
+    def custom_dilution_allowed(self, custom: str):
+        if custom in self.custom_positions:
+            return self.custom_positions[custom].dilution_allowed()
+        else:
+            return False
+
+
+    async def custom_query_sample(self,custom: str, *args, **kwargs):
         sample = hcms.SampleList()
         error = error_codes.none
         
         if custom in self.custom_positions:
-            sample = self.custom_positions[custom].sample
+            sample = copy.deepcopy(self.custom_positions[custom].sample)
         else:
             error = error_codes.not_available
 
@@ -579,6 +651,12 @@ class Archive():
                                      *args,**kwargs
                                     ):
 
+
+        if len(sample.samples) > 1:
+            print_message({}, "archive", "custom_update_position: sample_list contains more than one sample. Only using first one.", error = True)
+            sample = hcms.SampleList(samples = [sample.samples[0]])
+
+
         if custom in self.custom_positions:
             if len(sample.samples) > 1:
                 return False, hcms.SampleList()
@@ -586,7 +664,7 @@ class Archive():
             and not self.custom_positions[custom].assembly_allowed():
                 return False, hcms.SampleList()
 
-            self.custom_positions[custom].sample = sample
+            self.custom_positions[custom].sample = copy.deepcopy(sample)
             self.write_config()
 
         return True, sample
@@ -594,7 +672,7 @@ class Archive():
 
     async def customs_to_dict(self):
         customdict = copy.deepcopy(self.custom_positions)
-        for custom_key in customdict.keys():
+        for custom_key in customdict:
             customdict[custom_key] = customdict[custom_key].as_dict()
         return customdict
 
@@ -608,10 +686,11 @@ class Archive():
                 samples.samples.append(sample)
         
         self.write_config() # save current state of table
-        return True, samples, customs_dict
+        sample_in, sample_out = await self.unpack_samples(samples = samples)
+        return True, sample_in, sample_out, customs_dict
 
 
-    async def custom_unload(self, custom: str = "", *args, **kwargs):
+    async def custom_unload(self, custom: str, *args, **kwargs):
         sample = hcms.SampleList()
         unloaded = False
         customs_dict = dict()
@@ -621,7 +700,8 @@ class Archive():
             unloaded = True
         
         self.write_config() # save current state of table
-        return unloaded, sample, customs_dict
+        sample_in, sample_out = await self.unpack_samples(samples = sample)
+        return unloaded, sample_in, sample_out, customs_dict
 
 
     async def custom_load(
@@ -641,7 +721,7 @@ class Archive():
         # check if sample actually exists
         load_samples_in = await self.unified_db.get_sample(load_samples_in)
         if load_samples_in.samples[0] is None:
-            print_message({}, "archive", "Sample does not exist in DB.", error = True) 
+            print_message({}, "archive", "Sample does not exist in DB.", error = True)
             return False, hcms.SampleList(), dict()
 
 
@@ -656,3 +736,22 @@ class Archive():
 
         self.write_config() # save current state of table
         return loaded, sample, customs_dict
+
+
+    async def unpack_samples(self, samples: hcms.SampleList):
+        ret_samples_in = hcms.SampleList()
+        ret_samples_out = hcms.SampleList()
+        for sample in samples.samples:
+            if isinstance(sample, hcms.AssemblySample):
+                sample.inheritance = "allow_both"
+                sample.status = "destroyed"
+                ret_samples_in.samples.append(sample)
+                for part in sample.parts:
+                    part.inheritance = "allow_both"
+                    part.status = "recovered"
+                    ret_samples_out.samples.append(part)
+            else:
+                sample.inheritance = "allow_both"
+                sample.status = "preserved"
+                ret_samples_in.samples.append(sample)
+        return ret_samples_in, ret_samples_out

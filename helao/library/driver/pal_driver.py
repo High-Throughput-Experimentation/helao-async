@@ -1,4 +1,3 @@
-
 __all__ = ["Spacingmethod",
            "PALtools",
            "PAL_position",
@@ -9,25 +8,14 @@ import asyncio
 import os
 import paramiko
 import time
-from datetime import datetime
-from time import strftime
-import json
-import aiofiles
 import copy
-import pyaml
-from typing import Optional, List, Union
-# from socket import gethostname
+from typing import List, Union
 from pydantic import BaseModel
 from pydantic import validator
-# from typing import List
-# import pickle
-# import re
 
 from helaocore.schema import Process
 from helaocore.server import Base
 from helaocore.error import error_codes
-from helao.library.driver.HTEdata_legacy import LocalDataHandler
-# from helaocore.data import LiquidSampleAPI, OldLiquidSampleAPI
 
 import helaocore.data as hcd
 import helaocore.model.sample as hcms
@@ -97,7 +85,7 @@ class CAMS(Enum):
                 file_name = "lcfc_fill.cam", # from config later
                 sample_out_type = _sampletype.liquid,
                 source = _positiontype.custom,
-                dest = _positiontype.next_empty_vial,
+                dest = _positiontype.custom,
              )
 
     test = _cam(name="test",
@@ -173,7 +161,8 @@ class MicroPalParams(BaseModel):
     PAL_runtime_dest: List[PAL_position] = []
     PAL_runtime_source: List[PAL_position] = []
 
-    dilute: List[bool] = []
+    dilute: List[List[bool]] = []
+    dilute_type: List[List[str]] = []
     PAL_sample_in_delta_vol_ml: List[List[float]] = [] # contains a list of
                                                        # delta volumes
                                                        # for sample_in
@@ -199,7 +188,6 @@ class MicroPalParams(BaseModel):
 class cPALparams(BaseModel):
     PAL_sample_in: hcms.SampleList = hcms.SampleList()
     PAL_sample_out: hcms.SampleList = hcms.SampleList()
-    # PAL_sample_out_ref: hcms.SampleList = hcms.SampleList()
     
     micropal: Union[List[MicroPalParams],MicroPalParams]  = [MicroPalParams]
 
@@ -223,7 +211,6 @@ class cPALparams(BaseModel):
 
 
 class cPAL:
-    # def __init__(self, config_dict, stat, C, servkey):
     def __init__(self, process_serv: Base):
         
         self.base = process_serv
@@ -300,10 +287,6 @@ class cPAL:
         # check for that to return FASTapi post
         self.IO_continue = False
         self.IO_error = error_codes.none
-        # self.IO_datafile = LocalDataHandler()
-        # self.liquid_sample_prc = LocalDataHandler()
-
-        # self.runparams = process_runparams
 
         myloop = asyncio.get_event_loop()
         # add meas IOloop
@@ -344,12 +327,6 @@ class cPAL:
             self.cams = None
 
         self.palauxheader = ["Date", "Method", "Tool", "Source", "DestinationTray", "DestinationSlot", "DestinationVial", "Volume"]
-
-
-
-    async def convert_olddb_to_sqllite(self):
-        pass
-        # await self.sqlite_liquid_sample_API.old_jsondb_to_sqlitedb()
                 
 
     async def _poll_start(self):
@@ -433,10 +410,6 @@ class cPAL:
             self.base.print_message(" ... PAL method already in progress.", error = True)
             activeDict = A.as_dict()
             error = error_codes.in_progress
-        # else:
-        #     self.base.print_message(" ... PAL method not defined", error = True)
-        #     activeDict = A.as_dict()
-        #     error = error_codes.not_available
 
         activeDict["data"] = {"error_code": error}
         activeDict["error_code"] = error
@@ -477,6 +450,7 @@ class cPAL:
                     # only samples in sample_out should be new ones (ref samples)
                     # convert these to real samples by adding them to the db
                     for sample_out in micropal.PAL_sample_out[i_repeat].samples:
+                        self.base.print_message(f" converting ref sample {sample_out} to real sample", info = True)
                         # update sample creation time
                         sample_out.sample_creation_timecode = micropal.PAL_continue_time
                         # add sample to db
@@ -494,11 +468,13 @@ class cPAL:
                             self.IO_PALparams.PAL_sample_in.samples.append(sample_in)
 
                     # update the sample volumes
+                    # (needed only for input samples, samples_out are always
+                    # new samples)
                     await self._sendcommand_update_sample_volume(
                               samples = micropal.PAL_sample_in[i_repeat],
                               delta_vol_ml = micropal.PAL_sample_in_delta_vol_ml[i_repeat],
                               dilute = micropal.dilute[i_repeat],
-                              sample_type = micropal.cam.sample_out_type
+                              sample_type = micropal.dilute_type[i_repeat]
                     )
 
                     # update all samples also in the local sample sqlite db
@@ -562,7 +538,7 @@ class cPAL:
         error = error_codes.none
         sample = hcms.SampleList()
 
-        if len(sample_in.samples) == 0:
+        if not sample_in.samples:
             self.base.print_message(" ... no sample_in to create sample_out", error = True)
             error = error_codes.not_available
         elif len(sample_in.samples) == 1:
@@ -577,13 +553,13 @@ class cPAL:
             self.base.print_message(f" ... source_supplier: {source_supplier}")
             self.base.print_message(f" ... source_lotnumber: {source_lotnumber}")
 
-            if sample_out_type == "liquid":
-                # this is a sample reference, it needs to be added to the db later
+            if sample_out_type == _sampletype.liquid:
+                # this is a sample reference, it needs to be added
+                # to the db later
                 sample.samples.append(hcms.LiquidSample(
                         sequence_uuid=self.process.sequence_uuid,
                         process_uuid=self.process.process_uuid,
                         source=source,
-                        #volume_ml=micropal.PAL_volume_ul / 1000.0,
                         process_timestamp=self.process.process_timestamp,
                         chemical=source_chemical,
                         mass=source_mass,
@@ -592,12 +568,11 @@ class cPAL:
                         status="created",
                         inheritance="receive_only"
                         ))
-            elif sample_out_type == "gas":
+            elif sample_out_type == _sampletype.gas:
                 sample.samples.append(hcms.GasSample(
                         sequence_uuid=self.process.sequence_uuid,
                         process_uuid=self.process.process_uuid,
                         source=source,
-                        #volume_ml=micropal.PAL_volume_ul / 1000.0,
                         process_timestamp=self.process.process_timestamp,
                         chemical=source_chemical,
                         mass=source_mass,
@@ -606,19 +581,14 @@ class cPAL:
                         status="created",
                         inheritance="receive_only"
                         ))
-            elif sample_out_type == "assembly":
+            elif sample_out_type == _sampletype.assembly:
                 sample.samples.append(hcms.AssemblySample(
                         parts = [sample for sample in sample_in.samples],
                         sample_position = sample_position,
                         sequence_uuid=self.process.sequence_uuid,
                         process_uuid=self.process.process_uuid,
                         source=source,
-                        # volume_ml=micropal.PAL_volume_ul / 1000.0,
                         process_timestamp=self.process.process_timestamp,
-                        # chemical=source_chemical,
-                        # mass=source_mass,
-                        # supplier=source_supplier,
-                        # lot_number=source_lotnumber,
                         status="created",
                         inheritance="receive_only"
                         ))
@@ -656,9 +626,6 @@ class cPAL:
                                           after_slot:int,
                                           after_vial:int,
                                          ):
-
-               
-
         error = error_codes.none
         tray_pos = None
         slot_pos = None
@@ -687,7 +654,7 @@ class cPAL:
 
             # need to get the sample which is currently in this vial
             # and also add it to global samples_in
-            error, sample = await self.archive.tray_get_sample(
+            error, sample = await self.archive.tray_query_sample(
                                                          tray = tray_pos,
                                                          slot = slot_pos,
                                                          vial = vial_pos
@@ -734,23 +701,23 @@ class cPAL:
         # check against desired source type
         if micropal.cam.source == _positiontype.tray:
             source = _positiontype.tray # should be the same as micropal.PAL_requested_source.position
-            error, sample_in = await self.archive.tray_get_sample(
+            error, sample_in = await self.archive.tray_query_sample(
                     micropal.PAL_requested_source.tray,
                     micropal.PAL_requested_source.slot,
                     micropal.PAL_requested_source.vial
                     )
 
             if error != error_codes.none:
-                self.base.print_message("Requested tray position does not exist.", error = True)
+                self.base.print_message("PAL_source: Requested tray position does not exist.", error = True)
                 return error_codes.critical
 
             if len(sample_in.samples) > 1:
-                self.base.print_message("More then one sample in source position. This is not allowed.", error = True)
+                self.base.print_message("PAL_source: More then one sample in source position. This is not allowed.", error = True)
                 return error_codes.critical
 
 
-            if len(sample_in.samples) == 0:
-                self.base.print_message(f"No sample in tray {micropal.PAL_requested_source.tray}, slot {micropal.PAL_requested_source.slot}, vial {micropal.PAL_requested_source.vial}", error = True)
+            if not sample_in.samples:
+                self.base.print_message(f"PAL_source: No sample in tray {micropal.PAL_requested_source.tray}, slot {micropal.PAL_requested_source.slot}, vial {micropal.PAL_requested_source.vial}", error = True)
                 return error_codes.not_available
             
             source_tray = micropal.PAL_requested_source.tray
@@ -762,23 +729,24 @@ class cPAL:
         elif micropal.cam.source == _positiontype.custom:
             source = micropal.PAL_requested_source.position # custom position name
             if source is None:
-                self.base.print_message("Innvalid PAL source 'NONE' for 'custom' position method.", error = True)
+                self.base.print_message("PAL_source: Invalid PAL source 'NONE' for 'custom' position method.", error = True)
                 return error_codes.not_available
 
-            error, sample_in = await self.archive.custom_get_sample(micropal.PAL_requested_source.position)
+            error, sample_in = await self.archive.custom_query_sample(micropal.PAL_requested_source.position)
             if error != error_codes.none:
-                self.base.print_message("Requested custom position does not exist.", error = True)
+                self.base.print_message("PAL_source: Requested custom position does not exist.", error = True)
                 return error_codes.critical
             if len(sample_in.samples) > 1:
-                self.base.print_message("More then one sample in source position. This is not allowed.", error = True)
+                self.base.print_message("PAL_source: More then one sample in source position. This is not allowed.", error = True)
                 return error_codes.critical
-            if len(sample_in.samples) == 0:
-                self.base.print_message(f"No sample in custom position '{source}'", error = True)
+            if not sample_in.samples:
+                self.base.print_message(f"PAL_source: No sample in custom position '{source}'", error = True)
                 return error_codes.not_available
+
                     
 
         elif micropal.cam.source == _positiontype.next_empty_vial:
-            self.base.print_message("PAL source cannot be 'next_empty_vial'", error = True)
+            self.base.print_message("PAL_source: PAL source cannot be 'next_empty_vial'", error = True)
             return error_codes.not_available
 
 
@@ -791,10 +759,10 @@ class cPAL:
                                   after_vial = micropal.PAL_requested_source.vial,
                                                  )
             if error != error_codes.none:
-                self.base.print_message("No next full vial", error = True)
+                self.base.print_message("PAL_source: No next full vial", error = True)
                 return error_codes.not_available
             if len(sample_in.samples) > 1:
-                self.base.print_message("More then one sample in source position. This is not allowed.", error = True)
+                self.base.print_message("PAL_source: More then one sample in source position. This is not allowed.", error = True)
                 return error_codes.critical
 
             # Set requested position to new position.
@@ -805,7 +773,8 @@ class cPAL:
             micropal.PAL_requested_source.vial = source_vial
 
 
-
+        self.base.print_message(f"PAL_source: Got sample '{sample_in.samples[0].global_label}' in position '{source}'", info = True)
+ 
         # done with checking source type
         # setting inheritance and status to None for all samples
         # in sample_in (will be updated when dest is decided)
@@ -839,6 +808,9 @@ class cPAL:
         )
         micropal.PAL_sample_in.append(sample_in)
         micropal.PAL_sample_in_delta_vol_ml.append(sample_in_delta_vol_ml)
+        micropal.dilute.append([False]) # initial source is not diluted
+        micropal.dilute_type.append([None])
+        
         return error_codes.none
 
 
@@ -859,7 +831,6 @@ class cPAL:
         dest_tray = None
         dest_slot = None
         dest_vial = None
-        dilute = False
 
 
         ######################################################################
@@ -867,27 +838,27 @@ class cPAL:
         ######################################################################
         if micropal.cam.dest == _positiontype.tray:
             dest = _positiontype.tray
-            error, sample_in = await self.archive.tray_get_sample(  
+            error, sample_in = await self.archive.tray_query_sample(  
                     micropal.PAL_requested_dest.tray,
                     micropal.PAL_requested_dest.slot,
                     micropal.PAL_requested_dest.vial
                     )
 
             if error != error_codes.none:
-                self.base.print_message("Requested tray position does not exist.", error = True)
+                self.base.print_message("PAL_dest: Requested tray position does not exist.", error = True)
                 return error_codes.critical
 
             if len(sample_in.samples) > 1:
-                self.base.print_message("More then one sample in destination position. This is not allowed.", error = True)
+                self.base.print_message("PAL_dest: More then one sample in destination position. This is not allowed.", error = True)
                 return error_codes.critical
                 
 
             # check if a sample is present in destination
-            if len(sample_in.samples) == 0:
+            if not sample_in.samples:
                 # no sample in dest, create a new sample reference
-                self.base.print_message(f"No sample in tray {micropal.PAL_requested_dest.tray}, slot {micropal.PAL_requested_dest.slot}, vial {micropal.PAL_requested_dest.vial}", info = True)
-                if len(micropal.PAL_sample_in[-1].samples > 1):
-                    self.base.print_message(f"Found a BUG: Assembly not allowed for PAL dest '{dest}' for 'tray' position method.", error = True)
+                self.base.print_message(f"PAL_dest: No sample in tray {micropal.PAL_requested_dest.tray}, slot {micropal.PAL_requested_dest.slot}, vial {micropal.PAL_requested_dest.vial}", info = True)
+                if len(micropal.PAL_sample_in[-1].samples) > 1:
+                    self.base.print_message(f"PAL_dest: Found a BUG: Assembly not allowed for PAL dest '{dest}' for 'tray' position method.", error = True)
                     return error_codes.bug      
                 
                 
@@ -910,7 +881,7 @@ class cPAL:
             else:
                 # a sample is already present in the tray position
                 # we add more sample to it, e.g. dilute it
-                dilute = True # TODO, will calculate a dilution factor when updating position table
+                self.base.print_message(f"PAL_dest: Got sample '{sample_in.samples[0].global_label}' in position '{dest}'", info = True)
                 dest_sample = sample_in
                 for sample in sample_in.samples:
                     # we can only add liquid to vials (diluite them, no assembly here)
@@ -919,6 +890,9 @@ class cPAL:
                     # add that sample to the current sample_in list
                     micropal.PAL_sample_in[-1].samples.append(sample)
                     micropal.PAL_sample_in_delta_vol_ml[-1].append(micropal.PAL_volume_ul / 1000.0)
+                    micropal.dilute[-1].append(True)
+                    micropal.dilute_type[-1].append(sample.sample_type)
+
 
 
             dest_tray = micropal.PAL_requested_dest.tray
@@ -931,25 +905,30 @@ class cPAL:
         elif micropal.cam.dest == _positiontype.custom:
             dest = micropal.PAL_requested_dest.position
             if dest is None:
-                self.base.print_message("Innvalid PAL dest 'NONE' for 'custom' position method.", error = True)
-                return error_codes.not_available
+                self.base.print_message("PAL_dest: Invalid PAL dest 'NONE' for 'custom' position method.", error = True)
+                return error_codes.critical
 
-            error, sample_in = await self.archive.custom_get_sample(dest)
+            if not self.archive.custom_dest_allowed(dest):
+                self.base.print_message(f"PAL_dest: custom position '{dest}' cannot be dest.", error = True)
+                return error_codes.critical
+
+
+            error, sample_in = await self.archive.custom_query_sample(dest)
             if error != error_codes.none:
-                self.base.print_message(f"Innvalid PAL dest '{dest}' for 'custom' position method.", error = True)
+                self.base.print_message(f"PAL_dest: Invalid PAL dest '{dest}' for 'custom' position method.", error = True)
                 return error
             if len(sample_in.samples) > 1:
-                self.base.print_message("More then one sample on destination position. This is not allowed,", error = True)
+                self.base.print_message("PAL_dest: More then one sample on destination position. This is not allowed,", error = True)
                 return error_codes.critical
 
             # check if a sample is already present in the custom position
-            if len(sample_in.samples) == 0:
+            if not sample_in.samples:
                 # no sample in custom position, create a new sample reference
-                self.base.print_message(f"No sample in custom position '{dest}', creating new sample reference.", info = True)
+                self.base.print_message(f"PAL_dest: No sample in custom position '{dest}', creating new sample reference.", info = True)
                 
                 # cannot create an assembly
-                if len(micropal.PAL_sample_in[-1].samples > 1):
-                    self.base.print_message("Found a BUG: Too many input samples. Cannot create an assembly here.", error = True)
+                if len(micropal.PAL_sample_in[-1].samples) > 1:
+                    self.base.print_message("PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here.", error = True)
                     return error_codes.bug
 
                 # this should actually never create an assembly
@@ -972,9 +951,10 @@ class cPAL:
                 # sample is already present
                 # either create an assembly or dilute it
                 # first check what type is present
+                self.base.print_message(f"PAL_dest: Got sample '{sample_in.samples[0].global_label}' in position '{dest}'", info = True)
 
 
-                if sample_in.samples[0].sample_type == "assembly":
+                if isinstance(sample_in.samples[0], hcms.AssemblySample):
                     # need to check if we already go the same type in
                     # the assembly and then would dilute too
                     # else we add a new sample to that assembly
@@ -982,40 +962,31 @@ class cPAL:
 
                     # source input should only hold a single sample
                     # but better check for sure
-                    if len(micropal.PAL_sample_in[-1].samples > 1):
-                        self.base.print_message("Found a BUG: Too many input samples. Cannot create an assembly here.", error = True)
+                    if len(micropal.PAL_sample_in[-1].samples) > 1:
+                        self.base.print_message("PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here.", error = True)
                         return error_codes.bug
 
 
 
                     test = False
-                    if micropal.PAL_sample_in[-1].samples[0].sample_type == "liquid":
+                    if isinstance(micropal.PAL_sample_in[-1].samples[0], hcms.LiquidSample):
                         test = await self._sendcommand_check_for_assemblytypes(
-                            sample_type = "liquid",
+                            sample_type = _sampletype.liquid,
                             assembly = sample_in.samples[0]
                             )
-                    elif micropal.PAL_sample_in[-1].sample_type == "solid":
+                    elif isinstance(micropal.PAL_sample_in[-1].samples[0], hcms.SolidSample):
                         test = False # always add it as a new part
-                        # test = await self._sendcommand_check_for_assemblytypes(
-                        #     sample_type = "solid",
-                        #     assembly = sample_in.samples[0]
-                        #     )
-                    elif micropal.PAL_sample_in[-1].sample_type == "gas":
+                    elif isinstance(micropal.PAL_sample_in[-1].samples[0], hcms.GasSample):
                         test = await self._sendcommand_check_for_assemblytypes(
-                            sample_type = "gas",
+                            sample_type = _sampletype.gas,
                             assembly = sample_in.samples[0]
                             )
                     else:
-                        self.base.print_message("Found a BUG: unsupported sample type.", error = True)
+                        self.base.print_message("PAL_dest: Found a BUG: unsupported sample type.", error = True)
                         return error_codes.bug
 
                     if test is True:
                         # we dilute the assembly sample
-                        
-                        # if micropal.PAL_sample_in[-1].samples[0].sample_type == "liquid":
-                        dilute = True # will calculate a dilution factor
-                                      # when updating position table
-
                         dest_sample = sample_in
                         for sample in sample_in.samples:
                             # we can only add liquid to vials 
@@ -1024,12 +995,13 @@ class cPAL:
                             sample.status = "preserved"
                             micropal.PAL_sample_in[-1].samples.append(sample)
                             micropal.PAL_sample_in_delta_vol_ml[-1].append(micropal.PAL_volume_ul / 1000.0)
-                        
+                            micropal.dilute[-1].append(True)
+                            micropal.dilute_type[-1].append( micropal.PAL_sample_in[-1].samples[0].sample_type)
                     else:
                         # add a new part to assembly
-                        self.base.print_message("Adding new part to assembly", info = True)
-                        if len(micropal.PAL_sample_in[-1].samples > 1):
-                            self.base.print_message(f"Found a BUG: Assembly not allowed for PAL dest '{dest}' for 'tray' position method.", error = True)
+                        self.base.print_message("PAL_dest: Adding new part to assembly", info = True)
+                        if len(micropal.PAL_sample_in[-1].samples) > 1:
+                            self.base.print_message(f"PAL_dest: Found a BUG: Assembly not allowed for PAL dest '{dest}' for 'tray' position method.", error = True)
                             return error_codes.bug      
                         
                         
@@ -1066,11 +1038,9 @@ class cPAL:
 
 
 
-                elif sample_in.samples[0].sample_type == micropal.PAL_sample_in[-1].sample_type:
+                elif sample_in.samples[0].sample_type == micropal.PAL_sample_in[-1].samples[0].sample_type:
                     # we dilute it if its the same sample type
                     # (and not an assembly),
-                    dilute = True # will calculate a dilution factor
-                                           # when updating position table
                     dest_sample = sample_in
                     for sample in sample_in.samples:
                         # we can only add liquid to vials 
@@ -1079,32 +1049,25 @@ class cPAL:
                         sample.status = "preserved"
                         micropal.PAL_sample_in[-1].samples.append(sample)
                         micropal.PAL_sample_in_delta_vol_ml[-1].append(micropal.PAL_volume_ul / 1000.0)
+                        micropal.dilute[-1].append(True)
+                        micropal.dilute_type[-1].append(sample.sample_type)
 
 
                 else:
-                    # neither same type or an assembly present.
+                    # neither same sample type nor an assembly present.
                     # we now create an assembly if allowed
                     if not self.archive.custom_assembly_allowed(dest):
                         # no assembly allowed
-                        self.base.print_message(f"Assembly not allowed for PAL dest '{dest}' for 'custom' position method.", error = True)
+                        self.base.print_message(f"PAL_dest: Assembly not allowed for PAL dest '{dest}' for 'custom' position method.", error = True)
                         return error_codes.critical
         
-                    # cannot create an assembly from an assamebly
-                    if len(micropal.PAL_sample_in[-1].samples > 1):
-                        self.base.print_message("Found a BUG: Too many input samples. Cannot create an assembly here.", error = True)
+                    # cannot create an assembly from an assembly
+                    if len(micropal.PAL_sample_in[-1].samples) > 1:
+                        self.base.print_message("PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here.", error = True)
                         return error_codes.bug
-                        
-                    # add the sample which was found in the position
-                    # to the sample_in list for the prc/prg
-                    for sample in sample_in.samples:
-                        sample_out.samples[0].inheritance = "allow_both"
-                        sample_out.samples[0].status = "incorporated"
-                        micropal.PAL_sample_in[-1].samples.append(sample)
-                        # we only add the sample to assembly so delta_vol is 0
-                        micropal.PAL_sample_in_delta_vol_ml[-1].append(0.0)
-                        
 
-                    dest_sample = sample_in
+
+                    # dest_sample = sample_in
                     # first create a new sample from the source sample 
                     # which is then incoporarted into the assembly
                     error, sample_out = await self._sendcommand_new_ref_sample(
@@ -1120,6 +1083,20 @@ class cPAL:
                     sample_out.samples[0].sample_position = dest
                     sample_out.samples[0].inheritance = "allow_both"
                     sample_out.samples[0].status = ["created", "incorporated"]
+
+
+                    # only now add the sample which was found in the position
+                    # to the sample_in list for the prc/prg
+                    for sample in sample_in.samples:
+                        sample_in.samples[0].inheritance = "allow_both"
+                        sample_in.samples[0].status = "incorporated"
+                        micropal.PAL_sample_in[-1].samples.append(sample)
+                        # we only add the sample to assembly so delta_vol is 0
+                        micropal.PAL_sample_in_delta_vol_ml[-1].append(0.0)
+                        micropal.dilute[-1].append(False)
+                        micropal.dilute_type[-1].append(None)
+
+
         
         
                     # create now an assembly of both
@@ -1128,16 +1105,17 @@ class cPAL:
                     tmp_sample_in = hcms.SampleList(samples = [sample for sample in sample_in.samples])
                     # and also add the newly created sample ref to it
                     tmp_sample_in.samples.append(sample_out.samples[0])
+                    self.base.print_message(f"PAL_dest: Creating assembly from '{[sample.global_label for sample in tmp_sample_in.samples]}' in position '{dest}'", info = True)
                     error, sample_out2 = await self._sendcommand_new_ref_sample(
                           sample_in = tmp_sample_in,
-                          sample_out_type =  "assembly",
+                          sample_out_type =  _sampletype.assembly,
                           sample_position = dest
                          )
 
-                    
+
+
                     if error != error_codes.none:
                         return error
-                    # sample_out2.samples[0].volume_ml = micropal.PAL_volume_ul / 1000.0
                     sample_out2.samples[0].sample_position = dest
                     sample_out2.samples[0].inheritance = "allow_both"
                     sample_out2.samples[0].status = "created"
@@ -1145,6 +1123,8 @@ class cPAL:
                     sample_out.samples.append(sample_out2.samples[0])
                     # dest_sample.samples.append(sample_out2.samples[0])
                     
+                    # the assembly is now on dest position
+                    dest_sample = sample_out2
                     
         ######################################################################
         # check dest == next empty
@@ -1155,14 +1135,14 @@ class cPAL:
                             req_vol = micropal.PAL_volume_ul/1000.0)
 
             if newvialpos["tray"] is None:
-                self.base.print_message(" ... empty vial slot is not available", error= True)
+                self.base.print_message("PAL_dest: empty vial slot is not available", error= True)
                 return error_codes.not_available
 
-            dest = _positiontype.tray
+            # dest = _positiontype.tray
             dest_tray = newvialpos["tray"]
             dest_slot = newvialpos["slot"]
             dest_vial = newvialpos["vial"]
-            self.base.print_message(f" ... archiving liquid sample to tray {dest_tray}, slot {dest_slot}, vial {dest_vial}")
+            self.base.print_message(f"PAL_dest: archiving liquid sample to tray {dest_tray}, slot {dest_slot}, vial {dest_vial}")
 
             error, sample_out = await self._sendcommand_new_ref_sample(
                                       sample_in = micropal.PAL_sample_in[-1], # this should hold a sample already from "check source call"
@@ -1193,22 +1173,23 @@ class cPAL:
                                   after_vial = micropal.PAL_requested_dest.vial,
                                                  )
             if error != error_codes.none:
-                self.base.print_message("No next full vial", error = True)
+                self.base.print_message("PAL_dest: No next full vial", error = True)
                 return error_codes.not_available
             if len(sample_in.samples) > 1:
-                self.base.print_message("More then one sample in source position. This is not allowed.", error = True)
+                self.base.print_message("PAL_dest: More then one sample in source position. This is not allowed.", error = True)
                 return error_codes.critical
 
             # a sample is already present in the tray position
             # we add more sample to it, e.g. dilute it
-            dilute = True # TODO, will calculate a dilution factor when updating position table
-
+            self.base.print_message(f"PAL_dest: Got sample '{sample_in.samples[0].global_label}' in position '{dest}'", info = True)
             dest_sample = sample_in
             for sample in sample_in.samples:
                 sample.inheritance = "receive_only"
                 sample.status ="preserved"
                 micropal.PAL_sample_in[-1].samples.append(sample)
                 micropal.PAL_sample_in_delta_vol_ml[-1].append(micropal.PAL_volume_ul / 1000.0)
+                micropal.dilute[-1].append(True)
+                micropal.dilute_type[-1].append(sample.sample_type)
 
             # Set requested position to new position.
             # The new position will be the requested positin for the 
@@ -1216,9 +1197,6 @@ class cPAL:
             micropal.PAL_requested_dest.tray = dest_tray
             micropal.PAL_requested_dest.slot = dest_slot
             micropal.PAL_requested_dest.vial = dest_vial
-
-
-
 
 
         # done with destination checks
@@ -1242,7 +1220,12 @@ class cPAL:
             )
         )
         micropal.PAL_sample_out.append(sample_out)
-        micropal.dilute.append(dilute)
+        for i, sample in enumerate(micropal.PAL_sample_in[-1].samples):
+            if micropal.dilute[-1][i]:
+                self.base.print_message(f"PAL_dest: Diluting dest sample '{sample.global_label}'.", info = True)
+            else:
+                self.base.print_message(f"PAL_dest: Not diluting dest sample '{sample.global_label}'.", info = True)
+
         return error_codes.none
 
 
@@ -1352,7 +1335,6 @@ class cPAL:
                     self.base.print_message(" ... got PAL continue trigger", info = True)
                     self.base.print_message(" ... waiting for PAL done trigger", info = True)
                     micropal.PAL_continue_time = self.trigger_continue_epoch
-                    # val = await self.wait_for_trigger_done()
                     val = await self._poll_done()
                     if not val:
                         self.base.print_message(" ... PAL done trigger timeout", error = True)
@@ -1434,7 +1416,6 @@ class cPAL:
                 cmd_to_execute = f"tmux new-window PAL {tmpjob} /start /quit"
                 
 
-                # cmd_to_execute = f"tmux new-window PAL  /loadmethod '{PALparams.PAL_path_methodfile}' '{PALparams.PAL_tool};{PALparams.PAL_source};{PALparams.PAL_volume_ul};{PALparams.PAL_dest_tray};{PALparams.PAL_dest_slot};{PALparams.PAL_dest_vial};{wash1};{wash2};{wash3};{wash4};{PALparams.PAL_rshs_pal_logfile}' /start /quit"
                 self.base.print_message(f" ... PAL command: {cmd_to_execute}")
             
     
@@ -1490,18 +1471,41 @@ class cPAL:
                                                 ):
         error = error_codes.none
 
-        if micropal.PAL_runtime_dest[num].position == "tray":
-            retval = await self.archive.tray_update_position(
-                                              tray = micropal.PAL_runtime_dest[num].tray,
-                                              slot = micropal.PAL_runtime_dest[num].slot,
-                                              vial = micropal.PAL_runtime_dest[num].vial,
-                                              sample = micropal.PAL_sample_out[num],
-                                              )
-        else: # custom postion
-            retval, sample = await self.archive.custom_update_position(
-                                              custom = micropal.PAL_dest,
-                                              sample = micropal.PAL_sample_out[num],
-                                              )
+        if len(micropal.PAL_runtime_source[num].sample.samples) > 0:
+            sample_in = hcms.SampleList(samples=[micropal.PAL_runtime_source[num].sample.samples[0]])
+            if micropal.PAL_runtime_source[num].position == "tray":
+                retval = await self.archive.tray_update_position(
+                                                  tray = micropal.PAL_runtime_source[num].tray,
+                                                  slot = micropal.PAL_runtime_source[num].slot,
+                                                  vial = micropal.PAL_runtime_source[num].vial,
+                                                  sample = sample_in,
+                                                  )
+            else: # custom postion
+                retval, sample = await self.archive.custom_update_position(
+                                                  custom = micropal.PAL_runtime_source[num].position,
+                                                  sample = sample_in,
+                                                  )
+        else:
+            self.base.print_message("No sample in PAL source.", error = True)
+
+        if len(micropal.PAL_runtime_dest[num].sample.samples) > 0:
+            sample_out = hcms.SampleList(samples=[micropal.PAL_runtime_dest[num].sample.samples[0]])
+            if micropal.PAL_runtime_dest[num].position == "tray":
+                retval = await self.archive.tray_update_position(
+                                                  tray = micropal.PAL_runtime_dest[num].tray,
+                                                  slot = micropal.PAL_runtime_dest[num].slot,
+                                                  vial = micropal.PAL_runtime_dest[num].vial,
+                                                  sample = sample_out,
+                                                  )
+            else: # custom postion
+                retval, sample = await self.archive.custom_update_position(
+                                                  custom = micropal.PAL_runtime_dest[num].position,
+                                                  sample = sample_out,
+                                                  )
+        else:
+            self.base.print_message("No sample in PAL dest.", error = True)
+            
+
 
         if retval == False:
             error = error_codes.not_available
@@ -1511,25 +1515,30 @@ class cPAL:
     async def _sendcommand_update_sample_volume(
                                                 self, 
                                                 samples: hcms.SampleList, 
-                                                delta_vol_ml: float = 0.0,
-                                                dilute: bool = False,
-                                                sample_type: str = ""
+                                                delta_vol_ml: list,
+                                                dilute: list,
+                                                sample_type: list
                                                ):
 
         if len(delta_vol_ml) != len(samples.samples):
             self.base.print_message("len(samples_in) != len(delta_vol)", error = True)
             return
+        if len(dilute) != len(samples.samples):
+            self.base.print_message("len(samples_in) != len(dilute)", error = True)
+            return
+        if len(sample_type) != len(samples.samples):
+            self.base.print_message("len(samples_in) != len(sample_type)", error = True)
+            return
 
         for i, sample in enumerate(samples.samples):
             if isinstance(sample, hcms.AssemblySample):
-            # if sample.sample_type == "assembly":
+            # if sample.sample_type == _sampletype.assembly:
                 for part in sample.parts:
-                    if part.sample_type == sample_type:
-                        if hasattr(part, "volume_ml"):
-                            part.volume_ml += delta_vol_ml[i]
+                    if part.sample_type == sample_type[i]:
+                        part.update_vol(delta_vol_ml[i], dilute[i])
             else:
-                if hasattr(sample, "volume_ml"):
-                    sample.volume_ml += delta_vol_ml[i]
+                sample.update_vol(delta_vol_ml[i], dilute[i])
+
 
 
     async def _PAL_IOloop(self):
@@ -1569,25 +1578,32 @@ class cPAL:
                         # get the scheduled time for next PAL command
                         # self.IO_PALparams.timeoffset corrects for offset 
                         # between send ssh and continue (or any other offset)
+                        
+                        if len(self.IO_PALparams.PAL_sampleperiod) < (run+1):
+                            self.base.print_message("len(self.IO_PALparams.PAL_sampleperiod) < (run), using 0", info = True)
+                            sampleperiod = 0
+                        else:
+                            sampleperiod = self.IO_PALparams.PAL_sampleperiod[run]
+                        
                         if self.IO_PALparams.PAL_spacingmethod == Spacingmethod.linear:
                             self.base.print_message(" ... PAL linear scheduling")
                             cur_time = time.time()
-                            self.base.print_message(f"time since last PAL run {(cur_time-last_PAL_run_time)}", info= True)
-                            self.base.print_message(f"requested time between PAL runs {self.IO_PALparams.PAL_sampleperiod[run]-self.IO_PALparams.PAL_timeoffset}", info = True)
-                            diff_time = self.IO_PALparams.PAL_sampleperiod[0]-(cur_time-last_PAL_run_time)-self.IO_PALparams.PAL_timeoffset
+                            self.base.print_message(f"time since last PAL run {(cur_time-last_PAL_run_time)}", info = True)
+                            self.base.print_message(f"requested time between PAL runs {sampleperiod-self.IO_PALparams.PAL_timeoffset}", info = True)
+                            diff_time = sampleperiod-(cur_time-last_PAL_run_time)-self.IO_PALparams.PAL_timeoffset
                         elif self.IO_PALparams.PAL_spacingmethod == Spacingmethod.geometric:
                             self.base.print_message(" ... PAL geometric scheduling")
-                            timepoint = (self.IO_PALparams.PAL_spacingfactor ** run) * self.IO_PALparams.PAL_sampleperiod[0]
-                            self.base.print_message(f"time since last PAL run {(cur_time-last_PAL_run_time)}", info= True)
+                            timepoint = (self.IO_PALparams.PAL_spacingfactor ** run) * sampleperiod
+                            self.base.print_message(f"time since last PAL run {(cur_time-last_PAL_run_time)}", info = True)
                             self.base.print_message(f"requested time between PAL runs {timepoint-prev_timepoint-self.IO_PALparams.PAL_timeoffset}", info = True)
                             diff_time = timepoint-prev_timepoint-(cur_time-last_PAL_run_time)-self.IO_PALparams.PAL_timeoffset
                             prev_timepoint = timepoint # todo: consider time lag
                         elif self.IO_PALparams.PAL_spacingmethod == Spacingmethod.custom:
                             self.base.print_message(" ... PAL custom scheduling")
                             cur_time = time.time()
-                            self.base.print_message(f"time since PAL start {(cur_time-start_time)}", info= True)
-                            self.base.print_message(f"time for next PAL run since start {self.IO_PALparams.PAL_sampleperiod[run]-self.IO_PALparams.PAL_timeoffset}", info = True)
-                            diff_time = self.IO_PALparams.PAL_sampleperiod[run]-(cur_time-start_time)-self.IO_PALparams.PAL_timeoffset
+                            self.base.print_message(f"time since PAL start {(cur_time-start_time)}", info = True)
+                            self.base.print_message(f"time for next PAL run since start {sampleperiod-self.IO_PALparams.PAL_timeoffset}", info = True)
+                            diff_time = sampleperiod-(cur_time-start_time)-self.IO_PALparams.PAL_timeoffset
 
 
                         # only wait for positive time
@@ -1598,9 +1614,9 @@ class cPAL:
 
                         # finally submit a single PAL run
                         last_PAL_run_time = time.time()
-                        self.base.print_message(" ... PAL sendcommmand def start")
+                        self.base.print_message(" ... PAL sendcommmand def start", info = True)
                         self.IO_error = await self._sendcommand_main(run_PALparams)
-                        self.base.print_message(" ... PAL sendcommmand def end")
+                        self.base.print_message(" ... PAL sendcommmand def end", info = True)
 
 
                     # update samples_in/out in prc
@@ -1610,7 +1626,6 @@ class cPAL:
                 else:
                     self.IO_do_meas = False
                     self.base.print_message(" ... PAL is in estop.")
-                    # await self.stat.set_estop()
 
 
     async def _PAL_IOloop_meas_start_helper(self):
@@ -1639,7 +1654,6 @@ class cPAL:
                     self.base.print_message(f" ... correct PAL_sample_in is now: {self.IO_PALparams.PAL_sample_in.samples[0]}")
                 else:
                     # update information of sample from db
-                    # TODO also for other sample types
                     self.IO_PALparams.PAL_sample_in = await self.get_sample(hcms.SampleList(samples=[self.IO_PALparams.PAL_sample_in.samples[0]]))
 
 
@@ -1672,10 +1686,9 @@ class cPAL:
 
         if self.IO_estop:
             self.base.print_message(" ... PAL is in estop.")
-            # await self.stat.set_estop()
         else:
             self.base.print_message(" ... setting PAL to idle")
-        #                        await self.stat.set_idle()
+
         self.base.print_message(" ... PAL is done")
 
 
