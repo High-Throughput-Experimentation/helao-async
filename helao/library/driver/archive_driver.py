@@ -262,8 +262,10 @@ class Archive():
         else:
             self.base.print_message("customs matched", info = True)
 
-        self.write_config()
 
+        # update all samples in tray and custom positions
+        self.write_config()
+        asyncio.gather(self.update_samples_from_db())
 
         
     def process_startup_config(self):
@@ -330,13 +332,56 @@ class Archive():
             data = pickle.load(f)
             self.trays = data.get("trays", [])
             self.custom_positions = data.get("customs", {})
-        
 
-        
+
     def write_config(self):
         data = {"customs":self.custom_positions, "trays":self.trays}
         with open(self.archivepck, "wb") as f:
             pickle.dump(data, f)
+
+    async def update_samples_from_db(self):
+        self.base.print_message("Updating all samples in position table.", info = True)
+        # need to wait for the db to finish initializing
+        while not self.unified_db.ready:
+            self.base.print_message("db not ready", info = True)
+            await asyncio.sleep(0.1)
+
+        # first update all custom position samples
+        for custom in self.custom_positions:
+            self.custom_positions[custom].sample = \
+                await self.update_samples_from_db_helper(self.custom_positions[custom].sample)
+
+        # second update all tray samples
+        for tray_key, tray_item in self.trays.items():
+            if tray_item is not None:
+                for slot_key, slot_item in tray_item.items():
+                    if slot_item is not None:
+                        for i, sample_list in enumerate(slot_item.sample):
+                            slot_item.sample[i] = \
+                                await self.update_samples_from_db_helper(sample_list)
+
+        # update all samples in tray and custom positions
+        self.write_config()
+
+
+    async def update_samples_from_db_helper(self, samples: hcms.SampleList):
+        """pulls the newest sample data from the db,
+        only of global_label is not none, else sample is a ref sample"""
+        if isinstance(samples, dict):
+            samples = hcms.SampleList(**samples)
+        ret_sample = hcms.SampleList()
+        for sample in samples.samples:
+            if sample is None:
+                continue
+            if sample.global_label is not None:
+                new_samples = await self.unified_db.get_sample(hcms.SampleList(samples=[sample]))
+                for new_sample in new_samples.samples:
+                    ret_sample.samples.append(new_sample)
+            else:
+                self.base.print_message(f"Bug found: reference sample was saved in pck file: {sample}", error = True)
+                ret_sample.samples.append(sample)
+
+        return ret_sample
 
 
     async def tray_unload(self, tray, slot, *args, **kwargs):
@@ -364,7 +409,7 @@ class Archive():
             if tray_item is not None:
                 for slot_key, slot_item in tray_item.items():
                     if slot_item is not None:
-                        # first get content as dicy
+                        # first get content as dict
                         tray_dict[tray_key] = dict()
                         tray_dict[tray_key].update({slot_key:slot_item.as_dict()})
                         # then unload (which resets the slot)
@@ -589,7 +634,7 @@ class Archive():
                                    *args,**kwargs
                                   ):
 
-        if type(sample) is dict:
+        if isinstance(sample, dict):
             sample = hcms.SampleList(**sample)
 
         if len(sample.samples) > 1:
@@ -715,7 +760,7 @@ class Archive():
         loaded = False
         customs_dict = dict()
 
-        if type(load_samples_in) is dict:
+        if isinstance(load_samples_in, dict):
             load_samples_in = hcms.SampleList(**load_samples_in)
 
         # check if sample actually exists
