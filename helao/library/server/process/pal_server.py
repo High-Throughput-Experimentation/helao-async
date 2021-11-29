@@ -115,8 +115,8 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_archive")
         async def PAL_archive(
             request: Request,
-            PAL_tool: Optional[PALtools],
-            PAL_source: Optional[dev_customitems],
+            PAL_tool: Optional[PALtools] = None,
+            PAL_source: Optional[dev_customitems] = None,
             PAL_volume_ul: Optional[int] = 200,
             PAL_sampleperiod: Optional[List[float]] =  [0.0],
             PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
@@ -138,9 +138,9 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_fill")
         async def PAL_fill(
             request: Request,
-            PAL_tool: Optional[PALtools],
-            PAL_source: Optional[dev_customitems],
-            PAL_dest: Optional[dev_customitems],
+            PAL_tool: Optional[PALtools] = None,
+            PAL_source: Optional[dev_customitems] = None,
+            PAL_dest: Optional[dev_customitems] = None,
             PAL_volume_ul: Optional[int] = 200,
             PAL_wash1: Optional[bool] = False,
             PAL_wash2: Optional[bool] = False,
@@ -157,9 +157,9 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_fillfixed")
         async def PAL_fillfixed(
             request: Request,
-            PAL_tool: Optional[PALtools],
-            PAL_source: Optional[dev_customitems],
-            PAL_dest: Optional[dev_customitems],
+            PAL_tool: Optional[PALtools] = None,
+            PAL_source: Optional[dev_customitems] = None,
+            PAL_dest: Optional[dev_customitems] = None,
             PAL_volume_ul: Optional[int] = 200, # this value is only for prc, a fixed value is used
             PAL_wash1: Optional[bool] = False,
             PAL_wash2: Optional[bool] = False,
@@ -176,7 +176,7 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_deepclean")
         async def PAL_deepclean(
             request: Request,
-            PAL_tool: Optional[PALtools],
+            PAL_tool: Optional[PALtools] = None,
             PAL_volume_ul: Optional[int] = 200, # this value is only for prc, a fixed value is used
         ):
             A = await setup_process(request)
@@ -189,8 +189,8 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_dilute")
         async def PAL_dilute(
             request: Request,
-            PAL_tool: Optional[PALtools],
-            PAL_source: Optional[dev_customitems],
+            PAL_tool: Optional[PALtools] = None,
+            PAL_source: Optional[dev_customitems] = None,
             PAL_volume_ul: Optional[int] = 200,
             PAL_dest_tray: Optional[int] = 0,
             PAL_dest_slot: Optional[int] = 0,
@@ -215,8 +215,8 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_autodilute")
         async def PAL_autodilute(
             request: Request,
-            PAL_tool: Optional[PALtools],
-            PAL_source: Optional[dev_customitems],
+            PAL_tool: Optional[PALtools] = None,
+            PAL_source: Optional[dev_customitems] = None,
             PAL_volume_ul: Optional[int] = 200,
             PAL_sampleperiod: Optional[List[float]] =  [0.0],
             PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
@@ -252,6 +252,7 @@ def makeApp(confPrefix, servKey):
                            )
         await active.enqueue_data({'sample': sample.dict(),
                                    'error_code':error})
+        active.process.process_params.update({"_fast_sample_in":sample.dict()})
         finished_process = await active.finish()
         return finished_process.as_dict()
 
@@ -401,7 +402,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/archive_custom_load")
     async def archive_custom_load(
                                   request: Request,
-                                  custom: Optional[dev_customitems],
+                                  custom: Optional[dev_customitems] = None,
                                   load_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
                                   scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                                  ):
@@ -423,7 +424,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/archive_custom_unload")
     async def archive_custom_unload(
                                     request: Request,
-                                    custom: Optional[dev_customitems],
+                                    custom: Optional[dev_customitems] = None,
                                    ):
         A = await setup_process(request)
         A.process_abbr = "unload_sample"
@@ -467,7 +468,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/archive_custom_query_sample")
     async def archive_custom_query_sample(request: Request, 
-                                        custom: Optional[dev_customitems],
+                                        custom: Optional[dev_customitems] = None,
                                        ):
         A = await setup_process(request)
         A.process_abbr = "query_sample"
@@ -480,12 +481,13 @@ def makeApp(confPrefix, servKey):
                            )
         await active.enqueue_data({'sample': sample.dict(),
                                    'error_code':error})
+        active.process.process_params.update({"_fast_sample_in":sample.dict()})
         finished_process = await active.finish()
         return finished_process.as_dict()
 
 
-    @app.post(f"/{servKey}/get_sample")
-    async def get_sample(request: Request, 
+    @app.post(f"/{servKey}/db_get_sample")
+    async def db_get_sample(request: Request, 
                          fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
                          scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                         ):
@@ -493,14 +495,14 @@ def makeApp(confPrefix, servKey):
         from the end of the db."""
         A = await setup_process(request)
         active = await app.base.contain_process(A, file_data_keys="sample")
-        sample = await app.driver.get_sample(A.samples_in)
+        sample = await app.driver.db_get_sample(A.samples_in)
         await active.enqueue_data({'sample': sample.dict()})
         finished_process = await active.finish()
         return finished_process.as_dict()
 
 
-    @app.post(f"/{servKey}/new_sample")
-    async def new_sample(request: Request, 
+    @app.post(f"/{servKey}/db_new_sample")
+    async def db_new_sample(request: Request, 
                          fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{
                                               "machine_name":gethostname(),
                                               "source": None,
@@ -522,7 +524,7 @@ def makeApp(confPrefix, servKey):
         leave source and source_ml empty."""
         A = await setup_process(request)
         active = await app.base.contain_process(A, file_data_keys="sample")
-        sample = await app.driver.new_sample(A.samples_in)
+        sample = await app.driver.db_new_sample(A.samples_in)
         await active.enqueue_data({'sample': sample.dict()})
         finished_process = await active.finish()
         return finished_process.as_dict()
