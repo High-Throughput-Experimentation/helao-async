@@ -102,7 +102,7 @@ class C_async_operator:
 
 
         # FastAPI calls
-        self.get_sequences()
+        self.get_sequence_lib()
         self.vis.doc.add_next_tick_callback(partial(self.get_sequences))
         self.vis.doc.add_next_tick_callback(partial(self.get_processes))
         self.vis.doc.add_next_tick_callback(partial(self.get_active_processes))
@@ -123,10 +123,10 @@ class C_async_operator:
 
 
         self.sequence_dropdown = Select(title="Select sequence:", value = None, options=self.sequence_select_list)
-        self.sequence_dropdown.on_change('value', self.callback_process_select)
+        self.sequence_dropdown.on_change("value", self.callback_process_select)
 
         self.button_load_sample_list = FileInput(accept=".csv,.txt", width = 300)
-        self.button_load_sample_list.on_change('value', self.get_sample_list)
+        self.button_load_sample_list.on_change("value", self.get_sample_list)
 
 
         # buttons to control orch
@@ -154,13 +154,13 @@ class C_async_operator:
 
 #        self.process_descr_txt = Paragraph(text="""select item""", width=600, height=30)
         self.process_descr_txt = Div(text="""select item""", width=600, height=30)
-        self.error_txt = Paragraph(text="""no error""", width=600, height=30, style={'font-size': '100%', 'color': 'black'})
+        self.error_txt = Paragraph(text="""no error""", width=600, height=30, style={"font-size": "100%", "color": "black"})
 
 
         self.input_sampleno = TextInput(value="", title="sample no", disabled=False, width=330, height=40)
-        self.input_sampleno.on_change('value', self.callback_changed_sampleno)
+        self.input_sampleno.on_change("value", self.callback_changed_sampleno)
         self.input_plateid = TextInput(value="", title="plate id", disabled=False, width=60, height=40)
-        self.input_plateid.on_change('value', self.callback_changed_plateid)
+        self.input_plateid.on_change("value", self.callback_changed_plateid)
         
         self.input_label = TextInput(value="nolabel", title="label", disabled=False, width=120, height=40)
         self.input_elements = TextInput(value="", title="elements", disabled=False, width=120, height=40)
@@ -170,21 +170,21 @@ class C_async_operator:
 
 
 
-        self.plot_mpmap = figure(title="PlateMap", height=300,x_axis_label='X (mm)', y_axis_label='Y (mm)',width = 640)
+        self.plot_mpmap = figure(title="PlateMap", height=300,x_axis_label="X (mm)", y_axis_label="Y (mm)",width = 640)
         self.plot_mpmap.on_event(DoubleTap, self.callback_clicked_pmplot)
         self.update_pm_plot()
 
 
         self.layout0 = layout([
             layout(
-                [Spacer(width=20), Div(text=f"<b>{self.config_dict.get('doc_name', 'Operator')} on {gethostname()}</b>", width=620, height=32, style={'font-size': '200%', 'color': 'red'})],
+                [Spacer(width=20), Div(text=f"<b>{self.config_dict.get('doc_name', 'Operator')} on {gethostname()}</b>", width=620, height=32, style={"font-size": "200%", "color": "red"})],
                 background="#C0C0C0",width=640),
             layout([
                 [self.sequence_dropdown],
                 [Spacer(width=10), Div(text="<b>sequence description:</b>", width=200+50, height=15)],
                 [self.process_descr_txt],
                 Spacer(height=20),
-                [Spacer(width=10), Div(text="<b>Error message:</b>", width=200+50, height=15, style={'font-size': '100%', 'color': 'black'})],
+                [Spacer(width=10), Div(text="<b>Error message:</b>", width=200+50, height=15, style={"font-size": "100%", "color": "black"})],
                 [Spacer(width=10), self.error_txt],
                 Spacer(height=10),
                 ],background="#808080",width=640),
@@ -230,14 +230,14 @@ class C_async_operator:
 
 
 
-    def get_sequences(self):
+    def get_sequence_lib(self):
         """Return the current list of sequences."""
         self.sequences = []
         self.vis.print_message(f" ... found sequence: {[sequence for sequence in self.sequence_lib]}")
         for i, sequence in enumerate(self.sequence_lib):
-            # self.vis.print_message('full',inspect.getfullargspec(self.sequence_lib[sequence]))
-            #self.vis.print_message('anno',inspect.getfullargspec(self.sequence_lib[sequence]).annotations)
-            #self.vis.print_message('def',inspect.getfullargspec(self.sequence_lib[sequence]).defaults)
+            # self.vis.print_message("full",inspect.getfullargspec(self.sequence_lib[sequence]))
+            #self.vis.print_message("anno",inspect.getfullargspec(self.sequence_lib[sequence]).annotations)
+            #self.vis.print_message("def",inspect.getfullargspec(self.sequence_lib[sequence]).defaults)
             tmpdoc = self.sequence_lib[sequence].__doc__ 
             # self.vis.print_message("... doc:", tmpdoc)
             if tmpdoc == None:
@@ -247,7 +247,7 @@ class C_async_operator:
             if tmpdef == None:
                 tmpdef = []
             # if not tmpargs:
-            #     tmpargs = ['']
+            #     tmpargs = [""]
             
             
             self.sequences.append(return_sequence_lib(
@@ -258,16 +258,15 @@ class C_async_operator:
                 defaults = tmpdef,
                 #annotations = inspect.getfullargspec(self.sequence_lib[sequence]).annotations,
                 # defaults = inspect.getfullargspec(self.sequence_lib[sequence]).defaults,
-               #params = '',
+               #params = "",
             ).dict()
                 )
-
         for item in self.sequences:
-            self.sequence_select_list.append(item['sequence'])
+            self.sequence_select_list.append(item["sequence_name"])
 
 
     async def get_sequences(self):
-        '''get sequence list from orch'''
+        """get sequence list from orch"""
         response = await self.do_orch_request(process_name = "list_sequences")
         response = response["sequences"]
         self.sequence_list = dict()
@@ -277,11 +276,11 @@ class C_async_operator:
             for line in response:
                 for key, value in line.items():
                     self.sequence_list[key].append(value)
-        self.vis.print_message(' ... current queued sequences:',self.sequence_list)
+        self.vis.print_message(" ... current queued sequences:",self.sequence_list)
 
 
     async def get_processes(self):
-        '''get process list from orch'''
+        """get process list from orch"""
         response = await self.do_orch_request(process_name = "list_processes")
         response = response["processes"]
         self.process_list = dict()
@@ -291,11 +290,11 @@ class C_async_operator:
             for line in response:
                 for key, value in line.items():
                     self.process_list[key].append(value)
-        self.vis.print_message(' ... current queued processes:',self.process_list)
+        self.vis.print_message(" ... current queued processes:",self.process_list)
 
 
     async def get_active_processes(self):
-        '''get process list from orch'''
+        """get process list from orch"""
         response = await self.do_orch_request(process_name = "list_active_processes")
         response = response["processes"]
         self.active_process_list = dict()
@@ -305,7 +304,7 @@ class C_async_operator:
             for line in response:
                 for key, value in line.items():
                     self.active_process_list[key].append(value)
-        self.vis.print_message(' ... current active processes:',self.active_process_list)
+        self.vis.print_message(" ... current active processes:",self.active_process_list)
 
 
     async def do_orch_request(self,process_name, 
@@ -329,10 +328,10 @@ class C_async_operator:
 
     def callback_process_select(self, attr, old, new):
         idx = self.sequence_select_list.index(new)
-        process_doc = self.sequences[idx]['doc']
-        # for arg in self.sequences[idx]['args']:
+        process_doc = self.sequences[idx]["doc"]
+        # for arg in self.sequences[idx]["args"]:
         #     self.vis.print_message(arg)
-        self.update_param_layout(self.sequences[idx]['args'], self.sequences[idx]['defaults'])
+        self.update_param_layout(self.sequences[idx]["args"], self.sequences[idx]["defaults"])
         self.vis.doc.add_next_tick_callback(partial(self.update_doc,process_doc))
 
 
@@ -465,7 +464,7 @@ class C_async_operator:
         D = Sequence(inputdict={
             # "orch_name":orch_name,
             "sequence_label":sellabel,
-            "sequence":selected_sequence,
+            "sequence_name":selected_sequence,
             "sequence_params":sequence_params,
             # "result_dict":result_dict,
             # "access":access,
@@ -485,22 +484,22 @@ class C_async_operator:
         # self.param_layout = []
         self.param_layout = [
             layout([
-                [Spacer(width=10), Div(text="<b>Optional sequence parameters:</b>", width=200+50, height=15, style={'font-size': '100%', 'color': 'black'})],
+                [Spacer(width=10), Div(text="<b>Optional sequence parameters:</b>", width=200+50, height=15, style={"font-size": "100%", "color": "black"})],
                 ],background="#BDB76B",width=640),
             ]
 
         item = 0
         for idx in range(len(args)):
-            buf = f'{defaults[idx]}'
-            # self.vis.print_message(' ... process parameter:',args[idx])
+            buf = f"{defaults[idx]}"
+            # self.vis.print_message(" ... process parameter:",args[idx])
             # skip the sequence_Obj parameter
-            if args[idx] == 'pg_Obj':
+            if args[idx] == "pg_Obj":
                 continue
 
             disabled = False
-            if args[idx] == 'x_mm':
+            if args[idx] == "x_mm":
                 disabled = True
-            if args[idx] == 'y_mm':
+            if args[idx] == "y_mm":
                 disabled = True
 
             self.param_input.append(TextInput(value=buf, title=args[idx], disabled=disabled, width=400, height=40))
@@ -532,14 +531,14 @@ class C_async_operator:
 
     def update_xysamples(self, xval, yval):
         for paraminput in self.param_input:
-            if paraminput.title == 'x_mm':
+            if paraminput.title == "x_mm":
                 paraminput.value = xval
-            if paraminput.title == 'y_mm':
+            if paraminput.title == "y_mm":
                 paraminput.value = yval
 
 
     def update_elements(self, elements):
-        self.input_elements.value = ','.join(elements) 
+        self.input_elements.value = ",".join(elements) 
 
         
     def update_composition(self, composition):
@@ -551,24 +550,24 @@ class C_async_operator:
 
 
     def update_pm_plot(self):
-        '''plots the plate map'''
-        x = [col['x'] for col in self.pmdata]
-        y = [col['y'] for col in self.pmdata]
+        """plots the plate map"""
+        x = [col["x"] for col in self.pmdata]
+        y = [col["y"] for col in self.pmdata]
         # remove old Pmplot
         old_point = self.plot_mpmap.select(name="PMplot")
         if len(old_point)>0:
             self.plot_mpmap.renderers.remove(old_point[0])
-        self.plot_mpmap.square(x, y, size=5, color=None, alpha=0.5, line_color='black',name="PMplot")
+        self.plot_mpmap.square(x, y, size=5, color=None, alpha=0.5, line_color="black",name="PMplot")
 
 
     def get_sample_list(self, attr, old_file, new_file):
         f = io.BytesIO(b64decode(new_file))
         samplelist = np.loadtxt(f, skiprows=2, delimiter=",")
         self.vis.print_message(samplelist)
-        samplestr = ''
+        samplestr = ""
         for sample in samplelist:
-            samplestr += str(int(sample)) + ','
-        if samplestr.endswith(','):
+            samplestr += str(int(sample)) + ","
+        if samplestr.endswith(","):
             samplestr = samplestr[:-1]
         self.vis.print_message(samplestr)
         self.vis.doc.add_next_tick_callback(partial(self.update_samples,samplestr))
@@ -576,7 +575,7 @@ class C_async_operator:
 
     def get_pm(self, plateid):
         """"gets plate map from aligner server"""
-        #simple one for tests is plateid = '4534'
+        #simple one for tests is plateid = "4534"
         self.pmdata = json.loads(self.dataAPI.get_platemap_plateid(plateid))
         if len(self.pmdata) == 0:
             self.vis.doc.add_next_tick_callback(partial(self.update_error,"no pm found"))
@@ -584,7 +583,7 @@ class C_async_operator:
 
     
     def xy_to_sample(self, xy, pmapxy):
-        '''get point from pmap closest to xy'''
+        """get point from pmap closest to xy"""
         if len(pmapxy):
             diff = pmapxy - xy
             sumdiff = (diff ** 2).sum(axis=1)
@@ -594,16 +593,16 @@ class C_async_operator:
     
     
     def get_samples(self, X, Y):
-        '''get list of samples row number closest to xy'''
+        """get list of samples row number closest to xy"""
         # X and Y are vectors
         xyarr = np.array((X, Y)).T
-        pmxy = np.array([[col['x'], col['y']] for col in self.pmdata])
+        pmxy = np.array([[col["x"], col["y"]] for col in self.pmdata])
         samples = list(np.apply_along_axis(self.xy_to_sample, 1, xyarr, pmxy))
         return samples             
 
 
     def get_elements_plateid(self, plateid: int):
-        '''gets plate elements from aligner server'''
+        """gets plate elements from aligner server"""
         elements =  self.dataAPI.get_elements_plateid(
             plateid,
             multielementink_concentrationinfo_bool=False,
@@ -625,8 +624,8 @@ class C_async_operator:
                     self.vis.doc.add_next_tick_callback(partial(self.update_samples,""))
                     return False
                 
-                platex = self.pmdata[PMnum[0]]['x']
-                platey = self.pmdata[PMnum[0]]['y']
+                platex = self.pmdata[PMnum[0]]["x"]
+                platey = self.pmdata[PMnum[0]]["y"]
                 code = self.pmdata[PMnum[0]]["code"]
 
                 # only display non zero fractions
@@ -644,11 +643,11 @@ class C_async_operator:
                 self.vis.doc.add_next_tick_callback(partial(self.update_code,str(code)))
 
                 # remove old Marker point
-                old_point = self.plot_mpmap.select(name='selsample')
+                old_point = self.plot_mpmap.select(name="selsample")
                 if len(old_point)>0:
                     self.plot_mpmap.renderers.remove(old_point[0])
                 # plot new Marker point
-                self.plot_mpmap.square(platex, platey, size=7,line_width=2, color=None, alpha=1.0, line_color=(255,0,0), name='selsample')
+                self.plot_mpmap.square(platex, platey, size=7,line_width=2, color=None, alpha=1.0, line_color=(255,0,0), name="selsample")
                 return True
 
         return False
