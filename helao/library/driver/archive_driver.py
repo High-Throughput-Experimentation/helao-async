@@ -364,9 +364,15 @@ class Archive():
         self.write_config()
 
 
-    async def update_samples_from_db_helper(self, samples: hcms.SampleList):
+    async def update_samples_from_db_helper(
+                                            self, 
+                                            samples: hcms.SampleList = None
+                                           ):
         """pulls the newest sample data from the db,
         only of global_label is not none, else sample is a ref sample"""
+        if samples is None:
+            samples = hcms.SampleList()
+
         if isinstance(samples, dict):
             samples = hcms.SampleList(**samples)
         ret_sample = hcms.SampleList()
@@ -384,7 +390,12 @@ class Archive():
         return ret_sample
 
 
-    async def tray_unload(self, tray, slot, *args, **kwargs):
+    async def tray_unload(
+                          self,
+                          tray: int = None, 
+                          slot: int = None,
+                          *args, **kwargs
+                         ):
         samples = hcms.SampleList()
         unloaded = False
         tray_dict = dict()
@@ -423,7 +434,12 @@ class Archive():
 
     
     
-    async def tray_export_json(self, tray, slot, *args,**kwargs):
+    async def tray_export_json(
+                               self, 
+                               tray: int = None,
+                               slot: int = None,
+                               *args,**kwargs
+                              ):
         self.write_config()
 
         if tray in self.trays:
@@ -435,9 +451,9 @@ class Archive():
     
     async def tray_export_csv(
                               self,
-                              tray,
-                              slot,
-                              myactive
+                              tray: int = None,
+                              slot: int = None,
+                              myactive = None
                              ):
         self.write_config() # save backup
 
@@ -475,12 +491,12 @@ class Archive():
 
 
     async def tray_export_icpms(self, 
-                                tray: int, 
-                                slot: int, 
-                                myactive, 
-                                survey_runs: int,
-                                main_runs: int,
-                                rack: int,
+                                tray: int = None, 
+                                slot: int = None, 
+                                myactive = None, 
+                                survey_runs: int = None,
+                                main_runs: int = None,
+                                rack: int = None,
                                 dilution_factor: float = None,
                                ):
         self.write_config() # save backup
@@ -522,7 +538,12 @@ class Archive():
                     )
                 
                 
-    async def tray_query_sample(self, tray: int, slot: int, vial: int):
+    async def tray_query_sample(
+                                self, 
+                                tray: int = None, 
+                                slot: int = None, 
+                                vial: int = None
+                               ):
         vial -= 1
         sample = hcms.SampleList()
         error = error_codes.not_available
@@ -626,16 +647,21 @@ class Archive():
 
     async def tray_update_position(
                                    self, 
-                                   tray: int, 
-                                   slot: int, 
-                                   vial: int, 
-                                   sample: hcms.SampleList,
+                                   tray: int = None, 
+                                   slot: int = None, 
+                                   vial: int = None, 
+                                   sample: hcms.SampleList = None,
                                    dilute: bool = False,
                                    *args,**kwargs
                                   ):
+        if sample is None:
+            sample = hcms.SampleList()
 
         if isinstance(sample, dict):
             sample = hcms.SampleList(**sample)
+        
+        if not sample.samples:
+            return False
 
         if len(sample.samples) > 1:
             print_message({}, "archive", "tray_update_position: sample_list contains more than one sample. Only using first one.", error = True)
@@ -655,28 +681,28 @@ class Archive():
         return False
 
 
-    def custom_assembly_allowed(self, custom: str):
+    def custom_assembly_allowed(self, custom: str = None):
         if custom in self.custom_positions:
             return self.custom_positions[custom].assembly_allowed()
         else:
             return False
 
 
-    def custom_dest_allowed(self, custom: str):
+    def custom_dest_allowed(self, custom: str = None):
         if custom in self.custom_positions:
             return self.custom_positions[custom].dest_allowed()
         else:
             return False
 
 
-    def custom_dilution_allowed(self, custom: str):
+    def custom_dilution_allowed(self, custom: str = None):
         if custom in self.custom_positions:
             return self.custom_positions[custom].dilution_allowed()
         else:
             return False
 
 
-    async def custom_query_sample(self,custom: str, *args, **kwargs):
+    async def custom_query_sample(self,custom: str = None, *args, **kwargs):
         sample = hcms.SampleList()
         error = error_codes.none
         
@@ -690,12 +716,13 @@ class Archive():
 
     async def custom_update_position(
                                      self,
-                                     custom: str,
-                                     sample: hcms.SampleList,
+                                     custom: str = None,
+                                     sample: hcms.SampleList = None,
                                      dilute: bool = False,
                                      *args,**kwargs
                                     ):
-
+        if sample is None:
+            sample = hcms.SampleList()
 
         if len(sample.samples) > 1:
             print_message({}, "archive", "custom_update_position: sample_list contains more than one sample. Only using first one.", error = True)
@@ -735,7 +762,7 @@ class Archive():
         return True, sample_in, sample_out, customs_dict
 
 
-    async def custom_unload(self, custom: str, *args, **kwargs):
+    async def custom_unload(self, custom: str = None, *args, **kwargs):
         sample = hcms.SampleList()
         unloaded = False
         customs_dict = dict()
@@ -751,10 +778,13 @@ class Archive():
 
     async def custom_load(
                           self,
-                          custom: str,
-                          load_samples_in: hcms.SampleList,
+                          custom: str = None,
+                          load_samples_in: hcms.SampleList = None,
                           *args, **kwargs
                          ):
+
+        if load_samples_in is None:
+            load_samples_in = hcms.SampleList()
 
         sample = hcms.SampleList()
         loaded = False
@@ -763,6 +793,9 @@ class Archive():
         if isinstance(load_samples_in, dict):
             load_samples_in = hcms.SampleList(**load_samples_in)
 
+        if not load_samples_in.samples:
+            return False, hcms.SampleList(), dict()
+            
         # check if sample actually exists
         load_samples_in = await self.unified_db.get_sample(load_samples_in)
         if load_samples_in.samples[0] is None:
@@ -783,7 +816,10 @@ class Archive():
         return loaded, sample, customs_dict
 
 
-    async def unpack_samples(self, samples: hcms.SampleList):
+    async def unpack_samples(self, samples: hcms.SampleList = None):
+        if samples is None:
+            samples = hcms.SampleList()
+
         ret_samples_in = hcms.SampleList()
         ret_samples_out = hcms.SampleList()
         for sample in samples.samples:

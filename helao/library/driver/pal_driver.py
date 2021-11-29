@@ -454,7 +454,7 @@ class cPAL:
                         # update sample creation time
                         sample_out.sample_creation_timecode = micropal.PAL_continue_time
                         # add sample to db
-                        tmp = await self.new_sample(hcms.SampleList(samples=[sample_out]))
+                        tmp = await self.db_new_sample(hcms.SampleList(samples=[sample_out]))
                         
                         
                         sample_out = tmp.samples[0]
@@ -1650,11 +1650,11 @@ class cPAL:
             if sample is not None:
                 if sample.sample_no < 0:
                     self.base.print_message(f" ... PAL need to get n-{self.IO_PALparams.PAL_sample_in.samples[0].sample_no+1} last sample from list")
-                    self.IO_PALparams.PAL_sample_in = await self.get_sample(hcms.SampleList(samples=[sample]))
+                    self.IO_PALparams.PAL_sample_in = await self.db_get_sample(hcms.SampleList(samples=[sample]))
                     self.base.print_message(f" ... correct PAL_sample_in is now: {self.IO_PALparams.PAL_sample_in.samples[0]}")
                 else:
                     # update information of sample from db
-                    self.IO_PALparams.PAL_sample_in = await self.get_sample(hcms.SampleList(samples=[self.IO_PALparams.PAL_sample_in.samples[0]]))
+                    self.IO_PALparams.PAL_sample_in = await self.db_get_sample(hcms.SampleList(samples=[self.IO_PALparams.PAL_sample_in.samples[0]]))
 
 
     async def _PAL_IOloop_meas_end_helper(self):
@@ -1692,11 +1692,11 @@ class cPAL:
         self.base.print_message(" ... PAL is done")
 
 
-    async def get_sample(self, samples: hcms.SampleList = hcms.SampleList()):
+    async def db_get_sample(self, samples: hcms.SampleList = hcms.SampleList()):
         return await self.unified_db.get_sample(samples)
 
 
-    async def new_sample(self, samples: hcms.SampleList = hcms.SampleList()):
+    async def db_new_sample(self, samples: hcms.SampleList = hcms.SampleList()):
         return await self.unified_db.new_sample(samples)
     
     
