@@ -812,7 +812,7 @@ class cPAL:
         micropal.PAL_sample_in.append(sample_in)
         micropal.PAL_sample_in_delta_vol_ml.append(sample_in_delta_vol_ml)
         micropal.dilute.append([False]) # initial source is not diluted
-        micropal.dilute_type.append([None])
+        micropal.dilute_type.append([micropal.cam.sample_out_type])
         
         return error_codes.none
 
