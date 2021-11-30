@@ -73,7 +73,7 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/mastercell")
         async def mastercell(
                              request: Request, 
-                             cell: Optional[dev_mastercellitems],
+                             cell: Optional[dev_mastercellitems] = None,
                              on: Optional[bool] = True
                             ):
             A = await setup_process(request)
@@ -93,7 +93,7 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/activecell")
         async def activecell(
                              request: Request,
-                             cell: Optional[dev_activecellitems],
+                             cell: Optional[dev_activecellitems] = None,
                              on: Optional[bool] = True
                             ):
             A = await setup_process(request)
@@ -113,7 +113,7 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/pump")
         async def pump(
                        request: Request, 
-                       pump: Optional[dev_pumpitems],
+                       pump: Optional[dev_pumpitems] = None,
                        on: Optional[bool] = True
                       ):
             A = await setup_process(request)
@@ -133,7 +133,7 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/gasvalve")
         async def gasvalve(
                            request: Request, 
-                           gasvalve: Optional[dev_gasvalveitems],
+                           gasvalve: Optional[dev_gasvalveitems] = None,
                            on: Optional[bool] = True
                           ):
             A = await setup_process(request)
@@ -153,7 +153,7 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/liquidvalve")
         async def liquidvalve(
                               request: Request, 
-                              liquidvalve: Optional[dev_liquidvalveitems],
+                              liquidvalve: Optional[dev_liquidvalveitems] = None,
                               on: Optional[bool] = True
                              ):
             A = await setup_process(request)
@@ -193,7 +193,7 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/fswbcd")
         async def fswbcd(
                          request: Request,
-                         fswbcd: Optional[dev_fswbcditems],
+                         fswbcd: Optional[dev_fswbcditems] = None,
                          on: Optional[bool] = True
                         ):
             A = await setup_process(request)
@@ -213,7 +213,7 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/fsw")
         async def fsw(
                       request: Request,
-                      fsw: Optional[dev_fswitems],
+                      fsw: Optional[dev_fswitems] = None,
                      ):
             A = await setup_process(request)
             # some additional params in order to call the same driver functions 
