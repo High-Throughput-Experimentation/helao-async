@@ -167,9 +167,9 @@ config["servers"] = dict(
             #     'X':'PXI-6284/port0/line22'  #P0.22, two electrode
             #     },
             dev_pump = {
-                'PeriPump':'PXI-6284/port0/line4	', #P0.4
+                'peripump':'PXI-6284/port0/line4	', #P0.4
 #                'MultiPeriPump':'PXI-6284/port0/line0' #P0.0
-                'Direction':'PXI-6284/port0/line0' #P0.0
+                'direction':'PXI-6284/port0/line0' #P0.0
                 },
             dev_fsw = {
                 'done':'PXI-6284/port2/line4',  #P2.4
@@ -204,11 +204,12 @@ config["servers"] = dict(
             cam_file_path = r'C:\Users\rshs\Desktop\ADSS\adss_psc_methods\lcfc',
             cams = {
                     "archive":"lcfc_archive.cam",
+                    "archive_liquid":"lcfc_archive.cam",
                     "fillfixed":"lcfc_fill_hardcodedvolume.cam",
                     "fill":"lcfc_fill.cam",
-                    "test":"relay_actuation_test2.cam",
-                    "dilute":"lcfc_dilute.cam",
-                    "autodilute":"lcfc_dilute.cam",
+                    # "test":"relay_actuation_test2.cam",
+                    # "dilute":"lcfc_dilute.cam",
+                    # "autodilute":"lcfc_dilute.cam",
                     "deepclean":"lcfc_deep_clean.cam",
                    },
             positions = {
@@ -225,7 +226,8 @@ config["servers"] = dict(
                          "custom":{
                                    "elec_res1":"reservoir",
                                    "elec_res2":"reservoir",
-                                   "lcfc_res":"cell",
+                                    "cell1_we":"cell",
+                                    # "lcfc_res":"cell",
                                   }
                         },
         )
@@ -252,6 +254,7 @@ config["servers"] = dict(
         params = dict(
             doc_name = "ADSS Operator",
             orch = 'ORCH',
+            pal = 'PAL',
             # data_server = "data",
             # servicemode=False,
         )
