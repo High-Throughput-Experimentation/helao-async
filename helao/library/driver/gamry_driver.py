@@ -12,15 +12,12 @@ __all__ = ["gamry",
 
 from helaocore.schema import Process
 from helaocore.server import Base
-import sys
 import comtypes
 import comtypes.client as client
 import asyncio
 import time
 from enum import Enum
 import psutil
-import os
-import pyaml
 
 from helaocore.error import error_codes
 import helaocore.model.sample as hcms
@@ -274,11 +271,16 @@ class gamry:
 
                 self.pstat.Init(self.devices.EnumSections()[devid])
                 # self.base.print_message(" ... ", self.pstat)
+                self.base.print_message(
+                    f" ... Connected to Gamry on DevID {devid}!",
+                    info = True
+                )
 
             else:
                 self.pstat = None
                 self.base.print_message(
-                    f" ... No potentiostat is connected on DevID {devid}! Have you turned it on?"
+                    f" ... No potentiostat is connected on DevID {devid}! Have you turned it on?",
+                    error = True
                 )
 
         except Exception as e:
