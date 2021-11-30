@@ -3,7 +3,8 @@ Process library for ADSS
 server_key must be a FastAPI process server defined in config
 """
 
-__all__ = ["debug", 
+__all__ = [
+           "debug", 
            "ADSS_master_CA", 
            "ADSS_slave_startup", 
            "ADSS_slave_shutdown",
@@ -12,18 +13,22 @@ __all__ = ["debug",
            "ADSS_slave_drain",
            "ADSS_slave_clean_PALtool",
            "ADSS_slave_single_CA",
-           "OCV_sqtest"]
+           "ADSS_slave_unloadall_customs",
+           "ADSS_slave_load_solid",
+           "ADSS_slave_load_liquid",
+          ]
 
 
 from typing import Optional, List, Union
+from socket import gethostname
 
 from helaocore.schema import Process, Sequence, Sequencer
-
 from helaocore.server import process_start_condition
-from helao.library.driver.galil_driver import move_modes, transformation_mode
-
-from helao.library.driver.pal_driver import Spacingmethod, PALtools
 import helaocore.model.sample as hcms
+
+from helao.library.driver.galil_driver import move_modes, transformation_mode
+from helao.library.driver.pal_driver import Spacingmethod, PALtools
+
 
 SEQUENCES = __all__
 
@@ -60,27 +65,73 @@ def debug(pg_Obj: Sequence,
     # 1: orch is waiting for endpoint to become available
     # 2: orch is waiting for server to become available
     # 3: (or other): orch is waiting for all process_dq to finish
+
+    additional_local_var_added_to_sq = 12
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+
+    sq.add_process({
+        "process_server": f"{PAL_name}",
+        "process_name": "archive_custom_unload",
+        "process_params": {
+                        "custom": "cell1_we"
+                        },
+        "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
+        })
+
+    sq.add_process({
+        "process_server": f"{PAL_name}",
+        "process_name": "archive_custom_load",
+        "process_params": {
+                        "custom": "cell1_we",
+                        "load_samples_in": hcms.SampleList(samples=[hcms.SolidSample(**{"sample_no":1,
+                                                                                        "plate_id":4534,
+                                                                                        "machine_name":"legacy"
+                                                                                       })]).dict(),
+                        },
+        "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
+        })
+
+    sq.add_process({
+        "process_server": f"{PAL_name}",
+        "process_name": "archive_custom_query_sample",
+        "process_params": {
+                        "custom": "cell1_we",
+                        },
+        "to_global_params":["_fast_sample_in"], # save new liquid_sample_no of eche cell to globals
+        "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
+        })
+
+    # OCV
+    sq.add_process({
+        "process_server": f"{PSTAT_name}",
+        "process_name": "run_OCV",
+        "process_params": {
+                        "Tval": 10.0,
+                        "SampleRate": 1.0,
+                        "TTLwait": -1,  # -1 disables, else select TTL 0-3
+                        "TTLsend": -1,  # -1 disables, else select TTL 0-3
+                        "IErange": "auto",
+                        },
+        "from_global_params":{
+                    "_fast_sample_in":"fast_samples_in"
+                    },
+        "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
+        })
+
+
+    return sq.process_list # returns complete process list to orch
+
+
+
+def ADSS_slave_unloadall_customs(pg_Obj: Sequence):
+    """last functionality test: 11/29/2021"""
     
     sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_process({
-        "process_server": f"{NI_name}",
-        "process_name": "cellIV",
+        "process_server": f"{PAL_name}",
+        "process_name": "archive_custom_unloadall",
         "process_params": {
-                        "Tval": 10,
-                        "SampleRate": 1.0,
-                        "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                        "fast_samples_in":hcms.SampleList(samples=[
-                            hcms.LiquidSample(**{"sample_no":1}),
-                            hcms.LiquidSample(**{"sample_no":2}),
-                            hcms.LiquidSample(**{"sample_no":3}),
-                            hcms.LiquidSample(**{"sample_no":4}),
-                            hcms.LiquidSample(**{"sample_no":5}),
-                            hcms.LiquidSample(**{"sample_no":6}),
-                            hcms.LiquidSample(**{"sample_no":7}),
-                            hcms.LiquidSample(**{"sample_no":8}),
-                            hcms.LiquidSample(**{"sample_no":9}),
-                            ]).dict()
                         },
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         })
@@ -88,16 +139,93 @@ def debug(pg_Obj: Sequence,
     return sq.process_list # returns complete process list to orch
 
 
+def ADSS_slave_load_solid(
+                          pg_Obj: Sequence, 
+                          solid_custom_position: Optional[str] = "cell1_we",
+                          solid_plate_id: Optional[int] = 4534,
+                          solid_sample_no: Optional[int] = 1
+                         ):
+    """last functionality test: 11/29/2021"""
+    
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq.add_process({
+        "process_server": f"{PAL_name}",
+        "process_name": "archive_custom_load",
+        "process_params": {
+                        "custom": sq.pars.solid_custom_position,
+                        "load_samples_in": hcms.SampleList(samples=[hcms.SolidSample(**{"sample_no":sq.pars.solid_sample_no,
+                                                                                        "plate_id":sq.pars.solid_plate_id,
+                                                                                        "machine_name":"legacy"
+                                                                                       })]).dict(),
+                        },
+        "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
+        })
+    return sq.process_list # returns complete process list to orch
+
+
+def ADSS_slave_load_liquid(
+                          pg_Obj: Sequence, 
+                          liquid_custom_position: Optional[str] = "elec_res1",
+                          liquid_sample_no: Optional[int] = 1
+                         ):
+    """last functionality test: 11/29/2021"""
+    
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq.add_process({
+        "process_server": f"{PAL_name}",
+        "process_name": "archive_custom_load",
+        "process_params": {
+                        "custom": sq.pars.liquid_custom_position,
+                        "load_samples_in": hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":sq.pars.liquid_sample_no,
+                                                                                        "machine_name":gethostname()
+                                                                                       })]).dict(),
+                        },
+        "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
+        })
+    return sq.process_list # returns complete process list to orch
+
+
 def ADSS_slave_startup(pg_Obj: Sequence,
               x_mm: Optional[float] = 0.0, 
               y_mm: Optional[float] = 0.0,
+              solid_custom_position: Optional[str] = "cell1_we",
+              solid_plate_id: Optional[int] = 4534,
+              solid_sample_no: Optional[int] = 1,
+              liquid_custom_position: Optional[str] = "elec_res1",
+              liquid_sample_no: Optional[int] = 1
               ):
     """Slave sequence
-    (1) Move to position
-    (2) Engages cell"""
+    (1) Unload all custom position samples
+    (2) Load solid sample to cell
+    (3) Load liquid sample to reservoir
+    (4) Move to position
+    (5) Engages cell
+    
+    last functionality test: 11/29/2021"""
 
     
     sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+
+
+    # unload all samples from custom positions
+    sq.add_process_list(ADSS_slave_unloadall_customs(pg_Obj=pg_Obj))
+
+
+    # load new requested samples 
+    sq.add_process_list(ADSS_slave_load_solid(
+        pg_Obj=pg_Obj,
+        solid_custom_position = sq.pars.solid_custom_position,
+        solid_plate_id = sq.pars.solid_plate_id, 
+        solid_sample_no =sq.pars.solid_sample_no
+        ))
+    
+    sq.add_process_list( ADSS_slave_load_liquid(
+        pg_Obj=pg_Obj,
+        liquid_custom_position = sq.pars.liquid_custom_position,
+        liquid_sample_no =sq.pars.liquid_sample_no
+        ))
+
+
 
     # move z to home
     sq.add_process_list(ADSS_slave_disengage(pg_Obj))
@@ -126,7 +254,9 @@ def ADSS_slave_shutdown(pg_Obj: Sequence):
     (1) Deep clean PAL tool
     (2) pump liquid out off cell
     (3) Drain cell
-    (4) Disengages cell (TBD)"""
+    (4) Disengages cell (TBD)
+    
+    last functionality test: 11/29/2021"""
 
     sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
@@ -148,9 +278,9 @@ def ADSS_slave_shutdown(pg_Obj: Sequence):
     # set pump flow backward
     sq.add_process({
         "process_server": f"{NI_name}",
-        "process_name": "run_task_pump",
+        "process_name": "pump",
         "process_params": {
-                         "pump":"Direction",
+                         "pump":"direction",
                          "on": 1,
                          },
         "start_condition": process_start_condition.wait_for_all,
@@ -174,9 +304,9 @@ def ADSS_slave_shutdown(pg_Obj: Sequence):
     # turn pump off
     sq.add_process({
         "process_server": f"{NI_name}",
-        "process_name": "run_task_pump",
+        "process_name": "pump",
         "process_params": {
-                         "pump":"PeriPump",
+                         "pump":"peripump",
                          "on": 0,
                          },
         "start_condition": process_start_condition.wait_for_all,
@@ -185,9 +315,9 @@ def ADSS_slave_shutdown(pg_Obj: Sequence):
     # set pump flow forward
     sq.add_process({
         "process_server": f"{NI_name}",
-        "process_name": "run_task_pump",
+        "process_name": "pump",
         "process_params": {
-                         "pump":"Direction",
+                         "pump":"direction",
                          "on": 0,
                          },
         "start_condition": process_start_condition.wait_for_all,
@@ -205,7 +335,9 @@ def ADSS_slave_shutdown(pg_Obj: Sequence):
 
 def ADSS_slave_drain(pg_Obj: Sequence):
     """DUMMY Slave sequence
-    Drains electrochemical cell."""
+    Drains electrochemical cell.
+    
+    last functionality test: 11/29/2021"""
 
     sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
     # TODO
@@ -214,7 +346,9 @@ def ADSS_slave_drain(pg_Obj: Sequence):
 
 def ADSS_slave_engage(pg_Obj: Sequence):
     """Slave sequence
-    Engages and seals electrochemical cell."""
+    Engages and seals electrochemical cell.
+    
+    last functionality test: 11/29/2021"""
     
     sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
@@ -249,7 +383,9 @@ def ADSS_slave_engage(pg_Obj: Sequence):
 
 def ADSS_slave_disengage(pg_Obj: Sequence):
     """Slave sequence
-    Disengages and seals electrochemical cell."""
+    Disengages and seals electrochemical cell.
+    
+    last functionality test: 11/29/2021"""
 
     sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
@@ -273,7 +409,9 @@ def ADSS_slave_clean_PALtool(pg_Obj: Sequence,
                              clean_PAL_volume_ul: Optional[int] = 500
                              ):
     """Slave sequence
-    Performs deep clean of selected PAL tool."""
+    Performs deep clean of selected PAL tool.
+    
+    last functionality test: 11/29/2021"""
 
 
     sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
@@ -283,19 +421,8 @@ def ADSS_slave_clean_PALtool(pg_Obj: Sequence,
         "process_server": f"{PAL_name}",
         "process_name": "PAL_deepclean",
         "process_params": {
-                          # "liquid_sample_no_in": 0,
-                          # "PAL_method": PALmethods.deepclean,
                           "PAL_tool": sq.pars.clean_PAL_tool,
-                          # "PAL_source": "elec_res1",
                           "PAL_volume_ul": sq.pars.clean_PAL_volume_ul,
-                          # "PAL_totalruns": 1,
-                          # "PAL_sampleperiod": [0.0],
-                          # "PAL_spacingmethod": Spacingmethod.linear,
-                          # "PAL_spacingfactor": 1.0,
-                          # "PAL_wash1": 1, # dont use True or False but 0 AND 1
-                          # "PAL_wash2": 1,
-                          # "PAL_wash3": 1,
-                          # "PAL_wash4": 1,
                           },
         "start_condition": process_start_condition.wait_for_all,
         })
@@ -306,6 +433,10 @@ def ADSS_slave_clean_PALtool(pg_Obj: Sequence,
 def ADSS_master_CA(pg_Obj: Sequence,
               x_mm: Optional[float] = 0.0, 
               y_mm: Optional[float] = 0.0,
+              solid_custom_position: Optional[str] = "cell1_we",
+              solid_plate_id: Optional[int] = 4534,
+              solid_sample_no: Optional[int] = 1,
+              liquid_custom_position: Optional[str] = "elec_res1",
               liquid_sample_no: Optional[int] = 3,
               pH: Optional[float] = 9.53,
               CA_potentials_vsRHE: Optional[List[float]] = [0.2, 0.4, 0.6, 0.8, 1.0],
@@ -322,7 +453,10 @@ def ADSS_master_CA(pg_Obj: Sequence,
         potential (Volt): applied potential;
         CA_duration_sec (sec): how long the potential is applied;
         samplerate_sec (sec): sampleperiod of Gamry;
-        filltime_sec (sec): how long it takes to fill the cell with liquid or empty it."""
+        filltime_sec (sec): how long it takes to fill the cell with liquid or empty it.
+        
+        
+        last functionality test: tdb"""
 
 
 
@@ -331,11 +465,17 @@ def ADSS_master_CA(pg_Obj: Sequence,
     toNHE = -1.0*sq.pars.ref_vs_nhe-0.059*sq.pars.pH
     cycles = len(sq.pars.CA_potentials_vsRHE)
 
+
     # add startup processes to list
     sq.add_process_list(ADSS_slave_startup(
                                            pg_Obj=pg_Obj, 
                                            x_mm = sq.pars.x_mm, 
-                                           y_mm = sq.pars.y_mm
+                                           y_mm = sq.pars.y_mm,
+                                           solid_custom_position = sq.pars.solid_custom_position,
+                                           solid_plate_id = sq.pars.solid_plate_id,
+                                           solid_sample_no = sq.pars.solid_sample_no,
+                                           liquid_custom_position = sq.pars.liquid_custom_position,
+                                           liquid_sample_no = sq.pars.liquid_sample_no,
                                           ))
 
 
@@ -351,9 +491,13 @@ def ADSS_master_CA(pg_Obj: Sequence,
                 "process_params": {
                                  "PAL_tool": PALtools.LS3,
                                  "PAL_source": "elec_res1",
+                                 "PAL_dest": "cell1_we",
                                  "PAL_volume_ul": 10000,
+                                 "PAL_wash1": 0,
+                                 "PAL_wash2": 0,
+                                 "PAL_wash3": 0,
+                                 "PAL_wash4": 0,
                                  },
-                "to_global_params":["_eche_sample_no"], # save new liquid_sample_no of eche cell to globals
                 "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
                 })
 
@@ -361,9 +505,9 @@ def ADSS_master_CA(pg_Obj: Sequence,
             # set pump flow forward
             sq.add_process({
                 "process_server": f"{NI_name}",
-                "process_name": "run_task_pump",
+                "process_name": "pump",
                 "process_params": {
-                                 "pump":"Direction",
+                                 "pump":"direction",
                                  "on": 0,
                                  },
                 "start_condition": process_start_condition.wait_for_all,
@@ -372,9 +516,9 @@ def ADSS_master_CA(pg_Obj: Sequence,
             # turn on pump
             sq.add_process({
                 "process_server": f"{NI_name}",
-                "process_name": "run_task_pump",
+                "process_name": "pump",
                 "process_params": {
-                                 "pump":"PeriPump",
+                                 "pump":"peripump",
                                  "on": 1,
                                  },
                 "start_condition": process_start_condition.wait_for_all,
@@ -399,18 +543,20 @@ def ADSS_master_CA(pg_Obj: Sequence,
                 "process_params": {
                                  "PAL_tool": PALtools.LS3,
                                  "PAL_source": "elec_res1",
+                                 "PAL_dest": "cell1_we",
                                  "PAL_volume_ul": 1000,
+                                 "PAL_wash1": 0,
+                                 "PAL_wash2": 0,
+                                 "PAL_wash3": 0,
+                                 "PAL_wash4": 0,
                                  },
-                "to_global_params":["_eche_sample_no"],
                 "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
                 })
-
-
     
         sq.add_process_list(ADSS_slave_single_CA(
                                                  pg_Obj,
-                                                 x_mm = sq.pars.x_mm,
-                                                 y_mm = sq.pars.y_mm,
+                                                 # x_mm = sq.pars.x_mm,
+                                                 # y_mm = sq.pars.y_mm,
                                                  CA_single_potential = sq.pars.potential,
                                                  samplerate_sec = sq.pars.samplerate_sec,
                                                  OCV_duration_sec = sq.pars.OCV_duration_sec,
@@ -424,16 +570,32 @@ def ADSS_master_CA(pg_Obj: Sequence,
 
 
 def ADSS_slave_single_CA(pg_Obj: Sequence,
-              x_mm: Optional[float] = 0.0, 
-              y_mm: Optional[float] = 0.0,
+              # x_mm: Optional[float] = 0.0, 
+              # y_mm: Optional[float] = 0.0,
               CA_single_potential: Optional[float] = 0.0,
               samplerate_sec: Optional[float] = 1, 
               OCV_duration_sec: Optional[float] = 60, 
               CA_duration_sec: Optional[float] = 1320, 
               aliquot_times_sec: Optional[List[float]] = [60,600,1140],
               ):
-
+    """last functionality test: 11/29/2021"""
+    
     sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+
+
+
+
+
+    # get sample for gamry
+    sq.add_process({
+        "process_server": f"{PAL_name}",
+        "process_name": "archive_custom_query_sample",
+        "process_params": {
+                        "custom": "cell1_we",
+                        },
+        "to_global_params":["_fast_sample_in"], # save new liquid_sample_no of eche cell to globals
+        "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
+        })
     
     # OCV
     sq.add_process({
@@ -446,6 +608,9 @@ def ADSS_slave_single_CA(pg_Obj: Sequence,
                         "TTLsend": -1,  # -1 disables, else select TTL 0-3
                         "IErange": "auto",
                         },
+        "from_global_params":{
+                    "_fast_sample_in":"fast_samples_in"
+                    },
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         })
 
@@ -456,13 +621,28 @@ def ADSS_slave_single_CA(pg_Obj: Sequence,
         "process_name": "PAL_archive",
         "process_params": {
                           "PAL_tool": PALtools.LS3,
-                          "PAL_source": "lcfc_res",
+                          "PAL_source": "cell1_we",
                           "PAL_volume_ul": 200,
+                          "PAL_sampleperiod": [0.0],
+                          "PAL_spacingmethod":  Spacingmethod.linear,
+                          "PAL_spacingfactor": 1.0,
+                          "PAL_timeoffset": 0.0,
+                          "PAL_wash1": 0,
+                          "PAL_wash2": 0,
+                          "PAL_wash3": 0,
+                          "PAL_wash4": 0,
                           },
-        # "to_global_params":["_eche_sample_no"],
-        "from_global_params":{
-                    "_eche_sample_no":"liquid_sample_no_in"
-                    },
+        "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
+        })
+
+
+    sq.add_process({
+        "process_server": f"{PAL_name}",
+        "process_name": "archive_custom_query_sample",
+        "process_params": {
+                        "custom": "cell1_we",
+                        },
+        "to_global_params":["_fast_sample_in"], # save new liquid_sample_no of eche cell to globals
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         })
 
@@ -479,6 +659,9 @@ def ADSS_slave_single_CA(pg_Obj: Sequence,
                         "TTLsend": -1,  # -1 disables, else select TTL 0-3
                         "IErange": "auto",
                         },
+        "from_global_params":{
+                    "_fast_sample_in":"fast_samples_in"
+                    },
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         })
 
@@ -489,18 +672,17 @@ def ADSS_slave_single_CA(pg_Obj: Sequence,
         "process_name": "PAL_archive",
         "process_params": {
                           "PAL_tool": PALtools.LS3,
-                          "PAL_source": "lcfc_res",
+                          "PAL_source": "cell1_we",
                           "PAL_volume_ul": 200,
-                          # "PAL_totalruns": len(aliquot_times_sec),
                           "PAL_sampleperiod": sq.pars.aliquot_times_sec, #1min, 10min, 10min
                           "PAL_spacingmethod": Spacingmethod.custom,
                           "PAL_spacingfactor": 1.0,
                           "PAL_timeoffset": 60.0,
+                          "PAL_wash1": 0,
+                          "PAL_wash2": 0,
+                          "PAL_wash3": 0,
+                          "PAL_wash4": 0,
                           },
-        # "to_global_params":["_eche_sample_no"],
-        "from_global_params":{
-                    "_eche_sample_no":"liquid_sample_no_in"
-                    },
         "start_condition": process_start_condition.wait_for_endpoint, # orch is waiting for all process_dq to finish
         })
 
@@ -511,50 +693,18 @@ def ADSS_slave_single_CA(pg_Obj: Sequence,
         "process_name": "PAL_archive",
         "process_params": {
                           "PAL_tool": PALtools.LS3,
-                          "PAL_source": "lcfc_res",
+                          "PAL_source": "cell1_we",
                           "PAL_volume_ul": 200,
+                          "PAL_sampleperiod": [0.0],
+                          "PAL_spacingmethod":  Spacingmethod.linear,
+                          "PAL_spacingfactor": 1.0,
+                          "PAL_timeoffset": 0.0,
                           "PAL_wash1": 1, # dont use True or False but 0 AND 1
                           "PAL_wash2": 1,
                           "PAL_wash3": 1,
                           "PAL_wash4": 1,
                           },
-        # "to_global_params":["_eche_sample_no"],
-        "from_global_params":{
-                    "_eche_sample_no":"liquid_sample_no_in"
-                    },
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         })
-
-    return sq.process_list # returns complete process list to orch
-
-
-def OCV_sqtest(pg_Obj: Sequence,
-               OCV_duration_sec: Optional[float] = 10.0,
-               samplerate_sec: Optional[float] = 1.0,
-              ):
-
-    """This is the description of the sequence which will be displayed
-       in the operator webgui. For all function parameters (except pg_Obj)
-       a input field will be (dynamically) presented in the OP webgui.""" 
-    
-    additional_local_var = 12
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
-
-    sq.add_process(
-        {
-        "process_server": f"{PSTAT_name}",
-        "process_name": "run_OCV",
-        "process_params": {
-                        "Tval": sq.pars.OCV_duration_sec,
-                        "SampleRate": sq.pars.samplerate_sec,
-                        "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                        "TTLsend": -1,  # -1 disables, else select TTL 0-3
-                        "IErange": "auto",
-                        },
-        "save_prc": True,
-        "save_data": True,
-        "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
-        }
-    )
 
     return sq.process_list # returns complete process list to orch
