@@ -72,7 +72,7 @@ def makeApp(confPrefix, servKey):
         last_time = start_time
         while time.time()-start_time < waittime:
             await asyncio.sleep(1)
-            app.orch.print_message(f" ... orch waited {time.time()-start_time}sec")
+            app.orch.print_message(f" ... orch waited {(time.time()-start_time):.1f} sec / {waittime:.1f} sec")
         # await asyncio.sleep(waittime)
         app.orch.print_message(' ... wait process done')
         finished_process = await active.finish()
