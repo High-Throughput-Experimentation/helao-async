@@ -82,7 +82,16 @@ class C_async_operator:
 
         self.config_dict = self.vis.server_cfg["params"]
         self.orch_name = self.config_dict["orch"]
-        
+        self.pal_name = self.config_dict.get("pal", None)
+        self.dev_customitems = []
+        if self.pal_name is not None:
+            pal_server_params = self.vis.world_cfg["servers"][self.pal_name]["params"]
+            if "positions" in pal_server_params:
+                dev_custom = pal_server_params["positions"].get("custom",dict())
+            else:
+                dev_custom = dict()
+            self.dev_customitems = [key for key in dev_custom.keys()]
+
         self.pmdata = []
         
 
@@ -149,31 +158,22 @@ class C_async_operator:
         self.button_append = Button(label="append sq", button_type="default", width=150)
         self.button_append.on_event(ButtonClick, self.callback_append)
 
-
-
-
-#        self.process_descr_txt = Paragraph(text="""select item""", width=600, height=30)
-        self.process_descr_txt = Div(text="""select item""", width=600, height=30)
+        self.process_descr_txt = Div(text="""select item""", width=600)
         self.error_txt = Paragraph(text="""no error""", width=600, height=30, style={"font-size": "100%", "color": "black"})
 
-
-        self.input_sampleno = TextInput(value="", title="sample no", disabled=False, width=330, height=40)
-        self.input_sampleno.on_change("value", self.callback_changed_sampleno)
-        self.input_plateid = TextInput(value="", title="plate id", disabled=False, width=60, height=40)
-        self.input_plateid.on_change("value", self.callback_changed_plateid)
+        self.input_solid_sample_no = TextInput(value="", title="sample no", disabled=False, width=330, height=40)
+        self.input_solid_sample_no.on_change("value", self.callback_changed_sampleno)
+        self.input_solid_plate_id = TextInput(value="", title="plate id", disabled=False, width=60, height=40)
+        self.input_solid_plate_id.on_change("value", self.callback_changed_plateid)
         
-        self.input_label = TextInput(value="nolabel", title="label", disabled=False, width=120, height=40)
+        self.input_sequence_label = TextInput(value="nolabel", title="sequence label", disabled=False, width=120, height=40)
         self.input_elements = TextInput(value="", title="elements", disabled=False, width=120, height=40)
         self.input_code = TextInput(value="", title="code", disabled=False, width=60, height=40)
         self.input_composition = TextInput(value="", title="composition", disabled=False, width=220, height=40)
 
-
-
-
         self.plot_mpmap = figure(title="PlateMap", height=300,x_axis_label="X (mm)", y_axis_label="Y (mm)",width = 640)
         self.plot_mpmap.on_event(DoubleTap, self.callback_clicked_pmplot)
         self.update_pm_plot()
-
 
         self.layout0 = layout([
             layout(
@@ -191,11 +191,7 @@ class C_async_operator:
             layout([
                 # [Paragraph(text="""Load sample list from file:""", width=600, height=30)],
                 # [self.button_load_sample_list],
-                [self.input_plateid, self.input_sampleno],
-                [self.input_elements, self.input_code, self.input_composition],
-                [self.input_label],
-                Spacer(height=10),
-                [self.plot_mpmap],
+                [self.input_sequence_label],
                 Spacer(height=10),
                 ]),
             ])
@@ -444,30 +440,17 @@ class C_async_operator:
             return val
         
         selected_sequence = self.sequence_dropdown.value
-        selplateid = self.input_plateid.value
-        selsample = self.input_sampleno.value
-        sellabel = self.input_label.value
-        # elements = self.input_elements.value
-        # code  = self.input_code.value
-        # composition = self.input_composition.value
+        sellabel = self.input_sequence_label.value
 
         self.vis.print_message(f" ... selected process from list: {selected_sequence}")
-        self.vis.print_message(f" ... selected plateid: {selplateid}")
-        self.vis.print_message(f" ... selected sample: {selsample}")
         self.vis.print_message(f" ... selected label: {sellabel}")
 
-
         sequence_params = {paraminput.title: to_json(paraminput.value) for paraminput in self.param_input}
-        sequence_params["plate_id"] = selplateid
-        sequence_params["plate_sample_no"] = selsample
-
         D = Sequence(inputdict={
             # "orch_name":orch_name,
             "sequence_label":sellabel,
             "sequence_name":selected_sequence,
             "sequence_params":sequence_params,
-            # "result_dict":result_dict,
-            # "access":access,
         })
 
         return D.fastdict()
@@ -495,12 +478,7 @@ class C_async_operator:
             # skip the sequence_Obj parameter
             if args[idx] == "pg_Obj":
                 continue
-
             disabled = False
-            if args[idx] == "x_mm":
-                disabled = True
-            if args[idx] == "y_mm":
-                disabled = True
 
             self.param_input.append(TextInput(value=buf, title=args[idx], disabled=disabled, width=400, height=40))
             self.param_layout.append(layout([
@@ -508,6 +486,42 @@ class C_async_operator:
                         Spacer(height=10),
                         ],background="#BDB76B",width=640))
             item = item + 1
+
+            # special key params
+            if args[idx] == "solid_plate_id":
+                self.input_solid_plate_id = self.param_input[-1]
+                self.input_solid_plate_id.on_change("value", self.callback_changed_plateid)
+                self.param_layout.append(layout([
+                            [self.plot_mpmap],
+                            Spacer(height=10),
+                            ],background="#BDB76B",width=640))
+                self.param_layout.append(layout([
+                            [self.input_elements, self.input_code, self.input_composition],
+                            Spacer(height=10),
+                            ],background="#BDB76B",width=640))
+            elif args[idx] == "solid_sample_no":
+                self.input_solid_sample_no = self.param_input[-1]
+                self.input_solid_sample_no.on_change("value", self.callback_changed_sampleno)
+            elif args[idx] == "x_mm":
+                self.param_input[-1].disabled = True
+            elif args[idx] == "y_mm":
+                self.param_input[-1].disabled = True
+            elif args[idx] == "solid_custom_position":
+                self.param_input[-1] = Select(title=args[idx], value = None, options=self.dev_customitems)
+                if self.dev_customitems:
+                    self.param_input[-1].value = self.dev_customitems[0]
+                self.param_layout[-1] = layout([
+                            [self.param_input[-1]],
+                            Spacer(height=10),
+                            ],background="#BDB76B",width=640)
+            elif args[idx] == "liquid_custom_position":
+                self.param_input[-1] = Select(title=args[idx], value = None, options=self.dev_customitems)
+                if self.dev_customitems:
+                    self.param_input[-1].value = self.dev_customitems[0]
+                self.param_layout[-1] = layout([
+                            [self.param_input[-1]],
+                            Spacer(height=10),
+                            ],background="#BDB76B",width=640)
 
         self.dynamic_col.children.insert(-1, layout(self.param_layout))
 
@@ -522,11 +536,11 @@ class C_async_operator:
 
     def update_plateid(self, value):
         """updates plateid text input"""
-        self.input_plateid.value = value
+        self.input_solid_plate_id.value = value
 
 
     def update_samples(self, value):
-        self.input_sampleno.value = value
+        self.input_solid_sample_no.value = value
 
 
     def update_xysamples(self, xval, yval):
