@@ -773,7 +773,10 @@ class cPAL:
             micropal.PAL_requested_source.vial = source_vial
 
 
-        self.base.print_message(f"PAL_source: Got sample '{sample_in.samples[0].global_label}' in position '{source}'", info = True)
+        if sample_in.samples:
+            self.base.print_message(f"PAL_source: Got sample '{sample_in.samples[0].global_label}' in position '{source}'", info = True)
+        else:
+            self.base.print_message(f"PAL_source: Got sample no sampple in position '{source}'", info = True)
  
         # done with checking source type
         # setting inheritance and status to None for all samples
@@ -1470,7 +1473,7 @@ class cPAL:
                                                  num:int
                                                 ):
         error = error_codes.none
-
+        retval = False
         if len(micropal.PAL_runtime_source[num].sample.samples) > 0:
             sample_in = hcms.SampleList(samples=[micropal.PAL_runtime_source[num].sample.samples[0]])
             if micropal.PAL_runtime_source[num].position == "tray":
