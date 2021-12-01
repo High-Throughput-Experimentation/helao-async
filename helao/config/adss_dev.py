@@ -9,7 +9,7 @@ config = dict()
 # lists from input sequence_id grouping
 config["process_libraries"] = ["ADSS"]
 config["technique_name"] = "adss"
-config["save_root"] = r"C:\INST_dev2\RUNS"
+config["root"] = r"C:\INST_dev2"
 config["local_db_path"] = r"C:\INST_dev2\DATABASE"
 
 
@@ -168,20 +168,20 @@ config["servers"] = dict(
             #     },
             dev_pump = {
                 'peripump':'PXI-6284/port0/line4	', #P0.4
-#                'MultiPeriPump':'PXI-6284/port0/line0' #P0.0
+                # 'MultiPeriPump':'PXI-6284/port0/line0' #P0.0
                 'direction':'PXI-6284/port0/line0' #P0.0
                 },
             dev_fsw = {
                 'done':'PXI-6284/port2/line4',  #P2.4
                 'error':'PXI-6284/port2/line6'  #P2.6
                 },
-#             dev_RSHTTLhandshake = {
-#                 'RSH1':'PXI-6284/port2/line5',  #P2.5
-#                 'RSH2':'PXI-6284/port2/line7',  #P2.7
-#                 'RSH3':'PXI-6284/port2/line3',  #P2.3
-# #                'port':'PXI-6284/ctr0',
-# #                'term':'/PXI-6284/PFI8' #P2.0
-#                 }
+            # dev_RSHTTLhandshake = {
+            #     'RSH1':'PXI-6284/port2/line5',  #P2.5
+            #     'RSH2':'PXI-6284/port2/line7',  #P2.7
+            #     'RSH3':'PXI-6284/port2/line3',  #P2.3
+            #     #'port':'PXI-6284/ctr0',
+            #     #'term':'/PXI-6284/PFI8' #P2.0
+            #     }
         )
     ),
     PAL=dict(
@@ -211,21 +211,21 @@ config["servers"] = dict(
                     # "dilute":"lcfc_dilute.cam",
                     # "autodilute":"lcfc_dilute.cam",
                     "deepclean":"lcfc_deep_clean.cam",
-                   },
+                    },
             positions = {
-                         "tray1":{
+                          "tray1":{
                                   "slot1":None,
                                   "slot2":None,
                                   "slot3":None,
-                                 },
-                         "tray2":{
+                                  },
+                          "tray2":{
                                   "slot1":"VT54",
                                   "slot2":"VT54",
                                   "slot3":"VT54",
-                                 },
-                         "custom":{
-                                   "elec_res1":"reservoir",
-                                   "elec_res2":"reservoir",
+                                  },
+                          "custom":{
+                                    "elec_res1":"reservoir",
+                                    "elec_res2":"reservoir",
                                     "cell1_we":"cell",
                                     # "lcfc_res":"cell",
                                   }

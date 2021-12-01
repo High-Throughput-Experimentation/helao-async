@@ -33,6 +33,6 @@ if __name__ == "__main__":
     LOGGING_CONFIG["formatters"]["access"]["fmt"] = f"[%(asctime)s_{servKey}]: %(levelprefix)s %(message)s"
     LOGGING_CONFIG["formatters"]["access"]["use_colors"] = False
 
-    print_message({}, "fast_launcher", f" ---- starting  {servKey} ----", error=True)
+    print_message({}, "fast_launcher", f" ---- starting  {servKey} ----")
     uvicorn.run(app, host=S['host'], port=S['port'])
     
