@@ -194,8 +194,9 @@ class Archive():
         self.world_config = process_serv.world_cfg
         
         self.position_config = self.config_dict.get("positions", None)
-        self.local_data_dump = self.world_config["root"]
-        self.archivepck = os.path.join(self.local_data_dump,"RUNS", f"{gethostname()}_archive.pck")
+        self.archivepck = None
+        if self.base.states_root is not None:
+            self.archivepck = os.path.join(self.base.states_root, f"{gethostname()}_archive.pck")
         self.config = {}
 
         self.sample_no_db_path = self.world_config["local_db_path"]
@@ -346,16 +347,20 @@ class Archive():
         
 
     def load_config(self):
-        with open(self.archivepck, "rb") as f:
-            data = pickle.load(f)
-            self.trays = data.get("trays", [])
-            self.custom_positions = data.get("customs", {})
-
+        if self.archivepck is not None:
+            with open(self.archivepck, "rb") as f:
+                data = pickle.load(f)
+                self.trays = data.get("trays", [])
+                self.custom_positions = data.get("customs", {})
+        else:
+            self.trays = []
+            self.custom_positions = {}
 
     def write_config(self):
-        data = {"customs":self.custom_positions, "trays":self.trays}
-        with open(self.archivepck, "wb") as f:
-            pickle.dump(data, f)
+        if self.archivepck is not None:
+            data = {"customs":self.custom_positions, "trays":self.trays}
+            with open(self.archivepck, "wb") as f:
+                pickle.dump(data, f)
 
     async def update_samples_from_db(self):
         self.base.print_message("Updating all samples in position table.", info = True)
