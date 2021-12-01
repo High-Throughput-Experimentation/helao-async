@@ -176,8 +176,8 @@ class Archive():
         self.world_config = process_serv.world_cfg
         
         self.position_config = self.config_dict.get("positions", None)
-        self.local_data_dump = self.world_config["save_root"]
-        self.archivepck = os.path.join(self.local_data_dump, f"{gethostname()}_archive.pck")
+        self.local_data_dump = self.world_config["root"]
+        self.archivepck = os.path.join(self.local_data_dump,"RUNS", f"{gethostname()}_archive.pck")
         self.config = {}
 
         self.sample_no_db_path = self.world_config["local_db_path"]
@@ -308,7 +308,7 @@ class Archive():
                                         
                                         
                                     if slot_item is not None:
-                                        self.base.print_message(f" ... got {slot_item}")
+                                        self.base.print_message(f"got {slot_item}")
                                         if slot_item == "VT54":
                                             trays_dict[tmpi][slot_no] = VT54()
                                         elif slot_item == "VT15":
@@ -318,7 +318,7 @@ class Archive():
 
 
                                         else:
-                                            self.base.print_message(f" ... slot type {slot_item} not supported", error = True)
+                                            self.base.print_message(f"slot type {slot_item} not supported", error = True)
                                             trays_dict[tmpi][slot_no] = None
                                     else:
                                         trays_dict[tmpi][slot_no] = None
@@ -592,7 +592,7 @@ class Archive():
                                     new_vial_vol = self.trays[tray_no][slot_no].max_vol_ml
                                     self.trays[tray_no][slot_no].blocked[position] = True
     
-            self.base.print_message(f" ... new vial nr. {new_vial} in slot {new_slot} in tray {new_tray}")
+            self.base.print_message(f"new vial nr. {new_vial} in slot {new_slot} in tray {new_tray}")
             return {"tray": new_tray, "slot": new_slot, "vial": new_vial}
 
 

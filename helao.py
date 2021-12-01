@@ -63,10 +63,10 @@ class Pidd:
         try:
             self.load_global()
         except IOError:
-            print_message({}, "launcher", f"'{pidFile}' does not exist, writing empty global dict.", error = True)
+            print_message({}, "launcher", f"'{pidFile}' does not exist, writing empty global dict.", info = True)
             self.write_global()
         except Exception:
-            print_message({}, "launcher", f"Error loading '{pidFile}', writing empty global dict.", error = True)
+            print_message({}, "launcher", f"Error loading '{pidFile}', writing empty global dict.", info = True)
             self.write_global()
 
     def load_global(self):
@@ -136,7 +136,7 @@ class Pidd:
                         p.terminate()
                         time.sleep(0.5)
                         if not psutil.pid_exists(p.pid):
-                            print_message({}, "launcher", f"Successfully terminated server '{k}'.", info = True)
+                            print_message({}, "launcher", f"Successfully terminated server '{k}'.")
                             return True
                     if psutil.pid_exists(p.pid):
                         print_message({}, "launcher", 
@@ -155,11 +155,11 @@ class Pidd:
         activeserver = [k for k, _, _, _ in active]
         KILL_ORDER = ["operator", "visualizer", "process", "orchestrator"]
         for group in KILL_ORDER:
-            print_message({}, "launcher", f"Killing {group} group.", error = True)
+            print_message({}, "launcher", f"Killing {group} group.")
             if group in pidd.A:
                 G = pidd.A[group]
                 for server in G:
-                    print_message({}, "launcher", f"Killing {server}.", error = True)
+                    print_message({}, "launcher", f"Killing {server}.")
                     if server in activeserver:
                         self.kill_server(server)
 
@@ -173,7 +173,7 @@ class Pidd:
             for x in active:
                 print_message({}, "launcher", x)
         else:
-            print_message({}, "launcher", f"All processes terminated. Removing '{self.pidFile}'", info = True)
+            print_message({}, "launcher", f"All processes terminated. Removing '{self.pidFile}'")
             os.remove(self.pidFile)
 
 

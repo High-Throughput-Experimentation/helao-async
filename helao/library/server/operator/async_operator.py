@@ -94,6 +94,8 @@ class C_async_operator:
 
         self.pmdata = []
         
+        self.color_sq_param_inputs = "#BDB76B"
+
 
         # holds the page layout
         self.layout = []
@@ -167,11 +169,15 @@ class C_async_operator:
         self.input_solid_plate_id.on_change("value", self.callback_changed_plateid)
         
         self.input_sequence_label = TextInput(value="nolabel", title="sequence label", disabled=False, width=120, height=40)
-        self.input_elements = TextInput(value="", title="elements", disabled=False, width=120, height=40)
-        self.input_code = TextInput(value="", title="code", disabled=False, width=60, height=40)
-        self.input_composition = TextInput(value="", title="composition", disabled=False, width=220, height=40)
+        self.input_elements = TextInput(value="", title="elements", disabled=True, width=120, height=40)
+        self.input_code = TextInput(value="", title="code", disabled=True, width=60, height=40)
+        self.input_composition = TextInput(value="", title="composition", disabled=True, width=220, height=40)
 
         self.plot_mpmap = figure(title="PlateMap", height=300,x_axis_label="X (mm)", y_axis_label="Y (mm)",width = 640)
+        self.plot_mpmap.border_fill_color = self.color_sq_param_inputs
+        self.plot_mpmap.border_fill_alpha = 0.5
+        self.plot_mpmap.background_fill_color = self.color_sq_param_inputs
+        self.plot_mpmap.background_fill_alpha = 0.5
         self.plot_mpmap.on_event(DoubleTap, self.callback_clicked_pmplot)
         self.update_pm_plot()
 
@@ -189,8 +195,6 @@ class C_async_operator:
                 Spacer(height=10),
                 ],background="#808080",width=640),
             layout([
-                # [Paragraph(text="""Load sample list from file:""", width=600, height=30)],
-                # [self.button_load_sample_list],
                 [self.input_sequence_label],
                 Spacer(height=10),
                 ]),
@@ -229,7 +233,7 @@ class C_async_operator:
     def get_sequence_lib(self):
         """Return the current list of sequences."""
         self.sequences = []
-        self.vis.print_message(f" ... found sequence: {[sequence for sequence in self.sequence_lib]}")
+        self.vis.print_message(f"found sequence: {[sequence for sequence in self.sequence_lib]}")
         for i, sequence in enumerate(self.sequence_lib):
             # self.vis.print_message("full",inspect.getfullargspec(self.sequence_lib[sequence]))
             #self.vis.print_message("anno",inspect.getfullargspec(self.sequence_lib[sequence]).annotations)
@@ -272,7 +276,7 @@ class C_async_operator:
             for line in response:
                 for key, value in line.items():
                     self.sequence_list[key].append(value)
-        self.vis.print_message(" ... current queued sequences:",self.sequence_list)
+        self.vis.print_message(f"current queued sequences: {self.sequence_list}")
 
 
     async def get_processes(self):
@@ -286,7 +290,7 @@ class C_async_operator:
             for line in response:
                 for key, value in line.items():
                     self.process_list[key].append(value)
-        self.vis.print_message(" ... current queued processes:",self.process_list)
+        self.vis.print_message(f"current queued processes: {self.process_list}")
 
 
     async def get_active_processes(self):
@@ -300,7 +304,7 @@ class C_async_operator:
             for line in response:
                 for key, value in line.items():
                     self.active_process_list[key].append(value)
-        self.vis.print_message(" ... current active processes:",self.active_process_list)
+        self.vis.print_message(f"current active processes: {self.active_process_list}")
 
 
     async def do_orch_request(self,process_name, 
@@ -333,8 +337,7 @@ class C_async_operator:
 
     def callback_clicked_pmplot(self, event):
         """double click/tap on PM plot to add/move marker"""
-        self.vis.print_message("DOUBLE TAP PMplot")
-        self.vis.print_message(event.x, event.y)
+        self.vis.print_message(f"DOUBLE TAP PMplot: {event.x}, {event.y}")
         # get coordinates of doubleclick
         platex = event.x
         platey = event.y
@@ -375,31 +378,31 @@ class C_async_operator:
 
 
     def callback_start(self, event):
-        self.vis.print_message(" ... starting orch")
+        self.vis.print_message("starting orch")
         self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"start"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_stop(self, event):
-        self.vis.print_message(" ... stopping operator orch")
+        self.vis.print_message("stopping operator orch")
         self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"stop"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_skip_dec(self, event):
-        self.vis.print_message(" ... skipping sequence")
+        self.vis.print_message("skipping sequence")
         self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"skip"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_clear_sequences(self, event):
-        self.vis.print_message(" ... clearing sequences")
+        self.vis.print_message("clearing sequences")
         self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_sequences"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_clear_processes(self, event):
-        self.vis.print_message(" ... clearing processes")
+        self.vis.print_message("clearing processes")
         self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_processes"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
@@ -442,8 +445,8 @@ class C_async_operator:
         selected_sequence = self.sequence_dropdown.value
         sellabel = self.input_sequence_label.value
 
-        self.vis.print_message(f" ... selected process from list: {selected_sequence}")
-        self.vis.print_message(f" ... selected label: {sellabel}")
+        self.vis.print_message(f"selected process from list: {selected_sequence}")
+        self.vis.print_message(f"selected label: {sellabel}")
 
         sequence_params = {paraminput.title: to_json(paraminput.value) for paraminput in self.param_input}
         D = Sequence(inputdict={
@@ -468,13 +471,13 @@ class C_async_operator:
         self.param_layout = [
             layout([
                 [Spacer(width=10), Div(text="<b>Optional sequence parameters:</b>", width=200+50, height=15, style={"font-size": "100%", "color": "black"})],
-                ],background="#BDB76B",width=640),
+                ],background=self.color_sq_param_inputs,width=640),
             ]
 
         item = 0
         for idx in range(len(args)):
             buf = f"{defaults[idx]}"
-            # self.vis.print_message(" ... process parameter:",args[idx])
+            # self.vis.print_message("process parameter:",args[idx])
             # skip the sequence_Obj parameter
             if args[idx] == "pg_Obj":
                 continue
@@ -484,7 +487,7 @@ class C_async_operator:
             self.param_layout.append(layout([
                         [self.param_input[item]],
                         Spacer(height=10),
-                        ],background="#BDB76B",width=640))
+                        ],background=self.color_sq_param_inputs,width=640))
             item = item + 1
 
             # special key params
@@ -494,11 +497,11 @@ class C_async_operator:
                 self.param_layout.append(layout([
                             [self.plot_mpmap],
                             Spacer(height=10),
-                            ],background="#BDB76B",width=640))
+                            ],background=self.color_sq_param_inputs,width=640))
                 self.param_layout.append(layout([
                             [self.input_elements, self.input_code, self.input_composition],
                             Spacer(height=10),
-                            ],background="#BDB76B",width=640))
+                            ],background=self.color_sq_param_inputs,width=640))
             elif args[idx] == "solid_sample_no":
                 self.input_solid_sample_no = self.param_input[-1]
                 self.input_solid_sample_no.on_change("value", self.callback_changed_sampleno)
@@ -513,7 +516,7 @@ class C_async_operator:
                 self.param_layout[-1] = layout([
                             [self.param_input[-1]],
                             Spacer(height=10),
-                            ],background="#BDB76B",width=640)
+                            ],background=self.color_sq_param_inputs,width=640)
             elif args[idx] == "liquid_custom_position":
                 self.param_input[-1] = Select(title=args[idx], value = None, options=self.dev_customitems)
                 if self.dev_customitems:
@@ -521,7 +524,7 @@ class C_async_operator:
                 self.param_layout[-1] = layout([
                             [self.param_input[-1]],
                             Spacer(height=10),
-                            ],background="#BDB76B",width=640)
+                            ],background=self.color_sq_param_inputs,width=640)
 
         self.dynamic_col.children.insert(-1, layout(self.param_layout))
 
@@ -628,13 +631,13 @@ class C_async_operator:
 
 
     def get_sample_infos(self, PMnum: List = None):
-        self.vis.print_message(" ... updating samples")
+        self.vis.print_message("updating samples")
         buf = ""
         if PMnum is not None and self.pmdata:
             if PMnum[0] is not None: # need to check as this can also happen
-                self.vis.print_message(f" ... selected sampleid: {PMnum[0]}")
+                self.vis.print_message(f"selected sampleid: {PMnum[0]}")
                 if PMnum[0] > len(self.pmdata):
-                    self.vis.print_message(" ... invalid sample no")
+                    self.vis.print_message("invalid sample no")
                     self.vis.doc.add_next_tick_callback(partial(self.update_samples,""))
                     return False
                 

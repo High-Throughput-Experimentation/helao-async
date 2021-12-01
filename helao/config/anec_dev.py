@@ -5,7 +5,7 @@ config = dict()
 # lists from input sequence_id grouping
 config["process_libraries"] = ["ANEC"]
 config["technique_name"] = "anec"
-config["save_root"] = r"C:\INST_dev2\RUNS"
+config["root"] = r"C:\INST_dev2"
 config["local_db_path"] = r"C:\INST_dev2\DATABASE"
 
 
