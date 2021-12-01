@@ -5,7 +5,7 @@ server_key must be a FastAPI process server defined in config
 
 __all__ = [
            "debug", 
-           "ADSS_master_CA", 
+           "ADSS_duaribilty_CAv1", 
            "ADSS_slave_startup", 
            "ADSS_slave_shutdown",
            "ADSS_slave_engage", 
@@ -101,6 +101,7 @@ def debug(pg_Obj: Sequence,
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         })
 
+
     # OCV
     sq.add_process({
         "process_server": f"{PSTAT_name}",
@@ -186,11 +187,11 @@ def ADSS_slave_load_liquid(
 
 
 def ADSS_slave_startup(pg_Obj: Sequence,
-              x_mm: Optional[float] = 0.0, 
-              y_mm: Optional[float] = 0.0,
               solid_custom_position: Optional[str] = "cell1_we",
               solid_plate_id: Optional[int] = 4534,
               solid_sample_no: Optional[int] = 1,
+              x_mm: Optional[float] = 0.0, 
+              y_mm: Optional[float] = 0.0,
               liquid_custom_position: Optional[str] = "elec_res1",
               liquid_sample_no: Optional[int] = 1
               ):
@@ -224,6 +225,28 @@ def ADSS_slave_startup(pg_Obj: Sequence,
         liquid_custom_position = sq.pars.liquid_custom_position,
         liquid_sample_no =sq.pars.liquid_sample_no
         ))
+
+    # turn pump off
+    sq.add_process({
+        "process_server": f"{NI_name}",
+        "process_name": "pump",
+        "process_params": {
+                         "pump":"peripump",
+                         "on": 0,
+                         },
+        "start_condition": process_start_condition.wait_for_all,
+        })
+
+    # set pump flow forward
+    sq.add_process({
+        "process_server": f"{NI_name}",
+        "process_name": "pump",
+        "process_params": {
+                         "pump":"direction",
+                         "on": 0,
+                         },
+        "start_condition": process_start_condition.wait_for_all,
+        })
 
 
 
@@ -430,16 +453,16 @@ def ADSS_slave_clean_PALtool(pg_Obj: Sequence,
     return sq.process_list # returns complete process list to orch
 
 
-def ADSS_master_CA(pg_Obj: Sequence,
-              x_mm: Optional[float] = 0.0, 
-              y_mm: Optional[float] = 0.0,
+def ADSS_duaribilty_CAv1(pg_Obj: Sequence,
               solid_custom_position: Optional[str] = "cell1_we",
               solid_plate_id: Optional[int] = 4534,
               solid_sample_no: Optional[int] = 1,
+              x_mm: Optional[float] = 0.0, 
+              y_mm: Optional[float] = 0.0,
               liquid_custom_position: Optional[str] = "elec_res1",
               liquid_sample_no: Optional[int] = 3,
               pH: Optional[float] = 9.53,
-              CA_potentials_vsRHE: Optional[List[float]] = [0.2, 0.4, 0.6, 0.8, 1.0],
+              CA_potentials_vsRHE: Optional[List[float]] = [-0.2, 0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
               CA_duration_sec: Optional[float] = 1320, 
               aliquot_times_sec: Optional[List[float]] = [60,600,1140],
               OCV_duration_sec: Optional[float] = 60, 
@@ -456,15 +479,13 @@ def ADSS_master_CA(pg_Obj: Sequence,
         filltime_sec (sec): how long it takes to fill the cell with liquid or empty it.
         
         
-        last functionality test: tdb"""
+        last functionality test: 11/30/2021"""
 
 
 
     sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
-    toNHE = -1.0*sq.pars.ref_vs_nhe-0.059*sq.pars.pH
-    cycles = len(sq.pars.CA_potentials_vsRHE)
-
+    potentials = [pot-1.0*sq.pars.ref_vs_nhe-0.059*sq.pars.pH  for pot in sq.pars.CA_potentials_vsRHE]
 
     # add startup processes to list
     sq.add_process_list(ADSS_slave_startup(
@@ -479,8 +500,7 @@ def ADSS_master_CA(pg_Obj: Sequence,
                                           ))
 
 
-    for cycle in range(cycles):
-        potential = CA_potentials_vsRHE(cycle)+toNHE
+    for cycle, potential in enumerate(potentials):
         print(f" ... cycle {cycle} potential:", potential)
         if cycle == 0:
         
@@ -555,14 +575,13 @@ def ADSS_master_CA(pg_Obj: Sequence,
     
         sq.add_process_list(ADSS_slave_single_CA(
                                                  pg_Obj,
-                                                 # x_mm = sq.pars.x_mm,
-                                                 # y_mm = sq.pars.y_mm,
-                                                 CA_single_potential = sq.pars.potential,
+                                                 CA_single_potential = potential,
                                                  samplerate_sec = sq.pars.samplerate_sec,
                                                  OCV_duration_sec = sq.pars.OCV_duration_sec,
                                                  CA_duration_sec = sq.pars.CA_duration_sec,
                                                  aliquot_times_sec = sq.pars.aliquot_times_sec
                                                 ))
+
 
     sq.add_process_list(ADSS_slave_shutdown(pg_Obj = pg_Obj))
 
@@ -570,8 +589,6 @@ def ADSS_master_CA(pg_Obj: Sequence,
 
 
 def ADSS_slave_single_CA(pg_Obj: Sequence,
-              # x_mm: Optional[float] = 0.0, 
-              # y_mm: Optional[float] = 0.0,
               CA_single_potential: Optional[float] = 0.0,
               samplerate_sec: Optional[float] = 1, 
               OCV_duration_sec: Optional[float] = 60, 
@@ -581,10 +598,6 @@ def ADSS_slave_single_CA(pg_Obj: Sequence,
     """last functionality test: 11/29/2021"""
     
     sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
-
-
-
-
 
     # get sample for gamry
     sq.add_process({
