@@ -24,6 +24,13 @@ class Custom:
         self.custom_type = custom_type
         self.blocked = False
         self.max_vol_ml = None
+
+
+    def __repr__(self):
+        return f"<custom_name:{self.custom_name} custom_type:{self.custom_type}>" 
+
+    def __str__(self):
+        return f"custom_name:{self.custom_name}, custom_type:{self.custom_type}" 
         
         
     def assembly_allowed(self):
@@ -92,7 +99,18 @@ class VT_template:
         self.init_max_vol_ml = max_vol_ml
         self.init_VTtype = VTtype
         self.init_positions = positions
+        self.type = self.init_VTtype
+        self.max_vol_ml = self.init_max_vol_ml
+        self.vials = None
+        self.blocked = None
+        self.sample = None
         self.reset_tray()
+
+    def __repr__(self):
+        return f"<{self.init_VTtype} vials:{self.init_positions} max_vol_ml:{self.max_vol_ml}>" 
+
+    def __str__(self):
+        return  f"{self.init_VTtype} with vials:{self.init_positions} and max_vol_ml:{self.max_vol_ml}" 
 
     def reset_tray(self):
         self.type = self.init_VTtype
@@ -322,8 +340,8 @@ class Archive():
                                             trays_dict[tmpi][slot_no] = None
                                     else:
                                         trays_dict[tmpi][slot_no] = None
-        self.base.print_message(trays_dict)
-        self.base.print_message(custom_positions)
+        self.base.print_message(f"trays: {trays_dict}")
+        self.base.print_message(f"customs: {custom_positions}")
         return trays_dict, custom_positions
         
 
