@@ -63,22 +63,20 @@ class Pidd:
         try:
             self.load_global()
         except IOError:
-            print_message({}, "launcher", f"'{pidFile}' does not exist, writing empty global dict.", error = True)
+            print_message({}, "launcher", f"'{pidFile}' does not exist, writing empty global dict.", info = True)
             self.write_global()
         except Exception:
-            print_message({}, "launcher", f"Error loading '{pidFile}', writing empty global dict.", error = True)
+            print_message({}, "launcher", f"Error loading '{pidFile}', writing empty global dict.", info = True)
             self.write_global()
 
     def load_global(self):
-        filehandler = open(self.pidFile, "rb")
-        self.d = pickle.load(filehandler)
-        # print_message({}, "launcher", f"Succesfully loaded '{self.pidFile}'.")
-        filehandler.close()
+        with open(self.pidFile, "rb") as f:
+            self.d = pickle.load(f)
+            # print_message({}, "launcher", f"Succesfully loaded '{self.pidFile}'.")
         
     def write_global(self):
-        filehandler = open(self.pidFile, "wb")
-        pickle.dump(self.d, filehandler)
-        filehandler.close()
+        with open(self.pidFile, "wb") as f:
+            pickle.dump(self.d, f)
 
     def list_pids(self):
         self.load_global()
@@ -121,7 +119,7 @@ class Pidd:
 
     def kill_server(self, k):
         self.load_global()  # reload in case any servers were appended
-        if k not in self.d.keys():
+        if k not in self.d:
             print_message({}, "launcher", f"Server '{k}' not found in pid dict.")
             return True
         else:
@@ -138,7 +136,7 @@ class Pidd:
                         p.terminate()
                         time.sleep(0.5)
                         if not psutil.pid_exists(p.pid):
-                            print_message({}, "launcher", f"Successfully terminated server '{k}'.", info = True)
+                            print_message({}, "launcher", f"Successfully terminated server '{k}'.")
                             return True
                     if psutil.pid_exists(p.pid):
                         print_message({}, "launcher", 
@@ -157,11 +155,11 @@ class Pidd:
         activeserver = [k for k, _, _, _ in active]
         KILL_ORDER = ["operator", "visualizer", "process", "orchestrator"]
         for group in KILL_ORDER:
-            print_message({}, "launcher", f"Killing {group} group.", error = True)
+            print_message({}, "launcher", f"Killing {group} group.")
             if group in pidd.A:
                 G = pidd.A[group]
                 for server in G:
-                    print_message({}, "launcher", f"Killing {server}.", error = True)
+                    print_message({}, "launcher", f"Killing {server}.")
                     if server in activeserver:
                         self.kill_server(server)
 
@@ -175,21 +173,21 @@ class Pidd:
             for x in active:
                 print_message({}, "launcher", x)
         else:
-            print_message({}, "launcher", f"All processes terminated. Removing '{self.pidFile}'", info = True)
+            print_message({}, "launcher", f"All processes terminated. Removing '{self.pidFile}'")
             os.remove(self.pidFile)
 
 
 def validateConfig(PIDD, confDict):
-    if len(confDict["servers"].keys()) != len(set(confDict["servers"].keys())):
+    if len(confDict["servers"]) != len(set(confDict["servers"])):
         print_message({}, "launcher", "Server keys are not unique.")
         return False
-    if "servers" not in confDict.keys():
+    if "servers" not in confDict:
         print_message({}, "launcher", "'servers' key not defined in config dictionary.")
         return False
-    for server in confDict["servers"].keys():
+    for server in confDict["servers"]:
         serverDict = confDict["servers"][server]
-        hasKeys = [k in serverDict.keys() for k in PIDD.reqKeys]
-        hasCode = [k for k in serverDict.keys() if k in PIDD.codeKeys]
+        hasKeys = [k in serverDict for k in PIDD.reqKeys]
+        hasCode = [k for k in serverDict if k in PIDD.codeKeys]
         if not all(hasKeys):
             print_message({}, "launcher", 
                 f"{server} config is missing {[k for k,b in zip(PIDD.reqKeys, hasKeys) if b]}."
@@ -285,7 +283,7 @@ def launcher(confPrefix, confDict):
             G = pidd.A[group]
             for server in G:
                 S = G[server]
-                codeKey = [k for k in S.keys() if k in pidd.codeKeys]
+                codeKey = [k for k in S if k in pidd.codeKeys]
                 if codeKey:
                     codeKey = codeKey[0]
                     servPy = S[codeKey]

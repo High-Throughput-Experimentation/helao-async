@@ -17,7 +17,7 @@ from nidaqmx.constants import CurrentShuntResistorLocation
 from nidaqmx.constants import UnitsPreScaled
 from nidaqmx.constants import TriggerType
 
-from helaocore.schema import cProcess
+from helaocore.schema import Process
 from helaocore.server import Base
 from helaocore.error import error_codes
 import helaocore.model.sample as hcms
@@ -34,15 +34,15 @@ class cNIMAX:
 
 
         self.dev_pump = self.config_dict.get("dev_pump",dict())
-        self.dev_pumpitems = make_str_enum("dev_pump",{key:key for key in self.dev_pump.keys()})
+        self.dev_pumpitems = make_str_enum("dev_pump",{key:key for key in self.dev_pump})
         
         self.dev_gasvalve = self.config_dict.get("dev_gasvalve",dict())
-        self.dev_gasvalveitems = make_str_enum("dev_gasvalve",{key:key for key in self.dev_gasvalve.keys()})
+        self.dev_gasvalveitems = make_str_enum("dev_gasvalve",{key:key for key in self.dev_gasvalve})
         
         self.dev_liquidvalve = self.config_dict.get("dev_liquidvalve",dict())
-        self.dev_liquidvalveitems = make_str_enum("dev_liquidvalve",{key:key for key in self.dev_liquidvalve.keys()})
+        self.dev_liquidvalveitems = make_str_enum("dev_liquidvalve",{key:key for key in self.dev_liquidvalve})
 
-        self.base.print_message(" ... init NI-MAX")
+        self.base.print_message("init NI-MAX")
 
         self.process = None  # for passing process object from technique method to measure loop
         self.active = None  # for holding active process object, clear this at end of measurement
@@ -54,7 +54,7 @@ class cNIMAX:
                 "NEGATE3", -1.0, 0.0, UnitsPreScaled.AMPS, "AMPS"
             )
         except Exception as e:
-            self.base.print_message(" ... NImax error", error = True)
+            self.base.print_message("NImax error", error = True)
             raise e
         self.time_stamp = time.time()
 
@@ -238,7 +238,7 @@ class cNIMAX:
                         )
 
             except Exception:
-                self.base.print_message(" ... canceling NImax IV stream")
+                self.base.print_message("canceling NImax IV stream")
 
         elif self.IO_estop and self.IO_do_meas:
             _ = self.task_cellcurrent.read(
@@ -261,7 +261,7 @@ class cNIMAX:
                 number_of_samples_per_channel=number_of_samples
             )
             # task should be already off or should be closed soon
-            self.base.print_message(" ... meas was turned off but NImax IV task is still running ...")
+            self.base.print_message("meas was turned off but NImax IV task is still running ...")
             # self.task_cellcurrent.close()
             # self.task_cellvoltage.close()
 
@@ -278,7 +278,7 @@ class cNIMAX:
                 if self.IO_do_meas and not self.IO_measuring:
                     # are we in estop?
                     if not self.IO_estop:
-                        self.base.print_message(" ... NImax IV task got measurement request")
+                        self.base.print_message("NImax IV task got measurement request")
 
 
                         # start slave first
@@ -312,22 +312,22 @@ class cNIMAX:
 
 
                         if self.IO_estop:
-                            self.base.print_message(" ... NImax IV task is in estop.")
+                            self.base.print_message("NImax IV task is in estop.")
                             # await self.stat.set_estop()
                         else:
-                            self.base.print_message(" ... setting NImax IV task to idle")
+                            self.base.print_message("setting NImax IV task to idle")
                             # await self.stat.set_idle()
-                        self.base.print_message(" ... NImax IV task measurement is done")
+                        self.base.print_message("NImax IV task measurement is done")
                     else:
                         self.IO_do_meas = False
-                        self.base.print_message(" ... NImax IV task is in estop.")
+                        self.base.print_message("NImax IV task is in estop.")
                         # await self.stat.set_estop()
                 elif self.IO_do_meas and self.IO_measuring:
-                    self.base.print_message(" ... got measurement request but NImax IV task is busy")
+                    self.base.print_message("got measurement request but NImax IV task is busy")
                 elif not self.IO_do_meas and self.IO_measuring:
-                    self.base.print_message(" ... got stop request, measurement will stop next cycle")
+                    self.base.print_message("got stop request, measurement will stop next cycle")
                 else:
-                    self.base.print_message(" ... got stop request but NImax IV task is idle")
+                    self.base.print_message("got stop request but NImax IV task is idle")
         except asyncio.CancelledError:
             self.base.print_message("IOloop task was cancelled")
 
@@ -338,7 +338,7 @@ class cNIMAX:
                           on:bool = False,
                           *args,**kwargs
                          ):
-        self.base.print_message(f" ... do_port '{do_name}': {do_port} is {on}")
+        self.base.print_message(f"do_port '{do_name}': {do_port} is {on}")
         on = bool(on)
         cmds = []
         err_code = error_codes.none
@@ -371,7 +371,7 @@ class cNIMAX:
                           on:bool = False,
                           *args,**kwargs
                          ):
-        self.base.print_message(f" ... di_port '{di_name}': {di_port}")
+        self.base.print_message(f"di_port '{di_name}': {di_port}")
         on = None
         err_code = error_codes.none
         if di_port is not None:
@@ -394,7 +394,7 @@ class cNIMAX:
                }
 
 
-    async def run_cell_IV(self, A: cProcess):
+    async def run_cell_IV(self, A: Process):
         activeDict = dict()
         
         samplerate = A.process_params["SampleRate"]
@@ -434,10 +434,14 @@ class cNIMAX:
                 file_sample_label=file_sample_label,
                 header=None,
             )
+
+            for sample in self.samples_in.samples:
+                sample.status = "preserved"
+                sample.inheritance="allow_both"
+
             await self.active.append_sample(samples = [sample_in for sample_in in self.samples_in.samples],
-                                            IO="in", 
-                                            status="preserved",
-                                            inheritance="allow_both")
+                                            IO="in"
+                                           )
 
             self.base.print_message(f"!!! Active process uuid is {self.active.process.process_uuid}")
 
