@@ -48,7 +48,7 @@ class aligner:
         # Don't want to copy the complete config, which is also unnecessary
         # these are the params the Visulalizer needs
         self.plateid = plateid
-        if motor in self.C.keys():
+        if motor in self.C:
             self.motorhost = self.C[motor]['host']
             self.motorport = self.C[motor]['port']
             self.motorserv = motor
@@ -56,7 +56,7 @@ class aligner:
             self.base.print_message(f'Alignment Error. {motor} server not found.')
             return []
 
-        if data in self.C.keys():
+        if data in self.C:
             self.datahost = self.C[data]['host']
             self.dataport = self.C[data]['port']
             self.dataserv = data

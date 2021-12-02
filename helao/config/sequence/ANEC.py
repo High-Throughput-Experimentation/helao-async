@@ -12,7 +12,7 @@ __all__ = ["debug",
 
 from typing import Optional, List, Union
 
-from helaocore.schema import cProcess, cProcess_group, Sequencer
+from helaocore.schema import Process, Sequence, Sequencer
 from helaocore.server import process_start_condition
 from helao.library.driver.pal_driver import PALmethods, Spacingmethod, PALtools
 import helaocore.model.sample as hcms
@@ -35,7 +35,7 @@ z_seal = 4.5
 
 
 
-def debug(pg_Obj: cProcess_group, 
+def debug(pg_Obj: Sequence, 
              d_mm: Optional[str] = "1.0", 
              x_mm: Optional[float] = 0.0, 
              y_mm: Optional[float] = 0.0
@@ -43,7 +43,7 @@ def debug(pg_Obj: cProcess_group,
     """Test process for ORCH debugging
     simple plate is e.g. 4534"""
     
-     # additional sequence params should be stored in process_group.sequence_pars
+     # additional sequence params should be stored in sequence.sequence_params
      # these are duplicates of the function parameters (currently the op uses functions 
      # parameters to display them in the webUI)
      
@@ -83,12 +83,12 @@ def debug(pg_Obj: cProcess_group,
         # "save_data": False,
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
     return process_list
 
 
-def CA(pg_Obj: cProcess_group,
+def CA(pg_Obj: Sequence,
        CA_potential_V: Optional[float] = 0.0,
        CA_duration_sec: Optional[float] = 10.0,
        samplerate_sec: Optional[float] = 1.0,
@@ -98,9 +98,9 @@ def CA(pg_Obj: cProcess_group,
     
     # todo, I will try to write a function which will do this later
     # I assume we need a base sequence class for this
-    CA_potential_V = pg_Obj.sequence_pars.get("CA_potential_V", CA_potential_V)
-    CA_duration_sec = pg_Obj.sequence_pars.get("CA_duration_sec", CA_duration_sec)
-    samplerate_sec = pg_Obj.sequence_pars.get("samplerate_sec", samplerate_sec)
+    CA_potential_V = pg_Obj.sequence_params.get("CA_potential_V", CA_potential_V)
+    CA_duration_sec = pg_Obj.sequence_params.get("CA_duration_sec", CA_duration_sec)
+    samplerate_sec = pg_Obj.sequence_params.get("samplerate_sec", samplerate_sec)
 
 
 
@@ -126,12 +126,12 @@ def CA(pg_Obj: cProcess_group,
         "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
         # "plate_id": None,
         })
-    process_list.append(cProcess(inputdict=process_dict))
+    process_list.append(Process(inputdict=process_dict))
 
     return process_list
 
 
-def OCV_sqtest(pg_Obj: cProcess_group,
+def OCV_sqtest(pg_Obj: Sequence,
                OCV_duration_sec: Optional[float] = 10.0,
                samplerate_sec: Optional[float] = 1.0,
               ):
@@ -163,7 +163,7 @@ def OCV_sqtest(pg_Obj: cProcess_group,
     return sq.process_list # returns complete process list to orch
 
 
-def CA_sqtest(pg_Obj: cProcess_group,
+def CA_sqtest(pg_Obj: Sequence,
               Ewe_vs_RHE: Optional[float] = 0.0,
               Eref: Optional[float] = 0.2,
               pH: Optional[float] = 10.0,
