@@ -22,7 +22,7 @@ __all__ = [
 from typing import Optional, List, Union
 from socket import gethostname
 
-from helaocore.schema import Action, Sequence, Sequencer
+from helaocore.schema import Action, Process, Processr
 from helaocore.server import action_start_condition
 import helaocore.model.sample as hcms
 
@@ -47,7 +47,7 @@ z_seal = 4.5
 
 
 
-def debug(pg_Obj: Sequence, 
+def debug(pg_Obj: Process, 
              d_mm: Optional[str] = "1.0", 
              x_mm: Optional[float] = 0.0, 
              y_mm: Optional[float] = 0.0
@@ -55,7 +55,7 @@ def debug(pg_Obj: Sequence,
     """Test action for ORCH debugging
     simple plate is e.g. 4534"""
     
-     # additional sequence params should be stored in action_group.sequence_params
+     # additional process params should be stored in action_group.process_params
      # these are duplicates of the function parameters (currently the op uses functions 
      # parameters to display them in the webUI)
      
@@ -67,7 +67,7 @@ def debug(pg_Obj: Sequence,
     # 3: (or other): orch is waiting for all action_dq to finish
 
     additional_local_var_added_to_sq = 12
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": f"{PAL_name}",
@@ -124,10 +124,10 @@ def debug(pg_Obj: Sequence,
 
 
 
-def ADSS_slave_unloadall_customs(pg_Obj: Sequence):
+def ADSS_slave_unloadall_customs(pg_Obj: Process):
     """last functionality test: 11/29/2021"""
     
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": f"{PAL_name}",
@@ -141,14 +141,14 @@ def ADSS_slave_unloadall_customs(pg_Obj: Sequence):
 
 
 def ADSS_slave_load_solid(
-                          pg_Obj: Sequence, 
+                          pg_Obj: Process, 
                           solid_custom_position: Optional[str] = "cell1_we",
                           solid_plate_id: Optional[int] = 4534,
                           solid_sample_no: Optional[int] = 1
                          ):
     """last functionality test: 11/29/2021"""
     
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
     sq.add_action({
         "action_server": f"{PAL_name}",
         "action_name": "archive_custom_load",
@@ -165,13 +165,13 @@ def ADSS_slave_load_solid(
 
 
 def ADSS_slave_load_liquid(
-                          pg_Obj: Sequence, 
+                          pg_Obj: Process, 
                           liquid_custom_position: Optional[str] = "elec_res1",
                           liquid_sample_no: Optional[int] = 1
                          ):
     """last functionality test: 11/29/2021"""
     
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
     sq.add_action({
         "action_server": f"{PAL_name}",
         "action_name": "archive_custom_load",
@@ -186,7 +186,7 @@ def ADSS_slave_load_liquid(
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_startup(pg_Obj: Sequence,
+def ADSS_slave_startup(pg_Obj: Process,
               solid_custom_position: Optional[str] = "cell1_we",
               solid_plate_id: Optional[int] = 4534,
               solid_sample_no: Optional[int] = 1,
@@ -195,7 +195,7 @@ def ADSS_slave_startup(pg_Obj: Sequence,
               liquid_custom_position: Optional[str] = "elec_res1",
               liquid_sample_no: Optional[int] = 1
               ):
-    """Slave sequence
+    """Slave process
     (1) Unload all custom position samples
     (2) Load solid sample to cell
     (3) Load liquid sample to reservoir
@@ -205,7 +205,7 @@ def ADSS_slave_startup(pg_Obj: Sequence,
     last functionality test: 11/29/2021"""
 
     
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
 
 
     # unload all samples from custom positions
@@ -272,8 +272,8 @@ def ADSS_slave_startup(pg_Obj: Sequence,
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_shutdown(pg_Obj: Sequence):
-    """Slave sequence
+def ADSS_slave_shutdown(pg_Obj: Process):
+    """Slave process
     (1) Deep clean PAL tool
     (2) pump liquid out off cell
     (3) Drain cell
@@ -281,7 +281,7 @@ def ADSS_slave_shutdown(pg_Obj: Sequence):
     
     last functionality test: 11/29/2021"""
 
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
 
     # deep clean
     sq.add_action_list(ADSS_slave_clean_PALtool(pg_Obj, clean_PAL_tool = PALtools.LS3, clean_PAL_volume_ul = 500))
@@ -356,24 +356,24 @@ def ADSS_slave_shutdown(pg_Obj: Sequence):
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_drain(pg_Obj: Sequence):
-    """DUMMY Slave sequence
+def ADSS_slave_drain(pg_Obj: Process):
+    """DUMMY Slave process
     Drains electrochemical cell.
     
     last functionality test: 11/29/2021"""
 
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
     # TODO
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_engage(pg_Obj: Sequence):
-    """Slave sequence
+def ADSS_slave_engage(pg_Obj: Process):
+    """Slave process
     Engages and seals electrochemical cell.
     
     last functionality test: 11/29/2021"""
     
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
 
     # engage
     sq.add_action({
@@ -404,13 +404,13 @@ def ADSS_slave_engage(pg_Obj: Sequence):
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_disengage(pg_Obj: Sequence):
-    """Slave sequence
+def ADSS_slave_disengage(pg_Obj: Process):
+    """Slave process
     Disengages and seals electrochemical cell.
     
     last functionality test: 11/29/2021"""
 
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": f"{MOTOR_name}",
@@ -427,17 +427,17 @@ def ADSS_slave_disengage(pg_Obj: Sequence):
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_clean_PALtool(pg_Obj: Sequence, 
+def ADSS_slave_clean_PALtool(pg_Obj: Process, 
                              clean_PAL_tool: Optional[str] = PALtools.LS3, 
                              clean_PAL_volume_ul: Optional[int] = 500
                              ):
-    """Slave sequence
+    """Slave process
     Performs deep clean of selected PAL tool.
     
     last functionality test: 11/29/2021"""
 
 
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
     
     # deep clean
     sq.add_action({
@@ -453,7 +453,7 @@ def ADSS_slave_clean_PALtool(pg_Obj: Sequence,
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_duaribilty_CAv1(pg_Obj: Sequence,
+def ADSS_duaribilty_CAv1(pg_Obj: Process,
               solid_custom_position: Optional[str] = "cell1_we",
               solid_plate_id: Optional[int] = 4534,
               solid_sample_no: Optional[int] = 1,
@@ -483,7 +483,7 @@ def ADSS_duaribilty_CAv1(pg_Obj: Sequence,
 
 
 
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
 
     potentials = [pot-1.0*sq.pars.ref_vs_nhe-0.059*sq.pars.pH  for pot in sq.pars.CA_potentials_vsRHE]
 
@@ -588,7 +588,7 @@ def ADSS_duaribilty_CAv1(pg_Obj: Sequence,
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_single_CA(pg_Obj: Sequence,
+def ADSS_slave_single_CA(pg_Obj: Process,
               CA_single_potential: Optional[float] = 0.0,
               samplerate_sec: Optional[float] = 1, 
               OCV_duration_sec: Optional[float] = 60, 
@@ -597,7 +597,7 @@ def ADSS_slave_single_CA(pg_Obj: Sequence,
               ):
     """last functionality test: 11/29/2021"""
     
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
 
     # get sample for gamry
     sq.add_action({

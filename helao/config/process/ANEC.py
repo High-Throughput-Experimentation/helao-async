@@ -12,12 +12,12 @@ __all__ = ["debug",
 
 from typing import Optional, List, Union
 
-from helaocore.schema import Action, Sequence, Sequencer
+from helaocore.schema import Action, Process, Processr
 from helaocore.server import action_start_condition
 from helao.library.driver.pal_driver import PALmethods, Spacingmethod, PALtools
 import helaocore.model.sample as hcms
 
-# list valid sequence functions 
+# list valid process functions 
 SEQUENCES = __all__
 
 PSTAT_name = "PSTAT"
@@ -35,7 +35,7 @@ z_seal = 4.5
 
 
 
-def debug(pg_Obj: Sequence, 
+def debug(pg_Obj: Process, 
              d_mm: Optional[str] = "1.0", 
              x_mm: Optional[float] = 0.0, 
              y_mm: Optional[float] = 0.0
@@ -43,7 +43,7 @@ def debug(pg_Obj: Sequence,
     """Test action for ORCH debugging
     simple plate is e.g. 4534"""
     
-     # additional sequence params should be stored in sequence.sequence_params
+     # additional process params should be stored in process.process_params
      # these are duplicates of the function parameters (currently the op uses functions 
      # parameters to display them in the webUI)
      
@@ -54,7 +54,7 @@ def debug(pg_Obj: Sequence,
     # 2: orch is waiting for server to become available
     # 3: (or other): orch is waiting for all action_dq to finish
     
-    # holds all actions for this sequence  
+    # holds all actions for this process  
     action_list = []
 
 
@@ -88,7 +88,7 @@ def debug(pg_Obj: Sequence,
     return action_list
 
 
-def CA(pg_Obj: Sequence,
+def CA(pg_Obj: Process,
        CA_potential_V: Optional[float] = 0.0,
        CA_duration_sec: Optional[float] = 10.0,
        samplerate_sec: Optional[float] = 1.0,
@@ -97,10 +97,10 @@ def CA(pg_Obj: Sequence,
     """Perform a CA measurement."""
     
     # todo, I will try to write a function which will do this later
-    # I assume we need a base sequence class for this
-    CA_potential_V = pg_Obj.sequence_params.get("CA_potential_V", CA_potential_V)
-    CA_duration_sec = pg_Obj.sequence_params.get("CA_duration_sec", CA_duration_sec)
-    samplerate_sec = pg_Obj.sequence_params.get("samplerate_sec", samplerate_sec)
+    # I assume we need a base process class for this
+    CA_potential_V = pg_Obj.process_params.get("CA_potential_V", CA_potential_V)
+    CA_duration_sec = pg_Obj.process_params.get("CA_duration_sec", CA_duration_sec)
+    samplerate_sec = pg_Obj.process_params.get("samplerate_sec", samplerate_sec)
 
 
 
@@ -131,17 +131,17 @@ def CA(pg_Obj: Sequence,
     return action_list
 
 
-def OCV_sqtest(pg_Obj: Sequence,
+def OCV_sqtest(pg_Obj: Process,
                OCV_duration_sec: Optional[float] = 10.0,
                samplerate_sec: Optional[float] = 1.0,
               ):
 
-    """This is the description of the sequence which will be displayed
+    """This is the description of the process which will be displayed
        in the operator webgui. For all function parameters (except pg_Obj)
        a input field will be (dynamically) presented in the OP webgui.""" 
     
     
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action(
         {
@@ -163,7 +163,7 @@ def OCV_sqtest(pg_Obj: Sequence,
     return sq.action_list # returns complete action list to orch
 
 
-def CA_sqtest(pg_Obj: Sequence,
+def CA_sqtest(pg_Obj: Process,
               Ewe_vs_RHE: Optional[float] = 0.0,
               Eref: Optional[float] = 0.2,
               pH: Optional[float] = 10.0,
@@ -171,12 +171,12 @@ def CA_sqtest(pg_Obj: Sequence,
               samplerate_sec: Optional[float] = 1.0,
               ):
 
-    """This is the description of the sequence which will be displayed
+    """This is the description of the process which will be displayed
        in the operator webgui. For all function parameters (except pg_Obj)
        a input field will be (dynamically) presented in the OP webgui.""" 
     
     
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action(
         {

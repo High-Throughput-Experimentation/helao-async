@@ -19,10 +19,10 @@ a OrchHandler class object, the core functionality of an async orchestrator.
 
     Queue:
     The orchestrator uses deque objects to maintain separate sample and action queues.
-    The sample queue may be populated using POST requests to '/append_sequence' or
-    '/prepend_sequence' endpoints. The action queue is determined by the 'sequence'
-    method of a given sample [sequence]. Sequences are defined in an action library
-    specified by the configuration. An sequence takes a sample argument and returns a
+    The sample queue may be populated using POST requests to '/append_process' or
+    '/prepend_process' endpoints. The action queue is determined by the 'process'
+    method of a given sample [process]. Processes are defined in an action library
+    specified by the configuration. An process takes a sample argument and returns a
     list of actions. The action queue is repopulated once all actions on a given sample
     have finished (this prevents simultaneous execution of actions across samples).
 

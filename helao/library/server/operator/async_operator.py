@@ -58,13 +58,13 @@ from typing import Optional, List, Union
 
 import helaocore.server as hcs
 from helaocore.data import HTELegacyAPI
-from helaocore.schema import Sequence
+from helaocore.schema import Process
 
 
-class return_sequence_lib(BaseModel):
-    """Return class for queried sequence objects."""
+class return_process_lib(BaseModel):
+    """Return class for queried process objects."""
     index: int
-    sequence_name: str
+    process_name: str
     doc: str
     args: list
     defaults: list
@@ -102,26 +102,26 @@ class C_async_operator:
         self.param_layout = []
         self.param_input = []
 
-        self.sequence_list = dict()
+        self.process_list = dict()
         self.action_list = dict()
         self.active_action_list = dict()
 
-        self.sequence_select_list = []
-        self.sequences = []
-        self.sequence_lib = hcs.import_sequences(world_config_dict = self.vis.world_cfg, sequence_path = None, server_name=self.vis.server_name)
+        self.process_select_list = []
+        self.processes = []
+        self.process_lib = hcs.import_processes(world_config_dict = self.vis.world_cfg, process_path = None, server_name=self.vis.server_name)
 
 
 
         # FastAPI calls
-        self.get_sequence_lib()
-        self.vis.doc.add_next_tick_callback(partial(self.get_sequences))
+        self.get_process_lib()
+        self.vis.doc.add_next_tick_callback(partial(self.get_processes))
         self.vis.doc.add_next_tick_callback(partial(self.get_actions))
         self.vis.doc.add_next_tick_callback(partial(self.get_active_actions))
 
-        #self.vis.print_message([key for key in self.sequence_list])
-        self.sequence_source = ColumnDataSource(data=self.sequence_list)
-        self.columns_dec = [TableColumn(field=key, title=key) for key in self.sequence_list]
-        self.sequence_table = DataTable(source=self.sequence_source, columns=self.columns_dec, width=620, height=200)
+        #self.vis.print_message([key for key in self.process_list])
+        self.process_source = ColumnDataSource(data=self.process_list)
+        self.columns_dec = [TableColumn(field=key, title=key) for key in self.process_list]
+        self.process_table = DataTable(source=self.process_source, columns=self.columns_dec, width=620, height=200)
 
         self.action_source = ColumnDataSource(data=self.action_list)
         self.columns_action = [TableColumn(field=key, title=key) for key in self.action_list]
@@ -133,8 +133,8 @@ class C_async_operator:
 
 
 
-        self.sequence_dropdown = Select(title="Select sequence:", value = None, options=self.sequence_select_list)
-        self.sequence_dropdown.on_change("value", self.callback_action_select)
+        self.process_dropdown = Select(title="Select process:", value = None, options=self.process_select_list)
+        self.process_dropdown.on_change("value", self.callback_action_select)
 
         self.button_load_sample_list = FileInput(accept=".csv,.txt", width = 300)
         self.button_load_sample_list.on_change("value", self.get_sample_list)
@@ -151,7 +151,7 @@ class C_async_operator:
         self.button_update.on_event(ButtonClick, self.callback_update_tables)
 
         self.button_clear_dec = Button(label="clear prg", button_type="danger", width=100)
-        self.button_clear_dec.on_event(ButtonClick, self.callback_clear_sequences)
+        self.button_clear_dec.on_event(ButtonClick, self.callback_clear_processes)
         self.button_clear_action = Button(label="clear prc", button_type="danger", width=100)
         self.button_clear_action.on_event(ButtonClick, self.callback_clear_actions)
 
@@ -168,7 +168,7 @@ class C_async_operator:
         self.input_solid_plate_id = TextInput(value="", title="plate id", disabled=False, width=60, height=40)
         self.input_solid_plate_id.on_change("value", self.callback_changed_plateid)
         
-        self.input_sequence_label = TextInput(value="nolabel", title="sequence label", disabled=False, width=120, height=40)
+        self.input_process_label = TextInput(value="nolabel", title="process label", disabled=False, width=120, height=40)
         self.input_elements = TextInput(value="", title="elements", disabled=True, width=120, height=40)
         self.input_code = TextInput(value="", title="code", disabled=True, width=60, height=40)
         self.input_composition = TextInput(value="", title="composition", disabled=True, width=220, height=40)
@@ -186,8 +186,8 @@ class C_async_operator:
                 [Spacer(width=20), Div(text=f"<b>{self.config_dict.get('doc_name', 'Operator')} on {gethostname()}</b>", width=620, height=32, style={"font-size": "200%", "color": "red"})],
                 background="#C0C0C0",width=640),
             layout([
-                [self.sequence_dropdown],
-                [Spacer(width=10), Div(text="<b>sequence description:</b>", width=200+50, height=15)],
+                [self.process_dropdown],
+                [Spacer(width=10), Div(text="<b>process description:</b>", width=200+50, height=15)],
                 [self.action_descr_txt],
                 Spacer(height=20),
                 [Spacer(width=10), Div(text="<b>Error message:</b>", width=200+50, height=15, style={"font-size": "100%", "color": "black"})],
@@ -195,7 +195,7 @@ class C_async_operator:
                 Spacer(height=10),
                 ],background="#808080",width=640),
             layout([
-                [self.input_sequence_label],
+                [self.input_process_label],
                 Spacer(height=10),
                 ]),
             ])
@@ -207,8 +207,8 @@ class C_async_operator:
                     [self.button_append, self.button_prepend, self.button_start, self.button_stop],
                     ]),
                 layout([
-                [Spacer(width=20), Div(text="<b>queued sequences:</b>", width=200+50, height=15)],
-                [self.sequence_table],
+                [Spacer(width=20), Div(text="<b>queued processes:</b>", width=200+50, height=15)],
+                [self.process_table],
                 [Spacer(width=20), Div(text="<b>queued actions:</b>", width=200+50, height=15)],
                 [self.action_table],
                 [Spacer(width=20), Div(text="<b>Active actions:</b>", width=200+50, height=15)],
@@ -225,58 +225,58 @@ class C_async_operator:
 
 
         # select the first item to force an update of the layout
-        if self.sequence_select_list:
-            self.sequence_dropdown.value = self.sequence_select_list[0]
+        if self.process_select_list:
+            self.process_dropdown.value = self.process_select_list[0]
 
 
 
-    def get_sequence_lib(self):
-        """Return the current list of sequences."""
-        self.sequences = []
-        self.vis.print_message(f"found sequence: {[sequence for sequence in self.sequence_lib]}")
-        for i, sequence in enumerate(self.sequence_lib):
-            # self.vis.print_message("full",inspect.getfullargspec(self.sequence_lib[sequence]))
-            #self.vis.print_message("anno",inspect.getfullargspec(self.sequence_lib[sequence]).annotations)
-            #self.vis.print_message("def",inspect.getfullargspec(self.sequence_lib[sequence]).defaults)
-            tmpdoc = self.sequence_lib[sequence].__doc__ 
+    def get_process_lib(self):
+        """Return the current list of processes."""
+        self.processes = []
+        self.vis.print_message(f"found process: {[process for process in self.process_lib]}")
+        for i, process in enumerate(self.process_lib):
+            # self.vis.print_message("full",inspect.getfullargspec(self.process_lib[process]))
+            #self.vis.print_message("anno",inspect.getfullargspec(self.process_lib[process]).annotations)
+            #self.vis.print_message("def",inspect.getfullargspec(self.process_lib[process]).defaults)
+            tmpdoc = self.process_lib[process].__doc__ 
             # self.vis.print_message("... doc:", tmpdoc)
             if tmpdoc == None:
                 tmpdoc = ""
-            tmpargs = inspect.getfullargspec(self.sequence_lib[sequence]).args
-            tmpdef = inspect.getfullargspec(self.sequence_lib[sequence]).defaults
+            tmpargs = inspect.getfullargspec(self.process_lib[process]).args
+            tmpdef = inspect.getfullargspec(self.process_lib[process]).defaults
             if tmpdef == None:
                 tmpdef = []
             # if not tmpargs:
             #     tmpargs = [""]
             
             
-            self.sequences.append(return_sequence_lib(
+            self.processes.append(return_process_lib(
                 index=i,
-                sequence_name = sequence,
-                doc = tmpdoc,#self.sequence_lib[sequence].__doc__ if self.sequence_lib[sequence].__doc__ not None else "",
+                process_name = process,
+                doc = tmpdoc,#self.process_lib[process].__doc__ if self.process_lib[process].__doc__ not None else "",
                 args = tmpargs,#{},
                 defaults = tmpdef,
-                #annotations = inspect.getfullargspec(self.sequence_lib[sequence]).annotations,
-                # defaults = inspect.getfullargspec(self.sequence_lib[sequence]).defaults,
+                #annotations = inspect.getfullargspec(self.process_lib[process]).annotations,
+                # defaults = inspect.getfullargspec(self.process_lib[process]).defaults,
                #params = "",
             ).dict()
                 )
-        for item in self.sequences:
-            self.sequence_select_list.append(item["sequence_name"])
+        for item in self.processes:
+            self.process_select_list.append(item["process_name"])
 
 
-    async def get_sequences(self):
-        """get sequence list from orch"""
-        response = await self.do_orch_request(action_name = "list_sequences")
-        response = response["sequences"]
-        self.sequence_list = dict()
+    async def get_processes(self):
+        """get process list from orch"""
+        response = await self.do_orch_request(action_name = "list_processes")
+        response = response["processes"]
+        self.process_list = dict()
         if len(response):
             for key in response[0]:
-                self.sequence_list[key] = []
+                self.process_list[key] = []
             for line in response:
                 for key, value in line.items():
-                    self.sequence_list[key].append(value)
-        self.vis.print_message(f"current queued sequences: {self.sequence_list}")
+                    self.process_list[key].append(value)
+        self.vis.print_message(f"current queued processes: {self.process_list}")
 
 
     async def get_actions(self):
@@ -327,11 +327,11 @@ class C_async_operator:
 
 
     def callback_action_select(self, attr, old, new):
-        idx = self.sequence_select_list.index(new)
-        action_doc = self.sequences[idx]["doc"]
-        # for arg in self.sequences[idx]["args"]:
+        idx = self.process_select_list.index(new)
+        action_doc = self.processes[idx]["doc"]
+        # for arg in self.processes[idx]["args"]:
         #     self.vis.print_message(arg)
-        self.update_param_layout(self.sequences[idx]["args"], self.sequences[idx]["defaults"])
+        self.update_param_layout(self.processes[idx]["args"], self.processes[idx]["defaults"])
         self.vis.doc.add_next_tick_callback(partial(self.update_doc,action_doc))
 
 
@@ -390,14 +390,14 @@ class C_async_operator:
 
 
     def callback_skip_dec(self, event):
-        self.vis.print_message("skipping sequence")
+        self.vis.print_message("skipping process")
         self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"skip"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
-    def callback_clear_sequences(self, event):
-        self.vis.print_message("clearing sequences")
-        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_sequences"))
+    def callback_clear_processes(self, event):
+        self.vis.print_message("clearing processes")
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_processes"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
@@ -408,13 +408,13 @@ class C_async_operator:
 
 
     def callback_prepend(self, event):
-        self.prepend_sequence()
+        self.prepend_process()
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
 
     def callback_append(self, event):
-        self.append_sequence()
+        self.append_process()
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
@@ -422,16 +422,16 @@ class C_async_operator:
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
-    def append_sequence(self):
+    def append_process(self):
         params_dict, json_dict = self.populate_action()
         # submit decission to orchestrator
-        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"append_sequence", params_dict, json_dict))
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"append_process", params_dict, json_dict))
 
 
-    def prepend_sequence(self):
+    def prepend_process(self):
         params_dict, json_dict = self.populate_action()
         # submit decission to orchestrator
-        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"prepend_sequence", params_dict, json_dict))
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"prepend_process", params_dict, json_dict))
 
 
     def populate_action(self):
@@ -442,18 +442,18 @@ class C_async_operator:
                 val = v
             return val
         
-        selected_sequence = self.sequence_dropdown.value
-        sellabel = self.input_sequence_label.value
+        selected_process = self.process_dropdown.value
+        sellabel = self.input_process_label.value
 
-        self.vis.print_message(f"selected action from list: {selected_sequence}")
+        self.vis.print_message(f"selected action from list: {selected_process}")
         self.vis.print_message(f"selected label: {sellabel}")
 
-        sequence_params = {paraminput.title: to_json(paraminput.value) for paraminput in self.param_input}
-        D = Sequence(inputdict={
+        process_params = {paraminput.title: to_json(paraminput.value) for paraminput in self.param_input}
+        D = Process(inputdict={
             # "orch_name":orch_name,
-            "sequence_label":sellabel,
-            "sequence_name":selected_sequence,
-            "sequence_params":sequence_params,
+            "process_label":sellabel,
+            "process_name":selected_process,
+            "process_params":process_params,
         })
 
         return D.fastdict()
@@ -470,7 +470,7 @@ class C_async_operator:
         # self.param_layout = []
         self.param_layout = [
             layout([
-                [Spacer(width=10), Div(text="<b>Optional sequence parameters:</b>", width=200+50, height=15, style={"font-size": "100%", "color": "black"})],
+                [Spacer(width=10), Div(text="<b>Optional process parameters:</b>", width=200+50, height=15, style={"font-size": "100%", "color": "black"})],
                 ],background=self.color_sq_param_inputs,width=640),
             ]
 
@@ -478,7 +478,7 @@ class C_async_operator:
         for idx in range(len(args)):
             buf = f"{defaults[idx]}"
             # self.vis.print_message("action parameter:",args[idx])
-            # skip the sequence_Obj parameter
+            # skip the process_Obj parameter
             if args[idx] == "pg_Obj":
                 continue
             disabled = False
@@ -672,15 +672,15 @@ class C_async_operator:
 
 
     async def update_tables(self):
-        await self.get_sequences()
+        await self.get_processes()
         await self.get_actions()
         await self.get_active_actions()
 
 
 
-        self.columns_dec = [TableColumn(field=key, title=key) for key in self.sequence_list]
-        self.sequence_table.source.data = self.sequence_list
-        self.sequence_table.columns=self.columns_dec
+        self.columns_dec = [TableColumn(field=key, title=key) for key in self.process_list]
+        self.process_table.source.data = self.process_list
+        self.process_table.columns=self.columns_dec
 
         self.columns_action = [TableColumn(field=key, title=key) for key in self.action_list]
         self.action_table.source.data=self.action_list
@@ -720,7 +720,7 @@ def makeBokehApp(doc, confPrefix, servKey):
     # get the event loop
     # operatorloop = asyncio.get_event_loop()
 
-    # this periodically updates the GUI (action and sequence tables)
+    # this periodically updates the GUI (action and process tables)
     # operator.vis.doc.add_periodic_callback(operator.IOloop,2000) # time in ms
 
     return doc

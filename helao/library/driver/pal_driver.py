@@ -557,7 +557,7 @@ class cPAL:
                 # this is a sample reference, it needs to be added
                 # to the db later
                 sample.samples.append(hcms.LiquidSample(
-                        sequence_uuid=self.action.sequence_uuid,
+                        process_uuid=self.action.process_uuid,
                         action_uuid=self.action.action_uuid,
                         source=source,
                         action_timestamp=self.action.action_timestamp,
@@ -570,7 +570,7 @@ class cPAL:
                         ))
             elif sample_out_type == _sampletype.gas:
                 sample.samples.append(hcms.GasSample(
-                        sequence_uuid=self.action.sequence_uuid,
+                        process_uuid=self.action.process_uuid,
                         action_uuid=self.action.action_uuid,
                         source=source,
                         action_timestamp=self.action.action_timestamp,
@@ -585,7 +585,7 @@ class cPAL:
                 sample.samples.append(hcms.AssemblySample(
                         parts = [sample for sample in sample_in.samples],
                         sample_position = sample_position,
-                        sequence_uuid=self.action.sequence_uuid,
+                        process_uuid=self.action.process_uuid,
                         action_uuid=self.action.action_uuid,
                         source=source,
                         action_timestamp=self.action.action_timestamp,
@@ -608,7 +608,7 @@ class cPAL:
                 status="created",
                 inheritance="receive_only",
                 source = [sample.get_global_label() for sample in sample_in.samples],
-                sequence_uuid=self.action.sequence_uuid,
+                process_uuid=self.action.process_uuid,
                 action_uuid=self.action.action_uuid,
                 action_timestamp=self.action.action_timestamp,
                 ))

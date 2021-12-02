@@ -6,7 +6,7 @@ hostip = "127.0.0.1"
 config = dict()
 
 # action library provides generator functions which produce actions
-# lists from input sequence_id grouping
+# lists from input process_id grouping
 config["action_libraries"] = ["ADSS"]
 config["technique_name"] = "adss"
 config["root"] = r"C:\INST_dev2"
