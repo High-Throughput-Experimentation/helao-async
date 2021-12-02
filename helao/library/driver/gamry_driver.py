@@ -232,13 +232,13 @@ class gamry:
         """script can be blocked or crash if GamryCom is still open and busy"""
         pyPids = {
             p.pid: p
-            for p in psutil.action_iter(["name", "connections"])
+            for p in psutil.process_iter(["name", "connections"])
             if p.info["name"].startswith("GamryCom")
         }
 
         for pid in pyPids:
             self.base.print_message(f"killing GamryCom on PID: {pid}")
-            p = psutil.Action(pid)
+            p = psutil.Process(pid)
             for _ in range(3):
                 # os.kill(p.pid, signal.SIGTERM)
                 p.terminate()

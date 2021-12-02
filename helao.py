@@ -32,7 +32,7 @@ import pickle
 import psutil
 import time
 import requests
-import subaction
+import subprocess
 from importlib import import_module
 
 from munch import munchify
@@ -95,7 +95,7 @@ class Pidd:
             pid = tup[3]
             port = tup[2]
             host = tup[1]
-            proc = psutil.Action(pid)
+            proc = psutil.Process(pid)
             if proc.name() in self.PROC_NAMES:
                 connections = [
                     c for c in proc.connections("tcp4") if c.status == "LISTEN"
@@ -107,7 +107,7 @@ class Pidd:
     def find_bokeh(self, host, port):
         pyPids = {
             p.pid: p.info["connections"]
-            for p in psutil.action_iter(["name", "connections"])
+            for p in psutil.process_iter(["name", "connections"])
             if p.info["name"].startswith("python")
         }
         # print_message({}, "launcher", pyPids)
@@ -130,7 +130,7 @@ class Pidd:
                 return True
             else:
                 try:
-                    p = psutil.Action(self.d[k]["pid"])
+                    p = psutil.Process(self.d[k]["pid"])
                     for _ in range(self.RETRIES):
                         # os.kill(p.pid, signal.SIGTERM)
                         p.terminate()
@@ -316,11 +316,11 @@ def launcher(confPrefix, confDict):
                         if group == "orchestrators":
                             pidd.orchServs.append(server)
                         cmd = ["python", "fast_launcher.py", confPrefix, server]
-                        p = subaction.Popen(cmd, cwd=helao_root)
+                        p = subprocess.Popen(cmd, cwd=helao_root)
                         ppid = p.pid
                     elif codeKey == "bokeh":
                         cmd = ["python", "bokeh_launcher.py", confPrefix, server]
-                        p = subaction.Popen(cmd, cwd=helao_root)
+                        p = subprocess.Popen(cmd, cwd=helao_root)
                         try:
                             time.sleep(3)
                             ppid = pidd.find_bokeh(servHost, servPort)

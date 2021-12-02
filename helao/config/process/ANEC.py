@@ -12,7 +12,7 @@ __all__ = ["debug",
 
 from typing import Optional, List, Union
 
-from helaocore.schema import Action, Process, Processr
+from helaocore.schema import Action, Process, Sequencer
 from helaocore.server import action_start_condition
 from helao.library.driver.pal_driver import PALmethods, Spacingmethod, PALtools
 import helaocore.model.sample as hcms
@@ -141,7 +141,7 @@ def OCV_sqtest(pg_Obj: Process,
        a input field will be (dynamically) presented in the OP webgui.""" 
     
     
-    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action(
         {
@@ -176,7 +176,7 @@ def CA_sqtest(pg_Obj: Process,
        a input field will be (dynamically) presented in the OP webgui.""" 
     
     
-    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action(
         {
