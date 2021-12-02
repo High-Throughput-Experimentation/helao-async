@@ -28,7 +28,7 @@ init()
 
 confPrefix = sys.argv[1]
 
-LAUNCH_ORDER = ["server", "process", "orchestrators", "visualizer"]
+LAUNCH_ORDER = ["server", "action", "orchestrators", "visualizer"]
 # API end points to ignore
 IGNORE_ENDS = ['openapi', 'swagger_ui_html', 'swagger_ui_redirect',
                'redoc_html', 'websocket_messages', 'get_all_urls']
@@ -60,7 +60,7 @@ def load_config(confPrefix):
                 filterends = [
                     x for x in endpoints if x['name'] not in IGNORE_ENDS]
                 if filterends:
-                    print(f"Found {len(filterends)} processes for '{server}'.")
+                    print(f"Found {len(filterends)} actions for '{server}'.")
                 for x in filterends:
                     y = copy(x)
                     del y['name']
@@ -86,7 +86,7 @@ def parse_input(string, cmdDict, confDict, pidd):
                 S = munchify(confDict['servers'][server])
                 print(Fore.YELLOW + f"{server} running at http://{S.host}:{S.port}")
                 print(Fore.YELLOW +
-                      f"use 'list {server}' to see server processes")
+                      f"use 'list {server}' to see server actions")
             else:
                 print(Fore.YELLOW +
                       f"'{command}' not available for '{server}'")
@@ -105,7 +105,7 @@ def parse_input(string, cmdDict, confDict, pidd):
             print(Fore.RESET + "\n".join(sorted(
                 [f"{srv} {cmd}" for srv in cmdDict for cmd in cmdDict[srv]])))
         elif server in cmdDict:
-            print(Fore.YELLOW + f"valid '{server}' processes:")
+            print(Fore.YELLOW + f"valid '{server}' actions:")
             print(Fore.RESET + "\n".join(sorted(
                 [f"{server} {cmd}" for cmd in cmdDict[server]])))
         else:

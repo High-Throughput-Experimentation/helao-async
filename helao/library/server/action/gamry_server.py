@@ -13,7 +13,7 @@ preceded by:
   await stat.set_run()
 and followed by :
   await stat.set_idle()
-which will update this process server's status dictionary which is query-able via
+which will update this action server's status dictionary which is query-able via
 ../get_status, and also broadcast the status change via websocket ../ws_status
 
 IMPORTANT -- this framework assumes a single data stream and structure produced by the
@@ -35,7 +35,7 @@ from importlib import import_module
 from fastapi import Request
 
 
-from helaocore.server import make_process_serv, setup_process
+from helaocore.server import make_action_serv, setup_action
 from helao.library.driver.gamry_driver import gamry, Gamry_IErange
 import helaocore.model.sample as hcms
 
@@ -44,11 +44,11 @@ def makeApp(confPrefix, servKey):
 
     config = import_module(f"helao.config.{confPrefix}").config
  
-    app = make_process_serv(
+    app = make_action_serv(
         config,
         servKey,
         servKey,
-        "Gamry instrument/process server",
+        "Gamry instrument/action server",
         version=2.0,
         driver_class=gamry,
     )
@@ -58,12 +58,12 @@ def makeApp(confPrefix, servKey):
     async def get_meas_status(request: Request):
         """Will return 'idle' or 'measuring'. 
         Should be used in conjuction with eta to async.sleep loop poll"""
-        A = await setup_process(request)
-        active = await app.base.contain_process(A, file_data_keys="status")
+        A = await setup_action(request)
+        active = await app.base.contain_action(A, file_data_keys="status")
         driver_status = await app.driver.status()
         await active.enqueue_data({"status": driver_status})
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/run_LSV")
@@ -85,8 +85,8 @@ def makeApp(confPrefix, servKey):
         """Linear Sweep Voltammetry (unlike CV no backward scan is done)
         use 4bit bitmask for triggers
         IErange depends on gamry model used (test actual limit before using)"""
-        A = await setup_process(request)
-        A.process_abbr = "LSV"
+        A = await setup_action(request)
+        A.action_abbr = "LSV"
         # A.save_data = True
         active_dict = await app.driver.technique_LSV(A)
         return active_dict
@@ -111,8 +111,8 @@ def makeApp(confPrefix, servKey):
         use 4bit bitmask for triggers
         IErange depends on gamry model used 
         (test actual limit before using)"""
-        A = await setup_process(request)
-        A.process_abbr = "CA"
+        A = await setup_action(request)
+        A.action_abbr = "CA"
         # A.save_data = True
         active_dict = await app.driver.technique_CA(A)
         return active_dict
@@ -136,8 +136,8 @@ def makeApp(confPrefix, servKey):
         """Chronopotentiometry (Potential response on controlled current)
         use 4bit bitmask for triggers
         IErange depends on gamry model used (test actual limit before using)"""
-        A = await setup_process(request)
-        A.process_abbr = "CP"
+        A = await setup_action(request)
+        A.action_abbr = "CP"
         # A.save_data = True
         active_dict = await app.driver.technique_CP(A)
         return active_dict
@@ -163,11 +163,11 @@ def makeApp(confPrefix, servKey):
                      scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                     ):
         """Cyclic Voltammetry (most widely used technique 
-        for acquireing information about electrochemical reprocesss)
+        for acquireing information about electrochemical reactions)
         use 4bit bitmask for triggers
         IErange depends on gamry model used (test actual limit before using)"""
-        A = await setup_process(request)
-        A.process_abbr = "CV"
+        A = await setup_action(request)
+        A.action_abbr = "CV"
         # A.save_data = True
         active_dict = await app.driver.technique_CV(A)
         return active_dict
@@ -194,8 +194,8 @@ def makeApp(confPrefix, servKey):
         NOT TESTED
         use 4bit bitmask for triggers
         IErange depends on gamry model used (test actual limit before using)"""
-        A = await setup_process(request)
-        A.process_abbr = "EIS"
+        A = await setup_action(request)
+        A.action_abbr = "EIS"
         # A.save_data = True
         active_dict = await app.driver.technique_EIS(A)
         return active_dict
@@ -215,8 +215,8 @@ def makeApp(confPrefix, servKey):
         """mesasures open circuit potential
         use 4bit bitmask for triggers
         IErange depends on gamry model used (test actual limit before using)"""
-        A = await setup_process(request)
-        A.process_abbr = "OCV"
+        A = await setup_action(request)
+        A.action_abbr = "OCV"
         # A.save_data = True
         active_dict = await app.driver.technique_OCV(A)
         return active_dict
@@ -225,12 +225,12 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/stop")
     async def stop(request: Request):
         """Stops measurement in a controlled way."""
-        A = await setup_process(request)
-        A.process_abbr = "stop"
-        active = await app.base.contain_process(A, file_data_keys="stop")
+        A = await setup_action(request)
+        A.action_abbr = "stop"
+        active = await app.base.contain_action(A, file_data_keys="stop")
         await active.enqueue_data({"stop": await app.driver.stop()})
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/estop")
@@ -239,12 +239,12 @@ def makeApp(confPrefix, servKey):
                     switch: Optional[bool] = True,
                    ):
         """Same as stop, but also sets estop flag."""
-        A = await setup_process(request)
-        A.process_abbr = "estop"
-        active = await app.base.contain_process(A, file_data_keys="estop")
+        A = await setup_action(request)
+        A.action_abbr = "estop"
+        active = await app.base.contain_action(A, file_data_keys="estop")
         await active.enqueue_data({"estop": await app.driver.estop(A)})
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post("/shutdown")

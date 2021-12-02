@@ -17,7 +17,7 @@ from nidaqmx.constants import CurrentShuntResistorLocation
 from nidaqmx.constants import UnitsPreScaled
 from nidaqmx.constants import TriggerType
 
-from helaocore.schema import Process
+from helaocore.schema import Action
 from helaocore.server import Base
 from helaocore.error import error_codes
 import helaocore.model.sample as hcms
@@ -26,11 +26,11 @@ from helaocore.helper import make_str_enum
 
 class cNIMAX:
 
-    def __init__(self, process_serv: Base):
+    def __init__(self, action_serv: Base):
         
-        self.base = process_serv
-        self.config_dict = process_serv.server_cfg["params"]
-        self.world_config = process_serv.world_cfg
+        self.base = action_serv
+        self.config_dict = action_serv.server_cfg["params"]
+        self.world_config = action_serv.world_cfg
 
 
         self.dev_pump = self.config_dict.get("dev_pump",dict())
@@ -44,8 +44,8 @@ class cNIMAX:
 
         self.base.print_message("init NI-MAX")
 
-        self.process = None  # for passing process object from technique method to measure loop
-        self.active = None  # for holding active process object, clear this at end of measurement
+        self.action = None  # for passing action object from technique method to measure loop
+        self.active = None  # for holding active action object, clear this at end of measurement
         self.samples_in = hcms.SampleList()
 
         # seems to work by just defining the scale and then only using its name
@@ -199,7 +199,7 @@ class cNIMAX:
                     # need to correct for the first datapoints 
                     self.FIFO_epoch -= number_of_samples / self.samplingrate
                     if self.active:
-                        if self.active.process.save_data:
+                        if self.active.action.save_data:
                             self.active.finish_hlo_header(realtime=self.FIFO_epoch)
 
                 
@@ -231,7 +231,7 @@ class cNIMAX:
 
                 # push data to datalogger queue
                 if self.active:
-                    if self.active.process.save_data:
+                    if self.active.action.save_data:
                         self.active.enqueue_data_nowait(
                             data_dict,
                             file_sample_keys = self.FIFO_sample_keys
@@ -307,7 +307,7 @@ class cNIMAX:
                         self.task_cellvoltage.close()
                         _ = await self.active.finish()
                         self.active = None
-                        self.process = None
+                        self.action = None
                         self.samples_in = hcms.SampleList()
 
 
@@ -394,12 +394,12 @@ class cNIMAX:
                }
 
 
-    async def run_cell_IV(self, A: Process):
+    async def run_cell_IV(self, A: Action):
         activeDict = dict()
         
-        samplerate = A.process_params["SampleRate"]
-        duration = A.process_params["Tval"]
-        ttlwait = A.process_params["TTLwait"] # -1 disables, else select TTL channel
+        samplerate = A.action_params["SampleRate"]
+        duration = A.action_params["Tval"]
+        ttlwait = A.action_params["TTLwait"] # -1 disables, else select TTL channel
         
         err_code = error_codes.none
         if not self.IO_do_meas:
@@ -407,9 +407,9 @@ class cNIMAX:
             self.duration = duration
             self.ttlwait = ttlwait
             self.buffersizeread = int(self.samplingrate)
-            # save submitted process object
-            self.process = A
-            self.samples_in = self.process.samples_in
+            # save submitted action object
+            self.action = A
+            self.samples_in = self.action.samples_in
             self.FIFO_epoch = None
             # create active and write streaming file header
             
@@ -426,8 +426,8 @@ class cNIMAX:
                     sample_label = None
                 file_sample_label[FIFO_sample_key]=sample_label
                 
-            self.active = await self.base.contain_process(
-                self.process,
+            self.active = await self.base.contain_action(
+                self.action,
                 file_type="ni_helao__file",
                 file_data_keys=self.FIFO_column_headings,
                 file_sample_keys = self.FIFO_sample_keys,
@@ -443,7 +443,7 @@ class cNIMAX:
                                             IO="in"
                                            )
 
-            self.base.print_message(f"!!! Active process uuid is {self.active.process.process_uuid}")
+            self.base.print_message(f"!!! Active action uuid is {self.active.action.action_uuid}")
 
             # create the cell IV task
             self.create_IVtask()
@@ -453,7 +453,7 @@ class cNIMAX:
             err_code = error_codes.none
 
             if self.active:
-                activeDict = self.active.process.as_dict()
+                activeDict = self.active.action.as_dict()
             else:
                 activeDict = A.as_dict()
 
@@ -480,5 +480,5 @@ class cNIMAX:
             if switch:
                 await self.IO_signalq.put(False)
                 await self.base.set_estop(
-                    self.active.active.process_name, self.active.active.process_uuid
+                    self.active.active.action_name, self.active.active.action_uuid
                 )

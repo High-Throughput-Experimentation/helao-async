@@ -1,7 +1,7 @@
 """
-Process library for ANEC
+Action library for ANEC
 
-server_key must be a FastAPI process server defined in config
+server_key must be a FastAPI action server defined in config
 """
 
 __all__ = ["debug", 
@@ -12,8 +12,8 @@ __all__ = ["debug",
 
 from typing import Optional, List, Union
 
-from helaocore.schema import Process, Sequence, Sequencer
-from helaocore.server import process_start_condition
+from helaocore.schema import Action, Sequence, Sequencer
+from helaocore.server import action_start_condition
 from helao.library.driver.pal_driver import PALmethods, Spacingmethod, PALtools
 import helaocore.model.sample as hcms
 
@@ -40,7 +40,7 @@ def debug(pg_Obj: Sequence,
              x_mm: Optional[float] = 0.0, 
              y_mm: Optional[float] = 0.0
              ):
-    """Test process for ORCH debugging
+    """Test action for ORCH debugging
     simple plate is e.g. 4534"""
     
      # additional sequence params should be stored in sequence.sequence_params
@@ -49,21 +49,21 @@ def debug(pg_Obj: Sequence,
      
      
     # start_condition: 
-    # 0: orch is dispatching an unconditional process
+    # 0: orch is dispatching an unconditional action
     # 1: orch is waiting for endpoint to become available
     # 2: orch is waiting for server to become available
-    # 3: (or other): orch is waiting for all process_dq to finish
+    # 3: (or other): orch is waiting for all action_dq to finish
     
-    # holds all processes for this sequence  
-    process_list = []
+    # holds all actions for this sequence  
+    action_list = []
 
 
 
-    process_dict = pg_Obj.as_dict()
-    process_dict.update({
-        "process_server": f"{NI_name}",
-        "process_name": "run_cell_IV",
-        "process_params": {
+    action_dict = pg_Obj.as_dict()
+    action_dict.update({
+        "action_server": f"{NI_name}",
+        "action_name": "run_cell_IV",
+        "action_params": {
                         "Tval": 10,
                         "SampleRate": 1.0,
                         "TTLwait": -1,  # -1 disables, else select TTL 0-3
@@ -81,11 +81,11 @@ def debug(pg_Obj: Sequence,
                         },
         # "save_prc": False,
         # "save_data": False,
-        "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
+        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
         })
-    process_list.append(Process(inputdict=process_dict))
+    action_list.append(Action(inputdict=action_dict))
 
-    return process_list
+    return action_list
 
 
 def CA(pg_Obj: Sequence,
@@ -104,16 +104,16 @@ def CA(pg_Obj: Sequence,
 
 
 
-    # list to hold all processes
-    process_list = []
+    # list to hold all actions
+    action_list = []
     
     
     # apply potential
-    process_dict = pg_Obj.as_dict()
-    process_dict.update({
-        "process_server": f"{PSTAT_name}",
-        "process_name": "run_CA",
-        "process_params": {
+    action_dict = pg_Obj.as_dict()
+    action_dict.update({
+        "action_server": f"{PSTAT_name}",
+        "action_name": "run_CA",
+        "action_params": {
                         "Vval": CA_potential_V,
                         "Tval": CA_duration_sec,
                         "SampleRate": samplerate_sec,
@@ -123,12 +123,12 @@ def CA(pg_Obj: Sequence,
                         },
         "save_prc": True,
         "save_data": True,
-        "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
+        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
         # "plate_id": None,
         })
-    process_list.append(Process(inputdict=process_dict))
+    action_list.append(Action(inputdict=action_dict))
 
-    return process_list
+    return action_list
 
 
 def OCV_sqtest(pg_Obj: Sequence,
@@ -143,11 +143,11 @@ def OCV_sqtest(pg_Obj: Sequence,
     
     sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
-    sq.add_process(
+    sq.add_action(
         {
-        "process_server": f"{PSTAT_name}",
-        "process_name": "run_OCV",
-        "process_params": {
+        "action_server": f"{PSTAT_name}",
+        "action_name": "run_OCV",
+        "action_params": {
                         "Tval": sq.pars.OCV_duration_sec,
                         "SampleRate": sq.pars.samplerate_sec,
                         "TTLwait": -1,  # -1 disables, else select TTL 0-3
@@ -156,11 +156,11 @@ def OCV_sqtest(pg_Obj: Sequence,
                         },
         "save_prc": True,
         "save_data": True,
-        "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
+        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
         }
     )
 
-    return sq.process_list # returns complete process list to orch
+    return sq.action_list # returns complete action list to orch
 
 
 def CA_sqtest(pg_Obj: Sequence,
@@ -178,11 +178,11 @@ def CA_sqtest(pg_Obj: Sequence,
     
     sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
-    sq.add_process(
+    sq.add_action(
         {
-        "process_server": f"{PSTAT_name}",
-        "process_name": "run_CA",
-        "process_params": {
+        "action_server": f"{PSTAT_name}",
+        "action_name": "run_CA",
+        "action_params": {
                         "Vval": sq.pars.Ewe_vs_RHE-1.0*sq.pars.Eref-0.059*sq.pars.pH,
                         "Tval": sq.pars.duration_sec,
                         "SampleRate": sq.pars.samplerate_sec,
@@ -192,8 +192,8 @@ def CA_sqtest(pg_Obj: Sequence,
                         },
         "save_prc": True,
         "save_data": True,
-        "start_condition": process_start_condition.wait_for_all, # orch is waiting for all process_dq to finish
+        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
         }
     )
 
-    return sq.process_list # returns complete process list to orch
+    return sq.action_list # returns complete action list to orch

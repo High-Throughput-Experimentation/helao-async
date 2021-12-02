@@ -10,7 +10,7 @@ __all__ = ["makeApp"]
 from typing import Optional, List, Union
 from importlib import import_module
 from fastapi import Request
-from helaocore.server import make_process_serv, setup_process
+from helaocore.server import make_action_serv, setup_action
 from helao.library.driver.alignment_driver import aligner
 from helao.library.driver.galil_driver import move_modes
 
@@ -21,7 +21,7 @@ def makeApp(confPrefix, servKey):
     C = config["servers"]
     S = C[servKey]
 
-    app = make_process_serv(
+    app = make_action_serv(
         config,
         servKey,
         servKey,
@@ -36,11 +36,11 @@ def makeApp(confPrefix, servKey):
         """Return the current motor position"""
         # gets position of all axis, but use only axis defined in aligner server params
         # can also easily be 3d axis (but not implemented yet so only 2d for now)
-        A = await setup_process(request)
-        active = await app.base.contain_process(A)
+        A = await setup_action(request)
+        active = await app.base.contain_action(A)
         await active.enqueue_data(await app.driver.get_position())
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
     # only for alignment bokeh server
     @app.post(f"/{servKey}/private/align_move")
@@ -51,61 +51,61 @@ def makeApp(confPrefix, servKey):
         speed: Optional[int] = None,
         mode: Optional[move_modes] = "relative"
     ):
-        A = await setup_process(request)
-        # A.process_params['stopping'] = False
-        active = await app.base.contain_process(A)
+        A = await setup_action(request)
+        # A.action_params['stopping'] = False
+        active = await app.base.contain_action(A)
         await active.enqueue_data(await app.driver.move(A))
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
         
 
     # only for alignment bokeh server
     @app.post(f"/{servKey}/private/MxytoMPlate")
     async def private_MxytoMPlate(request: Request, Mxy: Optional[List[List[float]]]):
-        A = await setup_process(request)
-        active = await app.base.contain_process(A)
+        A = await setup_action(request)
+        active = await app.base.contain_action(A)
         await active.enqueue_data(await app.driver.MxytoMPlate(Mxy))
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
         
 
     # only for alignment bokeh server
     @app.post(f"/{servKey}/private/toPlateXY")
     async def private_toPlateXY(request: Request, motorxy: Optional[List[List[float]]]):
-        A = await setup_process(request)
-        active = await app.base.contain_process(A)
-        await active.enqueue_data(await app.driver.motor_to_platexy(**A.process_params))
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        A = await setup_action(request)
+        active = await app.base.contain_action(A)
+        await active.enqueue_data(await app.driver.motor_to_platexy(**A.action_params))
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
     # only for alignment bokeh server
     @app.post(f"/{servKey}/private/toMotorXY")
     async def private_toMotorXY(request: Request, platexy: Optional[List[List[float]]]):
-        A = await setup_process(request)
-        active = await app.base.contain_process(A)
-        await active.enqueue_data(await app.driver.plate_to_motorxy(**A.process_params))
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        A = await setup_action(request)
+        active = await app.base.contain_action(A)
+        await active.enqueue_data(await app.driver.plate_to_motorxy(**A.action_params))
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
     # only for alignment bokeh server
     @app.post(f"/{servKey}/private/align_get_PM")
     async def private_align_get_PM(request: Request):
         """Returns the PM for the alignment Visualizer"""
-        A = await setup_process(request)
-        active = await app.base.contain_process(A)
+        A = await setup_action(request)
+        active = await app.base.contain_action(A)
         await active.enqueue_data(await app.driver.get_PM())
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
     # only for alignment bokeh server
     @app.post(f"/{servKey}/private/ismoving")
     async def private_align_ismoving(request: Request, axis: str="xy"):
         """check if motor is moving"""
-        A = await setup_process(request)
-        active = await app.base.contain_process(A)
-        await active.enqueue_data(await app.driver.ismoving(**A.process_params))
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        A = await setup_action(request)
+        active = await app.base.contain_action(A)
+        await active.enqueue_data(await app.driver.ismoving(**A.action_params))
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
     # only for alignment bokeh server
     @app.post(f"/{servKey}/private/send_alignment")
@@ -113,8 +113,8 @@ def makeApp(confPrefix, servKey):
         request: Request, Transfermatrix: Optional[List[List[int]]]=None, errorcode: Optional[str]=None, 
     ):
         """the bokeh server will send its Transfermatrix back with this"""
-        A = await setup_process(request)
-        active = await app.base.contain_process(A)
+        A = await setup_action(request)
+        active = await app.base.contain_action(A)
         # saving params from bokehserver so we can send them back
         app.driver.newTransfermatrix = Transfermatrix
         app.driver.errorcode = errorcode
@@ -122,8 +122,8 @@ def makeApp(confPrefix, servKey):
         app.driver.aligning = False
         print("received new alignment")
         await active.enqueue_data("received new alignment")
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
     # TODO: alignment FastAPI and bokeh server are linked
     # should motor server and data server be parameters?
@@ -135,23 +135,23 @@ def makeApp(confPrefix, servKey):
         motor: Optional[str] = "motor",  # align.config_dict['motor_server'], # default motor server in config
         data: Optional[str] = "data"  # align.config_dict['data_server'] # default data server in config
     ):
-        """Starts alignment process and returns TransferMatrix"""
+        """Starts alignment action and returns TransferMatrix"""
         print("Getting alignment for:", plateid)
-        A = await setup_process(request)
-        active = await app.base.contain_process(A)
-        await active.enqueue_data(await app.driver.get_alignment(**A.process_params))
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        A = await setup_action(request)
+        active = await app.base.contain_action(A)
+        await active.enqueue_data(await app.driver.get_alignment(**A.action_params))
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
     # gets status and Transfermatrix
-    # for new Matrix, a new alignment process needs to be started via
+    # for new Matrix, a new alignment action needs to be started via
     # get_alignment
     # when align_status is then true the Matrix is valid, else it will return the initial one
     @app.post(f"/{servKey}/align_status")
     async def align_status(request: Request):
         """Return status of current alignment"""
-        A = await setup_process(request)
-        active = await app.base.contain_process(A)
+        A = await setup_action(request)
+        active = await app.base.contain_action(A)
         align_status={
             "aligning": await app.driver.is_aligning(),  # true when in progress, false otherwise
             "Transfermatrix": app.driver.newTransfermatrix,
@@ -161,8 +161,8 @@ def makeApp(confPrefix, servKey):
             "data_server": app.driver.dataserv,
         }
         await active.enqueue_data(align_status)
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
     @app.post("/shutdown")
     def post_shutdown():
