@@ -22,7 +22,7 @@ __all__ = [
 from typing import Optional, List, Union
 from socket import gethostname
 
-from helaocore.schema import Action, Process, Processr
+from helaocore.schema import Action, Process, Sequencer
 from helaocore.server import action_start_condition
 import helaocore.model.sample as hcms
 
@@ -67,7 +67,7 @@ def debug(pg_Obj: Process,
     # 3: (or other): orch is waiting for all action_dq to finish
 
     additional_local_var_added_to_sq = 12
-    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": f"{PAL_name}",
@@ -127,7 +127,7 @@ def debug(pg_Obj: Process,
 def ADSS_slave_unloadall_customs(pg_Obj: Process):
     """last functionality test: 11/29/2021"""
     
-    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": f"{PAL_name}",
@@ -148,7 +148,7 @@ def ADSS_slave_load_solid(
                          ):
     """last functionality test: 11/29/2021"""
     
-    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
     sq.add_action({
         "action_server": f"{PAL_name}",
         "action_name": "archive_custom_load",
@@ -171,7 +171,7 @@ def ADSS_slave_load_liquid(
                          ):
     """last functionality test: 11/29/2021"""
     
-    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
     sq.add_action({
         "action_server": f"{PAL_name}",
         "action_name": "archive_custom_load",
@@ -205,7 +205,7 @@ def ADSS_slave_startup(pg_Obj: Process,
     last functionality test: 11/29/2021"""
 
     
-    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
 
     # unload all samples from custom positions
@@ -281,7 +281,7 @@ def ADSS_slave_shutdown(pg_Obj: Process):
     
     last functionality test: 11/29/2021"""
 
-    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
     # deep clean
     sq.add_action_list(ADSS_slave_clean_PALtool(pg_Obj, clean_PAL_tool = PALtools.LS3, clean_PAL_volume_ul = 500))
@@ -362,7 +362,7 @@ def ADSS_slave_drain(pg_Obj: Process):
     
     last functionality test: 11/29/2021"""
 
-    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
     # TODO
     return sq.action_list # returns complete action list to orch
 
@@ -373,7 +373,7 @@ def ADSS_slave_engage(pg_Obj: Process):
     
     last functionality test: 11/29/2021"""
     
-    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
     # engage
     sq.add_action({
@@ -410,7 +410,7 @@ def ADSS_slave_disengage(pg_Obj: Process):
     
     last functionality test: 11/29/2021"""
 
-    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": f"{MOTOR_name}",
@@ -437,7 +437,7 @@ def ADSS_slave_clean_PALtool(pg_Obj: Process,
     last functionality test: 11/29/2021"""
 
 
-    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
     
     # deep clean
     sq.add_action({
@@ -483,7 +483,7 @@ def ADSS_duaribilty_CAv1(pg_Obj: Process,
 
 
 
-    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
     potentials = [pot-1.0*sq.pars.ref_vs_nhe-0.059*sq.pars.pH  for pot in sq.pars.CA_potentials_vsRHE]
 
@@ -597,7 +597,7 @@ def ADSS_slave_single_CA(pg_Obj: Process,
               ):
     """last functionality test: 11/29/2021"""
     
-    sq = Processr(pg_Obj) # exposes function parameters via sq.pars
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
     # get sample for gamry
     sq.add_action({
