@@ -12,7 +12,7 @@ __all__ = ["makeApp"]
 # - add wsstatus
 # - test what happens if NImax broswer has nothing configured and only lists the device
 # done - Current and voltage stream with interrut handler?
-# - create tasks for process library
+# - create tasks for action library
 # - handshake as stream with interrupt
 
 from importlib import import_module
@@ -21,7 +21,7 @@ from fastapi import Request
 from typing import Optional, List
 
 
-from helaocore.server import make_process_serv, setup_process
+from helaocore.server import make_action_serv, setup_action
 from helao.library.driver.nidaqmx_driver import cNIMAX
 import helaocore.model.sample as hcms
 from helaocore.helper import make_str_enum
@@ -31,7 +31,7 @@ def makeApp(confPrefix, servKey):
 
     config = import_module(f"helao.config.{confPrefix}").config
 
-    app = make_process_serv(
+    app = make_action_serv(
         config,
         servKey,
         servKey,
@@ -76,15 +76,15 @@ def makeApp(confPrefix, servKey):
                              cell: Optional[dev_mastercellitems] = None,
                              on: Optional[bool] = True
                             ):
-            A = await setup_process(request)
+            A = await setup_action(request)
             # some additional params in order to call the same driver functions 
             # for all DO actions
-            A.process_abbr = "mcell"
-            A.process_params["do_port"] = dev_mastercell[A.process_params["cell"]]
-            A.process_params["do_name"] = A.process_params["cell"]
-            active = await app.base.contain_process(A, 
+            A.action_abbr = "mcell"
+            A.action_params["do_port"] = dev_mastercell[A.action_params["cell"]]
+            A.action_params["do_name"] = A.action_params["cell"]
+            active = await app.base.contain_action(A, 
                 file_data_keys=["error_code", "port", "name", "type", "value"])
-            await active.enqueue_data(await app.driver.set_digital_out(**A.process_params))
+            await active.enqueue_data(await app.driver.set_digital_out(**A.action_params))
             finished_act = await active.finish()
             return finished_act.as_dict()
 
@@ -96,15 +96,15 @@ def makeApp(confPrefix, servKey):
                              cell: Optional[dev_activecellitems] = None,
                              on: Optional[bool] = True
                             ):
-            A = await setup_process(request)
+            A = await setup_action(request)
             # some additional params in order to call the same driver functions 
             # for all DO actions
-            A.process_abbr = "acell"
-            A.process_params["do_port"] = dev_activecell[A.process_params["cell"]]
-            A.process_params["do_name"] = A.process_params["cell"]
-            active = await app.base.contain_process(A,
+            A.action_abbr = "acell"
+            A.action_params["do_port"] = dev_activecell[A.action_params["cell"]]
+            A.action_params["do_name"] = A.action_params["cell"]
+            active = await app.base.contain_action(A,
                 file_data_keys=["error_code", "port", "name", "type", "value"])
-            await active.enqueue_data(await app.driver.set_digital_out(**A.process_params))
+            await active.enqueue_data(await app.driver.set_digital_out(**A.action_params))
             finished_act = await active.finish()
             return finished_act.as_dict()
 
@@ -116,15 +116,15 @@ def makeApp(confPrefix, servKey):
                        pump: Optional[dev_pumpitems] = None,
                        on: Optional[bool] = True
                       ):
-            A = await setup_process(request)
+            A = await setup_action(request)
             # some additional params in order to call the same driver functions 
             # for all DO actions
-            A.process_abbr = "pump"
-            A.process_params["do_port"] = dev_pump[A.process_params["pump"]]
-            A.process_params["do_name"] = A.process_params["pump"]
-            active = await app.base.contain_process(A,
+            A.action_abbr = "pump"
+            A.action_params["do_port"] = dev_pump[A.action_params["pump"]]
+            A.action_params["do_name"] = A.action_params["pump"]
+            active = await app.base.contain_action(A,
                 file_data_keys=["error_code", "port", "name", "type", "value"])
-            await active.enqueue_data(await app.driver.set_digital_out(**A.process_params))
+            await active.enqueue_data(await app.driver.set_digital_out(**A.action_params))
             finished_act = await active.finish()
             return finished_act.as_dict()
 
@@ -136,15 +136,15 @@ def makeApp(confPrefix, servKey):
                            gasvalve: Optional[dev_gasvalveitems] = None,
                            on: Optional[bool] = True
                           ):
-            A = await setup_process(request)
+            A = await setup_action(request)
             # some additional params in order to call the same driver functions 
             # for all DO actions
-            A.process_abbr = "gfv"
-            A.process_params["do_port"] = dev_gasvalve[A.process_params["gasvalve"]]
-            A.process_params["do_name"] = A.process_params["gasvalve"]
-            active = await app.base.contain_process(A,
+            A.action_abbr = "gfv"
+            A.action_params["do_port"] = dev_gasvalve[A.action_params["gasvalve"]]
+            A.action_params["do_name"] = A.action_params["gasvalve"]
+            active = await app.base.contain_action(A,
                 file_data_keys=["error_code", "port", "name", "type", "value"])
-            await active.enqueue_data(await app.driver.set_digital_out(**A.process_params))
+            await active.enqueue_data(await app.driver.set_digital_out(**A.action_params))
             finished_act = await active.finish()
             return finished_act.as_dict()
 
@@ -156,15 +156,15 @@ def makeApp(confPrefix, servKey):
                               liquidvalve: Optional[dev_liquidvalveitems] = None,
                               on: Optional[bool] = True
                              ):
-            A = await setup_process(request)
+            A = await setup_action(request)
             # some additional params in order to call the same driver functions 
             # for all DO actions
-            A.process_abbr = "lfv"
-            A.process_params["do_port"] = dev_liquidvalve[A.process_params["liquidvalve"]]
-            A.process_params["do_name"] = A.process_params["liquidvalve"]
-            active = await app.base.contain_process(A,
+            A.action_abbr = "lfv"
+            A.action_params["do_port"] = dev_liquidvalve[A.action_params["liquidvalve"]]
+            A.action_params["do_name"] = A.action_params["liquidvalve"]
+            active = await app.base.contain_action(A,
                 file_data_keys=["error_code", "port", "name", "type", "value"])
-            await active.enqueue_data(await app.driver.set_digital_out(**A.process_params))
+            await active.enqueue_data(await app.driver.set_digital_out(**A.action_params))
             finished_act = await active.finish()
             return finished_act.as_dict()
 
@@ -176,15 +176,15 @@ def makeApp(confPrefix, servKey):
                               led: Optional[dev_leditems],
                               on: Optional[bool] = True
                              ):
-            A = await setup_process(request)
+            A = await setup_action(request)
             # some additional params in order to call the same driver functions 
             # for all DO actions
-            A.process_abbr = "lfv"
-            A.process_params["do_port"] = dev_led[A.process_params["led"]]
-            A.process_params["do_name"] = A.process_params["led"]
-            active = await app.base.contain_process(A,
+            A.action_abbr = "lfv"
+            A.action_params["do_port"] = dev_led[A.action_params["led"]]
+            A.action_params["do_name"] = A.action_params["led"]
+            active = await app.base.contain_action(A,
                 file_data_keys=["error_code", "port", "name", "type", "value"])
-            await active.enqueue_data(await app.driver.set_digital_out(**A.process_params))
+            await active.enqueue_data(await app.driver.set_digital_out(**A.action_params))
             finished_act = await active.finish()
             return finished_act.as_dict()
 
@@ -196,15 +196,15 @@ def makeApp(confPrefix, servKey):
                          fswbcd: Optional[dev_fswbcditems] = None,
                          on: Optional[bool] = True
                         ):
-            A = await setup_process(request)
+            A = await setup_action(request)
             # some additional params in order to call the same driver functions 
             # for all DO actions
-            A.process_abbr = "fswbcd"
-            A.process_params["do_port"] = dev_fswbcd[A.process_params["fswbcd"]]
-            A.process_params["do_name"] = A.process_params["fswbcd"]
-            active = await app.base.contain_process(A,
+            A.action_abbr = "fswbcd"
+            A.action_params["do_port"] = dev_fswbcd[A.action_params["fswbcd"]]
+            A.action_params["do_name"] = A.action_params["fswbcd"]
+            active = await app.base.contain_action(A,
                 file_data_keys=["error_code", "port", "name", "type", "value"])
-            await active.enqueue_data(await app.driver.set_digital_out(**A.process_params))
+            await active.enqueue_data(await app.driver.set_digital_out(**A.action_params))
             finished_act = await active.finish()
             return finished_act.as_dict()
 
@@ -215,15 +215,15 @@ def makeApp(confPrefix, servKey):
                       request: Request,
                       fsw: Optional[dev_fswitems] = None,
                      ):
-            A = await setup_process(request)
+            A = await setup_action(request)
             # some additional params in order to call the same driver functions 
             # for all DI actions
-            A.process_abbr = "fsw"
-            A.process_params["di_port"] = dev_fsw[A.process_params["fsw"]]
-            A.process_params["di_name"] = A.process_params["fsw"]
-            active = await app.base.contain_process(A,
+            A.action_abbr = "fsw"
+            A.action_params["di_port"] = dev_fsw[A.action_params["fsw"]]
+            A.action_params["di_name"] = A.action_params["fsw"]
+            active = await app.base.contain_action(A,
                 file_data_keys=["error_code", "port", "name", "type", "value"])
-            await active.enqueue_data(await app.driver.get_digital_in(**A.process_params))
+            await active.enqueue_data(await app.driver.get_digital_in(**A.action_params))
             finished_act = await active.finish()
             return finished_act.as_dict()
 
@@ -240,8 +240,8 @@ def makeApp(confPrefix, servKey):
                          scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                         ):
             """Runs multi cell IV measurement."""
-            A = await setup_process(request)
-            A.process_abbr = "multiCV"
+            A = await setup_action(request)
+            A.action_abbr = "multiCV"
             active_dict = await app.driver.run_cell_IV(A)
             return active_dict
 
@@ -249,8 +249,8 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/stop")
     async def stop(request: Request):
         """Stops measurement in a controlled way."""
-        A = await setup_process(request)
-        active = await app.base.contain_process(A, file_data_keys="stop")
+        A = await setup_action(request)
+        active = await app.base.contain_action(A, file_data_keys="stop")
         await active.enqueue_data({"stop": await app.driver.stop()})
         finished_act = await active.finish()
         return finished_act.as_dict()
@@ -262,9 +262,9 @@ def makeApp(confPrefix, servKey):
                    switch: Optional[bool] = True
                    ):
         """Same as stop, but also sets estop flag."""
-        A = await setup_process(request)
-        active = await app.base.contain_process(A, file_data_keys="estop")
-        await active.enqueue_data({"estop": await app.driver.estop(**A.process_params)})
+        A = await setup_action(request)
+        active = await app.base.contain_action(A, file_data_keys="estop")
+        await active.enqueue_data({"estop": await app.driver.estop(**A.action_params)})
         finished_act = await active.finish()
         return finished_act.as_dict()
 

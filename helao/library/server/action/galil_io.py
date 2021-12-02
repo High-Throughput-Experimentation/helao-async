@@ -14,7 +14,7 @@ __all__ = ["makeApp"]
 from typing import Optional, Union, List
 from importlib import import_module
 from fastapi import Request
-from helaocore.server import make_process_serv, setup_process
+from helaocore.server import make_action_serv, setup_action
 from helao.library.driver.galil_driver import galil
 
 
@@ -22,7 +22,7 @@ def makeApp(confPrefix, servKey):
 
     config = import_module(f"helao.config.{confPrefix}").config
 
-    app = make_process_serv(
+    app = make_action_serv(
         config, 
         servKey, 
         servKey, 
@@ -37,12 +37,12 @@ def makeApp(confPrefix, servKey):
                             request: Request,
                             port:Optional[int] = None
                            ):
-        A = await setup_process(request)
-        active = await app.base.contain_process(A,
+        A = await setup_action(request)
+        active = await app.base.contain_action(A,
                 file_data_keys=["error_code", "port", "name", "type", "value"])
-        await active.enqueue_data(app.driver.get_analog_in(**A.process_params))
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        await active.enqueue_data(app.driver.get_analog_in(**A.action_params))
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/set_analog_out")
@@ -51,12 +51,12 @@ def makeApp(confPrefix, servKey):
                              port:Optional[int] = None,
                              value:Optional[float] = None
                             ):
-        A = await setup_process(request)
-        active = await app.base.contain_process(A,
+        A = await setup_action(request)
+        active = await app.base.contain_action(A,
                 file_data_keys=["error_code", "port", "name", "type", "value"])
-        await active.enqueue_data(app.driver.set_analog_out(**A.process_params))
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        await active.enqueue_data(app.driver.set_analog_out(**A.action_params))
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/get_digital_in")
@@ -64,12 +64,12 @@ def makeApp(confPrefix, servKey):
                              request: Request,
                              port:Optional[int] = None
                             ):
-        A = await setup_process(request)
-        active = await app.base.contain_process(A,
+        A = await setup_action(request)
+        active = await app.base.contain_action(A,
                 file_data_keys=["error_code", "port", "name", "type", "value"])
-        await active.enqueue_data(app.driver.get_digital_in(**A.process_params))
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        await active.enqueue_data(app.driver.get_digital_in(**A.action_params))
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/get_digital_out")
@@ -77,12 +77,12 @@ def makeApp(confPrefix, servKey):
                               request: Request,
                               port:Optional[int] = None
                              ):
-        A = await setup_process(request)
-        active = await app.base.contain_process(A,
+        A = await setup_action(request)
+        active = await app.base.contain_action(A,
                 file_data_keys=["error_code", "port", "name", "type", "value"])
-        await active.enqueue_data(app.driver.get_digital_out(**A.process_params))
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        await active.enqueue_data(app.driver.get_digital_out(**A.action_params))
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/set_digital_out")
@@ -91,32 +91,32 @@ def makeApp(confPrefix, servKey):
                               port:Optional[int] = None, 
                               on:Optional[bool] = False
                              ):
-        A = await setup_process(request)
-        active = await app.base.contain_process(A,
+        A = await setup_action(request)
+        active = await app.base.contain_action(A,
                 file_data_keys=["error_code", "port", "name", "type", "value"])
-        await active.enqueue_data(app.driver.set_digital_out(**A.process_params))
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        await active.enqueue_data(app.driver.set_digital_out(**A.action_params))
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/reset")
     async def reset(request: Request):
         """resets galil device. only for emergency use!"""
-        A = await setup_process(request)
-        active = await app.base.contain_process(A, file_data_keys="reset")
+        A = await setup_action(request)
+        active = await app.base.contain_action(A, file_data_keys="reset")
         await active.enqueue_data({"reset":await app.driver.reset()})
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/estop")
     async def estop(request: Request, switch: Optional[bool] = True):
         # http://127.0.0.1:8001/motor/set/stop
-        A = await setup_process(request)
-        active = await app.base.contain_process(A, file_data_keys="estop")
+        A = await setup_action(request)
+        active = await app.base.contain_action(A, file_data_keys="estop")
         await active.enqueue_data({"estop":await app.driver.estop_io(switch)})
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
     
     @app.post("/shutdown")

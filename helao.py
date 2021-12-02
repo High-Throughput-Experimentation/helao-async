@@ -32,7 +32,7 @@ import pickle
 import psutil
 import time
 import requests
-import subprocess
+import subaction
 from importlib import import_module
 
 from munch import munchify
@@ -95,7 +95,7 @@ class Pidd:
             pid = tup[3]
             port = tup[2]
             host = tup[1]
-            proc = psutil.Process(pid)
+            proc = psutil.Action(pid)
             if proc.name() in self.PROC_NAMES:
                 connections = [
                     c for c in proc.connections("tcp4") if c.status == "LISTEN"
@@ -107,7 +107,7 @@ class Pidd:
     def find_bokeh(self, host, port):
         pyPids = {
             p.pid: p.info["connections"]
-            for p in psutil.process_iter(["name", "connections"])
+            for p in psutil.action_iter(["name", "connections"])
             if p.info["name"].startswith("python")
         }
         # print_message({}, "launcher", pyPids)
@@ -130,7 +130,7 @@ class Pidd:
                 return True
             else:
                 try:
-                    p = psutil.Process(self.d[k]["pid"])
+                    p = psutil.Action(self.d[k]["pid"])
                     for _ in range(self.RETRIES):
                         # os.kill(p.pid, signal.SIGTERM)
                         p.terminate()
@@ -153,7 +153,7 @@ class Pidd:
         print_message({}, "launcher", active)
 
         activeserver = [k for k, _, _, _ in active]
-        KILL_ORDER = ["operator", "visualizer", "process", "orchestrator"]
+        KILL_ORDER = ["operator", "visualizer", "action", "orchestrator"]
         for group in KILL_ORDER:
             print_message({}, "launcher", f"Killing {group} group.")
             if group in pidd.A:
@@ -169,11 +169,11 @@ class Pidd:
             self.kill_server(k)
         active = self.list_active()
         if active:
-            print_message({}, "launcher", "Following processes failed to terminate:", error = True)
+            print_message({}, "launcher", "Following actions failed to terminate:", error = True)
             for x in active:
                 print_message({}, "launcher", x)
         else:
-            print_message({}, "launcher", f"All processes terminated. Removing '{self.pidFile}'")
+            print_message({}, "launcher", f"All actions terminated. Removing '{self.pidFile}'")
             os.remove(self.pidFile)
 
 
@@ -259,7 +259,7 @@ def wait_key():
 def launcher(confPrefix, confDict):
 
     # API server launch priority (matches folders in root helao-dev/)
-    LAUNCH_ORDER = ["process", "orchestrator", "visualizer", "operator"]
+    LAUNCH_ORDER = ["action", "orchestrator", "visualizer", "operator"]
 
     pidd = Pidd(f"pids_{confPrefix}.pck")
     if not validateConfig(pidd, confDict):
@@ -293,10 +293,10 @@ def launcher(confPrefix, confDict):
                 servPort = S.port
                 servKHP = (server, servHost, servPort)
                 servHP = (servHost, servPort)
-                # if 'py' key is None, assume remotely started or monitored by a separate process
+                # if 'py' key is None, assume remotely started or monitored by a separate action
                 if servPy is None:
                     print_message({}, "launcher", 
-                        f"{server} does not specify one of ({pidd.codeKeys}) so process not be managed.",
+                        f"{server} does not specify one of ({pidd.codeKeys}) so action not be managed.",
                         info = True
                     )
                 elif servKHP in activeKHP:
@@ -316,11 +316,11 @@ def launcher(confPrefix, confDict):
                         if group == "orchestrators":
                             pidd.orchServs.append(server)
                         cmd = ["python", "fast_launcher.py", confPrefix, server]
-                        p = subprocess.Popen(cmd, cwd=helao_root)
+                        p = subaction.Popen(cmd, cwd=helao_root)
                         ppid = p.pid
                     elif codeKey == "bokeh":
                         cmd = ["python", "bokeh_launcher.py", confPrefix, server]
-                        p = subprocess.Popen(cmd, cwd=helao_root)
+                        p = subaction.Popen(cmd, cwd=helao_root)
                         try:
                             time.sleep(3)
                             ppid = pidd.find_bokeh(servHost, servPort)
@@ -330,7 +330,7 @@ def launcher(confPrefix, confDict):
                                 error = True
                             )
                             print_message({}, "launcher", 
-                                "Unable to manage bokeh process. See bokeh output for correct PID.",
+                                "Unable to manage bokeh action. See bokeh output for correct PID.",
                                 error = True
                             )
                             ppid = p.pid
@@ -355,7 +355,7 @@ if __name__ == "__main__":
     pidd = launcher(confPrefix, config)
     result = None
     while result not in [b"\x18", b"\x04"]:
-        print_message({}, "launcher", "CTRL-x to terminate process group. CTRL-d to disconnect.")
+        print_message({}, "launcher", "CTRL-x to terminate action group. CTRL-d to disconnect.")
         result = wait_key()
     if result == b"\x18":
         for server in pidd.orchServs:
@@ -366,9 +366,9 @@ if __name__ == "__main__":
             except Exception as e:
                 print_message({}, "launcher", " ... got error: ", e, error = True)
         # in case a /shutdown is added to other FastAPI servers (not the shutdown without '/')
-        # KILL_ORDER = ["visualizer", "process", "server"] # orch are killed above
+        # KILL_ORDER = ["visualizer", "action", "server"] # orch are killed above
         # no /shutdown in visualizers
-        KILL_ORDER = ["process", "server"]  # orch are killed above
+        KILL_ORDER = ["action", "server"]  # orch are killed above
         for group in KILL_ORDER:
             print_message({}, "launcher", f"Shutting down {group} group.")
             if group in pidd.A:
@@ -385,7 +385,7 @@ if __name__ == "__main__":
         pidd.close()
     else:
         print_message({}, "launcher", 
-            f"Disconnecting process monitor. Launch 'python helao.py {confPrefix}' to reconnect."
+            f"Disconnecting action monitor. Launch 'python helao.py {confPrefix}' to reconnect."
         )
 
 # main()

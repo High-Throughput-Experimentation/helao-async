@@ -187,11 +187,11 @@ class PALtray:
 
 
 class Archive():
-    def __init__(self, process_serv: Base):
+    def __init__(self, action_serv: Base):
         
-        self.base = process_serv
-        self.config_dict = process_serv.server_cfg["params"]
-        self.world_config = process_serv.world_cfg
+        self.base = action_serv
+        self.config_dict = action_serv.server_cfg["params"]
+        self.world_config = action_serv.world_cfg
         
         self.position_config = self.config_dict.get("positions", None)
         self.archivepck = None
@@ -210,7 +210,7 @@ class Archive():
         self.startup_custom_positions = dict()
 
         # get some empty db dicts from default config
-        self.startup_trays, self.startup_custom_positions = self.process_startup_config()
+        self.startup_trays, self.startup_custom_positions = self.action_startup_config()
         # compare default config to backup
 
         try:
@@ -287,7 +287,7 @@ class Archive():
         asyncio.gather(self.update_samples_from_db())
 
         
-    def process_startup_config(self):
+    def action_startup_config(self):
         custom_positions = dict()
         trays_dict = dict()
 

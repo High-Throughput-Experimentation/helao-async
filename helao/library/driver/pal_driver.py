@@ -13,7 +13,7 @@ from typing import List, Union
 from pydantic import BaseModel
 from pydantic import validator
 
-from helaocore.schema import Process
+from helaocore.schema import Action
 from helaocore.server import Base
 from helaocore.error import error_codes
 
@@ -211,11 +211,11 @@ class cPALparams(BaseModel):
 
 
 class cPAL:
-    def __init__(self, process_serv: Base):
+    def __init__(self, action_serv: Base):
         
-        self.base = process_serv
-        self.config_dict = process_serv.server_cfg["params"]
-        self.world_config = process_serv.world_cfg
+        self.base = action_serv
+        self.config_dict = action_serv.server_cfg["params"]
+        self.world_config = action_serv.world_cfg
 
         self.sample_no_db_path = self.world_config["local_db_path"]
         self.unified_db = hcd.UnifiedSampleDataAPI(self.base, self.sample_no_db_path)
@@ -270,12 +270,12 @@ class cPAL:
             self.triggers = True
 
 
-        self.process = (
-            None  # for passing process object from technique method to measure loop
+        self.action = (
+            None  # for passing action object from technique method to measure loop
         )
 
         self.active = (
-            None  # for holding active process object, clear this at end of measurement
+            None  # for holding active action object, clear this at end of measurement
         )
 
 
@@ -389,12 +389,12 @@ class cPAL:
         return True
 
 
-    async def _init_PAL_IOloop(self, A: Process, PALparams: cPALparams):
+    async def _init_PAL_IOloop(self, A: Action, PALparams: cPALparams):
         activeDict = dict()
         if not self.IO_do_meas:
             self.IO_error = error_codes.none
             self.IO_PALparams = PALparams
-            self.process = A
+            self.action = A
             self.IO_continue = False
             self.IO_do_meas = True
             # wait for first continue trigger
@@ -403,7 +403,7 @@ class cPAL:
                 await asyncio.sleep(1)
             error = self.IO_error
             if self.active:
-                activeDict = self.active.process.as_dict()
+                activeDict = self.active.action.as_dict()
             else:
                 activeDict = A.as_dict()
         else:
@@ -487,7 +487,7 @@ class cPAL:
 
                     # write data
                     if self.active:
-                        if self.active.process.save_data:
+                        if self.active.action.save_data:
                             logdata = [
                                 [sample.get_global_label() for sample in micropal.PAL_runtime_source[i_repeat].sample.samples],
                                 [sample.get_global_label() for sample in micropal.PAL_runtime_dest[i_repeat].sample.samples],
@@ -557,10 +557,10 @@ class cPAL:
                 # this is a sample reference, it needs to be added
                 # to the db later
                 sample.samples.append(hcms.LiquidSample(
-                        sequence_uuid=self.process.sequence_uuid,
-                        process_uuid=self.process.process_uuid,
+                        sequence_uuid=self.action.sequence_uuid,
+                        action_uuid=self.action.action_uuid,
                         source=source,
-                        process_timestamp=self.process.process_timestamp,
+                        action_timestamp=self.action.action_timestamp,
                         chemical=source_chemical,
                         mass=source_mass,
                         supplier=source_supplier,
@@ -570,10 +570,10 @@ class cPAL:
                         ))
             elif sample_out_type == _sampletype.gas:
                 sample.samples.append(hcms.GasSample(
-                        sequence_uuid=self.process.sequence_uuid,
-                        process_uuid=self.process.process_uuid,
+                        sequence_uuid=self.action.sequence_uuid,
+                        action_uuid=self.action.action_uuid,
                         source=source,
-                        process_timestamp=self.process.process_timestamp,
+                        action_timestamp=self.action.action_timestamp,
                         chemical=source_chemical,
                         mass=source_mass,
                         supplier=source_supplier,
@@ -585,10 +585,10 @@ class cPAL:
                 sample.samples.append(hcms.AssemblySample(
                         parts = [sample for sample in sample_in.samples],
                         sample_position = sample_position,
-                        sequence_uuid=self.process.sequence_uuid,
-                        process_uuid=self.process.process_uuid,
+                        sequence_uuid=self.action.sequence_uuid,
+                        action_uuid=self.action.action_uuid,
                         source=source,
-                        process_timestamp=self.process.process_timestamp,
+                        action_timestamp=self.action.action_timestamp,
                         status="created",
                         inheritance="receive_only"
                         ))
@@ -608,9 +608,9 @@ class cPAL:
                 status="created",
                 inheritance="receive_only",
                 source = [sample.get_global_label() for sample in sample_in.samples],
-                sequence_uuid=self.process.sequence_uuid,
-                process_uuid=self.process.process_uuid,
-                process_timestamp=self.process.process_timestamp,
+                sequence_uuid=self.action.sequence_uuid,
+                action_uuid=self.action.action_uuid,
+                action_timestamp=self.action.action_timestamp,
                 ))
         else:
             # this should never happen, else we found a bug
@@ -1635,13 +1635,13 @@ class cPAL:
         """sets active object and
         checks samples_in"""
 
-        self.active = await self.base.contain_process(
-            self.process,
+        self.active = await self.base.contain_action(
+            self.action,
             file_type="pal_helao__file",
             file_data_keys=self.FIFO_column_headings,
             header=None,
         )
-        self.base.print_message(f"Active process uuid is {self.active.process.process_uuid}")
+        self.base.print_message(f"Active action uuid is {self.active.action.action_uuid}")
         if self.active:
             self.active.finish_hlo_header(realtime=await self.active.set_realtime())
 
@@ -1685,7 +1685,7 @@ class cPAL:
         # need to set the current meas to idle first
         _ = await self.active.finish()
         self.active = None
-        self.process = None
+        self.action = None
 
         if self.IO_estop:
             self.base.print_message("PAL is in estop.")
@@ -1703,8 +1703,8 @@ class cPAL:
         return await self.unified_db.new_sample(samples)
     
     
-    async def method_arbitrary(self, A: Process):
-        PALparams = cPALparams(**A.process_params)
+    async def method_arbitrary(self, A: Action):
+        PALparams = cPALparams(**A.action_params)
         PALparams.PAL_sample_in = A.samples_in
         return await self._init_PAL_IOloop(
             A = A,
@@ -1712,25 +1712,25 @@ class cPAL:
         )
     
     
-    async def method_archive(self, A: Process):
+    async def method_archive(self, A: Action):
         PALparams = cPALparams(
             PAL_sample_in = A.samples_in,
-            PAL_totalruns = len(A.process_params.get("PAL_sampleperiod",[])),
-            PAL_sampleperiod = A.process_params.get("PAL_sampleperiod",[]),
-            PAL_spacingmethod = A.process_params.get("PAL_spacingmethod",Spacingmethod.linear),
-            PAL_spacingfactor = A.process_params.get("PAL_spacingfactor",1.0),
-            PAL_timeoffset = A.process_params.get("PAL_timeoffset",0.0),
+            PAL_totalruns = len(A.action_params.get("PAL_sampleperiod",[])),
+            PAL_sampleperiod = A.action_params.get("PAL_sampleperiod",[]),
+            PAL_spacingmethod = A.action_params.get("PAL_spacingmethod",Spacingmethod.linear),
+            PAL_spacingfactor = A.action_params.get("PAL_spacingfactor",1.0),
+            PAL_timeoffset = A.action_params.get("PAL_timeoffset",0.0),
             micropal = MicroPalParams(**{
                     "PAL_method":"archive",
-                    "PAL_tool":A.process_params.get("PAL_tool",None),
-                    "PAL_volume_ul":A.process_params.get("PAL_volume_ul",0),
+                    "PAL_tool":A.action_params.get("PAL_tool",None),
+                    "PAL_volume_ul":A.action_params.get("PAL_volume_ul",0),
                     "PAL_requested_source":PAL_position(**{
-                        "position":A.process_params.get("PAL_source",None),
+                        "position":A.action_params.get("PAL_source",None),
                         }),
-                    "PAL_wash1":A.process_params.get("PAL_wash1",0),
-                    "PAL_wash2":A.process_params.get("PAL_wash2",0),
-                    "PAL_wash3":A.process_params.get("PAL_wash3",0),
-                    "PAL_wash4":A.process_params.get("PAL_wash4",0),
+                    "PAL_wash1":A.action_params.get("PAL_wash1",0),
+                    "PAL_wash2":A.action_params.get("PAL_wash2",0),
+                    "PAL_wash3":A.action_params.get("PAL_wash3",0),
+                    "PAL_wash4":A.action_params.get("PAL_wash4",0),
                     })
         )
         return await self._init_PAL_IOloop(
@@ -1739,7 +1739,7 @@ class cPAL:
         )
 
 
-    async def method_fill(self, A: Process):
+    async def method_fill(self, A: Action):
         PALparams = cPALparams(
             PAL_sample_in = A.samples_in,
             PAL_totalruns = 1,
@@ -1749,18 +1749,18 @@ class cPAL:
             PAL_timeoffset = 0.0,
             micropal = MicroPalParams(**{
                     "PAL_method":"fill",
-                    "PAL_tool":A.process_params.get("PAL_tool",None),
-                    "PAL_volume_ul":A.process_params.get("PAL_volume_ul",0),
+                    "PAL_tool":A.action_params.get("PAL_tool",None),
+                    "PAL_volume_ul":A.action_params.get("PAL_volume_ul",0),
                     "PAL_requested_source":PAL_position(**{
-                        "position":A.process_params.get("PAL_source",None),
+                        "position":A.action_params.get("PAL_source",None),
                         }),
                     "PAL_requested_dest":PAL_position(**{
-                        "position":A.process_params.get("PAL_dest",None),
+                        "position":A.action_params.get("PAL_dest",None),
                         }),
-                    "PAL_wash1":A.process_params.get("PAL_wash1",0),
-                    "PAL_wash2":A.process_params.get("PAL_wash2",0),
-                    "PAL_wash3":A.process_params.get("PAL_wash3",0),
-                    "PAL_wash4":A.process_params.get("PAL_wash4",0),
+                    "PAL_wash1":A.action_params.get("PAL_wash1",0),
+                    "PAL_wash2":A.action_params.get("PAL_wash2",0),
+                    "PAL_wash3":A.action_params.get("PAL_wash3",0),
+                    "PAL_wash4":A.action_params.get("PAL_wash4",0),
                     })
         )
         return await self._init_PAL_IOloop(
@@ -1769,7 +1769,7 @@ class cPAL:
         )
 
 
-    async def method_fillfixed(self, A: Process):
+    async def method_fillfixed(self, A: Action):
         PALparams = cPALparams(
             PAL_sample_in = A.samples_in,
             PAL_totalruns = 1,
@@ -1779,18 +1779,18 @@ class cPAL:
             PAL_timeoffset = 0.0,
             micropal = MicroPalParams(**{
                     "PAL_method":"fillfixed",
-                    "PAL_tool":A.process_params.get("PAL_tool",None),
-                    "PAL_volume_ul":A.process_params.get("PAL_volume_ul",0),
+                    "PAL_tool":A.action_params.get("PAL_tool",None),
+                    "PAL_volume_ul":A.action_params.get("PAL_volume_ul",0),
                     "PAL_requested_source":PAL_position(**{
-                        "position":A.process_params.get("PAL_source",None),
+                        "position":A.action_params.get("PAL_source",None),
                         }),
                     "PAL_requested_dest":PAL_position(**{
-                        "position":A.process_params.get("PAL_dest",None),
+                        "position":A.action_params.get("PAL_dest",None),
                         }),
-                    "PAL_wash1":A.process_params.get("PAL_wash1",0),
-                    "PAL_wash2":A.process_params.get("PAL_wash2",0),
-                    "PAL_wash3":A.process_params.get("PAL_wash3",0),
-                    "PAL_wash4":A.process_params.get("PAL_wash4",0),
+                    "PAL_wash1":A.action_params.get("PAL_wash1",0),
+                    "PAL_wash2":A.action_params.get("PAL_wash2",0),
+                    "PAL_wash3":A.action_params.get("PAL_wash3",0),
+                    "PAL_wash4":A.action_params.get("PAL_wash4",0),
                     })
         )
         return await self._init_PAL_IOloop(
@@ -1799,7 +1799,7 @@ class cPAL:
         )
 
 
-    async def method_deepclean(self, A: Process):
+    async def method_deepclean(self, A: Action):
         PALparams = cPALparams(
             PAL_sample_in = A.samples_in,
             PAL_totalruns = 1,
@@ -1809,8 +1809,8 @@ class cPAL:
             PAL_timeoffset = 0.0,
             micropal = MicroPalParams(**{
                     "PAL_method":"deepclean",
-                    "PAL_tool":A.process_params.get("PAL_tool",None),
-                    "PAL_volume_ul":A.process_params.get("PAL_volume_ul",0),
+                    "PAL_tool":A.action_params.get("PAL_tool",None),
+                    "PAL_volume_ul":A.action_params.get("PAL_volume_ul",0),
                     "PAL_wash1":1,
                     "PAL_wash2":1,
                     "PAL_wash3":1,
@@ -1823,31 +1823,31 @@ class cPAL:
         )
 
 
-    async def method_dilute(self, A: Process):
+    async def method_dilute(self, A: Action):
         PALparams = cPALparams(
             PAL_sample_in = A.samples_in,
-            PAL_totalruns = len(A.process_params.get("PAL_sampleperiod",[])),
-            PAL_sampleperiod = A.process_params.get("PAL_sampleperiod",[]),
-            PAL_spacingmethod = A.process_params.get("PAL_spacingmethod",Spacingmethod.linear),
-            PAL_spacingfactor = A.process_params.get("PAL_spacingfactor",1.0),
-            PAL_timeoffset = A.process_params.get("PAL_timeoffset",0.0),
+            PAL_totalruns = len(A.action_params.get("PAL_sampleperiod",[])),
+            PAL_sampleperiod = A.action_params.get("PAL_sampleperiod",[]),
+            PAL_spacingmethod = A.action_params.get("PAL_spacingmethod",Spacingmethod.linear),
+            PAL_spacingfactor = A.action_params.get("PAL_spacingfactor",1.0),
+            PAL_timeoffset = A.action_params.get("PAL_timeoffset",0.0),
             micropal = MicroPalParams(**{
                     "PAL_method":"dilute",
-                    "PAL_tool":A.process_params.get("PAL_tool",None),
-                    "PAL_volume_ul":A.process_params.get("PAL_volume_ul",0),
+                    "PAL_tool":A.action_params.get("PAL_tool",None),
+                    "PAL_volume_ul":A.action_params.get("PAL_volume_ul",0),
                     "PAL_requested_source":PAL_position(**{
-                        "position":A.process_params.get("PAL_source",None),
+                        "position":A.action_params.get("PAL_source",None),
                         }),
                     "PAL_requested_dest":PAL_position(**{
                         "position":_positiontype.tray,
-                        "tray":A.process_params.get("PAL_dest_tray",0),
-                        "slot":A.process_params.get("PAL_dest_slot",0),
-                        "vial":A.process_params.get("PAL_dest_vial",0),
+                        "tray":A.action_params.get("PAL_dest_tray",0),
+                        "slot":A.action_params.get("PAL_dest_slot",0),
+                        "vial":A.action_params.get("PAL_dest_vial",0),
                         }),
-                    "PAL_wash1":A.process_params.get("PAL_wash1",1),
-                    "PAL_wash2":A.process_params.get("PAL_wash2",1),
-                    "PAL_wash3":A.process_params.get("PAL_wash3",1),
-                    "PAL_wash4":A.process_params.get("PAL_wash4",1),
+                    "PAL_wash1":A.action_params.get("PAL_wash1",1),
+                    "PAL_wash2":A.action_params.get("PAL_wash2",1),
+                    "PAL_wash3":A.action_params.get("PAL_wash3",1),
+                    "PAL_wash4":A.action_params.get("PAL_wash4",1),
                     })
         )
         return await self._init_PAL_IOloop(
@@ -1856,25 +1856,25 @@ class cPAL:
         )
 
 
-    async def method_autodilute(self, A: Process):
+    async def method_autodilute(self, A: Action):
         PALparams = cPALparams(
             PAL_sample_in = A.samples_in,
-            PAL_totalruns = len(A.process_params.get("PAL_sampleperiod",[])),
-            PAL_sampleperiod = A.process_params.get("PAL_sampleperiod",[]),
-            PAL_spacingmethod = A.process_params.get("PAL_spacingmethod",Spacingmethod.linear),
-            PAL_spacingfactor = A.process_params.get("PAL_spacingfactor",1.0),
-            PAL_timeoffset = A.process_params.get("PAL_timeoffset",0.0),
+            PAL_totalruns = len(A.action_params.get("PAL_sampleperiod",[])),
+            PAL_sampleperiod = A.action_params.get("PAL_sampleperiod",[]),
+            PAL_spacingmethod = A.action_params.get("PAL_spacingmethod",Spacingmethod.linear),
+            PAL_spacingfactor = A.action_params.get("PAL_spacingfactor",1.0),
+            PAL_timeoffset = A.action_params.get("PAL_timeoffset",0.0),
             micropal = MicroPalParams(**{
                     "PAL_method":"autodilute",
-                    "PAL_tool":A.process_params.get("PAL_tool",None),
-                    "PAL_volume_ul":A.process_params.get("PAL_volume_ul",0),
+                    "PAL_tool":A.action_params.get("PAL_tool",None),
+                    "PAL_volume_ul":A.action_params.get("PAL_volume_ul",0),
                     "PAL_requested_source":PAL_position(**{
-                        "position":A.process_params.get("PAL_source",None),
+                        "position":A.action_params.get("PAL_source",None),
                         }),
-                    "PAL_wash1":A.process_params.get("PAL_wash1",1),
-                    "PAL_wash2":A.process_params.get("PAL_wash2",1),
-                    "PAL_wash3":A.process_params.get("PAL_wash3",1),
-                    "PAL_wash4":A.process_params.get("PAL_wash4",1),
+                    "PAL_wash1":A.action_params.get("PAL_wash1",1),
+                    "PAL_wash2":A.action_params.get("PAL_wash2",1),
+                    "PAL_wash3":A.action_params.get("PAL_wash3",1),
+                    "PAL_wash4":A.action_params.get("PAL_wash4",1),
                     })
         )
         return await self._init_PAL_IOloop(

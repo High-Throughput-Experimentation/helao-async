@@ -8,7 +8,7 @@ from time import strftime
 from fastapi import Request
 from typing import Optional, List
 
-from helaocore.server import make_process_serv, setup_process
+from helaocore.server import make_action_serv, setup_action
 from helao.library.driver.pal_driver import cPAL
 from helao.library.driver.pal_driver import Spacingmethod
 from helao.library.driver.pal_driver import PALtools
@@ -23,7 +23,7 @@ def makeApp(confPrefix, servKey):
 
     config = import_module(f"helao.config.{confPrefix}").config
 
-    app = make_process_serv(
+    app = make_action_serv(
         config,
         servKey,
         servKey,
@@ -105,8 +105,8 @@ def makeApp(confPrefix, servKey):
             PAL_spacingfactor: Optional[float] = 1.0,
             PAL_timeoffset: Optional[float] = 0.0,
         ):
-            """universal pal process"""
-            A = await setup_process(request)
+            """universal pal action"""
+            A = await setup_action(request)
             active_dict = await app.driver.method_arbitrary(A)
             return active_dict
 
@@ -128,8 +128,8 @@ def makeApp(confPrefix, servKey):
             PAL_wash4: Optional[bool] = False,
             scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
-            A = await setup_process(request)
-            A.process_abbr = "archive"
+            A = await setup_action(request)
+            A.action_abbr = "archive"
             active_dict = await app.driver.method_archive(A)
             return active_dict
 
@@ -147,8 +147,8 @@ def makeApp(confPrefix, servKey):
             PAL_wash3: Optional[bool] = False,
             PAL_wash4: Optional[bool] = False,
         ):
-            A = await setup_process(request)
-            A.process_abbr = "fill"
+            A = await setup_action(request)
+            A.action_abbr = "fill"
             active_dict = await app.driver.method_fill(A)
             return active_dict
 
@@ -166,8 +166,8 @@ def makeApp(confPrefix, servKey):
             PAL_wash3: Optional[bool] = False,
             PAL_wash4: Optional[bool] = False,
         ):
-            A = await setup_process(request)
-            A.process_abbr = "fillfixed"
+            A = await setup_action(request)
+            A.action_abbr = "fillfixed"
             active_dict = await app.driver.method_fillfixed(A)
             return active_dict
 
@@ -179,8 +179,8 @@ def makeApp(confPrefix, servKey):
             PAL_tool: Optional[PALtools] = None,
             PAL_volume_ul: Optional[int] = 200, # this value is only for prc, a fixed value is used
         ):
-            A = await setup_process(request)
-            A.process_abbr = "deepclean"
+            A = await setup_action(request)
+            A.action_abbr = "deepclean"
             active_dict = await app.driver.method_deepclean(A)
             return active_dict
 
@@ -205,8 +205,8 @@ def makeApp(confPrefix, servKey):
             PAL_wash4: Optional[bool] = True,
             scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
-            A = await setup_process(request)
-            A.process_abbr = "dilute"
+            A = await setup_action(request)
+            A.action_abbr = "dilute"
             active_dict = await app.driver.method_dilute(A)
             return active_dict
 
@@ -228,8 +228,8 @@ def makeApp(confPrefix, servKey):
             PAL_wash4: Optional[bool] = True,
             scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
-            A = await setup_process(request)
-            A.process_abbr = "autodilute"
+            A = await setup_action(request)
+            A.action_abbr = "autodilute"
             active_dict = await app.driver.method_autodilute(A)
             return active_dict
 
@@ -240,32 +240,32 @@ def makeApp(confPrefix, servKey):
                                       slot: Optional[int] = None,
                                       vial: Optional[int] = None,
                                      ):
-        A = await setup_process(request)
-        A.process_abbr = "query_sample"
-        active = await app.base.contain_process(A, 
+        A = await setup_action(request)
+        A.action_abbr = "query_sample"
+        active = await app.base.contain_action(A, 
                                        file_data_keys=["sample", "error_code"])
         error, sample = \
-            await app.driver.archive.tray_query_sample(**A.process_params)
+            await app.driver.archive.tray_query_sample(**A.action_params)
 
         await active.append_sample(samples = [sample for sample in sample.samples],
                             IO="in"
                            )
         await active.enqueue_data({'sample': sample.dict(),
                                    'error_code':error})
-        active.process.process_params.update({"_fast_sample_in":sample.dict()})
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        active.action.action_params.update({"_fast_sample_in":sample.dict()})
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/archive_tray_unloadall")
     async def archive_tray_unloadall(request: Request):
         """Resets app.driver vial table."""
-        A = await setup_process(request)
-        A.process_abbr = "unload_sample"
-        active = await app.base.contain_process(A, file_data_keys=
+        A = await setup_action(request)
+        A.action_abbr = "unload_sample"
+        active = await app.base.contain_action(A, file_data_keys=
                                                 ["unloaded","tray_dict"])
         unloaded, sample_in, sample_out, tray_dict = \
-            await app.driver.archive.tray_unloadall(**A.process_params)
+            await app.driver.archive.tray_unloadall(**A.action_params)
         if unloaded:
             await active.append_sample(
                   samples = [sample for sample in sample_in.samples],
@@ -287,12 +287,12 @@ def makeApp(confPrefix, servKey):
                                   slot: Optional[int] = None
                                  ):
         """Resets app.driver vial table."""
-        A = await setup_process(request)
-        A.process_abbr = "unload_sample"
-        active = await app.base.contain_process(A, file_data_keys=
+        A = await setup_action(request)
+        A.action_abbr = "unload_sample"
+        active = await app.base.contain_action(A, file_data_keys=
                                                 ["unloaded","tray_dict"])
         unloaded, sample_in, sample_out, tray_dict = \
-            await app.driver.archive.tray_unload(**A.process_params)
+            await app.driver.archive.tray_unload(**A.action_params)
         if unloaded:
             await active.append_sample(
                   samples = [sample for sample in sample_in.samples],
@@ -314,11 +314,11 @@ def makeApp(confPrefix, servKey):
         """Returns an empty vial position for given max volume.\n
         For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.\n
         It will select the first empty vial which has the smallest volume that still can hold req_vol"""
-        A = await setup_process(request)
-        active = await app.base.contain_process(A, file_data_keys="vial_position")
-        await active.enqueue_data({"position": await app.driver.archive.tray_new_position(**A.process_params)})
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        A = await setup_action(request)
+        active = await app.base.contain_action(A, file_data_keys="vial_position")
+        await active.enqueue_data({"position": await app.driver.archive.tray_new_position(**A.action_params)})
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/archive_tray_update_position")
@@ -331,11 +331,11 @@ def makeApp(confPrefix, servKey):
         scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
         """Updates app.driver vial Table. If sucessful (vial-slot was empty) returns True, else it returns False."""
-        A = await setup_process(request)
-        active = await app.base.contain_process(A, file_data_keys="update")
-        await active.enqueue_data({"update": await app.driver.archive.tray_update_position(**A.process_params)})
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        A = await setup_action(request)
+        active = await app.base.contain_action(A, file_data_keys="update")
+        await active.enqueue_data({"update": await app.driver.archive.tray_update_position(**A.action_params)})
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/archive_tray_export_json")
@@ -344,15 +344,15 @@ def makeApp(confPrefix, servKey):
         tray: Optional[int] = None, 
         slot: Optional[int] = None
     ):
-        A = await setup_process(request)
-        A.process_abbr = "traytojson"
-        active = await app.base.contain_process(A,
+        A = await setup_action(request)
+        A.action_abbr = "traytojson"
+        active = await app.base.contain_action(A,
             file_type="palvialtable_helao__file",
             file_data_keys=["table"],
         )
-        await active.enqueue_data({"table": await app.driver.archive.tray_export_json(**A.process_params)})
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        await active.enqueue_data({"table": await app.driver.archive.tray_export_json(**A.action_params)})
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/archive_tray_export_icpms")
@@ -365,20 +365,20 @@ def makeApp(confPrefix, servKey):
         rack: Optional[int] = None,
         dilution_factor: Optional[float] = None
     ):
-        A = await setup_process(request)
-        A.process_abbr = "traytoicpms"
-        active = await app.base.contain_process(A)
+        A = await setup_action(request)
+        A.action_abbr = "traytoicpms"
+        active = await app.base.contain_action(A)
         await app.driver.archive.tray_export_icpms(
              tray = tray,
              slot = slot,
              myactive = active,
-             survey_runs = A.process_params.get("survey_runs", None),
-             main_runs = A.process_params.get("main_runs", None),
-             rack = A.process_params.get("rack", None),
-             dilution_factor = A.process_params.get("dilution_factor", None),
+             survey_runs = A.action_params.get("survey_runs", None),
+             main_runs = A.action_params.get("main_runs", None),
+             rack = A.action_params.get("rack", None),
+             dilution_factor = A.action_params.get("dilution_factor", None),
         )
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/archive_tray_export_csv")
@@ -387,16 +387,16 @@ def makeApp(confPrefix, servKey):
         tray: Optional[int] = None,
         slot: Optional[int] = None
     ):
-        A = await setup_process(request)
-        A.process_abbr = "traytocsv"
-        active = await app.base.contain_process(A)
+        A = await setup_action(request)
+        A.action_abbr = "traytocsv"
+        active = await app.base.contain_action(A)
         await app.driver.archive.tray_export_csv(
-            tray = A.process_params.get("tray", None), 
-            slot = A.process_params.get("slot", None),
+            tray = A.action_params.get("tray", None), 
+            slot = A.action_params.get("slot", None),
             myactive = active
         )
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/archive_custom_load")
@@ -406,11 +406,11 @@ def makeApp(confPrefix, servKey):
                                   load_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
                                   scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                                  ):
-        A = await setup_process(request)
-        A.process_abbr = "load_sample"
-        active = await app.base.contain_process(A, file_data_keys=
+        A = await setup_action(request)
+        A.action_abbr = "load_sample"
+        active = await app.base.contain_action(A, file_data_keys=
                                                 ["loaded","customs_dict"])
-        loaded, loaded_sample, customs_dict = await app.driver.archive.custom_load(**A.process_params)
+        loaded, loaded_sample, customs_dict = await app.driver.archive.custom_load(**A.action_params)
         if loaded:
             await active.append_sample(samples = [sample for sample in loaded_sample.samples],
                                 IO="in"
@@ -426,12 +426,12 @@ def makeApp(confPrefix, servKey):
                                     request: Request,
                                     custom: Optional[dev_customitems] = None,
                                    ):
-        A = await setup_process(request)
-        A.process_abbr = "unload_sample"
-        active = await app.base.contain_process(A, file_data_keys=
+        A = await setup_action(request)
+        A.action_abbr = "unload_sample"
+        active = await app.base.contain_action(A, file_data_keys=
                                                 ["unloaded","customs_dict"])
         unloaded, sample_in, sample_out, customs_dict = \
-            await app.driver.archive.custom_unload(**A.process_params)
+            await app.driver.archive.custom_unload(**A.action_params)
         if unloaded:
             await active.append_sample(
                   samples = [sample for sample in sample_in.samples],
@@ -447,12 +447,12 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/archive_custom_unloadall")
     async def archive_custom_unloadall(request: Request):
-        A = await setup_process(request)
-        A.process_abbr = "unload_sample"
-        active = await app.base.contain_process(A, file_data_keys=
+        A = await setup_action(request)
+        A.action_abbr = "unload_sample"
+        active = await app.base.contain_action(A, file_data_keys=
                                                 ["unloaded","customs_dict"])
         unloaded, sample_in, sample_out, customs_dict = \
-            await app.driver.archive.custom_unloadall(**A.process_params)
+            await app.driver.archive.custom_unloadall(**A.action_params)
         if unloaded:
             await active.append_sample(
                   samples = [sample for sample in sample_in.samples],
@@ -470,20 +470,20 @@ def makeApp(confPrefix, servKey):
     async def archive_custom_query_sample(request: Request, 
                                         custom: Optional[dev_customitems] = None,
                                        ):
-        A = await setup_process(request)
-        A.process_abbr = "query_sample"
-        active = await app.base.contain_process(A, 
+        A = await setup_action(request)
+        A.action_abbr = "query_sample"
+        active = await app.base.contain_action(A, 
                                        file_data_keys=["sample", "error_code"])
         error, sample = \
-            await app.driver.archive.custom_query_sample(**A.process_params)
+            await app.driver.archive.custom_query_sample(**A.action_params)
         await active.append_sample(samples = [sample for sample in sample.samples],
                             IO="in"
                            )
         await active.enqueue_data({'sample': sample.dict(),
                                    'error_code':error})
-        active.process.process_params.update({"_fast_sample_in":sample.dict()})
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        active.action.action_params.update({"_fast_sample_in":sample.dict()})
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/db_get_sample")
@@ -493,12 +493,12 @@ def makeApp(confPrefix, servKey):
                         ):
         """Positive sample_no will get it from the beginng, negative
         from the end of the db."""
-        A = await setup_process(request)
-        active = await app.base.contain_process(A, file_data_keys="sample")
+        A = await setup_action(request)
+        active = await app.base.contain_action(A, file_data_keys="sample")
         sample = await app.driver.db_get_sample(A.samples_in)
         await active.enqueue_data({'sample': sample.dict()})
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/db_new_sample")
@@ -507,7 +507,7 @@ def makeApp(confPrefix, servKey):
                                               "machine_name":gethostname(),
                                               "source": None,
                                               "volume_ml": 0.0,
-                                              "process_time": strftime("%Y%m%d.%H%M%S"),
+                                              "action_time": strftime("%Y%m%d.%H%M%S"),
                                               "chemical": [],
                                               "mass": [],
                                               "supplier": [],
@@ -518,16 +518,16 @@ def makeApp(confPrefix, servKey):
         """use CAS for chemical if available. 
         Written on bottles of chemicals with all other necessary information.
         For empty DUID and AUID the UID will automatically created. 
-        For manual entry leave DUID, AUID, process_time, 
-        and process_params empty and servkey on "data".
+        For manual entry leave DUID, AUID, action_time, 
+        and action_params empty and servkey on "data".
         If its the very first liquid (no source in database exists) 
         leave source and source_ml empty."""
-        A = await setup_process(request)
-        active = await app.base.contain_process(A, file_data_keys="sample")
+        A = await setup_action(request)
+        active = await app.base.contain_action(A, file_data_keys="sample")
         sample = await app.driver.db_new_sample(A.samples_in)
         await active.enqueue_data({'sample': sample.dict()})
-        finished_process = await active.finish()
-        return finished_process.as_dict()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
 
     @app.post("/shutdown")

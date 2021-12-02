@@ -19,7 +19,7 @@ from typing import List
 
 from helaocore.server import Base
 from helaocore.error import error_codes
-from helaocore.schema import Process
+from helaocore.schema import Action
 from helaocore.error import error_codes
 
 
@@ -38,10 +38,10 @@ class cmd_exception(ValueError):
 
 
 class galil:
-    def __init__(self, process_serv: Base):
+    def __init__(self, action_serv: Base):
 
-        self.base = process_serv
-        self.config_dict = process_serv.server_cfg["params"]
+        self.base = action_serv
+        self.config_dict = action_serv.server_cfg["params"]
 
         self.config_dict["estop_motor"] = False
         self.config_dict["estop_io"] = False
@@ -133,8 +133,8 @@ class galil:
             # go slow to find the same position every time
             # first a fast move to find the switch
             retc1 = await self.motor_move(
-                Process({
-                        "process_params": {
+                Action({
+                        "action_params": {
                                 "d_mm": [0 for ax in axis],
                                 "axis": axis,
                                 "speed": None,
@@ -145,8 +145,8 @@ class galil:
             )
             # move back 2mm
             retc1 = await self.motor_move(
-                Process({
-                        "process_params": {
+                Action({
+                        "action_params": {
                                 "d_mm": [2 for ax in axis],
                                 "axis": axis,
                                 "speed": None,
@@ -157,8 +157,8 @@ class galil:
             )
             # approach switch again very slow to get better zero position
             retc1 = await self.motor_move(
-                Process({
-                        "process_params": {
+                Action({
+                        "action_params": {
                                 "d_mm": [0 for ax in axis],
                                 "axis": axis,
                                 "speed": 1000,
@@ -169,8 +169,8 @@ class galil:
             )
 
             retc2 = await self.motor_move(
-                Process({
-                        "process_params": {
+                Action({
+                        "action_params": {
                                 "d_mm":[
                     self.config_dict["axis_zero"][self.config_dict["axis_id"][ax]]
                     for ax in axis
@@ -202,16 +202,16 @@ class galil:
             return "error"
 
 
-    async def motor_move(self, A: Process):
-        d_mm = A.process_params.get("d_mm",[])
-        axis = A.process_params.get("axis",[])
-        speed = A.process_params.get("speed", None)
-        mode = A.process_params.get("mode",move_modes.absolute)
-        transformation = A.process_params.get("transformation",transformation_mode.motorxy)
+    async def motor_move(self, A: Action):
+        d_mm = A.action_params.get("d_mm",[])
+        axis = A.action_params.get("axis",[])
+        speed = A.action_params.get("speed", None)
+        mode = A.action_params.get("mode",move_modes.absolute)
+        transformation = A.action_params.get("transformation",transformation_mode.motorxy)
         
         error =  error_codes.none
 
-        stopping = False  # no stopping of any movement by other processes
+        stopping = False  # no stopping of any movement by other actions
         mode = move_modes(mode)
         transformation = transformation_mode(transformation)
         # this function moves the motor by a set amount of milimeters
@@ -668,7 +668,7 @@ class galil:
         return {"motor_status": ret_status, "err_code": ret_err_code}
 
     async def reset(self):
-        # The RS command resets the state of the processor to its power-on condition.
+        # The RS command resets the state of the actionor to its power-on condition.
         # The previously saved state of the controller,
         # along with parameter values, and saved sequences are restored.
         return self.c("RS")
@@ -978,8 +978,8 @@ class transformation_mode(str, Enum):
 class transformxy:
     # Updating plate calibration will automatically update the system transformation
     # matrix. When angles are changed updated them also here and run update_Msystem
-    def __init__(self, process_serv: Base, Minstr, seq=None):
-        self.base = process_serv
+    def __init__(self, action_serv: Base, Minstr, seq=None):
+        self.base = action_serv
         # instrument specific matrix
         # motor to instrument
         self.Minstrxyz = np.asmatrix(Minstr)  # np.asmatrix(np.identity(4))
