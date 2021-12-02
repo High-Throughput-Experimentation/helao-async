@@ -6,10 +6,10 @@ hostip = "127.0.0.1"
 config = dict()
 
 # process library provides generator functions which produce processes
-# lists from input process_group_id grouping
+# lists from input sequence_id grouping
 config["process_libraries"] = ["ADSS"]
 config["technique_name"] = "adss"
-config["save_root"] = r"C:\INST_dev2\RUNS"
+config["root"] = r"C:\INST_dev2"
 config["local_db_path"] = r"C:\INST_dev2\DATABASE"
 
 
@@ -167,21 +167,21 @@ config["servers"] = dict(
             #     'X':'PXI-6284/port0/line22'  #P0.22, two electrode
             #     },
             dev_pump = {
-                'PeriPump':'PXI-6284/port0/line4	', #P0.4
-#                'MultiPeriPump':'PXI-6284/port0/line0' #P0.0
-                'Direction':'PXI-6284/port0/line0' #P0.0
+                'peripump':'PXI-6284/port0/line4	', #P0.4
+                # 'MultiPeriPump':'PXI-6284/port0/line0' #P0.0
+                'direction':'PXI-6284/port0/line0' #P0.0
                 },
             dev_fsw = {
                 'done':'PXI-6284/port2/line4',  #P2.4
                 'error':'PXI-6284/port2/line6'  #P2.6
                 },
-#             dev_RSHTTLhandshake = {
-#                 'RSH1':'PXI-6284/port2/line5',  #P2.5
-#                 'RSH2':'PXI-6284/port2/line7',  #P2.7
-#                 'RSH3':'PXI-6284/port2/line3',  #P2.3
-# #                'port':'PXI-6284/ctr0',
-# #                'term':'/PXI-6284/PFI8' #P2.0
-#                 }
+            # dev_RSHTTLhandshake = {
+            #     'RSH1':'PXI-6284/port2/line5',  #P2.5
+            #     'RSH2':'PXI-6284/port2/line7',  #P2.7
+            #     'RSH3':'PXI-6284/port2/line3',  #P2.3
+            #     #'port':'PXI-6284/ctr0',
+            #     #'term':'/PXI-6284/PFI8' #P2.0
+            #     }
         )
     ),
     PAL=dict(
@@ -204,27 +204,30 @@ config["servers"] = dict(
             cam_file_path = r'C:\Users\rshs\Desktop\ADSS\adss_psc_methods\lcfc',
             cams = {
                     "archive":"lcfc_archive.cam",
+                    "archive_liquid":"lcfc_archive.cam",
                     "fillfixed":"lcfc_fill_hardcodedvolume.cam",
                     "fill":"lcfc_fill.cam",
-                    "test":"relay_actuation_test2.cam",
-                    "dilute":"lcfc_dilute.cam",
+                    # "test":"relay_actuation_test2.cam",
+                    # "dilute":"lcfc_dilute.cam",
+                    # "autodilute":"lcfc_dilute.cam",
                     "deepclean":"lcfc_deep_clean.cam",
-                   },
+                    },
             positions = {
-                         "tray1":{
+                          "tray1":{
                                   "slot1":None,
                                   "slot2":None,
                                   "slot3":None,
-                                 },
-                         "tray2":{
+                                  },
+                          "tray2":{
                                   "slot1":"VT54",
                                   "slot2":"VT54",
                                   "slot3":"VT54",
-                                 },
-                         "custom":{
-                                   "elec_res1":"reservoir",
-                                   "elec_res2":"reservoir",
-                                   "lcfc_res":"cell",
+                                  },
+                          "custom":{
+                                    "elec_res1":"reservoir",
+                                    "elec_res2":"reservoir",
+                                    "cell1_we":"cell",
+                                    # "lcfc_res":"cell",
                                   }
                         },
         )
@@ -251,6 +254,7 @@ config["servers"] = dict(
         params = dict(
             doc_name = "ADSS Operator",
             orch = 'ORCH',
+            pal = 'PAL',
             # data_server = "data",
             # servicemode=False,
         )
