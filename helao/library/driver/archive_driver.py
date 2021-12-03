@@ -199,8 +199,7 @@ class Archive():
             self.archivepck = os.path.join(self.base.states_root, f"{gethostname()}_archive.pck")
         self.config = {}
 
-        self.sample_no_db_path = self.world_config["local_db_path"]
-        self.unified_db = hcd.UnifiedSampleDataAPI(self.base, self.sample_no_db_path)
+        self.unified_db = hcd.UnifiedSampleDataAPI(self.base)
         asyncio.gather(self.unified_db.init_db())
 
         # configure the tray
