@@ -217,8 +217,7 @@ class cPAL:
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
 
-        self.sample_no_db_path = self.world_config["local_db_path"]
-        self.unified_db = hcd.UnifiedSampleDataAPI(self.base, self.sample_no_db_path)
+        self.unified_db = hcd.UnifiedSampleDataAPI(self.base)
         asyncio.gather(self.unified_db.init_db())
 
         self.archive = Archive(self.base)
