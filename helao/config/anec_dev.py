@@ -3,10 +3,10 @@ config = dict()
 
 # action library provides generator functions which produce actions
 # lists from input process_id grouping
-config["action_libraries"] = ["ANEC"]
+config["process_libraries"] = ["ANEC_prc"]
 config["technique_name"] = "anec"
 config["root"] = r"C:\INST_dev2"
-config["local_db_path"] = r"C:\INST_dev2\DATABASE"
+# config["local_db_path"] = r"C:\INST_dev2\DATABASE"
 
 
 # we define all the servers here so that the overview is a bit better

@@ -1,11 +1,11 @@
 """
-Action library for ADSS
+Process library for ADSS
 server_key must be a FastAPI action server defined in config
 """
 
 __all__ = [
            "debug", 
-           "ADSS_duaribilty_CAv1", 
+           # "ADSS_duaribilty_CAv1", 
            "ADSS_slave_startup", 
            "ADSS_slave_shutdown",
            "ADSS_slave_engage", 
@@ -16,6 +16,8 @@ __all__ = [
            "ADSS_slave_unloadall_customs",
            "ADSS_slave_load_solid",
            "ADSS_slave_load_liquid",
+           "ADSS_slave_fillfixed",
+           "ADSS_slave_fill"
           ]
 
 
@@ -30,7 +32,7 @@ from helao.library.driver.galil_driver import move_modes, transformation_mode
 from helao.library.driver.pal_driver import Spacingmethod, PALtools
 
 
-SEQUENCES = __all__
+PROCESSES = __all__
 
 PSTAT_name = "PSTAT"
 MOTOR_name = "MOTOR"
@@ -453,137 +455,85 @@ def ADSS_slave_clean_PALtool(pg_Obj: Process,
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_duaribilty_CAv1(pg_Obj: Process,
-              solid_custom_position: Optional[str] = "cell1_we",
-              solid_plate_id: Optional[int] = 4534,
-              solid_sample_no: Optional[int] = 1,
-              x_mm: Optional[float] = 0.0, 
-              y_mm: Optional[float] = 0.0,
-              liquid_custom_position: Optional[str] = "elec_res1",
-              liquid_sample_no: Optional[int] = 3,
-              pH: Optional[float] = 9.53,
-              CA_potentials_vsRHE: Optional[List[float]] = [-0.2, 0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
-              CA_duration_sec: Optional[float] = 1320, 
-              aliquot_times_sec: Optional[List[float]] = [60,600,1140],
-              OCV_duration_sec: Optional[float] = 60, 
-              samplerate_sec: Optional[float] = 1, 
-              ref_vs_nhe: Optional[float] = 0.21,
-              filltime_sec: Optional[float] = 10.0
-              ):
-           
-    """Chronoamperometry (current response on amplied potential):
-        x_mm / y_mm: plate coordinates of sample;
-        potential (Volt): applied potential;
-        CA_duration_sec (sec): how long the potential is applied;
-        samplerate_sec (sec): sampleperiod of Gamry;
-        filltime_sec (sec): how long it takes to fill the cell with liquid or empty it.
-        
-        
-        last functionality test: 11/30/2021"""
-
-
-
+def ADSS_slave_fillfixed(pg_Obj: Process, 
+                         fill_vol_ul: Optional[int] = 10000,
+                         filltime_sec: Optional[float] = 10.0
+                         ):
     sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
 
-    potentials = [pot-1.0*sq.pars.ref_vs_nhe-0.059*sq.pars.pH  for pot in sq.pars.CA_potentials_vsRHE]
-
-    # add startup actions to list
-    sq.add_action_list(ADSS_slave_startup(
-                                           pg_Obj=pg_Obj, 
-                                           x_mm = sq.pars.x_mm, 
-                                           y_mm = sq.pars.y_mm,
-                                           solid_custom_position = sq.pars.solid_custom_position,
-                                           solid_plate_id = sq.pars.solid_plate_id,
-                                           solid_sample_no = sq.pars.solid_sample_no,
-                                           liquid_custom_position = sq.pars.liquid_custom_position,
-                                           liquid_sample_no = sq.pars.liquid_sample_no,
-                                          ))
-
-
-    for cycle, potential in enumerate(potentials):
-        print(f" ... cycle {cycle} potential:", potential)
-        if cycle == 0:
-        
-            # fill liquid, no wash (assume it was cleaned before)
-            sq.add_action({
-                "action_server": f"{PAL_name}",
-                "action_name": "PAL_fillfixed",
-                "action_params": {
-                                 "PAL_tool": PALtools.LS3,
-                                 "PAL_source": "elec_res1",
-                                 "PAL_dest": "cell1_we",
-                                 "PAL_volume_ul": 10000,
-                                 "PAL_wash1": 0,
-                                 "PAL_wash2": 0,
-                                 "PAL_wash3": 0,
-                                 "PAL_wash4": 0,
-                                 },
-                "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
-                })
-
-        
-            # set pump flow forward
-            sq.add_action({
-                "action_server": f"{NI_name}",
-                "action_name": "pump",
-                "action_params": {
-                                 "pump":"direction",
-                                 "on": 0,
-                                 },
-                "start_condition": action_start_condition.wait_for_all,
-                })
-        
-            # turn on pump
-            sq.add_action({
-                "action_server": f"{NI_name}",
-                "action_name": "pump",
-                "action_params": {
-                                 "pump":"peripump",
-                                 "on": 1,
-                                 },
-                "start_condition": action_start_condition.wait_for_all,
-                })
-
-        
-            # wait some time to pump in the liquid
-            sq.add_action({
-                "action_server": f"{ORCH_name}",
-                "action_name": "wait",
-                "action_params": {
-                                 "waittime":sq.pars.filltime_sec,
-                                 },
-                "start_condition": action_start_condition.wait_for_all,
-                })
-            
-        else:    
-            # fill liquid, no wash (assume it was cleaned before)
-            sq.add_action({
-                "action_server": f"{PAL_name}",
-                "action_name": "PAL_fill",
-                "action_params": {
-                                 "PAL_tool": PALtools.LS3,
-                                 "PAL_source": "elec_res1",
-                                 "PAL_dest": "cell1_we",
-                                 "PAL_volume_ul": 1000,
-                                 "PAL_wash1": 0,
-                                 "PAL_wash2": 0,
-                                 "PAL_wash3": 0,
-                                 "PAL_wash4": 0,
-                                 },
-                "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
-                })
-    
-        sq.add_action_list(ADSS_slave_single_CA(
-                                                 pg_Obj,
-                                                 CA_single_potential = potential,
-                                                 samplerate_sec = sq.pars.samplerate_sec,
-                                                 OCV_duration_sec = sq.pars.OCV_duration_sec,
-                                                 CA_duration_sec = sq.pars.CA_duration_sec,
-                                                 aliquot_times_sec = sq.pars.aliquot_times_sec
-                                                ))
+    # fill liquid, no wash (assume it was cleaned before)
+    sq.add_action({
+        "action_server": f"{PAL_name}",
+        "action_name": "PAL_fillfixed",
+        "action_params": {
+                          "PAL_tool": PALtools.LS3,
+                          "PAL_source": "elec_res1",
+                          "PAL_dest": "cell1_we",
+                          "PAL_volume_ul": sq.pars.fill_vol_ul,
+                          "PAL_wash1": 0,
+                          "PAL_wash2": 0,
+                          "PAL_wash3": 0,
+                          "PAL_wash4": 0,
+                          },
+        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        })
 
 
-    sq.add_action_list(ADSS_slave_shutdown(pg_Obj = pg_Obj))
+    # set pump flow forward
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "pump",
+        "action_params": {
+                          "pump":"direction",
+                          "on": 0,
+                          },
+        "start_condition": action_start_condition.wait_for_all,
+        })
+
+    # turn on pump
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "pump",
+        "action_params": {
+                          "pump":"peripump",
+                          "on": 1,
+                          },
+        "start_condition": action_start_condition.wait_for_all,
+        })
+
+
+    # wait some time to pump in the liquid
+    sq.add_action({
+        "action_server": f"{ORCH_name}",
+        "action_name": "wait",
+        "action_params": {
+                          "waittime":sq.pars.filltime_sec,
+                          },
+        "start_condition": action_start_condition.wait_for_all,
+        })
+
+    return sq.action_list # returns complete action list to orch
+
+
+def ADSS_slave_fill(pg_Obj: Process, fill_vol_ul: Optional[int] = 1000):
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+
+    # fill liquid, no wash (assume it was cleaned before)
+    sq.add_action({
+        "action_server": f"{PAL_name}",
+        "action_name": "PAL_fill",
+        "action_params": {
+                          "PAL_tool": PALtools.LS3,
+                          "PAL_source": "elec_res1",
+                          "PAL_dest": "cell1_we",
+                          "PAL_volume_ul": sq.pars.fill_vol_ul,
+                          "PAL_wash1": 0,
+                          "PAL_wash2": 0,
+                          "PAL_wash3": 0,
+                          "PAL_wash4": 0,
+                          },
+        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        })
 
     return sq.action_list # returns complete action list to orch
 
