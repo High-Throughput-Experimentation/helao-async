@@ -683,12 +683,12 @@ class C_async_operator:
                           ):
         item = 0
         for idx in range(len(args)):
-            buf = f"{defaults[idx]}"
+            def_val = f"{defaults[idx]}"
             if args[idx] == "pg_Obj":
                 continue
             disabled = False
 
-            param_input.append(TextInput(value=buf, title=args[idx], disabled=disabled, width=400, height=40))
+            param_input.append(TextInput(value=def_val, title=args[idx], disabled=disabled, width=400, height=40))
             param_layout.append(layout([
                         [param_input[item]],
                         Spacer(height=10),
@@ -718,8 +718,6 @@ class C_async_operator:
                             Spacer(height=10),
                             ],background=self.color_sq_param_inputs,width=640))
 
-
-
             elif args[idx] == "solid_sample_no":
                 param_input[-1].on_change("value", partial(self.callback_changed_sampleno, sender=param_input[-1]))
 
@@ -732,16 +730,22 @@ class C_async_operator:
             elif args[idx] == "solid_custom_position":
                 param_input[-1] = Select(title=args[idx], value = None, options=self.dev_customitems)
                 if self.dev_customitems:
-                    param_input[-1].value = self.dev_customitems[0]
+                    if def_val in self.dev_customitems:
+                        param_input[-1].value = def_val
+                    else:
+                        param_input[-1].value = self.dev_customitems[0]
                 param_layout[-1] = layout([
                             [param_input[-1]],
                             Spacer(height=10),
                             ],background=self.color_sq_param_inputs,width=640)
-  
+
             elif args[idx] == "liquid_custom_position":
                 param_input[-1] = Select(title=args[idx], value = None, options=self.dev_customitems)
                 if self.dev_customitems:
-                    param_input[-1].value = self.dev_customitems[0]
+                    if def_val in self.dev_customitems:
+                        param_input[-1].value = def_val
+                    else:
+                        param_input[-1].value = self.dev_customitems[0]
                 param_layout[-1] = layout([
                             [param_input[-1]],
                             Spacer(height=10),
