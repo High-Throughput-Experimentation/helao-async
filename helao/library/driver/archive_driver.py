@@ -443,10 +443,11 @@ class Archive():
                 for slot_key, slot_item in tray_item.items():
                     if slot_item is not None:
                         # first get content as dict
-                        tray_dict[tray_key] = dict()
-                        tray_dict[tray_key].update({slot_key:slot_item.as_dict()})
+                        if tray_key not in tray_dict:
+                            tray_dict[tray_key] = dict()
+                        tray_dict[tray_key].update({slot_key:self.trays[tray_key][slot_key].as_dict()})
                         # then unload (which resets the slot)
-                        _samples = slot_item.unload()
+                        _samples = self.trays[tray_key][slot_key].unload()
                         for sample in _samples.samples:
                             samples.samples.append(sample)
                     
