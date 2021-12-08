@@ -138,9 +138,9 @@ class C_async_operator:
         self.button_clear_seqg = Button(label="clear seqg", button_type="default", width=70)
         self.button_clear_seqg.on_event(ButtonClick, self.callback_clear_seqg)
 
-        self.button_clear_prg = Button(label="clear prg", button_type="danger", width=100)
+        self.button_clear_prg = Button(label="clear prc", button_type="danger", width=100)
         self.button_clear_prg.on_event(ButtonClick, self.callback_clear_processes)
-        self.button_clear_action = Button(label="clear prc", button_type="danger", width=100)
+        self.button_clear_action = Button(label="clear act", button_type="danger", width=100)
         self.button_clear_action.on_event(ButtonClick, self.callback_clear_actions)
 
         self.button_prepend_prc = Button(label="prepend prc", button_type="default", width=150)
