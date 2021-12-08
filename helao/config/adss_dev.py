@@ -7,10 +7,11 @@ config = dict()
 
 # action library provides generator functions which produce actions
 # lists from input process_id grouping
-config["action_libraries"] = ["ADSS"]
+config["process_libraries"] = ["ADSS_prc"]
+config["sequence_libraries"] = ["ADSS_seq"]
 config["technique_name"] = "adss"
 config["root"] = r"C:\INST_dev2"
-config["local_db_path"] = r"C:\INST_dev2\DATABASE"
+# config["local_db_path"] = r"C:\INST_dev2\DATABASE"
 
 
 # we define all the servers here so that the overview is a bit better

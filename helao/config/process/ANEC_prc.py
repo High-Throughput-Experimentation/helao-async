@@ -18,7 +18,7 @@ from helao.library.driver.pal_driver import PALmethods, Spacingmethod, PALtools
 import helaocore.model.sample as hcms
 
 # list valid process functions 
-SEQUENCES = __all__
+PROCESSES = __all__
 
 PSTAT_name = "PSTAT"
 MOTOR_name = "MOTOR"
