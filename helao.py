@@ -351,7 +351,7 @@ if __name__ == "__main__":
         quit()
 
     # print("\x1b[2J") # clear screen
-    cprint(figlet_format(f"HELAO-V2\n{version.hlo_version}", font="starwars"),"yellow", "on_red", attrs=["bold"])
+    cprint(figlet_format(f"HELAO\nV2.1\n{version.hlo_version}", font="starwars"),"yellow", "on_red", attrs=["bold"])
     pidd = launcher(confPrefix, config)
     result = None
     while result not in [b"\x18", b"\x04"]:
