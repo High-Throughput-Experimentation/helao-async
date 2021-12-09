@@ -22,13 +22,13 @@ def ADSS_duaribilty_CAv1(
               y_mm: float = 0.0,
               liquid_custom_position: str = "elec_res1",
               liquid_sample_no: int = 3,
-              pH: float = 9.53,
               CA_potentials_vsRHE: List[float] = [-0.2, 0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+              ph: float = 9.53,
+              ref_vs_nhe: float = 0.21,
               CA_duration_sec: float = 1320, 
               aliquot_times_sec: List[float] = [60,600,1140],
               OCV_duration_sec: float = 60, 
               samplerate_sec: float = 1, 
-              ref_vs_nhe: float = 0.21,
               filltime_sec: float = 10.0
               ):
            
@@ -37,8 +37,6 @@ def ADSS_duaribilty_CAv1(
        last functionality test: tbd"""
 
     pl = SequenceListMaker()
-    potentials = [pot-1.0*ref_vs_nhe-0.059*pH  for pot in CA_potentials_vsRHE]
-    
     
     pl.add_process(
                    "ADSS_slave_startup", 
@@ -52,7 +50,7 @@ def ADSS_duaribilty_CAv1(
                     }
                    )
 
-    for cycle, potential in enumerate(potentials):
+    for cycle, potential in enumerate(CA_potentials_vsRHE):
         print(f" ... cycle {cycle} potential:", potential)
         if cycle == 0:
             pl.add_process(
@@ -70,8 +68,10 @@ def ADSS_duaribilty_CAv1(
 
 
         pl.add_process(
-                       "ADSS_slave_single_CA", 
-                       {"CA_single_potential":potential,
+                       "ADSS_slave_CA", 
+                       {"CA_potential":potential,
+                        "ph":ph,
+                        "ref_vs_nhe":ref_vs_nhe,
                         "samplerate_sec":samplerate_sec,
                         "OCV_duration_sec":OCV_duration_sec,
                         "CA_duration_sec":CA_duration_sec,
