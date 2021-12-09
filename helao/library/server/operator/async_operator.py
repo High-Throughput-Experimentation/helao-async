@@ -493,25 +493,15 @@ class C_async_operator:
 
     def callback_prepend_seqg(self, event):
         sequence = self.populate_sequence()
-        if self.sequence is None:
-            self.sequence = Sequence()
-        self.sequence.sequence_name = sequence.sequence_name
-        self.sequence.sequence_label = sequence.sequence_label
         for i, D in enumerate(sequence.process_list):
             self.sequence.process_list.insert(i,D)
-
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_append_seqg(self, event):
         sequence = self.populate_sequence()
-        if self.sequence is None:
-            self.sequence = Sequence()
-        self.sequence.sequence_name = sequence.sequence_name
-        self.sequence.sequence_label = sequence.sequence_label
         for D in sequence.process_list:
             self.sequence.process_list.append(D)
-
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))        
 
 
@@ -531,19 +521,11 @@ class C_async_operator:
 
     def append_process(self):
         D = self.populate_process()
-        if self.sequence is None:
-            self.sequence = Sequence()
-        self.sequence.sequence_name = "manual_orch_seq"
-        self.sequence.sequence_label = self.input_sequence_label.value
         self.sequence.process_list.append(D)
 
 
     def prepend_process(self):
         D = self.populate_process()
-        if self.sequence is None:
-            self.sequence = Sequence()
-        self.sequence.sequence_name = "manual_orch_seq"
-        self.sequence.sequence_label = self.input_sequence_label.value
         self.sequence.process_list.insert(0,D)
 
 
@@ -555,7 +537,6 @@ class C_async_operator:
 
 
     def populate_sequence(self):
-        
         selected_sequence = self.sequence_dropdown.value
         self.vis.print_message(f"selected sequence from list: {selected_sequence}")
 
@@ -568,20 +549,23 @@ class C_async_operator:
         sequence = Sequence()
         sequence.sequence_name = selected_sequence
         sequence.sequence_label = self.input_sequence_label.value
-
+        sequence.sequence_params = sequence_params
         for prc in prc_list:
             D = Process(inputdict=prc)
             sequence.process_list.append(D)
+
+        if self.sequence is None:
+            self.sequence = Sequence()
+        self.sequence.sequence_name = sequence.sequence_name
+        self.sequence.sequence_label = sequence.sequence_label
+        self.sequence.sequence_params = sequence.sequence_params
 
         return sequence
 
 
     def populate_process(self):
-        
         selected_process = self.process_dropdown.value
-
         self.vis.print_message(f"selected process from list: {selected_process}")
-
         process_params = {paraminput.title: to_json(paraminput.value) for paraminput in self.prc_param_input}
         D = Process(inputdict={
             # "orch_name":orch_name,
@@ -590,7 +574,10 @@ class C_async_operator:
             "process_name":selected_process,
             "process_params":process_params,
         })
-
+        if self.sequence is None:
+            self.sequence = Sequence()
+        self.sequence.sequence_name = "manual_orch_seq"
+        self.sequence.sequence_label = self.input_sequence_label.value
         return D
 
 
