@@ -3,7 +3,8 @@ Sequence library for ADSS
 """
 
 __all__ = [
-           "ADSS_duaribilty_CAv1", 
+           "ADSS_duaribilty_CAv1",
+           "ADSS_tray_unload"
           ]
 
 
@@ -82,5 +83,39 @@ def ADSS_duaribilty_CAv1(
                    "ADSS_slave_shutdown", 
                    {}
                    )
+
+    return pl.process_list # returns complete process list
+
+
+def ADSS_tray_unload(
+                     tray: int = 2,
+                     slot: int = 1,
+                     survey_runs: int = 1,
+                     main_runs: int = 3,
+                     rack: int = 2,
+                    ):
+    """Unloads a selected tray from PAL position tray-slot and creates
+    (1) json
+    (2) csv
+    (3) icpms
+    exports.
+
+    Parameters for ICPMS export are
+    survey_runs: rough sweep over the whole mass range
+    main_runs: sweep channel centered on element mass
+    rack: position of the tray in the icpms instrument, usually 2.
+    """
+    pl = SequenceListMaker()
+    
+    pl.add_process(
+                   "ADSS_slave_tray_unload", 
+                   {"tray":tray,
+                    "slot":slot,
+                    "survey_runs":survey_runs,
+                    "main_runs":main_runs,
+                    "rack":rack,
+                    }
+                   )
+
 
     return pl.process_list # returns complete process list
