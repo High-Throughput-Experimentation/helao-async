@@ -97,19 +97,43 @@ class C_async_operator:
 
         self.sequence_source = ColumnDataSource(data=self.sequence_list)
         self.columns_seq = [TableColumn(field=key, title=key) for key in self.sequence_list]
-        self.sequence_table = DataTable(source=self.sequence_source, columns=self.columns_seq, width=620, height=200)
+        self.sequence_table = DataTable(
+                                        source=self.sequence_source, 
+                                        columns=self.columns_seq, 
+                                        width=620, 
+                                        height=200,
+                                        autosize_mode = "fit_columns"
+                                        )
 
         self.process_source = ColumnDataSource(data=self.process_list)
         self.columns_prc = [TableColumn(field=key, title=key) for key in self.process_list]
-        self.process_table = DataTable(source=self.process_source, columns=self.columns_prc, width=620, height=200)
+        self.process_table = DataTable(
+                                       source=self.process_source, 
+                                       columns=self.columns_prc, 
+                                       width=620, 
+                                       height=200,
+                                       autosize_mode = "fit_columns"
+                                      )
 
         self.action_source = ColumnDataSource(data=self.action_list)
         self.columns_act = [TableColumn(field=key, title=key) for key in self.action_list]
-        self.action_table = DataTable(source=self.action_source, columns=self.columns_act, width=620, height=200)
+        self.action_table = DataTable(
+                                      source=self.action_source, 
+                                      columns=self.columns_act, 
+                                      width=620, 
+                                      height=200,
+                                      autosize_mode = "fit_columns"
+                                     )
 
         self.active_action_source = ColumnDataSource(data=self.active_action_list)
         self.columns_active_action = [TableColumn(field=key, title=key) for key in self.active_action_list]
-        self.active_action_table = DataTable(source=self.active_action_source, columns=self.columns_active_action, width=620, height=200)
+        self.active_action_table = DataTable(
+                                             source=self.active_action_source, 
+                                             columns=self.columns_active_action, 
+                                             width=620, 
+                                             height=200,
+                                             autosize_mode = "fit_columns"
+                                            )
 
         self.sequence_dropdown = Select(
                                         title="Select sequence:",
@@ -297,7 +321,6 @@ class C_async_operator:
     async def get_processes(self):
         """get process list from orch"""
         response = await self.do_orch_request(action_name = "list_processes")
-        response = response["processes"]
         self.process_list = dict()
         if len(response):
             for key in response[0]:
@@ -311,7 +334,6 @@ class C_async_operator:
     async def get_actions(self):
         """get action list from orch"""
         response = await self.do_orch_request(action_name = "list_actions")
-        response = response["actions"]
         self.action_list = dict()
         if len(response):
             for key in response[0]:
@@ -325,7 +347,6 @@ class C_async_operator:
     async def get_active_actions(self):
         """get action list from orch"""
         response = await self.do_orch_request(action_name = "list_active_actions")
-        response = response["actions"]
         self.active_action_list = dict()
         if len(response):
             for key in response[0]:
