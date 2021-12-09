@@ -323,11 +323,13 @@ class C_async_operator:
         response = await self.do_orch_request(action_name = "list_processes")
         self.process_list = dict()
         if len(response):
-            for key in response[0]:
-                self.process_list[key] = []
+            for key,val in response[0].items():
+                if val is not None:
+                    self.process_list[key] = []
             for line in response:
                 for key, value in line.items():
-                    self.process_list[key].append(value)
+                    if key in self.process_list:
+                        self.process_list[key].append(value)
         self.vis.print_message(f"current queued processes: {self.process_list}")
 
 
@@ -336,11 +338,13 @@ class C_async_operator:
         response = await self.do_orch_request(action_name = "list_actions")
         self.action_list = dict()
         if len(response):
-            for key in response[0]:
-                self.action_list[key] = []
+            for key,val in response[0].items():
+                if val is not None:
+                    self.action_list[key] = []
             for line in response:
                 for key, value in line.items():
-                    self.action_list[key].append(value)
+                    if key in self.action_list:
+                        self.action_list[key].append(value)
         self.vis.print_message(f"current queued actions: {self.action_list}")
 
 
