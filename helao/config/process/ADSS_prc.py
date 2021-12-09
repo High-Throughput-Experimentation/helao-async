@@ -17,7 +17,8 @@ __all__ = [
            "ADSS_slave_load_solid",
            "ADSS_slave_load_liquid",
            "ADSS_slave_fillfixed",
-           "ADSS_slave_fill"
+           "ADSS_slave_fill",
+           "ADSS_slave_tray_unload"
           ]
 
 
@@ -669,5 +670,76 @@ def ADSS_slave_single_CA(pg_Obj: Process,
                           },
         "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
         })
+
+    return sq.action_list # returns complete action list to orch
+
+
+def ADSS_slave_tray_unload(
+                     pg_Obj: Process,
+                     tray: Optional[int] = 2,
+                     slot: Optional[int] = 1,
+                     survey_runs: Optional[int] = 1,
+                     main_runs: Optional[int] = 3,
+                     rack: Optional[int] = 2,
+                      
+                    ):
+    """Unloads a selected tray from PAL position tray-slot and creates
+    (1) json
+    (2) csv
+    (3) icpms
+    exports.
+
+    Parameters for ICPMS export are
+    survey_runs: rough sweep over the whole mass range
+    main_runs: sweep channel centered on element mass
+    rack: position of the tray in the icpms instrument, usually 2.
+    """
+    
+    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+
+    sq.add_action({
+        "action_server": f"{PAL_name}",
+        "action_name": "archive_tray_export_json",
+        "action_params": {
+                          "tray": sq.pars.tray,
+                          "slot": sq.pars.slot,
+                          },
+        "start_condition": action_start_condition.wait_for_all,
+        })
+
+    sq.add_action({
+        "action_server": f"{PAL_name}",
+        "action_name": "archive_tray_export_csv",
+        "action_params": {
+                          "tray": sq.pars.tray,
+                          "slot": sq.pars.slot,
+                          },
+        "start_condition": action_start_condition.wait_for_all,
+        })
+
+    sq.add_action({
+        "action_server": f"{PAL_name}",
+        "action_name": "archive_tray_export_icpms",
+        "action_params": {
+                          "tray": sq.pars.tray,
+                          "slot": sq.pars.slot,
+                          "survey_runs":sq.pars.survey_runs,
+                          "main_runs":sq.pars.main_runs,
+                          "rack":sq.pars.rack,
+                          },
+        "start_condition": action_start_condition.wait_for_all,
+        })
+
+
+    sq.add_action({
+        "action_server": f"{PAL_name}",
+        "action_name": "archive_tray_unload",
+        "action_params": {
+                          "tray": sq.pars.tray,
+                          "slot": sq.pars.slot,
+                          },
+        "start_condition": action_start_condition.wait_for_all,
+        })
+
 
     return sq.action_list # returns complete action list to orch
