@@ -12,7 +12,7 @@ __all__ = [
            "ADSS_slave_disengage",
            "ADSS_slave_drain",
            "ADSS_slave_clean_PALtool",
-           "ADSS_slave_single_CA",
+           "ADSS_slave_CA",
            "ADSS_slave_unloadall_customs",
            "ADSS_slave_load_solid",
            "ADSS_slave_load_liquid",
@@ -539,8 +539,10 @@ def ADSS_slave_fill(pg_Obj: Process, fill_vol_ul: Optional[int] = 1000):
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_single_CA(pg_Obj: Process,
-              CA_single_potential: Optional[float] = 0.0,
+def ADSS_slave_CA(pg_Obj: Process,
+              CA_potential: Optional[float] = 0.0,
+              ph: float = 9.53,
+              ref_vs_nhe: float = 0.21,
               samplerate_sec: Optional[float] = 1, 
               OCV_duration_sec: Optional[float] = 60, 
               CA_duration_sec: Optional[float] = 1320, 
@@ -612,11 +614,13 @@ def ADSS_slave_single_CA(pg_Obj: Process,
 
 
     # apply potential
+    potential = sq.pars.CA_potential-1.0*sq.pars.ref_vs_nhe-0.059*sq.pars.ph
+    print(f"ADSS_slave_CA potential: {potential}")
     sq.add_action({
         "action_server": f"{PSTAT_name}",
         "action_name": "run_CA",
         "action_params": {
-                        "Vval": sq.pars.CA_single_potential,
+                        "Vval": potential,
                         "Tval": sq.pars.CA_duration_sec,
                         "SampleRate": sq.pars.samplerate_sec,
                         "TTLwait": -1,  # -1 disables, else select TTL 0-3
