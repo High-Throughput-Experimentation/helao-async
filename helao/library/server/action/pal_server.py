@@ -247,7 +247,7 @@ def makeApp(confPrefix, servKey):
         error, sample = \
             await app.driver.archive.tray_query_sample(**A.action_params)
 
-        await active.append_sample(samples = [sample for sample in sample.samples],
+        await active.append_sample(samples = [sample],
                             IO="in"
                            )
         await active.enqueue_data({'sample': sample.dict(),
@@ -268,10 +268,10 @@ def makeApp(confPrefix, servKey):
             await app.driver.archive.tray_unloadall(**A.action_params)
         if unloaded:
             await active.append_sample(
-                  samples = [sample for sample in sample_in.samples],
+                  samples = sample_in,
                   IO="in")
             await active.append_sample(
-                  samples = [sample for sample in sample_out.samples],
+                  samples = sample_out,
                   IO="out")
         await active.enqueue_data({"unloaded": unloaded,
                                    "tray_dict": tray_dict})
@@ -295,10 +295,10 @@ def makeApp(confPrefix, servKey):
             await app.driver.archive.tray_unload(**A.action_params)
         if unloaded:
             await active.append_sample(
-                  samples = [sample for sample in sample_in.samples],
+                  samples = sample_in,
                   IO="in")
             await active.append_sample(
-                  samples = [sample for sample in sample_out.samples],
+                  samples = sample_out,
                   IO="out")
         await active.enqueue_data({"unloaded": unloaded,
                                    "tray_dict": tray_dict})
@@ -324,7 +324,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/archive_tray_update_position")
     async def archive_tray_update_position(
         request: Request, 
-        sample: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
+        sample: Optional[hcms.SampleUnion] = hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()}),
         tray: Optional[int] = None,
         slot: Optional[int] = None,
         vial: Optional[int] = None,
@@ -403,7 +403,7 @@ def makeApp(confPrefix, servKey):
     async def archive_custom_load(
                                   request: Request,
                                   custom: Optional[dev_customitems] = None,
-                                  load_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
+                                  load_sample_in: Optional[hcms.SampleUnion] = hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()}),
                                   scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                                  ):
         A = await setup_action(request)
@@ -412,7 +412,7 @@ def makeApp(confPrefix, servKey):
                                                 ["loaded","customs_dict"])
         loaded, loaded_sample, customs_dict = await app.driver.archive.custom_load(**A.action_params)
         if loaded:
-            await active.append_sample(samples = [sample for sample in loaded_sample.samples],
+            await active.append_sample(samples = [loaded_sample],
                                 IO="in"
                                )
         await active.enqueue_data({"loaded":loaded,
@@ -434,10 +434,10 @@ def makeApp(confPrefix, servKey):
             await app.driver.archive.custom_unload(**A.action_params)
         if unloaded:
             await active.append_sample(
-                  samples = [sample for sample in sample_in.samples],
+                  samples = sample_in,
                   IO="in")
             await active.append_sample(
-                  samples = [sample for sample in sample_out.samples],
+                  samples = sample_out,
                   IO="out")
         await active.enqueue_data({"unloaded": unloaded,
                                    "customs_dict": customs_dict})
@@ -455,10 +455,10 @@ def makeApp(confPrefix, servKey):
             await app.driver.archive.custom_unloadall(**A.action_params)
         if unloaded:
             await active.append_sample(
-                  samples = [sample for sample in sample_in.samples],
+                  samples = sample_in,
                   IO="in")
             await active.append_sample(
-                  samples = [sample for sample in sample_out.samples],
+                  samples = sample_out,
                   IO="out")
         await active.enqueue_data({"unloaded": unloaded,
                                    "customs_dict": customs_dict})
@@ -476,7 +476,7 @@ def makeApp(confPrefix, servKey):
                                        file_data_keys=["sample", "error_code"])
         error, sample = \
             await app.driver.archive.custom_query_sample(**A.action_params)
-        await active.append_sample(samples = [sample for sample in sample.samples],
+        await active.append_sample(samples = [sample],
                             IO="in"
                            )
         await active.enqueue_data({'sample': sample.dict(),
@@ -488,7 +488,8 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/db_get_sample")
     async def db_get_sample(request: Request, 
-                         fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})]),
+                         fast_samples_in: Optional[List[hcms.SampleUnion]] = \
+           [hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
                          scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                         ):
         """Positive sample_no will get it from the beginng, negative
@@ -503,7 +504,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/db_new_sample")
     async def db_new_sample(request: Request, 
-                         fast_samples_in: Optional[hcms.SampleList] = hcms.SampleList(samples=[hcms.LiquidSample(**{
+                         fast_samples_in: Optional[List[hcms.SampleUnion]] = [hcms.LiquidSample(**{
                                               "machine_name":gethostname(),
                                               "source": None,
                                               "volume_ml": 0.0,
@@ -511,8 +512,8 @@ def makeApp(confPrefix, servKey):
                                               "chemical": [],
                                               "mass": [],
                                               "supplier": [],
-                                              "lot_number": [],                             
-                             })]),
+                                              "lot_number": [],
+                             })],
                          scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                         ):
         """use CAS for chemical if available. 
