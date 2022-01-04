@@ -11,7 +11,6 @@ __all__ = ["makeApp"]
 # done - add wsdata with buffering for visualizers
 # - add wsstatus
 # - test what happens if NImax broswer has nothing configured and only lists the device
-# done - Current and voltage stream with interrut handler?
 # - create tasks for action library
 # - handshake as stream with interrupt
 
@@ -19,6 +18,7 @@ from importlib import import_module
 
 from fastapi import Request
 from typing import Optional, List
+from socket import gethostname
 
 
 from helaocore.server import make_action_serv, setup_action
@@ -232,8 +232,8 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/cellIV")
         async def cellIV(
                          request: Request, 
-                         fast_samples_in: Optional[hcms.SampleList] = \
-                             hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
+                      fast_samples_in: Optional[List[hcms.SampleUnion]] = \
+           [hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
                          Tval: Optional[float] = 10.0,
                          SampleRate: Optional[float] = 1.0, 
                          TTLwait: Optional[int] = -1,  # -1 disables, else select TTL channel
