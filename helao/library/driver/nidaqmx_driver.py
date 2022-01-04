@@ -22,6 +22,7 @@ from helaocore.server import Base
 from helaocore.error import error_codes
 import helaocore.model.sample as hcms
 from helaocore.helper import make_str_enum
+import helaocore.data as hcd
 
 
 class cNIMAX:
@@ -32,6 +33,8 @@ class cNIMAX:
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
 
+        self.unified_db = hcd.UnifiedSampleDataAPI(self.base)
+        asyncio.gather(self.unified_db.init_db())
 
         self.dev_pump = self.config_dict.get("dev_pump",dict())
         self.dev_pumpitems = make_str_enum("dev_pump",{key:key for key in self.dev_pump})
@@ -46,7 +49,7 @@ class cNIMAX:
 
         self.action = None  # for passing action object from technique method to measure loop
         self.active = None  # for holding active action object, clear this at end of measurement
-        self.samples_in = hcms.SampleList()
+        self.samples_in = []
 
         # seems to work by just defining the scale and then only using its name
         try:
@@ -308,7 +311,7 @@ class cNIMAX:
                         _ = await self.active.finish()
                         self.active = None
                         self.action = None
-                        self.samples_in = hcms.SampleList()
+                        self.samples_in = []
 
 
                         if self.IO_estop:
@@ -409,7 +412,7 @@ class cNIMAX:
             self.buffersizeread = int(self.samplingrate)
             # save submitted action object
             self.action = A
-            self.samples_in = self.action.samples_in
+            self.samples_in = await self.unified_db.get_sample(self.action.samples_in)
             self.FIFO_epoch = None
             # create active and write streaming file header
             
@@ -418,10 +421,10 @@ class cNIMAX:
                 
             for i, FIFO_sample_key in enumerate(self.FIFO_sample_keys):
                 if self.samples_in is not None:
-                    if len(self.samples_in.samples) == 9:
-                        sample_label = [self.samples_in.samples[i].get_global_label()]
+                    if len(self.samples_in) == 9:
+                        sample_label = [self.samples_in[i].get_global_label()]
                     else:
-                        sample_label = [sample.get_global_label() for sample in self.samples_in.samples]
+                        sample_label = [sample.get_global_label() for sample in self.samples_in]
                 else:
                     sample_label = None
                 file_sample_label[FIFO_sample_key]=sample_label
@@ -435,11 +438,14 @@ class cNIMAX:
                 header=None,
             )
 
-            for sample in self.samples_in.samples:
+            for sample in self.samples_in:
                 sample.status = "preserved"
                 sample.inheritance="allow_both"
 
-            await self.active.append_sample(samples = [sample_in for sample_in in self.samples_in.samples],
+            # clear old samples_in first
+            self.active.action.samples_in = []
+            # now add updated samples to sample_in again
+            await self.active.append_sample(samples = [sample_in for sample_in in self.samples_in],
                                             IO="in"
                                            )
 
