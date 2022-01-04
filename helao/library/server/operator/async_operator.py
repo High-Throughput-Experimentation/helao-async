@@ -52,7 +52,7 @@ class C_async_operator:
         self.dataAPI = HTELegacyAPI(self.vis)
 
         self.config_dict = self.vis.server_cfg["params"]
-        self.orch_name = self.config_dict["orch"]
+        self.orchestrator = self.config_dict["orch"]
         self.pal_name = self.config_dict.get("pal", None)
         self.dev_customitems = []
         if self.pal_name is not None:
@@ -370,7 +370,7 @@ class C_async_operator:
 
         response = await hcs.async_private_dispatcher(
             world_config_dict = self.vis.world_cfg, 
-            server = self.orch_name,
+            server = self.orchestrator,
             private_action = action_name,
             params_dict = params_dict,
             json_dict = json_dict
@@ -572,9 +572,7 @@ class C_async_operator:
         self.vis.print_message(f"selected process from list: {selected_process}")
         process_params = {paraminput.title: to_json(paraminput.value) for paraminput in self.prc_param_input}
         D = Process(inputdict={
-            # "orch_name":orch_name,
-            "process_label":selected_process,
-            # "process_label":sellabel,
+            # "orchestrator":orchestrator,
             "process_name":selected_process,
             "process_params":process_params,
         })
