@@ -47,6 +47,7 @@ conf = munchify(config)
 
 import helaocore.helper
 import helaocore.server
+from helaocore.version import get_hlo_version
 
 import helao.test.unit_test_sample_models
 # from helao.test.unit_test_sample_models import sample_model_unit_test
@@ -351,7 +352,7 @@ if __name__ == "__main__":
     if not helao.test.unit_test_sample_models.sample_model_unit_test():
         quit()
     # print("\x1b[2J") # clear screen
-    cprint(figlet_format(f"HELAO\nV2.1\n{helaocore.server.hlo_version}", font="starwars"),"yellow", "on_red", attrs=["bold"])
+    cprint(figlet_format(f"HELAO\nV2.1\n{get_hlo_version()}", font="starwars"),"yellow", "on_red", attrs=["bold"])
     pidd = launcher(confPrefix, config)
     result = None
     while result not in [b"\x18", b"\x04"]:
