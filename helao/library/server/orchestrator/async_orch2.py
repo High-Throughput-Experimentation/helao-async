@@ -43,13 +43,12 @@ import asyncio
 import time
 
 
-from helaocore.server import makeOrchServ, setup_action
-
+import helaocore.server
 
 def makeApp(confPrefix, servKey):
     config = import_module(f"helao.config.{confPrefix}").config
 
-    app = makeOrchServ(
+    app = helaocore.server.makeOrchServ(
         config,
         servKey,
         servKey,
@@ -64,7 +63,7 @@ def makeApp(confPrefix, servKey):
         waittime: Optional[float] = 0.0
         ):
         """Sleep action"""    
-        A = await setup_action(request)
+        A = await helaocore.server.setup_action(request)
         active = await app.orch.contain_action(action = A)
         waittime = A.action_params["waittime"]
         app.orch.print_message(' ... wait action:', waittime)
