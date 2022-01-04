@@ -21,6 +21,7 @@ import psutil
 
 from helaocore.error import error_codes
 import helaocore.model.sample as hcms
+import helaocore.data as hcd
 
 class Gamry_modes(str, Enum):
     CA = "CA"
@@ -131,6 +132,9 @@ class gamry:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
 
+        self.unified_db = hcd.UnifiedSampleDataAPI(self.base)
+        asyncio.gather(self.unified_db.init_db())
+
         # get Gamry object (Garmry.com)
         # a busy gamrycom can lock up the server
         self.kill_GamryCom()
@@ -142,7 +146,7 @@ class gamry:
         self.pstat = None
         self.action = None  # for passing action object from technique method to measure loop
         self.active =None  # for holding active action object, clear this at end of measurement
-        self.samples_in=hcms.SampleList()
+        self.samples_in=[]
         # status is handled through active, call active.finish()
 
         if not "dev_id" in self.config_dict:
@@ -571,18 +575,22 @@ class gamry:
                 self.action,
                 file_type="pstat_helao__file",
                 file_data_keys=self.FIFO_column_headings,
-                file_sample_label=[sample.get_global_label() for sample in self.samples_in.samples],
+                file_sample_label=[sample.get_global_label() for sample in self.samples_in],
                 header=self.FIFO_gamryheader,
             )
             self.base.print_message(f"!!! Active action uuid is {self.active.action.action_uuid}")
             # active object is set so we can set the continue flag
             self.IO_continue = True
             
-            for sample in self.samples_in.samples:
+            for sample in self.samples_in:
                 sample.status = "preserved"
                 sample.inheritance="allow_both"
             
-            await self.active.append_sample(samples = [sample_in for sample_in in self.samples_in.samples],
+            
+            # clear old samples_in first
+            self.active.action.samples_in = []
+            # now add updated samples to sample_in again
+            await self.active.append_sample(samples = [sample_in for sample_in in self.samples_in],
                                             IO="in"
                                             )
 
@@ -759,7 +767,7 @@ class gamry:
             _ = await self.active.finish()
             self.active = None
             self.action = None
-            self.samples_in=hcms.SampleList()
+            self.samples_in=[]
 
             return {"measure": f"done_{self.IO_meas_mode}"}
         else:
@@ -824,7 +832,7 @@ class gamry:
                         self.base.print_message(f"IO_sigramp.Init error: {err_code}", error = True)
     
                     self.action = act
-                    self.samples_in=self.action.samples_in
+                    self.samples_in = await self.unified_db.get_sample(self.action.samples_in)
                     # signal the IOloop to start the measrurement
                     await self.IO_signalq.put(True)
                     # wait for data to appear in multisubscriber queue before returning active dict
