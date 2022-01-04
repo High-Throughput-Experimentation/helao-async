@@ -33,6 +33,7 @@ import asyncio
 from typing import Optional, Union, List
 from importlib import import_module
 from fastapi import Request
+from socket import gethostname
 
 
 from helaocore.server import make_action_serv, setup_action
@@ -69,8 +70,8 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/run_LSV")
     async def run_LSV(
                       request: Request,
-                      fast_samples_in: Optional[hcms.SampleList] = \
-               hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
+                      fast_samples_in: Optional[List[hcms.SampleUnion]] = \
+           [hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
                       Vinit: Optional[float] = 0.0,  # Initial value in volts or amps.
                       Vfinal: Optional[float] = 1.0,  # Final value in volts or amps.
                       ScanRate: Optional[float] = 1.0,  # Scan rate in volts/second or amps/second.
@@ -95,8 +96,8 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/run_CA")
     async def run_CA(
                      request: Request,
-                     fast_samples_in: Optional[hcms.SampleList] = \
-               hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
+                      fast_samples_in: Optional[List[hcms.SampleUnion]] = \
+           [hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
                      Vval: Optional[float] = 0.0,
                      Tval: Optional[float] = 10.0,
                      SampleRate: Optional[
@@ -121,8 +122,8 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/run_CP")
     async def run_CP(
                      request: Request,
-                     fast_samples_in: Optional[hcms.SampleList] = \
-            hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
+                      fast_samples_in: Optional[List[hcms.SampleUnion]] = \
+           [hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
                      Ival: Optional[float] = 0.0,
                      Tval: Optional[float] = 10.0,
                      SampleRate: Optional[
@@ -146,8 +147,8 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/run_CV")
     async def run_CV(
                      request: Request,
-                     fast_samples_in: Optional[hcms.SampleList] = \
-               hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
+                      fast_samples_in: Optional[List[hcms.SampleUnion]] = \
+           [hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
                      Vinit: Optional[float] = 0.0,  # Initial value in volts or amps.
                      Vapex1: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
                      Vapex2: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
@@ -175,8 +176,8 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/run_EIS")
     async def run_EIS(
                       request: Request,
-                      fast_samples_in: Optional[hcms.SampleList] = \
-                            hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
+                      fast_samples_in: Optional[List[hcms.SampleUnion]] = \
+           [hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
                       Vval: Optional[float] = 0.0,
                       Tval: Optional[float] = 10.0,
                       Freq: Optional[float] = 1000.0,
@@ -203,8 +204,8 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/run_OCV")
     async def run_OCV(
                       request: Request,
-                      fast_samples_in: Optional[hcms.SampleList] = \
-                      hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":1})]),
+                      fast_samples_in: Optional[List[hcms.SampleUnion]] = \
+           [hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
                       Tval: Optional[float] = 10.0,
                       SampleRate: Optional[float] = 0.01,
                       TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
