@@ -12,7 +12,7 @@ __all__ = ["debug",
 
 from typing import Optional, List, Union
 
-from helaocore.schema import Action, Process, Sequencer
+from helaocore.schema import Action, Process, ActionPlanMaker
 from helaocore.server import action_start_condition
 from helao.library.driver.pal_driver import PALmethods, Spacingmethod, PALtools
 import helaocore.model.sample as hcms
@@ -61,7 +61,7 @@ def debug(pg_Obj: Process,
 
     action_dict = pg_Obj.as_dict()
     action_dict.update({
-        "action_server": f"{NI_name}",
+        "action_server_name": f"{NI_name}",
         "action_name": "run_cell_IV",
         "action_params": {
                         "Tval": 10,
@@ -79,7 +79,7 @@ def debug(pg_Obj: Process,
                             hcms.LiquidSample(**{"sample_no":9}),
                             ]).dict()
                         },
-        # "save_prc": False,
+        # "save_act": False,
         # "save_data": False,
         "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
         })
@@ -111,7 +111,7 @@ def CA(pg_Obj: Process,
     # apply potential
     action_dict = pg_Obj.as_dict()
     action_dict.update({
-        "action_server": f"{PSTAT_name}",
+        "action_server_name": f"{PSTAT_name}",
         "action_name": "run_CA",
         "action_params": {
                         "Vval": CA_potential_V,
@@ -121,7 +121,7 @@ def CA(pg_Obj: Process,
                         "TTLsend": -1,  # -1 disables, else select TTL 0-3
                         "IErange": "auto",
                         },
-        "save_prc": True,
+        "save_act": True,
         "save_data": True,
         "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
         # "plate_id": None,
@@ -141,11 +141,11 @@ def OCV_sqtest(pg_Obj: Process,
        a input field will be (dynamically) presented in the OP webgui.""" 
     
     
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action(
         {
-        "action_server": f"{PSTAT_name}",
+        "action_server_name": f"{PSTAT_name}",
         "action_name": "run_OCV",
         "action_params": {
                         "Tval": sq.pars.OCV_duration_sec,
@@ -154,7 +154,7 @@ def OCV_sqtest(pg_Obj: Process,
                         "TTLsend": -1,  # -1 disables, else select TTL 0-3
                         "IErange": "auto",
                         },
-        "save_prc": True,
+        "save_act": True,
         "save_data": True,
         "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
         }
@@ -176,11 +176,11 @@ def CA_sqtest(pg_Obj: Process,
        a input field will be (dynamically) presented in the OP webgui.""" 
     
     
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action(
         {
-        "action_server": f"{PSTAT_name}",
+        "action_server_name": f"{PSTAT_name}",
         "action_name": "run_CA",
         "action_params": {
                         "Vval": sq.pars.Ewe_vs_RHE-1.0*sq.pars.Eref-0.059*sq.pars.pH,
@@ -190,7 +190,7 @@ def CA_sqtest(pg_Obj: Process,
                         "TTLsend": -1,  # -1 disables, else select TTL 0-3
                         "IErange": "auto",
                         },
-        "save_prc": True,
+        "save_act": True,
         "save_data": True,
         "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
         }

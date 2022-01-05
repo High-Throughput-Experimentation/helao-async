@@ -75,7 +75,7 @@ class C_async_operator:
         self.prc_private_input = []
 
         self.sequence = None
-        self.sequence_list = dict()
+        self.process_plan_list = dict()
         self.process_list = dict()
         self.action_list = dict()
         self.active_action_list = dict()
@@ -95,9 +95,9 @@ class C_async_operator:
         self.vis.doc.add_next_tick_callback(partial(self.get_actions))
         self.vis.doc.add_next_tick_callback(partial(self.get_active_actions))
 
-        self.sequence_source = ColumnDataSource(data=self.sequence_list)
-        self.columns_seq = [TableColumn(field=key, title=key) for key in self.sequence_list]
-        self.sequence_table = DataTable(
+        self.sequence_source = ColumnDataSource(data=self.process_plan_list)
+        self.columns_seq = [TableColumn(field=key, title=key) for key in self.process_plan_list]
+        self.processplan_table = DataTable(
                                         source=self.sequence_source, 
                                         columns=self.columns_seq, 
                                         width=620, 
@@ -234,8 +234,8 @@ class C_async_operator:
                     Spacer(height=10),
                     ],background="#808080",width=640),
                 layout([
-                [Spacer(width=20), bmw.Div(text="<b>Process Group content:</b>", width=200+50, height=15)],
-                [self.sequence_table],
+                [Spacer(width=20), bmw.Div(text="<b>Process Plan:</b>", width=200+50, height=15)],
+                [self.processplan_table],
                 [Spacer(width=20), bmw.Div(text="<b>queued processes:</b>", width=200+50, height=15)],
                 [self.process_table],
                 [Spacer(width=20), bmw.Div(text="<b>queued actions:</b>", width=200+50, height=15)],
@@ -497,15 +497,15 @@ class C_async_operator:
 
     def callback_prepend_seqg(self, event):
         sequence = self.populate_sequence()
-        for i, D in enumerate(sequence.process_list):
-            self.sequence.process_list.insert(i,D)
+        for i, D in enumerate(sequence.process_plan_list):
+            self.sequence.process_plan_list.insert(i,D)
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_append_seqg(self, event):
         sequence = self.populate_sequence()
-        for D in sequence.process_list:
-            self.sequence.process_list.append(D)
+        for D in sequence.process_plan_list:
+            self.sequence.process_plan_list.append(D)
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))        
 
 
@@ -525,12 +525,12 @@ class C_async_operator:
 
     def append_process(self):
         D = self.populate_process()
-        self.sequence.process_list.append(D)
+        self.sequence.process_plan_list.append(D)
 
 
     def prepend_process(self):
         D = self.populate_process()
-        self.sequence.process_list.insert(0,D)
+        self.sequence.process_plan_list.insert(0,D)
 
 
     def unpack_sequence(self, sequence_name, sequence_params):
@@ -556,7 +556,7 @@ class C_async_operator:
         sequence.sequence_params = sequence_params
         for prc in prc_list:
             D = Process(inputdict=prc)
-            sequence.process_list.append(D)
+            sequence.process_plan_list.append(D)
 
         if self.sequence is None:
             self.sequence = Sequence()
@@ -963,21 +963,21 @@ class C_async_operator:
         await self.get_actions()
         await self.get_active_actions()
 
-        self.sequence_list = dict()
+        self.process_plan_list = dict()
 
-        self.sequence_list["sequence_name"] = []
-        self.sequence_list["sequence_label"] = []
-        self.sequence_list["process_name"] = []
+        self.process_plan_list["sequence_name"] = []
+        self.process_plan_list["sequence_label"] = []
+        self.process_plan_list["process_name"] = []
         if self.sequence is not None:
-            for D in self.sequence.process_list:
-                self.sequence_list["sequence_name"].append(self.sequence.sequence_name)
-                self.sequence_list["sequence_label"].append(self.sequence.sequence_label)
-                self.sequence_list["process_name"].append(D.process_name)
+            for D in self.sequence.process_plan_list:
+                self.process_plan_list["sequence_name"].append(self.sequence.sequence_name)
+                self.process_plan_list["sequence_label"].append(self.sequence.sequence_label)
+                self.process_plan_list["process_name"].append(D.process_name)
 
 
-        self.columns_seq = [TableColumn(field=key, title=key) for key in self.sequence_list]
-        self.sequence_table.source.data = self.sequence_list
-        self.sequence_table.columns=self.columns_seq
+        self.columns_seq = [TableColumn(field=key, title=key) for key in self.process_plan_list]
+        self.processplan_table.source.data = self.process_plan_list
+        self.processplan_table.columns=self.columns_seq
 
 
         self.columns_prc = [TableColumn(field=key, title=key) for key in self.process_list]
