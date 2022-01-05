@@ -661,7 +661,7 @@ class cPAL:
             if error != error_codes.none:
                 if len(sample.samples) == 1:
                     sample.samples[0].inheritance = "allow_both"
-                    sample.samples[0].status = "preserved"
+                    sample.samples[0].status = ["preserved"]
                     # self.IO_PALparams.PAL_sample_in.samples.append(tmp_sample_in.samples[0])
                 elif len(sample.samples) > 1:
                     error = error_codes.critical
@@ -784,9 +784,9 @@ class cPAL:
             # they all should actually be give only
             # but might not be preserved dpending on target
             # sample.inheritance =  "give_only"
-            # sample.status = "preserved"
+            # sample.status = ["preserved"]
             sample.inheritance = None
-            sample.status = None
+            sample.status = []
             sample.sample_position = source
             sample_in_delta_vol_ml.append(-1.0*micropal.PAL_volume_ul / 1000.0)
 
@@ -877,7 +877,7 @@ class cPAL:
                 sample_out.samples[0].volume_ml = micropal.PAL_volume_ul / 1000.0
                 sample_out.samples[0].sample_position = dest
                 sample_out.samples[0].inheritance = "receive_only"
-                sample_out.samples[0].status = "created"
+                sample_out.samples[0].status = ["created"]
                 dest_sample = sample_out
 
             else:
@@ -888,7 +888,7 @@ class cPAL:
                 for sample in sample_in.samples:
                     # we can only add liquid to vials (diluite them, no assembly here)
                     sample.inheritance = "receive_only"
-                    sample.status = "preserved"
+                    sample.status = ["preserved"]
                     # add that sample to the current sample_in list
                     micropal.PAL_sample_in[-1].samples.append(sample)
                     micropal.PAL_sample_in_delta_vol_ml[-1].append(micropal.PAL_volume_ul / 1000.0)
@@ -946,7 +946,7 @@ class cPAL:
                 sample_out.samples[0].volume_ml = micropal.PAL_volume_ul / 1000.0
                 sample_out.samples[0].sample_position = dest
                 sample_out.samples[0].inheritance = "receive_only"
-                sample_out.samples[0].status = "created"
+                sample_out.samples[0].status = ["created"]
                 dest_sample = sample_out
                 
             else:
@@ -994,7 +994,7 @@ class cPAL:
                             # we can only add liquid to vials 
                             # (diluite them, no assembly here)
                             sample.inheritance = "receive_only"
-                            sample.status = "preserved"
+                            sample.status = ["preserved"]
                             micropal.PAL_sample_in[-1].samples.append(sample)
                             micropal.PAL_sample_in_delta_vol_ml[-1].append(micropal.PAL_volume_ul / 1000.0)
                             micropal.dilute[-1].append(True)
@@ -1032,7 +1032,7 @@ class cPAL:
                             # we can only add liquid to vials 
                             # (diluite them, no assembly here)
                             sample.inheritance = "allow_both"
-                            sample.status = "preserved"
+                            sample.status = ["preserved"]
                             micropal.PAL_sample_in[-1].samples.append(sample)
 
 
@@ -1048,7 +1048,7 @@ class cPAL:
                         # we can only add liquid to vials 
                         # (diluite them, no assembly here)
                         sample.inheritance = "receive_only"
-                        sample.status = "preserved"
+                        sample.status = ["preserved"]
                         micropal.PAL_sample_in[-1].samples.append(sample)
                         micropal.PAL_sample_in_delta_vol_ml[-1].append(micropal.PAL_volume_ul / 1000.0)
                         micropal.dilute[-1].append(True)
@@ -1091,7 +1091,7 @@ class cPAL:
                     # to the sample_in list for the prc/prg
                     for sample in sample_in.samples:
                         sample_in.samples[0].inheritance = "allow_both"
-                        sample_in.samples[0].status = "incorporated"
+                        sample_in.samples[0].status = ["incorporated"]
                         micropal.PAL_sample_in[-1].samples.append(sample)
                         # we only add the sample to assembly so delta_vol is 0
                         micropal.PAL_sample_in_delta_vol_ml[-1].append(0.0)
@@ -1120,7 +1120,7 @@ class cPAL:
                         return error
                     sample_out2.samples[0].sample_position = dest
                     sample_out2.samples[0].inheritance = "allow_both"
-                    sample_out2.samples[0].status = "created"
+                    sample_out2.samples[0].status = ["created"]
                     # add second sample out to sample_out
                     sample_out.samples.append(sample_out2.samples[0])
                     # dest_sample.samples.append(sample_out2.samples[0])
@@ -1158,7 +1158,7 @@ class cPAL:
             sample_out.samples[0].volume_ml = micropal.PAL_volume_ul / 1000.0
             sample_out.samples[0].sample_position = dest
             sample_out.samples[0].inheritance = "receive_only"
-            sample_out.samples[0].status = "created"
+            sample_out.samples[0].status = ["created"]
             dest_sample = sample_out
 
 
@@ -1187,7 +1187,7 @@ class cPAL:
             dest_sample = sample_in
             for sample in sample_in.samples:
                 sample.inheritance = "receive_only"
-                sample.status ="preserved"
+                sample.status = ["preserved"]
                 micropal.PAL_sample_in[-1].samples.append(sample)
                 micropal.PAL_sample_in_delta_vol_ml[-1].append(micropal.PAL_volume_ul / 1000.0)
                 micropal.dilute[-1].append(True)
@@ -1207,7 +1207,7 @@ class cPAL:
         for sample in micropal.PAL_sample_in[-1].samples:
             if sample.inheritance is None:
                 sample.inheritance = "give_only"
-                sample.status = "preserved"
+                sample.status = ["preserved"]
 
 
 

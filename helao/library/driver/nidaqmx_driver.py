@@ -439,7 +439,7 @@ class cNIMAX:
             )
 
             for sample in self.samples_in:
-                sample.status = "preserved"
+                sample.status = ["preserved"]
                 sample.inheritance="allow_both"
 
             # clear old samples_in first

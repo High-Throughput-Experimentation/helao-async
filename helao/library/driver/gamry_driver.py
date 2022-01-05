@@ -583,7 +583,7 @@ class gamry:
             self.IO_continue = True
             
             for sample in self.samples_in:
-                sample.status = "preserved"
+                sample.status = ["preserved"]
                 sample.inheritance="allow_both"
             
             

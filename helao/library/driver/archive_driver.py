@@ -739,6 +739,15 @@ class Archive():
             customdict[custom_key] = customdict[custom_key].as_dict()
         return customdict
 
+    def assign_new_sample_status(
+                             self, 
+                             samples: List[hcms.SampleUnion],
+                             newstatus: List[str], 
+                            ):
+        for sample in samples:
+            sample.status = newstatus
+        return samples
+    
     
     async def custom_unloadall(self, *args, **kwargs):
         samples = []
@@ -747,6 +756,8 @@ class Archive():
             samples.append(self.custom_positions[custom].unload())
         self.write_config() # save current state of table
         sample_in, sample_out = await self.unpack_samples(samples)
+        sample_in = self.assign_new_sample_status(samples = sample_in, newstatus = ["recovered"])
+        sample_out = self.assign_new_sample_status(samples = sample_out, newstatus = ["recovered"])
         return True, sample_in, sample_out, customs_dict
 
 
@@ -761,6 +772,8 @@ class Archive():
         
         self.write_config() # save current state of table
         sample_in, sample_out = await self.unpack_samples(sample)
+        sample_in = self.assign_new_sample_status(samples = sample_in, newstatus = ["recovered"])
+        sample_out = self.assign_new_sample_status(samples = sample_out, newstatus = ["recovered"])
         return unloaded, sample_in, sample_out, customs_dict
 
 
@@ -802,15 +815,15 @@ class Archive():
         for sample in samples:
             if isinstance(sample, hcms.AssemblySample):
                 sample.inheritance = "allow_both"
-                sample.status = "destroyed"
+                sample.status = ["destroyed"]
                 ret_samples_in.append(sample)
                 for part in sample.parts:
                     part.inheritance = "allow_both"
-                    part.status = "recovered"
+                    part.status = ["recovered"]
                     ret_samples_out.append(part)
             else:
                 sample.inheritance = "allow_both"
-                sample.status = "preserved"
+                sample.status = ["preserved"]
                 ret_samples_in.append(sample)
 
         return ret_samples_in, ret_samples_out
