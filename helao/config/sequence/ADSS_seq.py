@@ -9,7 +9,7 @@ __all__ = [
 
 
 from typing import List
-from helaocore.schema import SequenceListMaker
+from helaocore.schema import ProcessPlanMaker
 
 
 SEQUENCES = __all__
@@ -36,7 +36,7 @@ def ADSS_duaribilty_CAv1(
         
        last functionality test: tbd"""
 
-    pl = SequenceListMaker()
+    pl = ProcessPlanMaker()
     
     pl.add_process(
                    "ADSS_slave_startup", 
@@ -84,7 +84,7 @@ def ADSS_duaribilty_CAv1(
                    {}
                    )
 
-    return pl.process_list # returns complete process list
+    return pl.process_plan_list # returns complete process list
 
 
 def ADSS_tray_unload(
@@ -105,7 +105,7 @@ def ADSS_tray_unload(
     main_runs: sweep channel centered on element mass
     rack: position of the tray in the icpms instrument, usually 2.
     """
-    pl = SequenceListMaker()
+    pl = ProcessPlanMaker()
     
     pl.add_process(
                    "ADSS_slave_tray_unload", 
@@ -118,4 +118,4 @@ def ADSS_tray_unload(
                    )
 
 
-    return pl.process_list # returns complete process list
+    return pl.process_plan_list # returns complete process list

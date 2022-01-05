@@ -25,7 +25,7 @@ __all__ = [
 from typing import Optional, List, Union
 from socket import gethostname
 
-from helaocore.schema import Action, Process, Sequencer
+from helaocore.schema import Action, Process, ActionPlanMaker
 from helaocore.server import action_start_condition
 import helaocore.model.sample as hcms
 
@@ -48,7 +48,9 @@ z_engage = 2.5
 # moves it up to put pressure on seal
 z_seal = 4.5
 
-
+# cannot save data without prc
+debug_save_act = False
+debug_save_data = False
 
 def debug(pg_Obj: Process, 
              d_mm: Optional[str] = "1.0", 
@@ -70,10 +72,10 @@ def debug(pg_Obj: Process,
     # 3: (or other): orch is waiting for all action_dq to finish
 
     additional_local_var_added_to_sq = 12
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "archive_custom_unload",
         "action_params": {
                         "custom": "cell1_we"
@@ -82,20 +84,20 @@ def debug(pg_Obj: Process,
         })
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "archive_custom_load",
         "action_params": {
                         "custom": "cell1_we",
-                        "load_samples_in": hcms.SampleList(samples=[hcms.SolidSample(**{"sample_no":1,
-                                                                                        "plate_id":4534,
-                                                                                        "machine_name":"legacy"
-                                                                                       })]).dict(),
+                        "load_sample_in": hcms.SolidSample(**{"sample_no":1,
+                                                              "plate_id":4534,
+                                                              "machine_name":"legacy"
+                                                             }).dict(),
                         },
         "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
         })
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "archive_custom_query_sample",
         "action_params": {
                         "custom": "cell1_we",
@@ -107,7 +109,7 @@ def debug(pg_Obj: Process,
 
     # OCV
     sq.add_action({
-        "action_server": f"{PSTAT_name}",
+        "action_server_name": f"{PSTAT_name}",
         "action_name": "run_OCV",
         "action_params": {
                         "Tval": 10.0,
@@ -129,11 +131,11 @@ def debug(pg_Obj: Process,
 
 def ADSS_slave_unloadall_customs(pg_Obj: Process):
     """last functionality test: 11/29/2021"""
-    
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+
+    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "archive_custom_unloadall",
         "action_params": {
                         },
@@ -151,16 +153,16 @@ def ADSS_slave_load_solid(
                          ):
     """last functionality test: 11/29/2021"""
     
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "archive_custom_load",
         "action_params": {
                         "custom": sq.pars.solid_custom_position,
-                        "load_samples_in": hcms.SampleList(samples=[hcms.SolidSample(**{"sample_no":sq.pars.solid_sample_no,
-                                                                                        "plate_id":sq.pars.solid_plate_id,
-                                                                                        "machine_name":"legacy"
-                                                                                       })]).dict(),
+                        "load_sample_in": hcms.SolidSample(**{"sample_no":sq.pars.solid_sample_no,
+                                                              "plate_id":sq.pars.solid_plate_id,
+                                                              "machine_name":"legacy"
+                                                             }).dict(),
                         },
         "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
         })
@@ -174,15 +176,15 @@ def ADSS_slave_load_liquid(
                          ):
     """last functionality test: 11/29/2021"""
     
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "archive_custom_load",
         "action_params": {
                         "custom": sq.pars.liquid_custom_position,
-                        "load_samples_in": hcms.SampleList(samples=[hcms.LiquidSample(**{"sample_no":sq.pars.liquid_sample_no,
-                                                                                        "machine_name":gethostname()
-                                                                                       })]).dict(),
+                        "load_sample_in": hcms.LiquidSample(**{"sample_no":sq.pars.liquid_sample_no,
+                                                               "machine_name":gethostname()
+                                                              }).dict(),
                         },
         "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
         })
@@ -208,7 +210,7 @@ def ADSS_slave_startup(pg_Obj: Process,
     last functionality test: 11/29/2021"""
 
     
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
 
     # unload all samples from custom positions
@@ -231,7 +233,7 @@ def ADSS_slave_startup(pg_Obj: Process,
 
     # turn pump off
     sq.add_action({
-        "action_server": f"{NI_name}",
+        "action_server_name": f"{NI_name}",
         "action_name": "pump",
         "action_params": {
                          "pump":"peripump",
@@ -242,7 +244,7 @@ def ADSS_slave_startup(pg_Obj: Process,
 
     # set pump flow forward
     sq.add_action({
-        "action_server": f"{NI_name}",
+        "action_server_name": f"{NI_name}",
         "action_name": "pump",
         "action_params": {
                          "pump":"direction",
@@ -258,7 +260,7 @@ def ADSS_slave_startup(pg_Obj: Process,
 
     # move to position
     sq.add_action({
-        "action_server": f"{MOTOR_name}",
+        "action_server_name": f"{MOTOR_name}",
         "action_name": "move",
         "action_params": {
                         "d_mm": [sq.pars.x_mm, sq.pars.y_mm],
@@ -266,6 +268,8 @@ def ADSS_slave_startup(pg_Obj: Process,
                         "mode": move_modes.absolute,
                         "transformation": transformation_mode.platexy,
                         },
+        "save_act": debug_save_act,
+        "save_data": debug_save_data,
         "start_condition": action_start_condition.wait_for_all,
         })
 
@@ -284,18 +288,18 @@ def ADSS_slave_shutdown(pg_Obj: Process):
     
     last functionality test: 11/29/2021"""
 
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
     # deep clean
     sq.add_action_list(ADSS_slave_clean_PALtool(pg_Obj, clean_PAL_tool = PALtools.LS3, clean_PAL_volume_ul = 500))
     # sq.add_action({
-    #     "action_server": f"{PAL_name}",
+    #     "action_server_name": f"{PAL_name}",
     #     "action_name": "PAL_deepclean",
     #     "action_params": {
     #                       "PAL_tool": PALtools.LS3,
     #                       "PAL_volume_ul": 500,
     #                       },
-    #     # "save_prc": True,
+    #     # "save_act": True,
     #     # "save_data": True,
     #     "start_condition": action_start_condition.wait_for_all,
     #     # "plate_id": None,
@@ -303,7 +307,7 @@ def ADSS_slave_shutdown(pg_Obj: Process):
 
     # set pump flow backward
     sq.add_action({
-        "action_server": f"{NI_name}",
+        "action_server_name": f"{NI_name}",
         "action_name": "pump",
         "action_params": {
                          "pump":"direction",
@@ -314,7 +318,7 @@ def ADSS_slave_shutdown(pg_Obj: Process):
 
     # wait some time to pump out the liquid
     sq.add_action({
-        "action_server": f"{ORCH_name}",
+        "action_server_name": f"{ORCH_name}",
         "action_name": "wait",
         "action_params": {
                          "waittime":120,
@@ -329,7 +333,7 @@ def ADSS_slave_shutdown(pg_Obj: Process):
 
     # turn pump off
     sq.add_action({
-        "action_server": f"{NI_name}",
+        "action_server_name": f"{NI_name}",
         "action_name": "pump",
         "action_params": {
                          "pump":"peripump",
@@ -340,7 +344,7 @@ def ADSS_slave_shutdown(pg_Obj: Process):
 
     # set pump flow forward
     sq.add_action({
-        "action_server": f"{NI_name}",
+        "action_server_name": f"{NI_name}",
         "action_name": "pump",
         "action_params": {
                          "pump":"direction",
@@ -365,7 +369,7 @@ def ADSS_slave_drain(pg_Obj: Process):
     
     last functionality test: 11/29/2021"""
 
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
     # TODO
     return sq.action_list # returns complete action list to orch
 
@@ -376,11 +380,11 @@ def ADSS_slave_engage(pg_Obj: Process):
     
     last functionality test: 11/29/2021"""
     
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
     # engage
     sq.add_action({
-        "action_server": f"{MOTOR_name}",
+        "action_server_name": f"{MOTOR_name}",
         "action_name": "move",
         "action_params": {
                         "d_mm": [z_engage],
@@ -388,12 +392,14 @@ def ADSS_slave_engage(pg_Obj: Process):
                         "mode": move_modes.absolute,
                         "transformation": transformation_mode.instrxy,
                         },
+        "save_act": debug_save_act,
+        "save_data": debug_save_data,
         "start_condition": action_start_condition.wait_for_all,
         })
 
     # seal
     sq.add_action({
-        "action_server": f"{MOTOR_name}",
+        "action_server_name": f"{MOTOR_name}",
         "action_name": "move",
         "action_params": {
                         "d_mm": [z_seal],
@@ -401,6 +407,8 @@ def ADSS_slave_engage(pg_Obj: Process):
                         "mode": move_modes.absolute,
                         "transformation": transformation_mode.instrxy,
                         },
+        "save_act": debug_save_act,
+        "save_data": debug_save_data,
         "start_condition": action_start_condition.wait_for_all,
         })
 
@@ -413,10 +421,10 @@ def ADSS_slave_disengage(pg_Obj: Process):
     
     last functionality test: 11/29/2021"""
 
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action({
-        "action_server": f"{MOTOR_name}",
+        "action_server_name": f"{MOTOR_name}",
         "action_name": "move",
         "action_params": {
                         "d_mm": [z_home],
@@ -424,6 +432,8 @@ def ADSS_slave_disengage(pg_Obj: Process):
                         "mode": move_modes.absolute,
                         "transformation": transformation_mode.instrxy,
                         },
+        "save_act": debug_save_act,
+        "save_data": debug_save_data,
         "start_condition": action_start_condition.wait_for_all,
         })
 
@@ -440,11 +450,11 @@ def ADSS_slave_clean_PALtool(pg_Obj: Process,
     last functionality test: 11/29/2021"""
 
 
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
     
     # deep clean
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "PAL_deepclean",
         "action_params": {
                           "PAL_tool": sq.pars.clean_PAL_tool,
@@ -460,11 +470,11 @@ def ADSS_slave_fillfixed(pg_Obj: Process,
                          fill_vol_ul: Optional[int] = 10000,
                          filltime_sec: Optional[float] = 10.0
                          ):
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
     # fill liquid, no wash (assume it was cleaned before)
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "PAL_fillfixed",
         "action_params": {
                           "PAL_tool": PALtools.LS3,
@@ -482,7 +492,7 @@ def ADSS_slave_fillfixed(pg_Obj: Process,
 
     # set pump flow forward
     sq.add_action({
-        "action_server": f"{NI_name}",
+        "action_server_name": f"{NI_name}",
         "action_name": "pump",
         "action_params": {
                           "pump":"direction",
@@ -493,7 +503,7 @@ def ADSS_slave_fillfixed(pg_Obj: Process,
 
     # turn on pump
     sq.add_action({
-        "action_server": f"{NI_name}",
+        "action_server_name": f"{NI_name}",
         "action_name": "pump",
         "action_params": {
                           "pump":"peripump",
@@ -505,7 +515,7 @@ def ADSS_slave_fillfixed(pg_Obj: Process,
 
     # wait some time to pump in the liquid
     sq.add_action({
-        "action_server": f"{ORCH_name}",
+        "action_server_name": f"{ORCH_name}",
         "action_name": "wait",
         "action_params": {
                           "waittime":sq.pars.filltime_sec,
@@ -517,11 +527,11 @@ def ADSS_slave_fillfixed(pg_Obj: Process,
 
 
 def ADSS_slave_fill(pg_Obj: Process, fill_vol_ul: Optional[int] = 1000):
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
     # fill liquid, no wash (assume it was cleaned before)
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "PAL_fill",
         "action_params": {
                           "PAL_tool": PALtools.LS3,
@@ -550,11 +560,11 @@ def ADSS_slave_CA(pg_Obj: Process,
               ):
     """last functionality test: 11/29/2021"""
     
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
     # get sample for gamry
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "archive_custom_query_sample",
         "action_params": {
                         "custom": "cell1_we",
@@ -565,7 +575,7 @@ def ADSS_slave_CA(pg_Obj: Process,
     
     # OCV
     sq.add_action({
-        "action_server": f"{PSTAT_name}",
+        "action_server_name": f"{PSTAT_name}",
         "action_name": "run_OCV",
         "action_params": {
                         "Tval": sq.pars.OCV_duration_sec,
@@ -583,7 +593,7 @@ def ADSS_slave_CA(pg_Obj: Process,
 
     # take liquid sample
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "PAL_archive",
         "action_params": {
                           "PAL_tool": PALtools.LS3,
@@ -603,7 +613,7 @@ def ADSS_slave_CA(pg_Obj: Process,
 
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "archive_custom_query_sample",
         "action_params": {
                         "custom": "cell1_we",
@@ -617,7 +627,7 @@ def ADSS_slave_CA(pg_Obj: Process,
     potential = sq.pars.CA_potential-1.0*sq.pars.ref_vs_nhe-0.059*sq.pars.ph
     print(f"ADSS_slave_CA potential: {potential}")
     sq.add_action({
-        "action_server": f"{PSTAT_name}",
+        "action_server_name": f"{PSTAT_name}",
         "action_name": "run_CA",
         "action_params": {
                         "Vval": potential,
@@ -636,7 +646,7 @@ def ADSS_slave_CA(pg_Obj: Process,
 
     # take multiple scheduled liquid samples
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "PAL_archive",
         "action_params": {
                           "PAL_tool": PALtools.LS3,
@@ -657,7 +667,7 @@ def ADSS_slave_CA(pg_Obj: Process,
 
     # take last liquid sample and clean
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "PAL_archive",
         "action_params": {
                           "PAL_tool": PALtools.LS3,
@@ -699,10 +709,10 @@ def ADSS_slave_tray_unload(
     rack: position of the tray in the icpms instrument, usually 2.
     """
     
-    sq = Sequencer(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "archive_tray_export_json",
         "action_params": {
                           "tray": sq.pars.tray,
@@ -712,7 +722,7 @@ def ADSS_slave_tray_unload(
         })
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "archive_tray_export_csv",
         "action_params": {
                           "tray": sq.pars.tray,
@@ -722,7 +732,7 @@ def ADSS_slave_tray_unload(
         })
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "archive_tray_export_icpms",
         "action_params": {
                           "tray": sq.pars.tray,
@@ -736,7 +746,7 @@ def ADSS_slave_tray_unload(
 
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server_name": f"{PAL_name}",
         "action_name": "archive_tray_unload",
         "action_params": {
                           "tray": sq.pars.tray,
