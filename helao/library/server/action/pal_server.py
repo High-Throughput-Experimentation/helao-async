@@ -506,7 +506,7 @@ def makeApp(confPrefix, servKey):
     async def db_new_sample(request: Request, 
                          fast_samples_in: Optional[List[hcms.SampleUnion]] = [hcms.LiquidSample(**{
                                               "machine_name":gethostname(),
-                                              "source": None,
+                                              "source": [],
                                               "volume_ml": 0.0,
                                               "action_time": strftime("%Y%m%d.%H%M%S"),
                                               "chemical": [],
