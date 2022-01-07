@@ -564,8 +564,8 @@ class cPAL:
                         mass=source_mass,
                         supplier=source_supplier,
                         lot_number=source_lotnumber,
-                        status="created",
-                        inheritance="receive_only"
+                        status=hcms.SampleStatus.created,
+                        inheritance=hcms.SampleInheritance.receive_only
                         ))
             elif sample_out_type == _sampletype.gas:
                 sample.samples.append(hcms.GasSample(
@@ -577,8 +577,8 @@ class cPAL:
                         mass=source_mass,
                         supplier=source_supplier,
                         lot_number=source_lotnumber,
-                        status="created",
-                        inheritance="receive_only"
+                        status=hcms.SampleStatus.created,
+                        inheritance=hcms.SampleInheritance.receive_only
                         ))
             elif sample_out_type == _sampletype.assembly:
                 sample.samples.append(hcms.AssemblySample(
@@ -588,8 +588,8 @@ class cPAL:
                         action_uuid=self.action.action_uuid,
                         source=source,
                         action_timestamp=self.action.action_timestamp,
-                        status="created",
-                        inheritance="receive_only"
+                        status=hcms.SampleStatus.created,
+                        inheritance=hcms.SampleInheritance.receive_only
                         ))
     
             else:
@@ -604,8 +604,8 @@ class cPAL:
             sample.samples.append(hcms.AssemblySample(
                 parts = [sample for sample in sample_in.samples],
                 #sample_position = "", # is updated later
-                status="created",
-                inheritance="receive_only",
+                status=hcms.SampleStatus.created,
+                inheritance=hcms.SampleInheritance.receive_only,
                 source = [sample.get_global_label() for sample in sample_in.samples],
                 process_uuid=self.action.process_uuid,
                 action_uuid=self.action.action_uuid,
@@ -660,8 +660,8 @@ class cPAL:
                                                         )
             if error != error_codes.none:
                 if len(sample.samples) == 1:
-                    sample.samples[0].inheritance = "allow_both"
-                    sample.samples[0].status = ["preserved"]
+                    sample.samples[0].inheritance = hcms.SampleInheritance.allow_both
+                    sample.samples[0].status = [hcms.SampleStatus.preserved]
                     # self.IO_PALparams.PAL_sample_in.samples.append(tmp_sample_in.samples[0])
                 elif len(sample.samples) > 1:
                     error = error_codes.critical
@@ -783,8 +783,8 @@ class cPAL:
         for sample in sample_in.samples:
             # they all should actually be give only
             # but might not be preserved dpending on target
-            # sample.inheritance =  "give_only"
-            # sample.status = ["preserved"]
+            # sample.inheritance =  hcms.SampleInheritance.give_only
+            # sample.status = [hcms.SampleStatus.preserved]
             sample.inheritance = None
             sample.status = []
             sample.sample_position = source
@@ -876,8 +876,8 @@ class cPAL:
 
                 sample_out.samples[0].volume_ml = micropal.PAL_volume_ul / 1000.0
                 sample_out.samples[0].sample_position = dest
-                sample_out.samples[0].inheritance = "receive_only"
-                sample_out.samples[0].status = ["created"]
+                sample_out.samples[0].inheritance = hcms.SampleInheritance.receive_only
+                sample_out.samples[0].status = [hcms.SampleStatus.created]
                 dest_sample = sample_out
 
             else:
@@ -887,8 +887,8 @@ class cPAL:
                 dest_sample = sample_in
                 for sample in sample_in.samples:
                     # we can only add liquid to vials (diluite them, no assembly here)
-                    sample.inheritance = "receive_only"
-                    sample.status = ["preserved"]
+                    sample.inheritance = hcms.SampleInheritance.receive_only
+                    sample.status = [hcms.SampleStatus.preserved]
                     # add that sample to the current sample_in list
                     micropal.PAL_sample_in[-1].samples.append(sample)
                     micropal.PAL_sample_in_delta_vol_ml[-1].append(micropal.PAL_volume_ul / 1000.0)
@@ -945,8 +945,8 @@ class cPAL:
 
                 sample_out.samples[0].volume_ml = micropal.PAL_volume_ul / 1000.0
                 sample_out.samples[0].sample_position = dest
-                sample_out.samples[0].inheritance = "receive_only"
-                sample_out.samples[0].status = ["created"]
+                sample_out.samples[0].inheritance = hcms.SampleInheritance.receive_only
+                sample_out.samples[0].status = [hcms.SampleStatus.created]
                 dest_sample = sample_out
                 
             else:
@@ -993,8 +993,8 @@ class cPAL:
                         for sample in sample_in.samples:
                             # we can only add liquid to vials 
                             # (diluite them, no assembly here)
-                            sample.inheritance = "receive_only"
-                            sample.status = ["preserved"]
+                            sample.inheritance = hcms.SampleInheritance.receive_only
+                            sample.status = [hcms.SampleStatus.preserved]
                             micropal.PAL_sample_in[-1].samples.append(sample)
                             micropal.PAL_sample_in_delta_vol_ml[-1].append(micropal.PAL_volume_ul / 1000.0)
                             micropal.dilute[-1].append(True)
@@ -1021,8 +1021,8 @@ class cPAL:
 
                         sample_out.samples[0].volume_ml = micropal.PAL_volume_ul / 1000.0
                         sample_out.samples[0].sample_position = dest
-                        sample_out.samples[0].inheritance = "allow_both"
-                        sample_out.samples[0].status = ["created", "incorporated"]
+                        sample_out.samples[0].inheritance = hcms.SampleInheritance.allow_both
+                        sample_out.samples[0].status = [hcms.SampleStatus.created, hcms.SampleStatus.incorporated]
 
                         # add new sample to assembly
                         sample_in.samples[0].parts.append(sample_out.samples[0])
@@ -1031,8 +1031,8 @@ class cPAL:
                         for sample in sample_in.samples:
                             # we can only add liquid to vials 
                             # (diluite them, no assembly here)
-                            sample.inheritance = "allow_both"
-                            sample.status = ["preserved"]
+                            sample.inheritance = hcms.SampleInheritance.allow_both
+                            sample.status = [hcms.SampleStatus.preserved]
                             micropal.PAL_sample_in[-1].samples.append(sample)
 
 
@@ -1047,8 +1047,8 @@ class cPAL:
                     for sample in sample_in.samples:
                         # we can only add liquid to vials 
                         # (diluite them, no assembly here)
-                        sample.inheritance = "receive_only"
-                        sample.status = ["preserved"]
+                        sample.inheritance = hcms.SampleInheritance.receive_only
+                        sample.status = [hcms.SampleStatus.preserved]
                         micropal.PAL_sample_in[-1].samples.append(sample)
                         micropal.PAL_sample_in_delta_vol_ml[-1].append(micropal.PAL_volume_ul / 1000.0)
                         micropal.dilute[-1].append(True)
@@ -1083,15 +1083,15 @@ class cPAL:
 
                     sample_out.samples[0].volume_ml = micropal.PAL_volume_ul / 1000.0
                     sample_out.samples[0].sample_position = dest
-                    sample_out.samples[0].inheritance = "allow_both"
-                    sample_out.samples[0].status = ["created", "incorporated"]
+                    sample_out.samples[0].inheritance = hcms.SampleInheritance.allow_both
+                    sample_out.samples[0].status = [hcms.SampleStatus.created, hcms.SampleStatus.incorporated]
 
 
                     # only now add the sample which was found in the position
                     # to the sample_in list for the prc/prg
                     for sample in sample_in.samples:
-                        sample_in.samples[0].inheritance = "allow_both"
-                        sample_in.samples[0].status = ["incorporated"]
+                        sample_in.samples[0].inheritance = hcms.SampleInheritance.allow_both
+                        sample_in.samples[0].status = [hcms.SampleStatus.incorporated]
                         micropal.PAL_sample_in[-1].samples.append(sample)
                         # we only add the sample to assembly so delta_vol is 0
                         micropal.PAL_sample_in_delta_vol_ml[-1].append(0.0)
@@ -1119,8 +1119,8 @@ class cPAL:
                     if error != error_codes.none:
                         return error
                     sample_out2.samples[0].sample_position = dest
-                    sample_out2.samples[0].inheritance = "allow_both"
-                    sample_out2.samples[0].status = ["created"]
+                    sample_out2.samples[0].inheritance = hcms.SampleInheritance.allow_both
+                    sample_out2.samples[0].status = [hcms.SampleStatus.created]
                     # add second sample out to sample_out
                     sample_out.samples.append(sample_out2.samples[0])
                     # dest_sample.samples.append(sample_out2.samples[0])
@@ -1157,8 +1157,8 @@ class cPAL:
 
             sample_out.samples[0].volume_ml = micropal.PAL_volume_ul / 1000.0
             sample_out.samples[0].sample_position = dest
-            sample_out.samples[0].inheritance = "receive_only"
-            sample_out.samples[0].status = ["created"]
+            sample_out.samples[0].inheritance = hcms.SampleInheritance.receive_only
+            sample_out.samples[0].status = [hcms.SampleStatus.created]
             dest_sample = sample_out
 
 
@@ -1186,8 +1186,8 @@ class cPAL:
             self.base.print_message(f"PAL_dest: Got sample '{sample_in.samples[0].global_label}' in position '{dest}'", info = True)
             dest_sample = sample_in
             for sample in sample_in.samples:
-                sample.inheritance = "receive_only"
-                sample.status = ["preserved"]
+                sample.inheritance = hcms.SampleInheritance.receive_only
+                sample.status = [hcms.SampleStatus.preserved]
                 micropal.PAL_sample_in[-1].samples.append(sample)
                 micropal.PAL_sample_in_delta_vol_ml[-1].append(micropal.PAL_volume_ul / 1000.0)
                 micropal.dilute[-1].append(True)
@@ -1206,8 +1206,8 @@ class cPAL:
         # update the rest of sample_in
         for sample in micropal.PAL_sample_in[-1].samples:
             if sample.inheritance is None:
-                sample.inheritance = "give_only"
-                sample.status = ["preserved"]
+                sample.inheritance = hcms.SampleInheritance.give_only
+                sample.status = [hcms.SampleStatus.preserved]
 
 
 

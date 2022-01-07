@@ -583,8 +583,8 @@ class gamry:
             self.IO_continue = True
             
             for sample in self.samples_in:
-                sample.status = ["preserved"]
-                sample.inheritance="allow_both"
+                sample.status = [hcms.SampleStatus.preserved]
+                sample.inheritance = hcms.SampleInheritance.allow_both
             
             
             # clear old samples_in first
