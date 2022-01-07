@@ -418,6 +418,8 @@ class Archive():
                         samples = self.trays[tray][slot].unload()
         self.write_config() # save current state of table
         sample_in, sample_out = await self.unpack_samples(samples)
+        sample_in = self.append_sample_status(samples = sample_in, newstatus = hcms.SampleStatus.unloaded)
+        sample_out = self.append_sample_status(samples = sample_out, newstatus = hcms.SampleStatus.unloaded)
         return unloaded, sample_in, sample_out, tray_dict
 
 
@@ -439,6 +441,8 @@ class Archive():
                     
         self.write_config() # save current state of table
         sample_in, sample_out = await self.unpack_samples(samples)
+        sample_in = self.append_sample_status(samples = sample_in, newstatus = hcms.SampleStatus.unloaded)
+        sample_out = self.append_sample_status(samples = sample_out, newstatus = hcms.SampleStatus.unloaded)
         return True, sample_in, sample_out, tray_dict
 
     
@@ -747,6 +751,16 @@ class Archive():
         for sample in samples:
             sample.status = newstatus
         return samples
+
+
+    def append_sample_status(
+                             self, 
+                             samples: List[hcms.SampleUnion],
+                             newstatus, 
+                            ):
+        for sample in samples:
+            sample.status.append(newstatus)
+        return samples
     
     
     async def custom_unloadall(self, *args, **kwargs):
@@ -756,8 +770,8 @@ class Archive():
             samples.append(self.custom_positions[custom].unload())
         self.write_config() # save current state of table
         sample_in, sample_out = await self.unpack_samples(samples)
-        sample_in = self.assign_new_sample_status(samples = sample_in, newstatus = ["recovered"])
-        sample_out = self.assign_new_sample_status(samples = sample_out, newstatus = ["recovered"])
+        sample_in = self.append_sample_status(samples = sample_in, newstatus = hcms.SampleStatus.unloaded)
+        sample_out = self.append_sample_status(samples = sample_out, newstatus = hcms.SampleStatus.unloaded)
         return True, sample_in, sample_out, customs_dict
 
 
@@ -772,8 +786,8 @@ class Archive():
         
         self.write_config() # save current state of table
         sample_in, sample_out = await self.unpack_samples(sample)
-        sample_in = self.assign_new_sample_status(samples = sample_in, newstatus = ["recovered"])
-        sample_out = self.assign_new_sample_status(samples = sample_out, newstatus = ["recovered"])
+        sample_in = self.append_sample_status(samples = sample_in, newstatus = hcms.SampleStatus.unloaded)
+        sample_out = self.append_sample_status(samples = sample_out, newstatus = hcms.SampleStatus.unloaded)
         return unloaded, sample_in, sample_out, customs_dict
 
 
@@ -787,7 +801,6 @@ class Archive():
         sample = hcms.NoneSample()
         loaded = False
         customs_dict = dict()
-
 
         if load_sample_in is None:
             return False, hcms.NoneSample(), dict()
@@ -806,6 +819,7 @@ class Archive():
             customs_dict = self.custom_positions[custom].as_dict()
 
         self.write_config() # save current state of table
+        sample.status = [hcms.SampleStatus.loaded]
         return loaded, sample, customs_dict
 
 
@@ -814,16 +828,16 @@ class Archive():
         ret_samples_out = []
         for sample in samples:
             if isinstance(sample, hcms.AssemblySample):
-                sample.inheritance = "allow_both"
-                sample.status = ["destroyed"]
+                sample.inheritance = hcms.SampleInheritance.allow_both
+                sample.status = [hcms.SampleStatus.destroyed]
                 ret_samples_in.append(sample)
                 for part in sample.parts:
-                    part.inheritance = "allow_both"
-                    part.status = ["recovered"]
+                    part.inheritance = hcms.SampleInheritance.allow_both
+                    part.status = [hcms.SampleStatus.recovered]
                     ret_samples_out.append(part)
             else:
-                sample.inheritance = "allow_both"
-                sample.status = ["preserved"]
+                sample.inheritance = hcms.SampleInheritance.allow_both
+                sample.status = [hcms.SampleStatus.preserved]
                 ret_samples_in.append(sample)
 
         return ret_samples_in, ret_samples_out
