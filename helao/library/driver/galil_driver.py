@@ -448,7 +448,7 @@ class galil:
 
             # if 1:
             try:
-                # the logic here is that we assemble a command process
+                # the logic here is that we assemble a command experiment
                 # here we decide if we move relative, home, or move absolute
                 if stopping:
                     cmd_seq = [
@@ -670,7 +670,7 @@ class galil:
     async def reset(self):
         # The RS command resets the state of the actionor to its power-on condition.
         # The previously saved state of the controller,
-        # along with parameter values, and saved processes are restored.
+        # along with parameter values, and saved experiments are restored.
         return self.c("RS")
 
     async def estop_axis(self, switch,*args,**kwargs):
@@ -1176,7 +1176,7 @@ class transformxy:
     def update_Msystem(self):
         """updates the transformation matrix for new plate calibration or
         when angles are changed.
-        Follows stacking process from bottom to top (plate)"""
+        Follows stacking experiment from bottom to top (plate)"""
 
         self.base.print_message("updating M")
 
@@ -1187,7 +1187,7 @@ class transformxy:
         else:
             self.Minstr = np.asmatrix(np.identity(4))
             # more complicated
-            # check for some common processes:
+            # check for some common experiments:
             Mcommon1 = (
                 False  # to check against when common combinations are already found
             )
@@ -1195,7 +1195,7 @@ class transformxy:
             for ax in self.seq:
                 axstr += ax
             # check for xyz or xy (with no z)
-            # process does not matter so should define it like this in the config
+            # experiment does not matter so should define it like this in the config
             # if we want to use this
             if axstr.find("xy") == 0 and axstr.find("z") <= 2:
                 self.base.print_message("got xyz seq")

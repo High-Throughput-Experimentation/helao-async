@@ -23,7 +23,7 @@ from bokeh.events import ButtonClick, DoubleTap
 
 import helaocore.server as hcs
 from helaocore.data import HTELegacyAPI
-from helaocore.schema import Process, Sequence
+from helaocore.schema import Experiment, Sequence
 from helaocore.helper import to_json
 
 
@@ -36,10 +36,10 @@ class return_sequence_lib(BaseModel):
     defaults: list
 
 
-class return_process_lib(BaseModel):
-    """Return class for queried process objects."""
+class return_experiment_lib(BaseModel):
+    """Return class for queried experiment objects."""
     index: int
-    process_name: str
+    experiment_name: str
     doc: str
     args: list
     defaults: list
@@ -75,8 +75,8 @@ class C_async_operator:
         self.prc_private_input = []
 
         self.sequence = None
-        self.process_plan_list = dict()
-        self.process_list = dict()
+        self.experiment_plan_list = dict()
+        self.experiment_list = dict()
         self.action_list = dict()
         self.active_action_list = dict()
 
@@ -84,20 +84,20 @@ class C_async_operator:
         self.sequences = []
         self.sequence_lib = hcs.import_sequences(world_config_dict = self.vis.world_cfg, sequence_path = None, server_name=self.vis.server_name)
 
-        self.process_select_list = []
-        self.processes = []
-        self.process_lib = hcs.import_processes(world_config_dict = self.vis.world_cfg, process_path = None, server_name=self.vis.server_name)
+        self.experiment_select_list = []
+        self.experiments = []
+        self.experiment_lib = hcs.import_experiments(world_config_dict = self.vis.world_cfg, experiment_path = None, server_name=self.vis.server_name)
 
         # FastAPI calls
         self.get_sequence_lib()
-        self.get_process_lib()
-        self.vis.doc.add_next_tick_callback(partial(self.get_processes))
+        self.get_experiment_lib()
+        self.vis.doc.add_next_tick_callback(partial(self.get_experiments))
         self.vis.doc.add_next_tick_callback(partial(self.get_actions))
         self.vis.doc.add_next_tick_callback(partial(self.get_active_actions))
 
-        self.sequence_source = ColumnDataSource(data=self.process_plan_list)
-        self.columns_seq = [TableColumn(field=key, title=key) for key in self.process_plan_list]
-        self.processplan_table = DataTable(
+        self.sequence_source = ColumnDataSource(data=self.experiment_plan_list)
+        self.columns_seq = [TableColumn(field=key, title=key) for key in self.experiment_plan_list]
+        self.experimentplan_table = DataTable(
                                         source=self.sequence_source, 
                                         columns=self.columns_seq, 
                                         width=620, 
@@ -105,10 +105,10 @@ class C_async_operator:
                                         autosize_mode = "fit_columns"
                                         )
 
-        self.process_source = ColumnDataSource(data=self.process_list)
-        self.columns_prc = [TableColumn(field=key, title=key) for key in self.process_list]
-        self.process_table = DataTable(
-                                       source=self.process_source, 
+        self.experiment_source = ColumnDataSource(data=self.experiment_list)
+        self.columns_prc = [TableColumn(field=key, title=key) for key in self.experiment_list]
+        self.experiment_table = DataTable(
+                                       source=self.experiment_source, 
                                        columns=self.columns_prc, 
                                        width=620, 
                                        height=200,
@@ -142,12 +142,12 @@ class C_async_operator:
                                        )
         self.sequence_dropdown.on_change("value", self.callback_sequence_select)
 
-        self.process_dropdown = Select(
-                                       title="Select process:",
+        self.experiment_dropdown = Select(
+                                       title="Select experiment:",
                                        value = None,
-                                       options=self.process_select_list
+                                       options=self.experiment_select_list
                                       )
-        self.process_dropdown.on_change("value", self.callback_process_select)
+        self.experiment_dropdown.on_change("value", self.callback_experiment_select)
 
 
         # buttons to control orch
@@ -163,7 +163,7 @@ class C_async_operator:
         self.button_clear_seqg.on_event(ButtonClick, self.callback_clear_seqg)
 
         self.button_clear_prg = Button(label="clear prc", button_type="danger", width=100)
-        self.button_clear_prg.on_event(ButtonClick, self.callback_clear_processes)
+        self.button_clear_prg.on_event(ButtonClick, self.callback_clear_experiments)
         self.button_clear_action = Button(label="clear act", button_type="danger", width=100)
         self.button_clear_action.on_event(ButtonClick, self.callback_clear_actions)
 
@@ -179,7 +179,7 @@ class C_async_operator:
 
 
         self.sequence_descr_txt = bmw.Div(text="""select a sequence item""", width=600)
-        self.process_descr_txt = bmw.Div(text="""select a process item""", width=600)
+        self.experiment_descr_txt = bmw.Div(text="""select a experiment item""", width=600)
         self.error_txt = Paragraph(text="""no error""", width=600, height=30, style={"font-size": "100%", "color": "black"})
 
         self.input_sequence_label = TextInput(value="nolabel", title="sequence label", disabled=False, width=120, height=40)
@@ -206,13 +206,13 @@ class C_async_operator:
         self.layout2 = layout([
             Spacer(height=10),
             layout(
-                [Spacer(width=20), bmw.Div(text="<b>Processes:</b>", width=620, height=32, style={"font-size": "150%", "color": "red"})],
+                [Spacer(width=20), bmw.Div(text="<b>Experiments:</b>", width=620, height=32, style={"font-size": "150%", "color": "red"})],
                 background="#C0C0C0",width=640),
             Spacer(height=10),
             layout([
-                [self.process_dropdown],
-                [Spacer(width=10), bmw.Div(text="<b>process description:</b>", width=200+50, height=15)],
-                [self.process_descr_txt],
+                [self.experiment_dropdown],
+                [Spacer(width=10), bmw.Div(text="<b>experiment description:</b>", width=200+50, height=15)],
+                [self.experiment_descr_txt],
                 Spacer(height=20),
                 ],background="#808080",width=640),
                 layout([
@@ -234,10 +234,10 @@ class C_async_operator:
                     Spacer(height=10),
                     ],background="#808080",width=640),
                 layout([
-                [Spacer(width=20), bmw.Div(text="<b>Process Plan:</b>", width=200+50, height=15)],
-                [self.processplan_table],
-                [Spacer(width=20), bmw.Div(text="<b>queued processes:</b>", width=200+50, height=15)],
-                [self.process_table],
+                [Spacer(width=20), bmw.Div(text="<b>Experiment Plan:</b>", width=200+50, height=15)],
+                [self.experimentplan_table],
+                [Spacer(width=20), bmw.Div(text="<b>queued experiments:</b>", width=200+50, height=15)],
+                [self.experiment_table],
                 [Spacer(width=20), bmw.Div(text="<b>queued actions:</b>", width=200+50, height=15)],
                 [self.action_table],
                 [Spacer(width=20), bmw.Div(text="<b>Active actions:</b>", width=200+50, height=15)],
@@ -260,8 +260,8 @@ class C_async_operator:
 
 
         # select the first item to force an update of the layout
-        if self.process_select_list:
-            self.process_dropdown.value = self.process_select_list[0]
+        if self.experiment_select_list:
+            self.experiment_dropdown.value = self.experiment_select_list[0]
 
         if self.sequence_select_list:
             self.sequence_dropdown.value = self.sequence_select_list[0]
@@ -293,44 +293,44 @@ class C_async_operator:
             self.sequence_select_list.append(item["sequence_name"])
 
 
-    def get_process_lib(self):
-        """Return the current list of processes."""
-        self.processes = []
-        self.vis.print_message(f"found process: {[process for process in self.process_lib]}")
-        for i, process in enumerate(self.process_lib):
-            tmpdoc = self.process_lib[process].__doc__ 
+    def get_experiment_lib(self):
+        """Return the current list of experiments."""
+        self.experiments = []
+        self.vis.print_message(f"found experiment: {[experiment for experiment in self.experiment_lib]}")
+        for i, experiment in enumerate(self.experiment_lib):
+            tmpdoc = self.experiment_lib[experiment].__doc__ 
             if tmpdoc == None:
                 tmpdoc = ""
-            tmpargs = inspect.getfullargspec(self.process_lib[process]).args
-            tmpdef = inspect.getfullargspec(self.process_lib[process]).defaults
+            tmpargs = inspect.getfullargspec(self.experiment_lib[experiment]).args
+            tmpdef = inspect.getfullargspec(self.experiment_lib[experiment]).defaults
             if tmpdef == None:
                 tmpdef = []
             
-            self.processes.append(return_process_lib(
+            self.experiments.append(return_experiment_lib(
                 index=i,
-                process_name = process,
+                experiment_name = experiment,
                 doc = tmpdoc,
                 args = tmpargs,
                 defaults = tmpdef,
                ).dict()
             )
-        for item in self.processes:
-            self.process_select_list.append(item["process_name"])
+        for item in self.experiments:
+            self.experiment_select_list.append(item["experiment_name"])
 
 
-    async def get_processes(self):
-        """get process list from orch"""
-        response = await self.do_orch_request(action_name = "list_processes")
-        self.process_list = dict()
+    async def get_experiments(self):
+        """get experiment list from orch"""
+        response = await self.do_orch_request(action_name = "list_experiments")
+        self.experiment_list = dict()
         if len(response):
             for key,val in response[0].items():
                 if val is not None:
-                    self.process_list[key] = []
+                    self.experiment_list[key] = []
             for line in response:
                 for key, value in line.items():
-                    if key in self.process_list:
-                        self.process_list[key].append(value)
-        self.vis.print_message(f"current queued processes: {self.process_list}")
+                    if key in self.experiment_list:
+                        self.experiment_list[key].append(value)
+        self.vis.print_message(f"current queued experiments: {self.experiment_list}")
 
 
     async def get_actions(self):
@@ -386,11 +386,11 @@ class C_async_operator:
         )
 
 
-    def callback_process_select(self, attr, old, new):
-        idx = self.process_select_list.index(new)
+    def callback_experiment_select(self, attr, old, new):
+        idx = self.experiment_select_list.index(new)
         self.update_prc_param_layout(idx)
         self.vis.doc.add_next_tick_callback(
-            partial(self.update_prc_doc,self.processes[idx]["doc"])
+            partial(self.update_prc_doc,self.experiments[idx]["doc"])
         )
 
 
@@ -472,7 +472,7 @@ class C_async_operator:
 
 
     def callback_skip_dec(self, event):
-        self.vis.print_message("skipping process")
+        self.vis.print_message("skipping experiment")
         self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"skip"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
@@ -483,9 +483,9 @@ class C_async_operator:
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
-    def callback_clear_processes(self, event):
-        self.vis.print_message("clearing processes")
-        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_processes"))
+    def callback_clear_experiments(self, event):
+        self.vis.print_message("clearing experiments")
+        self.vis.doc.add_next_tick_callback(partial(self.do_orch_request,"clear_experiments"))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
@@ -497,25 +497,25 @@ class C_async_operator:
 
     def callback_prepend_seqg(self, event):
         sequence = self.populate_sequence()
-        for i, D in enumerate(sequence.process_plan_list):
-            self.sequence.process_plan_list.insert(i,D)
+        for i, D in enumerate(sequence.experiment_plan_list):
+            self.sequence.experiment_plan_list.insert(i,D)
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_append_seqg(self, event):
         sequence = self.populate_sequence()
-        for D in sequence.process_plan_list:
-            self.sequence.process_plan_list.append(D)
+        for D in sequence.experiment_plan_list:
+            self.sequence.experiment_plan_list.append(D)
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))        
 
 
     def callback_prepend_prc(self, event):
-        self.prepend_process()
+        self.prepend_experiment()
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
     def callback_append_prc(self, event):
-        self.append_process()
+        self.append_experiment()
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
@@ -523,14 +523,14 @@ class C_async_operator:
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
 
-    def append_process(self):
-        D = self.populate_process()
-        self.sequence.process_plan_list.append(D)
+    def append_experiment(self):
+        D = self.populate_experiment()
+        self.sequence.experiment_plan_list.append(D)
 
 
-    def prepend_process(self):
-        D = self.populate_process()
-        self.sequence.process_plan_list.insert(0,D)
+    def prepend_experiment(self):
+        D = self.populate_experiment()
+        self.sequence.experiment_plan_list.insert(0,D)
 
 
     def unpack_sequence(self, sequence_name, sequence_params):
@@ -555,8 +555,8 @@ class C_async_operator:
         sequence.sequence_label = self.input_sequence_label.value
         sequence.sequence_params = sequence_params
         for prc in prc_list:
-            D = Process(inputdict=prc)
-            sequence.process_plan_list.append(D)
+            D = Experiment(inputdict=prc)
+            sequence.experiment_plan_list.append(D)
 
         if self.sequence is None:
             self.sequence = Sequence()
@@ -567,14 +567,14 @@ class C_async_operator:
         return sequence
 
 
-    def populate_process(self):
-        selected_process = self.process_dropdown.value
-        self.vis.print_message(f"selected process from list: {selected_process}")
-        process_params = {paraminput.title: to_json(paraminput.value) for paraminput in self.prc_param_input}
-        D = Process(inputdict={
+    def populate_experiment(self):
+        selected_experiment = self.experiment_dropdown.value
+        self.vis.print_message(f"selected experiment from list: {selected_experiment}")
+        experiment_params = {paraminput.title: to_json(paraminput.value) for paraminput in self.prc_param_input}
+        D = Experiment(inputdict={
             # "orchestrator":orchestrator,
-            "process_name":selected_process,
-            "process_params":process_params,
+            "experiment_name":selected_experiment,
+            "experiment_params":experiment_params,
         })
         if self.sequence is None:
             self.sequence = Sequence()
@@ -647,8 +647,8 @@ class C_async_operator:
 
 
     def update_prc_param_layout(self, idx):
-        args = self.processes[idx]["args"]
-        defaults = self.processes[idx]["defaults"]
+        args = self.experiments[idx]["args"]
+        defaults = self.experiments[idx]["defaults"]
         self.dynamic_col.children.pop(3)
 
         for _ in range(len(args)-len(defaults)):
@@ -658,7 +658,7 @@ class C_async_operator:
         self.prc_private_input = []
         self.prc_param_layout = [
             layout([
-                [Spacer(width=10), bmw.Div(text="<b>Optional process parameters:</b>", width=200+50, height=15, style={"font-size": "100%", "color": "black"})],
+                [Spacer(width=10), bmw.Div(text="<b>Optional experiment parameters:</b>", width=200+50, height=15, style={"font-size": "100%", "color": "black"})],
                 ],background=self.color_sq_param_inputs,width=640),
             ]
         self.add_dynamic_inputs(
@@ -767,7 +767,7 @@ class C_async_operator:
 
 
     def update_prc_doc(self, value):
-        self.process_descr_txt.text = value.replace("\n", "<br>")
+        self.experiment_descr_txt.text = value.replace("\n", "<br>")
 
 
     def update_error(self, value):
@@ -954,35 +954,35 @@ class C_async_operator:
         return False
 
 
-    async def add_process_to_sequence(self):
+    async def add_experiment_to_sequence(self):
         pass
         
 
     async def update_tables(self):
-        await self.get_processes()
+        await self.get_experiments()
         await self.get_actions()
         await self.get_active_actions()
 
-        self.process_plan_list = dict()
+        self.experiment_plan_list = dict()
 
-        self.process_plan_list["sequence_name"] = []
-        self.process_plan_list["sequence_label"] = []
-        self.process_plan_list["process_name"] = []
+        self.experiment_plan_list["sequence_name"] = []
+        self.experiment_plan_list["sequence_label"] = []
+        self.experiment_plan_list["experiment_name"] = []
         if self.sequence is not None:
-            for D in self.sequence.process_plan_list:
-                self.process_plan_list["sequence_name"].append(self.sequence.sequence_name)
-                self.process_plan_list["sequence_label"].append(self.sequence.sequence_label)
-                self.process_plan_list["process_name"].append(D.process_name)
+            for D in self.sequence.experiment_plan_list:
+                self.experiment_plan_list["sequence_name"].append(self.sequence.sequence_name)
+                self.experiment_plan_list["sequence_label"].append(self.sequence.sequence_label)
+                self.experiment_plan_list["experiment_name"].append(D.experiment_name)
 
 
-        self.columns_seq = [TableColumn(field=key, title=key) for key in self.process_plan_list]
-        self.processplan_table.source.data = self.process_plan_list
-        self.processplan_table.columns=self.columns_seq
+        self.columns_seq = [TableColumn(field=key, title=key) for key in self.experiment_plan_list]
+        self.experimentplan_table.source.data = self.experiment_plan_list
+        self.experimentplan_table.columns=self.columns_seq
 
 
-        self.columns_prc = [TableColumn(field=key, title=key) for key in self.process_list]
-        self.process_table.source.data = self.process_list
-        self.process_table.columns=self.columns_prc
+        self.columns_prc = [TableColumn(field=key, title=key) for key in self.experiment_list]
+        self.experiment_table.source.data = self.experiment_list
+        self.experiment_table.columns=self.columns_prc
 
         self.columns_act = [TableColumn(field=key, title=key) for key in self.action_list]
         self.action_table.source.data=self.action_list
@@ -1018,7 +1018,7 @@ def makeBokehApp(doc, confPrefix, servKey):
     # get the event loop
     # operatorloop = asyncio.get_event_loop()
 
-    # this periodically updates the GUI (action and process tables)
+    # this periodically updates the GUI (action and experiment tables)
     # operator.vis.doc.add_periodic_callback(operator.IOloop,2000) # time in ms
 
     return doc

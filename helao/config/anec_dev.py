@@ -2,8 +2,8 @@ hostip = "127.0.0.1"
 config = dict()
 
 # action library provides generator functions which produce actions
-# lists from input process_id grouping
-config["process_libraries"] = ["ANEC_prc"]
+# lists from input experiment_id grouping
+config["experiment_libraries"] = ["ANEC_prc"]
 config["technique_name"] = "anec"
 config["root"] = r"C:\INST_dev2"
 # config["local_db_path"] = r"C:\INST_dev2\DATABASE"

@@ -19,17 +19,17 @@ a OrchHandler class object, the core functionality of an async orchestrator.
 
     Queue:
     The orchestrator uses deque objects to maintain separate sample and action queues.
-    The sample queue may be populated using POST requests to '/append_process' or
-    '/prepend_process' endpoints. The action queue is determined by the 'process'
-    method of a given sample [process]. Processes are defined in an action library
-    specified by the configuration. An process takes a sample argument and returns a
+    The sample queue may be populated using POST requests to '/append_experiment' or
+    '/prepend_experiment' endpoints. The action queue is determined by the 'experiment'
+    method of a given sample [experiment]. Experiments are defined in an action library
+    specified by the configuration. An experiment takes a sample argument and returns a
     list of actions. The action queue is repopulated once all actions on a given sample
     have finished (this prevents simultaneous execution of actions across samples).
 
     Dispatch:
     Sample and action queues are actioned by the 'run_dispatch_loop' coroutine, which
     is created by posting a request to the '/start' server endpoint. The corresponding
-    '/stop' endpoint is used to end processing but at the moment does not interrupt any
+    '/stop' endpoint is used to end experimenting but at the moment does not interrupt any
     actions in progress.
 
 """
