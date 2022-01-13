@@ -9,11 +9,11 @@ from fastapi import Request
 from typing import Optional, List
 
 from helaocore.server import make_action_serv, setup_action
-from helao.library.driver.pal_driver import cPAL
+from helao.library.driver.pal_driver import PAL
 from helao.library.driver.pal_driver import Spacingmethod
 from helao.library.driver.pal_driver import PALtools
-from helao.library.driver.pal_driver import MicroPalParams
-from helao.library.driver.pal_driver import PAL_position
+from helao.library.driver.pal_driver import PalMicroCam
+from helao.library.driver.pal_driver import PALposition
 import helaocore.model.sample as hcms
 from helaocore.helper import make_str_enum
 
@@ -29,7 +29,7 @@ def makeApp(confPrefix, servKey):
         servKey,
         "PAL Autosampler Server",
         version=2.0,
-        driver_class=cPAL,
+        driver_class=PAL,
     )
 
 
@@ -55,55 +55,55 @@ def makeApp(confPrefix, servKey):
         async def PAL_run_method(
             request: Request,
             micropal: Optional[list] = [
-                MicroPalParams(**{
-                "PAL_method":"fillfixed",
-                "PAL_tool":"LS3",
-                "PAL_volume_ul":500,
-                "PAL_requested_source":PAL_position(**{
+                PalMicroCam(**{
+                "method":"fillfixed",
+                "tool":"LS3",
+                "volume_ul":500,
+                "requested_source":PALposition(**{
                     "position":"elec_res1",
                     "tray":None,
                     "slot":None,
                     "vial":None,
                     }),
-                "PAL_requested_dest":PAL_position(**{
+                "requested_dest":PALposition(**{
                     "position":"lcfc_res",
                     "tray":None,
                     "slot":None,
                     "vial":None,
                     }),
-                "PAL_wash1":0,
-                "PAL_wash2":0,
-                "PAL_wash3":0,
-                "PAL_wash4":0,
+                "wash1":0,
+                "wash2":0,
+                "wash3":0,
+                "wash4":0,
                 }),
-                MicroPalParams(**{
-                "PAL_method":"fillfixed",
-                "PAL_tool":"LS3",
-                "PAL_volume_ul":500,
-                "PAL_requested_source":PAL_position(**{
+                PalMicroCam(**{
+                "method":"fillfixed",
+                "tool":"LS3",
+                "volume_ul":500,
+                "requested_source":PALposition(**{
                     "position":"elec_res1",
                     "tray":None,
                     "slot":None,
                     "vial":None,
                     }),
-                "PAL_requested_dest":PAL_position(**{
+                "requested_dest":PALposition(**{
                     "position":"lcfc_res",
                     "tray":None,
                     "slot":None,
                     "vial":None,
                     }),
-                "PAL_wash1":0,
-                "PAL_wash2":0,
-                "PAL_wash3":0,
-                "PAL_wash4":0,
+                "wash1":0,
+                "wash2":0,
+                "wash3":0,
+                "wash4":0,
                 }),
                 ],
-            PAL_totalruns: Optional[int] = 1,
+            totalruns: Optional[int] = 1,
             # its a necessary param, but as its the only dict, it partially breaks swagger
-            PAL_sampleperiod: Optional[List[float]] = [0.0],
-            PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
-            PAL_spacingfactor: Optional[float] = 1.0,
-            PAL_timeoffset: Optional[float] = 0.0,
+            sampleperiod: Optional[List[float]] = [0.0],
+            spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
+            spacingfactor: Optional[float] = 1.0,
+            timeoffset: Optional[float] = 0.0,
         ):
             """universal pal action"""
             A = await setup_action(request)
@@ -115,17 +115,17 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_archive")
         async def PAL_archive(
             request: Request,
-            PAL_tool: Optional[PALtools] = None,
-            PAL_source: Optional[dev_customitems] = None,
-            PAL_volume_ul: Optional[int] = 200,
-            PAL_sampleperiod: Optional[List[float]] =  [0.0],
-            PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
-            PAL_spacingfactor: Optional[float] = 1.0,
-            PAL_timeoffset: Optional[float] = 0.0,
-            PAL_wash1: Optional[bool] = False,
-            PAL_wash2: Optional[bool] = False,
-            PAL_wash3: Optional[bool] = False,
-            PAL_wash4: Optional[bool] = False,
+            tool: Optional[PALtools] = None,
+            source: Optional[dev_customitems] = None,
+            volume_ul: Optional[int] = 200,
+            sampleperiod: Optional[List[float]] =  [0.0],
+            spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
+            spacingfactor: Optional[float] = 1.0,
+            timeoffset: Optional[float] = 0.0,
+            wash1: Optional[bool] = False,
+            wash2: Optional[bool] = False,
+            wash3: Optional[bool] = False,
+            wash4: Optional[bool] = False,
             scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             A = await setup_action(request)
@@ -138,14 +138,14 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_fill")
         async def PAL_fill(
             request: Request,
-            PAL_tool: Optional[PALtools] = None,
-            PAL_source: Optional[dev_customitems] = None,
-            PAL_dest: Optional[dev_customitems] = None,
-            PAL_volume_ul: Optional[int] = 200,
-            PAL_wash1: Optional[bool] = False,
-            PAL_wash2: Optional[bool] = False,
-            PAL_wash3: Optional[bool] = False,
-            PAL_wash4: Optional[bool] = False,
+            tool: Optional[PALtools] = None,
+            source: Optional[dev_customitems] = None,
+            dest: Optional[dev_customitems] = None,
+            volume_ul: Optional[int] = 200,
+            wash1: Optional[bool] = False,
+            wash2: Optional[bool] = False,
+            wash3: Optional[bool] = False,
+            wash4: Optional[bool] = False,
         ):
             A = await setup_action(request)
             A.action_abbr = "fill"
@@ -157,14 +157,14 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_fillfixed")
         async def PAL_fillfixed(
             request: Request,
-            PAL_tool: Optional[PALtools] = None,
-            PAL_source: Optional[dev_customitems] = None,
-            PAL_dest: Optional[dev_customitems] = None,
-            PAL_volume_ul: Optional[int] = 200, # this value is only for prc, a fixed value is used
-            PAL_wash1: Optional[bool] = False,
-            PAL_wash2: Optional[bool] = False,
-            PAL_wash3: Optional[bool] = False,
-            PAL_wash4: Optional[bool] = False,
+            tool: Optional[PALtools] = None,
+            source: Optional[dev_customitems] = None,
+            dest: Optional[dev_customitems] = None,
+            volume_ul: Optional[int] = 200, # this value is only for prc, a fixed value is used
+            wash1: Optional[bool] = False,
+            wash2: Optional[bool] = False,
+            wash3: Optional[bool] = False,
+            wash4: Optional[bool] = False,
         ):
             A = await setup_action(request)
             A.action_abbr = "fillfixed"
@@ -176,8 +176,8 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_deepclean")
         async def PAL_deepclean(
             request: Request,
-            PAL_tool: Optional[PALtools] = None,
-            PAL_volume_ul: Optional[int] = 200, # this value is only for prc, a fixed value is used
+            tool: Optional[PALtools] = None,
+            volume_ul: Optional[int] = 200, # this value is only for prc, a fixed value is used
         ):
             A = await setup_action(request)
             A.action_abbr = "deepclean"
@@ -189,20 +189,20 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_dilute")
         async def PAL_dilute(
             request: Request,
-            PAL_tool: Optional[PALtools] = None,
-            PAL_source: Optional[dev_customitems] = None,
-            PAL_volume_ul: Optional[int] = 200,
-            PAL_dest_tray: Optional[int] = 0,
-            PAL_dest_slot: Optional[int] = 0,
-            PAL_dest_vial: Optional[int] = 0,
-            PAL_sampleperiod: Optional[List[float]] =  [0.0],
-            PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
-            PAL_spacingfactor: Optional[float] = 1.0,
-            PAL_timeoffset: Optional[float] = 0.0,
-            PAL_wash1: Optional[bool] = True,
-            PAL_wash2: Optional[bool] = True,
-            PAL_wash3: Optional[bool] = True,
-            PAL_wash4: Optional[bool] = True,
+            tool: Optional[PALtools] = None,
+            source: Optional[dev_customitems] = None,
+            volume_ul: Optional[int] = 200,
+            dest_tray: Optional[int] = 0,
+            dest_slot: Optional[int] = 0,
+            dest_vial: Optional[int] = 0,
+            sampleperiod: Optional[List[float]] =  [0.0],
+            spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
+            spacingfactor: Optional[float] = 1.0,
+            timeoffset: Optional[float] = 0.0,
+            wash1: Optional[bool] = True,
+            wash2: Optional[bool] = True,
+            wash3: Optional[bool] = True,
+            wash4: Optional[bool] = True,
             scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             A = await setup_action(request)
@@ -215,17 +215,17 @@ def makeApp(confPrefix, servKey):
         @app.post(f"/{servKey}/PAL_autodilute")
         async def PAL_autodilute(
             request: Request,
-            PAL_tool: Optional[PALtools] = None,
-            PAL_source: Optional[dev_customitems] = None,
-            PAL_volume_ul: Optional[int] = 200,
-            PAL_sampleperiod: Optional[List[float]] =  [0.0],
-            PAL_spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
-            PAL_spacingfactor: Optional[float] = 1.0,
-            PAL_timeoffset: Optional[float] = 0.0,
-            PAL_wash1: Optional[bool] = True,
-            PAL_wash2: Optional[bool] = True,
-            PAL_wash3: Optional[bool] = True,
-            PAL_wash4: Optional[bool] = True,
+            tool: Optional[PALtools] = None,
+            source: Optional[dev_customitems] = None,
+            volume_ul: Optional[int] = 200,
+            sampleperiod: Optional[List[float]] =  [0.0],
+            spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
+            spacingfactor: Optional[float] = 1.0,
+            timeoffset: Optional[float] = 0.0,
+            wash1: Optional[bool] = True,
+            wash2: Optional[bool] = True,
+            wash3: Optional[bool] = True,
+            wash4: Optional[bool] = True,
             scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             A = await setup_action(request)
