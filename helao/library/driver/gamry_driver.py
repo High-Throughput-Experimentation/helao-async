@@ -101,12 +101,15 @@ class GamryDtaqEvents(object):
     def cook(self):
         count = 1
         while count > 0:
-            count, points = self.dtaq.Cook(1000)
-            # The columns exposed by GamryDtaq.Cook vary by dtaq and are
-            # documented in the Toolkit Reference Manual.
-            self.acquired_points.extend(zip(*points))
-            # self.buffer[time.time()] = self.acquired_points[-1]
-            # self.buffer_size += sys.getsizeof(self.acquired_points[-1]
+            try:
+                # TODO: how to know from self.dtaq that the 
+                # connection to Gamry was closed?
+                count, points = self.dtaq.Cook(1000)
+                # The columns exposed by GamryDtaq.Cook vary by dtaq and are
+                # documented in the Toolkit Reference Manual.
+                self.acquired_points.extend(zip(*points))
+            except Exception:
+                count = 0
 
     def _IGamryDtaqEvents_OnDataAvailable(self):
         self.cook()
@@ -145,7 +148,7 @@ class gamry:
 
         self.pstat = None
         self.action = None  # for passing action object from technique method to measure loop
-        self.active =None  # for holding active action object, clear this at end of measurement
+        self.active = None  # for holding active action object, clear this at end of measurement
         self.samples_in=[]
         # status is handled through active, call active.finish()
 
@@ -201,6 +204,11 @@ class gamry:
         self.IO_continue = False
 
 
+    async def set_IO_signalq(self, val: bool) -> None:
+        if self.IO_signalq.full():
+            _ = await self.IO_signalq.get()
+        await self.IO_signalq.put(val)
+
     async def IOloop(self):
         """This is main Gamry measurement loop which always needs to run
         else if measurement is done in FastAPI calls we will get timeouts"""
@@ -213,8 +221,8 @@ class gamry:
                         self.base.print_message("Gamry got measurement request")
                         await self.measure()
                         if self.IO_estop:
-                            self.base.print_message("Gamry is in estop.")
-                            # await self.stat.set_estop()
+                            self.IO_do_meas = False
+                            self.base.print_message("Gamry is in estop after measurement.")
                         else:
                             self.base.print_message("setting Gamry to idle")
                             # await self.stat.set_idle()
@@ -222,15 +230,24 @@ class gamry:
                     else:
                         self.IO_do_meas = False
                         self.base.print_message("Gamry is in estop.")
-                        # await self.stat.set_estop()
+
                 elif self.IO_do_meas and self.IO_measuring:
                     self.base.print_message("got measurement request but Gamry is busy")
+
                 elif not self.IO_do_meas and self.IO_measuring:
                     self.base.print_message("got stop request, measurement will stop next cycle")
+
                 else:
                     self.base.print_message("got stop request but Gamry is idle")
+
+                # endpoint can return even we got errors
+                self.IO_continue = True
+
         except asyncio.CancelledError:
+            # endpoint can return even we got errors
+            self.IO_continue = True
             self.base.print_message("IOloop task was cancelled")
+
 
     def kill_GamryCom(self):
         """script can be blocked or crash if GamryCom is still open and busy"""
@@ -732,7 +749,6 @@ class gamry:
     
                     if self.active:
                         if self.active.action.save_data:
-                            # self.base.print_message('gamry pushing data:', {k: [v] for k, v in zip(self.FIFO_column_headings, tmp_datapoints)})
                             await self.active.enqueue_data(
                                 {
                                     k: [v]
@@ -741,14 +757,9 @@ class gamry:
                                     )
                                 }
                             )
-                        # else:
-                        # self.base.print_message('gamry not pushing data:', {k: [v] for k, v in zip(self.FIFO_column_headings, tmp_datapoints)})
-                    # else:
-                    # self.base.print_message('gamry not pushing data:', {k: [v] for k, v in zip(self.FIFO_column_headings, tmp_datapoints)})    
                     counter += 1
 
                 sink_status = self.dtaqsink.status
-                # self.base.print_message(sink_status, self.IO_do_meas)
 
 
 
@@ -757,7 +768,7 @@ class gamry:
             self.pstat.SetCell(self.GamryCOM.CellOff)
             self.base.print_message("!!! signaling IOloop to stop")
             await self.close_connection()
-            await self.IO_signalq.put(False)
+            await self.set_IO_signalq(False)
             # # delete this at the very last step
             del connection
             # connection will be closed in IOloop
@@ -784,7 +795,8 @@ class gamry:
         # turn off cell and run before stopping meas loop
         if self.IO_measuring:
             # file and Gamry connection will be closed with the meas loop
-            await self.IO_signalq.put(False)
+            self.IO_do_meas = False # will stop meas loop
+            await self.set_IO_signalq(False)
 
     async def estop(self, A: Action):
         """same as stop, set or clear estop flag with switch parameter"""
@@ -794,11 +806,10 @@ class gamry:
         self.IO_estop = switch
         if self.IO_measuring:
             if switch:
-                await self.IO_signalq.put(False)
-                await self.base.set_estop(
-                    self.active.active.action_name, self.active.active.action_uuid
-                )
-                # can only set action server estop on a running uuid
+                self.IO_do_meas = False # will stop meas loop
+                await self.set_IO_signalq(False)
+                if self.active:
+                    await self.active.set_estop()
 
     async def technique_wrapper(
         self, 
@@ -834,7 +845,7 @@ class gamry:
                     self.action = act
                     self.samples_in = await self.unified_db.get_sample(self.action.samples_in)
                     # signal the IOloop to start the measrurement
-                    await self.IO_signalq.put(True)
+                    await self.set_IO_signalq(True)
                     # wait for data to appear in multisubscriber queue before returning active dict
                     # async for data_msg in self.base.data_q.subscribe():
                     #     for act_uuid, _ in data_msg.items():
@@ -848,7 +859,7 @@ class gamry:
     
                     while not self.IO_continue:
                         await asyncio.sleep(1)
-    
+
                     # reset continue flag
                     self.IO_continue = False
     
@@ -1006,17 +1017,29 @@ class gamry:
         return activeDict
 
     async def technique_CV(self, A: Action):
+        # Initial value in volts or amps.
         Vinit = A.action_params["Vinit"]
+        # Apex 1 value in volts or amps.
         Vapex1 = A.action_params["Vapex1"]
+        # Apex 2 value in volts or amps.
         Vapex2 = A.action_params["Vapex2"]
+        # Final value in volts or amps.
         Vfinal = A.action_params["Vfinal"]
-        ScanInit = A.action_params["ScanInit"]
-        ScanApex = A.action_params["ScanApex"]
-        ScanFinal = A.action_params["ScanFinal"]
-        HoldTime0 = A.action_params["HoldTime0"]
-        HoldTime1 = A.action_params["HoldTime1"]
-        HoldTime2 = A.action_params["HoldTime2"]
+        # Initial scan rate in volts/second or amps/second.
+        ScanInit = A.action_params["ScanRate"]
+        # Apex scan rate in volts/second or amps/second.
+        ScanApex = A.action_params["ScanRate"]
+        # Final scan rate in volts/second or amps/second.
+        ScanFinal = A.action_params["ScanRate"]
+        # Time to hold at Apex 1 in seconds
+        HoldTime0 = 0.0
+        # Time to hold at Apex 2 in seconds
+        HoldTime1 = 0.0
+        # Time to hold at Sfinal in seconds
+        HoldTime2 = 0.0
+        # Time between data acquisition steps.
         SampleRate = A.action_params["SampleRate"]
+        # The number of cycles the signal is to be run
         Cycles = A.action_params["Cycles"]
         TTLwait = A.action_params["TTLwait"]
         TTLsend = A.action_params["TTLsend"]
