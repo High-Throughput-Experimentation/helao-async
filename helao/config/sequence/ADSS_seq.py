@@ -9,7 +9,7 @@ __all__ = [
 
 
 from typing import List
-from helaocore.schema import ProcessPlanMaker
+from helaocore.schema import ExperimentPlanMaker
 
 
 SEQUENCES = __all__
@@ -36,9 +36,9 @@ def ADSS_duaribilty_CAv1(
         
        last functionality test: tbd"""
 
-    pl = ProcessPlanMaker()
+    pl = ExperimentPlanMaker()
     
-    pl.add_process(
+    pl.add_experiment(
                    "ADSS_slave_startup", 
                    {"x_mm":x_mm,
                     "y_mm":y_mm,
@@ -53,7 +53,7 @@ def ADSS_duaribilty_CAv1(
     for cycle, potential in enumerate(CA_potentials_vsRHE):
         print(f" ... cycle {cycle} potential:", potential)
         if cycle == 0:
-            pl.add_process(
+            pl.add_experiment(
                            "ADSS_slave_fillfixed", 
                            {"fill_vol_ul":10000,
                             "filltime_sec":filltime_sec
@@ -61,13 +61,13 @@ def ADSS_duaribilty_CAv1(
                            )
             
         else:    
-            pl.add_process(
+            pl.add_experiment(
                            "ADSS_slave_fill", 
                            {"fill_vol_ul":1000}
                           )
 
 
-        pl.add_process(
+        pl.add_experiment(
                        "ADSS_slave_CA", 
                        {"CA_potential":potential,
                         "ph":ph,
@@ -79,12 +79,12 @@ def ADSS_duaribilty_CAv1(
                         }
                        )
 
-    pl.add_process(
+    pl.add_experiment(
                    "ADSS_slave_shutdown", 
                    {}
                    )
 
-    return pl.process_plan_list # returns complete process list
+    return pl.experiment_plan_list # returns complete experiment list
 
 
 def ADSS_tray_unload(
@@ -105,9 +105,9 @@ def ADSS_tray_unload(
     main_runs: sweep channel centered on element mass
     rack: position of the tray in the icpms instrument, usually 2.
     """
-    pl = ProcessPlanMaker()
+    pl = ExperimentPlanMaker()
     
-    pl.add_process(
+    pl.add_experiment(
                    "ADSS_slave_tray_unload", 
                    {"tray":tray,
                     "slot":slot,
@@ -118,4 +118,4 @@ def ADSS_tray_unload(
                    )
 
 
-    return pl.process_plan_list # returns complete process list
+    return pl.experiment_plan_list # returns complete experiment list

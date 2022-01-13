@@ -6,8 +6,8 @@ hostip = "127.0.0.1"
 config = dict()
 
 # action library provides generator functions which produce actions
-# lists from input process_id grouping
-config["process_libraries"] = ["ADSS_prc"]
+# lists from input experiment_id grouping
+config["experiment_libraries"] = ["ADSS_prc"]
 config["sequence_libraries"] = ["ADSS_seq"]
 config["technique_name"] = "adss"
 config["root"] = r"C:\INST_dev2"
@@ -24,6 +24,7 @@ config["servers"] = dict(
         port=8001, 
         group="orchestrator", 
         fast="async_orch2",
+        # cmd_print = False
     ),
     ##########################################################################
     # Instrument Servers
@@ -34,6 +35,7 @@ config["servers"] = dict(
         group="action",
         fast="HTEdata_server",
         mode="legacy",  # lagcy; modelyst
+        # cmd_print=False,
         params=dict(
         ),
     ),
@@ -42,6 +44,7 @@ config["servers"] = dict(
         port=8003,
         group="action",
         fast="galil_motion",
+        # cmd_print=False,
         params=dict(
             Transfermatrix = [[1,0,0],[0,1,0],[0,0,1]], # default Transfermatrix for plate calibration
             
@@ -81,6 +84,7 @@ config["servers"] = dict(
         group="action",
         fast="gamry_server",
         simulate=False,  # choose between simulator(default) or real device
+        # cmd_print=False,
         params=dict(
             dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
         ),
@@ -102,6 +106,7 @@ config["servers"] = dict(
         port=8006,
         group="action",
         fast="nidaqmx_server",
+        # cmd_print=False,
         params = dict(
             dev_cellcurrent_trigger = 'PFI1', #P1.1
             dev_cellvoltage_trigger = 'PFI1', #P1.1
@@ -190,6 +195,7 @@ config["servers"] = dict(
         port=8007,
         group="action",
         fast="pal_server",
+        # cmd_print=False,
         params = dict(
             user = 'RSHS',
             key = r'c:\helao\sshkeys\rshs_private3.ppk', # needs to be in new openssh file format

@@ -1,5 +1,5 @@
 """
-Process library for ADSS
+Experiment library for ADSS
 server_key must be a FastAPI action server defined in config
 """
 
@@ -25,7 +25,7 @@ __all__ = [
 from typing import Optional, List, Union
 from socket import gethostname
 
-from helaocore.schema import Action, Process, ActionPlanMaker
+from helaocore.schema import Action, Experiment, ActionPlanMaker
 from helaocore.server import action_start_condition
 import helaocore.model.sample as hcms
 
@@ -33,7 +33,7 @@ from helao.library.driver.galil_driver import move_modes, transformation_mode
 from helao.library.driver.pal_driver import Spacingmethod, PALtools
 
 
-PROCESSES = __all__
+EXPERIMENTS = __all__
 
 PSTAT_name = "PSTAT"
 MOTOR_name = "MOTOR"
@@ -52,7 +52,7 @@ z_seal = 4.5
 debug_save_act = False
 debug_save_data = False
 
-def debug(pg_Obj: Process, 
+def debug(pg_Obj: Experiment, 
              d_mm: Optional[str] = "1.0", 
              x_mm: Optional[float] = 0.0, 
              y_mm: Optional[float] = 0.0
@@ -60,7 +60,7 @@ def debug(pg_Obj: Process,
     """Test action for ORCH debugging
     simple plate is e.g. 4534"""
     
-     # additional process params should be stored in action_group.process_params
+     # additional experiment params should be stored in action_group.experiment_params
      # these are duplicates of the function parameters (currently the op uses functions 
      # parameters to display them in the webUI)
      
@@ -129,7 +129,7 @@ def debug(pg_Obj: Process,
 
 
 
-def ADSS_slave_unloadall_customs(pg_Obj: Process):
+def ADSS_slave_unloadall_customs(pg_Obj: Experiment):
     """last functionality test: 11/29/2021"""
 
     sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
@@ -146,7 +146,7 @@ def ADSS_slave_unloadall_customs(pg_Obj: Process):
 
 
 def ADSS_slave_load_solid(
-                          pg_Obj: Process, 
+                          pg_Obj: Experiment, 
                           solid_custom_position: Optional[str] = "cell1_we",
                           solid_plate_id: Optional[int] = 4534,
                           solid_sample_no: Optional[int] = 1
@@ -170,7 +170,7 @@ def ADSS_slave_load_solid(
 
 
 def ADSS_slave_load_liquid(
-                          pg_Obj: Process, 
+                          pg_Obj: Experiment, 
                           liquid_custom_position: Optional[str] = "elec_res1",
                           liquid_sample_no: Optional[int] = 1
                          ):
@@ -191,7 +191,7 @@ def ADSS_slave_load_liquid(
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_startup(pg_Obj: Process,
+def ADSS_slave_startup(pg_Obj: Experiment,
               solid_custom_position: Optional[str] = "cell1_we",
               solid_plate_id: Optional[int] = 4534,
               solid_sample_no: Optional[int] = 1,
@@ -200,7 +200,7 @@ def ADSS_slave_startup(pg_Obj: Process,
               liquid_custom_position: Optional[str] = "elec_res1",
               liquid_sample_no: Optional[int] = 1
               ):
-    """Slave process
+    """Slave experiment
     (1) Unload all custom position samples
     (2) Load solid sample to cell
     (3) Load liquid sample to reservoir
@@ -279,8 +279,8 @@ def ADSS_slave_startup(pg_Obj: Process,
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_shutdown(pg_Obj: Process):
-    """Slave process
+def ADSS_slave_shutdown(pg_Obj: Experiment):
+    """Slave experiment
     (1) Deep clean PAL tool
     (2) pump liquid out off cell
     (3) Drain cell
@@ -291,13 +291,13 @@ def ADSS_slave_shutdown(pg_Obj: Process):
     sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
     # deep clean
-    sq.add_action_list(ADSS_slave_clean_PALtool(pg_Obj, clean_PAL_tool = PALtools.LS3, clean_PAL_volume_ul = 500))
+    sq.add_action_list(ADSS_slave_clean_PALtool(pg_Obj, clean_tool = PALtools.LS3, clean_volume_ul = 500))
     # sq.add_action({
     #     "action_server_name": f"{PAL_name}",
     #     "action_name": "PAL_deepclean",
     #     "action_params": {
-    #                       "PAL_tool": PALtools.LS3,
-    #                       "PAL_volume_ul": 500,
+    #                       "tool": PALtools.LS3,
+    #                       "volume_ul": 500,
     #                       },
     #     # "save_act": True,
     #     # "save_data": True,
@@ -363,8 +363,8 @@ def ADSS_slave_shutdown(pg_Obj: Process):
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_drain(pg_Obj: Process):
-    """DUMMY Slave process
+def ADSS_slave_drain(pg_Obj: Experiment):
+    """DUMMY Slave experiment
     Drains electrochemical cell.
     
     last functionality test: 11/29/2021"""
@@ -374,8 +374,8 @@ def ADSS_slave_drain(pg_Obj: Process):
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_engage(pg_Obj: Process):
-    """Slave process
+def ADSS_slave_engage(pg_Obj: Experiment):
+    """Slave experiment
     Engages and seals electrochemical cell.
     
     last functionality test: 11/29/2021"""
@@ -415,8 +415,8 @@ def ADSS_slave_engage(pg_Obj: Process):
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_disengage(pg_Obj: Process):
-    """Slave process
+def ADSS_slave_disengage(pg_Obj: Experiment):
+    """Slave experiment
     Disengages and seals electrochemical cell.
     
     last functionality test: 11/29/2021"""
@@ -440,11 +440,11 @@ def ADSS_slave_disengage(pg_Obj: Process):
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_clean_PALtool(pg_Obj: Process, 
-                             clean_PAL_tool: Optional[str] = PALtools.LS3, 
-                             clean_PAL_volume_ul: Optional[int] = 500
+def ADSS_slave_clean_PALtool(pg_Obj: Experiment, 
+                             clean_tool: Optional[str] = PALtools.LS3, 
+                             clean_volume_ul: Optional[int] = 500
                              ):
-    """Slave process
+    """Slave experiment
     Performs deep clean of selected PAL tool.
     
     last functionality test: 11/29/2021"""
@@ -457,8 +457,8 @@ def ADSS_slave_clean_PALtool(pg_Obj: Process,
         "action_server_name": f"{PAL_name}",
         "action_name": "PAL_deepclean",
         "action_params": {
-                          "PAL_tool": sq.pars.clean_PAL_tool,
-                          "PAL_volume_ul": sq.pars.clean_PAL_volume_ul,
+                          "tool": sq.pars.clean_tool,
+                          "volume_ul": sq.pars.clean_volume_ul,
                           },
         "start_condition": action_start_condition.wait_for_all,
         })
@@ -466,7 +466,7 @@ def ADSS_slave_clean_PALtool(pg_Obj: Process,
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_fillfixed(pg_Obj: Process, 
+def ADSS_slave_fillfixed(pg_Obj: Experiment, 
                          fill_vol_ul: Optional[int] = 10000,
                          filltime_sec: Optional[float] = 10.0
                          ):
@@ -477,14 +477,14 @@ def ADSS_slave_fillfixed(pg_Obj: Process,
         "action_server_name": f"{PAL_name}",
         "action_name": "PAL_fillfixed",
         "action_params": {
-                          "PAL_tool": PALtools.LS3,
-                          "PAL_source": "elec_res1",
-                          "PAL_dest": "cell1_we",
-                          "PAL_volume_ul": sq.pars.fill_vol_ul,
-                          "PAL_wash1": 0,
-                          "PAL_wash2": 0,
-                          "PAL_wash3": 0,
-                          "PAL_wash4": 0,
+                          "tool": PALtools.LS3,
+                          "source": "elec_res1",
+                          "dest": "cell1_we",
+                          "volume_ul": sq.pars.fill_vol_ul,
+                          "wash1": 0,
+                          "wash2": 0,
+                          "wash3": 0,
+                          "wash4": 0,
                           },
         "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
         })
@@ -526,7 +526,7 @@ def ADSS_slave_fillfixed(pg_Obj: Process,
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_fill(pg_Obj: Process, fill_vol_ul: Optional[int] = 1000):
+def ADSS_slave_fill(pg_Obj: Experiment, fill_vol_ul: Optional[int] = 1000):
     sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
     # fill liquid, no wash (assume it was cleaned before)
@@ -534,14 +534,14 @@ def ADSS_slave_fill(pg_Obj: Process, fill_vol_ul: Optional[int] = 1000):
         "action_server_name": f"{PAL_name}",
         "action_name": "PAL_fill",
         "action_params": {
-                          "PAL_tool": PALtools.LS3,
-                          "PAL_source": "elec_res1",
-                          "PAL_dest": "cell1_we",
-                          "PAL_volume_ul": sq.pars.fill_vol_ul,
-                          "PAL_wash1": 0,
-                          "PAL_wash2": 0,
-                          "PAL_wash3": 0,
-                          "PAL_wash4": 0,
+                          "tool": PALtools.LS3,
+                          "source": "elec_res1",
+                          "dest": "cell1_we",
+                          "volume_ul": sq.pars.fill_vol_ul,
+                          "wash1": 0,
+                          "wash2": 0,
+                          "wash3": 0,
+                          "wash4": 0,
                           },
         "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
         })
@@ -549,7 +549,7 @@ def ADSS_slave_fill(pg_Obj: Process, fill_vol_ul: Optional[int] = 1000):
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_CA(pg_Obj: Process,
+def ADSS_slave_CA(pg_Obj: Experiment,
               CA_potential: Optional[float] = 0.0,
               ph: float = 9.53,
               ref_vs_nhe: float = 0.21,
@@ -596,17 +596,17 @@ def ADSS_slave_CA(pg_Obj: Process,
         "action_server_name": f"{PAL_name}",
         "action_name": "PAL_archive",
         "action_params": {
-                          "PAL_tool": PALtools.LS3,
-                          "PAL_source": "cell1_we",
-                          "PAL_volume_ul": 200,
-                          "PAL_sampleperiod": [0.0],
-                          "PAL_spacingmethod":  Spacingmethod.linear,
-                          "PAL_spacingfactor": 1.0,
-                          "PAL_timeoffset": 0.0,
-                          "PAL_wash1": 0,
-                          "PAL_wash2": 0,
-                          "PAL_wash3": 0,
-                          "PAL_wash4": 0,
+                          "tool": PALtools.LS3,
+                          "source": "cell1_we",
+                          "volume_ul": 200,
+                          "sampleperiod": [0.0],
+                          "spacingmethod":  Spacingmethod.linear,
+                          "spacingfactor": 1.0,
+                          "timeoffset": 0.0,
+                          "wash1": 0,
+                          "wash2": 0,
+                          "wash3": 0,
+                          "wash4": 0,
                           },
         "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
         })
@@ -649,17 +649,17 @@ def ADSS_slave_CA(pg_Obj: Process,
         "action_server_name": f"{PAL_name}",
         "action_name": "PAL_archive",
         "action_params": {
-                          "PAL_tool": PALtools.LS3,
-                          "PAL_source": "cell1_we",
-                          "PAL_volume_ul": 200,
-                          "PAL_sampleperiod": sq.pars.aliquot_times_sec, #1min, 10min, 10min
-                          "PAL_spacingmethod": Spacingmethod.custom,
-                          "PAL_spacingfactor": 1.0,
-                          "PAL_timeoffset": 60.0,
-                          "PAL_wash1": 0,
-                          "PAL_wash2": 0,
-                          "PAL_wash3": 0,
-                          "PAL_wash4": 0,
+                          "tool": PALtools.LS3,
+                          "source": "cell1_we",
+                          "volume_ul": 200,
+                          "sampleperiod": sq.pars.aliquot_times_sec, #1min, 10min, 10min
+                          "spacingmethod": Spacingmethod.custom,
+                          "spacingfactor": 1.0,
+                          "timeoffset": 60.0,
+                          "wash1": 0,
+                          "wash2": 0,
+                          "wash3": 0,
+                          "wash4": 0,
                           },
         "start_condition": action_start_condition.wait_for_endpoint, # orch is waiting for all action_dq to finish
         })
@@ -670,17 +670,17 @@ def ADSS_slave_CA(pg_Obj: Process,
         "action_server_name": f"{PAL_name}",
         "action_name": "PAL_archive",
         "action_params": {
-                          "PAL_tool": PALtools.LS3,
-                          "PAL_source": "cell1_we",
-                          "PAL_volume_ul": 200,
-                          "PAL_sampleperiod": [0.0],
-                          "PAL_spacingmethod":  Spacingmethod.linear,
-                          "PAL_spacingfactor": 1.0,
-                          "PAL_timeoffset": 0.0,
-                          "PAL_wash1": 1, # dont use True or False but 0 AND 1
-                          "PAL_wash2": 1,
-                          "PAL_wash3": 1,
-                          "PAL_wash4": 1,
+                          "tool": PALtools.LS3,
+                          "source": "cell1_we",
+                          "volume_ul": 200,
+                          "sampleperiod": [0.0],
+                          "spacingmethod":  Spacingmethod.linear,
+                          "spacingfactor": 1.0,
+                          "timeoffset": 0.0,
+                          "wash1": 1, # dont use True or False but 0 AND 1
+                          "wash2": 1,
+                          "wash3": 1,
+                          "wash4": 1,
                           },
         "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
         })
@@ -689,7 +689,7 @@ def ADSS_slave_CA(pg_Obj: Process,
 
 
 def ADSS_slave_tray_unload(
-                     pg_Obj: Process,
+                     pg_Obj: Experiment,
                      tray: Optional[int] = 2,
                      slot: Optional[int] = 1,
                      survey_runs: Optional[int] = 1,

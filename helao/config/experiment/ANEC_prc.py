@@ -12,13 +12,13 @@ __all__ = ["debug",
 
 from typing import Optional, List, Union
 
-from helaocore.schema import Action, Process, ActionPlanMaker
+from helaocore.schema import Action, Experiment, ActionPlanMaker
 from helaocore.server import action_start_condition
 from helao.library.driver.pal_driver import PALmethods, Spacingmethod, PALtools
 import helaocore.model.sample as hcms
 
-# list valid process functions 
-PROCESSES = __all__
+# list valid experiment functions 
+EXPERIMENTS = __all__
 
 PSTAT_name = "PSTAT"
 MOTOR_name = "MOTOR"
@@ -35,7 +35,7 @@ z_seal = 4.5
 
 
 
-def debug(pg_Obj: Process, 
+def debug(pg_Obj: Experiment, 
              d_mm: Optional[str] = "1.0", 
              x_mm: Optional[float] = 0.0, 
              y_mm: Optional[float] = 0.0
@@ -43,7 +43,7 @@ def debug(pg_Obj: Process,
     """Test action for ORCH debugging
     simple plate is e.g. 4534"""
     
-     # additional process params should be stored in process.process_params
+     # additional experiment params should be stored in experiment.experiment_params
      # these are duplicates of the function parameters (currently the op uses functions 
      # parameters to display them in the webUI)
      
@@ -54,7 +54,7 @@ def debug(pg_Obj: Process,
     # 2: orch is waiting for server to become available
     # 3: (or other): orch is waiting for all action_dq to finish
     
-    # holds all actions for this process  
+    # holds all actions for this experiment  
     action_list = []
 
 
@@ -88,7 +88,7 @@ def debug(pg_Obj: Process,
     return action_list
 
 
-def CA(pg_Obj: Process,
+def CA(pg_Obj: Experiment,
        CA_potential_V: Optional[float] = 0.0,
        CA_duration_sec: Optional[float] = 10.0,
        samplerate_sec: Optional[float] = 1.0,
@@ -97,10 +97,10 @@ def CA(pg_Obj: Process,
     """Perform a CA measurement."""
     
     # todo, I will try to write a function which will do this later
-    # I assume we need a base process class for this
-    CA_potential_V = pg_Obj.process_params.get("CA_potential_V", CA_potential_V)
-    CA_duration_sec = pg_Obj.process_params.get("CA_duration_sec", CA_duration_sec)
-    samplerate_sec = pg_Obj.process_params.get("samplerate_sec", samplerate_sec)
+    # I assume we need a base experiment class for this
+    CA_potential_V = pg_Obj.experiment_params.get("CA_potential_V", CA_potential_V)
+    CA_duration_sec = pg_Obj.experiment_params.get("CA_duration_sec", CA_duration_sec)
+    samplerate_sec = pg_Obj.experiment_params.get("samplerate_sec", samplerate_sec)
 
 
 
@@ -131,12 +131,12 @@ def CA(pg_Obj: Process,
     return action_list
 
 
-def OCV_sqtest(pg_Obj: Process,
+def OCV_sqtest(pg_Obj: Experiment,
                OCV_duration_sec: Optional[float] = 10.0,
                samplerate_sec: Optional[float] = 1.0,
               ):
 
-    """This is the description of the process which will be displayed
+    """This is the description of the experiment which will be displayed
        in the operator webgui. For all function parameters (except pg_Obj)
        a input field will be (dynamically) presented in the OP webgui.""" 
     
@@ -163,7 +163,7 @@ def OCV_sqtest(pg_Obj: Process,
     return sq.action_list # returns complete action list to orch
 
 
-def CA_sqtest(pg_Obj: Process,
+def CA_sqtest(pg_Obj: Experiment,
               Ewe_vs_RHE: Optional[float] = 0.0,
               Eref: Optional[float] = 0.2,
               pH: Optional[float] = 10.0,
@@ -171,7 +171,7 @@ def CA_sqtest(pg_Obj: Process,
               samplerate_sec: Optional[float] = 1.0,
               ):
 
-    """This is the description of the process which will be displayed
+    """This is the description of the experiment which will be displayed
        in the operator webgui. For all function parameters (except pg_Obj)
        a input field will be (dynamically) presented in the OP webgui.""" 
     
