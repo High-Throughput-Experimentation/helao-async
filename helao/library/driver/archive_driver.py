@@ -4,7 +4,7 @@ import asyncio
 import os
 from datetime import datetime
 import copy
-from typing import List
+from typing import List, Tuple
 from socket import gethostname
 import pickle
 import re
@@ -555,7 +555,7 @@ class Archive():
                                 tray: int = None, 
                                 slot: int = None, 
                                 vial: int = None
-                               ) -> (error_codes, hcms.SampleUnion):
+                               ) -> Tuple[error_codes, hcms.SampleUnion]:
         vial -= 1
         sample = hcms.NoneSample()
         error = error_codes.not_available
@@ -709,7 +709,7 @@ class Archive():
                                   custom: str = None,
                                   *args,
                                   **kwargs
-                                 ) -> (error_codes, hcms.SampleUnion):
+                                 ) -> Tuple[error_codes, hcms.SampleUnion]:
         sample = hcms.NoneSample()
         error = error_codes.none
         
@@ -727,7 +727,7 @@ class Archive():
                                      sample: hcms.SampleUnion = None,
                                      dilute: bool = False,
                                      *args,**kwargs
-                                    ) -> (bool, hcms.SampleUnion):
+                                    ) -> Tuple[bool, hcms.SampleUnion]:
 
         if sample is None:
             return False, hcms.NoneSample()
