@@ -509,13 +509,14 @@ class Archive():
                                 rack: int = None,
                                 dilution_factor: float = None,
                                ):
+
         self.write_config() # save backup
+        tmp_output_str = ""
 
         if tray in self.trays:
             if self.trays[tray] is not None:
                 if slot in self.trays[tray]:
                     if self.trays[tray][slot] is not None:
-                        tmp_output_str = ""
                         for i, vial in enumerate(self.trays[tray][slot].vials):
                             if tmp_output_str != "":
                                 tmp_output_str += "\n"
@@ -539,13 +540,14 @@ class Archive():
                                     ]
                                 )
 
-                await myactive.write_file(
-                    file_type = "pal_icpms_file",
-                    filename = f"VialTable__tray{tray}__slot{slot}__{datetime.now().strftime('%Y%m%d-%H%M%S%f')}_ICPMS.csv",
-                    output_str = tmp_output_str,
-                    header = ";".join(["global_sample_label", "Survey Runs", "Main Runs", "Rack", "Vial", "Dilution Factor"]),
-                    sample_str = None
-                    )
+        
+        await myactive.write_file(
+            file_type = "pal_icpms_file",
+            filename = f"VialTable__tray{tray}__slot{slot}__{datetime.now().strftime('%Y%m%d-%H%M%S%f')}_ICPMS.csv",
+            output_str = tmp_output_str,
+            header = ";".join(["global_sample_label", "Survey Runs", "Main Runs", "Rack", "Vial", "Dilution Factor"]),
+            sample_str = None
+            )
                 
                 
     async def tray_query_sample(
@@ -553,7 +555,7 @@ class Archive():
                                 tray: int = None, 
                                 slot: int = None, 
                                 vial: int = None
-                               ):
+                               ) -> (error_codes, hcms.SampleUnion):
         vial -= 1
         sample = hcms.NoneSample()
         error = error_codes.not_available
@@ -702,7 +704,12 @@ class Archive():
             return False
 
 
-    async def custom_query_sample(self,custom: str = None, *args, **kwargs):
+    async def custom_query_sample(
+                                  self,
+                                  custom: str = None,
+                                  *args,
+                                  **kwargs
+                                 ) -> (error_codes, hcms.SampleUnion):
         sample = hcms.NoneSample()
         error = error_codes.none
         
@@ -720,7 +727,7 @@ class Archive():
                                      sample: hcms.SampleUnion = None,
                                      dilute: bool = False,
                                      *args,**kwargs
-                                    ):
+                                    ) -> (bool, hcms.SampleUnion):
 
         if sample is None:
             return False, hcms.NoneSample()
