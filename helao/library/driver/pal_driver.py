@@ -844,8 +844,8 @@ class PAL:
                                 
                                 
                                 
-                                dilute = [False], # initial source is not diluted
-                                dilute_type = [microcam.cam.sample_out_type],
+                                dilute = [False for _ in sample_in_list], # initial source is not diluted
+                                dilute_type = [microcam.cam.sample_out_type for _ in sample_in_list],
                                 sample_in_delta_vol_ml = sample_in_delta_vol_ml,
                             )                
                            )
@@ -1594,9 +1594,8 @@ class PAL:
                                                ) -> None:
         """updates sample volume only for input (sample_in)
         samples, output (sample_out) are always new samples"""
-
         if len(palaction.sample_in_delta_vol_ml) != len(palaction.sample_in):
-            self.base.print_message("len(samples_in) != len(delta_vol)", info = True)
+            self.base.print_message("len(samples_in) != len(delta_vol)", error = True)
             return
         if len(palaction.dilute) != len(palaction.sample_in):
             self.base.print_message("len(samples_in) != len(dilute)", error = True)
