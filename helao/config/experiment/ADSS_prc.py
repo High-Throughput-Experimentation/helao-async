@@ -49,8 +49,8 @@ z_engage = 2.5
 z_seal = 4.5
 
 # cannot save data without prc
-debug_save_act = False
-debug_save_data = False
+debug_save_act = True
+debug_save_data = True
 
 def debug(pg_Obj: Experiment, 
              d_mm: Optional[str] = "1.0", 
