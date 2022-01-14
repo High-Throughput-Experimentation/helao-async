@@ -30,11 +30,11 @@ __all__ = ["makeApp"]
 
 
 import asyncio
-from typing import Optional, Union, List
+from typing import Optional, List
 from importlib import import_module
 from fastapi import Request
 from socket import gethostname
-
+from uuid import UUID
 
 from helaocore.server import make_action_serv, setup_action
 from helao.library.driver.gamry_driver import gamry, Gamry_IErange
