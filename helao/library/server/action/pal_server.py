@@ -250,9 +250,9 @@ def makeApp(confPrefix, servKey):
         await active.append_sample(samples = [sample],
                             IO="in"
                            )
-        await active.enqueue_data({'sample': sample.dict(),
+        await active.enqueue_data({'sample': sample.as_dict(),
                                    'error_code':error})
-        active.action.action_params.update({"_fast_sample_in":sample.dict()})
+        active.action.action_params.update({"_fast_sample_in":sample.as_dict()})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -479,9 +479,9 @@ def makeApp(confPrefix, servKey):
         await active.append_sample(samples = [sample],
                             IO="in"
                            )
-        await active.enqueue_data({'sample': sample.dict(),
+        await active.enqueue_data({'sample': sample.as_dict(),
                                    'error_code':error})
-        active.action.action_params.update({"_fast_sample_in":sample.dict()})
+        active.action.action_params.update({"_fast_sample_in":sample.as_dict()})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -497,7 +497,7 @@ def makeApp(confPrefix, servKey):
         A = await setup_action(request)
         active = await app.base.contain_action(A, file_data_keys="sample")
         sample = await app.driver.db_get_sample(A.samples_in)
-        await active.enqueue_data({'sample': sample.dict()})
+        await active.enqueue_data({'sample': sample.as_dict()})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -526,7 +526,7 @@ def makeApp(confPrefix, servKey):
         A = await setup_action(request)
         active = await app.base.contain_action(A, file_data_keys="sample")
         sample = await app.driver.db_new_sample(A.samples_in)
-        await active.enqueue_data({'sample': sample.dict()})
+        await active.enqueue_data({'sample': sample.as_dict()})
         finished_action = await active.finish()
         return finished_action.as_dict()
 

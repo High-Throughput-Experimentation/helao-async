@@ -12,14 +12,22 @@ import re
 from helaocore.server import Base
 from helaocore.error import error_codes
 
-import helaocore.model.sample as hcms
-import helaocore.data as hcd
+from helaocore.model.sample import (
+                                   SampleUnion,
+                                   AssemblySample,
+                                   NoneSample,
+                                   SampleStatus,
+                                   SampleInheritance,
+                                   object_to_sample
+                                  )
+
 from helaocore.helper import print_message
+from helaocore.data import UnifiedSampleDataAPI
 
 
 class Custom:
     def __init__(self, custom_name, custom_type):
-        self.sample = hcms.NoneSample()
+        self.sample = NoneSample()
         self.custom_name = custom_name
         self.custom_type = custom_type
         self.blocked = False
@@ -67,14 +75,14 @@ class Custom:
         ret_sample = copy.deepcopy(self.sample)
         self.blocked = False
         self.max_vol_ml = None
-        self.sample = hcms.NoneSample()
+        self.sample = NoneSample()
         return ret_sample
 
     
-    def load(self, sample_in: hcms.SampleUnion):
-        if not isinstance(self.sample, hcms.NoneSample):
+    def load(self, sample_in: SampleUnion):
+        if not isinstance(self.sample, NoneSample):
             print_message({}, "archive", "sample already loaded. Unload first to load new one.", error = True) 
-            return False, hcms.NoneSample()
+            return False, NoneSample()
 
         
         self.sample = copy.deepcopy(sample_in)
@@ -115,7 +123,7 @@ class VT_template:
         self.max_vol_ml: float = self.init_max_vol_ml
         self.vials: List[bool] = [False for i in range(self.init_positions)]
         self.blocked: List[bool] = [False for i in range(self.init_positions)]
-        self.sample: List[hcms.SampleUnion] = [hcms.NoneSample() for i in range(self.init_positions)]
+        self.sample: List[SampleUnion] = [NoneSample() for i in range(self.init_positions)]
 
 
     def first_empty(self):
@@ -153,7 +161,7 @@ class VT_template:
     def unload(self):
         ret_sample = []
         for sample in self.sample:
-            if not isinstance(sample, hcms.NoneSample):
+            if not isinstance(sample, NoneSample):
                 ret_sample.append(copy.deepcopy(sample))
         
         self.reset_tray()
@@ -190,6 +198,11 @@ class Archive():
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
+
+
+        self.unified_db = UnifiedSampleDataAPI(self.base)
+        asyncio.gather(self.unified_db.init_db())
+
         
         self.position_config = self.config_dict.get("positions", None)
         self.archivepck = None
@@ -197,8 +210,6 @@ class Archive():
             self.archivepck = os.path.join(self.base.states_root, f"{gethostname()}_archive.pck")
         self.config = {}
 
-        self.unified_db = hcd.UnifiedSampleDataAPI(self.base)
-        asyncio.gather(self.unified_db.init_db())
 
         # configure the tray
         self.trays = dict()
@@ -384,11 +395,11 @@ class Archive():
 
     async def update_samples_from_db_helper(
                                             self, 
-                                            sample: hcms.SampleUnion
+                                            sample: SampleUnion
                                            ):
         """pulls the newest sample data from the db,
         only of global_label is not none, else sample is a ref sample"""
-        if not isinstance(sample, hcms.NoneSample):
+        if not isinstance(sample, NoneSample):
             if sample.global_label is not None:
                 _sample = await self.unified_db.get_sample([sample])
                 if _sample: sample = _sample[0]
@@ -418,8 +429,8 @@ class Archive():
                         samples = self.trays[tray][slot].unload()
         self.write_config() # save current state of table
         sample_in, sample_out = await self.unpack_samples(samples)
-        sample_in = self.append_sample_status(samples = sample_in, newstatus = hcms.SampleStatus.unloaded)
-        sample_out = self.append_sample_status(samples = sample_out, newstatus = hcms.SampleStatus.unloaded)
+        sample_in = self.append_sample_status(samples = sample_in, newstatus = SampleStatus.unloaded)
+        sample_out = self.append_sample_status(samples = sample_out, newstatus = SampleStatus.unloaded)
         return unloaded, sample_in, sample_out, tray_dict
 
 
@@ -441,8 +452,8 @@ class Archive():
                     
         self.write_config() # save current state of table
         sample_in, sample_out = await self.unpack_samples(samples)
-        sample_in = self.append_sample_status(samples = sample_in, newstatus = hcms.SampleStatus.unloaded)
-        sample_out = self.append_sample_status(samples = sample_out, newstatus = hcms.SampleStatus.unloaded)
+        sample_in = self.append_sample_status(samples = sample_in, newstatus = SampleStatus.unloaded)
+        sample_out = self.append_sample_status(samples = sample_out, newstatus = SampleStatus.unloaded)
         return True, sample_in, sample_out, tray_dict
 
     
@@ -521,7 +532,7 @@ class Archive():
                             if tmp_output_str != "":
                                 tmp_output_str += "\n"
                             if vial is True \
-                            and not isinstance(self.trays[tray][slot].sample[i], hcms.NoneSample):
+                            and not isinstance(self.trays[tray][slot].sample[i], NoneSample):
 
                                 if dilution_factor is None:
                                     temp_dilution_factor = \
@@ -555,9 +566,9 @@ class Archive():
                                 tray: int = None, 
                                 slot: int = None, 
                                 vial: int = None
-                               ) -> Tuple[error_codes, hcms.SampleUnion]:
+                               ) -> Tuple[error_codes, SampleUnion]:
         vial -= 1
-        sample = hcms.NoneSample()
+        sample = NoneSample()
         error = error_codes.not_available
 
 
@@ -569,7 +580,7 @@ class Archive():
                         if self.trays[tray][slot].vials[vial] is not False:
                             sample = copy.deepcopy(self.trays[tray][slot].sample[vial])
                             
-
+        sample = await self._update_sample(sample)
         return error, sample
 
 
@@ -662,7 +673,7 @@ class Archive():
                                    tray: int = None, 
                                    slot: int = None, 
                                    vial: int = None, 
-                                   sample: hcms.SampleUnion = None,
+                                   sample: SampleUnion = None,
                                    dilute: bool = False,
                                    *args,**kwargs
                                   ):
@@ -709,8 +720,8 @@ class Archive():
                                   custom: str = None,
                                   *args,
                                   **kwargs
-                                 ) -> Tuple[error_codes, hcms.SampleUnion]:
-        sample = hcms.NoneSample()
+                                 ) -> Tuple[error_codes, SampleUnion]:
+        sample = NoneSample()
         error = error_codes.none
         
         if custom in self.custom_positions:
@@ -718,25 +729,26 @@ class Archive():
         else:
             error = error_codes.not_available
 
+        sample = await self._update_sample(sample)        
         return error, sample
 
 
     async def custom_update_position(
                                      self,
                                      custom: str = None,
-                                     sample: hcms.SampleUnion = None,
+                                     sample: SampleUnion = None,
                                      dilute: bool = False,
                                      *args,**kwargs
-                                    ) -> Tuple[bool, hcms.SampleUnion]:
+                                    ) -> Tuple[bool, SampleUnion]:
 
         if sample is None:
-            return False, hcms.NoneSample()
+            return False, NoneSample()
 
 
         if custom in self.custom_positions:
             if sample.sample_type == "assembly" \
             and not self.custom_positions[custom].assembly_allowed():
-                return False, hcms.NoneSample()
+                return False, NoneSample()
 
             self.custom_positions[custom].sample = copy.deepcopy(sample)
             self.write_config()
@@ -752,7 +764,7 @@ class Archive():
 
     def assign_new_sample_status(
                              self, 
-                             samples: List[hcms.SampleUnion],
+                             samples: List[SampleUnion],
                              newstatus: List[str], 
                             ):
         for sample in samples:
@@ -762,7 +774,7 @@ class Archive():
 
     def append_sample_status(
                              self, 
-                             samples: List[hcms.SampleUnion],
+                             samples: List[SampleUnion],
                              newstatus, 
                             ):
         for sample in samples:
@@ -777,8 +789,8 @@ class Archive():
             samples.append(self.custom_positions[custom].unload())
         self.write_config() # save current state of table
         sample_in, sample_out = await self.unpack_samples(samples)
-        sample_in = self.append_sample_status(samples = sample_in, newstatus = hcms.SampleStatus.unloaded)
-        sample_out = self.append_sample_status(samples = sample_out, newstatus = hcms.SampleStatus.unloaded)
+        sample_in = self.append_sample_status(samples = sample_in, newstatus = SampleStatus.unloaded)
+        sample_out = self.append_sample_status(samples = sample_out, newstatus = SampleStatus.unloaded)
         return True, sample_in, sample_out, customs_dict
 
 
@@ -793,31 +805,31 @@ class Archive():
         
         self.write_config() # save current state of table
         sample_in, sample_out = await self.unpack_samples(sample)
-        sample_in = self.append_sample_status(samples = sample_in, newstatus = hcms.SampleStatus.unloaded)
-        sample_out = self.append_sample_status(samples = sample_out, newstatus = hcms.SampleStatus.unloaded)
+        sample_in = self.append_sample_status(samples = sample_in, newstatus = SampleStatus.unloaded)
+        sample_out = self.append_sample_status(samples = sample_out, newstatus = SampleStatus.unloaded)
         return unloaded, sample_in, sample_out, customs_dict
 
 
     async def custom_load(
                           self,
                           custom: str = None,
-                          load_sample_in: hcms.SampleUnion = None,
+                          load_sample_in: SampleUnion = None,
                           *args, **kwargs
                          ):
 
-        sample = hcms.NoneSample()
+        sample = NoneSample()
         loaded = False
         customs_dict = dict()
 
         if load_sample_in is None:
-            return False, hcms.NoneSample(), dict()
+            return False, NoneSample(), dict()
         
         # check if sample actually exists
-        load_sample_in = await self.unified_db.get_sample([hcms.object_to_sample(load_sample_in)])
+        load_sample_in = await self.unified_db.get_sample([object_to_sample(load_sample_in)])
 
         if not load_sample_in:
             print_message({}, "archive", "Sample does not exist in DB.", error = True)
-            return False, hcms.NoneSample(), dict()
+            return False, NoneSample(), dict()
 
 
         if custom in self.custom_positions:
@@ -826,25 +838,34 @@ class Archive():
             customs_dict = self.custom_positions[custom].as_dict()
 
         self.write_config() # save current state of table
-        sample.status = [hcms.SampleStatus.loaded]
+        sample.status = [SampleStatus.loaded]
         return loaded, sample, customs_dict
 
 
-    async def unpack_samples(self, samples: List[hcms.SampleUnion] = []):
+    async def unpack_samples(self, samples: List[SampleUnion] = []):
         ret_samples_in = []
         ret_samples_out = []
         for sample in samples:
-            if isinstance(sample, hcms.AssemblySample):
-                sample.inheritance = hcms.SampleInheritance.allow_both
-                sample.status = [hcms.SampleStatus.destroyed]
+            if isinstance(sample, AssemblySample):
+                sample.inheritance = SampleInheritance.allow_both
+                sample.status = [SampleStatus.destroyed]
                 ret_samples_in.append(sample)
                 for part in sample.parts:
-                    part.inheritance = hcms.SampleInheritance.allow_both
-                    part.status = [hcms.SampleStatus.recovered]
+                    part.inheritance = SampleInheritance.allow_both
+                    part.status = [SampleStatus.recovered]
                     ret_samples_out.append(part)
             else:
-                sample.inheritance = hcms.SampleInheritance.allow_both
-                sample.status = [hcms.SampleStatus.preserved]
+                sample.inheritance = SampleInheritance.allow_both
+                sample.status = [SampleStatus.preserved]
                 ret_samples_in.append(sample)
 
         return ret_samples_in, ret_samples_out
+
+
+    async def _update_sample(self, sample: SampleUnion) -> SampleUnion:
+        tmp_sample = \
+            await self.unified_db.get_sample(samples=[sample])
+        if tmp_sample:
+            return tmp_sample[0]
+        else:
+            return NoneSample()
