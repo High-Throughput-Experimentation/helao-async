@@ -461,14 +461,30 @@ class PAL:
 
 
                 # -- (1) -- get most recent information for all sample_in
+                # palaction.sample_in should always be non ref samples
                 palaction.sample_in = \
                     await self.db_get_sample(palaction.sample_in)
                 # as palaction.sample_in contains both source and dest samples
                 # we had them saved separately (this is for the hlo file)
-                palaction.dest.sample_initial = \
-                    await self.db_get_sample(palaction.dest.sample_initial)
+
+                # palaction.source should also always contain non ref samples
                 palaction.source.sample_initial = \
                     await self.db_get_sample(palaction.source.sample_initial)
+
+                # dest can also contain ref samples, and these are not yet in the db
+                for dest_i, dest_sample in enumerate(palaction.dest.sample_initial):
+                    if dest_sample.global_label is not None:
+                        dest_tmp = \
+                            await self.db_get_sample([dest_sample])
+                        if dest_tmp:
+                            palaction.dest.sample_initial[dest_i] = \
+                                copy.deepcopy(dest_tmp[0])
+                        else:
+                            self.base.print_message("Sample does not exist in db", error = True)
+                            return error_codes.critical
+                    else:
+                            self.base.print_message("palaction.dest.sample_initial should not contain ref samples", error = True)
+                            return error_codes.bug
 
                 # -- (2) -- update sample_out
                 # only samples in sample_out should be new ones (ref samples)
@@ -480,8 +496,23 @@ class PAL:
                     # if sample_out is an assembly we need to update its parts
                     if isinstance(sample_out, AssemblySample):
                         # could also check if it has parts attribute?
-                        sample_out.parts = \
-                            await self.db_get_sample(sample_out.parts)
+                        # reset source
+                        sample_out.source = []
+                        for part_i, part in enumerate(sample_out.parts):
+                            if part.global_label is not None:
+                                tmp_part = await self.db_get_sample([part])
+                                sample_out.parts[part_i] = \
+                                    copy.deepcopy(tmp_part[0])
+                            else:
+                                # the assembly contains a ref sample which 
+                                # first need to be updated and converted
+                                part.sample_creation_timecode = palaction.continue_time
+                                tmp_part = await self.db_new_sample([part])
+                                sample_out.parts[part_i] = \
+                                    copy.deepcopy(tmp_part[0])
+                            # now add the real samples back to the source list
+                            sample_out.source.append(part.get_global_label())
+                        
 
                 # -- (3) -- convert samples_out references to real sample
                 #           by adding them to the to db
@@ -499,7 +530,8 @@ class PAL:
                 for sample in palaction.sample_out:
                     self.IO_palcam.sample_out.append(copy.deepcopy(sample))
 
-                # -- (5) -- convert pal action sample_in_initial to final
+                # -- (5) -- convert pal action sample_in
+                # from initial to final
                 # update the sample volumes
                 # (needed only for input samples, samples_out are always
                 # new samples)
@@ -569,6 +601,10 @@ class PAL:
         await asyncio.sleep(20)
         return error
 
+    async def _sendcommand_add_listA_to_listB(self, listA, listB) -> list:
+        for item in listA:
+            listB.append(copy.deepcopy(item))
+        return listB
 
     async def _sendcommand_new_ref_samples(
                                           self, 
@@ -587,11 +623,33 @@ class PAL:
             self.base.print_message("no sample_in to create sample_out", error = True)
             error = error_codes.not_available
         elif len(samples_in) == 1:
-            source_chemical =  samples_in[0].chemical
-            source_mass = samples_in[0].mass
-            source_supplier = samples_in[0].supplier
-            source_lotnumber = samples_in[0].lot_number
-            source = [samples_in[0].get_global_label()]
+            source_chemical = []
+            source_mass = []
+            source_supplier = []
+            source_lotnumber = []
+            for sample in samples_in:
+                source_chemical = \
+                    await self._sendcommand_add_listA_to_listB(
+                                                               sample.chemical, 
+                                                               source_chemical
+                                                              )
+                source_mass = \
+                    await self._sendcommand_add_listA_to_listB(
+                                                               sample.mass, 
+                                                               source_mass
+                                                              )
+                source_supplier = \
+                    await self._sendcommand_add_listA_to_listB(
+                                                               sample.supplier, 
+                                                               source_supplier
+                                                              )
+                source_lotnumber = \
+                    await self._sendcommand_add_listA_to_listB(
+                                                               sample.lot_number,
+                                                               source_lotnumber
+                                                              )
+
+            source = [sample.get_global_label() for sample in samples_in]
             self.base.print_message(f"source_global_label: '{source}'")
             self.base.print_message(f"source_chemical: {source_chemical}")
             self.base.print_message(f"source_mass: {source_mass}")
@@ -602,8 +660,9 @@ class PAL:
                 # this is a sample reference, it needs to be added
                 # to the db later
                 samples.append(LiquidSample(
-                        experiment_uuid=self.action.experiment_uuid,
                         action_uuid=[self.action.action_uuid],
+                        sample_creation_action_uuid = self.action.action_uuid,
+                        sample_creation_experiment_uuid = self.action.experiment_uuid,
                         source=source,
                         action_timestamp=self.action.action_timestamp,
                         chemical=source_chemical,
@@ -615,8 +674,9 @@ class PAL:
                         ))
             elif samples_out_type == _sampletype.gas:
                 samples.append(GasSample(
-                        experiment_uuid=self.action.experiment_uuid,
                         action_uuid=[self.action.action_uuid],
+                        sample_creation_action_uuid = self.action.action_uuid,
+                        sample_creation_experiment_uuid = self.action.experiment_uuid,
                         source=source,
                         action_timestamp=self.action.action_timestamp,
                         chemical=source_chemical,
@@ -628,10 +688,11 @@ class PAL:
                         ))
             elif samples_out_type == _sampletype.assembly:
                 samples.append(AssemblySample(
-                        parts = [sample for sample in samples_in],
+                        parts = samples_in,
                         sample_position = samples_position,
-                        experiment_uuid=self.action.experiment_uuid,
                         action_uuid=[self.action.action_uuid],
+                        sample_creation_action_uuid = self.action.action_uuid,
+                        sample_creation_experiment_uuid = self.action.experiment_uuid,
                         source=source,
                         action_timestamp=self.action.action_timestamp,
                         status=[SampleStatus.created],
@@ -641,8 +702,6 @@ class PAL:
             else:
                 self.base.print_message(f"sample_out type {samples_out_type} is not supported yet.", error = True)
                 error = error_codes.not_available
-
-
 
 
         elif len(samples_in) > 1:
@@ -915,7 +974,7 @@ class PAL:
                 sample_out_list[0].sample_position = dest
                 sample_out_list[0].inheritance = SampleInheritance.receive_only
                 sample_out_list[0].status = [SampleStatus.created]
-                dest_sample_initial = copy.deepcopy(sample_out_list)
+                dest_sample_initial = [] # no sample here in the beginning
                 dest_sample_final = copy.deepcopy(sample_out_list)
 
             else:
@@ -986,7 +1045,7 @@ class PAL:
                 sample_out_list[0].sample_position = dest
                 sample_out_list[0].inheritance = SampleInheritance.receive_only
                 sample_out_list[0].status = [SampleStatus.created]
-                dest_sample_initial = copy.deepcopy(sample_out_list)
+                dest_sample_initial = [] # no sample here in the beginning
                 dest_sample_final = copy.deepcopy(sample_out_list)
                 
             else:
@@ -1198,6 +1257,8 @@ class PAL:
                                       samples_position = dest
                                      )
 
+            self.base.print_message(f"new reference sample for empty vial: {sample_out_list}")
+
             if error != error_codes.none:
                 return error
 
@@ -1205,7 +1266,7 @@ class PAL:
             sample_out_list[0].sample_position = dest
             sample_out_list[0].inheritance = SampleInheritance.receive_only
             sample_out_list[0].status = [SampleStatus.created]
-            dest_sample_initial =  copy.deepcopy(sample_out_list)
+            dest_sample_initial = [] # no sample here in the beginning
             dest_sample_final =  copy.deepcopy(sample_out_list)
 
 
@@ -1540,10 +1601,19 @@ class PAL:
         # update source and dest final samples
         palaction.source.sample_final = \
              await self.db_get_sample(palaction.source.sample_initial)
-        # palaction.dest.sample_final = \
-        #      await self.db_get_sample(palaction.dest.sample_initial)
-        palaction.dest.sample_final = \
-             await self.db_get_sample(palaction.dest.sample_final)
+        if palaction.dest.sample_final:
+            # should always only contain one sample
+            if palaction.dest.sample_final[0].global_label is None:
+                # dest_final contains a ref sample
+                # the correct new sample should be always found 
+                # in the last position of palaction.sample_out
+                # which should already be uptodate
+                palaction.dest.sample_final = [palaction.sample_out[-1]]
+                pass
+            else:
+                palaction.dest.sample_final = \
+                      await self.db_get_sample(palaction.dest.sample_final)
+
 
 
         error = error_codes.none
@@ -1810,8 +1880,8 @@ class PAL:
             A = A,
             palcam = palcam
         )
-    
-    
+
+
     async def method_archive(self, A: Action) -> dict:
         palcam = PalCam(
             sample_in = A.samples_in,
@@ -1912,9 +1982,9 @@ class PAL:
                     "tool":A.action_params.get("tool",None),
                     "volume_ul":A.action_params.get("volume_ul",0),
                     "wash1":1,
-                    "wash2":0,
-                    "wash3":0,
-                    "wash4":0,
+                    "wash2":1,
+                    "wash3":1,
+                    "wash4":1,
                     })]
         )
         return await self._init_PAL_IOloop(
