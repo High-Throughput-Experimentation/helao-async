@@ -8,13 +8,13 @@ from time import strftime
 from fastapi import Request
 from typing import Optional, List
 
-from helaocore.server import make_action_serv, setup_action
+from helaocore.server import makeActionServ, setup_action
 from helao.library.driver.pal_driver import PAL
 from helao.library.driver.pal_driver import Spacingmethod
 from helao.library.driver.pal_driver import PALtools
 from helao.library.driver.pal_driver import PalMicroCam
 from helao.library.driver.pal_driver import PALposition
-import helaocore.model.sample as hcms
+from helaocore.model.sample import LiquidSample, SampleUnion
 from helaocore.helper import make_str_enum
 
 
@@ -23,7 +23,7 @@ def makeApp(confPrefix, servKey):
 
     config = import_module(f"helao.config.{confPrefix}").config
 
-    app = make_action_serv(
+    app = makeActionServ(
         config,
         servKey,
         servKey,
@@ -240,18 +240,21 @@ def makeApp(confPrefix, servKey):
                                       slot: Optional[int] = None,
                                       vial: Optional[int] = None,
                                      ):
-        A = await setup_action(request)
-        A.action_abbr = "query_sample"
-        active = await app.base.contain_action(A, 
-                                       file_data_keys=["sample", "error_code"])
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["sample", "error_code"],
+                                          action_abbr = "query_sample"
+        )
         error, sample = \
-            await app.driver.archive.tray_query_sample(**A.action_params)
+            await app.driver.archive.tray_query_sample(**active.action.action_params)
 
         await active.append_sample(samples = [sample],
                             IO="in"
                            )
-        await active.enqueue_data({'sample': sample.as_dict(),
-                                   'error_code':error})
+        await active.enqueue_data_dflt(datadict = \
+                                       {'sample': sample.as_dict(),
+                                        'error_code':error}
+                                      )
         active.action.action_params.update({"_fast_sample_in":sample.as_dict()})
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -260,24 +263,24 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/archive_tray_unloadall")
     async def archive_tray_unloadall(request: Request):
         """Resets app.driver vial table."""
-        A = await setup_action(request)
-        A.action_abbr = "unload_sample"
-        active = await app.base.contain_action(A, file_data_keys=
-                                                ["unloaded","tray_dict"])
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["unloaded","tray_dict"],
+                                          action_abbr = "unload_sample"
+        )
         unloaded, sample_in, sample_out, tray_dict = \
-            await app.driver.archive.tray_unloadall(**A.action_params)
-        if unloaded:
-            await active.append_sample(
-                  samples = sample_in,
-                  IO="in")
-            await active.append_sample(
-                  samples = sample_out,
-                  IO="out")
-        await active.enqueue_data({"unloaded": unloaded,
-                                   "tray_dict": tray_dict})
+            await app.driver.archive.tray_unloadall(**active.action.action_params)
+        await active.append_sample(
+              samples = sample_in,
+              IO="in")
+        await active.append_sample(
+              samples = sample_out,
+              IO="out")
+        await active.enqueue_data_dflt(datadict = \
+                                       {"unloaded": unloaded,
+                                        "tray_dict": tray_dict})
         finished_act = await active.finish()
         return finished_act.as_dict()
-
 
 
     @app.post(f"/{servKey}/archive_tray_unload")
@@ -287,21 +290,22 @@ def makeApp(confPrefix, servKey):
                                   slot: Optional[int] = None
                                  ):
         """Resets app.driver vial table."""
-        A = await setup_action(request)
-        A.action_abbr = "unload_sample"
-        active = await app.base.contain_action(A, file_data_keys=
-                                                ["unloaded","tray_dict"])
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["unloaded","tray_dict"],
+                                          action_abbr = "unload_sample"
+        )
         unloaded, sample_in, sample_out, tray_dict = \
-            await app.driver.archive.tray_unload(**A.action_params)
-        if unloaded:
-            await active.append_sample(
-                  samples = sample_in,
-                  IO="in")
-            await active.append_sample(
-                  samples = sample_out,
-                  IO="out")
-        await active.enqueue_data({"unloaded": unloaded,
-                                   "tray_dict": tray_dict})
+            await app.driver.archive.tray_unload(**active.action.action_params)
+        await active.append_sample(
+              samples = sample_in,
+              IO="in")
+        await active.append_sample(
+              samples = sample_out,
+              IO="out")
+        await active.enqueue_data_dflt(datadict = \
+                                       {"unloaded": unloaded,
+                                        "tray_dict": tray_dict})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -314,9 +318,14 @@ def makeApp(confPrefix, servKey):
         """Returns an empty vial position for given max volume.\n
         For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.\n
         It will select the first empty vial which has the smallest volume that still can hold req_vol"""
-        A = await setup_action(request)
-        active = await app.base.contain_action(A, file_data_keys="vial_position")
-        await active.enqueue_data({"position": await app.driver.archive.tray_new_position(**A.action_params)})
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["tray", "slot", "vial"],
+                                          # action_abbr = ""
+        )
+        await active.enqueue_data_dflt(datadict = \
+                                       await app.driver.archive.tray_new_position(**active.action.action_params)
+                                       )
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -324,16 +333,21 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/archive_tray_update_position")
     async def archive_tray_update_position(
         request: Request, 
-        sample: Optional[hcms.SampleUnion] = hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()}),
+        sample: Optional[SampleUnion] = LiquidSample(**{"sample_no":1,"machine_name":gethostname()}),
         tray: Optional[int] = None,
         slot: Optional[int] = None,
         vial: Optional[int] = None,
         scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
         """Updates app.driver vial Table. If sucessful (vial-slot was empty) returns True, else it returns False."""
-        A = await setup_action(request)
-        active = await app.base.contain_action(A, file_data_keys="update")
-        await active.enqueue_data({"update": await app.driver.archive.tray_update_position(**A.action_params)})
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["update"],
+                                          # action_abbr = ""
+        )
+        await active.enqueue_data_dflt(datadict = \
+                                       {"update": await app.driver.archive.tray_update_position(**active.action.action_params),
+                                       })
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -344,13 +358,15 @@ def makeApp(confPrefix, servKey):
         tray: Optional[int] = None, 
         slot: Optional[int] = None
     ):
-        A = await setup_action(request)
-        A.action_abbr = "traytojson"
-        active = await app.base.contain_action(A,
-            file_type="palvialtable_helao__file",
-            file_data_keys=["table"],
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = app.driver.archive.tray_get_keys(),
+                                          action_abbr = "traytojson",
+                                          file_type="palvialtable_helao__file",
         )
-        await active.enqueue_data({"table": await app.driver.archive.tray_export_json(**A.action_params)})
+        await active.enqueue_data_dflt(datadict = \
+                                       await app.driver.archive.tray_export_json(**active.action.action_params)
+                                       )
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -365,17 +381,18 @@ def makeApp(confPrefix, servKey):
         rack: Optional[int] = None,
         dilution_factor: Optional[float] = None
     ):
-        A = await setup_action(request)
-        A.action_abbr = "traytoicpms"
-        active = await app.base.contain_action(A)
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          action_abbr = "traytoicpms",
+        )
         await app.driver.archive.tray_export_icpms(
              tray = tray,
              slot = slot,
              myactive = active,
-             survey_runs = A.action_params.get("survey_runs", None),
-             main_runs = A.action_params.get("main_runs", None),
-             rack = A.action_params.get("rack", None),
-             dilution_factor = A.action_params.get("dilution_factor", None),
+             survey_runs = active.action.action_params.get("survey_runs", None),
+             main_runs = active.action.action_params.get("main_runs", None),
+             rack = active.action.action_params.get("rack", None),
+             dilution_factor = active.action.action_params.get("dilution_factor", None),
         )
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -387,12 +404,14 @@ def makeApp(confPrefix, servKey):
         tray: Optional[int] = None,
         slot: Optional[int] = None
     ):
-        A = await setup_action(request)
-        A.action_abbr = "traytocsv"
-        active = await app.base.contain_action(A)
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          action_abbr = "traytocsv",
+        )
+
         await app.driver.archive.tray_export_csv(
-            tray = A.action_params.get("tray", None), 
-            slot = A.action_params.get("slot", None),
+            tray = active.action.action_params.get("tray", None), 
+            slot = active.action.action_params.get("slot", None),
             myactive = active
         )
         finished_action = await active.finish()
@@ -403,20 +422,22 @@ def makeApp(confPrefix, servKey):
     async def archive_custom_load(
                                   request: Request,
                                   custom: Optional[dev_customitems] = None,
-                                  load_sample_in: Optional[hcms.SampleUnion] = hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()}),
+                                  load_sample_in: Optional[SampleUnion] = LiquidSample(**{"sample_no":1,"machine_name":gethostname()}),
                                   scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                                  ):
-        A = await setup_action(request)
-        A.action_abbr = "load_sample"
-        active = await app.base.contain_action(A, file_data_keys=
-                                                ["loaded","customs_dict"])
-        loaded, loaded_sample, customs_dict = await app.driver.archive.custom_load(**A.action_params)
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["loaded","customs_dict"],
+                                          action_abbr = "load_sample",
+        )
+        loaded, loaded_sample, customs_dict = await app.driver.archive.custom_load(**active.action.action_params)
         if loaded:
             await active.append_sample(samples = [loaded_sample],
                                 IO="in"
                                )
-        await active.enqueue_data({"loaded":loaded,
-                                   "customs_dict": customs_dict})
+        await active.enqueue_data_dflt(datadict = \
+                                       {"loaded":loaded,
+                                        "customs_dict": customs_dict})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -426,42 +447,44 @@ def makeApp(confPrefix, servKey):
                                     request: Request,
                                     custom: Optional[dev_customitems] = None,
                                    ):
-        A = await setup_action(request)
-        A.action_abbr = "unload_sample"
-        active = await app.base.contain_action(A, file_data_keys=
-                                                ["unloaded","customs_dict"])
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["unloaded","customs_dict"],
+                                          action_abbr = "unload_sample",
+        )
         unloaded, sample_in, sample_out, customs_dict = \
-            await app.driver.archive.custom_unload(**A.action_params)
-        if unloaded:
-            await active.append_sample(
-                  samples = sample_in,
-                  IO="in")
-            await active.append_sample(
-                  samples = sample_out,
-                  IO="out")
-        await active.enqueue_data({"unloaded": unloaded,
-                                   "customs_dict": customs_dict})
+            await app.driver.archive.custom_unload(**active.action.action_params)
+        await active.append_sample(
+              samples = sample_in,
+              IO="in")
+        await active.append_sample(
+              samples = sample_out,
+              IO="out")
+        await active.enqueue_data_dflt(datadict = \
+                                       {"unloaded": unloaded,
+                                        "customs_dict": customs_dict})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
 
     @app.post(f"/{servKey}/archive_custom_unloadall")
     async def archive_custom_unloadall(request: Request):
-        A = await setup_action(request)
-        A.action_abbr = "unload_sample"
-        active = await app.base.contain_action(A, file_data_keys=
-                                                ["unloaded","customs_dict"])
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["unloaded","customs_dict"],
+                                          action_abbr = "unload_sample",
+        )
         unloaded, sample_in, sample_out, customs_dict = \
-            await app.driver.archive.custom_unloadall(**A.action_params)
-        if unloaded:
-            await active.append_sample(
-                  samples = sample_in,
-                  IO="in")
-            await active.append_sample(
-                  samples = sample_out,
-                  IO="out")
-        await active.enqueue_data({"unloaded": unloaded,
-                                   "customs_dict": customs_dict})
+            await app.driver.archive.custom_unloadall(**active.action.action_params)
+        await active.append_sample(
+              samples = sample_in,
+              IO="in")
+        await active.append_sample(
+              samples = sample_out,
+              IO="out")
+        await active.enqueue_data_dflt(datadict = \
+                                       {"unloaded": unloaded,
+                                        "customs_dict": customs_dict})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -470,17 +493,19 @@ def makeApp(confPrefix, servKey):
     async def archive_custom_query_sample(request: Request, 
                                         custom: Optional[dev_customitems] = None,
                                        ):
-        A = await setup_action(request)
-        A.action_abbr = "query_sample"
-        active = await app.base.contain_action(A, 
-                                       file_data_keys=["sample", "error_code"])
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["sample", "error_code"],
+                                          action_abbr = "query_sample",
+        )
         error, sample = \
-            await app.driver.archive.custom_query_sample(**A.action_params)
+            await app.driver.archive.custom_query_sample(**active.action.action_params)
         await active.append_sample(samples = [sample],
                             IO="in"
                            )
-        await active.enqueue_data({'sample': sample.as_dict(),
-                                   'error_code':error})
+        await active.enqueue_data_dflt(datadict = \
+                                       {"sample": sample.as_dict(),
+                                        "error_code":error})
         active.action.action_params.update({"_fast_sample_in":sample.as_dict()})
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -488,23 +513,26 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/db_get_sample")
     async def db_get_sample(request: Request, 
-                         fast_samples_in: Optional[List[hcms.SampleUnion]] = \
-           [hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
+                         fast_samples_in: Optional[List[SampleUnion]] = \
+           [LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
                          scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                         ):
         """Positive sample_no will get it from the beginng, negative
         from the end of the db."""
-        A = await setup_action(request)
-        active = await app.base.contain_action(A, file_data_keys="sample")
-        sample = await app.driver.db_get_sample(A.samples_in)
-        await active.enqueue_data({'sample': sample.as_dict()})
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["sample"],
+        )
+        sample = await app.driver.db_get_sample(active.action.samples_in)
+        await active.enqueue_data_dflt(datadict = \
+                                       {'sample': sample.as_dict()})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/db_new_sample")
     async def db_new_sample(request: Request, 
-                         fast_samples_in: Optional[List[hcms.SampleUnion]] = [hcms.LiquidSample(**{
+                         fast_samples_in: Optional[List[SampleUnion]] = [LiquidSample(**{
                                               "machine_name":gethostname(),
                                               "source": [],
                                               "volume_ml": 0.0,
@@ -523,10 +551,13 @@ def makeApp(confPrefix, servKey):
         and action_params empty and servkey on "data".
         If its the very first liquid (no source in database exists) 
         leave source and source_ml empty."""
-        A = await setup_action(request)
-        active = await app.base.contain_action(A, file_data_keys="sample")
-        sample = await app.driver.db_new_sample(A.samples_in)
-        await active.enqueue_data({'sample': sample.as_dict()})
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["sample"],
+        )
+        sample = await app.driver.db_new_sample(active.action.samples_in)
+        await active.enqueue_data_dflt(datadict = \
+                                       {'sample': sample.as_dict()})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
