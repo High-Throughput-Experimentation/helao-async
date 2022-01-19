@@ -20,8 +20,10 @@ from enum import Enum
 import psutil
 
 from helaocore.error import error_codes
-import helaocore.model.sample as hcms
+from helaocore.model.sample import SampleInheritance, SampleStatus
+from helaocore.model import DataModel
 import helaocore.data as hcd
+from helaocore.server.base import ActiveParams, FileConnParams
 
 class Gamry_modes(str, Enum):
     CA = "CA"
@@ -588,20 +590,27 @@ class gamry:
                     }
             )
 
-            self.active = await self.base.contain_action(
-                self.action,
-                file_type="pstat_helao__file",
-                file_data_keys=self.FIFO_column_headings,
-                file_sample_label=[sample.get_global_label() for sample in self.samples_in],
-                header=self.FIFO_gamryheader,
-            )
+            self.active =  await self.base.contain_action(
+                ActiveParams(
+                             action = self.action,
+                             file_conn_params_list = [
+                                 FileConnParams(
+                                                file_conn_key = \
+                                                    self.base.dflt_file_conn_key(),
+                                                sample_global_labels=[sample.get_global_label() for sample in self.samples_in],
+                                                json_data_keys = self.FIFO_column_headings,
+                                                file_type="pstat_helao__file",
+                                                header = self.FIFO_gamryheader
+                                               )
+                             ]
+            ))
             self.base.print_message(f"!!! Active action uuid is {self.active.action.action_uuid}")
             # active object is set so we can set the continue flag
             self.IO_continue = True
             
             for sample in self.samples_in:
-                sample.status = [hcms.SampleStatus.preserved]
-                sample.inheritance = hcms.SampleInheritance.allow_both
+                sample.status = [SampleStatus.preserved]
+                sample.inheritance = SampleInheritance.allow_both
             
             
             # clear old samples_in first
@@ -715,7 +724,11 @@ class gamry:
 
             realtime = await self.active.set_realtime()
             if self.active:
-                self.active.finish_hlo_header(realtime=realtime)
+                self.active.finish_hlo_header(
+                                              realtime=realtime,
+                                              file_conn_keys = \
+                                               [self.base.dflt_file_conn_key()]
+                                              )
                     
                     
             # dtaqsink.status might still be 'idle' if sleep is too short
@@ -749,13 +762,19 @@ class gamry:
     
                     if self.active:
                         if self.active.action.save_data:
-                            await self.active.enqueue_data(
-                                {
-                                    k: [v]
-                                    for k, v in zip(
-                                        self.FIFO_column_headings, tmp_datapoints
-                                    )
-                                }
+                            await self.active.enqueue_data(datamodel = \
+                                   DataModel(
+                                             data = {self.base.dflt_file_conn_key():\
+                                                        {
+                                                            k: [v]
+                                                            for k, v in zip(
+                                                                self.FIFO_column_headings, tmp_datapoints
+                                                            )
+                                                        }
+                                                     },
+                                             errors = []
+                                       
+                                            )
                             )
                     counter += 1
 
@@ -798,11 +817,11 @@ class gamry:
             self.IO_do_meas = False # will stop meas loop
             await self.set_IO_signalq(False)
 
-    async def estop(self, A: Action):
+
+    async def estop(self, active):
         """same as stop, set or clear estop flag with switch parameter"""
         # should be the same as stop()
-        switch = A.action_params["switch"]
-        
+        switch = active.action.action_params["switch"]
         self.IO_estop = switch
         if self.IO_measuring:
             if switch:
@@ -810,6 +829,7 @@ class gamry:
                 await self.set_IO_signalq(False)
                 if self.active:
                     await self.active.set_estop()
+
 
     async def technique_wrapper(
         self, 

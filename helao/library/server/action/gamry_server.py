@@ -39,6 +39,7 @@ from uuid import UUID
 from helaocore.server import make_action_serv, setup_action
 from helao.library.driver.gamry_driver import gamry, Gamry_IErange
 import helaocore.model.sample as hcms
+from helaocore.server.base import ActiveParams, FileConnParams
 
 
 def makeApp(confPrefix, servKey):
@@ -59,10 +60,12 @@ def makeApp(confPrefix, servKey):
     async def get_meas_status(request: Request):
         """Will return 'idle' or 'measuring'. 
         Should be used in conjuction with eta to async.sleep loop poll"""
-        A = await setup_action(request)
-        active = await app.base.contain_action(A, file_data_keys="status")
-        driver_status = await app.driver.status()
-        await active.enqueue_data({"status": driver_status})
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["status"]
+        )
+        await active.enqueue_data_dflt(datadict = \
+                                       {"status": await app.driver.status()})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -226,10 +229,13 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/stop")
     async def stop(request: Request):
         """Stops measurement in a controlled way."""
-        A = await setup_action(request)
-        A.action_abbr = "stop"
-        active = await app.base.contain_action(A, file_data_keys="stop")
-        await active.enqueue_data({"stop": await app.driver.stop()})
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["status"],
+                                          action_abbr = "stop"
+        )
+        await active.enqueue_data_dflt(datadict = \
+                                       {"stop": await app.driver.stop()})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -240,10 +246,13 @@ def makeApp(confPrefix, servKey):
                     switch: Optional[bool] = True,
                    ):
         """Same as stop, but also sets estop flag."""
-        A = await setup_action(request)
-        A.action_abbr = "estop"
-        active = await app.base.contain_action(A, file_data_keys="estop")
-        await active.enqueue_data({"estop": await app.driver.estop(A)})
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["status"],
+                                          action_abbr = "estop"
+        )
+        await active.enqueue_data_dflt(datadict = \
+                                       {"stop": await app.driver.estop(active)})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
