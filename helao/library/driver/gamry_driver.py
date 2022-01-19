@@ -21,9 +21,11 @@ import psutil
 
 from helaocore.error import error_codes
 from helaocore.model.sample import SampleInheritance, SampleStatus
-from helaocore.model import DataModel
-import helaocore.data as hcd
-from helaocore.server.base import ActiveParams, FileConnParams
+from helaocore.model.data import DataModel
+from helaocore.model.file import FileConnParams, HloHeaderModel
+from helaocore.model.active import ActiveParams
+from helaocore.data.sample import UnifiedSampleDataAPI
+
 
 class Gamry_modes(str, Enum):
     CA = "CA"
@@ -137,7 +139,7 @@ class gamry:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
 
-        self.unified_db = hcd.UnifiedSampleDataAPI(self.base)
+        self.unified_db = UnifiedSampleDataAPI(self.base)
         asyncio.gather(self.unified_db.init_db())
 
         # get Gamry object (Garmry.com)
@@ -600,7 +602,11 @@ class gamry:
                                                 sample_global_labels=[sample.get_global_label() for sample in self.samples_in],
                                                 json_data_keys = self.FIFO_column_headings,
                                                 file_type="pstat_helao__file",
-                                                header = self.FIFO_gamryheader
+                                                # only add optional keys to header
+                                                # rest will be added later
+                                                hloheader = HloHeaderModel(
+                                                    optional = self.FIFO_gamryheader
+                                                ),
                                                )
                              ]
             ))
