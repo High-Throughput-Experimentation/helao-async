@@ -20,9 +20,12 @@ from nidaqmx.constants import TriggerType
 from helaocore.schema import Action
 from helaocore.server import Base
 from helaocore.error import error_codes
-import helaocore.model.sample as hcms
 from helaocore.helper import make_str_enum
-import helaocore.data as hcd
+from helaocore.data.sample import UnifiedSampleDataAPI
+from helaocore.model.sample import SampleInheritance, SampleStatus
+from helaocore.model.file import FileConnParams, HloHeaderModel
+from helaocore.model.active import ActiveParams
+from helaocore.model.data import DataModel
 
 
 class cNIMAX:
@@ -33,7 +36,7 @@ class cNIMAX:
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
 
-        self.unified_db = hcd.UnifiedSampleDataAPI(self.base)
+        self.unified_db = UnifiedSampleDataAPI(self.base)
         asyncio.gather(self.unified_db.init_db())
 
         self.dev_pump = self.config_dict.get("dev_pump",dict())
@@ -86,7 +89,7 @@ class cNIMAX:
         self.FIFO_NImaxheader = dict()
         self.FIFO_name = ""
         self.FIFO_dir = ""
-        self.FIFO_sample_keys = [
+        self.FIFO_cell_keys = [
             "cell1",
             "cell2",
             "cell3",
@@ -97,13 +100,15 @@ class cNIMAX:
             "cell8",
             "cell9",
         ]
-        self.FIFO_column_headings = dict()
-        for FIFO_sample_key in self.FIFO_sample_keys:
-            self.FIFO_column_headings[FIFO_sample_key] = [
-                "t_s",
-                "Icell_A",
-                "Ecell_V",
-                ]
+        self.file_conn_keys = [
+                               self.base.new_file_conn_key(FIFO_cell_key)
+                               for FIFO_cell_key in self.FIFO_cell_keys
+                              ]
+        self.FIFO_column_headings = [
+                                     "t_s",
+                                     "Icell_A",
+                                     "Ecell_V",
+                                    ]
         
 
         # keeps track of the multi cell IV measurements in the background        
@@ -116,8 +121,8 @@ class cNIMAX:
         """configures a NImax task for multi cell IV measurements"""
         # Voltage reading is MASTER
         self.task_cellcurrent = nidaqmx.Task()
-        for myname, mydev in self.config_dict["dev_CellCurrent"].items():
-            self.task_CellCurrent.ai_channels.add_ai_current_chan(
+        for myname, mydev in self.config_dict["dev_cellcurrent"].items():
+            self.task_cellcurrent.ai_channels.add_ai_current_chan(
                 mydev,
                 name_to_assign_to_channel="Cell_" + myname,
                 terminal_config=TerminalConfiguration.DIFFERENTIAL,
@@ -225,20 +230,21 @@ class cNIMAX:
 
 
                 data_dict = dict()
-                for i,FIFO_sample_key in enumerate(self.FIFO_sample_keys):
-                    data_dict[FIFO_sample_key] = {
-                        f"{self.FIFO_column_headings[FIFO_sample_key][0]}":time,
-                        f"{self.FIFO_column_headings[FIFO_sample_key][1]}":dataI[i],
-                        f"{self.FIFO_column_headings[FIFO_sample_key][2]}":dataV[i],
+                for i,FIFO_cell_key in enumerate(self.FIFO_cell_keys):
+                    data_dict[self.file_conn_keys[i]] = {
+                        f"{self.FIFO_column_headings[0]}":time,
+                        f"{self.FIFO_column_headings[1]}":dataI[i],
+                        f"{self.FIFO_column_headings[2]}":dataV[i],
                         }
 
                 # push data to datalogger queue
                 if self.active:
-                    if self.active.action.save_data:
-                        self.active.enqueue_data_nowait(
-                            data_dict,
-                            file_sample_keys = self.FIFO_sample_keys
-                        )
+                    self.active.enqueue_data_nowait(datamodel = \
+                           DataModel(
+                                     data = data_dict,
+                                     errors = []
+                                    )
+                    )
 
             except Exception:
                 self.base.print_message("canceling NImax IV stream")
@@ -419,7 +425,7 @@ class cNIMAX:
             self.FIFO_NImaxheader = dict()
             file_sample_label = dict()
                 
-            for i, FIFO_sample_key in enumerate(self.FIFO_sample_keys):
+            for i, FIFO_cell_key in enumerate(self.FIFO_cell_keys):
                 if self.samples_in is not None:
                     if len(self.samples_in) == 9:
                         sample_label = [self.samples_in[i].get_global_label()]
@@ -427,20 +433,36 @@ class cNIMAX:
                         sample_label = [sample.get_global_label() for sample in self.samples_in]
                 else:
                     sample_label = None
-                file_sample_label[FIFO_sample_key]=sample_label
-                
-            self.active = await self.base.contain_action(
-                self.action,
-                file_type="ni_helao__file",
-                file_data_keys=self.FIFO_column_headings,
-                file_sample_keys = self.FIFO_sample_keys,
-                file_sample_label=file_sample_label,
-                header=None,
-            )
+                file_sample_label[FIFO_cell_key]=sample_label
+
+
+            self.active =  await self.base.contain_action(
+                ActiveParams(
+                             action = self.action,
+                             file_conn_params_list = [
+                                 FileConnParams(
+                                                file_conn_key = \
+                                                    file_conn_key,
+                                                sample_global_labels=[sample_label],
+                                                json_data_keys = self.FIFO_column_headings,
+                                                file_type="ni_helao__file",
+                                                # only add optional keys to header
+                                                # rest will be added later
+                                                hloheader = HloHeaderModel(
+                                                    optional = {"cell":cell_key}
+                                                ),
+                                               ) for file_conn_key, sample_label, cell_key in
+                                     zip(
+                                         self.file_conn_keys, 
+                                         file_sample_label, 
+                                          self.FIFO_cell_keys
+                                        )
+                             ]
+            ))
 
             for sample in self.samples_in:
-                sample.status = [hcms.SampleStatus.preserved]
-                sample.inheritance = hcms.SampleInheritance.allow_both
+                sample.status = [SampleStatus.preserved]
+                sample.inheritance = SampleInheritance.allow_both
 
             # clear old samples_in first
             self.active.action.samples_in = []
@@ -478,13 +500,12 @@ class cNIMAX:
             await self.IO_signalq.put(False)
 
 
-    async def estop(self, switch:bool,*args,**kwargs):
+    async def estop(self, switch:bool, *args, **kwargs):
         """same as estop, but also sets flag"""
         switch = bool(switch)
         self.IO_estop = switch
         if self.IO_measuring:
             if switch:
                 await self.IO_signalq.put(False)
-                await self.base.set_estop(
-                    self.active.active.action_name, self.active.active.action_uuid
-                )
+                if self.active:
+                    await self.active.set_estop()
