@@ -28,7 +28,11 @@ from helaocore.model.sample import (
                                     SampleStatus,
                                     SampleInheritance
                                     )
+from helaocore.model.file import FileConnParams
+from helaocore.model.active import ActiveParams
+from helaocore.model.data import DataModel
 from helao.library.driver.archive_driver import Archive
+
 
 import nidaqmx
 from nidaqmx.constants import LineGrouping
@@ -578,15 +582,17 @@ class PAL:
                             microcam.rshs_pal_logfile,
                             microcam.path_methodfile,
                         ]
-                        await self.active.enqueue_data(
-                            {
-                                k: [v]
-                                for k, v in zip(
-                                    self.FIFO_column_headings, logdata
-                                )
-                            }
-                        )
+
                         tmpdata = {k: [v] for k, v in zip(self.FIFO_column_headings, logdata)}
+                        await self.active.enqueue_data(datamodel = \
+                               DataModel(
+                                         data = {self.base.dflt_file_conn_key():\
+                                                    tmpdata
+                                                 },
+                                         errors = []
+                                   
+                                        )
+                        )
                         self.base.print_message(f"PAL data: {tmpdata}")
 
                 # -- (9) -- split action (tbd)
@@ -1809,11 +1815,20 @@ class PAL:
         checks samples_in"""
 
         self.active = await self.base.contain_action(
-            self.action,
-            file_type="pal_helao__file",
-            file_data_keys=self.FIFO_column_headings,
-            header=None,
-        )
+        ActiveParams(
+             action = self.action,
+            file_conn_params_list = [
+                FileConnParams(
+                               file_conn_key = \
+                                   self.base.dflt_file_conn_key(),
+                               # sample_global_labels=[],
+                               json_data_keys = self.FIFO_column_headings,
+                               file_type="pal_helao__file",
+                              )
+                             ]
+        ))
+
+
         self.base.print_message(f"Active action uuid is {self.active.action.action_uuid}")
         if self.active:
             self.active.finish_hlo_header(realtime=await self.active.set_realtime())

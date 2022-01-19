@@ -350,7 +350,7 @@ class Archive():
         self.base.print_message(f"trays: {trays_dict}")
         self.base.print_message(f"customs: {custom_positions}")
         return trays_dict, custom_positions
-        
+
 
     def load_config(self):
         if self.archivepck is not None:
@@ -407,6 +407,10 @@ class Archive():
                 self.base.print_message(f"Bug found: reference sample was saved in pck file: {sample}", error = True)
 
         return sample
+
+
+    def tray_get_keys(self):
+        return [key for key in VT_template().as_dict().keys()]
 
 
     async def tray_unload(
