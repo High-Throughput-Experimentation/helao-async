@@ -434,8 +434,6 @@ class cNIMAX:
                 else:
                     sample_label = None
                 file_sample_label[FIFO_cell_key]=sample_label
-
-
             self.active =  await self.base.contain_action(
                 ActiveParams(
                              action = self.action,
@@ -443,7 +441,7 @@ class cNIMAX:
                                  FileConnParams(
                                                 file_conn_key = \
                                                     file_conn_key,
-                                                sample_global_labels=[sample_label],
+                                                sample_global_labels=file_sample_label[cell_key],
                                                 json_data_keys = self.FIFO_column_headings,
                                                 file_type="ni_helao__file",
                                                 # only add optional keys to header
@@ -451,11 +449,10 @@ class cNIMAX:
                                                 hloheader = HloHeaderModel(
                                                     optional = {"cell":cell_key}
                                                 ),
-                                               ) for file_conn_key, sample_label, cell_key in
+                                               ) for file_conn_key, cell_key in
                                      zip(
                                          self.file_conn_keys, 
-                                         file_sample_label, 
-                                          self.FIFO_cell_keys
+                                         self.FIFO_cell_keys
                                         )
                              ]
             ))
