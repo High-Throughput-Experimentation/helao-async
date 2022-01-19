@@ -824,10 +824,10 @@ class gamry:
             await self.set_IO_signalq(False)
 
 
-    async def estop(self, active):
+    async def estop(self, switch:bool, *args, **kwargs):
         """same as stop, set or clear estop flag with switch parameter"""
         # should be the same as stop()
-        switch = active.action.action_params["switch"]
+        switch = bool(switch)
         self.IO_estop = switch
         if self.IO_measuring:
             if switch:

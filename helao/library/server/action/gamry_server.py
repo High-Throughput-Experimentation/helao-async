@@ -250,7 +250,7 @@ def makeApp(confPrefix, servKey):
                                           action_abbr = "estop"
         )
         await active.enqueue_data_dflt(datadict = \
-                                       {"stop": await app.driver.estop(active)})
+                                       {"stop": await app.driver.estop(**active.action.action_params)})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
