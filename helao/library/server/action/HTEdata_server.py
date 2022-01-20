@@ -6,7 +6,7 @@ __all__ = ["makeApp"]
 from typing import Optional
 from importlib import import_module
 from fastapi import Request
-from helaocore.server import make_action_serv, setup_action
+from helaocore.server import makeActionServ
 
 
 def makeApp(confPrefix, servKey):
@@ -34,94 +34,162 @@ def makeApp(confPrefix, servKey):
     #    from HTEdata_dummy import HTEdata
 
 
-    app = make_action_serv(
-        config, servKey, servKey, "HTE data management server", version=2.0, driver_class=HTEdata
-    )
+    app = makeActionServ(
+                         config=config, 
+                         server_key=servKey, 
+                         server_title=servKey, 
+                         description="HTE data management server", 
+                         version=2.0, 
+                         driver_class=HTEdata
+                        )
 
     @app.post(f"/{servKey}/get_elements_plateid")
-    async def get_elements_plateid(request: Request, plateid: Optional[int]=None):
+    async def get_elements_plateid(
+                                   request: Request, 
+                                   plateid: Optional[int]=None
+                                  ):
         """Gets the elements from the screening print in the info file"""
-        A = await setup_action(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(app.driver.get_elements_plateid(**A.action_params))
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["elements"],
+        )
+        await active.enqueue_data_dflt(datadict = \
+                                       {"elements": \
+               app.driver.get_elements_plateid(**active.action.action_params)})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/get_platemap_plateid")
-    async def get_platemap_plateid(request: Request, plateid: Optional[int]=None):
+    async def get_platemap_plateid(
+                                   request: Request, 
+                                   plateid: Optional[int]=None
+                                  ):
         """gets platemap"""
-        A = await setup_action(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(app.driver.get_platemap_plateid(**A.action_params))
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["platemap"],
+        )
+        await active.enqueue_data_dflt(datadict = \
+                                       {"platemap": \
+               app.driver.get_platemap_plateid(**active.action.action_params)})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/get_platexycalibration") 
-    async def get_platexycalibration(request: Request, plateid: Optional[int]=None):
+    async def get_platexycalibration(
+                                     request: Request, 
+                                     plateid: Optional[int]=None
+                                    ):
         """gets saved plate alignment matrix"""
-        A = await setup_action(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(app.driver.get_platexycalibration(**A.action_params))
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["platecal"],
+        )
+        await active.enqueue_data_dflt(datadict = \
+                                       {"platecal": \
+             app.driver.get_platexycalibration(**active.action.action_params)})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/save_platexycalibration")
-    async def save_platexycalibration(request: Request, plateid: Optional[int]=None):
+    async def save_platexycalibration(
+                                      request: Request, 
+                                      plateid: Optional[int]=None
+                                     ):
         """saves alignment matrix"""
-        A = await setup_action(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(app.driver.save_platexycalibration(**A.action_params))
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["platecal"],
+        )
+        await active.enqueue_data_dflt(datadict = \
+                                       {"platecal": \
+            app.driver.save_platexycalibration(**active.action.action_params)})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/check_plateid")
-    async def check_plateid(request: Request, plateid: Optional[int]=None):
+    async def check_plateid(
+                            request: Request, 
+                            plateid: Optional[int]=None
+                           ):
         """checks that the plate_id (info file) exists"""
-        A = await setup_action(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(app.driver.check_plateid(**A.action_params))
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["plateid"],
+        )
+        await active.enqueue_data_dflt(datadict = \
+                                       {"plateid": \
+                      app.driver.check_plateid(**active.action.action_params)})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/check_printrecord_plateid")
-    async def check_printrecord_plateid(request: Request, plateid: Optional[int]=None):
+    async def check_printrecord_plateid(
+                                        request: Request, 
+                                        plateid: Optional[int]=None
+                                       ):
         """checks that a print record exist in the info file"""
-        A = await setup_action(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(app.driver.check_printrecord_plateid(**A.action_params))
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["printrecord"],
+        )
+        await active.enqueue_data_dflt(datadict = \
+                                       {"printrecord": \
+          app.driver.check_printrecord_plateid(**active.action.action_params)})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/check_annealrecord_plateid")
-    async def check_annealrecord_plateid(request: Request, plateid: Optional[int]=None):
+    async def check_annealrecord_plateid(
+                                         request: Request, 
+                                         plateid: Optional[int]=None
+                                        ):
         """checks that a anneal record exist in the info file"""
-        A = await setup_action(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(app.driver.check_annealrecord_plateid(**A.action_params))
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["annealrecord"],
+        )
+        await active.enqueue_data_dflt(datadict = \
+                                       {"annealrecord": \
+         app.driver.check_annealrecord_plateid(**active.action.action_params)})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/get_info_plateid")
-    async def get_info_plateid(request: Request, plateid: Optional[int]=None):
-        A = await setup_action(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(app.driver.get_info_plateid(**A.action_params))
+    async def get_info_plateid(
+                               request: Request, 
+                               plateid: Optional[int]=None
+                              ):
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["info"],
+        )
+        await active.enqueue_data_dflt(datadict = \
+                                       {"info": \
+                   app.driver.get_info_plateid(**active.action.action_params)})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/get_rcp_plateid")
-    async def get_rcp_plateid(request: Request, plateid: Optional[int]=None):
-        A = await setup_action(request)
-        active = await app.base.contain_action(A)
-        await active.enqueue_data(app.driver.get_rcp_plateid(**A.action_params))
+    async def get_rcp_plateid(
+                              request: Request, 
+                              plateid: Optional[int]=None
+                             ):
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["rcp"],
+        )
+        await active.enqueue_data_dflt(datadict = \
+                                       {"rcp": \
+                    app.driver.get_rcp_plateid(**active.action.action_params)})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
