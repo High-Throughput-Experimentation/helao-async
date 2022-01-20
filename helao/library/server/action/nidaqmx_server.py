@@ -32,10 +32,10 @@ def makeApp(confPrefix, servKey):
     config = import_module(f"helao.config.{confPrefix}").config
 
     app = makeActionServ(
-        config,
-        servKey,
-        servKey,
-        "NIdaqmx server",
+        config=config,
+        server_key=servKey,
+        server_title=servKey,
+        description="NIdaqmx server",
         version=2.0,
         driver_class=cNIMAX,
     )
@@ -316,6 +316,7 @@ def makeApp(confPrefix, servKey):
         active = await app.base.setup_and_contain_action(
                                           request = request,
                                           json_data_keys = ["stop"],
+                                          action_abbr = "stop"
         )
         await active.enqueue_data_dflt(datadict = \
                                        {"stop": await app.driver.stop()})
@@ -332,6 +333,7 @@ def makeApp(confPrefix, servKey):
         active = await app.base.setup_and_contain_action(
                                           request = request,
                                           json_data_keys = ["estop"],
+                                          action_abbr = "estop"
         )
         await active.enqueue_data_dflt(datadict = \
                                        {"estop": await app.driver.estop(**active.action.action_params)})

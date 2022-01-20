@@ -11,10 +11,10 @@ driver code, and hard-coded to use 'galil' class (see "__main__").
 
 __all__ = ["makeApp"]
 
-from typing import Optional, Union, List
+from typing import Optional
 from importlib import import_module
 from fastapi import Request
-from helaocore.server import make_action_serv, setup_action
+from helaocore.server import makeActionServ, setup_action
 from helao.library.driver.galil_driver import galil
 
 
@@ -22,11 +22,11 @@ def makeApp(confPrefix, servKey):
 
     config = import_module(f"helao.config.{confPrefix}").config
 
-    app = make_action_serv(
-        config, 
-        servKey, 
-        servKey, 
-        "Galil IO server", 
+    app = makeActionServ(
+        config=config, 
+        server_key=servKey, 
+        server_title=servKey, 
+        description="Galil IO server", 
         version=2.0, 
         driver_class=galil
     )
@@ -37,9 +37,13 @@ def makeApp(confPrefix, servKey):
                             request: Request,
                             port:Optional[int] = None
                            ):
+
+
+
+
         A = await setup_action(request)
         active = await app.base.contain_action(A,
-                file_data_keys=["error_code", "port", "name", "type", "value"])
+                json_data_keys=["error_code", "port", "name", "type", "value"])
         await active.enqueue_data(app.driver.get_analog_in(**A.action_params))
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -51,10 +55,19 @@ def makeApp(confPrefix, servKey):
                              port:Optional[int] = None,
                              value:Optional[float] = None
                             ):
-        A = await setup_action(request)
-        active = await app.base.contain_action(A,
-                file_data_keys=["error_code", "port", "name", "type", "value"])
-        await active.enqueue_data(app.driver.set_analog_out(**A.action_params))
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = [
+                                                            "error_code", 
+                                                            "port", 
+                                                            "name", 
+                                                            "type", 
+                                                            "value"
+                                                           ],
+                                          action_abbr = "set_ao"
+        )
+        await active.enqueue_data_dflt(datadict = \
+                await app.driver.set_analog_out(**active.action.action_params))
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -64,10 +77,19 @@ def makeApp(confPrefix, servKey):
                              request: Request,
                              port:Optional[int] = None
                             ):
-        A = await setup_action(request)
-        active = await app.base.contain_action(A,
-                file_data_keys=["error_code", "port", "name", "type", "value"])
-        await active.enqueue_data(app.driver.get_digital_in(**A.action_params))
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = [
+                                                            "error_code", 
+                                                            "port", 
+                                                            "name", 
+                                                            "type", 
+                                                            "value"
+                                                           ],
+                                          action_abbr = "get_di"
+        )
+        await active.enqueue_data_dflt(datadict = \
+                await app.driver.get_digital_in(**active.action.action_params))
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -77,10 +99,19 @@ def makeApp(confPrefix, servKey):
                               request: Request,
                               port:Optional[int] = None
                              ):
-        A = await setup_action(request)
-        active = await app.base.contain_action(A,
-                file_data_keys=["error_code", "port", "name", "type", "value"])
-        await active.enqueue_data(app.driver.get_digital_out(**A.action_params))
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = [
+                                                            "error_code", 
+                                                            "port", 
+                                                            "name", 
+                                                            "type", 
+                                                            "value"
+                                                           ],
+                                          action_abbr = "get_do"
+        )
+        await active.enqueue_data_dflt(datadict = \
+               await app.driver.get_digital_out(**active.action.action_params))
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -91,30 +122,50 @@ def makeApp(confPrefix, servKey):
                               port:Optional[int] = None, 
                               on:Optional[bool] = False
                              ):
-        A = await setup_action(request)
-        active = await app.base.contain_action(A,
-                file_data_keys=["error_code", "port", "name", "type", "value"])
-        await active.enqueue_data(app.driver.set_digital_out(**A.action_params))
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = [
+                                                            "error_code", 
+                                                            "port", 
+                                                            "name", 
+                                                            "type", 
+                                                            "value"
+                                                           ],
+                                          action_abbr = "set_do"
+        )
+        await active.enqueue_data_dflt(datadict = \
+               await app.driver.set_digital_out(**active.action.action_params))
         finished_action = await active.finish()
         return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/reset")
     async def reset(request: Request):
-        """resets galil device. only for emergency use!"""
-        A = await setup_action(request)
-        active = await app.base.contain_action(A, file_data_keys="reset")
-        await active.enqueue_data({"reset":await app.driver.reset()})
+        """FOR EMERGENCY USE ONLY!
+           resets galil device. 
+        """
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = [
+                                                            "reset",
+                                                           ],
+                                          action_abbr = "reset"
+        )
+        await active.enqueue_data_dflt(datadict = \
+                                       {"reset":await app.driver.reset()})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
 
     @app.post(f"/{servKey}/estop")
     async def estop(request: Request, switch: Optional[bool] = True):
-        # http://127.0.0.1:8001/motor/set/stop
-        A = await setup_action(request)
-        active = await app.base.contain_action(A, file_data_keys="estop")
-        await active.enqueue_data({"estop":await app.driver.estop_io(switch)})
+        active = await app.base.setup_and_contain_action(
+                                          request = request,
+                                          json_data_keys = ["estop"],
+                                          action_abbr = "estop"
+        )
+        await active.enqueue_data_dflt(datadict = \
+           {"estop": await app.driver.estop_io(**active.action.action_params)})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
