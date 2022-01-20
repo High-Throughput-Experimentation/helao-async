@@ -45,10 +45,10 @@ def makeApp(confPrefix, servKey):
     config = import_module(f"helao.config.{confPrefix}").config
  
     app = makeActionServ(
-        config,
-        servKey,
-        servKey,
-        "Gamry instrument/action server",
+        config=config,
+        server_key=servKey,
+        server_title=servKey,
+        description="Gamry instrument/action server",
         version=2.0,
         driver_class=gamry,
     )
@@ -229,7 +229,7 @@ def makeApp(confPrefix, servKey):
         """Stops measurement in a controlled way."""
         active = await app.base.setup_and_contain_action(
                                           request = request,
-                                          json_data_keys = ["status"],
+                                          json_data_keys = ["stop"],
                                           action_abbr = "stop"
         )
         await active.enqueue_data_dflt(datadict = \
@@ -246,11 +246,11 @@ def makeApp(confPrefix, servKey):
         """Same as stop, but also sets estop flag."""
         active = await app.base.setup_and_contain_action(
                                           request = request,
-                                          json_data_keys = ["status"],
+                                          json_data_keys = ["estop"],
                                           action_abbr = "estop"
         )
         await active.enqueue_data_dflt(datadict = \
-                                       {"stop": await app.driver.estop(**active.action.action_params)})
+                                       {"estop": await app.driver.estop(**active.action.action_params)})
         finished_action = await active.finish()
         return finished_action.as_dict()
 

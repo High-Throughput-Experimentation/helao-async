@@ -202,12 +202,20 @@ class galil:
             return "error"
 
 
-    async def motor_move(self, A: Action):
-        d_mm = A.action_params.get("d_mm",[])
-        axis = A.action_params.get("axis",[])
-        speed = A.action_params.get("speed", None)
-        mode = A.action_params.get("mode",move_modes.absolute)
-        transformation = A.action_params.get("transformation",transformation_mode.motorxy)
+    async def motor_move(self, active):
+        d_mm = active.action.action_params.get("d_mm",[])
+        axis = active.action.action_params.get("axis",[])
+        speed = active.action.action_params.get("speed", None)
+        mode = active.action.action_params.get("mode",move_modes.absolute)
+        transformation = active.action.action_params.get("transformation",transformation_mode.motorxy)
+        
+        # in order to enable easy mode fore swagger:
+        if type(axis) is not list:
+            axis = [axis]
+        if type(d_mm) is not list:
+            d_mm = [d_mm]
+
+        
         
         error =  error_codes.none
 
@@ -624,6 +632,7 @@ class galil:
 
         return {"ax": ret_ax, "position": ret_position}
 
+
     async def query_axis_moving(self, axis,*args,**kwargs):
         # this functions queries the status of the axis
         q = self.c("SC")
@@ -667,11 +676,13 @@ class galil:
 
         return {"motor_status": ret_status, "err_code": ret_err_code}
 
+
     async def reset(self):
         # The RS command resets the state of the actionor to its power-on condition.
         # The previously saved state of the controller,
         # along with parameter values, and saved experiments are restored.
         return self.c("RS")
+
 
     async def estop_axis(self, switch,*args,**kwargs):
         # this will estop the axis
@@ -686,6 +697,8 @@ class galil:
         else:
             # need only to set the flag
             self.config_dict["estop_motor"] = False
+        return switch
+
 
     async def estop_io(self, switch):
         # this will estop the io
@@ -1261,6 +1274,8 @@ class transformxy:
 
         # update the system matrix so we save calculation time later
         self.update_Msystem()
+        return True
+
 
     def get_Mplatexy(self):
         """returns the xy part of the platecalibration"""
@@ -1269,6 +1284,7 @@ class transformxy:
         self.Mplatexy[0, 2] = self.Mplate[0, 3]
         self.Mplatexy[1, 2] = self.Mplate[1, 3]
         return self.Mplatexy
+
 
     def get_Mplate_Msystem(self, Mxy,*args,**kwargs):
         """removes Minstr from Msystem to obtain Mplate for alignment"""
