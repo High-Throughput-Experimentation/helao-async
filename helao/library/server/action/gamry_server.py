@@ -32,7 +32,7 @@ __all__ = ["makeApp"]
 import asyncio
 from typing import Optional, List
 from importlib import import_module
-from fastapi import Request
+from fastapi import Request, Body
 from socket import gethostname
 
 from helaocore.server import makeActionServ, setup_action
@@ -72,7 +72,7 @@ def makeApp(confPrefix, servKey):
     async def run_LSV(
                       request: Request,
                       fast_samples_in: Optional[List[SampleUnion]] = \
-           [LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
+           Body([LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
                       Vinit: Optional[float] = 0.0,  # Initial value in volts or amps.
                       Vfinal: Optional[float] = 1.0,  # Final value in volts or amps.
                       ScanRate: Optional[float] = 1.0,  # Scan rate in volts/second or amps/second.
@@ -82,7 +82,6 @@ def makeApp(confPrefix, servKey):
                       TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
                       TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
                       IErange: Optional[Gamry_IErange] = "auto",
-                      scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                      ):
         """Linear Sweep Voltammetry (unlike CV no backward scan is done)
         use 4bit bitmask for triggers
@@ -98,7 +97,7 @@ def makeApp(confPrefix, servKey):
     async def run_CA(
                      request: Request,
                       fast_samples_in: Optional[List[SampleUnion]] = \
-           [LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
+           Body([LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
                      Vval: Optional[float] = 0.0,
                      Tval: Optional[float] = 10.0,
                      SampleRate: Optional[
@@ -107,7 +106,6 @@ def makeApp(confPrefix, servKey):
                      TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
                      TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
                      IErange: Optional[Gamry_IErange] = "auto",
-                     scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                     ):
         """Chronoamperometry (current response on amplied potential)
         use 4bit bitmask for triggers
@@ -124,7 +122,7 @@ def makeApp(confPrefix, servKey):
     async def run_CP(
                      request: Request,
                       fast_samples_in: Optional[List[SampleUnion]] = \
-           [LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
+           Body([LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
                      Ival: Optional[float] = 0.0,
                      Tval: Optional[float] = 10.0,
                      SampleRate: Optional[
@@ -133,7 +131,6 @@ def makeApp(confPrefix, servKey):
                      TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
                      TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
                      IErange: Optional[Gamry_IErange] = "auto",
-                     scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                     ):
         """Chronopotentiometry (Potential response on controlled current)
         use 4bit bitmask for triggers
@@ -149,7 +146,7 @@ def makeApp(confPrefix, servKey):
     async def run_CV(
                      request: Request,
                       fast_samples_in: Optional[List[SampleUnion]] = \
-           [LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
+           Body([LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
                      Vinit: Optional[float] = 0.0,  # Initial value in volts or amps.
                      Vapex1: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
                      Vapex2: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
@@ -162,7 +159,6 @@ def makeApp(confPrefix, servKey):
                      TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
                      TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
                      IErange: Optional[Gamry_IErange] = "auto",
-                     scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                     ):
         """Cyclic Voltammetry (most widely used technique 
         for acquireing information about electrochemical reactions)
@@ -178,7 +174,7 @@ def makeApp(confPrefix, servKey):
     async def run_EIS(
                       request: Request,
                       fast_samples_in: Optional[List[SampleUnion]] = \
-           [LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
+           Body([LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
                       Vval: Optional[float] = 0.0,
                       Tval: Optional[float] = 10.0,
                       Freq: Optional[float] = 1000.0,
@@ -190,7 +186,6 @@ def makeApp(confPrefix, servKey):
                       TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
                       TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
                       IErange: Optional[Gamry_IErange] = "auto",
-                      scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                      ):
         """Electrochemical Impendance Spectroscopy
         NOT TESTED
@@ -206,13 +201,12 @@ def makeApp(confPrefix, servKey):
     async def run_OCV(
                       request: Request,
                       fast_samples_in: Optional[List[SampleUnion]] = \
-           [LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
+           Body([LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
                       Tval: Optional[float] = 10.0,
                       SampleRate: Optional[float] = 0.01,
                       TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
                       TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
                       IErange: Optional[Gamry_IErange] = "auto",
-                      scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                      ):
         """mesasures open circuit potential
         use 4bit bitmask for triggers

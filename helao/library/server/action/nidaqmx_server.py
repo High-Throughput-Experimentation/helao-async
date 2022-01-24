@@ -16,7 +16,7 @@ __all__ = ["makeApp"]
 
 from importlib import import_module
 
-from fastapi import Request
+from fastapi import Request, Body
 from typing import Optional, List
 from socket import gethostname
 
@@ -297,11 +297,11 @@ def makeApp(confPrefix, servKey):
         async def cellIV(
                          request: Request, 
                       fast_samples_in: Optional[List[hcms.SampleUnion]] = \
-           [hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
+                          Body(\
+           [hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
                          Tval: Optional[float] = 10.0,
                          SampleRate: Optional[float] = 1.0, 
                          TTLwait: Optional[int] = -1,  # -1 disables, else select TTL channel
-                         scratch: Optional[List[None]] = [None], # temp fix so swagger still works
                         ):
             """Runs multi cell IV measurement."""
             A = await setup_action(request)
