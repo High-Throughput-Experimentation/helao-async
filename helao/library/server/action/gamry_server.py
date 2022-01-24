@@ -32,7 +32,7 @@ __all__ = ["makeApp"]
 import asyncio
 from typing import Optional, List
 from importlib import import_module
-from fastapi import Request, Body
+from fastapi import Request, Body, Query
 from socket import gethostname
 
 from helaocore.server import makeActionServ, setup_action
@@ -79,8 +79,8 @@ def makeApp(confPrefix, servKey):
                       SampleRate: Optional[
                                            float
                                           ] = 0.01,  # Time between data acquisition samples in seconds.
-                      TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-                      TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                      TTLwait: Optional[int] = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+                      TTLsend: Optional[int] = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
                       IErange: Optional[Gamry_IErange] = "auto",
                      ):
         """Linear Sweep Voltammetry (unlike CV no backward scan is done)
@@ -103,8 +103,8 @@ def makeApp(confPrefix, servKey):
                      SampleRate: Optional[
                                           float
                      ] = 0.01,  # Time between data acquisition samples in seconds.
-                     TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-                     TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                     TTLwait: Optional[int] = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+                     TTLsend: Optional[int] = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
                      IErange: Optional[Gamry_IErange] = "auto",
                     ):
         """Chronoamperometry (current response on amplied potential)
@@ -128,8 +128,8 @@ def makeApp(confPrefix, servKey):
                      SampleRate: Optional[
                                           float
                                          ] = 1.0,  # Time between data acquisition samples in seconds.
-                     TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-                     TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                     TTLwait: Optional[int] = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+                     TTLsend: Optional[int] = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
                      IErange: Optional[Gamry_IErange] = "auto",
                     ):
         """Chronopotentiometry (Potential response on controlled current)
@@ -156,8 +156,8 @@ def makeApp(confPrefix, servKey):
                      ] = 1.0,  # Apex scan rate in volts/second or amps/second.
                      SampleRate: Optional[float] = 0.01,  # Time between data acquisition steps.
                      Cycles: Optional[int] = 1,
-                     TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-                     TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                     TTLwait: Optional[int] = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+                     TTLsend: Optional[int] = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
                      IErange: Optional[Gamry_IErange] = "auto",
                     ):
         """Cyclic Voltammetry (most widely used technique 
@@ -183,8 +183,8 @@ def makeApp(confPrefix, servKey):
                                           float
                                          ] = 0.001,  # The precision is used in a Correlation Coefficient (residual power) based test to determine whether or not to measure another cycle.
                       SampleRate: Optional[float] = 0.01,
-                      TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-                      TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                      TTLwait: Optional[int] = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+                      TTLsend: Optional[int] = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
                       IErange: Optional[Gamry_IErange] = "auto",
                      ):
         """Electrochemical Impendance Spectroscopy
@@ -204,8 +204,8 @@ def makeApp(confPrefix, servKey):
            Body([LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
                       Tval: Optional[float] = 10.0,
                       SampleRate: Optional[float] = 0.01,
-                      TTLwait: Optional[int] = -1,  # -1 disables, else select TTL 0-3
-                      TTLsend: Optional[int] = -1,  # -1 disables, else select TTL 0-3
+                      TTLwait: Optional[int] = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
+                      TTLsend: Optional[int] = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
                       IErange: Optional[Gamry_IErange] = "auto",
                      ):
         """mesasures open circuit potential
