@@ -5,7 +5,7 @@ from importlib import import_module
 from socket import gethostname
 from time import strftime
 
-from fastapi import Request
+from fastapi import Request, Body
 from typing import Optional, List
 
 from helaocore.server import makeActionServ, setup_action
@@ -118,7 +118,7 @@ def makeApp(confPrefix, servKey):
             tool: Optional[PALtools] = None,
             source: Optional[dev_customitems] = None,
             volume_ul: Optional[int] = 200,
-            sampleperiod: Optional[List[float]] =  [0.0],
+            sampleperiod: Optional[List[float]] =  Body([0.0], embed=True),
             spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
             spacingfactor: Optional[float] = 1.0,
             timeoffset: Optional[float] = 0.0,
@@ -126,7 +126,6 @@ def makeApp(confPrefix, servKey):
             wash2: Optional[bool] = False,
             wash3: Optional[bool] = False,
             wash4: Optional[bool] = False,
-            scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             A = await setup_action(request)
             A.action_abbr = "archive"
@@ -195,7 +194,7 @@ def makeApp(confPrefix, servKey):
             dest_tray: Optional[int] = 0,
             dest_slot: Optional[int] = 0,
             dest_vial: Optional[int] = 0,
-            sampleperiod: Optional[List[float]] =  [0.0],
+            sampleperiod: Optional[List[float]] =  Body([0.0], embed=True),
             spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
             spacingfactor: Optional[float] = 1.0,
             timeoffset: Optional[float] = 0.0,
@@ -203,7 +202,6 @@ def makeApp(confPrefix, servKey):
             wash2: Optional[bool] = True,
             wash3: Optional[bool] = True,
             wash4: Optional[bool] = True,
-            scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             A = await setup_action(request)
             A.action_abbr = "dilute"
@@ -218,7 +216,7 @@ def makeApp(confPrefix, servKey):
             tool: Optional[PALtools] = None,
             source: Optional[dev_customitems] = None,
             volume_ul: Optional[int] = 200,
-            sampleperiod: Optional[List[float]] =  [0.0],
+            sampleperiod: Optional[List[float]] =  Body([0.0], embed=True),
             spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
             spacingfactor: Optional[float] = 1.0,
             timeoffset: Optional[float] = 0.0,
@@ -226,7 +224,6 @@ def makeApp(confPrefix, servKey):
             wash2: Optional[bool] = True,
             wash3: Optional[bool] = True,
             wash4: Optional[bool] = True,
-            scratch: Optional[List[None]] = [None], # temp fix so swagger still works
         ):
             A = await setup_action(request)
             A.action_abbr = "autodilute"
@@ -333,11 +330,10 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/archive_tray_update_position")
     async def archive_tray_update_position(
         request: Request, 
-        sample: Optional[SampleUnion] = LiquidSample(**{"sample_no":1,"machine_name":gethostname()}),
+        sample: Optional[SampleUnion] = Body(LiquidSample(**{"sample_no":1,"machine_name":gethostname()}), embed=True),
         tray: Optional[int] = None,
         slot: Optional[int] = None,
         vial: Optional[int] = None,
-        scratch: Optional[List[None]] = [None], # temp fix so swagger still works
     ):
         """Updates app.driver vial Table. If sucessful (vial-slot was empty) returns True, else it returns False."""
         active = await app.base.setup_and_contain_action(
@@ -422,8 +418,7 @@ def makeApp(confPrefix, servKey):
     async def archive_custom_load(
                                   request: Request,
                                   custom: Optional[dev_customitems] = None,
-                                  load_sample_in: Optional[SampleUnion] = LiquidSample(**{"sample_no":1,"machine_name":gethostname()}),
-                                  scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+                                  load_sample_in: Optional[SampleUnion] = Body(LiquidSample(**{"sample_no":1,"machine_name":gethostname()}), embed=True),
                                  ):
         active = await app.base.setup_and_contain_action(
                                           request = request,
@@ -514,8 +509,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/db_get_sample")
     async def db_get_sample(request: Request, 
                          fast_samples_in: Optional[List[SampleUnion]] = \
-           [LiquidSample(**{"sample_no":1,"machine_name":gethostname()})],
-                         scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+           Body([LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
                         ):
         """Positive sample_no will get it from the beginng, negative
         from the end of the db."""
@@ -532,7 +526,7 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/db_new_sample")
     async def db_new_sample(request: Request, 
-                         fast_samples_in: Optional[List[SampleUnion]] = [LiquidSample(**{
+                         fast_samples_in: Optional[List[SampleUnion]] = Body([LiquidSample(**{
                                               "machine_name":gethostname(),
                                               "source": [],
                                               "volume_ml": 0.0,
@@ -541,8 +535,7 @@ def makeApp(confPrefix, servKey):
                                               "mass": [],
                                               "supplier": [],
                                               "lot_number": [],
-                             })],
-                         scratch: Optional[List[None]] = [None], # temp fix so swagger still works
+                             })], embed=True),
                         ):
         """use CAS for chemical if available. 
         Written on bottles of chemicals with all other necessary information.
