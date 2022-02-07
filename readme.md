@@ -1,6 +1,6 @@
 # HELAO-async
 
-HELAO-async is Caltech HTE group's instrument control software following HELAO design principles. This repository contains instrument drivers, API server configurations, and experiment sequences intended for use with the [HELAO-core](https://github.com/High-Throughput-Experimentation/helao-core) package.
+HELAO-async is Caltech HTE group's instrument control software following [HELAO](https://doi.org/10.26434/chemrxiv-2021-kr87t) design principles. This repository contains instrument drivers, API server configurations, and experiment sequences intended for use with the [HELAO-core](https://github.com/High-Throughput-Experimentation/helao-core) package.
 
 
 ## Requirements for v2.0 release
