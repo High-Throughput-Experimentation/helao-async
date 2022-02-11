@@ -13,7 +13,7 @@ from importlib import import_module
 from fastapi import Request
 from helaocore.server import makeActionServ, setup_action
 from helao.library.driver.alignment_driver import aligner
-from helao.library.driver.galil_driver import move_modes
+from helao.library.driver.galil_motion_driver import move_modes
 
 
 def makeApp(confPrefix, servKey):

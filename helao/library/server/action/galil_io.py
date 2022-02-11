@@ -15,7 +15,7 @@ from typing import Optional
 from importlib import import_module
 from fastapi import Request
 from helaocore.server import makeActionServ, setup_action
-from helao.library.driver.galil_driver import galil
+from helao.library.driver.galil_io_driver import galil
 
 
 def makeApp(confPrefix, servKey):
@@ -153,19 +153,6 @@ def makeApp(confPrefix, servKey):
         )
         await active.enqueue_data_dflt(datadict = \
                                        {"reset":await app.driver.reset()})
-        finished_action = await active.finish()
-        return finished_action.as_dict()
-
-
-    @app.post(f"/{servKey}/estop")
-    async def estop(request: Request, switch: Optional[bool] = True):
-        active = await app.base.setup_and_contain_action(
-                                          request = request,
-                                          json_data_keys = ["estop"],
-                                          action_abbr = "estop"
-        )
-        await active.enqueue_data_dflt(datadict = \
-           {"estop": await app.driver.estop_io(**active.action.action_params)})
         finished_action = await active.finish()
         return finished_action.as_dict()
 

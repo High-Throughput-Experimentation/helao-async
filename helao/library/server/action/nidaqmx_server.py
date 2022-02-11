@@ -324,23 +324,6 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
 
-    @app.post(f"/{servKey}/estop")
-    async def estop(
-                   request: Request, 
-                   switch: Optional[bool] = True
-                   ):
-        """Same as stop, but also sets estop flag."""
-        active = await app.base.setup_and_contain_action(
-                                          request = request,
-                                          json_data_keys = ["estop"],
-                                          action_abbr = "estop"
-        )
-        await active.enqueue_data_dflt(datadict = \
-                                       {"estop": await app.driver.estop(**active.action.action_params)})
-        finished_act = await active.finish()
-        return finished_act.as_dict()
-
-
     @app.post("/shutdown")
     def post_shutdown():
         shutdown_event()

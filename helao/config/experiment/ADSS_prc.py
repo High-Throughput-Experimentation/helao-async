@@ -29,7 +29,7 @@ from helaocore.schema import Action, Experiment, ActionPlanMaker
 from helaocore.server import action_start_condition
 import helaocore.model.sample as hcms
 
-from helao.library.driver.galil_driver import move_modes, transformation_mode
+from helao.library.driver.galil_motion_driver import move_modes, transformation_mode
 from helao.library.driver.pal_driver import Spacingmethod, PALtools
 
 

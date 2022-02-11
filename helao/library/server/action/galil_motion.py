@@ -17,9 +17,12 @@ from typing import Optional, List, Union
 from fastapi import Request
 
 
-from helao.library.driver.galil_driver import move_modes, transformation_mode
+from helao.library.driver.galil_motion_driver import (
+                                                      move_modes, 
+                                                      transformation_mode,
+                                                      galil
+                                                     )
 from helaocore.server import makeActionServ, setup_action
-from helao.library.driver.galil_driver import galil
 from helaocore.helper import make_str_enum
 
 
@@ -358,19 +361,6 @@ def makeApp(confPrefix, servKey):
         )
         await active.enqueue_data_dflt(datadict = \
                                        {"reset":await app.driver.reset()})
-        finished_action = await active.finish()
-        return finished_action.as_dict()
-
-
-    @app.post(f"/{servKey}/estop")
-    async def estop(request: Request, switch: Optional[bool] = True):
-        active = await app.base.setup_and_contain_action(
-                                          request = request,
-                                          json_data_keys = ["estop"],
-                                          action_abbr = "estop"
-        )
-        await active.enqueue_data_dflt(datadict = \
-           {"estop": await app.driver.estop_axis(**active.action.action_params)})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
