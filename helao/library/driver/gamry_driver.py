@@ -25,7 +25,7 @@ from helaocore.model.data import DataModel
 from helaocore.model.file import FileConnParams, HloHeaderModel
 from helaocore.model.active import ActiveParams
 from helaocore.data.sample import UnifiedSampleDataAPI
-
+from helaocore.model.hlostatus import HloStatus
 
 class Gamry_modes(str, Enum):
     CA = "CA"
@@ -231,17 +231,39 @@ class gamry:
                             # await self.stat.set_idle()
                         self.base.print_message("Gamry measurement is done")
                     else:
+                        self.active =  await self.base.contain_action(
+                            ActiveParams(
+                                         action = self.action,
+                        ))
+                        self.active.action.action_status.append(HloStatus.estopped)
                         self.IO_do_meas = False
                         self.base.print_message("Gamry is in estop.")
 
                 elif self.IO_do_meas and self.IO_measuring:
+                    self.active =  await self.base.contain_action(
+                        ActiveParams(
+                                     action = self.action,
+                    ))
+                    self.active.action.action_status.append(HloStatus.busy)
+                    self.active.action.action_status.append(HloStatus.errored)
                     self.base.print_message("got measurement request but Gamry is busy")
 
                 elif not self.IO_do_meas and self.IO_measuring:
+                    self.active =  await self.base.contain_action(
+                        ActiveParams(
+                                     action = self.action,
+                    ))
                     self.base.print_message("got stop request, measurement will stop next cycle")
 
                 else:
                     self.base.print_message("got stop request but Gamry is idle")
+
+                if self.active:
+                    self.base.print_message("gamry finishes active action")
+                    _ = await self.active.finish()
+                    self.active = None
+                    self.action = None
+                    self.samples_in=[]
 
                 # endpoint can return even we got errors
                 self.IO_continue = True
@@ -590,7 +612,6 @@ class gamry:
                     "ierangemode":self.IO_IErange.name,
                     }
             )
-
             self.active =  await self.base.contain_action(
                 ActiveParams(
                              action = self.action,
@@ -798,12 +819,6 @@ class gamry:
             # connection will be closed in IOloop
             self.dtaqsink = dummy_sink()
 
-            self.base.print_message("gamry finishes active action")
-            _ = await self.active.finish()
-            self.active = None
-            self.action = None
-            self.samples_in=[]
-
             return {"measure": f"done_{self.IO_meas_mode}"}
         else:
             self.IO_measuring = False
@@ -913,6 +928,7 @@ class gamry:
         
         activeDict["data"] = {"err_code": err_code, "eta": eta}
         return activeDict
+
 
     async def technique_LSV(
         self, A: Action,
