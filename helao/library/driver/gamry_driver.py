@@ -186,7 +186,6 @@ class gamry:
         self.IO_sigramp = None
         self.IO_TTLwait = -1
         self.IO_TTLsend = -1
-        self.IO_estop = False
         self.IO_IErange = Gamry_IErange("auto")
 
         myloop = asyncio.get_event_loop()
@@ -221,10 +220,10 @@ class gamry:
                 self.IO_do_meas = await self.IO_signalq.get()
                 if self.IO_do_meas and not self.IO_measuring:
                     # are we in estop?
-                    if not self.IO_estop:
+                    if not self.base.actionserver.estop:
                         self.base.print_message("Gamry got measurement request")
                         await self.measure()
-                        if self.IO_estop:
+                        if self.base.actionserver.estop:
                             self.IO_do_meas = False
                             self.base.print_message("Gamry is in estop after measurement.")
                         else:
@@ -828,13 +827,15 @@ class gamry:
         """same as stop, set or clear estop flag with switch parameter"""
         # should be the same as stop()
         switch = bool(switch)
-        self.IO_estop = switch
+        self.base.actionserver.estop = switch
         if self.IO_measuring:
             if switch:
                 self.IO_do_meas = False # will stop meas loop
                 await self.set_IO_signalq(False)
                 if self.active:
+                    # add estop status to active.status
                     await self.active.set_estop()
+        return switch
 
 
     async def technique_wrapper(

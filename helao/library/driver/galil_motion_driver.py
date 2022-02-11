@@ -43,25 +43,11 @@ class galil:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
 
-        self.config_dict["estop_motor"] = False
-        self.config_dict["estop_io"] = False
 
         # need to check if config settings exist
         # else need to create empty ones
         if "axis_id" not in self.config_dict:
             self.config_dict["axis_id"] = dict()
-
-        if "Din_id" not in self.config_dict:
-            self.config_dict["Din_id"] = dict()
-
-        if "Dout_id" not in self.config_dict:
-            self.config_dict["Dout_id"] = dict()
-
-        if "Aout_id" not in self.config_dict:
-            self.config_dict["Aout_id"] = dict()
-
-        if "Ain_id" not in self.config_dict:
-            self.config_dict["Ain_id"] = dict()
 
         # this is only here for testing purposes to supply a matrix
         if "Transfermatrix" not in self.config_dict:
@@ -388,7 +374,7 @@ class galil:
         # expected time for each move, used for axis stop check
         timeofmove = []
 
-        if self.config_dict["estop_motor"] == True:
+        if self.base.actionserver.estop:
             return {
                 "moved_axis": None,
                 "speed": None,
@@ -522,7 +508,7 @@ class galil:
         # wait for expected axis move time before checking if axis stoppped
         self.base.print_message(f"axis expected to stop in {tmax} sec")
 
-        if self.config_dict["estop_motor"] == False:
+        if not self.base.actionserver.estop:
 
             # check if all axis stopped
             tstart = time.time()
@@ -530,16 +516,15 @@ class galil:
                 tout = self.config_dict["timeout"]
             else:
                 tout = 60
-            while (time.time() - tstart < tout) and self.config_dict[
-                "estop_motor"
-            ] == False:
+            while (time.time() - tstart < tout) \
+            and not self.base.actionserver.estop:
                 qmove = await self.query_axis_moving(axis)
                 #                time.sleep(0.5) # TODO: what time is ok to wait and not to overload the Galil
                 await asyncio.sleep(0.5)
                 if all(qmove["err_code"]):
                     break
 
-            if self.config_dict["estop_motor"] == False:
+            if not self.base.actionserver.estop:
                 # stop of motor movement (motor still on)
                 if time.time() - tstart > tout:
                     await self.stop_axis(axis)
@@ -684,7 +669,7 @@ class galil:
         return self.c("RS")
 
 
-    async def estop_axis(self, switch,*args,**kwargs):
+    async def estop(self, switch:bool, *args, **kwargs):
         # this will estop the axis
         # set estop: switch=true
         # release estop: switch=false
@@ -693,28 +678,12 @@ class galil:
             await self.stop_axis(await self.get_all_axis())
             await self.motor_off(await self.get_all_axis())
             # set flag (move command need to check for it)
-            self.config_dict["estop_motor"] = True
+            self.base.actionserver.estop = True
         else:
             # need only to set the flag
-            self.config_dict["estop_motor"] = False
+            self.base.actionserver.estop = False
         return switch
 
-
-    async def estop_io(self, switch):
-        # this will estop the io
-        # set estop: switch=true
-        # release estop: switch=false
-        self.base.print_message("IO Estop")
-        if switch == True:
-            await self.break_infinite_digital_cycles()
-            await self.digital_out_off(await self.get_all_digital_out())
-            await self.set_analog_out(await self.get_all_analoh_out(), 0)
-            # set flag
-            self.config_dict["estop_io"] = True
-        else:
-            # need only to set the flag
-            self.config_dict["estop_io"] = False
-        return switch
 
     async def stop_axis(self, axis):
         # this will stop the current motion of the axis
@@ -796,120 +765,6 @@ class galil:
         return ret
 
 
-    async def get_analog_in(self, 
-                            port:int,
-                            ai_name:str="analog_in",
-                            *args,**kwargs):
-        err_code = error_codes.none
-        ret = None
-        if port in self.config_dict["Ain_id"]:
-            pID = self.config_dict["Ain_id"][port]
-            ret = self.c(f"@AN[{int(pID)}]")
-        else:
-            err_code = error_codes.not_available
-
-        return {
-                "error_code": err_code,
-                "port": port,
-                "name": ai_name,
-                "type": "analog_in",
-                "value": ret
-               }
-
-
-    async def get_digital_in(self, 
-                             port:int, 
-                             di_name:str="digital_in",
-                             *args,**kwargs):
-        err_code = error_codes.none
-        ret = None
-        if port in self.config_dict["Din_id"]:
-            pID = self.config_dict["Din_id"][port]
-            ret = self.c(f"@IN[{int(pID)}]")
-        else:
-            err_code = error_codes.not_available
-
-        return {
-                "error_code": err_code,
-                "port": port,
-                "name": di_name,
-                "type": "digital_in",
-                "value": ret
-               }
-
-
-    async def get_digital_out(self, 
-                              port:int,
-                              do_name:str="digital_out",
-                              *args,**kwargs):
-        err_code = error_codes.none
-        ret = None
-        if port in self.config_dict["Dout_id"]:
-            pID = self.config_dict["Dout_id"][port]
-            ret = self.c(f"@OUT[{int(pID)}]")
-        else:
-            err_code = error_codes.not_available
-
-        return {
-                "error_code": err_code,
-                "port": port,
-                "name": do_name,
-                "type": "digital_out",
-                "value": ret
-               }
-
-
-    # def set_analog_out(self, ports, handle: int, module: int, bitnum: int, multi_value):
-    async def set_analog_out(self, 
-                             port:int, 
-                             value:float,
-                             ao_name:str="analog_out",
-                             *args,**kwargs):
-        err_code = error_codes.not_available
-        # this is essentially a placeholder for now since the DMC-4143 does not support
-        # analog out but I believe it is worthwhile to have this in here for the RIO
-        # Handle num is A-H and must be on port 502 for the modbus commons
-        # module is the position of the module from 1 to 16
-        # bitnum is the IO point in the module from 1-4
-        # the fist value n_0
-        # n_0 = handle * 1000 + (module - 1) * 4 + bitnum
-        # _ = self.c("AO {},{}".format(port, value))
-        return {
-                "error_code": err_code,
-                "port": port,
-                "name": ao_name,
-                "type": "analog_out",
-                "value": None
-               }
-
-
-    async def set_digital_out(self, 
-                              port:int, 
-                              on:bool, 
-                              do_name:str="digital_out",
-                              *args,**kwargs):
-        err_code = error_codes.none
-        on = bool(on)
-        ret = None
-        if port in self.config_dict["Dout_id"]:
-            pID = self.config_dict["Dout_id"][port]
-            if on:
-                _ = self.c(f"SB {int(pID)}")
-            else:
-                _ = self.c(f"CB {int(pID)}")
-            ret = self.c(f"@OUT[{int(pID)}]")
-        else:
-            err_code = error_codes.not_available
-
-        return {
-                "error_code": err_code,
-                "port": port,
-                "name": do_name,
-                "type": "digital_out",
-                "value": ret
-               }
-
-
     async def upload_DMC(self, DMC_prog):
         self.c("UL;")  # begin upload
         # upload line by line from DMC_prog
@@ -917,39 +772,6 @@ class galil:
             self.c(DMC_prog_line)
         self.c("\x1a")  # terminator "<cntrl>Z"
 
-    async def set_digital_cycle(self, trigger_port:int, out_port:int, t_cycle:float,*args,**kwargs):
-        DMC_prog = pathlib.Path(
-            os.path.join(driver_path, "galil_toogle.dmc")
-        ).read_text()
-        DMC_prog = DMC_prog.format(
-            p_trigger=trigger_port, p_output=out_port, t_time=t_cycle
-        )
-        self.upload_DMC(DMC_prog)
-        # self.c("XQ")
-        self.c("XQ #main")  # excecute main routine
-
-
-    async def infinite_digital_cycles(
-        self, on_time:float=0.2, off_time:float=0.2, port:int=0, init_time:float=0,*args,**kwargs
-    ):
-        self.cycle_lights = True
-        time.sleep(init_time)
-        while self.cycle_lights:
-            await self.set_digital_out(port, True)
-            time.sleep(on_time)
-            await self.set_digital_out(port, False)
-            time.sleep(off_time)
-        return {
-            "ports": port,
-            "value": "ran_infinite_light_cycles",
-            "type": "digital_out",
-        }
-
-
-    async def break_infinite_digital_cycles(
-        self, on_time=0.2, off_time=0.2, port=0, init_time=0
-    ):
-        self.cycle_lights = False
 
     async def get_all_axis(self):
         return [ax for ax in self.config_dict["axis_id"]]

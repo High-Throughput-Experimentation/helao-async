@@ -294,7 +294,6 @@ class PAL:
 
         # for global IOloop
         self.IO_do_meas = False
-        self.IO_estop = False
         # holds the parameters for the PAL
         self.IO_palcam = PalCam()
         # check for that to return FASTapi post
@@ -1725,7 +1724,7 @@ class PAL:
         while True:
             await asyncio.sleep(1)
             if self.IO_do_meas:
-                if not self.IO_estop:
+                if not self.base.actionserver.estop:
                     # create active and check sample_in
                     await self._PAL_IOloop_meas_start_helper()
 
@@ -1866,7 +1865,7 @@ class PAL:
         self.active = None
         self.action = None
 
-        if self.IO_estop:
+        if self.base.actionserver.estop:
             self.base.print_message("PAL is in estop.")
         else:
             self.base.print_message("setting PAL to idle")

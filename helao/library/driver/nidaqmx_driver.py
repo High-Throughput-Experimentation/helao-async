@@ -80,7 +80,6 @@ class cNIMAX:
         self.task_cellvoltage = None
         self.IO_do_meas = False  # signal flag for intent (start/stop)
         self.IO_measuring = False  # status flag of measurement
-        self.IO_estop = False
         self.activeCell = [False for _ in range(9)]
         
 
@@ -198,7 +197,7 @@ class cNIMAX:
     def streamIV_callback(
         self, task_handle, every_n_samples_event_type, number_of_samples, callback_data
     ):
-        if self.IO_do_meas and not self.IO_estop:
+        if self.IO_do_meas and not self.base.actionserver.estop:
             try:
                 self.IO_measuring = True
 
@@ -249,7 +248,7 @@ class cNIMAX:
             except Exception:
                 self.base.print_message("canceling NImax IV stream")
 
-        elif self.IO_estop and self.IO_do_meas:
+        elif self.base.actionserver.estop and self.IO_do_meas:
             _ = self.task_cellcurrent.read(
                 number_of_samples_per_channel=number_of_samples
             )
@@ -286,7 +285,7 @@ class cNIMAX:
                 self.IO_do_meas = await self.IO_signalq.get()
                 if self.IO_do_meas and not self.IO_measuring:
                     # are we in estop?
-                    if not self.IO_estop:
+                    if not self.base.actionserver.estop:
                         self.base.print_message("NImax IV task got measurement request")
 
 
@@ -320,7 +319,7 @@ class cNIMAX:
                         self.samples_in = []
 
 
-                        if self.IO_estop:
+                        if self.base.actionserver.estop:
                             self.base.print_message("NImax IV task is in estop.")
                             # await self.stat.set_estop()
                         else:
@@ -500,9 +499,10 @@ class cNIMAX:
     async def estop(self, switch:bool, *args, **kwargs):
         """same as estop, but also sets flag"""
         switch = bool(switch)
-        self.IO_estop = switch
+        self.base.actionserver.estop = switch
         if self.IO_measuring:
             if switch:
                 await self.IO_signalq.put(False)
                 if self.active:
                     await self.active.set_estop()
+        return switch
