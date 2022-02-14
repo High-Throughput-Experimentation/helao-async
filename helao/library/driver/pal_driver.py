@@ -299,6 +299,10 @@ class PAL:
         # check for that to return FASTapi post
         self.IO_continue = False
         self.IO_error = error_codes.none
+        
+        # counts the total submission
+        # for split actions
+        self.IO_action_run_counter: int = 0
 
         myloop = asyncio.get_event_loop()
         # add meas IOloop
@@ -442,6 +446,7 @@ class PAL:
                 # after each pal trigger:
                 # as a pal action can contain many actions which modify
                 # samples in a complex manner
+                # (0) split action if its not the first one
                 # (1) we need to update all input samples from the db to get 
                 #     most up-to-date information
                 # (2) then update the new samples (sample_out) 
@@ -460,8 +465,13 @@ class PAL:
                 # (7) update all positions in the archive 
                 #     with new final samples
                 # (8) write all output files
-                # (9) split action
 
+
+
+                # (0) split action
+                if self.IO_action_run_counter > 0:
+                    _ = await self.active.split()
+                self.IO_action_run_counter += 1
 
                 # -- (1) -- get most recent information for all sample_in
                 # palaction.sample_in should always be non ref samples
@@ -583,9 +593,16 @@ class PAL:
                         ]
 
                         tmpdata = {k: [v] for k, v in zip(self.FIFO_column_headings, logdata)}
+                        # self.active.action.file_conn_keys holds the current
+                        # active file conn keys
+                        # cannot use the one which we used for contain action
+                        # as action.split will generate a new one
+                        # but will always update the one in
+                        # self.active.action.file_conn_keys[0]
+                        # to the current one
                         await self.active.enqueue_data(datamodel = \
                                DataModel(
-                                         data = {self.base.dflt_file_conn_key():\
+                                         data = {self.active.action.file_conn_keys[0]:\
                                                     tmpdata
                                                  },
                                          errors = []
@@ -1812,11 +1829,11 @@ class PAL:
     async def _PAL_IOloop_meas_start_helper(self) -> None:
         """sets active object and
         checks samples_in"""
-
+        self.IO_action_run_counter = 0
         self.active = await self.base.contain_action(
         ActiveParams(
-             action = self.action,
-            file_conn_params_list = [
+            action = self.action,
+            file_conn_params_dict = {self.base.dflt_file_conn_key():
                 FileConnParams(
                                file_conn_key = \
                                    self.base.dflt_file_conn_key(),
@@ -1824,13 +1841,14 @@ class PAL:
                                json_data_keys = self.FIFO_column_headings,
                                file_type="pal_helao__file",
                               )
-                             ]
+                             }
         ))
 
 
         self.base.print_message(f"Active action uuid is {self.active.action.action_uuid}")
         if self.active:
-            self.active.finish_hlo_header(realtime=await self.active.set_realtime())
+            self.active.finish_hlo_header(file_conn_keys=self.active.action.file_conn_keys,
+                                          realtime=await self.active.set_realtime())
 
         self.base.print_message(f"PAL_sample_in: {self.IO_palcam.sample_in}")
         # update sample list with correct information from db if possible
@@ -1846,6 +1864,7 @@ class PAL:
         self.IO_continue = True
         # done sending all PAL commands
         self.IO_do_meas = False
+        self.IO_action_run_counter = 0
 
         # add sample in and out to prc
             

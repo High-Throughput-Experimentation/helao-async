@@ -70,7 +70,7 @@ def makeApp(confPrefix, servKey):
     
 
     if dev_mastercell:
-        @app.post(f"/{servKey}/mastercell")
+        @app.post(f"/{servKey}/mastercell", tags=["public"])
         async def mastercell(
                              action: Optional[Action] = \
                                      Body({}, embed=True),
@@ -98,7 +98,7 @@ def makeApp(confPrefix, servKey):
 
 
     if dev_activecell:
-        @app.post(f"/{servKey}/activecell")
+        @app.post(f"/{servKey}/activecell", tags=["public"])
         async def activecell(
                              action: Optional[Action] = \
                                      Body({}, embed=True),
@@ -126,7 +126,7 @@ def makeApp(confPrefix, servKey):
 
 
     if dev_pump:
-        @app.post(f"/{servKey}/pump")
+        @app.post(f"/{servKey}/pump", tags=["public"])
         async def pump(
                        action: Optional[Action] = \
                                Body({}, embed=True),
@@ -154,7 +154,7 @@ def makeApp(confPrefix, servKey):
 
 
     if dev_gasvalve:
-        @app.post(f"/{servKey}/gasvalve")
+        @app.post(f"/{servKey}/gasvalve", tags=["public"])
         async def gasvalve(
                            action: Optional[Action] = \
                                    Body({}, embed=True),
@@ -182,7 +182,7 @@ def makeApp(confPrefix, servKey):
 
 
     if dev_liquidvalve:
-        @app.post(f"/{servKey}/liquidvalve")
+        @app.post(f"/{servKey}/liquidvalve", tags=["public"])
         async def liquidvalve(
                              action: Optional[Action] = \
                                      Body({}, embed=True),
@@ -210,7 +210,7 @@ def makeApp(confPrefix, servKey):
 
 
     if dev_led:
-        @app.post(f"/{servKey}/led")
+        @app.post(f"/{servKey}/led", tags=["public"])
         async def led(
                       action: Optional[Action] = \
                               Body({}, embed=True),
@@ -238,7 +238,7 @@ def makeApp(confPrefix, servKey):
 
 
     if dev_fswbcd:
-        @app.post(f"/{servKey}/fswbcd")
+        @app.post(f"/{servKey}/fswbcd", tags=["public"])
         async def fswbcd(
                          action: Optional[Action] = \
                                  Body({}, embed=True),
@@ -266,7 +266,7 @@ def makeApp(confPrefix, servKey):
 
 
     if dev_fsw:
-        @app.post(f"/{servKey}/fsw")
+        @app.post(f"/{servKey}/fsw", tags=["public"])
         async def fsw(
                       action: Optional[Action] = \
                               Body({}, embed=True),
@@ -293,7 +293,7 @@ def makeApp(confPrefix, servKey):
 
 
     if dev_cellcurrent and dev_cellvoltage:
-        @app.post(f"/{servKey}/cellIV")
+        @app.post(f"/{servKey}/cellIV", tags=["public"])
         async def cellIV(
                          action: Optional[Action] = \
                                  Body({}, embed=True),
@@ -311,7 +311,7 @@ def makeApp(confPrefix, servKey):
             return active_dict
 
 
-    @app.post(f"/{servKey}/stop")
+    @app.post(f"/{servKey}/stop", tags=["public"])
     async def stop(
                    action: Optional[Action] = \
                            Body({}, embed=True),
@@ -327,7 +327,7 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
 
-    @app.post("/shutdown")
+    @app.post("/shutdown", tags=["private"])
     def post_shutdown():
         shutdown_event()
 

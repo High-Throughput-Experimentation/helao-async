@@ -587,7 +587,7 @@ class gamry:
                         self.dtaq.SetDecimation(False)
         
                     self.dtaqsink = GamryDtaqEvents(self.dtaq)
-                    self.base.print_message(f"!!! initialized dtaqsink with status {self.dtaqsink.status} in mode setup_{mode}")
+                    self.base.print_message(f"initialized dtaqsink with status {self.dtaqsink.status} in mode setup_{mode}")
                     
 
             except comtypes.COMError as e:
@@ -615,10 +615,12 @@ class gamry:
             self.active =  await self.base.contain_action(
                 ActiveParams(
                              action = self.action,
-                             file_conn_params_list = [
+                             file_conn_params_dict = {self.base.dflt_file_conn_key():
                                  FileConnParams(
-                                                file_conn_key = \
-                                                    self.base.dflt_file_conn_key(),
+                                     # use dflt file conn key for first
+                                     # init
+                                               file_conn_key = \
+                                                   self.base.dflt_file_conn_key(),
                                                 sample_global_labels=[sample.get_global_label() for sample in self.samples_in],
                                                 json_data_keys = self.FIFO_column_headings,
                                                 file_type="pstat_helao__file",
@@ -628,9 +630,9 @@ class gamry:
                                                     optional = self.FIFO_gamryheader
                                                 ),
                                                )
-                             ]
+                                 }
+
             ))
-            self.base.print_message(f"!!! Active action uuid is {self.active.action.action_uuid}")
             # active object is set so we can set the continue flag
             self.IO_continue = True
             
@@ -658,7 +660,7 @@ class gamry:
             # push the signal ramp over
             try:
                 self.pstat.SetSignal(self.IO_sigramp)
-                self.base.print_message("!!! signal ramp set")
+                self.base.print_message("signal ramp set")
             except Exception as e:
                 self.base.print_message("gamry error in signal")
                 self.base.print_message(gamry_error_decoder(e))
@@ -737,7 +739,7 @@ class gamry:
             try:
                 # get current time and start measurement
                 self.dtaq.Run(True)
-                self.base.print_message("!!! running dtaq")
+                self.base.print_message("running dtaq")
                 self.IO_measuring = True
             except Exception as e:
                 self.base.print_message("gamry error run")
@@ -752,8 +754,11 @@ class gamry:
             if self.active:
                 self.active.finish_hlo_header(
                                               realtime=realtime,
+                                              # use firt of currently
+                                              # active file_conn_keys
+                                              # split action will update it
                                               file_conn_keys = \
-                                               [self.base.dflt_file_conn_key()]
+                                               self.active.action.file_conn_keys
                                               )
                     
                     
@@ -763,7 +768,6 @@ class gamry:
             sink_status = self.dtaqsink.status
             counter = 0
 
-            # self.base.print_message(f"!!! sink_status is {sink_status}, loop flag is {self.IO_do_meas}")
 
             while (
                 # counter < len(self.dtaqsink.acquired_points)
@@ -790,7 +794,7 @@ class gamry:
                         if self.active.action.save_data:
                             await self.active.enqueue_data(datamodel = \
                                    DataModel(
-                                             data = {self.base.dflt_file_conn_key():\
+                                             data = {self.active.action.file_conn_keys[0]:\
                                                         {
                                                             k: [v]
                                                             for k, v in zip(
@@ -811,7 +815,7 @@ class gamry:
             self.IO_measuring = False
             self.dtaq.Run(False)
             self.pstat.SetCell(self.GamryCOM.CellOff)
-            self.base.print_message("!!! signaling IOloop to stop")
+            self.base.print_message("signaling IOloop to stop")
             await self.close_connection()
             await self.set_IO_signalq(False)
             # # delete this at the very last step
