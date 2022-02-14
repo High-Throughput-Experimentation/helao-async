@@ -14,7 +14,7 @@ __all__ = ["makeApp"]
 
 from importlib import import_module
 from typing import Optional, List, Union
-from fastapi import Request
+from fastapi import Body
 
 
 from helao.library.driver.galil_motion_driver import (
@@ -22,9 +22,9 @@ from helao.library.driver.galil_motion_driver import (
                                                       transformation_mode,
                                                       galil
                                                      )
-from helaocore.server import makeActionServ, setup_action
+from helaocore.server import makeActionServ
 from helaocore.helper import make_str_enum
-
+from helaocore.schema import Action
 
 def makeApp(confPrefix, servKey):
 
@@ -44,14 +44,16 @@ def makeApp(confPrefix, servKey):
 
     if dev_axis:
         @app.post(f"/{servKey}/setmotionref")
-        async def setmotionref(request: Request):
+        async def setmotionref(
+                               action: Optional[Action] = \
+                                       Body({}, embed=True)
+                              ):
             """Set the reference position for xyz by 
             (1) homing xyz, 
             (2) set abs zero, 
             (3) moving by center counts back, 
             (4) set abs zero"""
             active = await app.base.setup_and_contain_action(
-                                              request = request,
                                               json_data_keys = ["setref"],
                                               action_abbr = "setmotionref"
             )
@@ -63,12 +65,13 @@ def makeApp(confPrefix, servKey):
 
     # parse as {'M':json.dumps(np.matrix(M).tolist()),'platexy':json.dumps(np.array(platexy).tolist())}
     @app.post(f"/{servKey}/toMotorXY")
-    async def transform_platexy_to_motorxy(request: Request, 
-        platexy: Optional[str] = None
-    ):
+    async def transform_platexy_to_motorxy(
+                                           action: Optional[Action] = \
+                                                   Body({}, embed=True),
+                                           platexy: Optional[str] = None
+                                          ):
         """Converts plate to motor xy"""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["motorxy"],
                                           action_abbr = "tomotorxy"
         )
@@ -80,12 +83,13 @@ def makeApp(confPrefix, servKey):
 
     # parse as {'M':json.dumps(np.matrix(M).tolist()),'platexy':json.dumps(np.array(motorxy).tolist())}
     @app.post(f"/{servKey}/toPlateXY")
-    async def transform_motorxy_to_platexy(request: Request, 
-        motorxy: Optional[str] = None
-    ):
+    async def transform_motorxy_to_platexy(
+                                           action: Optional[Action] = \
+                                                   Body({}, embed=True),
+                                           motorxy: Optional[str] = None
+                                          ):
         """Converts motor to plate xy"""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["platexy"],
                                           action_abbr = "toplatexy"
         )
@@ -96,12 +100,13 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/MxytoMPlate")
-    async def MxytoMPlate(request: Request, 
-        Mxy: Optional[str] = None
-    ):
+    async def MxytoMPlate(
+                          action: Optional[Action] = \
+                                  Body({}, embed=True),
+                          Mxy: Optional[str] = None
+                         ):
         """removes Minstr from Msystem to obtain Mplate for alignment"""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["mplate"],
                                           action_abbr = "mxytomplate"
         )
@@ -112,14 +117,14 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/download_alignmentmatrix")
-    async def download_alignmentmatrix(request: Request, 
-        
-    ):
+    async def download_alignmentmatrix(
+                                       action: Optional[Action] = \
+                                               Body({}, embed=True),
+                                      ):
         """Get current in use Alignment from motion server
            returns the xy part of the platecalibration.
         """
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["mplatexy"],
                                           action_abbr = "get_mplatexy"
         )
@@ -131,14 +136,14 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/upload_alignmentmatrix")
     async def upload_alignmentmatrix(
-                                     request: Request,
+                                     action: Optional[Action] = \
+                                             Body({}, embed=True),
                                      Mxy: Optional[str] = None
                                     ):
         """Send new Alignment to motion server.
            Updates the xy part of the plate calibration.
         """
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["uploaded"],
                                           action_abbr = "upload_mplatexy"
         )
@@ -151,18 +156,18 @@ def makeApp(confPrefix, servKey):
     if dev_axis:
         @app.post(f"/{servKey}/move")
         async def move(
-            request: Request, 
-            d_mm: Optional[List[float]] = [0,0],
-            axis: Optional[List[str]] = ["x","y"],
-            speed: Optional[int] = None,
-            mode: Optional[move_modes] = "relative",
-            transformation: Optional[transformation_mode] = "motorxy"  # default, nothing to do
-        ):
+                       action: Optional[Action] = \
+                               Body({}, embed=True),
+                       d_mm: Optional[List[float]] = [0,0],
+                       axis: Optional[List[str]] = ["x","y"],
+                       speed: Optional[int] = None,
+                       mode: Optional[move_modes] = "relative",
+                       transformation: Optional[transformation_mode] = "motorxy"  # default, nothing to do
+                      ):
             """Move a apecified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
             Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.
             No z, Rx, Ry, Rz when platexy selected."""
             active = await app.base.setup_and_contain_action(
-                                              request = request,
                                               json_data_keys = [
                                                                 "moved_axis",
                                                                 "speed",
@@ -183,18 +188,18 @@ def makeApp(confPrefix, servKey):
     if dev_axis:
         @app.post(f"/{servKey}/easymove")
         async def easymove(
-            request: Request, 
-            axis: Optional[dev_axisitems],
-            d_mm: Optional[float] = 0,
-            speed: Optional[int] = None,
-            mode: Optional[move_modes] = "relative",
-            transformation: Optional[transformation_mode] = "motorxy"  # default, nothing to do
-        ):
+                           action: Optional[Action] = \
+                                   Body({}, embed=True),
+                           axis: Optional[dev_axisitems] = None,
+                           d_mm: Optional[float] = 0,
+                           speed: Optional[int] = None,
+                           mode: Optional[move_modes] = "relative",
+                           transformation: Optional[transformation_mode] = "motorxy"  # default, nothing to do
+                          ):
             """Move a apecified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
             Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.
             No z, Rx, Ry, Rz when platexy selected."""
             active = await app.base.setup_and_contain_action(
-                                              request = request,
                                               json_data_keys = [
                                                                 "moved_axis",
                                                                 "speed",
@@ -213,9 +218,11 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/disconnect")
-    async def disconnect(request: Request):
+    async def disconnect(
+                         action: Optional[Action] = \
+                                 Body({}, embed=True),
+                        ):
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["connection"],
                                           action_abbr = "disconnect"
         )
@@ -227,9 +234,11 @@ def makeApp(confPrefix, servKey):
 
     if dev_axis:
         @app.post(f"/{servKey}/query_positions")
-        async def query_positions(request: Request):
+        async def query_positions(
+                                  action: Optional[Action] = \
+                                          Body({}, embed=True),
+                                 ):
             active = await app.base.setup_and_contain_action(
-                                              request = request,
                                               json_data_keys = [
                                                                 "ax",
                                                                 "position"
@@ -244,12 +253,13 @@ def makeApp(confPrefix, servKey):
 
     if dev_axis:
         @app.post(f"/{servKey}/query_position")
-        async def query_position(request: Request, 
-            # axis: Optional[Union[List[str], str]] = None
-            axis: Optional[dev_axisitems]
+        async def query_position(
+                                 action: Optional[Action] = \
+                                         Body({}, embed=True),
+                                 # axis: Optional[Union[List[str], str]] = None
+                                 axis: Optional[dev_axisitems] = None
         ):
             active = await app.base.setup_and_contain_action(
-                                              request = request,
                                               json_data_keys = [
                                                                 "ax",
                                                                 "position"
@@ -264,11 +274,12 @@ def makeApp(confPrefix, servKey):
 
     if dev_axis:
         @app.post(f"/{servKey}/query_moving")
-        async def query_moving(request: Request, 
-            axis: Optional[Union[List[str], str]] = None
-        ):
+        async def query_moving(
+                               action: Optional[Action] = \
+                                       Body({}, embed=True),
+                               axis: Optional[Union[List[str], str]] = None
+                              ):
             active = await app.base.setup_and_contain_action(
-                                              request = request,
                                               json_data_keys = [
                                                                 "motor_status",
                                                                 "err_code"
@@ -284,13 +295,13 @@ def makeApp(confPrefix, servKey):
     if dev_axis:
         @app.post(f"/{servKey}/axis_off")
         async def axis_off(
-                           request: Request, 
+                           action: Optional[Action] = \
+                                   Body({}, embed=True),
                            # axis: Optional[Union[List[str], str]] = None
-                           axis: Optional[dev_axisitems]
+                           axis: Optional[dev_axisitems] = None
                           ):
             # http://127.0.0.1:8001/motor/set/off?axis=x
             active = await app.base.setup_and_contain_action(
-                                              request = request,
                                               json_data_keys = [
                                                                 "motor_status",
                                                                 "ax",
@@ -308,12 +319,12 @@ def makeApp(confPrefix, servKey):
     if dev_axis:
         @app.post(f"/{servKey}/axis_on")
         async def axis_on(
-                          request: Request, 
+                          action: Optional[Action] = \
+                                  Body({}, embed=True),
                           # axis: Optional[Union[List[str], str]] = None
-                          axis: Optional[dev_axisitems]
+                          axis: Optional[dev_axisitems] = None
                          ):
             active = await app.base.setup_and_contain_action(
-                                              request = request,
                                               json_data_keys = [
                                                                 "motor_status",
                                                                 "ax",
@@ -330,9 +341,11 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/stop")
-    async def stop(request: Request):
+    async def stop(
+                   action: Optional[Action] = \
+                           Body({}, embed=True),
+                  ):
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = [
                                                             "motor_status",
                                                             "ax",
@@ -348,12 +361,14 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/reset")
-    async def reset(request: Request):
+    async def reset(
+                    action: Optional[Action] = \
+                            Body({}, embed=True),
+                   ):
         """FOR EMERGENCY USE ONLY!
            resets galil device. 
         """
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = [
                                                             "reset",
                                                            ],

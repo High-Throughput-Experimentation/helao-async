@@ -4,9 +4,10 @@ __all__ = ["makeApp"]
 
 # data management server for HTE
 from typing import Optional
+from fastapi import Body
 from importlib import import_module
-from fastapi import Request
 from helaocore.server import makeActionServ
+from helaocore.schema import Action
 
 
 def makeApp(confPrefix, servKey):
@@ -45,12 +46,12 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/get_elements_plateid")
     async def get_elements_plateid(
-                                   request: Request, 
+                                   action: Optional[Action] = \
+                                           Body({}, embed=True),
                                    plateid: Optional[int]=None
                                   ):
         """Gets the elements from the screening print in the info file"""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["elements"],
         )
         await active.enqueue_data_dflt(datadict = \
@@ -62,12 +63,12 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/get_platemap_plateid")
     async def get_platemap_plateid(
-                                   request: Request, 
+                                   action: Optional[Action] = \
+                                           Body({}, embed=True),
                                    plateid: Optional[int]=None
                                   ):
         """gets platemap"""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["platemap"],
         )
         await active.enqueue_data_dflt(datadict = \
@@ -79,12 +80,12 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/get_platexycalibration") 
     async def get_platexycalibration(
-                                     request: Request, 
+                                     action: Optional[Action] = \
+                                             Body({}, embed=True),
                                      plateid: Optional[int]=None
                                     ):
         """gets saved plate alignment matrix"""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["platecal"],
         )
         await active.enqueue_data_dflt(datadict = \
@@ -96,12 +97,12 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/save_platexycalibration")
     async def save_platexycalibration(
-                                      request: Request, 
+                                      action: Optional[Action] = \
+                                              Body({}, embed=True),
                                       plateid: Optional[int]=None
                                      ):
         """saves alignment matrix"""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["platecal"],
         )
         await active.enqueue_data_dflt(datadict = \
@@ -113,12 +114,12 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/check_plateid")
     async def check_plateid(
-                            request: Request, 
+                            action: Optional[Action] = \
+                                    Body({}, embed=True),
                             plateid: Optional[int]=None
                            ):
         """checks that the plate_id (info file) exists"""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["plateid"],
         )
         await active.enqueue_data_dflt(datadict = \
@@ -130,12 +131,12 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/check_printrecord_plateid")
     async def check_printrecord_plateid(
-                                        request: Request, 
+                                        action: Optional[Action] = \
+                                                Body({}, embed=True),
                                         plateid: Optional[int]=None
                                        ):
         """checks that a print record exist in the info file"""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["printrecord"],
         )
         await active.enqueue_data_dflt(datadict = \
@@ -147,12 +148,12 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/check_annealrecord_plateid")
     async def check_annealrecord_plateid(
-                                         request: Request, 
+                                         action: Optional[Action] = \
+                                                 Body({}, embed=True),
                                          plateid: Optional[int]=None
                                         ):
         """checks that a anneal record exist in the info file"""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["annealrecord"],
         )
         await active.enqueue_data_dflt(datadict = \
@@ -164,11 +165,11 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/get_info_plateid")
     async def get_info_plateid(
-                               request: Request, 
+                               action: Optional[Action] = \
+                                       Body({}, embed=True),
                                plateid: Optional[int]=None
                               ):
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["info"],
         )
         await active.enqueue_data_dflt(datadict = \
@@ -180,11 +181,11 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/get_rcp_plateid")
     async def get_rcp_plateid(
-                              request: Request, 
+                              action: Optional[Action] = \
+                                      Body({}, embed=True),
                               plateid: Optional[int]=None
                              ):
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["rcp"],
         )
         await active.enqueue_data_dflt(datadict = \

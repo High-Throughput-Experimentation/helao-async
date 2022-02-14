@@ -6,7 +6,7 @@ from colorama import Fore, Style
 import sys
 
 
-import helaocore.model.sample as hcms
+import helaocore.model
 
 colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
 
@@ -22,13 +22,12 @@ def sample_model_unit_test():
         print(" --- testing single sample models ---")
         
         
-        test_liquid = hcms.LiquidSample()
-        test_gas = hcms.GasSample()
-        test_solid = hcms.SolidSample()
-        test_assembly = hcms.AssemblySample(parts=[None])
-        test_assembly2 = hcms.AssemblySample(parts=[test_gas, test_solid, test_liquid, test_assembly])
-        # test_assembly2 = assembly_sample(parts=33)
-        # test_assembly2 = assembly_sample(myparts=[])
+        test_liquid = helaocore.model.LiquidSample()
+        test_gas = helaocore.model.GasSample()
+        test_solid = helaocore.model.SolidSample()
+        test_assembly = helaocore.model.AssemblySample(parts=[helaocore.model.NoneSample()])
+        test_assembly2 = helaocore.model.AssemblySample(parts=[test_gas, test_solid, test_liquid, test_assembly])
+
         
         # testing some basic sampple functions
         try:
@@ -90,10 +89,9 @@ def sample_model_unit_test():
         
         print(" --- testing sample list ---")
         
-        
         try:
             print(f"sample_model test {testcounter} ",end = "")
-            test_sample_list = hcms.SampleList(samples=[test_liquid,test_gas,test_solid,test_assembly,test_assembly2])
+            test_sample_list = helaocore.model.SampleList(samples=[test_liquid,test_gas,test_solid,test_assembly,test_assembly2])
             print(passed_msg)
         except Exception as e:
             print(fail_msg, "cannot convert list of model dicts to model list")
@@ -107,7 +105,6 @@ def sample_model_unit_test():
             assert  test_sample_list.samples[0].sample_type == "liquid",fail_msg    
             print(passed_msg)
         except AssertionError:
-            print(test_sample_list.samples[0].dict())
             print(fail_msg, "sample_type is not liquid.")
             success = False
         
@@ -205,25 +202,22 @@ def sample_model_unit_test():
         
         
         print(" --- testing sample list when converted from dict---")
-        
         # testing sample list basemodel functions
         try:
             print(f"sample_model test {testcounter} ",end = "")
-            test_sample_list = hcms.SampleList(samples=[test_liquid.dict(),test_gas.dict(),test_solid.dict(),test_assembly.dict(), test_assembly2.dict()])
+            test_sample_list = helaocore.model.SampleList(samples=[test_liquid.dict(),test_gas.dict(),test_solid.dict(),test_assembly.dict(), test_assembly2.dict()])
             print(passed_msg)
         except Exception as e:
             print(fail_msg, "cannot convert list of model dicts to model list")
             print(e)
             return False
 
-            
         try:
             print(f"sample_model test {testcounter} ",end = "")
             testcounter+=1
             assert  test_sample_list.samples[0].sample_type == "liquid",fail_msg    
             print(passed_msg)
         except AssertionError:
-            print(test_sample_list.samples[0].dict())
             print(fail_msg, "sample_type is not liquid.")
             success = False
         
@@ -319,5 +313,6 @@ def sample_model_unit_test():
 
         return success
 
-    except Exception:
+    except Exception as e:
+        print(e)
         return False

@@ -37,18 +37,18 @@ a OrchHandler class object, the core functionality of an async orchestrator.
 __all__ = ["makeApp"]
 
 from importlib import import_module
-from fastapi import Request
 from typing import Optional
 import asyncio
 import time
+from fastapi import Body
 
-
-import helaocore.server
+from helaocore.server import makeOrchServ
+from helaocore.schema import Action
 
 def makeApp(confPrefix, servKey):
     config = import_module(f"helao.config.{confPrefix}").config
 
-    app = helaocore.server.makeOrchServ(
+    app = makeOrchServ(
         config,
         servKey,
         servKey,
@@ -57,24 +57,5 @@ def makeApp(confPrefix, servKey):
         driver_class=None
     )
 
-    @app.post(f"/{servKey}/wait")
-    async def wait(
-        request: Request,
-        waittime: Optional[float] = 0.0
-        ):
-        """Sleep action"""    
-        A = await helaocore.server.setup_action(request)
-        active = await app.orch.contain_action(action = A)
-        waittime = A.action_params["waittime"]
-        app.orch.print_message(' ... wait action:', waittime)
-        start_time = time.time()
-        last_time = start_time
-        while time.time()-start_time < waittime:
-            await asyncio.sleep(1)
-            app.orch.print_message(f" ... orch waited {(time.time()-start_time):.1f} sec / {waittime:.1f} sec")
-        # await asyncio.sleep(waittime)
-        app.orch.print_message(' ... wait action done')
-        finished_action = await active.finish()
-        return finished_action.as_dict()
 
     return app

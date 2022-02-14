@@ -13,7 +13,7 @@ __all__ = ["debug",
 from typing import Optional, List, Union
 
 from helaocore.schema import Action, Experiment, ActionPlanMaker
-from helaocore.server import action_start_condition
+from helaocore.model.action_start_condition import ActionStartCondition
 from helao.library.driver.pal_driver import PALmethods, Spacingmethod, PALtools
 import helaocore.model.sample as hcms
 
@@ -81,7 +81,7 @@ def debug(pg_Obj: Experiment,
                         },
         # "save_act": False,
         # "save_data": False,
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })
     action_list.append(Action(inputdict=action_dict))
 
@@ -123,7 +123,7 @@ def CA(pg_Obj: Experiment,
                         },
         "save_act": True,
         "save_data": True,
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         # "plate_id": None,
         })
     action_list.append(Action(inputdict=action_dict))
@@ -156,7 +156,7 @@ def OCV_sqtest(pg_Obj: Experiment,
                         },
         "save_act": True,
         "save_data": True,
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         }
     )
 
@@ -192,7 +192,7 @@ def CA_sqtest(pg_Obj: Experiment,
                         },
         "save_act": True,
         "save_data": True,
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         }
     )
 
