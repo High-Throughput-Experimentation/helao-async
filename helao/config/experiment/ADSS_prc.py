@@ -26,7 +26,7 @@ from typing import Optional, List, Union
 from socket import gethostname
 
 from helaocore.schema import Action, Experiment, ActionPlanMaker
-from helaocore.server import action_start_condition
+from helaocore.model.action_start_condition import ActionStartCondition
 import helaocore.model.sample as hcms
 
 from helao.library.driver.galil_motion_driver import move_modes, transformation_mode
@@ -80,7 +80,7 @@ def debug(pg_Obj: Experiment,
         "action_params": {
                         "custom": "cell1_we"
                         },
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })
 
     sq.add_action({
@@ -93,7 +93,7 @@ def debug(pg_Obj: Experiment,
                                                               "machine_name":"legacy"
                                                              }).dict(),
                         },
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })
 
     sq.add_action({
@@ -103,7 +103,7 @@ def debug(pg_Obj: Experiment,
                         "custom": "cell1_we",
                         },
         "to_global_params":["_fast_sample_in"], # save new liquid_sample_no of eche cell to globals
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })
 
 
@@ -121,7 +121,7 @@ def debug(pg_Obj: Experiment,
         "from_global_params":{
                     "_fast_sample_in":"fast_samples_in"
                     },
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })
 
 
@@ -139,7 +139,7 @@ def ADSS_slave_unloadall_customs(pg_Obj: Experiment):
         "action_name": "archive_custom_unloadall",
         "action_params": {
                         },
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })
 
     return sq.action_list # returns complete action list to orch
@@ -164,7 +164,7 @@ def ADSS_slave_load_solid(
                                                               "machine_name":"legacy"
                                                              }).dict(),
                         },
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })
     return sq.action_list # returns complete action list to orch
 
@@ -186,7 +186,7 @@ def ADSS_slave_load_liquid(
                                                                "machine_name":gethostname()
                                                               }).dict(),
                         },
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })
     return sq.action_list # returns complete action list to orch
 
@@ -239,7 +239,7 @@ def ADSS_slave_startup(pg_Obj: Experiment,
                          "pump":"peripump",
                          "on": 0,
                          },
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
     # set pump flow forward
@@ -250,7 +250,7 @@ def ADSS_slave_startup(pg_Obj: Experiment,
                          "pump":"direction",
                          "on": 0,
                          },
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
 
@@ -270,7 +270,7 @@ def ADSS_slave_startup(pg_Obj: Experiment,
                         },
         "save_act": debug_save_act,
         "save_data": debug_save_data,
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
     # seal cell
@@ -301,7 +301,7 @@ def ADSS_slave_shutdown(pg_Obj: Experiment):
     #                       },
     #     # "save_act": True,
     #     # "save_data": True,
-    #     "start_condition": action_start_condition.wait_for_all,
+    #     "start_condition": ActionStartCondition.wait_for_all,
     #     # "plate_id": None,
     #     })
 
@@ -313,7 +313,7 @@ def ADSS_slave_shutdown(pg_Obj: Experiment):
                          "pump":"direction",
                          "on": 1,
                          },
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
     # wait some time to pump out the liquid
@@ -323,7 +323,7 @@ def ADSS_slave_shutdown(pg_Obj: Experiment):
         "action_params": {
                          "waittime":120,
                          },
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
 
@@ -339,7 +339,7 @@ def ADSS_slave_shutdown(pg_Obj: Experiment):
                          "pump":"peripump",
                          "on": 0,
                          },
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
     # set pump flow forward
@@ -350,7 +350,7 @@ def ADSS_slave_shutdown(pg_Obj: Experiment):
                          "pump":"direction",
                          "on": 0,
                          },
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
 
@@ -394,7 +394,7 @@ def ADSS_slave_engage(pg_Obj: Experiment):
                         },
         "save_act": debug_save_act,
         "save_data": debug_save_data,
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
     # seal
@@ -409,7 +409,7 @@ def ADSS_slave_engage(pg_Obj: Experiment):
                         },
         "save_act": debug_save_act,
         "save_data": debug_save_data,
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
     return sq.action_list # returns complete action list to orch
@@ -434,7 +434,7 @@ def ADSS_slave_disengage(pg_Obj: Experiment):
                         },
         "save_act": debug_save_act,
         "save_data": debug_save_data,
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
     return sq.action_list # returns complete action list to orch
@@ -460,7 +460,7 @@ def ADSS_slave_clean_PALtool(pg_Obj: Experiment,
                           "tool": sq.pars.clean_tool,
                           "volume_ul": sq.pars.clean_volume_ul,
                           },
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
     return sq.action_list # returns complete action list to orch
@@ -486,7 +486,7 @@ def ADSS_slave_fillfixed(pg_Obj: Experiment,
                           "wash3": 0,
                           "wash4": 0,
                           },
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })
 
 
@@ -498,7 +498,7 @@ def ADSS_slave_fillfixed(pg_Obj: Experiment,
                           "pump":"direction",
                           "on": 0,
                           },
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
     # turn on pump
@@ -509,7 +509,7 @@ def ADSS_slave_fillfixed(pg_Obj: Experiment,
                           "pump":"peripump",
                           "on": 1,
                           },
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
 
@@ -520,7 +520,7 @@ def ADSS_slave_fillfixed(pg_Obj: Experiment,
         "action_params": {
                           "waittime":sq.pars.filltime_sec,
                           },
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
     return sq.action_list # returns complete action list to orch
@@ -543,7 +543,7 @@ def ADSS_slave_fill(pg_Obj: Experiment, fill_vol_ul: Optional[int] = 1000):
                           "wash3": 0,
                           "wash4": 0,
                           },
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })
 
     return sq.action_list # returns complete action list to orch
@@ -570,7 +570,7 @@ def ADSS_slave_CA(pg_Obj: Experiment,
                         "custom": "cell1_we",
                         },
         "to_global_params":["_fast_sample_in"], # save new liquid_sample_no of eche cell to globals
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })
     
     # OCV
@@ -587,7 +587,7 @@ def ADSS_slave_CA(pg_Obj: Experiment,
         "from_global_params":{
                     "_fast_sample_in":"fast_samples_in"
                     },
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })
 
 
@@ -608,7 +608,7 @@ def ADSS_slave_CA(pg_Obj: Experiment,
                           "wash3": 0,
                           "wash4": 0,
                           },
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })
 
 
@@ -619,7 +619,7 @@ def ADSS_slave_CA(pg_Obj: Experiment,
                         "custom": "cell1_we",
                         },
         "to_global_params":["_fast_sample_in"], # save new liquid_sample_no of eche cell to globals
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })
 
 
@@ -640,7 +640,7 @@ def ADSS_slave_CA(pg_Obj: Experiment,
         "from_global_params":{
                     "_fast_sample_in":"fast_samples_in"
                     },
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })
 
 
@@ -661,7 +661,7 @@ def ADSS_slave_CA(pg_Obj: Experiment,
                           "wash3": 0,
                           "wash4": 0,
                           },
-        "start_condition": action_start_condition.wait_for_endpoint, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_endpoint, # orch is waiting for all action_dq to finish
         })
 
 
@@ -682,7 +682,7 @@ def ADSS_slave_CA(pg_Obj: Experiment,
                           "wash3": 1,
                           "wash4": 1,
                           },
-        "start_condition": action_start_condition.wait_for_all, # orch is waiting for all action_dq to finish
+        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })
 
     return sq.action_list # returns complete action list to orch
@@ -718,7 +718,7 @@ def ADSS_slave_tray_unload(
                           "tray": sq.pars.tray,
                           "slot": sq.pars.slot,
                           },
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
     sq.add_action({
@@ -728,7 +728,7 @@ def ADSS_slave_tray_unload(
                           "tray": sq.pars.tray,
                           "slot": sq.pars.slot,
                           },
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
     sq.add_action({
@@ -741,7 +741,7 @@ def ADSS_slave_tray_unload(
                           "main_runs":sq.pars.main_runs,
                           "rack":sq.pars.rack,
                           },
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
 
@@ -752,7 +752,7 @@ def ADSS_slave_tray_unload(
                           "tray": sq.pars.tray,
                           "slot": sq.pars.slot,
                           },
-        "start_condition": action_start_condition.wait_for_all,
+        "start_condition": ActionStartCondition.wait_for_all,
         })
 
 

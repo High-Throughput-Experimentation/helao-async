@@ -12,10 +12,11 @@ driver code, and hard-coded to use 'galil' class (see "__main__").
 __all__ = ["makeApp"]
 
 from typing import Optional
+from fastapi import Body
 from importlib import import_module
-from fastapi import Request
-from helaocore.server import makeActionServ, setup_action
+from helaocore.server import makeActionServ
 from helao.library.driver.galil_io_driver import galil
+from helaocore.schema import Action
 
 
 def makeApp(confPrefix, servKey):
@@ -34,14 +35,11 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/get_analog_in")
     async def get_analog_in(
-                            request: Request,
+                            action: Optional[Action] = \
+                                    Body({}, embed=True),
                             port:Optional[int] = None
                            ):
-
-
-
-
-        A = await setup_action(request)
+        A = await app.base.setup_action()
         active = await app.base.contain_action(A,
                 json_data_keys=["error_code", "port", "name", "type", "value"])
         await active.enqueue_data(app.driver.get_analog_in(**A.action_params))
@@ -51,12 +49,12 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/set_analog_out")
     async def set_analog_out(
-                             request: Request,
+                             action: Optional[Action] = \
+                                     Body({}, embed=True),
                              port:Optional[int] = None,
                              value:Optional[float] = None
                             ):
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = [
                                                             "error_code", 
                                                             "port", 
@@ -74,11 +72,11 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/get_digital_in")
     async def get_digital_in(
-                             request: Request,
+                             action: Optional[Action] = \
+                                     Body({}, embed=True),
                              port:Optional[int] = None
                             ):
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = [
                                                             "error_code", 
                                                             "port", 
@@ -96,11 +94,11 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/get_digital_out")
     async def get_digital_out(
-                              request: Request,
+                              action: Optional[Action] = \
+                                      Body({}, embed=True),
                               port:Optional[int] = None
                              ):
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = [
                                                             "error_code", 
                                                             "port", 
@@ -118,12 +116,12 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/set_digital_out")
     async def set_digital_out(
-                              request: Request,
+                              action: Optional[Action] = \
+                                      Body({}, embed=True),
                               port:Optional[int] = None, 
                               on:Optional[bool] = False
                              ):
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = [
                                                             "error_code", 
                                                             "port", 
@@ -140,12 +138,14 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/reset")
-    async def reset(request: Request):
+    async def reset(
+                    action: Optional[Action] = \
+                            Body({}, embed=True),
+                   ):
         """FOR EMERGENCY USE ONLY!
            resets galil device. 
         """
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = [
                                                             "reset",
                                                            ],

@@ -32,11 +32,12 @@ __all__ = ["makeApp"]
 import asyncio
 from typing import Optional, List
 from importlib import import_module
-from fastapi import Request, Body, Query
+from fastapi import Body, Query
 from socket import gethostname
 
-from helaocore.server import makeActionServ, setup_action
+from helaocore.server import makeActionServ
 from helaocore.model.sample import LiquidSample, SampleUnion
+from helaocore.schema import Action
 from helao.library.driver.gamry_driver import gamry, Gamry_IErange
 
 
@@ -55,11 +56,13 @@ def makeApp(confPrefix, servKey):
     
 
     @app.post(f"/{servKey}/get_meas_status")
-    async def get_meas_status(request: Request):
+    async def get_meas_status(
+                              action: Optional[Action] = \
+                                      Body({}, embed=True)
+                             ):
         """Will return 'idle' or 'measuring'. 
         Should be used in conjuction with eta to async.sleep loop poll"""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["status"]
         )
         await active.enqueue_data_dflt(datadict = \
@@ -70,7 +73,8 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/run_LSV")
     async def run_LSV(
-                      request: Request,
+                      action: Optional[Action] = \
+                              Body({}, embed=True),
                       fast_samples_in: Optional[List[SampleUnion]] = \
            Body([LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
                       Vinit: Optional[float] = 0.0,  # Initial value in volts or amps.
@@ -86,7 +90,7 @@ def makeApp(confPrefix, servKey):
         """Linear Sweep Voltammetry (unlike CV no backward scan is done)
         use 4bit bitmask for triggers
         IErange depends on gamry model used (test actual limit before using)"""
-        A = await setup_action(request)
+        A = await app.base.setup_action()
         A.action_abbr = "LSV"
         # A.save_data = True
         active_dict = await app.driver.technique_LSV(A)
@@ -95,7 +99,8 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/run_CA")
     async def run_CA(
-                     request: Request,
+                     action: Optional[Action] = \
+                             Body({}, embed=True),
                       fast_samples_in: Optional[List[SampleUnion]] = \
            Body([LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
                      Vval: Optional[float] = 0.0,
@@ -111,7 +116,7 @@ def makeApp(confPrefix, servKey):
         use 4bit bitmask for triggers
         IErange depends on gamry model used 
         (test actual limit before using)"""
-        A = await setup_action(request)
+        A = await app.base.setup_action()
         A.action_abbr = "CA"
         # A.save_data = True
         active_dict = await app.driver.technique_CA(A)
@@ -120,8 +125,9 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/run_CP")
     async def run_CP(
-                     request: Request,
-                      fast_samples_in: Optional[List[SampleUnion]] = \
+                     action: Optional[Action] = \
+                             Body({}, embed=True),
+                     fast_samples_in: Optional[List[SampleUnion]] = \
            Body([LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
                      Ival: Optional[float] = 0.0,
                      Tval: Optional[float] = 10.0,
@@ -135,7 +141,7 @@ def makeApp(confPrefix, servKey):
         """Chronopotentiometry (Potential response on controlled current)
         use 4bit bitmask for triggers
         IErange depends on gamry model used (test actual limit before using)"""
-        A = await setup_action(request)
+        A = await app.base.setup_action()
         A.action_abbr = "CP"
         # A.save_data = True
         active_dict = await app.driver.technique_CP(A)
@@ -144,8 +150,9 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/run_CV")
     async def run_CV(
-                     request: Request,
-                      fast_samples_in: Optional[List[SampleUnion]] = \
+                     action: Optional[Action] = \
+                             Body({}, embed=True),
+                     fast_samples_in: Optional[List[SampleUnion]] = \
            Body([LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
                      Vinit: Optional[float] = 0.0,  # Initial value in volts or amps.
                      Vapex1: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
@@ -164,7 +171,7 @@ def makeApp(confPrefix, servKey):
         for acquireing information about electrochemical reactions)
         use 4bit bitmask for triggers
         IErange depends on gamry model used (test actual limit before using)"""
-        A = await setup_action(request)
+        A = await app.base.setup_action()
         A.action_abbr = "CV"
         # A.save_data = True
         active_dict = await app.driver.technique_CV(A)
@@ -172,7 +179,8 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/run_EIS")
     async def run_EIS(
-                      request: Request,
+                      action: Optional[Action] = \
+                              Body({}, embed=True),
                       fast_samples_in: Optional[List[SampleUnion]] = \
            Body([LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
                       Vval: Optional[float] = 0.0,
@@ -191,7 +199,7 @@ def makeApp(confPrefix, servKey):
         NOT TESTED
         use 4bit bitmask for triggers
         IErange depends on gamry model used (test actual limit before using)"""
-        A = await setup_action(request)
+        A = await app.base.setup_action()
         A.action_abbr = "EIS"
         # A.save_data = True
         active_dict = await app.driver.technique_EIS(A)
@@ -199,7 +207,8 @@ def makeApp(confPrefix, servKey):
 
     @app.post(f"/{servKey}/run_OCV")
     async def run_OCV(
-                      request: Request,
+                      action: Optional[Action] = \
+                            Body({}, embed=True),
                       fast_samples_in: Optional[List[SampleUnion]] = \
            Body([LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
                       Tval: Optional[float] = 10.0,
@@ -211,7 +220,7 @@ def makeApp(confPrefix, servKey):
         """mesasures open circuit potential
         use 4bit bitmask for triggers
         IErange depends on gamry model used (test actual limit before using)"""
-        A = await setup_action(request)
+        A = await app.base.setup_action()
         A.action_abbr = "OCV"
         # A.save_data = True
         active_dict = await app.driver.technique_OCV(A)
@@ -219,10 +228,12 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/stop")
-    async def stop(request: Request):
+    async def stop(
+                   action: Optional[Action] = \
+                           Body({}, embed=True),
+                  ):
         """Stops measurement in a controlled way."""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["stop"],
                                           action_abbr = "stop"
         )

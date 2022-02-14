@@ -349,8 +349,8 @@ def launcher(confPrefix, confDict):
 
 # def main():
 if __name__ == "__main__":
-    # if not helao.test.unit_test_sample_models.sample_model_unit_test():
-    #     quit()
+    if not helao.test.unit_test_sample_models.sample_model_unit_test():
+        quit()
     # print("\x1b[2J") # clear screen
     cprint(figlet_format(f"HELAO\nV2.2\n{get_hlo_version()}", font="starwars"),"yellow", "on_red", attrs=["bold"])
     pidd = launcher(confPrefix, config)

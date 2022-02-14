@@ -5,10 +5,10 @@ from importlib import import_module
 from socket import gethostname
 from time import strftime
 
-from fastapi import Request, Body
+from fastapi import Body
 from typing import Optional, List
 
-from helaocore.server import makeActionServ, setup_action
+from helaocore.server import makeActionServ
 from helao.library.driver.pal_driver import PAL
 from helao.library.driver.pal_driver import Spacingmethod
 from helao.library.driver.pal_driver import PALtools
@@ -16,6 +16,7 @@ from helao.library.driver.pal_driver import PalMicroCam
 from helao.library.driver.pal_driver import PALposition
 from helaocore.model.sample import LiquidSample, SampleUnion
 from helaocore.helper import make_str_enum
+from helaocore.schema import Action
 
 
 
@@ -43,17 +44,21 @@ def makeApp(confPrefix, servKey):
     dev_customitems = make_str_enum("dev_custom",{key:key for key in dev_custom.keys()})
 
 
-    @app.post(f"/{servKey}/convert_v1DB")
-    async def convert_v1DB(request: Request):
+    @app.post(f"/{servKey}/convert_v1DB", tags=["convert DBs"])
+    async def convert_v1DB(
+                           action: Optional[Action] = \
+                                   Body({}, embed=True)
+                          ):
         # await app.driver.convert_oldDB_to_sqllite()
         await app.driver.unified_db.liquidAPI.old_jsondb_to_sqlitedb()
         return {}
 
 
     if _cams:
-        @app.post(f"/{servKey}/PAL_run_method")
+        @app.post(f"/{servKey}/PAL_run_method", tags=["public_PAL"])
         async def PAL_run_method(
-            request: Request,
+            action: Optional[Action] = \
+                    Body({}, embed=True),
             micropal: Optional[list] = [
                 PalMicroCam(**{
                 "method":"fillfixed",
@@ -106,15 +111,16 @@ def makeApp(confPrefix, servKey):
             timeoffset: Optional[float] = 0.0,
         ):
             """universal pal action"""
-            A = await setup_action(request)
+            A = await app.base.setup_action()
             active_dict = await app.driver.method_arbitrary(A)
             return active_dict
 
 
     if "archive" in _cams:
-        @app.post(f"/{servKey}/PAL_archive")
+        @app.post(f"/{servKey}/PAL_archive", tags=["public_PAL"])
         async def PAL_archive(
-            request: Request,
+            action: Optional[Action] = \
+                    Body({}, embed=True),
             tool: Optional[PALtools] = None,
             source: Optional[dev_customitems] = None,
             volume_ul: Optional[int] = 200,
@@ -127,16 +133,17 @@ def makeApp(confPrefix, servKey):
             wash3: Optional[bool] = False,
             wash4: Optional[bool] = False,
         ):
-            A = await setup_action(request)
+            A = await app.base.setup_action()
             A.action_abbr = "archive"
             active_dict = await app.driver.method_archive(A)
             return active_dict
 
 
     if "fill" in _cams:
-        @app.post(f"/{servKey}/PAL_fill")
+        @app.post(f"/{servKey}/PAL_fill", tags=["public_PAL"])
         async def PAL_fill(
-            request: Request,
+            action: Optional[Action] = \
+                    Body({}, embed=True),
             tool: Optional[PALtools] = None,
             source: Optional[dev_customitems] = None,
             dest: Optional[dev_customitems] = None,
@@ -146,16 +153,17 @@ def makeApp(confPrefix, servKey):
             wash3: Optional[bool] = False,
             wash4: Optional[bool] = False,
         ):
-            A = await setup_action(request)
+            A = await app.base.setup_action()
             A.action_abbr = "fill"
             active_dict = await app.driver.method_fill(A)
             return active_dict
 
 
     if "fillfixed" in _cams:
-        @app.post(f"/{servKey}/PAL_fillfixed")
+        @app.post(f"/{servKey}/PAL_fillfixed", tags=["public_PAL"])
         async def PAL_fillfixed(
-            request: Request,
+            action: Optional[Action] = \
+                    Body({}, embed=True),
             tool: Optional[PALtools] = None,
             source: Optional[dev_customitems] = None,
             dest: Optional[dev_customitems] = None,
@@ -165,29 +173,31 @@ def makeApp(confPrefix, servKey):
             wash3: Optional[bool] = False,
             wash4: Optional[bool] = False,
         ):
-            A = await setup_action(request)
+            A = await app.base.setup_action()
             A.action_abbr = "fillfixed"
             active_dict = await app.driver.method_fillfixed(A)
             return active_dict
 
 
     if "deepclean" in _cams:
-        @app.post(f"/{servKey}/PAL_deepclean")
+        @app.post(f"/{servKey}/PAL_deepclean", tags=["public_PAL"])
         async def PAL_deepclean(
-            request: Request,
+            action: Optional[Action] = \
+                    Body({}, embed=True),
             tool: Optional[PALtools] = None,
             volume_ul: Optional[int] = 200, # this value is only for prc, a fixed value is used
         ):
-            A = await setup_action(request)
+            A = await app.base.setup_action()
             A.action_abbr = "deepclean"
             active_dict = await app.driver.method_deepclean(A)
             return active_dict
 
 
     if "dilute" in _cams:
-        @app.post(f"/{servKey}/PAL_dilute")
+        @app.post(f"/{servKey}/PAL_dilute", tags=["public_PAL"])
         async def PAL_dilute(
-            request: Request,
+            action: Optional[Action] = \
+                    Body({}, embed=True),
             tool: Optional[PALtools] = None,
             source: Optional[dev_customitems] = None,
             volume_ul: Optional[int] = 200,
@@ -203,16 +213,17 @@ def makeApp(confPrefix, servKey):
             wash3: Optional[bool] = True,
             wash4: Optional[bool] = True,
         ):
-            A = await setup_action(request)
+            A = await app.base.setup_action()
             A.action_abbr = "dilute"
             active_dict = await app.driver.method_dilute(A)
             return active_dict
 
 
     if "autodilute" in _cams:
-        @app.post(f"/{servKey}/PAL_autodilute")
+        @app.post(f"/{servKey}/PAL_autodilute", tags=["public_PAL"])
         async def PAL_autodilute(
-            request: Request,
+            action: Optional[Action] = \
+                    Body({}, embed=True),
             tool: Optional[PALtools] = None,
             source: Optional[dev_customitems] = None,
             volume_ul: Optional[int] = 200,
@@ -225,20 +236,21 @@ def makeApp(confPrefix, servKey):
             wash3: Optional[bool] = True,
             wash4: Optional[bool] = True,
         ):
-            A = await setup_action(request)
+            A = await app.base.setup_action()
             A.action_abbr = "autodilute"
             active_dict = await app.driver.method_autodilute(A)
             return active_dict
 
 
-    @app.post(f"/{servKey}/archive_tray_query_sample")
-    async def archive_tray_query_sample(request: Request, 
+    @app.post(f"/{servKey}/archive_tray_query_sample", tags=["public_archive"])
+    async def archive_tray_query_sample(
+                                      action: Optional[Action] = \
+                                              Body({}, embed=True),
                                       tray: Optional[int] = None,
                                       slot: Optional[int] = None,
                                       vial: Optional[int] = None,
                                      ):
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["sample", "error_code"],
                                           action_abbr = "query_sample"
         )
@@ -257,11 +269,13 @@ def makeApp(confPrefix, servKey):
         return finished_action.as_dict()
 
 
-    @app.post(f"/{servKey}/archive_tray_unloadall")
-    async def archive_tray_unloadall(request: Request):
+    @app.post(f"/{servKey}/archive_tray_unloadall", tags=["public_archive"])
+    async def archive_tray_unloadall(
+                                     action: Optional[Action] = \
+                                             Body({}, embed=True)
+                                    ):
         """Resets app.driver vial table."""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["unloaded","tray_dict"],
                                           action_abbr = "unload_sample"
         )
@@ -280,15 +294,15 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
 
-    @app.post(f"/{servKey}/archive_tray_unload")
+    @app.post(f"/{servKey}/archive_tray_unload", tags=["public_archive"])
     async def archive_tray_unload(
-                                  request: Request,
+                                  action: Optional[Action] = \
+                                          Body({}, embed=True),
                                   tray: Optional[int] = None, 
                                   slot: Optional[int] = None
                                  ):
         """Resets app.driver vial table."""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["unloaded","tray_dict"],
                                           action_abbr = "unload_sample"
         )
@@ -307,16 +321,16 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
 
-    @app.post(f"/{servKey}/archive_tray_new_position")
+    @app.post(f"/{servKey}/archive_tray_new_position", tags=["public_archive"])
     async def archive_tray_new(
-        request: Request, 
+        action: Optional[Action] = \
+                Body({}, embed=True),
         req_vol: Optional[float] = None
     ):
         """Returns an empty vial position for given max volume.\n
         For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.\n
         It will select the first empty vial which has the smallest volume that still can hold req_vol"""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["tray", "slot", "vial"],
                                           # action_abbr = ""
         )
@@ -327,9 +341,10 @@ def makeApp(confPrefix, servKey):
         return finished_action.as_dict()
 
 
-    @app.post(f"/{servKey}/archive_tray_update_position")
+    @app.post(f"/{servKey}/archive_tray_update_position", tags=["public_archive"])
     async def archive_tray_update_position(
-        request: Request, 
+        action: Optional[Action] = \
+                Body({}, embed=True),
         sample: Optional[SampleUnion] = Body(LiquidSample(**{"sample_no":1,"machine_name":gethostname()}), embed=True),
         tray: Optional[int] = None,
         slot: Optional[int] = None,
@@ -337,7 +352,6 @@ def makeApp(confPrefix, servKey):
     ):
         """Updates app.driver vial Table. If sucessful (vial-slot was empty) returns True, else it returns False."""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["update"],
                                           # action_abbr = ""
         )
@@ -348,14 +362,14 @@ def makeApp(confPrefix, servKey):
         return finished_action.as_dict()
 
 
-    @app.post(f"/{servKey}/archive_tray_export_json")
+    @app.post(f"/{servKey}/archive_tray_export_json", tags=["public_archive"])
     async def archive_tray_export_json(
-        request: Request, 
+        action: Optional[Action] = \
+                Body({}, embed=True),
         tray: Optional[int] = None, 
         slot: Optional[int] = None
     ):
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = app.driver.archive.tray_get_keys(),
                                           action_abbr = "traytojson",
                                           file_type="palvialtable_helao__file",
@@ -367,9 +381,10 @@ def makeApp(confPrefix, servKey):
         return finished_action.as_dict()
 
 
-    @app.post(f"/{servKey}/archive_tray_export_icpms")
+    @app.post(f"/{servKey}/archive_tray_export_icpms", tags=["public_archive"])
     async def archive_tray_export_icpms(
-        request: Request, 
+        action: Optional[Action] = \
+                Body({}, embed=True),
         tray: Optional[int] = None,
         slot: Optional[int] = None,
         survey_runs: Optional[int] = None,
@@ -378,7 +393,6 @@ def makeApp(confPrefix, servKey):
         dilution_factor: Optional[float] = None
     ):
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           action_abbr = "traytoicpms",
         )
         await app.driver.archive.tray_export_icpms(
@@ -394,14 +408,14 @@ def makeApp(confPrefix, servKey):
         return finished_action.as_dict()
 
 
-    @app.post(f"/{servKey}/archive_tray_export_csv")
+    @app.post(f"/{servKey}/archive_tray_export_csv", tags=["public_archive"])
     async def archive_tray_export_csv(
-        request: Request, 
+        action: Optional[Action] = \
+                Body({}, embed=True),
         tray: Optional[int] = None,
         slot: Optional[int] = None
     ):
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           action_abbr = "traytocsv",
         )
 
@@ -414,14 +428,14 @@ def makeApp(confPrefix, servKey):
         return finished_action.as_dict()
 
 
-    @app.post(f"/{servKey}/archive_custom_load")
+    @app.post(f"/{servKey}/archive_custom_load", tags=["public_archive"])
     async def archive_custom_load(
-                                  request: Request,
+                                  action: Optional[Action] = \
+                                          Body({}, embed=True),
                                   custom: Optional[dev_customitems] = None,
                                   load_sample_in: Optional[SampleUnion] = Body(LiquidSample(**{"sample_no":1,"machine_name":gethostname()}), embed=True),
                                  ):
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["loaded","customs_dict"],
                                           action_abbr = "load_sample",
         )
@@ -437,13 +451,13 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
 
-    @app.post(f"/{servKey}/archive_custom_unload")
+    @app.post(f"/{servKey}/archive_custom_unload", tags=["public_archive"])
     async def archive_custom_unload(
-                                    request: Request,
+                                    action: Optional[Action] = \
+                                            Body({}, embed=True),
                                     custom: Optional[dev_customitems] = None,
                                    ):
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["unloaded","customs_dict"],
                                           action_abbr = "unload_sample",
         )
@@ -462,10 +476,12 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
 
-    @app.post(f"/{servKey}/archive_custom_unloadall")
-    async def archive_custom_unloadall(request: Request):
+    @app.post(f"/{servKey}/archive_custom_unloadall", tags=["public_archive"])
+    async def archive_custom_unloadall(
+                                       action: Optional[Action] = \
+                                               Body({}, embed=True),
+                                      ):
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["unloaded","customs_dict"],
                                           action_abbr = "unload_sample",
         )
@@ -484,12 +500,13 @@ def makeApp(confPrefix, servKey):
         return finished_act.as_dict()
 
 
-    @app.post(f"/{servKey}/archive_custom_query_sample")
-    async def archive_custom_query_sample(request: Request, 
-                                        custom: Optional[dev_customitems] = None,
+    @app.post(f"/{servKey}/archive_custom_query_sample", tags=["public_archive"])
+    async def archive_custom_query_sample(
+                                    action: Optional[Action] = \
+                                            Body({}, embed=True),
+                                    custom: Optional[dev_customitems] = None,
                                        ):
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["sample", "error_code"],
                                           action_abbr = "query_sample",
         )
@@ -507,14 +524,15 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/db_get_sample")
-    async def db_get_sample(request: Request, 
+    async def db_get_sample(
+                         action: Optional[Action] = \
+                                 Body({}, embed=True),
                          fast_samples_in: Optional[List[SampleUnion]] = \
            Body([LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
                         ):
         """Positive sample_no will get it from the beginng, negative
         from the end of the db."""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["sample"],
         )
         sample = await app.driver.db_get_sample(active.action.samples_in)
@@ -525,7 +543,9 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/db_new_sample")
-    async def db_new_sample(request: Request, 
+    async def db_new_sample(
+                         action: Optional[Action] = \
+                                 Body({}, embed=True),
                          fast_samples_in: Optional[List[SampleUnion]] = Body([LiquidSample(**{
                                               "machine_name":gethostname(),
                                               "source": [],
@@ -545,7 +565,6 @@ def makeApp(confPrefix, servKey):
         If its the very first liquid (no source in database exists) 
         leave source and source_ml empty."""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["sample"],
         )
         sample = await app.driver.db_new_sample(active.action.samples_in)

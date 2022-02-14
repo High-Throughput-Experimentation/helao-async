@@ -16,16 +16,16 @@ __all__ = ["makeApp"]
 
 from importlib import import_module
 
-from fastapi import Request, Body
+from fastapi import Body
 from typing import Optional, List
 from socket import gethostname
 
 
-from helaocore.server import makeActionServ, setup_action
+from helaocore.server import makeActionServ
 from helao.library.driver.nidaqmx_driver import cNIMAX
-import helaocore.model.sample as hcms
+from helaocore.model.sample import LiquidSample, SampleUnion
 from helaocore.helper import make_str_enum
-
+from helaocore.schema import Action
 
 def makeApp(confPrefix, servKey):
 
@@ -72,12 +72,12 @@ def makeApp(confPrefix, servKey):
     if dev_mastercell:
         @app.post(f"/{servKey}/mastercell")
         async def mastercell(
-                             request: Request, 
+                             action: Optional[Action] = \
+                                     Body({}, embed=True),
                              cell: Optional[dev_mastercellitems] = None,
                              on: Optional[bool] = True
                             ):
             active = await app.base.setup_and_contain_action(
-                                              request = request,
                                               json_data_keys = [
                                                                 "error_code", 
                                                                 "port", 
@@ -100,12 +100,12 @@ def makeApp(confPrefix, servKey):
     if dev_activecell:
         @app.post(f"/{servKey}/activecell")
         async def activecell(
-                             request: Request,
+                             action: Optional[Action] = \
+                                     Body({}, embed=True),
                              cell: Optional[dev_activecellitems] = None,
                              on: Optional[bool] = True
                             ):
             active = await app.base.setup_and_contain_action(
-                                              request = request,
                                               json_data_keys = [
                                                                 "error_code", 
                                                                 "port", 
@@ -128,12 +128,12 @@ def makeApp(confPrefix, servKey):
     if dev_pump:
         @app.post(f"/{servKey}/pump")
         async def pump(
-                       request: Request, 
+                       action: Optional[Action] = \
+                               Body({}, embed=True),
                        pump: Optional[dev_pumpitems] = None,
                        on: Optional[bool] = True
                       ):
             active = await app.base.setup_and_contain_action(
-                                              request = request,
                                               json_data_keys = [
                                                                 "error_code", 
                                                                 "port", 
@@ -156,12 +156,12 @@ def makeApp(confPrefix, servKey):
     if dev_gasvalve:
         @app.post(f"/{servKey}/gasvalve")
         async def gasvalve(
-                           request: Request, 
+                           action: Optional[Action] = \
+                                   Body({}, embed=True),
                            gasvalve: Optional[dev_gasvalveitems] = None,
                            on: Optional[bool] = True
                           ):
             active = await app.base.setup_and_contain_action(
-                                              request = request,
                                               json_data_keys = [
                                                                 "error_code", 
                                                                 "port", 
@@ -184,12 +184,12 @@ def makeApp(confPrefix, servKey):
     if dev_liquidvalve:
         @app.post(f"/{servKey}/liquidvalve")
         async def liquidvalve(
-                              request: Request, 
+                             action: Optional[Action] = \
+                                     Body({}, embed=True),
                               liquidvalve: Optional[dev_liquidvalveitems] = None,
                               on: Optional[bool] = True
                              ):
             active = await app.base.setup_and_contain_action(
-                                              request = request,
                                               json_data_keys = [
                                                                 "error_code", 
                                                                 "port", 
@@ -212,12 +212,12 @@ def makeApp(confPrefix, servKey):
     if dev_led:
         @app.post(f"/{servKey}/led")
         async def led(
-                              request: Request, 
-                              led: Optional[dev_leditems],
-                              on: Optional[bool] = True
-                             ):
+                      action: Optional[Action] = \
+                              Body({}, embed=True),
+                      led: Optional[dev_leditems] = None,
+                      on: Optional[bool] = True
+                     ):
             active = await app.base.setup_and_contain_action(
-                                              request = request,
                                               json_data_keys = [
                                                                 "error_code", 
                                                                 "port", 
@@ -240,12 +240,12 @@ def makeApp(confPrefix, servKey):
     if dev_fswbcd:
         @app.post(f"/{servKey}/fswbcd")
         async def fswbcd(
-                         request: Request,
+                         action: Optional[Action] = \
+                                 Body({}, embed=True),
                          fswbcd: Optional[dev_fswbcditems] = None,
                          on: Optional[bool] = True
                         ):
             active = await app.base.setup_and_contain_action(
-                                              request = request,
                                               json_data_keys = [
                                                                 "error_code", 
                                                                 "port", 
@@ -268,11 +268,11 @@ def makeApp(confPrefix, servKey):
     if dev_fsw:
         @app.post(f"/{servKey}/fsw")
         async def fsw(
-                      request: Request,
+                      action: Optional[Action] = \
+                              Body({}, embed=True),
                       fsw: Optional[dev_fswitems] = None,
                      ):
             active = await app.base.setup_and_contain_action(
-                                              request = request,
                                               json_data_keys = [
                                                                 "error_code", 
                                                                 "port", 
@@ -295,26 +295,29 @@ def makeApp(confPrefix, servKey):
     if dev_cellcurrent and dev_cellvoltage:
         @app.post(f"/{servKey}/cellIV")
         async def cellIV(
-                         request: Request, 
-                      fast_samples_in: Optional[List[hcms.SampleUnion]] = \
+                         action: Optional[Action] = \
+                                 Body({}, embed=True),
+                         fast_samples_in: Optional[List[SampleUnion]] = \
                           Body(\
-           [hcms.LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
+           [LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
                          Tval: Optional[float] = 10.0,
                          SampleRate: Optional[float] = 1.0, 
                          TTLwait: Optional[int] = -1,  # -1 disables, else select TTL channel
                         ):
             """Runs multi cell IV measurement."""
-            A = await setup_action(request)
+            A = await app.base.setup_action()
             A.action_abbr = "multiCV"
             active_dict = await app.driver.run_cell_IV(A)
             return active_dict
 
 
     @app.post(f"/{servKey}/stop")
-    async def stop(request: Request):
+    async def stop(
+                   action: Optional[Action] = \
+                           Body({}, embed=True),
+                  ):
         """Stops measurement in a controlled way."""
         active = await app.base.setup_and_contain_action(
-                                          request = request,
                                           json_data_keys = ["stop"],
                                           action_abbr = "stop"
         )
