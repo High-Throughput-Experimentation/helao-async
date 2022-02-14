@@ -22,7 +22,7 @@ from helaocore.server import Base
 from helaocore.error import error_codes
 from helaocore.helper import make_str_enum
 from helaocore.data.sample import UnifiedSampleDataAPI
-from helaocore.model.sample import SampleInheritance, SampleStatus
+from helaocore.model.sample import SampleInheritance, SampleStatus, NoneSample
 from helaocore.model.file import FileConnParams, HloHeaderModel
 from helaocore.model.active import ActiveParams
 from helaocore.model.data import DataModel
@@ -99,10 +99,7 @@ class cNIMAX:
             "cell8",
             "cell9",
         ]
-        self.file_conn_keys = [
-                               self.base.new_file_conn_key(FIFO_cell_key)
-                               for FIFO_cell_key in self.FIFO_cell_keys
-                              ]
+        self.file_conn_keys = []
         self.FIFO_column_headings = [
                                      "t_s",
                                      "Icell_A",
@@ -411,6 +408,7 @@ class cNIMAX:
         
         err_code = error_codes.none
         if not self.IO_do_meas:
+            self.file_conn_keys = []
             self.samplingrate = samplerate
             self.duration = duration
             self.ttlwait = ttlwait
@@ -423,51 +421,82 @@ class cNIMAX:
             
             self.FIFO_NImaxheader = dict()
             file_sample_label = dict()
-                
-            for i, FIFO_cell_key in enumerate(self.FIFO_cell_keys):
-                if self.samples_in is not None:
-                    if len(self.samples_in) == 9:
-                        sample_label = [self.samples_in[i].get_global_label()]
-                    else:
-                        sample_label = [sample.get_global_label() for sample in self.samples_in]
-                else:
-                    sample_label = None
-                file_sample_label[FIFO_cell_key]=sample_label
-            self.active =  await self.base.contain_action(
-                ActiveParams(
-                             action = self.action,
-                             file_conn_params_list = [
-                                 FileConnParams(
-                                                file_conn_key = \
-                                                    file_conn_key,
-                                                sample_global_labels=file_sample_label[cell_key],
-                                                json_data_keys = self.FIFO_column_headings,
-                                                file_type="ni_helao__file",
-                                                # only add optional keys to header
-                                                # rest will be added later
-                                                hloheader = HloHeaderModel(
-                                                    optional = {"cell":cell_key}
-                                                ),
-                                               ) for file_conn_key, cell_key in
-                                     zip(
-                                         self.file_conn_keys, 
-                                         self.FIFO_cell_keys
-                                        )
-                             ]
-            ))
+            file_sample_list = []
 
             for sample in self.samples_in:
                 sample.status = [SampleStatus.preserved]
                 sample.inheritance = SampleInheritance.allow_both
 
+            for i, FIFO_cell_key in enumerate(self.FIFO_cell_keys):
+                if self.samples_in is not None:
+                    if len(self.samples_in) == 9:
+                        file_sample_list.append([self.samples_in[i]])
+                        sample_label = [self.samples_in[i].get_global_label()]
+                    else:
+                        file_sample_list.append(self.samples_in)
+                        sample_label = [sample.get_global_label() for sample in self.samples_in]
+                else:
+                    file_sample_list.append([])
+                    sample_label = None
+                file_sample_label[FIFO_cell_key]=sample_label
+
+
+            # create the first action and then split it into child actions
+            # for the other data streams
+            self.file_conn_keys.append(self.base.dflt_file_conn_key())
+            self.active =  await self.base.contain_action(
+                ActiveParams(
+                             action = self.action,
+                             file_conn_params_dict = {self.base.dflt_file_conn_key():
+                                 FileConnParams(
+                                                file_conn_key = \
+                                                    self.base.dflt_file_conn_key(),
+                                                sample_global_labels=file_sample_label[self.FIFO_cell_keys[0]],
+                                                json_data_keys = self.FIFO_column_headings,
+                                                file_type="ni_helao__file",
+                                                # only add optional keys to header
+                                                # rest will be added later
+                                                hloheader = HloHeaderModel(
+                                                    optional = {"cell":self.FIFO_cell_keys[0]})
+                                               )
+                                     }
+
+                )
+            )
             # clear old samples_in first
             self.active.action.samples_in = []
             # now add updated samples to sample_in again
-            await self.active.append_sample(samples = [sample_in for sample_in in self.samples_in],
+            await self.active.append_sample(samples = file_sample_list[0],
                                             IO="in"
                                            )
 
-            self.base.print_message(f"!!! Active action uuid is {self.active.action.action_uuid}")
+            # now add the rest
+            for i in range(len(self.FIFO_cell_keys)-1):
+                new_file_conn_keys = await self.active.split(new_fileconnparams = 
+                    FileConnParams(
+                                   file_conn_key = \
+                                       self.base.dflt_file_conn_key(),
+                                   sample_global_labels=\
+                                       file_sample_label[self.FIFO_cell_keys[i+1]],
+                                   json_data_keys = self.FIFO_column_headings,
+                                   file_type="ni_helao__file",
+                                   # only add optional keys to header
+                                   # rest will be added later
+                                   hloheader = HloHeaderModel(
+                                       optional = {"cell":self.FIFO_cell_keys[i+1]})
+                                  )
+                )
+                # add the new file_conn_key to the list
+                if new_file_conn_keys:
+                    self.file_conn_keys.append(new_file_conn_keys[0])
+
+                # clear old samples_in first
+                self.active.action.samples_in = []
+                    
+                # now add updated samples to sample_in again
+                await self.active.append_sample(samples = file_sample_list[i+1],
+                                                IO="in"
+                                               )
 
             # create the cell IV task
             self.create_IVtask()
