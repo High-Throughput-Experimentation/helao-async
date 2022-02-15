@@ -2,8 +2,8 @@ hostip = "127.0.0.1"
 config = dict()
 
 # action library provides generator functions which produce actions
-# lists from input experiment_id grouping
 config["experiment_libraries"] = ["ANEC_prc"]
+config["sequence_libraries"] = ["ANEC_seq"]
 config["technique_name"] = "anec"
 config["root"] = r"C:\INST_dev2"
 # config["local_db_path"] = r"C:\INST_dev2\DATABASE"
@@ -122,12 +122,10 @@ config["servers"] = dict(
         group="action",
         fast="pal_server",
         params = dict(
-            #user = 'RSHS',
-            #key = r'c:\helao\sshkeys\rshs_private3.ppk', # needs to be in new openssh file format
             host = "localhost",
             method_path = r'C:\Users\rshs\Desktop\ADSS\adss_psc_methods\lcfc',
-            log_file = r'C:\Users\rshs\Desktop\ADSS\adss_logfile\210512_lcfc_manualwatertest\210512_LCFC_manualwatertest_logfile.txt',
             timeout = 30*60, # 30min timeout for waiting for TTL
+            dev_trigger = "NImax",
             dev_NImax = { # TTL handshake via NImax
                 'start':'cDAQ1Mod2/port2/line5', #TTL1
                 'continue':'cDAQ1Mod2/port2/line7',  #TTL2
@@ -149,18 +147,18 @@ config["servers"] = dict(
             ws_potentiostat = 'PSTAT',
         )
     ),
-    OP=dict(
-        host=hostip,
-        port=5002,
-        group="operator",
-        bokeh="async_operator",
-        params = dict(
-            doc_name = "ANEC Operator",
-            orch = 'ORCH',
-            # data_server = "data",
-            # servicemode=False,
-        )
-    ),
+    # OP=dict(
+    #     host=hostip,
+    #     port=5002,
+    #     group="operator",
+    #     bokeh="async_operator",
+    #     params = dict(
+    #         doc_name = "ANEC Operator",
+    #         orch = 'ORCH',
+    #         # data_server = "data",
+    #         # servicemode=False,
+    #     )
+    # ),
     # aligner_vis=dict(
     #     host=hostip,
     #     port=5003,
