@@ -495,6 +495,8 @@ class PAL:
                     _ = await self.active.split()
                 self.IO_action_run_counter += 1
 
+                self.active.action.action_sub_name = microcam.method
+
                 # -- (1) -- get most recent information for all sample_in
                 # palaction.sample_in should always be non ref samples
                 palaction.sample_in = \
