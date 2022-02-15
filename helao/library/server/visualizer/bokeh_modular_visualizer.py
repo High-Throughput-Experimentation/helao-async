@@ -10,35 +10,22 @@ from helaocore.server import Vis
 
 
 
-import os
-# import sys
 import websockets
 import asyncio
 import json
-import collections
 from functools import partial
-# from importlib import import_module
-# from functools import partial
 from socket import gethostname
-
+from uuid import UUID
 
 from bokeh.models import ColumnDataSource, CheckboxButtonGroup, RadioButtonGroup
-# from bokeh.models import Title, DataTable, TableColumn
 from bokeh.models.widgets import Paragraph
-from bokeh.plotting import figure, curdoc
-# from bokeh.models import Range1d
-# from bokeh.models import Arrow, NormalHead, OpenHead, VeeHead
-# #from tornado.ioloop import IOLoop
-# from munch import munchify
-from bokeh.palettes import Spectral6, small_palettes
-# from bokeh.transform import linear_cmap
-
-# from bokeh.models import TextInput
+from bokeh.plotting import figure
+from bokeh.palettes import small_palettes
 from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
-# import pathlib
-# import copy
-# import math
+
+
+from helaocore.model.data import DataPackageModel
 
 
 # ##############################################################################
@@ -157,8 +144,8 @@ class C_nidaqmxvis:
         self.sourceIV = ColumnDataSource(data=datadict)
         self.sourceIV_prev = ColumnDataSource(data=datadict)
 
-        self.cur_action_id = ""
-        self.prev_action_id = ""
+        self.cur_action_uuid = ""
+        self.prev_action_uuid = ""
 
         # create visual elements
         self.layout = []
@@ -168,6 +155,8 @@ class C_nidaqmxvis:
                                     labels=[f"{i+1}" for i in range(9)], 
                                     active=[i for i in range(9)]
                                     )
+        # to check if selection changed during ploting
+        self.yselect = self.yaxis_selector_group.active
         
         
         self.plot_VOLT = figure(title="CELL VOLTs", height=300, width=500)
@@ -176,7 +165,7 @@ class C_nidaqmxvis:
         self.plot_VOLT_prev = figure(title="prev. CELL VOLTs", height=300, width=500)
         self.plot_CURRENT_prev = figure(title="prev. CELL CURRENTs", height=300, width=500)
 
-        self.reset_plot()
+        self.reset_plot(self.cur_action_uuid, forceupdate= True)
 
         # combine all sublayouts into a single one
         self.layout = layout([
@@ -194,36 +183,23 @@ class C_nidaqmxvis:
         self.vis.doc.add_root(Spacer(height=10))
 
 
-    def add_points(self, new_data):
-        new_action_id = list(new_data)[0]
-
-        if (new_action_id != self.cur_action_id):
-            self.prev_action_id = self.cur_action_id
-            self.cur_action_id = new_action_id
-            self.reset_plot()
-
-        data_dict = new_data[new_action_id]["data"]
-        if type(data_dict) is not dict:
-            return
+    def add_points(self, datapackage: DataPackageModel):
+        self.reset_plot(str(datapackage.action_uuid))
 
         tmpdata = {key:[] for key in self.datakeys}
-        for sample_key, sample_data in data_dict.items():
-            if type(sample_data) is dict:
-                for key, val in sample_data.items():
-                    if key == "t_s":
-                        tmpdata[key] = val
-                    elif key == "Icell_A":
-                        tmpdata[f"I{sample_key}_A"] = val
-                    elif key == "Ecell_V":
-                        tmpdata[f"E{sample_key}_V"] = val
+        # they are all in sequence of cell1 to cell9 in the dict
+        cellnum = 1
 
-                    else:
-                        return
-            else:
-                break
+        for fileconnkey, data_dict in datapackage.datamodel.data.items():
 
-        self.sourceIV_prev.data = {key: val for key, val in self.sourceIV.data.items()}        
-        self.sourceIV.data = {k: [] for k in self.sourceIV.data}
+            for key, val in data_dict.items():
+                if key == "t_s":
+                    tmpdata[key] = val
+                elif key == "Icell_A":
+                    tmpdata[f"Icell{cellnum}_A"] = val
+                elif key == "Ecell_V":
+                    tmpdata[f"Ecell{cellnum}_V"] = val
+            cellnum += 1
         self.sourceIV.stream(tmpdata)
 
 
@@ -233,15 +209,13 @@ class C_nidaqmxvis:
             self.IOloop_data_run = True
             while self.IOloop_data_run:
                 try:
-                    new_data = json.loads(await ws.recv())
-                    new_action_id = list(new_data)[0]
-                    if new_data[new_action_id]["action_name"] == "run_cell_IV":
-                        self.vis.doc.add_next_tick_callback(partial(self.add_points, new_data))
+                    datapackage = DataPackageModel(**json.loads(await ws.recv()))
+                    if datapackage.action_name == "cellIV":
+                        self.vis.doc.add_next_tick_callback(partial(self.add_points, datapackage))
                 except Exception:
                     self.IOloop_data_run = False
 
-
-    def reset_plot(self):
+    def _add_plots(self):
         # remove all old lines and clear legend
         if self.plot_VOLT.renderers:
             self.plot_VOLT.legend.items = []
@@ -263,10 +237,10 @@ class C_nidaqmxvis:
         self.plot_CURRENT_prev.renderers = []
         
 
-        self.plot_VOLT.title.text = ("action_ID: "+self.cur_action_id)
-        self.plot_VOLT.title.text = ("action_ID: "+self.cur_action_id)
-        # self.plot_VOLT_prev.title.text = ("action_ID: "+self.prev_action_id)
-        # self.plot_VOLT_prev.title.text = ("action_ID: "+self.prev_action_id)
+        self.plot_VOLT.title.text = (f"action_uuid: {self.cur_action_uuid}")
+        self.plot_CURRENT.title.text = (f"action_uuid: {self.cur_action_uuid}")
+        # self.plot_VOLT_prev.title.text = ("action_uuid: "+self.prev_action_uuid)
+        # self.plot_VOLT_prev.title.text = ("action_uuid: "+self.prev_action_uuid)
 
 
         colors = small_palettes["Category10"][9]
@@ -275,6 +249,23 @@ class C_nidaqmxvis:
             _ = self.plot_CURRENT.line(x="t_s", y=f"Icell{i+1}_A", source=self.sourceIV, name=f"Icell{i+1}_A", line_color=colors[i], legend_label=f"Icell{i+1}_A")
             _ = self.plot_VOLT_prev.line(x="t_s", y=f"Ecell{i+1}_V", source=self.sourceIV_prev, name=f"Ecell{i+1}_V", line_color=colors[i], legend_label=f"Ecell{i+1}_V")
             _ = self.plot_CURRENT_prev.line(x="t_s", y=f"Icell{i+1}_A", source=self.sourceIV_prev, name=f"Icell{i+1}_A", line_color=colors[i], legend_label=f"Icell{i+1}_A")
+        
+
+
+    def reset_plot(self, new_action_uuid: UUID, forceupdate: bool = False):
+        if (new_action_uuid != self.cur_action_uuid) or forceupdate:
+            self.vis.print_message(" ... reseting NImax graph")
+            self.prev_action_uuid = self.cur_action_uuid
+            self.cur_action_uuid = new_action_uuid
+
+            # copy old data to "prev" plot
+            self.sourceIV_prev.data = {key: val for key, val in self.sourceIV.data.items()}        
+            self.sourceIV.data = {k: [] for k in self.sourceIV.data}
+            self._add_plots()
+
+        elif (self.yselect != self.yaxis_selector_group.active):
+            self.yselect = self.yaxis_selector_group.active
+            self._add_plots()
 
 
 class C_potvis:
@@ -302,8 +293,8 @@ class C_potvis:
 
         self.datasource = ColumnDataSource(data=dict(pt=[], t_s=[], Ewe_V=[], Ach_V=[], I_A=[]))
         self.datasource_prev = ColumnDataSource(data=dict(pt=[], t_s=[], Ewe_V=[], Ach_V=[], I_A=[]))
-        self.cur_action_id = ""
-        self.prev_action_id = ""
+        self.cur_action_uuid = ""
+        self.prev_action_uuid = ""
  
         # create visual elements
         self.layout = []
@@ -332,43 +323,29 @@ class C_potvis:
         self.xselect = self.xaxis_selector_group.active
         self.yselect = self.yaxis_selector_group.active
 
-        self.reset_plot(self.cur_action_id, forceupdate= True)
+        self.reset_plot(self.cur_action_uuid, forceupdate= True)
 
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
 
 
-    def add_points(self, new_data):
-        # if len(new_data):
-        new_action_id = list(new_data)[0]
+    def add_points(self, datapackage: DataPackageModel):
 
-        # detect if plot selection changed
-        if  (self.xselect != self.xaxis_selector_group.active) or (self.yselect != self.yaxis_selector_group.active):
-            self.xselect = self.xaxis_selector_group.active
-            self.yselect = self.yaxis_selector_group.active
-            # use current(old) timestamp but force update via optional
-            # second parameter
-            self.reset_plot(new_action_id,True)
-        else:
-            self.reset_plot(new_action_id)
+        self.reset_plot(str(datapackage.action_uuid))
         
         
         tmpdata = {"pt":[0]}
         # for some techniques not all data is present
         # we should only get one data point at the time
-        data_dict = new_data[new_action_id]["data"]
-        if type(data_dict) is not dict:
-            return
-
-        for sample_key, sample_data in data_dict.items():
-            if type(sample_data) is dict:
-                tmpdata["t_s"] = sample_data.get("t_s", [0])
-                tmpdata["Ewe_V"] = sample_data.get("Ewe_V", [0])
-                tmpdata["Ach_V"] = sample_data.get("Ach_V", [0])
-                tmpdata["I_A"] = sample_data.get("I_A", [0])
-                self.datasource.stream(tmpdata)
-            break # we only measure/display first sample
-
+        
+        for fileconnkey, data_dict in datapackage.datamodel.data.items():
+            tmpdata = {"pt":[0]}
+            tmpdata["t_s"] = data_dict.get("t_s", [0])
+            tmpdata["Ewe_V"] = data_dict.get("Ewe_V", [0])
+            tmpdata["Ach_V"] = data_dict.get("Ach_V", [0])
+            tmpdata["I_A"] = data_dict.get("I_A", [0])
+            self.datasource.stream(tmpdata)
+            # break # we only measure/display first sample
 
 
     async def IOloop_data(self): # non-blocking coroutine, updates data source
@@ -377,56 +354,71 @@ class C_potvis:
             self.IOloop_data_run = True
             while self.IOloop_data_run:
                 try:
-                    new_data = json.loads(await ws.recv())
-                    # self.vis.print_message(" ... new data for potentiostat visualizer module:")
-                    # self.vis.print_message(new_data)
-                    if new_data is not None:
-                        self.vis.doc.add_next_tick_callback(partial(self.add_points, new_data))
+                    datapackage = DataPackageModel(**json.loads(await ws.recv()))
+                    self.vis.doc.add_next_tick_callback(partial(self.add_points, datapackage))
                 except Exception:
                     self.IOloop_data_run = False
 
     
-    def reset_plot(self, new_action_id, forceupdate: bool = False):
-        if (new_action_id != self.cur_action_id) or forceupdate:
-            self.vis.print_message(" ... reseting Gamry graph")
-            # copy old data to "prev" plot
-            self.prev_action_id = self.cur_action_id
-            self.datasource_prev.data = {key: val for key, val in self.datasource.data.items()}
-            self.cur_action_id = new_action_id
+
+    def _add_plots(self):
+        # clear legend
+        if self.plot.renderers:
+            self.plot.legend.items = []
+
+        if self.plot_prev.renderers:
+            self.plot_prev.legend.items = []
+
+
+        # remove all old lines
+        self.plot.renderers = []
+        self.plot_prev.renderers = []
+
         
-            self.datasource.data = {k: [] for k in self.datasource.data}
-            # remove all old lines
-            self.plot.renderers = []
-            self.plot_prev.renderers = []
-    
-            
-            self.plot.title.text = ("active action_ID: "+self.cur_action_id)
-            self.plot_prev.title.text = ("previous action_ID: "+self.prev_action_id)
-            xstr = ""
-            if(self.xaxis_selector_group.active == 0):
-                xstr = "t_s"
-            elif(self.xaxis_selector_group.active == 1):
-                xstr = "Ewe_V"
-            elif(self.xaxis_selector_group.active == 2):
-                xstr = "Ach_V"
+        self.plot.title.text = (f"active action_uuid: {self.cur_action_uuid}")
+        self.plot_prev.title.text = (f"previous action_uuid: {self.prev_action_uuid}")
+        xstr = ""
+        if(self.xaxis_selector_group.active == 0):
+            xstr = "t_s"
+        elif(self.xaxis_selector_group.active == 1):
+            xstr = "Ewe_V"
+        elif(self.xaxis_selector_group.active == 2):
+            xstr = "Ach_V"
+        else:
+            xstr = "I_A"
+        colors = ["red", "blue", "yellow", "green"]
+        color_count = 0
+        for i in self.yaxis_selector_group.active:
+            if i == 0:
+                self.plot.line(x=xstr, y="t_s", line_color=colors[color_count], source=self.datasource, name=self.cur_action_uuid, legend_label="t_s")
+                self.plot_prev.line(x=xstr, y="t_s", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_uuid, legend_label="t_s")
+            elif i == 1:
+                self.plot.line(x=xstr, y="Ewe_V", line_color=colors[color_count], source=self.datasource, name=self.cur_action_uuid, legend_label="Ewe_V")
+                self.plot_prev.line(x=xstr, y="Ewe_V", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_uuid, legend_label="Ewe_V")
+            elif i == 2:
+                self.plot.line(x=xstr, y="Ach_V", line_color=colors[color_count], source=self.datasource, name=self.cur_action_uuid, legend_label="Ach_V")
+                self.plot_prev.line(x=xstr, y="Ach_V", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_uuid, legend_label="Ach_V")
             else:
-                xstr = "I_A"
-            colors = ["red", "blue", "yellow", "green"]
-            color_count = 0
-            for i in self.yaxis_selector_group.active:
-                if i == 0:
-                    self.plot.line(x=xstr, y="t_s", line_color=colors[color_count], source=self.datasource, name=self.cur_action_id, legend_label="t_s")
-                    self.plot_prev.line(x=xstr, y="t_s", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_id, legend_label="t_s")
-                elif i == 1:
-                    self.plot.line(x=xstr, y="Ewe_V", line_color=colors[color_count], source=self.datasource, name=self.cur_action_id, legend_label="Ewe_V")
-                    self.plot_prev.line(x=xstr, y="Ewe_V", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_id, legend_label="Ewe_V")
-                elif i == 2:
-                    self.plot.line(x=xstr, y="Ach_V", line_color=colors[color_count], source=self.datasource, name=self.cur_action_id, legend_label="Ach_V")
-                    self.plot_prev.line(x=xstr, y="Ach_V", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_id, legend_label="Ach_V")
-                else:
-                    self.plot.line(x=xstr, y="I_A", line_color=colors[color_count], source=self.datasource, name=self.cur_action_id, legend_label="I_A")
-                    self.plot_prev.line(x=xstr, y="I_A", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_id, legend_label="I_A")
-                color_count += 1
+                self.plot.line(x=xstr, y="I_A", line_color=colors[color_count], source=self.datasource, name=self.cur_action_uuid, legend_label="I_A")
+                self.plot_prev.line(x=xstr, y="I_A", line_color=colors[color_count], source=self.datasource_prev, name=self.prev_action_uuid, legend_label="I_A")
+            color_count += 1
+
+
+    def reset_plot(self, new_action_uuid: UUID, forceupdate: bool = False):
+        if (new_action_uuid != self.cur_action_uuid) or forceupdate:
+            self.vis.print_message(" ... reseting Gamry graph")
+            self.prev_action_uuid = self.cur_action_uuid
+            self.cur_action_uuid = new_action_uuid
+        
+            # copy old data to "prev" plot
+            self.datasource_prev.data = {key: val for key, val in self.datasource.data.items()}
+            self.datasource.data = {k: [] for k in self.datasource.data}
+            self._add_plots()
+
+        elif  (self.xselect != self.xaxis_selector_group.active) or (self.yselect != self.yaxis_selector_group.active):
+            self.xselect = self.xaxis_selector_group.active
+            self.yselect = self.yaxis_selector_group.active
+            self._add_plots()
    
 
 
