@@ -408,6 +408,7 @@ class cNIMAX:
         
         err_code = error_codes.none
         if not self.IO_do_meas:
+            self.IVtimeoffset = 0.0
             self.file_conn_keys = []
             self.samplingrate = samplerate
             self.duration = duration
