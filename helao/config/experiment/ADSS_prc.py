@@ -27,7 +27,10 @@ from socket import gethostname
 
 from helaocore.schema import Action, Experiment, ActionPlanMaker
 from helaocore.model.action_start_condition import ActionStartCondition
-import helaocore.model.sample as hcms
+from helaocore.model.sample import (
+                                    SolidSample,
+                                    LiquidSample
+                                   )
 
 from helao.library.driver.galil_motion_driver import move_modes, transformation_mode
 from helao.library.driver.pal_driver import Spacingmethod, PALtools
@@ -88,7 +91,7 @@ def debug(pg_Obj: Experiment,
         "action_name": "archive_custom_load",
         "action_params": {
                         "custom": "cell1_we",
-                        "load_sample_in": hcms.SolidSample(**{"sample_no":1,
+                        "load_sample_in": SolidSample(**{"sample_no":1,
                                                               "plate_id":4534,
                                                               "machine_name":"legacy"
                                                              }).dict(),
@@ -159,7 +162,7 @@ def ADSS_slave_load_solid(
         "action_name": "archive_custom_load",
         "action_params": {
                         "custom": sq.pars.solid_custom_position,
-                        "load_sample_in": hcms.SolidSample(**{"sample_no":sq.pars.solid_sample_no,
+                        "load_sample_in": SolidSample(**{"sample_no":sq.pars.solid_sample_no,
                                                               "plate_id":sq.pars.solid_plate_id,
                                                               "machine_name":"legacy"
                                                              }).dict(),
@@ -182,7 +185,7 @@ def ADSS_slave_load_liquid(
         "action_name": "archive_custom_load",
         "action_params": {
                         "custom": sq.pars.liquid_custom_position,
-                        "load_sample_in": hcms.LiquidSample(**{"sample_no":sq.pars.liquid_sample_no,
+                        "load_sample_in": LiquidSample(**{"sample_no":sq.pars.liquid_sample_no,
                                                                "machine_name":gethostname()
                                                               }).dict(),
                         },
