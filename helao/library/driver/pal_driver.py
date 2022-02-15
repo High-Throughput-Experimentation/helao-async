@@ -11,6 +11,7 @@ import time
 import copy
 from typing import List, Optional, Union, Tuple
 from pydantic import BaseModel, Field
+import aiofiles
 
 from helaocore.schema import Action
 from helaocore.server import Base
@@ -71,61 +72,83 @@ class _sampletype(str, Enum):
 
 
 class CAMS(Enum):
-    archive_liquid = _cam(name="archive_liquid",
-                          file_name = "lcfc_archive.cam", # from config later
-                          sample_out_type = _sampletype.liquid,
-                          source = _positiontype.custom,
-                          dest = _positiontype.next_empty_vial,
-                         )
 
-
-    archive = _cam(name="archive",
-                   file_name = "lcfc_archive.cam", # from config later
+    archive_tray_tray = _cam(name="archive_tray_tray",
+                   file_name = "", # filled in from config later
                    sample_out_type = _sampletype.liquid,
-                   source = _positiontype.custom,
-                   dest = _positiontype.next_empty_vial,
+                   source = _positiontype.tray,
+                   dest = _positiontype.tray,
                   )
 
+    archive_custom_tray = _cam(name="archive_custom_tray",
+                   file_name = "", # filled in from config later
+                   sample_out_type = _sampletype.liquid,
+                   source = _positiontype.custom,
+                   dest = _positiontype.tray,
+                  )
 
-    fillfixed = _cam(name="fillfixed",
-                      file_name = "lcfc_fill_hardcodedvolume.cam", # from config later
-                      sample_out_type = _sampletype.liquid,
-                      source = _positiontype.custom,
-                      dest = _positiontype.custom,
-                    )
-    
-    fill = _cam(name="fill",
-                file_name = "lcfc_fill.cam", # from config later
-                sample_out_type = _sampletype.liquid,
-                source = _positiontype.custom,
-                dest = _positiontype.custom,
-             )
-
-    test = _cam(name="test",
-                file_name = "relay_actuation_test2.cam", # from config later
-               )
-
-    autodilute = _cam(name="autodilute",
-                  file_name = "lcfc_dilute.cam", # from config later
-                  sample_out_type = _sampletype.liquid,
-                  source = _positiontype.custom,
-                  dest = _positiontype.next_full_vial,
-                 )
-
-    dilute = _cam(name="dilute",
-                  file_name = "lcfc_dilute.cam", # from config later
-                  sample_out_type = _sampletype.liquid,
-                  source = _positiontype.custom,
-                  dest = _positiontype.tray,
-                 )
+    archive_tray_custom = _cam(name="archive_tray_custom",
+                   file_name = "", # filled in from config later
+                   sample_out_type = _sampletype.liquid,
+                   source = _positiontype.tray,
+                   dest = _positiontype.custom,
+                  )
 
     deepclean = _cam(name="deepclean",
-                     file_name = "lcfc_deep_clean.cam", # from config later
+                     file_name = "", # filled in from config later
                     )
 
     none = _cam(name="",
                 file_name = "",
                )
+    
+    # archive_liquid = _cam(name="archive_liquid",
+    #                       file_name = "lcfc_archive.cam", # from config later
+    #                       sample_out_type = _sampletype.liquid,
+    #                       source = _positiontype.custom,
+    #                       dest = _positiontype.next_empty_vial,
+    #                      )
+
+
+    # archive = _cam(name="archive",
+    #                file_name = "lcfc_archive.cam", # from config later
+    #                sample_out_type = _sampletype.liquid,
+    #                source = _positiontype.custom,
+    #                dest = _positiontype.next_empty_vial,
+    #               )
+
+
+    # fillfixed = _cam(name="fillfixed",
+    #                   file_name = "lcfc_fill_hardcodedvolume.cam", # from config later
+    #                   sample_out_type = _sampletype.liquid,
+    #                   source = _positiontype.custom,
+    #                   dest = _positiontype.custom,
+    #                 )
+    
+    # fill = _cam(name="fill",
+    #             file_name = "lcfc_fill.cam", # from config later
+    #             sample_out_type = _sampletype.liquid,
+    #             source = _positiontype.custom,
+    #             dest = _positiontype.custom,
+    #          )
+
+    # test = _cam(name="test",
+    #             file_name = "relay_actuation_test2.cam", # from config later
+    #            )
+
+    # autodilute = _cam(name="autodilute",
+    #               file_name = "lcfc_dilute.cam", # from config later
+    #               sample_out_type = _sampletype.liquid,
+    #               source = _positiontype.custom,
+    #               dest = _positiontype.next_full_vial,
+    #              )
+
+    # dilute = _cam(name="dilute",
+    #               file_name = "lcfc_dilute.cam", # from config later
+    #               sample_out_type = _sampletype.liquid,
+    #               source = _positiontype.custom,
+    #               dest = _positiontype.tray,
+    #              )
 
 
 class Spacingmethod(str, Enum):
@@ -240,7 +263,6 @@ class PAL:
         self.sshkey = self.config_dict["key"]
         self.sshhost = self.config_dict["host"]
         self.cam_file_path = self.config_dict["cam_file_path"]
-        self.log_file = self.config_dict["log_file"]
         self.timeout = self.config_dict.get("timeout", 30 * 60)
 
         self.triggers = False
@@ -1438,17 +1460,22 @@ class PAL:
                     wash4 = "True"
                 microcam.rshs_pal_logfile = palcam.aux_output_filepath
                 microcam.path_methodfile = camfile
-
+                
+                # A --> B
+                # A
                 source = microcam.run[-1].source.position
+                source_tray = microcam.run[-1].source.tray
+                source_slot = microcam.run[-1].source.slot
+                source_vial = microcam.run[-1].source.vial
+                # B
+                dest = microcam.run[-1].dest.position
                 dest_tray = microcam.run[-1].dest.tray
                 dest_slot = microcam.run[-1].dest.slot
                 dest_vial = microcam.run[-1].dest.vial
 
-
                 palcam.joblist.append(_palcmd(method=f"{camfile}",
-                                       params=f"{microcam.tool};{source};{microcam.volume_ul};{dest_tray};{dest_slot};{dest_vial};{wash1};{wash2};{wash3};{wash4};{microcam.rshs_pal_logfile}"))
-
- 
+                                       params=f"{microcam.tool};{microcam.volume_ul};{source};{source_tray};{source_slot};{source_vial};{dest};{dest_tray};{dest_slot};{dest_vial};{wash1};{wash2};{wash3};{wash4};{microcam.rshs_pal_logfile}"))
+    
         return error
 
 
@@ -1495,6 +1522,15 @@ class PAL:
         return error
 
 
+    async def _sendcommand_write_local_rshs_aux_header(
+                                           self,
+                                           auxheader,
+                                           output_file
+                                          ):
+        async with aiofiles.open(output_file, mode="w+") as f:
+            await f.write(auxheader)
+
+
     async def _sendcommand_submitjoblist_helper(
                                                 self, 
                                                 palcam: PalCam
@@ -1503,8 +1539,35 @@ class PAL:
         error = error_codes.none
 
         if self.sshhost == "localhost":
-            error = error_codes.not_available
-            #TODO: tdb
+            
+            FIFO_rshs_dir,rshs_logfile = os.path.split(palcam.aux_output_filepath)
+            self.base.print_message(f"RSHS saving to: {FIFO_rshs_dir}")
+
+            if not os.path.exists(FIFO_rshs_dir):
+                os.makedirs(FIFO_rshs_dir, exist_ok=True)
+            
+            await self._sendcommand_write_local_rshs_aux_header(
+                            auxheader = "\t".join(self.palauxheader)+"\r\n",
+                            output_file = palcam.aux_output_filepath
+            )
+            
+
+            tmpjob = " ".join([f"/loadmethod '{job.method}' '{job.params}'" for job in palcam.joblist])
+            cmd_to_execute = f"PAL {tmpjob} /start /quit &"
+            self.base.print_message(f"PAL command: {cmd_to_execute}")
+            try:
+                result = os.system(cmd_to_execute)
+                self.base.print_message(f"PAL command send: {result}")
+            except Exception as e:
+                self.base.print_message(
+                    "CMD error. Could not send commands.",
+                    error = True
+                )
+                self.base.print_message(
+                    e,
+                    error = True
+                )
+                error = error_codes.cmd_error
         else:
             ssh_connected = False
             while not ssh_connected:
