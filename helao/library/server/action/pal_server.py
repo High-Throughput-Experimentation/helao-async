@@ -14,7 +14,7 @@ from helao.library.driver.pal_driver import Spacingmethod
 from helao.library.driver.pal_driver import PALtools
 from helao.library.driver.pal_driver import PalMicroCam
 from helao.library.driver.pal_driver import PALposition
-from helaocore.model.sample import LiquidSample, SampleUnion
+from helaocore.model.sample import LiquidSample, SampleUnion, NoneSample
 from helaocore.helper import make_str_enum
 from helaocore.schema import Action
 
@@ -116,6 +116,28 @@ def makeApp(confPrefix, servKey):
             return active_dict
 
 
+    if "injection_tray_GC_liquid_start" in _cams:
+        @app.post(f"/{servKey}/PAL_injection_tray_GC_liquid_start", tags=["public_PAL"])
+        async def PAL_injection_tray_GC_liquid_start(
+            action: Optional[Action] = \
+                    Body({}, embed=True),
+            tool: Optional[PALtools] = None,
+            source_tray: Optional[int] = 1,
+            source_slot: Optional[int] = 1,
+            source_vial: Optional[int] = 1,
+            dest: Optional[dev_customitems] = None,
+            volume_ul: Optional[int] = 2,
+            wash1: Optional[bool] = True,
+            wash2: Optional[bool] = True,
+            wash3: Optional[bool] = True,
+            wash4: Optional[bool] = False,
+        ):
+            A = await app.base.setup_action()
+            A.action_abbr = "GC_injection"
+            active_dict = await app.driver.injection_tray_GC_liquid_start(A)
+            return active_dict
+
+
     if "archive" in _cams:
         @app.post(f"/{servKey}/PAL_archive", tags=["public_PAL"])
         async def PAL_archive(
@@ -186,6 +208,10 @@ def makeApp(confPrefix, servKey):
                     Body({}, embed=True),
             tool: Optional[PALtools] = None,
             volume_ul: Optional[int] = 200, # this value is only for prc, a fixed value is used
+            wash1: Optional[bool] = True,
+            wash2: Optional[bool] = True,
+            wash3: Optional[bool] = True,
+            wash4: Optional[bool] = True,
         ):
             A = await app.base.setup_action()
             A.action_abbr = "deepclean"
@@ -290,6 +316,31 @@ def makeApp(confPrefix, servKey):
         await active.enqueue_data_dflt(datadict = \
                                        {"unloaded": unloaded,
                                         "tray_dict": tray_dict})
+        finished_act = await active.finish()
+        return finished_act.as_dict()
+
+
+    @app.post(f"/{servKey}/archive_tray_load", tags=["public_archive"])
+    async def archive_tray_load(
+                                action: Optional[Action] = \
+                                          Body({}, embed=True),
+                                load_sample_in: Optional[SampleUnion] = Body(LiquidSample(**{"sample_no":1,"machine_name":gethostname()}), embed=True),
+                                tray: Optional[int] = None,
+                                slot: Optional[int] = None,
+                                vial: Optional[int] = None,
+                               ):
+        active = await app.base.setup_and_contain_action(
+                                          json_data_keys = ["error_code","sample"],
+                                          action_abbr = "load_sample",
+        )
+        error_code, loaded_sample = await app.driver.archive.tray_load(**active.action.action_params)
+        if loaded_sample != NoneSample():
+            await active.append_sample(samples = [loaded_sample],
+                                IO="in"
+                               )
+        await active.enqueue_data_dflt(datadict = \
+                                       {"error_code":error_code.name,
+                                        "sample": loaded_sample.as_dict()})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -567,9 +618,9 @@ def makeApp(confPrefix, servKey):
         active = await app.base.setup_and_contain_action(
                                           json_data_keys = ["sample"],
         )
-        sample = await app.driver.db_new_sample(active.action.samples_in)
+        samples = await app.driver.db_new_sample(active.action.samples_in)
         await active.enqueue_data_dflt(datadict = \
-                                       {'sample': sample.as_dict()})
+                                       {'sample': [sample.as_dict() for sample in samples]})
         finished_action = await active.finish()
         return finished_action.as_dict()
 

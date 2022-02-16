@@ -12,6 +12,7 @@ import copy
 from typing import List, Optional, Union, Tuple
 from pydantic import BaseModel, Field
 import aiofiles
+import subprocess
 
 from helaocore.schema import Action
 from helaocore.server import Base
@@ -32,7 +33,7 @@ from helaocore.model.sample import (
 from helaocore.model.file import FileConnParams
 from helaocore.model.active import ActiveParams
 from helaocore.model.data import DataModel
-from helao.library.driver.archive_driver import Archive
+from helao.library.driver.archive_driver import Archive, CustomTypes
 
 
 import nidaqmx
@@ -73,26 +74,81 @@ class _sampletype(str, Enum):
 
 class CAMS(Enum):
 
-    archive_tray_tray = _cam(name="archive_tray_tray",
+    transfer_tray_tray = _cam(name="transfer_tray_tray",
                    file_name = "", # filled in from config later
                    sample_out_type = _sampletype.liquid,
                    source = _positiontype.tray,
                    dest = _positiontype.tray,
                   )
 
-    archive_custom_tray = _cam(name="archive_custom_tray",
+    transfer_custom_tray = _cam(name="transfer_custom_tray",
                    file_name = "", # filled in from config later
                    sample_out_type = _sampletype.liquid,
                    source = _positiontype.custom,
                    dest = _positiontype.tray,
                   )
 
-    archive_tray_custom = _cam(name="archive_tray_custom",
+    transfer_tray_custom = _cam(name="transfer_tray_custom",
                    file_name = "", # filled in from config later
                    sample_out_type = _sampletype.liquid,
                    source = _positiontype.tray,
                    dest = _positiontype.custom,
                   )
+
+    injection_custom_GC_gas_wait = _cam(name="injection_custom_GC_gas_wait",
+                   file_name = "", # filled in from config later
+                   sample_out_type = _sampletype.gas,
+                   source = _positiontype.custom,
+                   dest = _positiontype.custom,
+                  )
+
+    injection_custom_GC_gas_start = _cam(name="injection_custom_GC_gas_start",
+                   file_name = "", # filled in from config later
+                   sample_out_type = _sampletype.gas,
+                   source = _positiontype.custom,
+                   dest = _positiontype.custom,
+                  )
+
+
+    injection_custom_GC_liquid_wait = _cam(name="injection_custom_GC_liquid_wait",
+                   file_name = "", # filled in from config later
+                   sample_out_type = _sampletype.liquid,
+                   source = _positiontype.custom,
+                   dest = _positiontype.custom,
+                  )
+
+
+    injection_custom_GC_liquid_start = _cam(name="injection_custom_GC_liquid_start",
+                   file_name = "", # filled in from config later
+                   sample_out_type = _sampletype.liquid,
+                   source = _positiontype.custom,
+                   dest = _positiontype.custom,
+                  )
+
+
+    injection_tray_GC_liquid_start = _cam(name="injection_tray_GC_liquid_start",
+                   file_name = "", # filled in from config later
+                   sample_out_type = _sampletype.liquid,
+                   source = _positiontype.tray,
+                   dest = _positiontype.custom,
+                  )
+
+
+    injection_custom_HPLC = _cam(name="injection_custom_GC_liquid",
+                   file_name = "", # filled in from config later
+                   sample_out_type = _sampletype.liquid,
+                   source = _positiontype.custom,
+                   dest = _positiontype.custom,
+                  )
+
+
+    injection_tray_HPLC = _cam(name="injection_custom_GC_liquid",
+                   file_name = "", # filled in from config later
+                   sample_out_type = _sampletype.liquid,
+                   source = _positiontype.tray,
+                   dest = _positiontype.custom,
+                  )
+
 
     deepclean = _cam(name="deepclean",
                      file_name = "", # filled in from config later
@@ -102,16 +158,16 @@ class CAMS(Enum):
                 file_name = "",
                )
     
-    # archive_liquid = _cam(name="archive_liquid",
-    #                       file_name = "lcfc_archive.cam", # from config later
+    # transfer_liquid = _cam(name="transfer_liquid",
+    #                       file_name = "lcfc_transfer.cam", # from config later
     #                       sample_out_type = _sampletype.liquid,
     #                       source = _positiontype.custom,
     #                       dest = _positiontype.next_empty_vial,
     #                      )
 
 
-    # archive = _cam(name="archive",
-    #                file_name = "lcfc_archive.cam", # from config later
+    # transfer = _cam(name="transfer",
+    #                file_name = "lcfc_transfer.cam", # from config later
     #                sample_out_type = _sampletype.liquid,
     #                source = _positiontype.custom,
     #                dest = _positiontype.next_empty_vial,
@@ -162,6 +218,8 @@ class PALtools(str, Enum):
     LS1 = "LS1"
     LS2 = "LS2"
     LS3 = "LS3"
+    HS1 = "HS1"
+    HS2 = "HS2"
 
 
 class PALposition(BaseModel, HelaoDict):
@@ -259,11 +317,12 @@ class PAL:
 
         self.archive = Archive(self.base)
 
-        self.sshuser = self.config_dict["user"]
-        self.sshkey = self.config_dict["key"]
-        self.sshhost = self.config_dict["host"]
-        self.cam_file_path = self.config_dict["cam_file_path"]
+        self.sshuser = self.config_dict.get("user","")
+        self.sshkey = self.config_dict.get("key","")
+        self.sshhost = self.config_dict.get("host","")
+        self.cam_file_path = self.config_dict.get("cam_file_path","")
         self.timeout = self.config_dict.get("timeout", 30 * 60)
+        self.PAL_pid = None
 
         self.triggers = False
         self.triggerport_start = None
@@ -371,13 +430,14 @@ class PAL:
         starttime = time.time()
         self.trigger_start = False
         with nidaqmx.Task() as task:
+            self.base.print_message(f"using trigger port '{self.triggerport_start}' for 'start' trigger", info = True)
             task.di_channels.add_di_chan(
                 self.triggerport_start, line_grouping=LineGrouping.CHAN_PER_LINE
             )
             while self.trigger_start == False:
                 data = task.read(number_of_samples_per_channel=1)
                 if any(data) == True:
-                    self.base.print_message("got PAL start trigger poll", info = True)
+                    self.base.print_message("got PAL 'start' trigger poll", info = True)
                     self.trigger_start_epoch = self.active.set_realtime_nowait()
                     self.trigger_start = True
                     return True
@@ -391,13 +451,14 @@ class PAL:
         starttime = time.time()
         self.trigger_continue = False
         with nidaqmx.Task() as task:
+            self.base.print_message(f"using trigger port '{self.triggerport_start}' for 'continue' trigger", info = True)
             task.di_channels.add_di_chan(
                 self.triggerport_continue, line_grouping=LineGrouping.CHAN_PER_LINE
             )
             while self.trigger_continue == False:
                 data = task.read(number_of_samples_per_channel=1)
                 if any(data) == True:
-                    self.base.print_message("got PAL continue trigger poll", info = True)
+                    self.base.print_message("got PAL 'continue' trigger poll", info = True)
                     self.trigger_continue_epoch = self.active.set_realtime_nowait()
                     self.trigger_continue = True
                     return True
@@ -411,13 +472,14 @@ class PAL:
         starttime = time.time()
         self.trigger_done = False
         with nidaqmx.Task() as task:
+            self.base.print_message(f"using trigger port '{self.triggerport_start}' for 'done' trigger", info = True)
             task.di_channels.add_di_chan(
                 self.triggerport_done, line_grouping=LineGrouping.CHAN_PER_LINE
             )
             while self.trigger_done == False:
                 data = task.read(number_of_samples_per_channel=1)
                 if any(data) == True:
-                    self.base.print_message("got PAL done trigger poll", info = True)
+                    self.base.print_message("got PAL 'done' trigger poll", info = True)
                     self.trigger_done_epoch = self.active.set_realtime_nowait()
                     self.trigger_done = True
                     return True
@@ -644,13 +706,24 @@ class PAL:
 
         # wait another 20sec for program to close
         # after final done
-        await asyncio.sleep(20)
+        tmp_time = 20
+        self.base.print_message(f"waiting {tmp_time}sec for PAL to close", info = True)
+        await asyncio.sleep(tmp_time)
+        self.base.print_message(f"done waiting {tmp_time}sec for PAL to close", info = True)
+        print(self.PAL_pid)
+        if self.PAL_pid is not None:
+            self.base.print_message("waiting for PAL pid to finish", info = True)
+            self.PAL_pid.communicate()
+            self.PAL_pid = None
+
         return error
+
 
     async def _sendcommand_add_listA_to_listB(self, listA, listB) -> list:
         for item in listA:
             listB.append(copy.deepcopy(item))
         return listB
+
 
     async def _sendcommand_new_ref_samples(
                                           self, 
@@ -706,11 +779,11 @@ class PAL:
                 # this is a sample reference, it needs to be added
                 # to the db later
                 samples.append(LiquidSample(
-                        action_uuid=[self.action.action_uuid],
-                        sample_creation_action_uuid = self.action.action_uuid,
-                        sample_creation_experiment_uuid = self.action.experiment_uuid,
+                        action_uuid=[self.active.action.action_uuid],
+                        sample_creation_action_uuid = self.active.action.action_uuid,
+                        sample_creation_experiment_uuid = self.active.action.experiment_uuid,
                         source=source,
-                        action_timestamp=self.action.action_timestamp,
+                        action_timestamp=self.active.action.action_timestamp,
                         chemical=source_chemical,
                         mass=source_mass,
                         supplier=source_supplier,
@@ -720,11 +793,11 @@ class PAL:
                         ))
             elif samples_out_type == _sampletype.gas:
                 samples.append(GasSample(
-                        action_uuid=[self.action.action_uuid],
-                        sample_creation_action_uuid = self.action.action_uuid,
-                        sample_creation_experiment_uuid = self.action.experiment_uuid,
+                        action_uuid=[self.active.action.action_uuid],
+                        sample_creation_action_uuid = self.active.action.action_uuid,
+                        sample_creation_experiment_uuid = self.active.action.experiment_uuid,
                         source=source,
-                        action_timestamp=self.action.action_timestamp,
+                        action_timestamp=self.active.action.action_timestamp,
                         chemical=source_chemical,
                         mass=source_mass,
                         supplier=source_supplier,
@@ -736,11 +809,11 @@ class PAL:
                 samples.append(AssemblySample(
                         parts = samples_in,
                         sample_position = samples_position,
-                        action_uuid=[self.action.action_uuid],
-                        sample_creation_action_uuid = self.action.action_uuid,
-                        sample_creation_experiment_uuid = self.action.experiment_uuid,
+                        action_uuid=[self.active.action.action_uuid],
+                        sample_creation_action_uuid = self.active.action.action_uuid,
+                        sample_creation_experiment_uuid = self.active.action.experiment_uuid,
                         source=source,
-                        action_timestamp=self.action.action_timestamp,
+                        action_timestamp=self.active.action.action_timestamp,
                         status=[SampleStatus.created],
                         inheritance=SampleInheritance.receive_only
                         ))
@@ -758,9 +831,9 @@ class PAL:
                 status=[SampleStatus.created],
                 inheritance=SampleInheritance.receive_only,
                 source = [sample.get_global_label() for sample in samples_in],
-                experiment_uuid=self.action.experiment_uuid,
-                action_uuid=[self.action.action_uuid],
-                action_timestamp=self.action.action_timestamp,
+                experiment_uuid=self.active.action.experiment_uuid,
+                action_uuid=[self.active.action.action_uuid],
+                action_timestamp=self.active.action.action_timestamp,
                 ))
         else:
             # this should never happen, else we found a bug
@@ -853,7 +926,6 @@ class PAL:
                     microcam.requested_source.slot,
                     microcam.requested_source.vial
                     )
-
             if error != error_codes.none:
                 self.base.print_message("PAL_source: Requested tray position does not exist.", error = True)
                 return error_codes.critical
@@ -1546,20 +1618,19 @@ class PAL:
             self.base.print_message(f"RSHS saving to: {FIFO_rshs_dir}")
 
             if not os.path.exists(FIFO_rshs_dir):
-                os.makedirs(FIFO_rshs_dir, exist_ok=True)
+                os.makedirs(FIFO_rshs_dir, exist_ok=True, cwd=FIFO_rshs_dir)
             
             await self._sendcommand_write_local_rshs_aux_header(
                             auxheader = "\t".join(self.palauxheader)+"\r\n",
                             output_file = palcam.aux_output_filepath
             )
-            
-
-            tmpjob = " ".join([f"/loadmethod '{job.method}' '{job.params}'" for job in palcam.joblist])
-            cmd_to_execute = f"PAL {tmpjob} /start /quit &"
-            self.base.print_message(f"PAL command: {cmd_to_execute}")
+            tmpjob = ' '.join([f'/loadmethod "{job.method}" "{job.params}"' for job in palcam.joblist])
+            cmd_to_execute = f'PAL {tmpjob} /start /quit'
+            self.base.print_message(f"PAL command: '{cmd_to_execute}'")
             try:
-                result = os.system(cmd_to_execute)
-                self.base.print_message(f"PAL command send: {result}")
+                # result = os.system(cmd_to_execute)
+                self.PAL_pid = subprocess.Popen(cmd_to_execute, shell = True)
+                self.base.print_message(f"PAL command send: {self.PAL_pid}")
             except Exception as e:
                 self.base.print_message(
                     "CMD error. Could not send commands.",
@@ -1632,7 +1703,7 @@ class PAL:
                 cmd_to_execute = f"tmux new-window PAL {tmpjob} /start /quit"
                 
 
-                self.base.print_message(f"PAL command: {cmd_to_execute}")
+                self.base.print_message(f"PAL command: '{cmd_to_execute}'")
             
     
     
@@ -1925,6 +1996,10 @@ class PAL:
         """resets all IO variables
             and updates prc samples in and out"""
 
+        if self.PAL_pid is not None:            
+            self.base.print_message("waiting for PAL pid to finish")
+            self.PAL_pid.communicate()
+            self.PAL_pid = None
 
         self.IO_continue = True
         # done sending all PAL commands
@@ -2079,10 +2154,10 @@ class PAL:
                     "method":"deepclean",
                     "tool":A.action_params.get("tool",None),
                     "volume_ul":A.action_params.get("volume_ul",0),
-                    "wash1":1,
-                    "wash2":1,
-                    "wash3":1,
-                    "wash4":1,
+                    "wash1":A.action_params.get("wash1",1),
+                    "wash2":A.action_params.get("wash2",1),
+                    "wash3":A.action_params.get("wash3",1),
+                    "wash4":A.action_params.get("wash4",1),
                     })]
         )
         return await self._init_PAL_IOloop(
@@ -2143,6 +2218,72 @@ class PAL:
                     "wash2":A.action_params.get("wash2",1),
                     "wash3":A.action_params.get("wash3",1),
                     "wash4":A.action_params.get("wash4",1),
+                    })]
+        )
+        return await self._init_PAL_IOloop(
+            A = A,
+            palcam = palcam,
+        )
+
+
+    async def method_injection_tray_GC_liquid_start(self, A: Action) -> dict:
+        palcam = PalCam(
+            sample_in = A.samples_in,
+            totalruns = 1,
+            sampleperiod = [],
+            spacingmethod = Spacingmethod.linear,
+            spacingfactor = 1.0,
+            timeoffset = 0.0,
+            microcam = [PalMicroCam(**{
+                    "method":"injection_tray_GC_liquid_start",
+                    "tool":A.action_params.get("tool",None),
+                    "volume_ul":A.action_params.get("volume_ul",0),
+                    "requested_source":PALposition(**{
+                        "position":_positiontype.tray,
+                        "tray":A.action_params.get("source_tray",0),
+                        "slot":A.action_params.get("source_slot",0),
+                        "vial":A.action_params.get("source_vial",0),
+                        }),
+                    "requested_dest":PALposition(**{
+                        "position":A.action_params.get("dest",None),
+                        }),
+                    "wash1":A.action_params.get("wash1",0),
+                    "wash2":A.action_params.get("wash2",0),
+                    "wash3":A.action_params.get("wash3",0),
+                    "wash4":A.action_params.get("wash4",0),
+                    })]
+        )
+        return await self._init_PAL_IOloop(
+            A = A,
+            palcam = palcam,
+        )
+
+
+    async def method_injection_tray_HPLC(self, A: Action) -> dict:
+        palcam = PalCam(
+            sample_in = A.samples_in,
+            totalruns = 1,
+            sampleperiod = [],
+            spacingmethod = Spacingmethod.linear,
+            spacingfactor = 1.0,
+            timeoffset = 0.0,
+            microcam = [PalMicroCam(**{
+                    "method":"injection_tray_HPLC",
+                    "tool":A.action_params.get("tool",None),
+                    "volume_ul":A.action_params.get("volume_ul",0),
+                    "requested_source":PALposition(**{
+                        "position":_positiontype.tray,
+                        "tray":A.action_params.get("source_tray",0),
+                        "slot":A.action_params.get("source_slot",0),
+                        "vial":A.action_params.get("source_vial",0),
+                        }),
+                    "requested_dest":PALposition(**{
+                        "position":A.action_params.get("dest",None),
+                        }),
+                    "wash1":A.action_params.get("wash1",0),
+                    "wash2":A.action_params.get("wash2",0),
+                    "wash3":A.action_params.get("wash3",0),
+                    "wash4":A.action_params.get("wash4",0),
                     })]
         )
         return await self._init_PAL_IOloop(

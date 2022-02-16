@@ -1,4 +1,7 @@
-__all__ = ["Archive"]
+__all__ = [
+           "Archive",
+           "CustomTypes"
+          ]
 
 import asyncio
 import os
@@ -8,6 +11,7 @@ from typing import List, Tuple
 from socket import gethostname
 import pickle
 import re
+from enum import Enum
 
 from helaocore.server import Base
 from helaocore.error import error_codes
@@ -23,6 +27,11 @@ from helaocore.model.sample import (
 
 from helaocore.helper import print_message
 from helaocore.data import UnifiedSampleDataAPI
+
+class CustomTypes(str, Enum):
+    cell = "cell"
+    reservoir = "reservoir"
+    injector = "injector"
 
 
 class Custom:
@@ -42,9 +51,9 @@ class Custom:
         
         
     def assembly_allowed(self):
-        if self.custom_type == "cell":
+        if self.custom_type == CustomTypes.cell:
             return True
-        elif self.custom_type == "reservoir":
+        elif self.custom_type == CustomTypes.reservoir:
             return False
         else:
             print_message({}, "archive", f"invalid 'custom_type': {self.custom_type}", error = True)                
@@ -52,9 +61,9 @@ class Custom:
 
 
     def dilution_allowed(self):
-        if self.custom_type == "cell":
+        if self.custom_type == CustomTypes.cell:
             return True
-        elif self.custom_type == "reservoir":
+        elif self.custom_type == CustomTypes.reservoir:
             return False
         else:
             print_message({}, "archive", f"invalid 'custom_type': {self.custom_type}", error = True)                
@@ -62,9 +71,11 @@ class Custom:
 
 
     def dest_allowed(self):
-        if self.custom_type == "cell":
+        if self.custom_type == CustomTypes.cell:
             return True
-        elif self.custom_type == "reservoir":
+        elif self.custom_type ==  CustomTypes.injector:
+            return True
+        elif self.custom_type == CustomTypes.reservoir:
             return False
         else:
             print_message({}, "archive", f"invalid 'custom_type': {self.custom_type}", error = True)                
@@ -166,7 +177,27 @@ class VT_template:
         
         self.reset_tray()
         return ret_sample
+    
+    
+    def load(
+             self, 
+             sample: SampleUnion,
+             vial: int = None,
+            ):
+        vial -= 1
+        ret_sample = NoneSample()        
+        if sample == NoneSample():
+            return ret_sample
+        
+        if vial+1 <= self.init_positions:
+            if self.sample[vial] == NoneSample() and self.vials[vial] == False:
+                self.vials[vial] = True
+                print(sample.as_dict())
+                self.sample[vial] = copy.deepcopy(sample)
+                ret_sample = copy.deepcopy(self.sample[vial])
+                print(ret_sample)
 
+        return ret_sample
         
 
 class VT15(VT_template):
@@ -411,6 +442,43 @@ class Archive():
 
     def tray_get_keys(self):
         return [key for key in VT_template().as_dict().keys()]
+
+
+    async def tray_load(
+                        self, 
+                        tray: int = None, 
+                        slot: int = None, 
+                        vial: int = None,
+                        load_sample_in: SampleUnion = None,
+                       ) -> Tuple[error_codes, SampleUnion]:
+        vial -= 1
+        sample = NoneSample()
+        error = error_codes.not_available
+
+        if load_sample_in is None:
+            return False, NoneSample(), dict()
+        
+        # check if sample actually exists
+        load_sample_in = await self.unified_db.get_sample([object_to_sample(load_sample_in)])
+
+
+        if not load_sample_in:
+            print_message({}, "archive", "Sample does not exist in DB.", error = True)
+            return error, sample
+
+        if tray in self.trays:
+            if self.trays[tray] is not None:
+                if slot in self.trays[tray]:
+                    if self.trays[tray][slot] is not None:
+                        if self.trays[tray][slot].vials[vial] is not True:
+                            error = error_codes.none
+                            sample = self.trays[tray][slot].load(
+                                                                 vial = vial+1,
+                                                                 sample = load_sample_in[0]
+                                                                )
+        # update with information from db                            
+        sample = await self._update_sample(sample)
+        return error, sample
 
 
     async def tray_unload(

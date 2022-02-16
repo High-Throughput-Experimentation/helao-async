@@ -123,14 +123,35 @@ config["servers"] = dict(
         fast="pal_server",
         params = dict(
             host = "localhost",
-            method_path = r'C:\Users\rshs\Desktop\ADSS\adss_psc_methods\lcfc',
             timeout = 30*60, # 30min timeout for waiting for TTL
             dev_trigger = "NImax",
-            dev_NImax = { # TTL handshake via NImax
-                'start':'cDAQ1Mod2/port2/line5', #TTL1
-                'continue':'cDAQ1Mod2/port2/line7',  #TTL2
-                'done':'cDAQ1Mod2/port2/line3',  #TTL3
+            trigger = { # TTL handshake via NImax
+                'start':'cDAQ1Mod2/port0/line1', #TTL1
+                'continue':'cDAQ1Mod2/port0/line2',  #TTL2
+                'done':'cDAQ1Mod2/port0/line3',  #TTL3
                 },
+            cam_file_path = r'C:\Users\anec\Desktop\psc_methods\active_methods\HELAO',
+            cams = {
+                    "deepclean":"HELAO_LiquidSyringe_DeepClean_220215.cam",
+                    "injection_custom_HPLC":"HELAO_HPLC_LiquidInjection_Custom_to_HPLCInjector_220215.cam",
+                    "injection_tray_HPLC":"HELAO_HPLC_LiquidInjection_Tray_to_HPLCInjector_220215.cam",
+                    "injection_custom_GC_gas_wait":"HELAO_GCHeadspace_Injection1_220215.cam",
+                    "injection_custom_GC_gas_start":"HELAO_GCHeadspace_Injection2_220215.cam",
+                    "injection_tray_GC_liquid_start":"HELAO_GC_LiquidInjection_FromArchive_220215.cam"
+                    },
+            positions = {
+                          "tray2":{
+                                  "slot1":"VT54",
+                                  "slot2":"VT54",
+                                  "slot3":"VT15",
+                                  },
+                          "custom":{
+                                    "cell1_we":"cell",
+                                    "Injector 1":"injector",
+                                    "Injector 2":"injector",
+                                    "LCInjector1":"injector",
+                                  }
+                        },
         )
     ),
     # #########################################################################
