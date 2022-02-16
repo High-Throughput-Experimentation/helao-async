@@ -8,7 +8,7 @@ configuration is read from config/config.py.
 
 __all__ = ["gamry",
            "Gamry_modes",
-           "Gamry_IErange"]
+          ]
 
 from helaocore.schema import Action
 from helaocore.server import Base
@@ -35,35 +35,35 @@ class Gamry_modes(str, Enum):
     EIS = "EIS"
     OCV = "OCV"
 
-
+# https://www.gamry.com/support/technical-support/frequently-asked-questions/fixed-vs-autoranging/
 # class Gamry_IErange(str, Enum):
 #     #NOTE: The ranges listed below are for 300 mA or 30 mA models. For 750 mA models, multiply the ranges by 2.5. For 600 mA models, multiply the ranges by 2.0.
-#     auto = 'auto'
-#     mode0 = '3pA'
-#     mode1 = '30pA'
-#     mode2 = '300pA'
-#     mode3 = '3nA'
-#     mode4 = '30nA'
-#     mode5 = '300nA'
-#     mode6 = '3μA'
-#     mode7 = '30μA'
-#     mode8 = '300μA'
-#     mode9 = '3mA'
-#     mode10 = '30mA'
-#     mode11 = '300mA'
-#     mode12 = '3A'
-#     mode13 = '30A'
-#     mode14 = '300A'
-#     mode15 = '3kA'
+#     auto = "auto"
+#     mode0 = "3pA"
+#     mode1 = "30pA"
+#     mode2 = "300pA"
+#     mode3 = "3nA"
+#     mode4 = "30nA"
+#     mode5 = "300nA"
+#     mode6 = "3μA"
+#     mode7 = "30μA"
+#     mode8 = "300μA"
+#     mode9 = "3mA"
+#     mode10 = "30mA"
+#     mode11 = "300mA"
+#     mode12 = "3A"
+#     mode13 = "30A"
+#     mode14 = "300A"
+#     mode15 = "3kA"
 
 # for IFC1010
-class Gamry_IErange(str, Enum):
+class Gamry_IErange_IFC1010(str, Enum):
     # NOTE: The ranges listed below are for 300 mA or 30 mA models. For 750 mA models, multiply the ranges by 2.5. For 600 mA models, multiply the ranges by 2.0.
     auto = "auto"
-    mode0 = "1pA"  # doesnt go that low
-    mode1 = "10pA"  # doesnt go that low
-    mode2 = "100pA"  # doesnt go that low
-    mode3 = "1nA"
+    # mode0 = "1pA"  # N/A
+    # mode1 = "10pA"  # N/A
+    # mode2 = "100pA"  # N/A
+    # mode3 = "1nA"  # N/A
     mode4 = "10nA"
     mode5 = "100nA"
     mode6 = "1μA"
@@ -73,10 +73,51 @@ class Gamry_IErange(str, Enum):
     mode10 = "10mA"
     mode11 = "100mA"
     mode12 = "1A"
-    mode13 = "10A"
-    mode14 = "100A"
-    mode15 = "1kA"
+    # mode13 = "10A"  # N/A
+    # mode14 = "100A"  # N/A
+    # mode15 = "1kA"  # N/A
 
+
+class Gamry_IErange_REF600(str, Enum):
+    # NOTE: The ranges listed below are for 300 mA or 30 mA models. For 750 mA models, multiply the ranges by 2.5. For 600 mA models, multiply the ranges by 2.0.
+    auto = "auto"
+    # mode0 = "6pA"
+    mode1 = "60pA"
+    mode2 = "600pA"
+    mode3 = "6nA"
+    mode4 = "60nA"
+    mode5 = "600nA"
+    mode6 = "6μA"
+    mode7 = "60μA"
+    mode8 = "600μA"
+    mode9 = "6mA"
+    mode10 = "60mA"
+    mode11 = "600mA"
+    # mode12 = "6A"  # N/A
+    # mode13 = "60A"  # N/A
+    # mode14 = "600A"  # N/A
+    # mode15 = "6kA"  # N/A
+
+
+class Gamry_IErange_dflt(str, Enum):
+    # NOTE: The ranges listed below are for 300 mA or 30 mA models. For 750 mA models, multiply the ranges by 2.5. For 600 mA models, multiply the ranges by 2.0.
+    auto = "auto"
+    mode0 = "mode0"  # doesnt go that low
+    mode1 = "mode1"  # doesnt go that low
+    mode2 = "mode2"  # doesnt go that low
+    mode3 = "mode3"
+    mode4 = "mode4"
+    mode5 = "mode5"
+    mode6 = "mode6"
+    mode7 = "mode7"
+    mode8 = "mode8"
+    mode9 = "mode9"
+    mode10 = "mode10"
+    mode11 = "mode11"
+    mode12 = "mode12"
+    mode13 = "mode13"
+    mode14 = "mode14"
+    mode15 = "mode15"
 
 def gamry_error_decoder(e):
     if isinstance(e, comtypes.COMError):
@@ -138,6 +179,8 @@ class gamry:
 
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
+        # signals the dynamic endpoints that init was done
+        self.ready = False
 
         self.unified_db = UnifiedSampleDataAPI(self.base)
         asyncio.gather(self.unified_db.init_db())
@@ -155,6 +198,7 @@ class gamry:
         self.active = None  # for holding active action object, clear this at end of measurement
         self.samples_in=[]
         # status is handled through active, call active.finish()
+        self.gamry_range_enum = Gamry_IErange_dflt
 
         if not "dev_id" in self.config_dict:
             self.config_dict["dev_id"] = 0
@@ -186,7 +230,7 @@ class gamry:
         self.IO_sigramp = None
         self.IO_TTLwait = -1
         self.IO_TTLsend = -1
-        self.IO_IErange = Gamry_IErange("auto")
+        self.IO_IErange = self.gamry_range_enum("auto")
 
         myloop = asyncio.get_event_loop()
         # add meas IOloop
@@ -205,7 +249,6 @@ class gamry:
         
         # signals return to endpoint after active was created
         self.IO_continue = False
-
 
     async def set_IO_signalq(self, val: bool) -> None:
         if self.IO_signalq.full():
@@ -315,6 +358,13 @@ class gamry:
                 #     self.pstat = client.CreateObject('GamryCOM.GamryPstat')
                 #     self.base.print_message('Gamry, using Farmework , 7.06?', self.pstat)
 
+                if self.FIFO_Gamryname.find("IFC1010") == 0:
+                    self.gamry_range_enum = Gamry_IErange_IFC1010
+                elif self.FIFO_Gamryname.find("REF600") == 0:
+                    self.gamry_range_enum = Gamry_IErange_REF600
+                else:
+                    self.gamry_range_enum = Gamry_IErange_dflt
+
                 self.pstat.Init(self.devices.EnumSections()[devid])
                 # self.base.print_message("", self.pstat)
                 self.base.print_message(
@@ -334,6 +384,7 @@ class gamry:
             # happens when a not activated Gamry is connected and turned on
             # TODO: find a way to avoid it
             self.base.print_message(f"fatal error initializing Gamry: {e}", error=True)
+        self.ready = True
 
     async def open_connection(self):
         """Open connection to Gamry"""
@@ -441,7 +492,7 @@ class gamry:
                 # Enable or disable current measurement auto-ranging.
                 self.pstat.SetIERangeMode(True)
     
-                if self.IO_IErange == Gamry_IErange.auto:
+                if self.IO_IErange == self.gamry_range_enum.auto:
                     self.base.print_message("auto I range selected")
                     self.pstat.SetIERange(0.03)
                     self.pstat.SetIERangeMode(True)
@@ -450,7 +501,7 @@ class gamry:
                     self.base.print_message(f"{IErangesdict[self.IO_IErange.name]} I range selected")
                     self.pstat.SetIERange(IErangesdict[self.IO_IErange.name])
                     self.pstat.SetIERangeMode(False)
-                # elif self.IO_IErange == Gamry_IErange.mode0:
+                # elif self.IO_IErange == self.gamry_range_enum.mode0:
                 #     self.pstat.SetIERangeMode(False)
                 #     self.pstat.SetIERange(0)
     
@@ -969,7 +1020,7 @@ class gamry:
         }
 
         # common
-        self.IO_IErange = Gamry_IErange(IErange)
+        self.IO_IErange = self.gamry_range_enum(IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
         activeDict = await self.technique_wrapper(
@@ -1011,7 +1062,7 @@ class gamry:
         }
 
         # common
-        self.IO_IErange = Gamry_IErange(IErange)
+        self.IO_IErange = self.gamry_range_enum(IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
         activeDict = await self.technique_wrapper(
@@ -1050,7 +1101,7 @@ class gamry:
         }
 
         # common
-        self.IO_IErange = Gamry_IErange(IErange)
+        self.IO_IErange = self.gamry_range_enum(IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
         activeDict = await self.technique_wrapper(
@@ -1134,7 +1185,7 @@ class gamry:
         }
 
         # common
-        self.IO_IErange = Gamry_IErange(IErange)
+        self.IO_IErange = self.gamry_range_enum(IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
         activeDict = await self.technique_wrapper(
@@ -1178,7 +1229,7 @@ class gamry:
         }
 
         # common
-        self.IO_IErange = Gamry_IErange(IErange)
+        self.IO_IErange = self.gamry_range_enum(IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
         activeDict = await self.technique_wrapper(
@@ -1217,7 +1268,7 @@ class gamry:
         }
 
         # common
-        self.IO_IErange = Gamry_IErange(IErange)
+        self.IO_IErange = self.gamry_range_enum(IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
 

@@ -205,15 +205,25 @@ class C_nidaqmxvis:
 
     async def IOloop_data(self): # non-blocking coroutine, updates data source
         self.vis.print_message(f" ... NI visualizer subscribing to: {self.data_url}")
-        async with websockets.connect(self.data_url) as ws:
-            self.IOloop_data_run = True
-            while self.IOloop_data_run:
-                try:
-                    datapackage = DataPackageModel(**json.loads(await ws.recv()))
-                    if datapackage.action_name == "cellIV":
-                        self.vis.doc.add_next_tick_callback(partial(self.add_points, datapackage))
-                except Exception:
-                    self.IOloop_data_run = False
+        retry_limit = 5
+        for _ in range(retry_limit):
+            try:
+                async with websockets.connect(self.data_url) as ws:
+                    self.IOloop_data_run = True
+                    while self.IOloop_data_run:
+                        try:
+                            datapackage = DataPackageModel(**json.loads(await ws.recv()))
+                            if datapackage.action_name == "cellIV":
+                                self.vis.doc.add_next_tick_callback(partial(self.add_points, datapackage))
+                        except Exception:
+                            self.IOloop_data_run = False
+            except Exception:
+                self.vis.print_message(f"failed to subscribe to "
+                                   f"{self.data_url}"
+                                   "trying again in 1sec",
+                                   error = True)
+                await asyncio.sleep(1) 
+
 
     def _add_plots(self):
         # remove all old lines and clear legend
@@ -350,15 +360,23 @@ class C_potvis:
 
     async def IOloop_data(self): # non-blocking coroutine, updates data source
         self.vis.print_message(f" ... potentiostat visualizer subscribing to: {self.data_url}")
-        async with websockets.connect(self.data_url) as ws:
-            self.IOloop_data_run = True
-            while self.IOloop_data_run:
-                try:
-                    datapackage = DataPackageModel(**json.loads(await ws.recv()))
-                    self.vis.doc.add_next_tick_callback(partial(self.add_points, datapackage))
-                except Exception:
-                    self.IOloop_data_run = False
-
+        retry_limit = 5
+        for _ in range(retry_limit):
+            try:
+                async with websockets.connect(self.data_url) as ws:
+                    self.IOloop_data_run = True
+                    while self.IOloop_data_run:
+                        try:
+                            datapackage = DataPackageModel(**json.loads(await ws.recv()))
+                            self.vis.doc.add_next_tick_callback(partial(self.add_points, datapackage))
+                        except Exception:
+                            self.IOloop_data_run = False
+            except Exception:
+                self.vis.print_message(f"failed to subscribe to "
+                                   f"{self.data_url}"
+                                   "trying again in 1sec",
+                                   error = True)
+                await asyncio.sleep(1) 
     
 
     def _add_plots(self):
