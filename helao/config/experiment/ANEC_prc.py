@@ -4,18 +4,22 @@ Action library for ANEC
 server_key must be a FastAPI action server defined in config
 """
 
-__all__ = ["debug", 
+__all__ = [
            "CA",
            "OCV_sqtest",
-           "CA_sqtest"]
+           "CA_sqtest"
+          ]
 
 
 from typing import Optional, List, Union
 
 from helaocore.schema import Action, Experiment, ActionPlanMaker
 from helaocore.model.action_start_condition import ActionStartCondition
-from helao.library.driver.pal_driver import PALmethods, Spacingmethod, PALtools
-import helaocore.model.sample as hcms
+from helao.library.driver.pal_driver import Spacingmethod, PALtools
+from helaocore.model.sample import (
+                                    SolidSample,
+                                    LiquidSample
+                                   )
 
 # list valid experiment functions 
 EXPERIMENTS = __all__
@@ -34,58 +38,6 @@ z_engage = 2.5
 z_seal = 4.5
 
 
-
-def debug(pg_Obj: Experiment, 
-             d_mm: Optional[str] = "1.0", 
-             x_mm: Optional[float] = 0.0, 
-             y_mm: Optional[float] = 0.0
-             ):
-    """Test action for ORCH debugging
-    simple plate is e.g. 4534"""
-    
-     # additional experiment params should be stored in experiment.experiment_params
-     # these are duplicates of the function parameters (currently the op uses functions 
-     # parameters to display them in the webUI)
-     
-     
-    # start_condition: 
-    # 0: orch is dispatching an unconditional action
-    # 1: orch is waiting for endpoint to become available
-    # 2: orch is waiting for server to become available
-    # 3: (or other): orch is waiting for all action_dq to finish
-    
-    # holds all actions for this experiment  
-    action_list = []
-
-
-
-    action_dict = pg_Obj.as_dict()
-    action_dict.update({
-        "action_server_name": f"{NI_name}",
-        "action_name": "run_cell_IV",
-        "action_params": {
-                        "Tval": 10,
-                        "SampleRate": 1.0,
-                        "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                        "fast_samples_in":hcms.SampleList(samples=[
-                            hcms.LiquidSample(**{"sample_no":1}),
-                            hcms.LiquidSample(**{"sample_no":2}),
-                            hcms.LiquidSample(**{"sample_no":3}),
-                            hcms.LiquidSample(**{"sample_no":4}),
-                            hcms.LiquidSample(**{"sample_no":5}),
-                            hcms.LiquidSample(**{"sample_no":6}),
-                            hcms.LiquidSample(**{"sample_no":7}),
-                            hcms.LiquidSample(**{"sample_no":8}),
-                            hcms.LiquidSample(**{"sample_no":9}),
-                            ]).dict()
-                        },
-        # "save_act": False,
-        # "save_data": False,
-        "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
-        })
-    action_list.append(Action(inputdict=action_dict))
-
-    return action_list
 
 
 def CA(pg_Obj: Experiment,
