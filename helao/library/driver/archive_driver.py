@@ -32,6 +32,7 @@ class CustomTypes(str, Enum):
     cell = "cell"
     reservoir = "reservoir"
     injector = "injector"
+    waste = "waste"
 
 
 class Custom:
@@ -69,6 +70,15 @@ class Custom:
             print_message({}, "archive", f"invalid 'custom_type': {self.custom_type}", error = True)                
             return False
 
+
+    def is_destroyed(self):
+        if self.custom_type ==  CustomTypes.injector:
+            return True
+        elif self.custom_type == CustomTypes.waste:
+            return True
+        else:
+            return False
+        
 
     def dest_allowed(self):
         if self.custom_type == CustomTypes.cell:
@@ -766,6 +776,17 @@ class Archive():
         return False
 
 
+    def custom_is_destroyed(self, custom: str = None):
+        """checks if the custom position is a waste, injector
+           and similar position which fully comsumes and destroyes a 
+           sample if selected as a destination"""
+
+        if custom in self.custom_positions:
+            return self.custom_positions[custom].is_destroyed()
+        else:
+            return False
+
+
     def custom_assembly_allowed(self, custom: str = None):
         if custom in self.custom_positions:
             return self.custom_positions[custom].assembly_allowed()
@@ -822,11 +843,16 @@ class Archive():
             and not self.custom_positions[custom].assembly_allowed():
                 return False, NoneSample()
 
-            self.custom_positions[custom].sample = copy.deepcopy(sample)
+            # check if updated sample has destroyed status 
+            # and empty position of necessary
+            if SampleStatus.destroyed in sample.status:
+                _ = self.custom_positions[custom].unload()
+            else:
+                self.custom_positions[custom].sample = copy.deepcopy(sample)
+
             self.write_config()
 
         return True, sample
-    
 
     async def customs_to_dict(self):
         customdict = copy.deepcopy(self.custom_positions)
