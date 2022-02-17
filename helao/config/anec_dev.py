@@ -132,12 +132,13 @@ config["servers"] = dict(
                 },
             cam_file_path = r'C:\Users\anec\Desktop\psc_methods\active_methods\HELAO',
             cams = {
-                    "deepclean":"HELAO_LiquidSyringe_DeepClean_220215.cam",
-                    "injection_custom_HPLC":"HELAO_HPLC_LiquidInjection_Custom_to_HPLCInjector_220215.cam",
-                    "injection_tray_HPLC":"HELAO_HPLC_LiquidInjection_Tray_to_HPLCInjector_220215.cam",
-                    "injection_custom_GC_gas_wait":"HELAO_GCHeadspace_Injection1_220215.cam",
-                    "injection_custom_GC_gas_start":"HELAO_GCHeadspace_Injection2_220215.cam",
-                    "injection_tray_GC_liquid_start":"HELAO_GC_LiquidInjection_FromArchive_220215.cam"
+                    "deepclean":"HELAO_LiquidSyringe_DeepClean_220215.cam",#
+                    # "injection_custom_HPLC":"HELAO_HPLC_LiquidInjection_Custom_to_HPLCInjector_220215.cam",
+                    "injection_tray_HPLC":"HELAO_HPLC_LiquidInjection_Tray_to_HPLCInjector_220215.cam",#
+                    "injection_custom_GC_gas_wait":"HELAO_GCHeadspace_Injection1_220215.cam",#
+                    "injection_custom_GC_gas_start":"HELAO_GCHeadspace_Injection2_220215.cam",#
+                    "injection_tray_GC_liquid_start":"HELAO_GC_LiquidInjection_FromArchive_220215.cam",#
+                    "archive":"HELAO_GCHeadspace_Liquid_Archive_220215.cam"#
                     },
             positions = {
                           "tray2":{
@@ -168,18 +169,18 @@ config["servers"] = dict(
             ws_potentiostat = 'PSTAT',
         )
     ),
-    # OP=dict(
-    #     host=hostip,
-    #     port=5002,
-    #     group="operator",
-    #     bokeh="async_operator",
-    #     params = dict(
-    #         doc_name = "ANEC Operator",
-    #         orch = 'ORCH',
-    #         # data_server = "data",
-    #         # servicemode=False,
-    #     )
-    # ),
+    OP=dict(
+        host=hostip,
+        port=5002,
+        group="operator",
+        bokeh="async_operator",
+        params = dict(
+            doc_name = "ANEC Operator",
+            orch = 'ORCH',
+            # data_server = "data",
+            # servicemode=False,
+        )
+    ),
     # aligner_vis=dict(
     #     host=hostip,
     #     port=5003,

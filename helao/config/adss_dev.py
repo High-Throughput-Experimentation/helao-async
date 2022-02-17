@@ -29,55 +29,55 @@ config["servers"] = dict(
     ##########################################################################
     # Instrument Servers
     ##########################################################################
-    DATA=dict(
-        host=hostip,
-        port=8002,
-        group="action",
-        fast="HTEdata_server",
-        mode="legacy",  # lagcy; modelyst
-        # cmd_print=False,
-        params=dict(
-        ),
-    ),
-    MOTOR=dict(
-        host=hostip,
-        port=8003,
-        group="action",
-        fast="galil_motion",
-        # cmd_print=False,
-        params=dict(
-            Transfermatrix = [[1,0,0],[0,1,0],[0,0,1]], # default Transfermatrix for plate calibration
+    # DATA=dict(
+    #     host=hostip,
+    #     port=8002,
+    #     group="action",
+    #     fast="HTEdata_server",
+    #     mode="legacy",  # lagcy; modelyst
+    #     # cmd_print=False,
+    #     params=dict(
+    #     ),
+    # ),
+    # MOTOR=dict(
+    #     host=hostip,
+    #     port=8003,
+    #     group="action",
+    #     fast="galil_motion",
+    #     # cmd_print=False,
+    #     params=dict(
+    #         Transfermatrix = [[1,0,0],[0,1,0],[0,0,1]], # default Transfermatrix for plate calibration
             
-            # 4x6 plate
-            #M_instr = [[1,0,0,-76.525],[0,1,0,-50.875],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
-            # 100mm wafer
-            M_instr = [[1,0,0,-76.525+(3*25.4-50)-0.5+0.75+1.5+0.25],[0,1,0,-50.875+2.71+5-3+1],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
+    #         # 4x6 plate
+    #         #M_instr = [[1,0,0,-76.525],[0,1,0,-50.875],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
+    #         # 100mm wafer
+    #         M_instr = [[1,0,0,-76.525+(3*25.4-50)-0.5+0.75+1.5+0.25],[0,1,0,-50.875+2.71+5-3+1],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
 
-            count_to_mm=dict(
-                A=1.0/15835.31275,#1.0/15690.3,
-                B=1.0/6398.771436,#1.0/6395.45,
-                C=1.0/6396.315722,#1.0/6395.45,
-                D=1.0/3154.787,#1.0/3154.787,
-            ),
-            galil_ip_str="192.168.200.23",
-            def_speed_count_sec=10000,
-            max_speed_count_sec=25000,
-            ipstr="192.168.200.23",
-            axis_id=dict(
-                x="C",
-                y="B",
-                z="A",
-                Rz="D",
-                ),
-            axis_zero=dict(
-                A=0.0, #z
-                B=52.0, #y
-                C=77.0, #x
-                D=0.0, #Rz
-                ),
-            timeout = 10*60, # timeout for axis stop in sec
-        )
-    ),
+    #         count_to_mm=dict(
+    #             A=1.0/15835.31275,#1.0/15690.3,
+    #             B=1.0/6398.771436,#1.0/6395.45,
+    #             C=1.0/6396.315722,#1.0/6395.45,
+    #             D=1.0/3154.787,#1.0/3154.787,
+    #         ),
+    #         galil_ip_str="192.168.200.23",
+    #         def_speed_count_sec=10000,
+    #         max_speed_count_sec=25000,
+    #         ipstr="192.168.200.23",
+    #         axis_id=dict(
+    #             x="C",
+    #             y="B",
+    #             z="A",
+    #             Rz="D",
+    #             ),
+    #         axis_zero=dict(
+    #             A=0.0, #z
+    #             B=52.0, #y
+    #             C=77.0, #x
+    #             D=0.0, #Rz
+    #             ),
+    #         timeout = 10*60, # timeout for axis stop in sec
+    #     )
+    # ),
     PSTAT=dict(
         host=hostip,
         port=8004,
@@ -200,7 +200,6 @@ config["servers"] = dict(
             user = 'RSHS',
             key = r'c:\helao\sshkeys\rshs_private3.ppk', # needs to be in new openssh file format
             host = "10.231.100.169",#r'hte-rshs-01.htejcap.caltech.edu',
-            log_file = r'C:\Users\rshs\Desktop\ADSS\adss_logfile\210512_lcfc_manualwatertest\210512_LCFC_manualwatertest_logfile.txt',
             timeout = 30*60, # 30min timeout for waiting for TTL
             dev_trigger = "NImax",
             trigger = { # TTL handshake via NImax
@@ -208,16 +207,19 @@ config["servers"] = dict(
                 'continue':'PXI-6284/port2/line7',  #P2.7 #PFI15
                 'done':'PXI-6284/port2/line3',  #P2.3 #PFI11
                 },
-            cam_file_path = r'C:\Users\rshs\Desktop\ADSS\adss_psc_methods\lcfc',
+            cam_file_path = r'C:\Users\rshs\Desktop\ADSS\adss_psc_methods\HELAO',
             cams = {
-                    "archive":"lcfc_archive.cam",
-                    "archive_liquid":"lcfc_archive.cam",
-                    "fillfixed":"lcfc_fill_hardcodedvolume.cam",
-                    "fill":"lcfc_fill.cam",
+                    "archive_tray_tray":"tray_to_tray_220214.cam",
+                    "archive_custom_tray":"custom_to_tray_220214.cam",
+                    "archive_tray_custom":"tray_to_custom_220214.cam",
+                    # "archive":"lcfc_archive.cam",
+                    # "archive_liquid":"lcfc_archive.cam",
+                    # "fillfixed":"lcfc_fill_hardcodedvolume.cam",
+                    # "fill":"lcfc_fill.cam",
                     # "test":"relay_actuation_test2.cam",
                     # "dilute":"lcfc_dilute.cam",
                     # "autodilute":"lcfc_dilute.cam",
-                    "deepclean":"lcfc_deep_clean.cam",
+                    "deepclean":"deep_clean_220214.cam",
                     },
             positions = {
                           "tray1":{
