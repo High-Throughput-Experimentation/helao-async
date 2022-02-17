@@ -268,7 +268,8 @@ class gamry:
                         await self.measure()
                         if self.base.actionserver.estop:
                             self.IO_do_meas = False
-                            self.base.print_message("Gamry is in estop after measurement.")
+                            self.base.print_message("Gamry is in estop after measurement.",
+                                                    error=True)
                         else:
                             self.base.print_message("setting Gamry to idle")
                             # await self.stat.set_idle()
@@ -280,7 +281,8 @@ class gamry:
                         ))
                         self.active.action.action_status.append(HloStatus.estopped)
                         self.IO_do_meas = False
-                        self.base.print_message("Gamry is in estop.")
+                        self.base.print_message("Gamry is in estop.",
+                                                error=True)
 
                 elif self.IO_do_meas and self.IO_measuring:
                     self.active =  await self.base.contain_action(
