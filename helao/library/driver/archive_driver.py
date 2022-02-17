@@ -14,7 +14,7 @@ import re
 from enum import Enum
 
 from helaocore.server import Base
-from helaocore.error import error_codes
+from helaocore.error import ErrorCodes
 
 from helaocore.model.sample import (
                                    SampleUnion,
@@ -460,10 +460,10 @@ class Archive():
                         slot: int = None, 
                         vial: int = None,
                         load_sample_in: SampleUnion = None,
-                       ) -> Tuple[error_codes, SampleUnion]:
+                       ) -> Tuple[ErrorCodes, SampleUnion]:
         vial -= 1
         sample = NoneSample()
-        error = error_codes.not_available
+        error = ErrorCodes.not_available
 
         if load_sample_in is None:
             return False, NoneSample(), dict()
@@ -481,7 +481,7 @@ class Archive():
                 if slot in self.trays[tray]:
                     if self.trays[tray][slot] is not None:
                         if self.trays[tray][slot].vials[vial] is not True:
-                            error = error_codes.none
+                            error = ErrorCodes.none
                             sample = self.trays[tray][slot].load(
                                                                  vial = vial+1,
                                                                  sample = load_sample_in[0]
@@ -648,17 +648,17 @@ class Archive():
                                 tray: int = None, 
                                 slot: int = None, 
                                 vial: int = None
-                               ) -> Tuple[error_codes, SampleUnion]:
+                               ) -> Tuple[ErrorCodes, SampleUnion]:
         vial -= 1
         sample = NoneSample()
-        error = error_codes.not_available
+        error = ErrorCodes.not_available
 
 
         if tray in self.trays:
             if self.trays[tray] is not None:
                 if slot in self.trays[tray]:
                     if self.trays[tray][slot] is not None:
-                        error = error_codes.none
+                        error = ErrorCodes.none
                         if self.trays[tray][slot].vials[vial] is not False:
                             sample = copy.deepcopy(self.trays[tray][slot].sample[vial])
                             
@@ -813,14 +813,14 @@ class Archive():
                                   custom: str = None,
                                   *args,
                                   **kwargs
-                                 ) -> Tuple[error_codes, SampleUnion]:
+                                 ) -> Tuple[ErrorCodes, SampleUnion]:
         sample = NoneSample()
-        error = error_codes.none
+        error = ErrorCodes.none
         
         if custom in self.custom_positions:
             sample = copy.deepcopy(self.custom_positions[custom].sample)
         else:
-            error = error_codes.not_available
+            error = ErrorCodes.not_available
 
         sample = await self._update_sample(sample)        
         return error, sample
