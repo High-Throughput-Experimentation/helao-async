@@ -19,7 +19,7 @@ import subprocess
 
 from helaocore.schema import Action
 from helaocore.server import Base
-from helaocore.error import error_codes
+from helaocore.error import ErrorCodes
 from helaocore.helper import HelaoDict
 
 from helaocore.data import UnifiedSampleDataAPI
@@ -279,6 +279,7 @@ class PALposition(BaseModel, HelaoDict):
     tray: Optional[int]
     slot: Optional[int]
     vial: Optional[int]
+    error: Optional[ErrorCodes] = ErrorCodes.none
 
 
 class PalAction(BaseModel, HelaoDict):
@@ -425,7 +426,7 @@ class PAL:
         self.IO_palcam = PalCam()
         # check for that to return FASTapi post
         self.IO_continue = False
-        self.IO_error = error_codes.none
+        self.IO_error = ErrorCodes.none
         
         # counts the total submission
         # for split actions
@@ -535,25 +536,25 @@ class PAL:
         return True
 
 
-    async def _sendcommand_main(self, palcam: PalCam) -> error_codes:
+    async def _sendcommand_main(self, palcam: PalCam) -> ErrorCodes:
         """PAL takes liquid from sample_in and puts it in sample_out"""
-        error =  error_codes.none
+        error =  ErrorCodes.none
 
         # check if we have free vial slots
         # and update the microcams with correct positions and samples_out
         error = await self._sendcommand_prechecks(palcam)
-        if error is not error_codes.none:
+        if error is not ErrorCodes.none:
             self.base.print_message(f"Got error after pre-checks: '{error}'", error = True)
             return error
 
 
         # assemble complete PAL command from microcams to submit a full joblist
         error = await self._sendcommand_submitjoblist_helper(palcam)
-        if error is not error_codes.none:
+        if error is not ErrorCodes.none:
             self.base.print_message(f"Got error after sendcommand_ssh_helper: '{error}'", error = True)
             return error
 
-        if error is not error_codes.none:
+        if error is not ErrorCodes.none:
             return error
 
         # wait for each microcam cam
@@ -568,7 +569,7 @@ class PAL:
                 # populates the three trigger timings in palaction
                 error = await self._sendcommand_triggerwait(palaction)
 
-                if error is not error_codes.none:
+                if error is not ErrorCodes.none:
                     # there is not much we can do here
                     # as we have not control of pal directly
                     self.base.print_message(f"Got error after triggerwait: '{error}'", error = True)
@@ -627,10 +628,10 @@ class PAL:
                                 copy.deepcopy(dest_tmp[0])
                         else:
                             self.base.print_message("Sample does not exist in db", error = True)
-                            return error_codes.critical
+                            return ErrorCodes.critical
                     else:
                             self.base.print_message("palaction.dest.sample_initial should not contain ref samples", error = True)
-                            return error_codes.bug
+                            return ErrorCodes.bug
 
                 # -- (2) -- update sample_out
                 # only samples in sample_out should be new ones (ref samples)
@@ -791,12 +792,12 @@ class PAL:
         """ volume_ml and sample_position need to be updated after the 
         function call by the function calling this."""
 
-        error = error_codes.none
+        error = ErrorCodes.none
         samples: List[SampleUnion] = []
 
         if not samples_in:
             self.base.print_message("no sample_in to create sample_out", error = True)
-            error = error_codes.not_available
+            error = ErrorCodes.not_available
         elif len(samples_in) == 1:
             source_chemical = []
             source_mass = []
@@ -876,7 +877,7 @@ class PAL:
     
             else:
                 self.base.print_message(f"sample_out type {samples_out_type} is not supported yet.", error = True)
-                error = error_codes.not_available
+                error = ErrorCodes.not_available
 
 
         elif len(samples_in) > 1:
@@ -894,7 +895,7 @@ class PAL:
         else:
             # this should never happen, else we found a bug
             self.base.print_message("found a BUG in new_ref_sample", error = True)
-            error = error_codes.bug
+            error = ErrorCodes.bug
 
         return error, samples
 
@@ -904,15 +905,15 @@ class PAL:
                                           after_tray:int,
                                           after_slot:int,
                                           after_vial:int,
-                                         ) -> Tuple[error_codes, int, int, int, SampleUnion]:
-        error = error_codes.none
+                                         ) -> Tuple[ErrorCodes, int, int, int, SampleUnion]:
+        error = ErrorCodes.none
         tray_pos = None
         slot_pos = None
         vial_pos = None
         sample = NoneSample()
 
         if after_tray is None or after_slot is None or after_vial is None:
-            error = error_codes.not_available
+            error = ErrorCodes.not_available
             return error, tray_pos, slot_pos, vial_pos, sample
         
 
@@ -938,25 +939,131 @@ class PAL:
                                                          slot = slot_pos,
                                                          vial = vial_pos
                                                         )
-            if error != error_codes.none:
+            if error != ErrorCodes.none:
                 if sample != NoneSample():
                     sample.inheritance = SampleInheritance.allow_both
                     sample.status = [SampleStatus.preserved]
                 else:
-                    error = error_codes.not_available
+                    error = ErrorCodes.not_available
                     self.base.print_message("error converting old liquid_sample to basemodel.", error= True)
 
         else:
             self.base.print_message("no full vial slots", error = True)
-            error = error_codes.not_available        
+            error = ErrorCodes.not_available        
         
         return error, tray_pos, slot_pos, vial_pos, sample
 
 
-    async def _sendcommand_check_microcam_source(
+    async def _sendcommand_check_source_tray(
+                                             self, 
+                                             microcam: PalMicroCam
+                                            ) -> PALposition:
+        """checks for a valid sample in tray source position"""
+        source = _positiontype.tray # should be the same as microcam.requested_source.position
+        error, sample_in = await self.archive.tray_query_sample(
+                microcam.requested_source.tray,
+                microcam.requested_source.slot,
+                microcam.requested_source.vial
+                )
+
+        if error != ErrorCodes.none:
+            self.base.print_message("PAL_source: Requested tray position "
+                                    "does not exist.", error = True)
+            error = ErrorCodes.critical
+
+        elif sample_in == NoneSample():
+            self.base.print_message(f"PAL_source: No sample in tray "
+                                    f"{microcam.requested_source.tray}, "
+                                    f"slot {microcam.requested_source.slot}, "
+                                    f"vial {microcam.requested_source.vial}",
+                                    error = True)
+            error = ErrorCodes.not_available
+        
+
+
+        return PALposition(
+            position = source,
+            sample_initial = [sample_in],
+            tray = microcam.requested_source.tray,
+            slot = microcam.requested_source.slot,
+            vial = microcam.requested_source.vial,
+            error = error
+        )
+
+
+    async def _sendcommand_check_source_custom(
+                                               self, 
+                                               microcam: PalMicroCam
+                                              ) -> PALposition:
+        """checks for a valid sample in custom source position"""
+        source = microcam.requested_source.position # custom position name
+
+        if source is None:
+            self.base.print_message("PAL_source: Invalid PAL source 'NONE' for 'custom' position method.", error = True)
+            return PALposition(error = ErrorCodes.not_available)
+
+        error, sample_in = await self.archive.custom_query_sample(microcam.requested_source.position)
+
+        if error != ErrorCodes.none:
+            self.base.print_message("PAL_source: Requested custom position does not exist.", error = True)
+            error = ErrorCodes.critical
+        elif sample_in == NoneSample():
+            self.base.print_message(f"PAL_source: No sample in custom position '{source}'", error = True)
+            error = ErrorCodes.not_available
+        
+        return PALposition(
+            position = source,
+            sample_initial = [sample_in],
+            error = error
+        )
+
+
+    async def _sendcommand_check_source_next_empty(
+                                                   self, 
+                                                   microcam: PalMicroCam
+                                                  ) -> PALposition:
+        """source can never be empty, throw an error"""
+        self.base.print_message("PAL_source: PAL source cannot be "
+                                "'next_empty_vial'", error = True)
+        return PALposition(error = ErrorCodes.not_available)
+
+
+    async def _sendcommand_check_source_next_full(
+                                                  self, 
+                                                  microcam: PalMicroCam
+                                                 ) -> PALposition:
+        """find the next full vial in a tray AFTER the requested 
+           source position"""
+
+        source = _positiontype.tray
+        error, source_tray, source_slot, source_vial, sample_in = \
+            await self._sendcommand_next_full_vial(
+                              after_tray = microcam.requested_source.tray,
+                              after_slot = microcam.requested_source.slot,
+                              after_vial = microcam.requested_source.vial,
+                                             )
+        if error != ErrorCodes.none:
+            self.base.print_message("PAL_source: No next full vial", error = True)
+            return PALposition(error = ErrorCodes.not_available)
+
+        elif sample_in == NoneSample():
+            self.base.print_message("PAL_source: More then one sample in source position. This is not allowed.", error = True)
+            return PALposition(error = ErrorCodes.critical)
+
+        return PALposition(
+            position = source,
+            sample_initial = [sample_in],
+            tray = source_tray,
+            slot = source_slot,
+            vial = source_vial,
+            error = error
+        )
+
+
+    async def _sendcommand_check_source(
                                                  self, 
                                                  microcam: PalMicroCam
-                                                ) -> error_codes:
+                                                ) -> ErrorCodes:
 
         """Checks if a sample is present in the source position.
         An error is returned if no sample is found.
@@ -964,87 +1071,53 @@ class PAL:
         'Inheritance' and 'status' are set later when the destination
         is determined."""
         
-        sample_in = NoneSample()
-        sample_in_list: List[SampleUnion] = []
-
-        source = None
-        source_tray = None
-        source_slot = None
-        source_vial = None
-        sample_in_delta_vol_ml = []
-
+        palposition = PALposition()
         
         # check against desired source type
         if microcam.cam.source == _positiontype.tray:
-            source = _positiontype.tray # should be the same as microcam.requested_source.position
-            error, sample_in = await self.archive.tray_query_sample(
-                    microcam.requested_source.tray,
-                    microcam.requested_source.slot,
-                    microcam.requested_source.vial
-                    )
-            if error != error_codes.none:
-                self.base.print_message("PAL_source: Requested tray position does not exist.", error = True)
-                return error_codes.critical
-
-            if sample_in == NoneSample():
-                self.base.print_message(f"PAL_source: No sample in tray {microcam.requested_source.tray}, slot {microcam.requested_source.slot}, vial {microcam.requested_source.vial}", error = True)
-                return error_codes.not_available
-            
-            source_tray = microcam.requested_source.tray
-            source_slot = microcam.requested_source.slot
-            source_vial = microcam.requested_source.vial
-            
-
+            palposition = \
+                 await self._sendcommand_check_source_tray(microcam = microcam)
+            if palposition.error != ErrorCodes.none:
+                return palposition.error
 
         elif microcam.cam.source == _positiontype.custom:
-            source = microcam.requested_source.position # custom position name
-            if source is None:
-                self.base.print_message("PAL_source: Invalid PAL source 'NONE' for 'custom' position method.", error = True)
-                return error_codes.not_available
-
-            error, sample_in = await self.archive.custom_query_sample(microcam.requested_source.position)
-            if error != error_codes.none:
-                self.base.print_message("PAL_source: Requested custom position does not exist.", error = True)
-                return error_codes.critical
-
-            if sample_in == NoneSample():
-                self.base.print_message(f"PAL_source: No sample in custom position '{source}'", error = True)
-                return error_codes.not_available
-
-                    
+            palposition = \
+                 await self._sendcommand_check_source_custom(microcam = microcam)
+            if palposition.error != ErrorCodes.none:
+                return palposition.error
 
         elif microcam.cam.source == _positiontype.next_empty_vial:
-            self.base.print_message("PAL_source: PAL source cannot be 'next_empty_vial'", error = True)
-            return error_codes.not_available
-
+            palposition = \
+                 await self._sendcommand_check_source_next_empty(microcam = microcam)
+            if palposition.error != ErrorCodes.none:
+                return palposition.error
 
         elif microcam.cam.source == _positiontype.next_full_vial:
-            source = _positiontype.tray
-            error, source_tray, source_slot, source_vial, sample_in = \
-                await self._sendcommand_next_full_vial(
-                                  after_tray = microcam.requested_source.tray,
-                                  after_slot = microcam.requested_source.slot,
-                                  after_vial = microcam.requested_source.vial,
-                                                 )
-            if error != error_codes.none:
-                self.base.print_message("PAL_source: No next full vial", error = True)
-                return error_codes.not_available
-            if sample_in == NoneSample():
-                self.base.print_message("PAL_source: More then one sample in source position. This is not allowed.", error = True)
-                return error_codes.critical
+            palposition = \
+                 await self._sendcommand_check_source_next_empty(microcam = microcam)
+            if palposition.error != ErrorCodes.none:
+                return palposition.error
 
 
+        # # Set requested position to new position.
+        # # The new position will be the requested positin for the 
+        # # e.g. next full vial search as the new start position
+        microcam.requested_source.tray = palposition.tray
+        microcam.requested_source.slot = palposition.slot
+        microcam.requested_source.vial = palposition.vial
 
-            # Set requested position to new position.
-            # The new position will be the requested positin for the 
-            # e.g. next full vial search as the new start position
-            microcam.requested_source.tray = source_tray
-            microcam.requested_source.slot = source_slot
-            microcam.requested_source.vial = source_vial
 
+        # if sample_in != NoneSample():
+        # should never be the case as this will already throw an error before
+        # but better check agin
+        if palposition.sample_initial \
+        and len(palposition.sample_initial) == 1 \
+        and palposition.sample_initial[0] != NoneSample():
 
-        if sample_in != NoneSample():
-            self.base.print_message(f"PAL_source: Got sample '{sample_in.global_label}' in position '{source}'", info = True)
+            self.base.print_message(f"PAL_source: Got sample "
+                                    f"'{palposition.sample_initial[0].global_label}' "
+                                    f"in position '{palposition.position}'",
+                                    info = True)
             # done with checking source type
             # setting inheritance and status to None for all samples
             # in sample_in (will be updated when dest is decided)
@@ -1052,45 +1125,38 @@ class PAL:
             # but might not be preserved depending on target
             # sample_in.inheritance =  SampleInheritance.give_only
             # sample_in.status = [SampleStatus.preserved]
-            sample_in.inheritance = None
-            sample_in.status = []
-            sample_in.sample_position = source
-            sample_in_delta_vol_ml.append(-1.0*microcam.volume_ul / 1000.0)
-            sample_in_list.append(sample_in)
+            palposition.sample_initial[0].inheritance = None
+            palposition.sample_initial[0].status = []
+            palposition.sample_initial[0].sample_position = palposition.position
 
         else:
-            self.base.print_message(f"PAL_source: Got sample no sample in position '{source}'", info = True)
+            # this should never happen
+            # else we have a bug in the source checks
+            self.base.print_message(f"BUG PAL_source: "
+                                    f"Got sample no sample in position "
+                                    f"'{palposition.position}'", info = True)
  
 
 
         microcam.run.append(
-                            PalAction(
-                                sample_in = copy.deepcopy(sample_in_list),
-                                source = PALposition(
-                                                     position = source,
-                                                     sample_initial = copy.deepcopy(sample_in_list),
-                                                     tray = source_tray,
-                                                     slot = source_slot,
-                                                     vial = source_vial
-                                                    ),
-                                
-                                
-                                
-                                
-                                dilute = [False for _ in sample_in_list], # initial source is not diluted
-                                dilute_type = [microcam.cam.sample_out_type for _ in sample_in_list],
-                                sample_in_delta_vol_ml = sample_in_delta_vol_ml,
-                            )                
-                           )
+            PalAction(
+                sample_in = copy.deepcopy(palposition.sample_initial),
+                source = copy.deepcopy(palposition),
+                dilute = [False], # initial source is not diluted
+                dilute_type = [microcam.cam.sample_out_type],
+                sample_in_delta_vol_ml = [-1.0*microcam.volume_ul / 1000.0],
+            )                
+        )
 
         
-        return error_codes.none
+        return ErrorCodes.none
 
 
-    async def _sendcommand_check_microcam_dest(
+
+    async def _sendcommand_check_dest(
                                                self, 
                                                microcam: PalMicroCam
-                                              ) -> error_codes:
+                                              ) -> ErrorCodes:
 
         """Checks if the destination position is empty or contains a sample.
         If it finds a sample, it either creates an assembly or 
@@ -1120,9 +1186,9 @@ class PAL:
                     microcam.requested_dest.vial
                     )
 
-            if error != error_codes.none:
+            if error != ErrorCodes.none:
                 self.base.print_message("PAL_dest: Requested tray position does not exist.", error = True)
-                return error_codes.critical
+                return ErrorCodes.critical
 
             # check if a sample is present in destination
             if sample_in == NoneSample():
@@ -1130,7 +1196,7 @@ class PAL:
                 self.base.print_message(f"PAL_dest: No sample in tray {microcam.requested_dest.tray}, slot {microcam.requested_dest.slot}, vial {microcam.requested_dest.vial}", info = True)
                 if len(microcam.run[-1].sample_in) > 1:
                     self.base.print_message(f"PAL_dest: Found a BUG: Assembly not allowed for PAL dest '{dest}' for 'tray' position method.", error = True)
-                    return error_codes.bug      
+                    return ErrorCodes.bug      
                 
                 
                 
@@ -1140,7 +1206,7 @@ class PAL:
                                           samples_position = dest
                                          )
 
-                if error != error_codes.none:
+                if error != ErrorCodes.none:
                     return error
 
                 # this will be a single sample anyway
@@ -1182,15 +1248,15 @@ class PAL:
             dest = microcam.requested_dest.position
             if dest is None:
                 self.base.print_message("PAL_dest: Invalid PAL dest 'NONE' for 'custom' position method.", error = True)
-                return error_codes.critical
+                return ErrorCodes.critical
 
             if not self.archive.custom_dest_allowed(dest):
                 self.base.print_message(f"PAL_dest: custom position '{dest}' cannot be dest.", error = True)
-                return error_codes.critical
+                return ErrorCodes.critical
 
 
             error, sample_in = await self.archive.custom_query_sample(dest)
-            if error != error_codes.none:
+            if error != ErrorCodes.none:
                 self.base.print_message(f"PAL_dest: Invalid PAL dest '{dest}' for 'custom' position method.", error = True)
                 return error
 
@@ -1202,7 +1268,7 @@ class PAL:
                 # cannot create an assembly
                 if len(microcam.run[-1].sample_in) > 1:
                     self.base.print_message("PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here.", error = True)
-                    return error_codes.bug
+                    return ErrorCodes.bug
 
                 # this should actually never create an assembly
                 error, sample_out_list = await self._sendcommand_new_ref_samples(
@@ -1211,7 +1277,7 @@ class PAL:
                                           samples_position = dest
                                          )
 
-                if error != error_codes.none:
+                if error != ErrorCodes.none:
                     return error
 
 
@@ -1239,7 +1305,7 @@ class PAL:
                     # but better check for sure
                     if len(microcam.run[-1].sample_in) > 1:
                         self.base.print_message("PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here.", error = True)
-                        return error_codes.bug
+                        return ErrorCodes.bug
 
 
 
@@ -1258,7 +1324,7 @@ class PAL:
                             )
                     else:
                         self.base.print_message("PAL_dest: Found a BUG: unsupported sample type.", error = True)
-                        return error_codes.bug
+                        return ErrorCodes.bug
 
                     if test is True:
                         # we dilute the assembly sample
@@ -1283,7 +1349,7 @@ class PAL:
                         if len(microcam.run[-1].sample_in) > 1:
                             # sample_in should only hold one sample at that point
                             self.base.print_message(f"PAL_dest: Found a BUG: Assembly not allowed for PAL dest '{dest}' for 'tray' position method.", error = True)
-                            return error_codes.bug      
+                            return ErrorCodes.bug      
                         
                         
                         # first create a new sample from the source sample 
@@ -1294,7 +1360,7 @@ class PAL:
                                                   samples_position = dest
                                                  )
         
-                        if error != error_codes.none:
+                        if error != ErrorCodes.none:
                             return error
 
                         sample_out_list[0].volume_ml = microcam.volume_ul / 1000.0
@@ -1339,12 +1405,12 @@ class PAL:
                     if not self.archive.custom_assembly_allowed(dest):
                         # no assembly allowed
                         self.base.print_message(f"PAL_dest: Assembly not allowed for PAL dest '{dest}' for 'custom' position method.", error = True)
-                        return error_codes.critical
+                        return ErrorCodes.critical
         
                     # cannot create an assembly from an assembly
                     if len(microcam.run[-1].sample_in) > 1:
                         self.base.print_message("PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here.", error = True)
-                        return error_codes.bug
+                        return ErrorCodes.bug
 
 
                     # dest_sample = sample_in
@@ -1356,7 +1422,7 @@ class PAL:
                                               samples_position = dest
                                              )
         
-                    if error != error_codes.none:
+                    if error != ErrorCodes.none:
                         return error
 
                     sample_out_list[0].volume_ml = microcam.volume_ul / 1000.0
@@ -1390,7 +1456,7 @@ class PAL:
 
 
 
-                    if error != error_codes.none:
+                    if error != ErrorCodes.none:
                         return error
 
                     sample_out2_list[0].sample_position = dest
@@ -1417,7 +1483,7 @@ class PAL:
 
             if newvialpos["tray"] is None:
                 self.base.print_message("PAL_dest: empty vial slot is not available", error= True)
-                return error_codes.not_available
+                return ErrorCodes.not_available
 
             # dest = _positiontype.tray
             dest_tray = newvialpos["tray"]
@@ -1433,7 +1499,7 @@ class PAL:
 
             self.base.print_message(f"new reference sample for empty vial: {sample_out_list}")
 
-            if error != error_codes.none:
+            if error != ErrorCodes.none:
                 return error
 
             sample_out_list[0].volume_ml = microcam.volume_ul / 1000.0
@@ -1456,12 +1522,12 @@ class PAL:
                                   after_slot = microcam.requested_dest.slot,
                                   after_vial = microcam.requested_dest.vial,
                                                  )
-            if error != error_codes.none:
+            if error != ErrorCodes.none:
                 self.base.print_message("PAL_dest: No next full vial", error = True)
-                return error_codes.not_available
+                return ErrorCodes.not_available
             if sample_in == NoneSample():
                 self.base.print_message("PAL_dest: More then one sample in source position. This is not allowed.", error = True)
-                return error_codes.critical
+                return ErrorCodes.critical
 
             # a sample is already present in the tray position
             # we add more sample to it, e.g. dilute it
@@ -1522,14 +1588,14 @@ class PAL:
             else:
                 self.base.print_message(f"PAL: Not diluting sample_in '{sample.global_label}'.", info = True)
 
-        return error_codes.none
+        return ErrorCodes.none
 
 
     async def _sendcommand_prechecks(
                                      self, 
                                      palcam: PalCam
-                                    ) -> error_codes:
-        error =  error_codes.none
+                                    ) -> ErrorCodes:
+        error =  ErrorCodes.none
         palcam.joblist = []
 
 
@@ -1557,10 +1623,10 @@ class PAL:
                     microcam.cam = self.cams[microcam.method].value
                 else:
                     self.base.print_message(f"cam method '{microcam.method}' is not available", error = True)
-                    return error_codes.not_available
+                    return ErrorCodes.not_available
             else: 
                 self.base.print_message(f"cam method '{microcam.method}' is not available", error = True)
-                return error_codes.not_available
+                return ErrorCodes.not_available
 
 
 
@@ -1572,12 +1638,12 @@ class PAL:
             for repeat in range(microcam.repeat+1):
 
                 # check source position
-                error = await self._sendcommand_check_microcam_source(microcam)
-                if error != error_codes.none:
+                error = await self._sendcommand_check_source(microcam)
+                if error != ErrorCodes.none:
                     return error
                 # check target position
-                error = await self._sendcommand_check_microcam_dest(microcam)
-                if error != error_codes.none:
+                error = await self._sendcommand_check_dest(microcam)
+                if error != ErrorCodes.none:
                     return error
 
                     
@@ -1620,15 +1686,15 @@ class PAL:
     async def _sendcommand_triggerwait(
                                        self, 
                                        palaction: PalAction
-                                      ) -> error_codes:
-        error =  error_codes.none
+                                      ) -> ErrorCodes:
+        error =  ErrorCodes.none
         # only wait if triggers are configured
         if self.triggers:
             self.base.print_message("waiting for PAL start trigger", info = True)
             val = await self._poll_start()
             if not val:
                 self.base.print_message("PAL start trigger timeout", error = True)
-                error = error_codes.start_timeout
+                error = ErrorCodes.start_timeout
                 self.IO_error = error
                 self.IO_continue = True
             else:
@@ -1638,7 +1704,7 @@ class PAL:
                 val = await self._poll_continue()
                 if not val:
                     self.base.print_message("PAL continue trigger timeout", error = True)
-                    error = error_codes.continue_timeout
+                    error = ErrorCodes.continue_timeout
                     self.IO_error = error
                     self.IO_continue = True
                 else:
@@ -1651,7 +1717,7 @@ class PAL:
                     val = await self._poll_done()
                     if not val:
                         self.base.print_message("PAL done trigger timeout", error = True)
-                        error = error_codes.done_timeout
+                        error = ErrorCodes.done_timeout
                     else:
                         self.base.print_message("got PAL done trigger", info = True)
                         palaction.done_time = self.trigger_done_epoch
@@ -1672,9 +1738,9 @@ class PAL:
     async def _sendcommand_submitjoblist_helper(
                                                 self, 
                                                 palcam: PalCam
-                                               ) -> error_codes:
+                                               ) -> ErrorCodes:
 
-        error = error_codes.none
+        error = ErrorCodes.none
 
         if self.sshhost == "localhost":
             
@@ -1705,7 +1771,7 @@ class PAL:
                     e,
                     error = True
                 )
-                error = error_codes.cmd_error
+                error = ErrorCodes.cmd_error
         else:
             ssh_connected = False
             while not ssh_connected:
@@ -1783,11 +1849,11 @@ class PAL:
                     error = True
                 )
                 
-                error = error_codes.ssh_error
+                error = ErrorCodes.ssh_error
     
     
             try:
-                if error is error_codes.none:
+                if error is ErrorCodes.none:
                     palcam.joblist_time = self.active.set_realtime_nowait()
                     (
                         mysshclient_stdin,
@@ -1801,7 +1867,7 @@ class PAL:
                     "SSH connection error 2. Could not send commands.",
                     error = True
                 )
-                error = error_codes.ssh_error
+                error = ErrorCodes.ssh_error
     
         return error
 
@@ -1820,7 +1886,7 @@ class PAL:
     async def _sendcommand_update_archive_helper(
                                                  self, 
                                                  palaction: PalAction
-                                                ) -> error_codes:
+                                                ) -> ErrorCodes:
 
         # update source and dest final samples
         palaction.source.sample_final = \
@@ -1840,7 +1906,7 @@ class PAL:
 
 
 
-        error = error_codes.none
+        error = ErrorCodes.none
         retval = False
         if palaction.source.sample_final:
             if palaction.source.position == "tray":
@@ -1877,7 +1943,7 @@ class PAL:
 
 
         if retval == False:
-            error = error_codes.not_available
+            error = ErrorCodes.not_available
 
         return error
 
@@ -1911,13 +1977,13 @@ class PAL:
     async def _init_PAL_IOloop(self, A: Action, palcam: PalCam) -> dict:
         activeDict = dict()
         if not self.IO_do_meas:
-            self.IO_error = error_codes.none
+            self.IO_error = ErrorCodes.none
             self.IO_palcam = palcam
             self.action = A
             self.IO_continue = False
             self.IO_do_meas = True
             # wait for first continue trigger
-            error = error_codes.none
+            error = ErrorCodes.none
             while not self.IO_continue:
                 await asyncio.sleep(1)
             error = self.IO_error
@@ -1928,7 +1994,7 @@ class PAL:
         else:
             self.base.print_message("PAL method already in progress.", error = True)
             activeDict = A.as_dict()
-            error = error_codes.in_progress
+            error = ErrorCodes.in_progress
 
         activeDict["data"] = {"error_code": error}
         activeDict["error_code"] = error

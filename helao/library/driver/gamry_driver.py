@@ -19,7 +19,7 @@ import time
 from enum import Enum
 import psutil
 
-from helaocore.error import error_codes
+from helaocore.error import ErrorCodes
 from helaocore.model.sample import SampleInheritance, SampleStatus
 from helaocore.model.data import DataModel
 from helaocore.model.file import FileConnParams, HloHeaderModel
@@ -395,15 +395,15 @@ class gamry:
         try:
             if self.pstat:
                 self.pstat.Open()
-                return error_codes.none
+                return ErrorCodes.none
             else:
                 self.base.print_message("open_connection: Gamry not initialized!", error=True)
-                return error_codes.not_initialized
+                return ErrorCodes.not_initialized
 
         except Exception as e:
             # self.pstat = None
             self.base.print_message(f"Gamry error init: {e}", error=True)
-            return error_codes.critical
+            return ErrorCodes.critical
 
 
     async def close_connection(self):
@@ -413,20 +413,20 @@ class gamry:
         try:
             if self.pstat:
                 self.pstat.Close()
-                return error_codes.none
+                return ErrorCodes.none
             else:
                 self.base.print_message("close_connection: Gamry not initialized!", error=True)
-                return error_codes.not_initialized
+                return ErrorCodes.not_initialized
         except Exception:
             # self.pstat = None
-            return error_codes.critical
+            return ErrorCodes.critical
 
 
     async def measurement_setup(self, AcqFreq, mode: Gamry_modes = None, *argv):
         """setting up the measurement parameters
         need to initialize and open connection to gamry first"""
         await asyncio.sleep(0.001)
-        error =  error_codes.none
+        error =  ErrorCodes.none
         if self.pstat:
             try:
                 IErangesdict = dict(
@@ -616,10 +616,10 @@ class gamry:
                     self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
                 else:
                     self.base.print_message(f"'mode {mode} not supported'", error=True)
-                    error = error_codes.not_available
+                    error = ErrorCodes.not_available
 
 
-                if error is error_codes.none:  
+                if error is ErrorCodes.none:  
                     try:
                         self.dtaq = client.CreateObject(Dtaqmode)
                         if Dtaqtype:
@@ -643,10 +643,10 @@ class gamry:
 
             except comtypes.COMError as e:
                 self.base.print_message(f"Gamry error during measurement setup: {e}", error=True)
-                error = error_codes.critical
+                error = ErrorCodes.critical
         else:
             self.base.print_message("measurement_setup: Gamry not initialized!", error=True)
-            error = error_codes.not_initialized
+            error = ErrorCodes.not_initialized
 
         return error
 
@@ -921,20 +921,20 @@ class gamry:
         # open connection, will be closed after measurement in IOloop
         err_code = await self.open_connection()
         activeDict = dict()
-        if err_code is error_codes.none:
+        if err_code is ErrorCodes.none:
             if self.pstat and not self.IO_do_meas:
                 # set parameters for IOloop meas
                 self.IO_meas_mode = measmode
                 err_code = await self.measurement_setup(
                     1.0 / samplerate, self.IO_meas_mode, *setupargs
                 )
-                if err_code is error_codes.none:
+                if err_code is ErrorCodes.none:
                         
                     # setup the experiment specific signal ramp
                     self.IO_sigramp = client.CreateObject(sigfunc)
                     try:
                         self.IO_sigramp.Init(*sigfunc_params)
-                        err_code = error_codes.none
+                        err_code = ErrorCodes.none
                     except Exception as e:
                         err_code = gamry_error_decoder(e)
                         self.base.print_message(f"IO_sigramp.Init error: {err_code}", error = True)
@@ -960,7 +960,7 @@ class gamry:
                     # reset continue flag
                     self.IO_continue = False
     
-                    err_code = error_codes.none
+                    err_code = ErrorCodes.none
     
                     if self.active:
                         activeDict = self.active.action.as_dict()
@@ -972,10 +972,10 @@ class gamry:
 
             elif self.IO_measuring:
                 activeDict = act.as_dict()                
-                err_code = error_codes.in_progress
+                err_code = ErrorCodes.in_progress
             else:
                 activeDict = act.as_dict()                
-                err_code = error_codes.not_initialized
+                err_code = ErrorCodes.not_initialized
         else:
             activeDict = act.as_dict()                
 

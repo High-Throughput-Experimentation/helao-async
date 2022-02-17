@@ -19,7 +19,7 @@ from nidaqmx.constants import TriggerType
 
 from helaocore.schema import Action
 from helaocore.server import Base
-from helaocore.error import error_codes
+from helaocore.error import ErrorCodes
 from helaocore.helper import make_str_enum
 from helaocore.data.sample import UnifiedSampleDataAPI
 from helaocore.model.sample import SampleInheritance, SampleStatus, NoneSample
@@ -346,7 +346,7 @@ class cNIMAX:
         self.base.print_message(f"do_port '{do_name}': {do_port} is {on}")
         on = bool(on)
         cmds = []
-        err_code = error_codes.none
+        err_code = ErrorCodes.none
         if do_port is not None:
             with nidaqmx.Task() as task_do_port:
                 # for pump in pumps:
@@ -356,11 +356,11 @@ class cNIMAX:
                 cmds.append(on)
                 if cmds:
                     task_do_port.write(cmds)
-                    err_code = error_codes.none
+                    err_code = ErrorCodes.none
                 else:
-                    err_code = error_codes.not_available
+                    err_code = ErrorCodes.not_available
         else:
-            err_code = error_codes.not_available
+            err_code = ErrorCodes.not_available
 
         return {
                 "error_code": err_code,
@@ -378,7 +378,7 @@ class cNIMAX:
                          ):
         self.base.print_message(f"di_port '{di_name}': {di_port}")
         on = None
-        err_code = error_codes.none
+        err_code = ErrorCodes.none
         if di_port is not None:
             with nidaqmx.Task() as task_di_port:
 
@@ -388,7 +388,7 @@ class cNIMAX:
                 )
                 on = task_di_port.read(number_of_samples_per_channel=1)
         else:
-            err_code = error_codes.not_available
+            err_code = ErrorCodes.not_available
 
         return {
                 "error_code": err_code,
@@ -406,7 +406,7 @@ class cNIMAX:
         duration = A.action_params["Tval"]
         ttlwait = A.action_params["TTLwait"] # -1 disables, else select TTL channel
         
-        err_code = error_codes.none
+        err_code = ErrorCodes.none
         if not self.IO_do_meas:
             self.IVtimeoffset = 0.0
             self.file_conn_keys = []
@@ -504,7 +504,7 @@ class cNIMAX:
             
             await self.IO_signalq.put(True)
 
-            err_code = error_codes.none
+            err_code = ErrorCodes.none
 
             if self.active:
                 activeDict = self.active.action.as_dict()
@@ -513,7 +513,7 @@ class cNIMAX:
 
         else:
             activeDict = A.as_dict()
-            err_code = error_codes.in_progress
+            err_code = ErrorCodes.in_progress
 
         activeDict["data"] = {"err_code": err_code}
         return activeDict

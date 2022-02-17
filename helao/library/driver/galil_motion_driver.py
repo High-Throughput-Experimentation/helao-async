@@ -18,9 +18,9 @@ from enum import Enum
 from typing import List
 
 from helaocore.server import Base
-from helaocore.error import error_codes
+from helaocore.error import ErrorCodes
 from helaocore.schema import Action
-from helaocore.error import error_codes
+from helaocore.error import ErrorCodes
 
 
 driver_path = os.path.dirname(__file__)
@@ -203,7 +203,7 @@ class galil:
 
         
         
-        error =  error_codes.none
+        error =  ErrorCodes.none
 
         stopping = False  # no stopping of any movement by other actions
         mode = move_modes(mode)

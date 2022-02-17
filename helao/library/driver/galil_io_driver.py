@@ -15,9 +15,9 @@ from enum import Enum
 from typing import List
 
 from helaocore.server import Base
-from helaocore.error import error_codes
+from helaocore.error import ErrorCodes
 from helaocore.schema import Action
-from helaocore.error import error_codes
+from helaocore.error import ErrorCodes
 
 
 driver_path = os.path.dirname(__file__)
@@ -94,13 +94,13 @@ class galil:
                             port:int,
                             ai_name:str="analog_in",
                             *args,**kwargs):
-        err_code = error_codes.none
+        err_code = ErrorCodes.none
         ret = None
         if port in self.config_dict["Ain_id"]:
             pID = self.config_dict["Ain_id"][port]
             ret = self.c(f"@AN[{int(pID)}]")
         else:
-            err_code = error_codes.not_available
+            err_code = ErrorCodes.not_available
 
         return {
                 "error_code": err_code,
@@ -115,13 +115,13 @@ class galil:
                              port:int, 
                              di_name:str="digital_in",
                              *args,**kwargs):
-        err_code = error_codes.none
+        err_code = ErrorCodes.none
         ret = None
         if port in self.config_dict["Din_id"]:
             pID = self.config_dict["Din_id"][port]
             ret = self.c(f"@IN[{int(pID)}]")
         else:
-            err_code = error_codes.not_available
+            err_code = ErrorCodes.not_available
 
         return {
                 "error_code": err_code,
@@ -136,13 +136,13 @@ class galil:
                               port:int,
                               do_name:str="digital_out",
                               *args,**kwargs):
-        err_code = error_codes.none
+        err_code = ErrorCodes.none
         ret = None
         if port in self.config_dict["Dout_id"]:
             pID = self.config_dict["Dout_id"][port]
             ret = self.c(f"@OUT[{int(pID)}]")
         else:
-            err_code = error_codes.not_available
+            err_code = ErrorCodes.not_available
 
         return {
                 "error_code": err_code,
@@ -159,7 +159,7 @@ class galil:
                              value:float,
                              ao_name:str="analog_out",
                              *args,**kwargs):
-        err_code = error_codes.not_available
+        err_code = ErrorCodes.not_available
         # this is essentially a placeholder for now since the DMC-4143 does not support
         # analog out but I believe it is worthwhile to have this in here for the RIO
         # Handle num is A-H and must be on port 502 for the modbus commons
@@ -182,7 +182,7 @@ class galil:
                               on:bool, 
                               do_name:str="digital_out",
                               *args,**kwargs):
-        err_code = error_codes.none
+        err_code = ErrorCodes.none
         on = bool(on)
         ret = None
         if port in self.config_dict["Dout_id"]:
@@ -193,7 +193,7 @@ class galil:
                 _ = self.c(f"CB {int(pID)}")
             ret = self.c(f"@OUT[{int(pID)}]")
         else:
-            err_code = error_codes.not_available
+            err_code = ErrorCodes.not_available
 
         return {
                 "error_code": err_code,
