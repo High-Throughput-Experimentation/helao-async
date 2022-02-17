@@ -1,7 +1,10 @@
-__all__ = ["Spacingmethod",
+__all__ = [
+           "Spacingmethod",
            "PALtools",
            "PALposition",
-           "PAL"]
+           "PAL",
+           "GCsampletype"
+          ]
 
 from enum import Enum
 import asyncio
@@ -71,6 +74,13 @@ class _sampletype(str, Enum):
     solid = "solid"
     assembly = "assembly"
 
+class GCsampletype(str, Enum):
+    liquid = "liquid"
+    gas = "gas"
+    none = "none"
+    # solid = "solid"
+    # assembly = "assembly"
+
 
 class CAMS(Enum):
 
@@ -81,12 +91,14 @@ class CAMS(Enum):
                    dest = _positiontype.tray,
                   )
 
+
     transfer_custom_tray = _cam(name="transfer_custom_tray",
                    file_name = "", # filled in from config later
                    sample_out_type = _sampletype.liquid,
                    source = _positiontype.custom,
                    dest = _positiontype.tray,
                   )
+
 
     transfer_tray_custom = _cam(name="transfer_tray_custom",
                    file_name = "", # filled in from config later
@@ -95,12 +107,22 @@ class CAMS(Enum):
                    dest = _positiontype.custom,
                   )
 
+
+    transfer_custom_custom = _cam(name="transfer_tray_custom",
+                   file_name = "", # filled in from config later
+                   sample_out_type = _sampletype.liquid,
+                   source = _positiontype.custom,
+                   dest = _positiontype.custom,
+                  )
+
+
     injection_custom_GC_gas_wait = _cam(name="injection_custom_GC_gas_wait",
                    file_name = "", # filled in from config later
                    sample_out_type = _sampletype.gas,
                    source = _positiontype.custom,
                    dest = _positiontype.custom,
                   )
+
 
     injection_custom_GC_gas_start = _cam(name="injection_custom_GC_gas_start",
                    file_name = "", # filled in from config later
@@ -126,7 +148,7 @@ class CAMS(Enum):
                   )
 
 
-    injection_tray_GC_liquid_start = _cam(name="injection_tray_GC_liquid_start",
+    injection_tray_GC_liquid_wait = _cam(name="injection_tray_GC_liquid_wait",
                    file_name = "", # filled in from config later
                    sample_out_type = _sampletype.liquid,
                    source = _positiontype.tray,
@@ -134,7 +156,30 @@ class CAMS(Enum):
                   )
 
 
-    injection_custom_HPLC = _cam(name="injection_custom_GC_liquid",
+    injection_tray_GC_liquid_start = _cam(name="injection_tray_GC_liquid_start",
+                   file_name = "", # filled in from config later
+                   sample_out_type = _sampletype.liquid,
+                   source = _positiontype.tray,
+                   dest = _positiontype.custom,
+                  )
+
+    injection_tray_GC_gas_wait = _cam(name="injection_tray_GC_gas_wait",
+                   file_name = "", # filled in from config later
+                   sample_out_type = _sampletype.gas,
+                   source = _positiontype.tray,
+                   dest = _positiontype.custom,
+                  )
+
+
+    injection_tray_GC_gas_start = _cam(name="injection_tray_GC_gas_start",
+                   file_name = "", # filled in from config later
+                   sample_out_type = _sampletype.gas,
+                   source = _positiontype.tray,
+                   dest = _positiontype.custom,
+                  )
+
+
+    injection_custom_HPLC = _cam(name="injection_custom_HPLC",
                    file_name = "", # filled in from config later
                    sample_out_type = _sampletype.liquid,
                    source = _positiontype.custom,
@@ -142,7 +187,7 @@ class CAMS(Enum):
                   )
 
 
-    injection_tray_HPLC = _cam(name="injection_custom_GC_liquid",
+    injection_tray_HPLC = _cam(name="injection_tray_HPLC",
                    file_name = "", # filled in from config later
                    sample_out_type = _sampletype.liquid,
                    source = _positiontype.tray,
@@ -166,12 +211,12 @@ class CAMS(Enum):
     #                      )
 
 
-    # transfer = _cam(name="transfer",
-    #                file_name = "lcfc_transfer.cam", # from config later
-    #                sample_out_type = _sampletype.liquid,
-    #                source = _positiontype.custom,
-    #                dest = _positiontype.next_empty_vial,
-    #               )
+    archive = _cam(name="archive",
+                    file_name = "", # from config later
+                    sample_out_type = _sampletype.liquid,
+                    source = _positiontype.custom,
+                    dest = _positiontype.next_empty_vial,
+                  )
 
 
     # fillfixed = _cam(name="fillfixed",
@@ -215,11 +260,12 @@ class Spacingmethod(str, Enum):
 #    exponential = "exponential"
 
 class PALtools(str, Enum):
-    LS1 = "LS1"
-    LS2 = "LS2"
-    LS3 = "LS3"
-    HS1 = "HS1"
-    HS2 = "HS2"
+    LS1 = "LS 1"
+    LS2 = "LS 2"
+    LS3 = "LS 3"
+    LS4 = "LS 4"
+    HS1 = "HS 1"
+    HS2 = "HS 2"
 
 
 class PALposition(BaseModel, HelaoDict):
@@ -526,7 +572,8 @@ class PAL:
                     # there is not much we can do here
                     # as we have not control of pal directly
                     self.base.print_message(f"Got error after triggerwait: '{error}'", error = True)
-                
+
+
                 # after each pal trigger:
                 # as a pal action can contain many actions which modify
                 # samples in a complex manner
@@ -592,6 +639,15 @@ class PAL:
                 for sample_out in palaction.sample_out:
                     self.base.print_message(f" converting ref sample {sample_out} to real sample", info = True)
                     sample_out.sample_creation_timecode = palaction.continue_time
+                    
+                    # if the sample was destroyed during this run set its
+                    # volume to zero
+                    # destroyed: destination was waste or injector
+                    # for newly created samples
+                    if SampleStatus.destroyed in sample_out.status:
+                        sample_out.zero_volume()
+
+
                     # if sample_out is an assembly we need to update its parts
                     if isinstance(sample_out, AssemblySample):
                         # could also check if it has parts attribute?
@@ -1449,14 +1505,22 @@ class PAL:
                                     vial = dest_vial
                                 )
 
+
+        if self.archive.custom_is_destroyed(custom = dest):
+            for sample in sample_out_list:
+                sample.status.append(SampleStatus.destroyed)
+            for sample in dest_sample_final:
+                sample.status.append(SampleStatus.destroyed)
+                
+
         for sample in sample_out_list:
             microcam.run[-1].sample_out.append(sample)
 
         for i, sample in enumerate(microcam.run[-1].sample_in):
             if microcam.run[-1].dilute[i]:
-                self.base.print_message(f"PAL_dest: Diluting dest sample '{sample.global_label}'.", info = True)
+                self.base.print_message(f"PAL: Diluting sample_in '{sample.global_label}'.", info = True)
             else:
-                self.base.print_message(f"PAL_dest: Not diluting dest sample '{sample.global_label}'.", info = True)
+                self.base.print_message(f"PAL: Not diluting sample_in '{sample.global_label}'.", info = True)
 
         return error_codes.none
 
@@ -1626,7 +1690,8 @@ class PAL:
             )
             tmpjob = ' '.join([f'/loadmethod "{job.method}" "{job.params}"' for job in palcam.joblist])
             cmd_to_execute = f'PAL {tmpjob} /start /quit'
-            self.base.print_message(f"PAL command: '{cmd_to_execute}'")
+            self.base.print_message(f"PAL command: '{cmd_to_execute}'",
+                                    info=True)
             try:
                 # result = os.system(cmd_to_execute)
                 self.PAL_pid = subprocess.Popen(cmd_to_execute, shell = True)
@@ -1703,7 +1768,8 @@ class PAL:
                 cmd_to_execute = f"tmux new-window PAL {tmpjob} /start /quit"
                 
 
-                self.base.print_message(f"PAL command: '{cmd_to_execute}'")
+                self.base.print_message(f"PAL command: '{cmd_to_execute}'",
+                                        info=True)
             
     
     
@@ -2055,6 +2121,137 @@ class PAL:
         )
 
 
+    async def method_transfer_tray_tray(self, A: Action) -> dict:
+        palcam = PalCam(
+            sample_in = A.samples_in,
+            totalruns = len(A.action_params.get("sampleperiod",[])),
+            sampleperiod = A.action_params.get("sampleperiod",[]),
+            spacingmethod = A.action_params.get("spacingmethod",Spacingmethod.linear),
+            spacingfactor = A.action_params.get("spacingfactor",1.0),
+            timeoffset = A.action_params.get("timeoffset",0.0),
+            microcam = [PalMicroCam(**{
+                    "method":"transfer_tray_tray",
+                    "tool":A.action_params.get("tool",None),
+                    "volume_ul":A.action_params.get("volume_ul",0),
+                    "requested_source":PALposition(**{
+                        "position":_positiontype.tray,
+                        "tray":A.action_params.get("source_tray",0),
+                        "slot":A.action_params.get("source_slot",0),
+                        "vial":A.action_params.get("source_vial",0),
+                        }),
+                    "requested_dest":PALposition(**{
+                        "position":_positiontype.tray,
+                        "tray":A.action_params.get("dest_tray",0),
+                        "slot":A.action_params.get("dest_slot",0),
+                        "vial":A.action_params.get("dest_vial",0),
+                        }),
+                    "wash1":A.action_params.get("wash1",0),
+                    "wash2":A.action_params.get("wash2",0),
+                    "wash3":A.action_params.get("wash3",0),
+                    "wash4":A.action_params.get("wash4",0),
+                    })]
+        )
+        return await self._init_PAL_IOloop(
+            A = A,
+            palcam = palcam,
+        )
+
+
+    async def method_transfer_custom_tray(self, A: Action) -> dict:
+        palcam = PalCam(
+            sample_in = A.samples_in,
+            totalruns = len(A.action_params.get("sampleperiod",[])),
+            sampleperiod = A.action_params.get("sampleperiod",[]),
+            spacingmethod = A.action_params.get("spacingmethod",Spacingmethod.linear),
+            spacingfactor = A.action_params.get("spacingfactor",1.0),
+            timeoffset = A.action_params.get("timeoffset",0.0),
+            microcam = [PalMicroCam(**{
+                    "method":"transfer_tray_tray",
+                    "tool":A.action_params.get("tool",None),
+                    "volume_ul":A.action_params.get("volume_ul",0),
+                    "requested_source":PALposition(**{
+                        "position":A.action_params.get("source",None),
+                        }),
+                    "requested_dest":PALposition(**{
+                        "position":_positiontype.tray,
+                        "tray":A.action_params.get("dest_tray",0),
+                        "slot":A.action_params.get("dest_slot",0),
+                        "vial":A.action_params.get("dest_vial",0),
+                        }),
+                    "wash1":A.action_params.get("wash1",0),
+                    "wash2":A.action_params.get("wash2",0),
+                    "wash3":A.action_params.get("wash3",0),
+                    "wash4":A.action_params.get("wash4",0),
+                    })]
+        )
+        return await self._init_PAL_IOloop(
+            A = A,
+            palcam = palcam,
+        )
+
+
+    async def method_transfer_tray_custom(self, A: Action) -> dict:
+        palcam = PalCam(
+            sample_in = A.samples_in,
+            totalruns = len(A.action_params.get("sampleperiod",[])),
+            sampleperiod = A.action_params.get("sampleperiod",[]),
+            spacingmethod = A.action_params.get("spacingmethod",Spacingmethod.linear),
+            spacingfactor = A.action_params.get("spacingfactor",1.0),
+            timeoffset = A.action_params.get("timeoffset",0.0),
+            microcam = [PalMicroCam(**{
+                    "method":"transfer_tray_tray",
+                    "tool":A.action_params.get("tool",None),
+                    "volume_ul":A.action_params.get("volume_ul",0),
+                    "requested_source":PALposition(**{
+                        "position":_positiontype.tray,
+                        "tray":A.action_params.get("source_tray",0),
+                        "slot":A.action_params.get("source_slot",0),
+                        "vial":A.action_params.get("source_vial",0),
+                        }),
+                    "requested_dest":PALposition(**{
+                        "position":A.action_params.get("dest",None),
+                        }),
+                    "wash1":A.action_params.get("wash1",0),
+                    "wash2":A.action_params.get("wash2",0),
+                    "wash3":A.action_params.get("wash3",0),
+                    "wash4":A.action_params.get("wash4",0),
+                    })]
+        )
+        return await self._init_PAL_IOloop(
+            A = A,
+            palcam = palcam,
+        )
+
+
+    async def method_transfer_custom_custom(self, A: Action) -> dict:
+        palcam = PalCam(
+            sample_in = A.samples_in,
+            totalruns = len(A.action_params.get("sampleperiod",[])),
+            sampleperiod = A.action_params.get("sampleperiod",[]),
+            spacingmethod = A.action_params.get("spacingmethod",Spacingmethod.linear),
+            spacingfactor = A.action_params.get("spacingfactor",1.0),
+            timeoffset = A.action_params.get("timeoffset",0.0),
+            microcam = [PalMicroCam(**{
+                    "method":"transfer_tray_tray",
+                    "tool":A.action_params.get("tool",None),
+                    "volume_ul":A.action_params.get("volume_ul",0),
+                      "requested_source":PALposition(**{
+                        "position":A.action_params.get("source",None),
+                        }),
+                    "requested_dest":PALposition(**{
+                        "position":A.action_params.get("dest",None),
+                        }),
+                    "wash1":A.action_params.get("wash1",0),
+                    "wash2":A.action_params.get("wash2",0),
+                    "wash3":A.action_params.get("wash3",0),
+                    "wash4":A.action_params.get("wash4",0),
+                    })]
+        )
+        return await self._init_PAL_IOloop(
+            A = A,
+            palcam = palcam,
+        )
+
     async def method_archive(self, A: Action) -> dict:
         palcam = PalCam(
             sample_in = A.samples_in,
@@ -2080,66 +2277,67 @@ class PAL:
             A = A,
             palcam = palcam,
         )
+    
+    
+
+    # async def method_fill(self, A: Action) -> dict:
+    #     palcam = PalCam(
+    #         sample_in = A.samples_in,
+    #         totalruns = 1,
+    #         sampleperiod = [],
+    #         spacingmethod = Spacingmethod.linear,
+    #         spacingfactor = 1.0,
+    #         timeoffset = 0.0,
+    #         microcam = [PalMicroCam(**{
+    #                 "method":"fill",
+    #                 "tool":A.action_params.get("tool",None),
+    #                 "volume_ul":A.action_params.get("volume_ul",0),
+    #                 "requested_source":PALposition(**{
+    #                     "position":A.action_params.get("source",None),
+    #                     }),
+    #                 "requested_dest":PALposition(**{
+    #                     "position":A.action_params.get("dest",None),
+    #                     }),
+    #                 "wash1":A.action_params.get("wash1",0),
+    #                 "wash2":A.action_params.get("wash2",0),
+    #                 "wash3":A.action_params.get("wash3",0),
+    #                 "wash4":A.action_params.get("wash4",0),
+    #                 })]
+    #     )
+    #     return await self._init_PAL_IOloop(
+    #         A = A,
+    #         palcam = palcam,
+    #     )
 
 
-    async def method_fill(self, A: Action) -> dict:
-        palcam = PalCam(
-            sample_in = A.samples_in,
-            totalruns = 1,
-            sampleperiod = [],
-            spacingmethod = Spacingmethod.linear,
-            spacingfactor = 1.0,
-            timeoffset = 0.0,
-            microcam = [PalMicroCam(**{
-                    "method":"fill",
-                    "tool":A.action_params.get("tool",None),
-                    "volume_ul":A.action_params.get("volume_ul",0),
-                    "requested_source":PALposition(**{
-                        "position":A.action_params.get("source",None),
-                        }),
-                    "requested_dest":PALposition(**{
-                        "position":A.action_params.get("dest",None),
-                        }),
-                    "wash1":A.action_params.get("wash1",0),
-                    "wash2":A.action_params.get("wash2",0),
-                    "wash3":A.action_params.get("wash3",0),
-                    "wash4":A.action_params.get("wash4",0),
-                    })]
-        )
-        return await self._init_PAL_IOloop(
-            A = A,
-            palcam = palcam,
-        )
-
-
-    async def method_fillfixed(self, A: Action) -> dict:
-        palcam = PalCam(
-            sample_in = A.samples_in,
-            totalruns = 1,
-            sampleperiod = [],
-            spacingmethod = Spacingmethod.linear,
-            spacingfactor = 1.0,
-            timeoffset = 0.0,
-            microcam = [PalMicroCam(**{
-                    "method":"fillfixed",
-                    "tool":A.action_params.get("tool",None),
-                    "volume_ul":A.action_params.get("volume_ul",0),
-                    "requested_source":PALposition(**{
-                        "position":A.action_params.get("source",None),
-                        }),
-                    "requested_dest":PALposition(**{
-                        "position":A.action_params.get("dest",None),
-                        }),
-                    "wash1":A.action_params.get("wash1",0),
-                    "wash2":A.action_params.get("wash2",0),
-                    "wash3":A.action_params.get("wash3",0),
-                    "wash4":A.action_params.get("wash4",0),
-                    })]
-        )
-        return await self._init_PAL_IOloop(
-            A = A,
-            palcam = palcam,
-        )
+    # async def method_fillfixed(self, A: Action) -> dict:
+    #     palcam = PalCam(
+    #         sample_in = A.samples_in,
+    #         totalruns = 1,
+    #         sampleperiod = [],
+    #         spacingmethod = Spacingmethod.linear,
+    #         spacingfactor = 1.0,
+    #         timeoffset = 0.0,
+    #         microcam = [PalMicroCam(**{
+    #                 "method":"fillfixed",
+    #                 "tool":A.action_params.get("tool",None),
+    #                 "volume_ul":A.action_params.get("volume_ul",0),
+    #                 "requested_source":PALposition(**{
+    #                     "position":A.action_params.get("source",None),
+    #                     }),
+    #                 "requested_dest":PALposition(**{
+    #                     "position":A.action_params.get("dest",None),
+    #                     }),
+    #                 "wash1":A.action_params.get("wash1",0),
+    #                 "wash2":A.action_params.get("wash2",0),
+    #                 "wash3":A.action_params.get("wash3",0),
+    #                 "wash4":A.action_params.get("wash4",0),
+    #                 })]
+    #     )
+    #     return await self._init_PAL_IOloop(
+    #         A = A,
+    #         palcam = palcam,
+    #     )
 
 
     async def method_deepclean(self, A: Action) -> dict:
@@ -2150,7 +2348,8 @@ class PAL:
             spacingmethod = Spacingmethod.linear,
             spacingfactor = 1.0,
             timeoffset = 0.0,
-            microcam = [PalMicroCam(**{
+            microcam = [
+                PalMicroCam(**{
                     "method":"deepclean",
                     "tool":A.action_params.get("tool",None),
                     "volume_ul":A.action_params.get("volume_ul",0),
@@ -2158,7 +2357,8 @@ class PAL:
                     "wash2":A.action_params.get("wash2",1),
                     "wash3":A.action_params.get("wash3",1),
                     "wash4":A.action_params.get("wash4",1),
-                    })]
+                    })
+            ]
         )
         return await self._init_PAL_IOloop(
             A = A,
@@ -2166,67 +2366,78 @@ class PAL:
         )
 
 
-    async def method_dilute(self, A: Action) -> dict:
-        palcam = PalCam(
-            sample_in = A.samples_in,
-            totalruns = len(A.action_params.get("sampleperiod",[])),
-            sampleperiod = A.action_params.get("sampleperiod",[]),
-            spacingmethod = A.action_params.get("spacingmethod",Spacingmethod.linear),
-            spacingfactor = A.action_params.get("spacingfactor",1.0),
-            timeoffset = A.action_params.get("timeoffset",0.0),
-            microcam = [PalMicroCam(**{
-                    "method":"dilute",
-                    "tool":A.action_params.get("tool",None),
-                    "volume_ul":A.action_params.get("volume_ul",0),
-                    "requested_source":PALposition(**{
-                        "position":A.action_params.get("source",None),
-                        }),
-                    "requested_dest":PALposition(**{
-                        "position":_positiontype.tray,
-                        "tray":A.action_params.get("dest_tray",0),
-                        "slot":A.action_params.get("dest_slot",0),
-                        "vial":A.action_params.get("dest_vial",0),
-                        }),
-                    "wash1":A.action_params.get("wash1",1),
-                    "wash2":A.action_params.get("wash2",1),
-                    "wash3":A.action_params.get("wash3",1),
-                    "wash4":A.action_params.get("wash4",1),
-                    })]
-        )
-        return await self._init_PAL_IOloop(
-            A = A,
-            palcam = palcam,
-        )
+    # async def method_dilute(self, A: Action) -> dict:
+    #     palcam = PalCam(
+    #         sample_in = A.samples_in,
+    #         totalruns = len(A.action_params.get("sampleperiod",[])),
+    #         sampleperiod = A.action_params.get("sampleperiod",[]),
+    #         spacingmethod = A.action_params.get("spacingmethod",Spacingmethod.linear),
+    #         spacingfactor = A.action_params.get("spacingfactor",1.0),
+    #         timeoffset = A.action_params.get("timeoffset",0.0),
+    #         microcam = [PalMicroCam(**{
+    #                 "method":"dilute",
+    #                 "tool":A.action_params.get("tool",None),
+    #                 "volume_ul":A.action_params.get("volume_ul",0),
+    #                 "requested_source":PALposition(**{
+    #                     "position":A.action_params.get("source",None),
+    #                     }),
+    #                 "requested_dest":PALposition(**{
+    #                     "position":_positiontype.tray,
+    #                     "tray":A.action_params.get("dest_tray",0),
+    #                     "slot":A.action_params.get("dest_slot",0),
+    #                     "vial":A.action_params.get("dest_vial",0),
+    #                     }),
+    #                 "wash1":A.action_params.get("wash1",1),
+    #                 "wash2":A.action_params.get("wash2",1),
+    #                 "wash3":A.action_params.get("wash3",1),
+    #                 "wash4":A.action_params.get("wash4",1),
+    #                 })]
+    #     )
+    #     return await self._init_PAL_IOloop(
+    #         A = A,
+    #         palcam = palcam,
+    #     )
 
 
-    async def method_autodilute(self, A: Action) -> dict:
-        palcam = PalCam(
-            sample_in = A.samples_in,
-            totalruns = len(A.action_params.get("sampleperiod",[])),
-            sampleperiod = A.action_params.get("sampleperiod",[]),
-            spacingmethod = A.action_params.get("spacingmethod",Spacingmethod.linear),
-            spacingfactor = A.action_params.get("spacingfactor",1.0),
-            timeoffset = A.action_params.get("timeoffset",0.0),
-            microcam = [PalMicroCam(**{
-                    "method":"autodilute",
-                    "tool":A.action_params.get("tool",None),
-                    "volume_ul":A.action_params.get("volume_ul",0),
-                    "requested_source":PALposition(**{
-                        "position":A.action_params.get("source",None),
-                        }),
-                    "wash1":A.action_params.get("wash1",1),
-                    "wash2":A.action_params.get("wash2",1),
-                    "wash3":A.action_params.get("wash3",1),
-                    "wash4":A.action_params.get("wash4",1),
-                    })]
-        )
-        return await self._init_PAL_IOloop(
-            A = A,
-            palcam = palcam,
-        )
+    # async def method_autodilute(self, A: Action) -> dict:
+    #     palcam = PalCam(
+    #         sample_in = A.samples_in,
+    #         totalruns = len(A.action_params.get("sampleperiod",[])),
+    #         sampleperiod = A.action_params.get("sampleperiod",[]),
+    #         spacingmethod = A.action_params.get("spacingmethod",Spacingmethod.linear),
+    #         spacingfactor = A.action_params.get("spacingfactor",1.0),
+    #         timeoffset = A.action_params.get("timeoffset",0.0),
+    #         microcam = [PalMicroCam(**{
+    #                 "method":"autodilute",
+    #                 "tool":A.action_params.get("tool",None),
+    #                 "volume_ul":A.action_params.get("volume_ul",0),
+    #                 "requested_source":PALposition(**{
+    #                     "position":A.action_params.get("source",None),
+    #                     }),
+    #                 "wash1":A.action_params.get("wash1",1),
+    #                 "wash2":A.action_params.get("wash2",1),
+    #                 "wash3":A.action_params.get("wash3",1),
+    #                 "wash4":A.action_params.get("wash4",1),
+    #                 })]
+    #     )
+    #     return await self._init_PAL_IOloop(
+    #         A = A,
+    #         palcam = palcam,
+    #     )
 
 
-    async def method_injection_tray_GC_liquid_start(self, A: Action) -> dict:
+    async def method_injection_tray_GC(self, A: Action) -> dict:
+        start = A.action_params.get("startGC",None)
+
+        if start == True:
+            start = "start"
+        elif start == False:
+            start = "wait"
+
+        sampletype = A.action_params.get("sampletype",GCsampletype.none)
+
+        method = f"injection_tray_GC_{str(sampletype.name)}_{start}"
+
         palcam = PalCam(
             sample_in = A.samples_in,
             totalruns = 1,
@@ -2235,7 +2446,7 @@ class PAL:
             spacingfactor = 1.0,
             timeoffset = 0.0,
             microcam = [PalMicroCam(**{
-                    "method":"injection_tray_GC_liquid_start",
+                    "method":method,
                     "tool":A.action_params.get("tool",None),
                     "volume_ul":A.action_params.get("volume_ul",0),
                     "requested_source":PALposition(**{
@@ -2243,6 +2454,48 @@ class PAL:
                         "tray":A.action_params.get("source_tray",0),
                         "slot":A.action_params.get("source_slot",0),
                         "vial":A.action_params.get("source_vial",0),
+                        }),
+                    "requested_dest":PALposition(**{
+                        "position":A.action_params.get("dest",None),
+                        }),
+                    "wash1":A.action_params.get("wash1",0),
+                    "wash2":A.action_params.get("wash2",0),
+                    "wash3":A.action_params.get("wash3",0),
+                    "wash4":A.action_params.get("wash4",0),
+                    })]
+        )
+        return await self._init_PAL_IOloop(
+            A = A,
+            palcam = palcam,
+        )
+
+
+    async def method_injection_custom_GC(self, A: Action) -> dict:
+        start = A.action_params.get("startGC",None)
+
+        if start == True:
+            start = "start"
+        elif start == False:
+            start = "wait"
+
+        sampletype = A.action_params.get("sampletype",GCsampletype.none)
+
+        method = f"injection_custom_GC_{str(sampletype.name)}_{start}"
+
+
+        palcam = PalCam(
+            sample_in = A.samples_in,
+            totalruns = 1,
+            sampleperiod = [],
+            spacingmethod = Spacingmethod.linear,
+            spacingfactor = 1.0,
+            timeoffset = 0.0,
+            microcam = [PalMicroCam(**{
+                    "method":method,
+                    "tool":A.action_params.get("tool",None),
+                    "volume_ul":A.action_params.get("volume_ul",0),
+                    "requested_source":PALposition(**{
+                        "position":A.action_params.get("source",None),
                         }),
                     "requested_dest":PALposition(**{
                         "position":A.action_params.get("dest",None),
@@ -2286,6 +2539,99 @@ class PAL:
                     "wash4":A.action_params.get("wash4",0),
                     })]
         )
+        return await self._init_PAL_IOloop(
+            A = A,
+            palcam = palcam,
+        )
+    
+    
+    async def method_injection_custom_HPLC(self, A: Action) -> dict:
+        palcam = PalCam(
+            sample_in = A.samples_in,
+            totalruns = 1,
+            sampleperiod = [],
+            spacingmethod = Spacingmethod.linear,
+            spacingfactor = 1.0,
+            timeoffset = 0.0,
+            microcam = [PalMicroCam(**{
+                    "method":"injection_custom_HPLC",
+                    "tool":A.action_params.get("tool",None),
+                    "volume_ul":A.action_params.get("volume_ul",0),
+                    "requested_source":PALposition(**{
+                        "position":A.action_params.get("source",None),
+                        }),
+                    "requested_dest":PALposition(**{
+                        "position":A.action_params.get("dest",None),
+                        }),
+                    "wash1":A.action_params.get("wash1",0),
+                    "wash2":A.action_params.get("wash2",0),
+                    "wash3":A.action_params.get("wash3",0),
+                    "wash4":A.action_params.get("wash4",0),
+                    })]
+        )
+        return await self._init_PAL_IOloop(
+            A = A,
+            palcam = palcam,
+        )
+
+
+    async def method_ANEC_aliquot(self, A: Action) -> dict:
+        palcam = PalCam(
+            sample_in = A.samples_in,
+            totalruns = 1,
+            sampleperiod = [],
+            spacingmethod = Spacingmethod.linear,
+            spacingfactor = 1.0,
+            timeoffset = 0.0,
+            microcam = [
+                PalMicroCam(**{
+                    "method":"injection_custom_GC_gas_wait",
+                    "tool":A.action_params.get("toolGC",None),
+                    "volume_ul":A.action_params.get("volume_ul_GC",0),
+                    "requested_source":PALposition(**{
+                        "position":A.action_params.get("source",None),
+                        }),
+                    "requested_dest":PALposition(**{
+                        "position":"Injector 2",
+                        }),
+                    "wash1":0,
+                    "wash2":0,
+                    "wash3":0,
+                    "wash4":0,
+                }),
+                PalMicroCam(**{
+                    "method":"injection_custom_GC_gas_start",
+                    "tool":A.action_params.get("toolGC",None),
+                    "volume_ul":A.action_params.get("volume_ul_GC",0),
+                    "requested_source":PALposition(**{
+                        "position":A.action_params.get("source",None),
+                        }),
+                    "requested_dest":PALposition(**{
+                        "position":"Injector 1",
+                        }),
+                    "wash1":0,
+                    "wash2":0,
+                    "wash3":0,
+                    "wash4":0,
+                }),
+                PalMicroCam(**{
+                        "method":"archive",
+                        "tool":A.action_params.get("toolarchive",None),
+                        "volume_ul":A.action_params.get("volume_ul_archive",0),
+                        "requested_source":PALposition(**{
+                            "position":A.action_params.get("source",None),
+                            }),
+                        "wash1":A.action_params.get("wash1",0),
+                        "wash2":A.action_params.get("wash2",0),
+                        "wash3":A.action_params.get("wash3",0),
+                        "wash4":A.action_params.get("wash4",0),
+                })
+                
+                
+            ]
+        )
+        
+
         return await self._init_PAL_IOloop(
             A = A,
             palcam = palcam,

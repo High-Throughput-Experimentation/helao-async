@@ -9,11 +9,14 @@ from fastapi import Body
 from typing import Optional, List
 
 from helaocore.server import makeActionServ
-from helao.library.driver.pal_driver import PAL
-from helao.library.driver.pal_driver import Spacingmethod
-from helao.library.driver.pal_driver import PALtools
-from helao.library.driver.pal_driver import PalMicroCam
-from helao.library.driver.pal_driver import PALposition
+from helao.library.driver.pal_driver import (
+                                             PAL,
+                                             Spacingmethod,
+                                             PALtools,
+                                             PalMicroCam,
+                                             PALposition,
+                                             GCsampletype
+                                            ) 
 from helaocore.model.sample import LiquidSample, SampleUnion, NoneSample
 from helaocore.helper import make_str_enum
 from helaocore.schema import Action
@@ -116,9 +119,107 @@ def makeApp(confPrefix, servKey):
             return active_dict
 
 
-    if "injection_tray_GC_liquid_start" in _cams:
-        @app.post(f"/{servKey}/PAL_injection_tray_GC_liquid_start", tags=["public_PAL"])
-        async def PAL_injection_tray_GC_liquid_start(
+    if "injection_custom_GC_liquid_start" in _cams \
+    or "injection_custom_GC_liquid_wait" in _cams \
+    or "injection_custom_GC_gas_start" in _cams \
+    or "injection_custom_GC_gas_wait" in _cams \
+    and "archive":
+        @app.post(f"/{servKey}/PAL_ANEC_aliquot", tags=["PAL_ANEC"])
+        async def PAL_ANEC_aliquot(
+            action: Optional[Action] = \
+                    Body({}, embed=True),
+            toolGC: Optional[PALtools] = PALtools.HS2,
+            toolarchive: Optional[PALtools] = PALtools.LS3,
+            source: Optional[dev_customitems] = "cell1_we",
+            volume_ul_GC: Optional[int] = 300,
+            volume_ul_archive: Optional[int] = 500,
+            wash1: Optional[bool] = True,
+            wash2: Optional[bool] = True,
+            wash3: Optional[bool] = True,
+            wash4: Optional[bool] = False,
+        ):
+            A = await app.base.setup_action()
+            A.action_abbr = "GC_injection"
+            active_dict = await app.driver.method_ANEC_aliquot(A)
+            return active_dict
+
+
+
+    if "injection_tray_GC_liquid_start" in _cams \
+    or "injection_tray_GC_liquid_wait" in _cams \
+    or "injection_tray_GC_gas_start" in _cams \
+    or "injection_tray_GC_gas_wait" in _cams:
+        @app.post(f"/{servKey}/PAL_injection_tray_GC", tags=["PAL_GC"])
+        async def PAL_injection_tray_GC(
+            action: Optional[Action] = \
+                    Body({}, embed=True),
+            startGC: Optional[bool] = None,
+            sampletype: Optional[GCsampletype] = None,
+            tool: Optional[PALtools] = None,
+            source_tray: Optional[int] = 1,
+            source_slot: Optional[int] = 1,
+            source_vial: Optional[int] = 1,
+            dest: Optional[dev_customitems] = None,
+            volume_ul: Optional[int] = 2,
+            wash1: Optional[bool] = True,
+            wash2: Optional[bool] = True,
+            wash3: Optional[bool] = True,
+            wash4: Optional[bool] = False,
+        ):
+            A = await app.base.setup_action()
+            A.action_abbr = "GC_injection"
+            active_dict = await app.driver.method_injection_tray_GC(A)
+            return active_dict
+
+
+    if "injection_custom_GC_liquid_start" in _cams \
+    or "injection_custom_GC_liquid_wait" in _cams \
+    or "injection_custom_GC_gas_start" in _cams \
+    or "injection_custom_GC_gas_wait" in _cams:
+        @app.post(f"/{servKey}/PAL_injection_custom_GC", tags=["PAL_GC"])
+        async def PAL_injection_custom_GC(
+            action: Optional[Action] = \
+                    Body({}, embed=True),
+            startGC: Optional[bool] = None,
+            sampletype: Optional[GCsampletype] = None,
+            tool: Optional[PALtools] = None,
+            source: Optional[dev_customitems] = None,
+            dest: Optional[dev_customitems] = None,
+            volume_ul: Optional[int] = 2,
+            wash1: Optional[bool] = True,
+            wash2: Optional[bool] = True,
+            wash3: Optional[bool] = True,
+            wash4: Optional[bool] = False,
+        ):
+            A = await app.base.setup_action()
+            A.action_abbr = "GC_injection"
+            active_dict = await app.driver.method_injection_custom_GC(A)
+            return active_dict
+
+
+    if "injection_custom_HPLC" in _cams:
+        @app.post(f"/{servKey}/PAL_injection_custom_HPLC", tags=["PAL_HPLC"])
+        async def PAL_injection_custom_HPLC(
+            action: Optional[Action] = \
+                    Body({}, embed=True),
+            tool: Optional[PALtools] = None,
+            source: Optional[dev_customitems] = None,
+            dest: Optional[dev_customitems] = None,
+            volume_ul: Optional[int] = 2,
+            wash1: Optional[bool] = True,
+            wash2: Optional[bool] = True,
+            wash3: Optional[bool] = True,
+            wash4: Optional[bool] = False,
+        ):
+            A = await app.base.setup_action()
+            A.action_abbr = "HPLC_injection"
+            active_dict = await app.driver.method_injection_custom_HPLC(A)
+            return active_dict
+
+
+    if "injection_tray_HPLC" in _cams:
+        @app.post(f"/{servKey}/PAL_injection_tray_HPLC", tags=["PAL_HPLC"])
+        async def PAL_injection_tray_HPLC(
             action: Optional[Action] = \
                     Body({}, embed=True),
             tool: Optional[PALtools] = None,
@@ -133,9 +234,114 @@ def makeApp(confPrefix, servKey):
             wash4: Optional[bool] = False,
         ):
             A = await app.base.setup_action()
-            A.action_abbr = "GC_injection"
-            active_dict = await app.driver.injection_tray_GC_liquid_start(A)
+            A.action_abbr = "HPLC_injection"
+            active_dict = await app.driver.method_injection_tray_HPLC(A)
             return active_dict
+
+
+    if "transfer_tray_tray" in _cams:
+        @app.post(f"/{servKey}/PAL_transfer_tray_tray", tags=["PAL_transfer"])
+        async def PAL_transfer_tray_tray(
+            action: Optional[Action] = \
+                    Body({}, embed=True),
+            sampleperiod: Optional[List[float]] =  Body([0.0], embed=True),
+            spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
+            spacingfactor: Optional[float] = 1.0,
+            timeoffset: Optional[float] = 0.0,
+            tool: Optional[PALtools] = None,
+            volume_ul: Optional[int] = 2,
+            source_tray: Optional[int] = 1,
+            source_slot: Optional[int] = 1,
+            source_vial: Optional[int] = 1,
+            dest_tray: Optional[int] = 1,
+            dest_slot: Optional[int] = 1,
+            dest_vial: Optional[int] = 1,
+            wash1: Optional[bool] = True,
+            wash2: Optional[bool] = True,
+            wash3: Optional[bool] = True,
+            wash4: Optional[bool] = False,
+        ):
+            A = await app.base.setup_action()
+            A.action_abbr = "transfer"
+            active_dict = await app.driver.method_transfer_tray_tray(A)
+            return active_dict
+
+
+    if "transfer_tray_custom" in _cams:
+        @app.post(f"/{servKey}/PAL_transfer_tray_custom", tags=["PAL_transfer"])
+        async def PAL_transfer_tray_custom(
+            action: Optional[Action] = \
+                    Body({}, embed=True),
+            sampleperiod: Optional[List[float]] =  Body([0.0], embed=True),
+            spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
+            spacingfactor: Optional[float] = 1.0,
+            timeoffset: Optional[float] = 0.0,
+            tool: Optional[PALtools] = None,
+            volume_ul: Optional[int] = 2,
+            source_tray: Optional[int] = 1,
+            source_slot: Optional[int] = 1,
+            source_vial: Optional[int] = 1,
+            dest: Optional[dev_customitems] = None,
+            wash1: Optional[bool] = True,
+            wash2: Optional[bool] = True,
+            wash3: Optional[bool] = True,
+            wash4: Optional[bool] = False,
+        ):
+            A = await app.base.setup_action()
+            A.action_abbr = "transfer"
+            active_dict = await app.driver.method_transfer_tray_custom(A)
+            return active_dict
+
+
+    if "transfer_custom_tray" in _cams:
+        @app.post(f"/{servKey}/PAL_transfer_custom_tray", tags=["PAL_transfer"])
+        async def PAL_transfer_custom_tray(
+            action: Optional[Action] = \
+                    Body({}, embed=True),
+            sampleperiod: Optional[List[float]] =  Body([0.0], embed=True),
+            spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
+            spacingfactor: Optional[float] = 1.0,
+            timeoffset: Optional[float] = 0.0,
+            tool: Optional[PALtools] = None,
+            volume_ul: Optional[int] = 2,
+            source: Optional[dev_customitems] = None,
+            dest_tray: Optional[int] = 1,
+            dest_slot: Optional[int] = 1,
+            dest_vial: Optional[int] = 1,
+            wash1: Optional[bool] = True,
+            wash2: Optional[bool] = True,
+            wash3: Optional[bool] = True,
+            wash4: Optional[bool] = False,
+        ):
+            A = await app.base.setup_action()
+            A.action_abbr = "transfer"
+            active_dict = await app.driver.method_transfer_custom_tray(A)
+            return active_dict
+
+
+    if "transfer_custom_custom" in _cams:
+        @app.post(f"/{servKey}/PAL_transfer_custom_custom", tags=["PAL_transfer"])
+        async def PAL_transfer_custom_custom(
+            action: Optional[Action] = \
+                    Body({}, embed=True),
+            sampleperiod: Optional[List[float]] =  Body([0.0], embed=True),
+            spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
+            spacingfactor: Optional[float] = 1.0,
+            timeoffset: Optional[float] = 0.0,
+            tool: Optional[PALtools] = None,
+            volume_ul: Optional[int] = 2,
+            source: Optional[dev_customitems] = None,
+            dest: Optional[dev_customitems] = None,
+            wash1: Optional[bool] = True,
+            wash2: Optional[bool] = True,
+            wash3: Optional[bool] = True,
+            wash4: Optional[bool] = False,
+        ):
+            A = await app.base.setup_action()
+            A.action_abbr = "transfer"
+            active_dict = await app.driver.method_transfer_custom_custom(A)
+            return active_dict
+
 
 
     if "archive" in _cams:
@@ -161,44 +367,44 @@ def makeApp(confPrefix, servKey):
             return active_dict
 
 
-    if "fill" in _cams:
-        @app.post(f"/{servKey}/PAL_fill", tags=["public_PAL"])
-        async def PAL_fill(
-            action: Optional[Action] = \
-                    Body({}, embed=True),
-            tool: Optional[PALtools] = None,
-            source: Optional[dev_customitems] = None,
-            dest: Optional[dev_customitems] = None,
-            volume_ul: Optional[int] = 200,
-            wash1: Optional[bool] = False,
-            wash2: Optional[bool] = False,
-            wash3: Optional[bool] = False,
-            wash4: Optional[bool] = False,
-        ):
-            A = await app.base.setup_action()
-            A.action_abbr = "fill"
-            active_dict = await app.driver.method_fill(A)
-            return active_dict
+    # if "fill" in _cams:
+    #     @app.post(f"/{servKey}/PAL_fill", tags=["public_PAL"])
+    #     async def PAL_fill(
+    #         action: Optional[Action] = \
+    #                 Body({}, embed=True),
+    #         tool: Optional[PALtools] = None,
+    #         source: Optional[dev_customitems] = None,
+    #         dest: Optional[dev_customitems] = None,
+    #         volume_ul: Optional[int] = 200,
+    #         wash1: Optional[bool] = False,
+    #         wash2: Optional[bool] = False,
+    #         wash3: Optional[bool] = False,
+    #         wash4: Optional[bool] = False,
+    #     ):
+    #         A = await app.base.setup_action()
+    #         A.action_abbr = "fill"
+    #         active_dict = await app.driver.method_fill(A)
+    #         return active_dict
 
 
-    if "fillfixed" in _cams:
-        @app.post(f"/{servKey}/PAL_fillfixed", tags=["public_PAL"])
-        async def PAL_fillfixed(
-            action: Optional[Action] = \
-                    Body({}, embed=True),
-            tool: Optional[PALtools] = None,
-            source: Optional[dev_customitems] = None,
-            dest: Optional[dev_customitems] = None,
-            volume_ul: Optional[int] = 200, # this value is only for prc, a fixed value is used
-            wash1: Optional[bool] = False,
-            wash2: Optional[bool] = False,
-            wash3: Optional[bool] = False,
-            wash4: Optional[bool] = False,
-        ):
-            A = await app.base.setup_action()
-            A.action_abbr = "fillfixed"
-            active_dict = await app.driver.method_fillfixed(A)
-            return active_dict
+    # if "fillfixed" in _cams:
+    #     @app.post(f"/{servKey}/PAL_fillfixed", tags=["public_PAL"])
+    #     async def PAL_fillfixed(
+    #         action: Optional[Action] = \
+    #                 Body({}, embed=True),
+    #         tool: Optional[PALtools] = None,
+    #         source: Optional[dev_customitems] = None,
+    #         dest: Optional[dev_customitems] = None,
+    #         volume_ul: Optional[int] = 200, # this value is only for prc, a fixed value is used
+    #         wash1: Optional[bool] = False,
+    #         wash2: Optional[bool] = False,
+    #         wash3: Optional[bool] = False,
+    #         wash4: Optional[bool] = False,
+    #     ):
+    #         A = await app.base.setup_action()
+    #         A.action_abbr = "fillfixed"
+    #         active_dict = await app.driver.method_fillfixed(A)
+    #         return active_dict
 
 
     if "deepclean" in _cams:
