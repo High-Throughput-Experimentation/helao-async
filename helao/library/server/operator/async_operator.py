@@ -82,11 +82,11 @@ class C_async_operator:
 
         self.sequence_select_list = []
         self.sequences = []
-        self.sequence_lib = hcs.import_sequences(world_config_dict = self.vis.world_cfg, sequence_path = None, server_name=self.vis.server_name)
+        self.sequence_lib = hcs.import_sequences(world_config_dict = self.vis.world_cfg, sequence_path = None, server_name=self.vis.server.server_name)
 
         self.experiment_select_list = []
         self.experiments = []
-        self.experiment_lib = hcs.import_experiments(world_config_dict = self.vis.world_cfg, experiment_path = None, server_name=self.vis.server_name)
+        self.experiment_lib = hcs.import_experiments(world_config_dict = self.vis.world_cfg, experiment_path = None, server_name=self.vis.server.server_name)
 
         # FastAPI calls
         self.get_sequence_lib()
@@ -804,7 +804,8 @@ class C_async_operator:
         if private_input is None or param_input is None:
             return False
 
-        pmdata = json.loads(self.dataAPI.get_platemap_plateid(plateid))
+        # pmdata = json.loads(self.dataAPI.get_platemap_plateid(plateid))
+        pmdata = self.dataAPI.get_platemap_plateid(plateid)
         if len(pmdata) == 0:
             self.vis.doc.add_next_tick_callback(partial(self.update_error,"no pm found"))
 
@@ -834,7 +835,8 @@ class C_async_operator:
         input_plate_id = self.find_input(param_input, "solid_plate_id")
 
         if input_plate_id is not None:
-            pmdata = json.loads(self.dataAPI.get_platemap_plateid(input_plate_id.value))
+            # pmdata = json.loads(self.dataAPI.get_platemap_plateid(input_plate_id.value))
+            pmdata = self.dataAPI.get_platemap_plateid(input_plate_id.value)
     
             xyarr = np.array((X, Y)).T
             pmxy = np.array([[col["x"], col["y"]] for col in pmdata])
@@ -913,7 +915,8 @@ class C_async_operator:
         if plot_mpmap is not None \
         and input_plate_id is not None \
         and input_sample_no is not None:
-            pmdata = json.loads(self.dataAPI.get_platemap_plateid(input_plate_id.value))
+            # pmdata = json.loads(self.dataAPI.get_platemap_plateid(input_plate_id.value))
+            pmdata = self.dataAPI.get_platemap_plateid(input_plate_id.value)
             buf = ""
             if PMnum is not None and pmdata:
                 if PMnum[0] is not None: # need to check as this can also happen
