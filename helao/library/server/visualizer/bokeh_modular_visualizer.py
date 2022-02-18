@@ -213,7 +213,7 @@ class C_nidaqmxvis:
                     while self.IOloop_data_run:
                         try:
                             datapackage = DataPackageModel(**json.loads(await ws.recv()))
-                            if datapackage.action_name == "cellIV":
+                            if datapackage.action_name in ("cellIV"):
                                 self.vis.doc.add_next_tick_callback(partial(self.add_points, datapackage))
                         except Exception:
                             self.IOloop_data_run = False
@@ -368,7 +368,15 @@ class C_potvis:
                     while self.IOloop_data_run:
                         try:
                             datapackage = DataPackageModel(**json.loads(await ws.recv()))
-                            self.vis.doc.add_next_tick_callback(partial(self.add_points, datapackage))
+                            if datapackage.action_name in (
+                                    "run_LSV",
+                                    "run_CA",
+                                    "run_CP",
+                                    "run_CV",
+                                    "run_EIS",
+                                    "run_OCV"
+                                        ):
+                                self.vis.doc.add_next_tick_callback(partial(self.add_points, datapackage))
                         except Exception:
                             self.IOloop_data_run = False
             except Exception:
