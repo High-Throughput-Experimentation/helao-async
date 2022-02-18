@@ -6,7 +6,7 @@ server_key must be a FastAPI action server defined in config
 
 __all__ = [
            "ANEC_GC_preparation",
-           #"ANEC_cleanup",
+           "ANEC_cleanup",
            "ANEC_run_CA",
          #   "OCV_sqtest",
          #   "CA_sqtest"
@@ -805,6 +805,248 @@ def ANEC_run_CA(pg_Obj: Experiment,
     })
 
     # step 32
+    sq.add_action({
+        "action_server": f"{ORCH_name}",
+        "action_name": "wait",
+        "action_params": {
+                        "waittime":90,
+                        },
+        "start_condition": ActionStartCondition.wait_for_all,
+        })
+
+    return sq.action_list
+
+
+def ANEC_cleanup(pg_Obj: Experiment):
+    """Flush and purge ANEC cell
+    
+    (1) Drain cell and purge with CO2 for 10 seconds
+    (2) Fill cell with liquid for 90 seconds
+    (3) Equilibrate for 15 seconds
+    (4) Drain cell and purge with CO2 for 60 seconds
+    (5) Fill cell with liquid for 90 seconds
+
+    Args:
+        pg_Obj (Experiment): Active experiment object supplied by Orchestrator
+        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
+        volume_ul_GC: GC injection volume
+        
+    """
+
+    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+
+
+    ###### Fill cell with liquid
+
+    # step 1
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "liquidvalve",
+        "action_params": {
+            "liquidvalve": "down",
+            "on": 0,
+            },
+        "start_condition": ActionStartCondition.wait_for_all
+    })
+
+    # step 2
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "liquidvalve",
+        "action_params": {
+            "liquidvalve": "up",
+            "on": 1,
+            },
+        "start_condition": ActionStartCondition.wait_for_all
+    })
+
+    # step 3
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "pump",
+        "action_params": {
+            "pump": "Direction",
+            "on": 0,
+            },
+        "start_condition": ActionStartCondition.wait_for_all
+    })
+
+    # step 4
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "gasvalve",
+        "action_params": {
+            "gasvalve": "CO2",
+            "on": 0,
+            },
+        "start_condition": ActionStartCondition.wait_for_all
+    })
+
+    # step 5
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "liquidvalve",
+        "action_params": {
+            "liquidvalve": "liquid",
+            "on": 1,
+            },
+        "start_condition": ActionStartCondition.wait_for_all
+    })
+
+    # step 6
+    sq.add_action({
+        "action_server": f"{ORCH_name}",
+        "action_name": "wait",
+        "action_params": {
+                        "waittime":90,
+                        },
+        "start_condition": ActionStartCondition.wait_for_all,
+        })
+
+    ###### Equilibration
+
+    # step 7
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "liquidvalve",
+        "action_params": {
+            "liquidvalve": "liquid",
+            "on": 0,
+            },
+        "start_condition": ActionStartCondition.wait_for_all
+    })
+
+    # step 8
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "gasvalve",
+        "action_params": {
+            "gasvalve": "CO2",
+            "on": 1,
+            },
+        "start_condition": ActionStartCondition.wait_for_all
+    })
+
+    # step 9
+    sq.add_action({
+        "action_server": f"{ORCH_name}",
+        "action_name": "wait",
+        "action_params": {
+                        "waittime":15,
+                        },
+        "start_condition": ActionStartCondition.wait_for_all,
+        })
+
+    # step 10
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "gasvalve",
+        "action_params": {
+            "gasvalve": "atm",
+            "on": 1,
+            },
+        "start_condition": ActionStartCondition.wait_for_all
+    })
+
+    # step 11
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "liquidvalve",
+        "action_params": {
+            "liquidvalve": "up",
+            "on": 0,
+            },
+        "start_condition": ActionStartCondition.wait_for_all
+    })
+
+    # step 12
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "pump",
+        "action_params": {
+            "pump": "PeriPump2",
+            "on": 0,
+            },
+        "start_condition": ActionStartCondition.wait_for_all
+    })
+
+    # step 13
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "gasvalve",
+        "action_params": {
+            "gasvalve": "CO2",
+            "on": 0,
+            },
+        "start_condition": ActionStartCondition.wait_for_all
+    })
+
+    # step 14
+    sq.add_action({
+        "action_server": f"{ORCH_name}",
+        "action_name": "wait",
+        "action_params": {
+                        "waittime":1,
+                        },
+        "start_condition": ActionStartCondition.wait_for_all,
+        })
+
+    # step 15
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "gasvalve",
+        "action_params": {
+            "gasvalve": "atm",
+            "on": 0,
+            },
+        "start_condition": ActionStartCondition.wait_for_all
+    })
+
+    # step 16
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "pump",
+        "action_params": {
+            "pump": "Direction",
+            "on": 1,
+            },
+        "start_condition": ActionStartCondition.wait_for_all
+    })
+
+    # step 17
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "liquidvalve",
+        "action_params": {
+            "liquidvalve": "down",
+            "on": 1,
+            },
+        "start_condition": ActionStartCondition.wait_for_all
+    })
+
+    # step 18
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "gasvalve",
+        "action_params": {
+            "gasvalve": "CO2",
+            "on": 1,
+            },
+        "start_condition": ActionStartCondition.wait_for_all
+    })
+
+    # step 19
+    sq.add_action({
+        "action_server": f"{NI_name}",
+        "action_name": "pump",
+        "action_params": {
+            "pump": "PeriPump2",
+            "on": 1,
+            },
+        "start_condition": ActionStartCondition.wait_for_all
+    })
+
+    # step 20
     sq.add_action({
         "action_server": f"{ORCH_name}",
         "action_name": "wait",
