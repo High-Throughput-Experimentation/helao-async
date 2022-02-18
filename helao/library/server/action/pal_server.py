@@ -144,6 +144,24 @@ def makeApp(confPrefix, servKey):
             return active_dict
 
 
+    if "injection_custom_GC_liquid_start" in _cams \
+    or "injection_custom_GC_liquid_wait" in _cams \
+    or "injection_custom_GC_gas_start" in _cams \
+    or "injection_custom_GC_gas_wait" in _cams:
+        @app.post(f"/{servKey}/PAL_ANEC_GC", tags=["PAL_ANEC"])
+        async def PAL_ANEC_GC(
+            action: Optional[Action] = \
+                    Body({}, embed=True),
+            toolGC: Optional[PALtools] = PALtools.HS2,
+            source: Optional[dev_customitems] = "cell1_we",
+            volume_ul_GC: Optional[int] = 300,
+        ):
+            A = await app.base.setup_action()
+            A.action_abbr = "GC_injection"
+            active_dict = await app.driver.method_ANEC_GC(A)
+            return active_dict
+
+
 
     if "injection_tray_GC_liquid_start" in _cams \
     or "injection_tray_GC_liquid_wait" in _cams \
