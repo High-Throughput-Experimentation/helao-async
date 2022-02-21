@@ -408,108 +408,118 @@ class cNIMAX:
         
         err_code = ErrorCodes.none
         if not self.IO_do_meas:
-            self.IVtimeoffset = 0.0
-            self.file_conn_keys = []
-            self.samplingrate = samplerate
-            self.duration = duration
-            self.ttlwait = ttlwait
-            self.buffersizeread = int(self.samplingrate)
-            # save submitted action object
-            self.action = A
-            self.samples_in = await self.unified_db.get_sample(self.action.samples_in)
-            self.FIFO_epoch = None
-            # create active and write streaming file header
-            
-            self.FIFO_NImaxheader = dict()
-            file_sample_label = dict()
-            file_sample_list = []
-
-            for sample in self.samples_in:
-                sample.status = [SampleStatus.preserved]
-                sample.inheritance = SampleInheritance.allow_both
-
-            for i, FIFO_cell_key in enumerate(self.FIFO_cell_keys):
-                if self.samples_in is not None:
-                    if len(self.samples_in) == 9:
-                        file_sample_list.append([self.samples_in[i]])
-                        sample_label = [self.samples_in[i].get_global_label()]
+            # first validate the provided samples
+            samples_in = await self.unified_db.get_sample(A.samples_in)
+            if not samples_in:
+                self.base.print_message("NI got no valid sample, "
+                                        "cannot start measurement!",
+                                        error = True)
+                err_code = ErrorCodes.no_sample
+                activeDict = A.as_dict()
+            else:
+    
+                self.IVtimeoffset = 0.0
+                self.file_conn_keys = []
+                self.samplingrate = samplerate
+                self.duration = duration
+                self.ttlwait = ttlwait
+                self.buffersizeread = int(self.samplingrate)
+                # save submitted action object
+                self.action = A
+                self.samples_in = samples_in
+                self.FIFO_epoch = None
+                # create active and write streaming file header
+                
+                self.FIFO_NImaxheader = dict()
+                file_sample_label = dict()
+                file_sample_list = []
+    
+                for sample in self.samples_in:
+                    sample.status = [SampleStatus.preserved]
+                    sample.inheritance = SampleInheritance.allow_both
+    
+                for i, FIFO_cell_key in enumerate(self.FIFO_cell_keys):
+                    if self.samples_in is not None:
+                        if len(self.samples_in) == 9:
+                            file_sample_list.append([self.samples_in[i]])
+                            sample_label = [self.samples_in[i].get_global_label()]
+                        else:
+                            file_sample_list.append(self.samples_in)
+                            sample_label = [sample.get_global_label() for sample in self.samples_in]
                     else:
-                        file_sample_list.append(self.samples_in)
-                        sample_label = [sample.get_global_label() for sample in self.samples_in]
-                else:
-                    file_sample_list.append([])
-                    sample_label = None
-                file_sample_label[FIFO_cell_key]=sample_label
-
-
-            # create the first action and then split it into child actions
-            # for the other data streams
-            self.file_conn_keys.append(self.base.dflt_file_conn_key())
-            self.active =  await self.base.contain_action(
-                ActiveParams(
-                             action = self.action,
-                             file_conn_params_dict = {self.base.dflt_file_conn_key():
-                                 FileConnParams(
-                                                file_conn_key = \
-                                                    self.base.dflt_file_conn_key(),
-                                                sample_global_labels=file_sample_label[self.FIFO_cell_keys[0]],
-                                                json_data_keys = self.FIFO_column_headings,
-                                                file_type="ni_helao__file",
-                                                # only add optional keys to header
-                                                # rest will be added later
-                                                hloheader = HloHeaderModel(
-                                                    optional = {"cell":self.FIFO_cell_keys[0]})
-                                               )
-                                     }
-
+                        file_sample_list.append([])
+                        sample_label = None
+                    file_sample_label[FIFO_cell_key]=sample_label
+    
+    
+                # create the first action and then split it into child actions
+                # for the other data streams
+                self.file_conn_keys.append(self.base.dflt_file_conn_key())
+                self.active =  await self.base.contain_action(
+                    ActiveParams(
+                                 action = self.action,
+                                 file_conn_params_dict = {self.base.dflt_file_conn_key():
+                                     FileConnParams(
+                                                    file_conn_key = \
+                                                        self.base.dflt_file_conn_key(),
+                                                    sample_global_labels=file_sample_label[self.FIFO_cell_keys[0]],
+                                                    json_data_keys = self.FIFO_column_headings,
+                                                    file_type="ni_helao__file",
+                                                    # only add optional keys to header
+                                                    # rest will be added later
+                                                    hloheader = HloHeaderModel(
+                                                        optional = {"cell":self.FIFO_cell_keys[0]})
+                                                   )
+                                         }
+    
+                    )
                 )
-            )
-            # clear old samples_in first
-            self.active.action.samples_in = []
-            # now add updated samples to sample_in again
-            await self.active.append_sample(samples = file_sample_list[0],
-                                            IO="in"
-                                           )
-
-            # now add the rest
-            for i in range(len(self.FIFO_cell_keys)-1):
-                new_file_conn_keys = await self.active.split(new_fileconnparams = 
-                    FileConnParams(
-                                   file_conn_key = \
-                                       self.base.dflt_file_conn_key(),
-                                   sample_global_labels=\
-                                       file_sample_label[self.FIFO_cell_keys[i+1]],
-                                   json_data_keys = self.FIFO_column_headings,
-                                   file_type="ni_helao__file",
-                                   # only add optional keys to header
-                                   # rest will be added later
-                                   hloheader = HloHeaderModel(
-                                       optional = {"cell":self.FIFO_cell_keys[i+1]})
-                                  )
-                )
-                # add the new file_conn_key to the list
-                if new_file_conn_keys:
-                    self.file_conn_keys.append(new_file_conn_keys[0])
-
                 # clear old samples_in first
                 self.active.action.samples_in = []
-                    
                 # now add updated samples to sample_in again
-                await self.active.append_sample(samples = file_sample_list[i+1],
+                await self.active.append_sample(samples = file_sample_list[0],
                                                 IO="in"
                                                )
-
-            # create the cell IV task
-            self.create_IVtask()
-            
-            await self.IO_signalq.put(True)
-
-            err_code = ErrorCodes.none
-
-            if self.active:
-                activeDict = self.active.action.as_dict()
-            else:
-                activeDict = A.as_dict()
+    
+                # now add the rest
+                for i in range(len(self.FIFO_cell_keys)-1):
+                    new_file_conn_keys = await self.active.split(new_fileconnparams = 
+                        FileConnParams(
+                                       file_conn_key = \
+                                           self.base.dflt_file_conn_key(),
+                                       sample_global_labels=\
+                                           file_sample_label[self.FIFO_cell_keys[i+1]],
+                                       json_data_keys = self.FIFO_column_headings,
+                                       file_type="ni_helao__file",
+                                       # only add optional keys to header
+                                       # rest will be added later
+                                       hloheader = HloHeaderModel(
+                                           optional = {"cell":self.FIFO_cell_keys[i+1]})
+                                      )
+                    )
+                    # add the new file_conn_key to the list
+                    if new_file_conn_keys:
+                        self.file_conn_keys.append(new_file_conn_keys[0])
+    
+                    # clear old samples_in first
+                    self.active.action.samples_in = []
+                        
+                    # now add updated samples to sample_in again
+                    await self.active.append_sample(samples = file_sample_list[i+1],
+                                                    IO="in"
+                                                   )
+    
+                # create the cell IV task
+                self.create_IVtask()
+                
+                await self.IO_signalq.put(True)
+    
+                err_code = ErrorCodes.none
+    
+                if self.active:
+                    activeDict = self.active.action.as_dict()
+                else:
+                    activeDict = A.as_dict()
 
         else:
             activeDict = A.as_dict()

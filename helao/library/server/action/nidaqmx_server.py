@@ -298,8 +298,7 @@ def makeApp(confPrefix, servKey):
                          action: Optional[Action] = \
                                  Body({}, embed=True),
                          fast_samples_in: Optional[List[SampleUnion]] = \
-                          Body(\
-           [LiquidSample(**{"sample_no":1,"machine_name":gethostname()})], embed=True),
+                          Body([], embed=True),
                          Tval: Optional[float] = 10.0,
                          SampleRate: Optional[float] = 1.0, 
                          TTLwait: Optional[int] = -1,  # -1 disables, else select TTL channel

@@ -920,9 +920,20 @@ class gamry:
         eta=0.0,
         setupargs=[]
     ):
-        # open connection, will be closed after measurement in IOloop
-        err_code = await self.open_connection()
         activeDict = dict()
+        err_code = ErrorCodes.none
+        samples_in = await self.unified_db.get_sample(act.samples_in)
+        if not samples_in:
+            self.base.print_message("Gamry got no valid sample, "
+                                    "cannot start measurement!",
+                                    error = True)
+            err_code = ErrorCodes.no_sample
+            activeDict = act.as_dict()
+ 
+        if err_code is ErrorCodes.none:
+            # open connection, will be closed after measurement in IOloop
+            err_code = await self.open_connection()
+
         if err_code is ErrorCodes.none:
             if self.pstat and not self.IO_do_meas:
                 # set parameters for IOloop meas
@@ -931,7 +942,6 @@ class gamry:
                     1.0 / samplerate, self.IO_meas_mode, *setupargs
                 )
                 if err_code is ErrorCodes.none:
-                        
                     # setup the experiment specific signal ramp
                     self.IO_sigramp = client.CreateObject(sigfunc)
                     try:
@@ -940,9 +950,10 @@ class gamry:
                     except Exception as e:
                         err_code = gamry_error_decoder(e)
                         self.base.print_message(f"IO_sigramp.Init error: {err_code}", error = True)
-    
+                    
+                    self.samples_in = samples_in
                     self.action = act
-                    self.samples_in = await self.unified_db.get_sample(self.action.samples_in)
+
                     # signal the IOloop to start the measrurement
                     await self.set_IO_signalq(True)
                     # wait for data to appear in multisubscriber queue before returning active dict
@@ -952,10 +963,10 @@ class gamry:
                     #             activeDict = self.active.action.as_dict()
                     #     if activeDict:
                     #         break
-    
+
                     # need to wait now for the activation of the meas routine
                     # and that the active object is activated and sets action status
-    
+
                     while not self.IO_continue:
                         await asyncio.sleep(1)
 
@@ -967,9 +978,9 @@ class gamry:
                     if self.active:
                         activeDict = self.active.action.as_dict()
                     else:
-                        activeDict = act.as_dict()   
+                        activeDict = act.as_dict()
                 else:
-                    activeDict = act.as_dict()                
+                    activeDict = act.as_dict()
                     
 
             elif self.IO_measuring:
