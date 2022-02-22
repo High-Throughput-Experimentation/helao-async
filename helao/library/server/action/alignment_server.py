@@ -11,7 +11,7 @@ __all__ = ["makeApp"]
 from typing import Optional, List, Union
 from fastapi import Body
 from importlib import import_module
-from helaocore.server import makeActionServ
+from helaocore.server.base import makeActionServ
 from helao.library.driver.alignment_driver import aligner
 from helao.library.driver.galil_motion_driver import move_modes
 from helaocore.schema import Action

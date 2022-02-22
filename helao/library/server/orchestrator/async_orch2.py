@@ -42,7 +42,7 @@ import asyncio
 import time
 from fastapi import Body
 
-from helaocore.server import makeOrchServ
+from helaocore.server.orch import makeOrchServ
 from helaocore.schema import Action
 
 def makeApp(confPrefix, servKey):

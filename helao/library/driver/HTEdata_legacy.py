@@ -6,7 +6,7 @@ __all__ = ["HTEdata"]
 # import aiofiles
 
 
-from helaocore.server import Base
+from helaocore.server.base import Base
 from helaocore.data import HTELegacyAPI
 
 

@@ -22,8 +22,8 @@ from helao.library.driver.galil_motion_driver import (
                                                       transformation_mode,
                                                       galil
                                                      )
-from helaocore.server import makeActionServ
-from helaocore.helper import make_str_enum
+from helaocore.server.base import makeActionServ
+from helaocore.helper.make_str_enum import make_str_enum
 from helaocore.schema import Action
 
 def makeApp(confPrefix, servKey):

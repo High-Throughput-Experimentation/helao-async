@@ -14,7 +14,7 @@ __all__ = ["makeApp"]
 from typing import Optional
 from fastapi import Body
 from importlib import import_module
-from helaocore.server import makeActionServ
+from helaocore.server.base import makeActionServ
 from helao.library.driver.galil_io_driver import galil
 from helaocore.schema import Action
 

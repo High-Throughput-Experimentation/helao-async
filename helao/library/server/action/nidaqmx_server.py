@@ -21,11 +21,12 @@ from typing import Optional, List
 from socket import gethostname
 
 
-from helaocore.server import makeActionServ
+from helaocore.server.base import makeActionServ
 from helao.library.driver.nidaqmx_driver import cNIMAX
 from helaocore.model.sample import LiquidSample, SampleUnion
-from helaocore.helper import make_str_enum
+from helaocore.helper.make_str_enum import make_str_enum
 from helaocore.schema import Action
+from helaocore.error import ErrorCodes
 
 def makeApp(confPrefix, servKey):
 
@@ -89,10 +90,15 @@ def makeApp(confPrefix, servKey):
             )
             # some additional params in order to call the same driver functions 
             # for all DO actions
-            active.action.action_params["do_port"] = dev_mastercell[active.action.action_params["cell"]]
-            active.action.action_params["do_name"] = active.action.action_params["cell"]
-            await active.enqueue_data_dflt(datadict = \
-                                           await app.driver.set_digital_out(**active.action.action_params))
+            active.action.action_params["do_port"] = \
+                dev_mastercell[active.action.action_params["cell"]]
+            active.action.action_params["do_name"] = \
+                active.action.action_params["cell"]
+            datadict = \
+                await app.driver.set_digital_out(**active.action.action_params)
+            active.action.error_code = \
+                datadict.get("error_code", ErrorCodes.unspecified)
+            await active.enqueue_data_dflt(datadict = datadict)
             finished_act = await active.finish()
             return finished_act.as_dict()
 
@@ -117,10 +123,15 @@ def makeApp(confPrefix, servKey):
             )
             # some additional params in order to call the same driver functions 
             # for all DO actions
-            active.action.action_params["do_port"] = dev_activecell[active.action.action_params["cell"]]
-            active.action.action_params["do_name"] = active.action.action_params["cell"]
-            await active.enqueue_data_dflt(datadict = \
-                                           await app.driver.set_digital_out(**active.action.action_params))
+            active.action.action_params["do_port"] = \
+                dev_activecell[active.action.action_params["cell"]]
+            active.action.action_params["do_name"] = \
+                active.action.action_params["cell"]
+            datadict = \
+                await app.driver.set_digital_out(**active.action.action_params)
+            active.action.error_code = \
+                datadict.get("error_code", ErrorCodes.unspecified)
+            await active.enqueue_data_dflt(datadict = datadict)
             finished_act = await active.finish()
             return finished_act.as_dict()
 
@@ -145,10 +156,15 @@ def makeApp(confPrefix, servKey):
             )
             # some additional params in order to call the same driver functions 
             # for all DO actions
-            active.action.action_params["do_port"] = dev_pump[active.action.action_params["pump"]]
-            active.action.action_params["do_name"] = active.action.action_params["pump"]
-            await active.enqueue_data_dflt(datadict = \
-                                           await app.driver.set_digital_out(**active.action.action_params))
+            active.action.action_params["do_port"] = \
+                dev_pump[active.action.action_params["pump"]]
+            active.action.action_params["do_name"] = \
+                active.action.action_params["pump"]
+            datadict = \
+                await app.driver.set_digital_out(**active.action.action_params)
+            active.action.error_code = \
+                datadict.get("error_code", ErrorCodes.unspecified)
+            await active.enqueue_data_dflt(datadict = datadict)
             finished_act = await active.finish()
             return finished_act.as_dict()
 
@@ -173,10 +189,15 @@ def makeApp(confPrefix, servKey):
             )
             # some additional params in order to call the same driver functions 
             # for all DO actions
-            active.action.action_params["do_port"] = dev_gasvalve[active.action.action_params["gasvalve"]]
-            active.action.action_params["do_name"] = active.action.action_params["gasvalve"]
-            await active.enqueue_data_dflt(datadict = \
-                                           await app.driver.set_digital_out(**active.action.action_params))
+            active.action.action_params["do_port"] = \
+                dev_gasvalve[active.action.action_params["gasvalve"]]
+            active.action.action_params["do_name"] = \
+                active.action.action_params["gasvalve"]
+            datadict = \
+                await app.driver.set_digital_out(**active.action.action_params)
+            active.action.error_code = \
+                datadict.get("error_code", ErrorCodes.unspecified)
+            await active.enqueue_data_dflt(datadict = datadict)
             finished_act = await active.finish()
             return finished_act.as_dict()
 
@@ -201,10 +222,15 @@ def makeApp(confPrefix, servKey):
             )
             # some additional params in order to call the same driver functions 
             # for all DO actions
-            active.action.action_params["do_port"] = dev_liquidvalve[active.action.action_params["liquidvalve"]]
-            active.action.action_params["do_name"] = active.action.action_params["liquidvalve"]
-            await active.enqueue_data_dflt(datadict = \
-                                           await app.driver.set_digital_out(**active.action.action_params))
+            active.action.action_params["do_port"] = \
+                dev_liquidvalve[active.action.action_params["liquidvalve"]]
+            active.action.action_params["do_name"] = \
+                active.action.action_params["liquidvalve"]
+            datadict = \
+                await app.driver.set_digital_out(**active.action.action_params)
+            active.action.error_code = \
+                datadict.get("error_code", ErrorCodes.unspecified)
+            await active.enqueue_data_dflt(datadict = datadict)
             finished_act = await active.finish()
             return finished_act.as_dict()
 
@@ -229,10 +255,15 @@ def makeApp(confPrefix, servKey):
             )
             # some additional params in order to call the same driver functions 
             # for all DO actions
-            active.action.action_params["do_port"] = dev_led[active.action.action_params["led"]]
-            active.action.action_params["do_name"] = active.action.action_params["led"]
-            await active.enqueue_data_dflt(datadict = \
-                                           await app.driver.set_digital_out(**active.action.action_params))
+            active.action.action_params["do_port"] = \
+                dev_led[active.action.action_params["led"]]
+            active.action.action_params["do_name"] = \
+                active.action.action_params["led"]
+            datadict = \
+                await app.driver.set_digital_out(**active.action.action_params)
+            active.action.error_code = \
+                datadict.get("error_code", ErrorCodes.unspecified)
+            await active.enqueue_data_dflt(datadict = datadict)
             finished_act = await active.finish()
             return finished_act.as_dict()
 
@@ -257,10 +288,15 @@ def makeApp(confPrefix, servKey):
             )
             # some additional params in order to call the same driver functions 
             # for all DO actions
-            active.action.action_params["do_port"] = dev_fswbcd[active.action.action_params["fswbcd"]]
-            active.action.action_params["do_name"] = active.action.action_params["fswbcd"]
-            await active.enqueue_data_dflt(datadict = \
-                                           await app.driver.set_digital_out(**active.action.action_params))
+            active.action.action_params["do_port"] = \
+                dev_fswbcd[active.action.action_params["fswbcd"]]
+            active.action.action_params["do_name"] = \
+                active.action.action_params["fswbcd"]
+            datadict = \
+                await app.driver.set_digital_out(**active.action.action_params)
+            active.action.error_code = \
+                datadict.get("error_code", ErrorCodes.unspecified)
+            await active.enqueue_data_dflt(datadict = datadict)
             finished_act = await active.finish()
             return finished_act.as_dict()
 
@@ -284,10 +320,15 @@ def makeApp(confPrefix, servKey):
             )
             # some additional params in order to call the same driver functions 
             # for all DI actions
-            active.action.action_params["di_port"] = dev_fsw[active.action.action_params["fsw"]]
-            active.action.action_params["di_name"] = active.action.action_params["fsw"]
-            await active.enqueue_data_dflt(datadict = \
-                                           await app.driver.get_digital_in(**active.action.action_params))
+            active.action.action_params["di_port"] = \
+                dev_fsw[active.action.action_params["fsw"]]
+            active.action.action_params["di_name"] = \
+                active.action.action_params["fsw"]
+            datadict = \
+                await app.driver.get_digital_in(**active.action.action_params)
+            active.action.error_code = \
+                datadict.get("error_code", ErrorCodes.unspecified)
+            await active.enqueue_data_dflt(datadict = datadict)
             finished_act = await active.finish()
             return finished_act.as_dict()
 

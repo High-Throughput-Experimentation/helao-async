@@ -21,10 +21,15 @@ import bokeh.models.widgets as bmw
 import bokeh.plotting as bpl
 from bokeh.events import ButtonClick, DoubleTap
 
-import helaocore.server as hcs
-from helaocore.data import HTELegacyAPI
+from helaocore.server.vis import Vis
+from helaocore.server.make_vis_serv import makeVisServ
+from helaocore.server.import_sequences import import_sequences
+from helaocore.server.import_experiments import import_experiments
+from helaocore.server.dispatcher import async_private_dispatcher
+
+from helaocore.data.legacy import HTELegacyAPI
 from helaocore.schema import Experiment, Sequence
-from helaocore.helper import to_json
+from helaocore.helper.to_json import to_json
 
 
 class return_sequence_lib(BaseModel):
@@ -46,7 +51,7 @@ class return_experiment_lib(BaseModel):
 
 
 class C_async_operator:
-    def __init__(self, visServ: hcs.Vis):
+    def __init__(self, visServ: Vis):
         self.vis = visServ
 
         self.dataAPI = HTELegacyAPI(self.vis)
@@ -82,11 +87,11 @@ class C_async_operator:
 
         self.sequence_select_list = []
         self.sequences = []
-        self.sequence_lib = hcs.import_sequences(world_config_dict = self.vis.world_cfg, sequence_path = None, server_name=self.vis.server.server_name)
+        self.sequence_lib = import_sequences(world_config_dict = self.vis.world_cfg, sequence_path = None, server_name=self.vis.server.server_name)
 
         self.experiment_select_list = []
         self.experiments = []
-        self.experiment_lib = hcs.import_experiments(world_config_dict = self.vis.world_cfg, experiment_path = None, server_name=self.vis.server.server_name)
+        self.experiment_lib = import_experiments(world_config_dict = self.vis.world_cfg, experiment_path = None, server_name=self.vis.server.server_name)
 
         # FastAPI calls
         self.get_sequence_lib()
@@ -368,7 +373,7 @@ class C_async_operator:
         """submit a FastAPI request to orch"""
     
 
-        response = await hcs.async_private_dispatcher(
+        response = await async_private_dispatcher(
             world_config_dict = self.vis.world_cfg, 
             server = self.orchestrator,
             private_action = action_name,
@@ -1005,7 +1010,7 @@ def makeBokehApp(doc, confPrefix, servKey):
 
     config = import_module(f"helao.config.{confPrefix}").config
 
-    app = hcs.makeVisServ(
+    app = makeVisServ(
         config,
         servKey,
         doc,
