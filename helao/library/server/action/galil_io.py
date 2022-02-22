@@ -17,7 +17,7 @@ from importlib import import_module
 from helaocore.server.base import makeActionServ
 from helao.library.driver.galil_io_driver import galil
 from helaocore.schema import Action
-
+from helaocore.error import ErrorCodes
 
 def makeApp(confPrefix, servKey):
 
@@ -39,10 +39,21 @@ def makeApp(confPrefix, servKey):
                                     Body({}, embed=True),
                             port:Optional[int] = None
                            ):
-        A = await app.base.setup_action()
-        active = await app.base.contain_action(A,
-                json_data_keys=["error_code", "port", "name", "type", "value"])
-        await active.enqueue_data(app.driver.get_analog_in(**A.action_params))
+        active = await app.base.setup_and_contain_action(
+                                          json_data_keys = [
+                                                            "error_code", 
+                                                            "port", 
+                                                            "name", 
+                                                            "type", 
+                                                            "value"
+                                                           ],
+                                          action_abbr = "get_ai"
+        )
+        datadict = \
+            await app.driver.get_analog_in(**active.action.action_params)
+        active.action.error_code = \
+            datadict.get("error_code", ErrorCodes.unspecified)
+        await active.enqueue_data_dflt(datadict = datadict)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -64,8 +75,11 @@ def makeApp(confPrefix, servKey):
                                                            ],
                                           action_abbr = "set_ao"
         )
-        await active.enqueue_data_dflt(datadict = \
-                await app.driver.set_analog_out(**active.action.action_params))
+        datadict = \
+            await app.driver.set_analog_out(**active.action.action_params)
+        active.action.error_code = \
+            datadict.get("error_code", ErrorCodes.unspecified)
+        await active.enqueue_data_dflt(datadict = datadict)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -86,8 +100,11 @@ def makeApp(confPrefix, servKey):
                                                            ],
                                           action_abbr = "get_di"
         )
-        await active.enqueue_data_dflt(datadict = \
-                await app.driver.get_digital_in(**active.action.action_params))
+        datadict = \
+            await app.driver.get_digital_in(**active.action.action_params)
+        active.action.error_code = \
+            datadict.get("error_code", ErrorCodes.unspecified)
+        await active.enqueue_data_dflt(datadict = datadict)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -108,8 +125,11 @@ def makeApp(confPrefix, servKey):
                                                            ],
                                           action_abbr = "get_do"
         )
-        await active.enqueue_data_dflt(datadict = \
-               await app.driver.get_digital_out(**active.action.action_params))
+        datadict = \
+            await app.driver.get_digital_out(**active.action.action_params)
+        active.action.error_code = \
+            datadict.get("error_code", ErrorCodes.unspecified)
+        await active.enqueue_data_dflt(datadict = datadict)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -131,8 +151,11 @@ def makeApp(confPrefix, servKey):
                                                            ],
                                           action_abbr = "set_do"
         )
-        await active.enqueue_data_dflt(datadict = \
-               await app.driver.set_digital_out(**active.action.action_params))
+        datadict = \
+            await app.driver.set_digital_out(**active.action.action_params)
+        active.action.error_code = \
+            datadict.get("error_code", ErrorCodes.unspecified)
+        await active.enqueue_data_dflt(datadict = datadict)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
