@@ -10,8 +10,6 @@ __all__ = ["gamry",
            "Gamry_modes",
           ]
 
-from helaocore.schema import Action
-from helaocore.server import Base
 import comtypes
 import comtypes.client as client
 import asyncio
@@ -19,6 +17,8 @@ import time
 from enum import Enum
 import psutil
 
+from helaocore.schema import Action
+from helaocore.server.base import Base
 from helaocore.error import ErrorCodes
 from helaocore.model.sample import SampleInheritance, SampleStatus
 from helaocore.model.data import DataModel
@@ -921,35 +921,37 @@ class gamry:
         setupargs=[]
     ):
         activeDict = dict()
-        err_code = ErrorCodes.none
+        act.action_etc = eta
+        act.error_code = ErrorCodes.none
         samples_in = await self.unified_db.get_sample(act.samples_in)
         if not samples_in:
             self.base.print_message("Gamry got no valid sample, "
                                     "cannot start measurement!",
                                     error = True)
-            err_code = ErrorCodes.no_sample
+            act.error_code = ErrorCodes.no_sample
             activeDict = act.as_dict()
  
-        if err_code is ErrorCodes.none:
+        if act.error_code is ErrorCodes.none:
             # open connection, will be closed after measurement in IOloop
-            err_code = await self.open_connection()
+            act.error_code = await self.open_connection()
 
-        if err_code is ErrorCodes.none:
+        if act.error_code is ErrorCodes.none:
             if self.pstat and not self.IO_do_meas:
                 # set parameters for IOloop meas
                 self.IO_meas_mode = measmode
-                err_code = await self.measurement_setup(
+                act.error_code = await self.measurement_setup(
                     1.0 / samplerate, self.IO_meas_mode, *setupargs
                 )
-                if err_code is ErrorCodes.none:
+                if act.error_code is ErrorCodes.none:
                     # setup the experiment specific signal ramp
                     self.IO_sigramp = client.CreateObject(sigfunc)
                     try:
                         self.IO_sigramp.Init(*sigfunc_params)
-                        err_code = ErrorCodes.none
+                        act.error_code = ErrorCodes.none
                     except Exception as e:
-                        err_code = gamry_error_decoder(e)
-                        self.base.print_message(f"IO_sigramp.Init error: {err_code}", error = True)
+                        act.error_code = gamry_error_decoder(e)
+                        self.base.print_message(f"IO_sigramp.Init error: "
+                                                f"{act.error_code}", error = True)
                     
                     self.samples_in = samples_in
                     self.action = act
@@ -973,7 +975,7 @@ class gamry:
                     # reset continue flag
                     self.IO_continue = False
     
-                    err_code = ErrorCodes.none
+                    act.error_code = ErrorCodes.none
     
                     if self.active:
                         activeDict = self.active.action.as_dict()
@@ -985,16 +987,14 @@ class gamry:
 
             elif self.IO_measuring:
                 activeDict = act.as_dict()                
-                err_code = ErrorCodes.in_progress
+                act.error_code = ErrorCodes.in_progress
             else:
                 activeDict = act.as_dict()                
-                err_code = ErrorCodes.not_initialized
+                act.error_code = ErrorCodes.not_initialized
         else:
             activeDict = act.as_dict()                
 
 
-        
-        activeDict["data"] = {"err_code": err_code, "eta": eta}
         return activeDict
 
 

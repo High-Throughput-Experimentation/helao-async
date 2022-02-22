@@ -6,7 +6,14 @@ from colorama import Fore, Style
 import sys
 
 
-import helaocore.model
+from helaocore.model.sample import (
+                                    LiquidSample,
+                                    GasSample,
+                                    SolidSample,
+                                    AssemblySample,
+                                    NoneSample,
+                                    SampleList
+                                   )
 
 colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
 
@@ -22,11 +29,11 @@ def sample_model_unit_test():
         print(" --- testing single sample models ---")
         
         
-        test_liquid = helaocore.model.LiquidSample()
-        test_gas = helaocore.model.GasSample()
-        test_solid = helaocore.model.SolidSample()
-        test_assembly = helaocore.model.AssemblySample(parts=[helaocore.model.NoneSample()])
-        test_assembly2 = helaocore.model.AssemblySample(parts=[test_gas, test_solid, test_liquid, test_assembly])
+        test_liquid = LiquidSample()
+        test_gas = GasSample()
+        test_solid = SolidSample()
+        test_assembly = AssemblySample(parts=[NoneSample()])
+        test_assembly2 = AssemblySample(parts=[test_gas, test_solid, test_liquid, test_assembly])
 
         
         # testing some basic sampple functions
@@ -91,7 +98,7 @@ def sample_model_unit_test():
         
         try:
             print(f"sample_model test {testcounter} ",end = "")
-            test_sample_list = helaocore.model.SampleList(samples=[test_liquid,test_gas,test_solid,test_assembly,test_assembly2])
+            test_sample_list = SampleList(samples=[test_liquid,test_gas,test_solid,test_assembly,test_assembly2])
             print(passed_msg)
         except Exception as e:
             print(fail_msg, "cannot convert list of model dicts to model list")
@@ -205,7 +212,7 @@ def sample_model_unit_test():
         # testing sample list basemodel functions
         try:
             print(f"sample_model test {testcounter} ",end = "")
-            test_sample_list = helaocore.model.SampleList(samples=[test_liquid.dict(),test_gas.dict(),test_solid.dict(),test_assembly.dict(), test_assembly2.dict()])
+            test_sample_list = SampleList(samples=[test_liquid.dict(),test_gas.dict(),test_solid.dict(),test_assembly.dict(), test_assembly2.dict()])
             print(passed_msg)
         except Exception as e:
             print(fail_msg, "cannot convert list of model dicts to model list")

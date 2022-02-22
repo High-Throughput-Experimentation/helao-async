@@ -8,7 +8,7 @@ from time import strftime
 from fastapi import Body
 from typing import Optional, List
 
-from helaocore.server import makeActionServ
+from helaocore.server.base import makeActionServ
 from helao.library.driver.pal_driver import (
                                              PAL,
                                              Spacingmethod,
@@ -18,7 +18,7 @@ from helao.library.driver.pal_driver import (
                                              GCsampletype
                                             ) 
 from helaocore.model.sample import LiquidSample, SampleUnion, NoneSample
-from helaocore.helper import make_str_enum
+from helaocore.helper.make_str_enum import make_str_enum
 from helaocore.schema import Action
 
 

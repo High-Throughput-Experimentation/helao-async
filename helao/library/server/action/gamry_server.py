@@ -35,7 +35,7 @@ from importlib import import_module
 from fastapi import Body, Query
 from socket import gethostname
 
-from helaocore.server import makeActionServ
+from helaocore.server.base import makeActionServ
 from helaocore.model.sample import LiquidSample, SampleUnion
 from helaocore.schema import Action
 from helao.library.driver.gamry_driver import gamry

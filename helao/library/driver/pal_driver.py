@@ -18,11 +18,11 @@ import aiofiles
 import subprocess
 
 from helaocore.schema import Action
-from helaocore.server import Base
+from helaocore.server.base import Base
 from helaocore.error import ErrorCodes
-from helaocore.helper import HelaoDict
+from helaocore.helper.helaodict import HelaoDict
 
-from helaocore.data import UnifiedSampleDataAPI
+from helaocore.data.sample import UnifiedSampleDataAPI
 from helaocore.model.sample import (
                                     SampleUnion, 
                                     NoneSample, 

@@ -18,9 +18,9 @@ from nidaqmx.constants import UnitsPreScaled
 from nidaqmx.constants import TriggerType
 
 from helaocore.schema import Action
-from helaocore.server import Base
+from helaocore.server.base import Base
 from helaocore.error import ErrorCodes
-from helaocore.helper import make_str_enum
+from helaocore.helper.make_str_enum import make_str_enum
 from helaocore.data.sample import UnifiedSampleDataAPI
 from helaocore.model.sample import SampleInheritance, SampleStatus, NoneSample
 from helaocore.model.file import FileConnParams, HloHeaderModel
@@ -406,7 +406,7 @@ class cNIMAX:
         duration = A.action_params["Tval"]
         ttlwait = A.action_params["TTLwait"] # -1 disables, else select TTL channel
         
-        err_code = ErrorCodes.none
+        A.error_code = ErrorCodes.none
         if not self.IO_do_meas:
             # first validate the provided samples
             samples_in = await self.unified_db.get_sample(A.samples_in)
@@ -414,7 +414,7 @@ class cNIMAX:
                 self.base.print_message("NI got no valid sample, "
                                         "cannot start measurement!",
                                         error = True)
-                err_code = ErrorCodes.no_sample
+                A.error_code = ErrorCodes.no_sample
                 activeDict = A.as_dict()
             else:
     
@@ -514,7 +514,7 @@ class cNIMAX:
                 
                 await self.IO_signalq.put(True)
     
-                err_code = ErrorCodes.none
+                self.active.action.error_code = ErrorCodes.none
     
                 if self.active:
                     activeDict = self.active.action.as_dict()
@@ -522,10 +522,9 @@ class cNIMAX:
                     activeDict = A.as_dict()
 
         else:
+            A.error_code = ErrorCodes.in_progress
             activeDict = A.as_dict()
-            err_code = ErrorCodes.in_progress
 
-        activeDict["data"] = {"err_code": err_code}
         return activeDict
 
 

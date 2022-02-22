@@ -3,10 +3,6 @@ __all__ = ["makeBokehApp"]
 
 from importlib import import_module
 
-from helaocore.server import makeVisServ
-
-
-from helaocore.server import Vis
 
 
 
@@ -26,6 +22,8 @@ from bokeh.layouts import layout, Spacer
 
 
 from helaocore.model.data import DataPackageModel
+from helaocore.server.make_vis_serv import makeVisServ
+from helaocore.server.vis import Vis
 
 
 # ##############################################################################

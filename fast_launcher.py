@@ -9,7 +9,7 @@ from uvicorn.config import LOGGING_CONFIG
 import uvicorn
 
 
-from helaocore.helper import print_message
+from helaocore.helper.print_message import print_message
 
 
 confPrefix = sys.argv[1]

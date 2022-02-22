@@ -17,7 +17,7 @@ import asyncio
 from enum import Enum
 from typing import List
 
-from helaocore.server import Base
+from helaocore.server.base import Base
 from helaocore.error import ErrorCodes
 from helaocore.schema import Action
 from helaocore.error import ErrorCodes

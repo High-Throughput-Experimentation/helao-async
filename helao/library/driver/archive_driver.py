@@ -13,7 +13,7 @@ import pickle
 import re
 from enum import Enum
 
-from helaocore.server import Base
+from helaocore.server.base import Base
 from helaocore.error import ErrorCodes
 
 from helaocore.model.sample import (
@@ -26,7 +26,7 @@ from helaocore.model.sample import (
                                   )
 
 from helaocore.helper import print_message
-from helaocore.data import UnifiedSampleDataAPI
+from helaocore.data.sample import UnifiedSampleDataAPI
 
 class CustomTypes(str, Enum):
     cell = "cell"
