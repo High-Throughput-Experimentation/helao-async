@@ -25,6 +25,7 @@ from helao.library.driver.galil_motion_driver import (
 from helaocore.server.base import makeActionServ
 from helaocore.helper.make_str_enum import make_str_enum
 from helaocore.schema import Action
+from helaocore.error import ErrorCodes
 
 def makeApp(confPrefix, servKey):
 
@@ -179,8 +180,12 @@ def makeApp(confPrefix, servKey):
                                                                ],
                                               action_abbr = "move"
             )
-            await active.enqueue_data_dflt(datadict = \
-               await app.driver.motor_move(active))
+            datadict = await app.driver.motor_move(active)
+            active.action.error_code = \
+                app.base.get_main_error(
+                    datadict.get("err_code", ErrorCodes.unspecified)
+                )
+            await active.enqueue_data_dflt(datadict = datadict)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -211,8 +216,12 @@ def makeApp(confPrefix, servKey):
                                                                ],
                                               action_abbr = "move"
             )
-            await active.enqueue_data_dflt(datadict = \
-               await app.driver.motor_move(active))
+            datadict = await app.driver.motor_move(active)
+            active.action.error_code = \
+                app.base.get_main_error(
+                    datadict.get("err_code", ErrorCodes.unspecified)
+                )
+            await active.enqueue_data_dflt(datadict = datadict)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -286,8 +295,12 @@ def makeApp(confPrefix, servKey):
                                                                ],
                                               action_abbr = "query_moving"
             )
-            await active.enqueue_data_dflt(datadict = \
-               await app.driver.query_axis_moving(**active.action.action_params))
+            datadict = await app.driver.query_axis_moving(**active.action.action_params)
+            active.action.error_code = \
+                app.base.get_main_error(
+                    datadict.get("err_code", ErrorCodes.unspecified)
+                )
+            await active.enqueue_data_dflt(datadict = datadict)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -310,8 +323,13 @@ def makeApp(confPrefix, servKey):
                                                                ],
                                               action_abbr = "axis_off"
             )
-            await active.enqueue_data_dflt(datadict = \
-               await app.driver.motor_off(**active.action.action_params))
+            datadict = \
+                await app.driver.motor_off(**active.action.action_params)
+            active.action.error_code = \
+                app.base.get_main_error(
+                    datadict.get("err_code", ErrorCodes.unspecified)
+                )
+            await active.enqueue_data_dflt(datadict = datadict)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -333,8 +351,13 @@ def makeApp(confPrefix, servKey):
                                                                ],
                                               action_abbr = "axis_on"
             )
-            await active.enqueue_data_dflt(datadict = \
-               await app.driver.motor_on(**active.action.action_params))
+            datadict = \
+                await app.driver.motor_on(**active.action.action_params)
+            active.action.error_code = \
+                app.base.get_main_error(
+                    datadict.get("err_code", ErrorCodes.unspecified)
+                )
+            await active.enqueue_data_dflt(datadict = datadict)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -354,8 +377,13 @@ def makeApp(confPrefix, servKey):
                                                            ],
                                           action_abbr = "stop"
         )
-        await active.enqueue_data_dflt(datadict = \
-           await app.driver.motor_off(axis = await app.driver.get_all_axis()))
+        datadict = \
+            await app.driver.motor_off(axis = await app.driver.get_all_axis())
+        active.action.error_code = \
+            app.base.get_main_error(
+                datadict.get("err_code", ErrorCodes.unspecified)
+            )
+        await active.enqueue_data_dflt(datadict = datadict)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
