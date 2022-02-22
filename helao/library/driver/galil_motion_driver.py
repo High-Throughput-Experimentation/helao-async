@@ -381,7 +381,7 @@ class galil:
                 "accepted_rel_dist": None,
                 "supplied_rel_dist": None,
                 "err_dist": None,
-                "err_code": "estop",
+                "err_code": ErrorCodes.estop,
                 "counts": None,
             }
 
@@ -396,12 +396,14 @@ class galil:
             if ax in self.config_dict["axis_id"]:
                 axl = self.config_dict["axis_id"][ax]
             else:
+                self.base.print_message("motor setup error",
+                                        error = True)
                 ret_moved_axis.append(None)
                 ret_speed.append(None)
                 ret_accepted_rel_dist.append(None)
                 ret_supplied_rel_dist.append(d)
                 ret_err_dist.append(None)
-                ret_err_code.append("setup")
+                ret_err_code.append(ErrorCodes.setup)
                 ret_counts.append(None)
                 continue
 
@@ -430,13 +432,15 @@ class galil:
                     speed = self.config_dict["max_speed_count_sec"]
                 self._speed = speed
             except Exception:
+                self.base.print_message("motor numerical error",
+                                        error = True)
                 # something went wrong in the numerical part so we give that as feedback
                 ret_moved_axis.append(None)
                 ret_speed.append(None)
                 ret_accepted_rel_dist.append(None)
                 ret_supplied_rel_dist.append(d)
                 ret_err_dist.append(None)
-                ret_err_code.append("numerical")
+                ret_err_code.append(ErrorCodes.numerical)
                 ret_counts.append(None)
                 continue
 
@@ -481,18 +485,20 @@ class galil:
                 ret_accepted_rel_dist.append(None)
                 ret_supplied_rel_dist.append(d)
                 ret_err_dist.append(error_distance)
-                ret_err_code.append(0)
+                ret_err_code.append(ErrorCodes.none)
                 ret_counts.append(counts)
                 # time = counts/ counts_per_second
 
                 # continue
             except Exception:
+                self.base.print_message("motor error",
+                                        error = True)
                 ret_moved_axis.append(None)
                 ret_speed.append(None)
                 ret_accepted_rel_dist.append(None)
                 ret_supplied_rel_dist.append(d)
                 ret_err_dist.append(None)
-                ret_err_code.append("motor")
+                ret_err_code.append(ErrorCodes.motor)
                 ret_counts.append(None)
                 continue
 
@@ -516,12 +522,13 @@ class galil:
                 tout = self.config_dict["timeout"]
             else:
                 tout = 60
+
             while (time.time() - tstart < tout) \
             and not self.base.actionserver.estop:
                 qmove = await self.query_axis_moving(axis)
                 #                time.sleep(0.5) # TODO: what time is ok to wait and not to overload the Galil
                 await asyncio.sleep(0.5)
-                if all(qmove["err_code"]):
+                if all(status == "stopped" for status in qmove["motor_status"]):
                     break
 
             if not self.base.actionserver.estop:
@@ -531,19 +538,21 @@ class galil:
                 # check which axis had the timeout
                 newret_err_code = []
                 for erridx, err_code in enumerate(ret_err_code):
-                    if qmove["err_code"][erridx] == 0:
-                        newret_err_code.append("timeout")
+                    if qmove["err_code"][erridx] != ErrorCodes.none:
+                        newret_err_code.append(ErrorCodes.timeout)
+                        self.base.print_message("motor timeout error",
+                                                error = True)
                     else:
                         newret_err_code.append(err_code)
 
                 ret_err_code = newret_err_code
             else:
                 # estop occured while checking axis end position
-                ret_err_code = ["estop" for _ in ret_err_code]
+                ret_err_code = [ErrorCodes.estop for _ in ret_err_code]
 
         else:
             # estop was triggered while waiting for axis to stop
-            ret_err_code = ["estop" for _ in ret_err_code]
+            ret_err_code = [ErrorCodes.estop for _ in ret_err_code]
 
         # read final position
         # updates ws buffer
@@ -638,25 +647,25 @@ class galil:
                         # self.update_wsmotorbuffersingle("motor_status", ax, "moving")
                         # self.update_wsmotorbuffersingle("err_code", ax, int(r))
                         ret_status.append("moving")
-                        ret_err_code.append(int(r))
+                        ret_err_code.append(ErrorCodes.none)
                     elif int(r) == 1:
                         # self.update_wsmotorbuffersingle("motor_status", ax, "stopped")
                         # self.update_wsmotorbuffersingle("err_code", ax, int(r))
                         ret_status.append("stopped")
-                        ret_err_code.append(int(r))
+                        ret_err_code.append(ErrorCodes.none)
                     else:
                         # self.update_wsmotorbuffersingle("motor_status", ax, "stopped")
                         # self.update_wsmotorbuffersingle("err_code", ax, int(r))
                         # stopped due to error/issue
                         ret_status.append("stopped")
-                        ret_err_code.append(int(r))
+                        ret_err_code.append(ErrorCodes.none)
                 else:
                     ret_status.append("invalid")
-                    ret_err_code.append(-1)
+                    ret_err_code.append(ErrorCodes.unspecified)
 
             else:
                 ret_status.append("invalid")
-                ret_err_code.append(-1)
+                ret_err_code.append(ErrorCodes.not_available)
                 pass
 
         return {"motor_status": ret_status, "err_code": ret_err_code}

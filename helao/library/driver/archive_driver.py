@@ -25,7 +25,7 @@ from helaocore.model.sample import (
                                    object_to_sample
                                   )
 
-from helaocore.helper import print_message
+from helaocore.helper.print_message import print_message
 from helaocore.data.sample import UnifiedSampleDataAPI
 
 class CustomTypes(str, Enum):
