@@ -2095,21 +2095,19 @@ class PAL:
             self.IO_continue = False
             self.IO_do_meas = True
             # wait for first continue trigger
-            error = ErrorCodes.none
+            A.error_code = ErrorCodes.none
             while not self.IO_continue:
                 await asyncio.sleep(1)
-            error = self.IO_error
+            A.error_code = self.IO_error
             if self.active:
                 activeDict = self.active.action.as_dict()
             else:
                 activeDict = A.as_dict()
         else:
             self.base.print_message("PAL method already in progress.", error = True)
+            A.error_code = ErrorCodes.in_progress
             activeDict = A.as_dict()
-            error = ErrorCodes.in_progress
 
-        activeDict["data"] = {"error_code": error}
-        activeDict["error_code"] = error
         return activeDict
 
 
