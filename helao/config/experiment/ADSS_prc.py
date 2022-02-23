@@ -39,25 +39,25 @@ from helao.library.driver.pal_driver import Spacingmethod, PALtools
 
 EXPERIMENTS = __all__
 
-PSTAT_name = MachineModel(
+PSTAT_server = MachineModel(
                 server_name = "PSTAT",
                 machine_name = gethostname()
              ).json_dict()
 
-MOTOR_name = MachineModel(
+MOTOR_server = MachineModel(
                 server_name = "MOTOR",
                 machine_name = gethostname()
              ).json_dict()
 
-NI_name = MachineModel(
+NI_server = MachineModel(
                 server_name = "NI",
                 machine_name = gethostname()
              ).json_dict()
-ORCH_name = MachineModel(
+ORCH_server = MachineModel(
                 server_name = "ORCH",
                 machine_name = gethostname()
              ).json_dict()
-PAL_name = MachineModel(
+PAL_server = MachineModel(
                 server_name = "PAL",
                 machine_name = gethostname()
              ).json_dict()
@@ -96,7 +96,7 @@ def debug(pg_Obj: Experiment,
     sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "archive_custom_unload",
         "action_params": {
                         "custom": "cell1_we"
@@ -105,7 +105,7 @@ def debug(pg_Obj: Experiment,
         })
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "archive_custom_load",
         "action_params": {
                         "custom": "cell1_we",
@@ -118,7 +118,7 @@ def debug(pg_Obj: Experiment,
         })
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "archive_custom_query_sample",
         "action_params": {
                         "custom": "cell1_we",
@@ -130,7 +130,7 @@ def debug(pg_Obj: Experiment,
 
     # OCV
     sq.add_action({
-        "action_server": f"{PSTAT_name}",
+        "action_server": PSTAT_server,
         "action_name": "run_OCV",
         "action_params": {
                         "Tval": 10.0,
@@ -156,7 +156,7 @@ def ADSS_slave_unloadall_customs(pg_Obj: Experiment):
     sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "archive_custom_unloadall",
         "action_params": {
                         },
@@ -176,7 +176,7 @@ def ADSS_slave_load_solid(
     
     sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "archive_custom_load",
         "action_params": {
                         "custom": sq.pars.solid_custom_position,
@@ -199,7 +199,7 @@ def ADSS_slave_load_liquid(
     
     sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "archive_custom_load",
         "action_params": {
                         "custom": sq.pars.liquid_custom_position,
@@ -254,7 +254,7 @@ def ADSS_slave_startup(pg_Obj: Experiment,
 
     # turn pump off
     sq.add_action({
-        "action_server": f"{NI_name}",
+        "action_server": NI_server,
         "action_name": "pump",
         "action_params": {
                          "pump":"peripump",
@@ -265,7 +265,7 @@ def ADSS_slave_startup(pg_Obj: Experiment,
 
     # set pump flow forward
     sq.add_action({
-        "action_server": f"{NI_name}",
+        "action_server": NI_server,
         "action_name": "pump",
         "action_params": {
                          "pump":"direction",
@@ -281,7 +281,7 @@ def ADSS_slave_startup(pg_Obj: Experiment,
 
     # move to position
     sq.add_action({
-        "action_server": f"{MOTOR_name}",
+        "action_server": MOTOR_server,
         "action_name": "move",
         "action_params": {
                         "d_mm": [sq.pars.x_mm, sq.pars.y_mm],
@@ -314,7 +314,7 @@ def ADSS_slave_shutdown(pg_Obj: Experiment):
     # deep clean
     sq.add_action_list(ADSS_slave_clean_PALtool(pg_Obj, clean_tool = PALtools.LS3, clean_volume_ul = 500))
     # sq.add_action({
-    #     "action_server": f"{PAL_name}",
+    #     "action_server": PAL_server,
     #     "action_name": "PAL_deepclean",
     #     "action_params": {
     #                       "tool": PALtools.LS3,
@@ -328,7 +328,7 @@ def ADSS_slave_shutdown(pg_Obj: Experiment):
 
     # set pump flow backward
     sq.add_action({
-        "action_server": f"{NI_name}",
+        "action_server": NI_server,
         "action_name": "pump",
         "action_params": {
                          "pump":"direction",
@@ -339,7 +339,7 @@ def ADSS_slave_shutdown(pg_Obj: Experiment):
 
     # wait some time to pump out the liquid
     sq.add_action({
-        "action_server": f"{ORCH_name}",
+        "action_server": ORCH_server,
         "action_name": "wait",
         "action_params": {
                          "waittime":120,
@@ -354,7 +354,7 @@ def ADSS_slave_shutdown(pg_Obj: Experiment):
 
     # turn pump off
     sq.add_action({
-        "action_server": f"{NI_name}",
+        "action_server": NI_server,
         "action_name": "pump",
         "action_params": {
                          "pump":"peripump",
@@ -365,7 +365,7 @@ def ADSS_slave_shutdown(pg_Obj: Experiment):
 
     # set pump flow forward
     sq.add_action({
-        "action_server": f"{NI_name}",
+        "action_server": NI_server,
         "action_name": "pump",
         "action_params": {
                          "pump":"direction",
@@ -405,7 +405,7 @@ def ADSS_slave_engage(pg_Obj: Experiment):
 
     # engage
     sq.add_action({
-        "action_server": f"{MOTOR_name}",
+        "action_server": MOTOR_server,
         "action_name": "move",
         "action_params": {
                         "d_mm": [z_engage],
@@ -420,7 +420,7 @@ def ADSS_slave_engage(pg_Obj: Experiment):
 
     # seal
     sq.add_action({
-        "action_server": f"{MOTOR_name}",
+        "action_server": MOTOR_server,
         "action_name": "move",
         "action_params": {
                         "d_mm": [z_seal],
@@ -445,7 +445,7 @@ def ADSS_slave_disengage(pg_Obj: Experiment):
     sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action({
-        "action_server": f"{MOTOR_name}",
+        "action_server": MOTOR_server,
         "action_name": "move",
         "action_params": {
                         "d_mm": [z_home],
@@ -475,7 +475,7 @@ def ADSS_slave_clean_PALtool(pg_Obj: Experiment,
     
     # deep clean
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "PAL_deepclean",
         "action_params": {
                           "tool": sq.pars.clean_tool,
@@ -495,7 +495,7 @@ def ADSS_slave_fillfixed(pg_Obj: Experiment,
 
     # fill liquid, no wash (assume it was cleaned before)
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "PAL_fillfixed",
         "action_params": {
                           "tool": PALtools.LS3,
@@ -513,7 +513,7 @@ def ADSS_slave_fillfixed(pg_Obj: Experiment,
 
     # set pump flow forward
     sq.add_action({
-        "action_server": f"{NI_name}",
+        "action_server": NI_server,
         "action_name": "pump",
         "action_params": {
                           "pump":"direction",
@@ -524,7 +524,7 @@ def ADSS_slave_fillfixed(pg_Obj: Experiment,
 
     # turn on pump
     sq.add_action({
-        "action_server": f"{NI_name}",
+        "action_server": NI_server,
         "action_name": "pump",
         "action_params": {
                           "pump":"peripump",
@@ -536,7 +536,7 @@ def ADSS_slave_fillfixed(pg_Obj: Experiment,
 
     # wait some time to pump in the liquid
     sq.add_action({
-        "action_server": f"{ORCH_name}",
+        "action_server": ORCH_server,
         "action_name": "wait",
         "action_params": {
                           "waittime":sq.pars.filltime_sec,
@@ -552,7 +552,7 @@ def ADSS_slave_fill(pg_Obj: Experiment, fill_vol_ul: Optional[int] = 1000):
 
     # fill liquid, no wash (assume it was cleaned before)
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "PAL_fill",
         "action_params": {
                           "tool": PALtools.LS3,
@@ -585,7 +585,7 @@ def ADSS_slave_CA(pg_Obj: Experiment,
 
     # get sample for gamry
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "archive_custom_query_sample",
         "action_params": {
                         "custom": "cell1_we",
@@ -596,7 +596,7 @@ def ADSS_slave_CA(pg_Obj: Experiment,
     
     # OCV
     sq.add_action({
-        "action_server": f"{PSTAT_name}",
+        "action_server": PSTAT_server,
         "action_name": "run_OCV",
         "action_params": {
                         "Tval": sq.pars.OCV_duration_sec,
@@ -614,7 +614,7 @@ def ADSS_slave_CA(pg_Obj: Experiment,
 
     # take liquid sample
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "PAL_archive",
         "action_params": {
                           "tool": PALtools.LS3,
@@ -634,7 +634,7 @@ def ADSS_slave_CA(pg_Obj: Experiment,
 
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "archive_custom_query_sample",
         "action_params": {
                         "custom": "cell1_we",
@@ -648,7 +648,7 @@ def ADSS_slave_CA(pg_Obj: Experiment,
     potential = sq.pars.CA_potential-1.0*sq.pars.ref_vs_nhe-0.059*sq.pars.ph
     print(f"ADSS_slave_CA potential: {potential}")
     sq.add_action({
-        "action_server": f"{PSTAT_name}",
+        "action_server": PSTAT_server,
         "action_name": "run_CA",
         "action_params": {
                         "Vval": potential,
@@ -667,7 +667,7 @@ def ADSS_slave_CA(pg_Obj: Experiment,
 
     # take multiple scheduled liquid samples
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "PAL_archive",
         "action_params": {
                           "tool": PALtools.LS3,
@@ -688,7 +688,7 @@ def ADSS_slave_CA(pg_Obj: Experiment,
 
     # take last liquid sample and clean
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "PAL_archive",
         "action_params": {
                           "tool": PALtools.LS3,
@@ -733,7 +733,7 @@ def ADSS_slave_tray_unload(
     sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "archive_tray_export_json",
         "action_params": {
                           "tray": sq.pars.tray,
@@ -743,7 +743,7 @@ def ADSS_slave_tray_unload(
         })
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "archive_tray_export_csv",
         "action_params": {
                           "tray": sq.pars.tray,
@@ -753,7 +753,7 @@ def ADSS_slave_tray_unload(
         })
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "archive_tray_export_icpms",
         "action_params": {
                           "tray": sq.pars.tray,
@@ -767,7 +767,7 @@ def ADSS_slave_tray_unload(
 
 
     sq.add_action({
-        "action_server": f"{PAL_name}",
+        "action_server": PAL_server,
         "action_name": "archive_tray_unload",
         "action_params": {
                           "tray": sq.pars.tray,
