@@ -514,7 +514,7 @@ def makeApp(confPrefix, servKey):
                                        {'sample': sample.as_dict(),
                                         'error_code':error}
                                       )
-        active.action.action_params.update({"_fast_sample_in":sample.as_dict()})
+        active.action.action_params.update({"_fast_sample_in":[sample.as_dict()]})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -793,7 +793,7 @@ def makeApp(confPrefix, servKey):
         await active.enqueue_data_dflt(datadict = \
                                        {"sample": sample.as_dict(),
                                         "error_code":error})
-        active.action.action_params.update({"_fast_sample_in":sample.as_dict()})
+        active.action.action_params.update({"_fast_sample_in":[sample.as_dict()]})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
