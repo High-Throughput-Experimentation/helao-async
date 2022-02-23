@@ -19,6 +19,10 @@ config["servers"] = dict(
         port=8001, 
         group="orchestrator", 
         fast="async_orch2",
+        params=dict(
+            enable_op = True,
+            bokeh_port = 5002,
+        )
     ),
     ##########################################################################
     # Instrument Servers
@@ -167,18 +171,6 @@ config["servers"] = dict(
             doc_name = "ANEC Visualizer",
             # ws_nidaqmx="NI",
             ws_potentiostat = 'PSTAT',
-        )
-    ),
-    OP=dict(
-        host=hostip,
-        port=5002,
-        group="operator",
-        bokeh="async_operator",
-        params = dict(
-            doc_name = "ANEC Operator",
-            orch = 'ORCH',
-            # data_server = "data",
-            # servicemode=False,
         )
     ),
     # aligner_vis=dict(

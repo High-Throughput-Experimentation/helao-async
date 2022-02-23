@@ -586,7 +586,7 @@ def makeBokehApp(doc, confPrefix, servKey):
 
     # create visualizer objects for defined instruments
 
-    if "ws_potentiostat" in app.srv_config:
+    if "ws_potentiostat" in app.server_params:
         potvis = C_potvis(app.vis)
         if potvis.show:
             visoloop.create_task(potvis.IOloop_data())
@@ -596,7 +596,7 @@ def makeBokehApp(doc, confPrefix, servKey):
         potvis = []
 
 
-    if "ws_nidaqmx" in app.srv_config:
+    if "ws_nidaqmx" in app.server_params:
         NImaxvis = C_nidaqmxvis(app.vis)
         if NImaxvis.show:
             visoloop.create_task(NImaxvis.IOloop_data())

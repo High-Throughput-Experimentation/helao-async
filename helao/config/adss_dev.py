@@ -24,6 +24,10 @@ config["servers"] = dict(
         port=8001, 
         group="orchestrator", 
         fast="async_orch2",
+        params=dict(
+            enable_op = True,
+            bokeh_port = 5002,
+        )
         # cmd_print = False
     ),
     ##########################################################################
@@ -39,45 +43,45 @@ config["servers"] = dict(
     #     params=dict(
     #     ),
     # ),
-    # MOTOR=dict(
-    #     host=hostip,
-    #     port=8003,
-    #     group="action",
-    #     fast="galil_motion",
-    #     # cmd_print=False,
-    #     params=dict(
-    #         Transfermatrix = [[1,0,0],[0,1,0],[0,0,1]], # default Transfermatrix for plate calibration
+    MOTOR=dict(
+        host=hostip,
+        port=8003,
+        group="action",
+        fast="galil_motion",
+        # cmd_print=False,
+        params=dict(
+            Transfermatrix = [[1,0,0],[0,1,0],[0,0,1]], # default Transfermatrix for plate calibration
             
-    #         # 4x6 plate
-    #         #M_instr = [[1,0,0,-76.525],[0,1,0,-50.875],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
-    #         # 100mm wafer
-    #         M_instr = [[1,0,0,-76.525+(3*25.4-50)-0.5+0.75+1.5+0.25],[0,1,0,-50.875+2.71+5-3+1],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
+            # 4x6 plate
+            #M_instr = [[1,0,0,-76.525],[0,1,0,-50.875],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
+            # 100mm wafer
+            M_instr = [[1,0,0,-76.525+(3*25.4-50)-0.5+0.75+1.5+0.25],[0,1,0,-50.875+2.71+5-3+1],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
 
-    #         count_to_mm=dict(
-    #             A=1.0/15835.31275,#1.0/15690.3,
-    #             B=1.0/6398.771436,#1.0/6395.45,
-    #             C=1.0/6396.315722,#1.0/6395.45,
-    #             D=1.0/3154.787,#1.0/3154.787,
-    #         ),
-    #         galil_ip_str="192.168.200.23",
-    #         def_speed_count_sec=10000,
-    #         max_speed_count_sec=25000,
-    #         ipstr="192.168.200.23",
-    #         axis_id=dict(
-    #             x="C",
-    #             y="B",
-    #             z="A",
-    #             Rz="D",
-    #             ),
-    #         axis_zero=dict(
-    #             A=0.0, #z
-    #             B=52.0, #y
-    #             C=77.0, #x
-    #             D=0.0, #Rz
-    #             ),
-    #         timeout = 10*60, # timeout for axis stop in sec
-    #     )
-    # ),
+            count_to_mm=dict(
+                A=1.0/15835.31275,#1.0/15690.3,
+                B=1.0/6398.771436,#1.0/6395.45,
+                C=1.0/6396.315722,#1.0/6395.45,
+                D=1.0/3154.787,#1.0/3154.787,
+            ),
+            galil_ip_str="192.168.200.23",
+            def_speed_count_sec=10000,
+            max_speed_count_sec=25000,
+            ipstr="192.168.200.23",
+            axis_id=dict(
+                x="C",
+                y="B",
+                z="A",
+                Rz="D",
+                ),
+            axis_zero=dict(
+                A=0.0, #z
+                B=52.0, #y
+                C=77.0, #x
+                D=0.0, #Rz
+                ),
+            timeout = 10*60, # timeout for axis stop in sec
+        )
+    ),
     PSTAT=dict(
         host=hostip,
         port=8004,
@@ -253,19 +257,6 @@ config["servers"] = dict(
             doc_name = "ADSS visualizer",
             ws_nidaqmx="NI",
             ws_potentiostat = 'PSTAT',
-        )
-    ),
-    OP=dict(
-        host=hostip,
-        port=5002,
-        group="operator",
-        bokeh="async_operator",
-        params = dict(
-            doc_name = "ADSS Operator",
-            orch = 'ORCH',
-            pal = 'PAL',
-            # data_server = "data",
-            # servicemode=False,
         )
     ),
     # aligner_vis=dict(
