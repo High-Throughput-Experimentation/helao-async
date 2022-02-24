@@ -14,6 +14,9 @@ import time
 import asyncio
 from enum import Enum
 from functools import partial
+import json
+import os
+from socket import gethostname
 
 from bokeh.server.server import Server
 from bokeh.models import ColumnDataSource, CheckboxButtonGroup, RadioButtonGroup
@@ -56,31 +59,41 @@ class Galil:
         self.config_dict = action_serv.server_cfg["params"]
 
 
+
+        self.file_backup_transfermatrix = None
+        if self.base.states_root is not None:
+            self.file_backup_transfermatrix = \
+                os.path.join(self.base.states_root, 
+                             f"{gethostname()}_motor_calib.json")
+ 
+        self.transfermatrix = \
+        self.load_transfermatrix(file = self.file_backup_transfermatrix)
+        self.save_transfermatrix(file = self.file_backup_transfermatrix)
+
+
+
         # need to check if config settings exist
         # else need to create empty ones
-        if "axis_id" not in self.config_dict:
-            self.config_dict["axis_id"] = dict()
+        self.axis_id = self.config_dict.get("axis_id", dict())
 
-        # this is only here for testing purposes to supply a matrix
-        if "Transfermatrix" not in self.config_dict:
-            self.config_dict["Transfermatrix"] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
-
-        if "M_instr" not in self.config_dict:
-            self.config_dict["M_instr"] = [
+        self.M_instr = self.config_dict.get("M_instr", [
                 [1, 0, 0, 0],
                 [0, 1, 0, 0],
                 [0, 0, 1, 0],
                 [0, 0, 0, 1],
-            ]
+            ])
 
-        self.xyTransfermatrix = np.matrix(self.config_dict["Transfermatrix"])
+        self.xyTransfermatrix = np.matrix([
+                                           [1, 0, 0],
+                                           [0, 1, 0],[0, 0, 1]
+                                          ])
 
         # Mplatexy is identity matrix by default
         self.transform = TransformXY(self.base,
-            self.config_dict["M_instr"], self.config_dict["axis_id"]
+            self.M_instr, self.axis_id
         )
         # only here for testing: will overwrite the default identity matrix
-        self.transform.update_Mplatexy(self.config_dict["Transfermatrix"])
+        self.transform.update_Mplatexy(Mxy = self.transfermatrix)
 
         # if this is the main instance let us make a galil connection
         self.g = gclib.py()
@@ -114,7 +127,10 @@ class Galil:
 
         self.cycle_lights = False
 
+        # block gamry
         self.blocked = False
+        # is motor move busy?
+        self.motor_busy = False
         self.bokehapp = None
         self.aligner = None
         self.aligner_enabled = self.base.server_params.get("enable_aligner", False)
@@ -206,7 +222,7 @@ class Galil:
             # move back to configured center coordinates
             retc2 = await self._motor_move(
                 d_mm = [
-                    self.config_dict["axis_zero"][self.config_dict["axis_id"][ax]]
+                    self.config_dict["axis_zero"][self.axis_id[ax]]
                     for ax in axis
                 ],
                 axis = axis,
@@ -312,6 +328,19 @@ class Galil:
                           mode,
                           transformation
                          ):
+        if self.motor_busy:
+            return {
+                "moved_axis": None,
+                "speed": None,
+                "accepted_rel_dist": None,
+                "supplied_rel_dist": None,
+                "err_dist": None,
+                "err_code": ErrorCodes.in_progress,
+                "counts": None,
+            }
+            
+        self.motor_busy = True
+
         # in order to enable easy mode for swagger:
         if type(axis) is not list:
             axis = [axis]
@@ -475,6 +504,7 @@ class Galil:
         timeofmove = []
 
         if self.base.actionserver.estop:
+            self.motor_busy = False
             return {
                 "moved_axis": None,
                 "speed": None,
@@ -493,8 +523,8 @@ class Galil:
 
             # first we check if we have the right axis specified
             # if 1:
-            if ax in self.config_dict["axis_id"]:
-                axl = self.config_dict["axis_id"][ax]
+            if ax in self.axis_id:
+                axl = self.axis_id[ax]
             else:
                 self.base.print_message("motor setup error",
                                         error = True)
@@ -661,6 +691,7 @@ class Galil:
 
 
         # one return for all axis
+        self.motor_busy = False
         return {
             "moved_axis": ret_moved_axis,
             "speed": ret_speed,
@@ -706,7 +737,7 @@ class Galil:
         # and then map that to xyz so it is humanly readable
         axlett = "ABCDEFGH"
         axlett = axlett[0 : len(q.split(","))]
-        inv_axis_id = {d: v for v, d in self.config_dict["axis_id"].items()}
+        inv_axis_id = {d: v for v, d in self.axis_id.items()}
         ax_abc_to_xyz = {l: inv_axis_id[l] for i, l in enumerate(axlett) if l in inv_axis_id}
         # this puts the counts back to motor mm
         pos = {
@@ -748,8 +779,8 @@ class Galil:
         ret_err_code = []
         qdict = dict(zip(axlett, q.split(", ")))
         for ax in axis:
-            if ax in self.config_dict["axis_id"]:
-                axl = self.config_dict["axis_id"].get(ax, None)
+            if ax in self.axis_id:
+                axl = self.axis_id.get(ax, None)
                 if axl in qdict:
                     r = qdict[axl]
                     if int(r) == 0:
@@ -815,8 +846,8 @@ class Galil:
         if type(axis) is not list:
             axis = [axis]
         for ax in axis:
-            if ax in self.config_dict["axis_id"]:
-                axl = self.config_dict["axis_id"][ax]
+            if ax in self.axis_id:
+                axl = self.axis_id[ax]
                 self.c(f"ST{axl}")
 
         ret = await self.query_axis_moving(axis)
@@ -838,8 +869,8 @@ class Galil:
 
         for ax in axis:
 
-            if ax in self.config_dict["axis_id"]:
-                axl = self.config_dict["axis_id"][ax]
+            if ax in self.axis_id:
+                axl = self.axis_id[ax]
             else:
                 continue
                 # ret = self.query_axis_moving(axis)
@@ -869,8 +900,8 @@ class Galil:
 
         for ax in axis:
 
-            if ax in self.config_dict["axis_id"]:
-                axl = self.config_dict["axis_id"][ax]
+            if ax in self.axis_id:
+                axl = self.axis_id[ax]
             else:
                 continue
                 # ret = self.query_axis_moving(axis)
@@ -895,7 +926,7 @@ class Galil:
 
 
     async def get_all_axis(self):
-        return [ax for ax in self.config_dict["axis_id"]]
+        return [ax for ax in self.axis_id]
 
     async def get_all_digital_out(self):
         return [port for port in self.config_dict["Dout_id"]]
@@ -925,6 +956,51 @@ class Galil:
         # await self.interrupt_q.put(self.orchstatusmodel)
         if self.aligner_enabled and self.aligner:
             await self.aligner.motorpos_q.put(msg)
+
+
+    def save_transfermatrix(self, file):
+        if file is not None:
+            filedir, filename = os.path.split(file)
+            self.base.print_message(f"saving calib '{filename}' "
+                                    f"to '{filedir}'", info = True)
+            if not os.path.exists(filedir):
+                os.makedirs(filedir, exist_ok=True)
+
+            with open(file, "w") as f:
+                # f.write(json.dumps(f"{self.TransferMatrix}"))
+                f.write(json.dumps(self.transfermatrix.tolist()))
+
+
+    def load_transfermatrix(self, file):
+        matrix = np.matrix(
+                      [
+                       [1,0,0],
+                       [0,1,0],
+                       [0,0,1]
+                      ]
+                     )
+        if os.path.exists(file):
+            with open(file, "r") as f:
+                try:
+                    data = f.readline()
+                    new_matrix = np.matrix(json.loads(data))
+                    if new_matrix.shape != matrix.shape:
+                        self.base.print_message(f"matrix {new_matrix} "
+                                               "has wrong shape",
+                                               error = True)
+                        return matrix
+                    else:
+                        self.base.print_message(f"loaded matrix {new_matrix}")
+                        return new_matrix
+                    
+                except Exception:
+                    self.base.print_message(f"error loading matrix for '{file}'",
+                                           error = True)
+                    return matrix
+        else:
+            self.base.print_message(f"matrix file '{file}' not found",
+                                   error = True)
+            return matrix
 
 
 class MoveModes(str, Enum):
@@ -1380,13 +1456,14 @@ class Aligner:
         self.manual_step = 1 # mm
         self.mouse_control = False
         # initial instrument specific TransferMatrix
-        self.initialTransferMatrix = np.matrix(
-                                               [
-                                                [1,0,0],
-                                                [0,1,0],
-                                                [0,0,1]
-                                               ]
-                                              )
+        self.initialTransferMatrix = self.motor.transfermatrix
+        # self.initialTransferMatrix = np.matrix(
+        #                                        [
+        #                                         [1,0,0],
+        #                                         [0,1,0],
+        #                                         [0,0,1]
+        #                                        ]
+        #                                       )
         self.cutoff = np.array(self.config_dict.get("cutoff",6))
         
         # this is now used for plate to motor transformation and will be refined
@@ -2450,8 +2527,8 @@ class Aligner:
             asyncio.gather(
                 self.motor_move(
                     mode = MoveModes.relative,
-                    x = self.manual_step*event.delta_x/100,
-                    y = self.manual_step*event.delta_y/100
+                    x = -self.manual_step*event.delta_x/100,
+                    y = -self.manual_step*event.delta_y/100
                 )
             )
 
@@ -2523,17 +2600,32 @@ class Aligner:
                                   )
             # add Marker positions to list
             self.update_Markerdisplay(selMarker)
-    
-    
+
+
     async def finish_alignment(self, newTransfermatrix, errorcode):
         """sends finished alignment back to FastAPI server"""
         if self.active:
+            self.motor.transfermatrix = newTransfermatrix
+            self.motor.transform.update_Mplatexy(Mxy = self.motor.transfermatrix)
+            self.motor.save_transfermatrix(file = self.motor.file_backup_transfermatrix)
+            self.motor.save_transfermatrix(file = os.path.join(self.motor.base.db_root, "plate_calib",
+                             f"{gethostname()}_plate_{self.plateid}_calib.json")
+            )
+            await self.active.write_file(
+                file_type = "plate_calib",
+                filename = f"{gethostname()}_plate_{self.plateid}_calib.json",
+                output_str = json.dumps(self.motor.transfermatrix.tolist()),
+                # header = ";".join(["global_sample_label", "Survey Runs", "Main Runs", "Rack", "Vial", "Dilution Factor"]),
+                # sample_str = None
+                )
+
+
             await self.active.enqueue_data(datamodel = \
                    DataModel(
                              data = {self.active.action.file_conn_keys[0]:\
                                         {
-                                            "Transfermatrix":f"{newTransfermatrix}",
-                                            "oldTransfermatrix":f"{self.initialTransferMatrix}",
+                                            "Transfermatrix":self.motor.transfermatrix.tolist(),
+                                            "oldTransfermatrix":self.initialTransferMatrix.tolist(),
                                             "errorcode":f"{errorcode}"
                                         }
                                      },
@@ -2557,7 +2649,8 @@ class Aligner:
 
     async def motor_move(self, mode, x, y):
         """moves the motor by submitting a request to aligner server"""
-        if self.g_aligning:
+        if self.g_aligning \
+        and not self.motor.motor_busy:
             _ = await self.motor._motor_move(
                 d_mm = [x, y],
                 axis = ["x", "y"],
@@ -2565,6 +2658,8 @@ class Aligner:
                 mode = mode,#MoveModes.absolute,
                 transformation = TransformationModes.platexy
             )
+        elif self.motor.motor_busy:
+            self.vis.print_message("motor is busy", error = True)
 
 
     async def motor_getxy(self):
@@ -2842,6 +2937,7 @@ class Aligner:
 
     def init_mapaligner(self):
         """resets all parameters"""
+        self.initialTransferMatrix = self.motor.transfermatrix
         self.TransferMatrix = self.initialTransferMatrix
         self.calib_ptsplate = [
                                (None, None,1),
@@ -2987,7 +3083,7 @@ class Aligner:
                     # TODO: test on other platemap
                     for fraclet in ("A", "B", "C", "D", "E", "F", "G", "H"):
                         if self.pmdata[PMnum[0]][fraclet] > 0:
-                            buf = "%s%s%d " % (buf,fraclet, self.pmdata[PMnum[0]][fraclet]*100)
+                            buf = f"{buf}{fraclet}{self.pmdata[PMnum[0]][fraclet]*100} "
                     if len(buf) == 0:
                         buf = "-"
                     self.MarkerFraction[0] = buf
