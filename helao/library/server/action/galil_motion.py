@@ -18,9 +18,9 @@ from fastapi import Body
 
 
 from helao.library.driver.galil_motion_driver import (
-                                                      move_modes, 
-                                                      transformation_mode,
-                                                      galil
+                                                      MoveModes, 
+                                                      TransformationModes,
+                                                      Galil
                                                      )
 from helaocore.server.base import makeActionServ
 from helaocore.helper.make_str_enum import make_str_enum
@@ -37,7 +37,7 @@ def makeApp(confPrefix, servKey):
         server_title=servKey, 
         description="Galil motion server", 
         version=2.0, 
-        driver_class=galil
+        driver_class=Galil
     )
     
     dev_axis = app.server_params.get("axis_id",dict())
@@ -62,6 +62,18 @@ def makeApp(confPrefix, servKey):
                {"setref": await app.driver.setaxisref()})
             finished_action = await active.finish()
             return finished_action.as_dict()
+
+
+    @app.post(f"/{servKey}/run_aligner")
+    async def run_aligner(
+                                           action: Optional[Action] = \
+                                                   Body({}, embed=True),
+                                           plateid: Optional[int] = None
+                                          ):
+        """starts the plate aligning process, matrix is return when fully done"""
+        A = await app.base.setup_action()
+        active_dict = await app.driver.run_aligner(A)
+        return active_dict
 
 
     # parse as {'M':json.dumps(np.matrix(M).tolist()),'platexy':json.dumps(np.array(platexy).tolist())}
@@ -162,8 +174,8 @@ def makeApp(confPrefix, servKey):
                        d_mm: Optional[List[float]] = [0,0],
                        axis: Optional[List[str]] = ["x","y"],
                        speed: Optional[int] = None,
-                       mode: Optional[move_modes] = "relative",
-                       transformation: Optional[transformation_mode] = "motorxy"  # default, nothing to do
+                       mode: Optional[MoveModes] = "relative",
+                       transformation: Optional[TransformationModes] = "motorxy"  # default, nothing to do
                       ):
             """Move a apecified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
             Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.
@@ -198,8 +210,8 @@ def makeApp(confPrefix, servKey):
                            axis: Optional[dev_axisitems] = None,
                            d_mm: Optional[float] = 0,
                            speed: Optional[int] = None,
-                           mode: Optional[move_modes] = "relative",
-                           transformation: Optional[transformation_mode] = "motorxy"  # default, nothing to do
+                           mode: Optional[MoveModes] = "relative",
+                           transformation: Optional[TransformationModes] = "motorxy"  # default, nothing to do
                           ):
             """Move a apecified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
             Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.

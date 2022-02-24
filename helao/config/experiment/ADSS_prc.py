@@ -33,7 +33,7 @@ from helaocore.model.sample import (
                                    )
 from helaocore.model.machine import MachineModel
 
-from helao.library.driver.galil_motion_driver import move_modes, transformation_mode
+from helao.library.driver.galil_motion_driver import MoveModes, TransformationModes
 from helao.library.driver.pal_driver import Spacingmethod, PALtools
 
 
@@ -286,8 +286,8 @@ def ADSS_slave_startup(pg_Obj: Experiment,
         "action_params": {
                         "d_mm": [sq.pars.x_mm, sq.pars.y_mm],
                         "axis": ["x", "y"],
-                        "mode": move_modes.absolute,
-                        "transformation": transformation_mode.platexy,
+                        "mode": MoveModes.absolute,
+                        "transformation": TransformationModes.platexy,
                         },
         "save_act": debug_save_act,
         "save_data": debug_save_data,
@@ -410,8 +410,8 @@ def ADSS_slave_engage(pg_Obj: Experiment):
         "action_params": {
                         "d_mm": [z_engage],
                         "axis": ["z"],
-                        "mode": move_modes.absolute,
-                        "transformation": transformation_mode.instrxy,
+                        "mode": MoveModes.absolute,
+                        "transformation": TransformationModes.instrxy,
                         },
         "save_act": debug_save_act,
         "save_data": debug_save_data,
@@ -425,8 +425,8 @@ def ADSS_slave_engage(pg_Obj: Experiment):
         "action_params": {
                         "d_mm": [z_seal],
                         "axis": ["z"],
-                        "mode": move_modes.absolute,
-                        "transformation": transformation_mode.instrxy,
+                        "mode": MoveModes.absolute,
+                        "transformation": TransformationModes.instrxy,
                         },
         "save_act": debug_save_act,
         "save_data": debug_save_data,
@@ -450,8 +450,8 @@ def ADSS_slave_disengage(pg_Obj: Experiment):
         "action_params": {
                         "d_mm": [z_home],
                         "axis": ["z"],
-                        "mode": move_modes.absolute,
-                        "transformation": transformation_mode.instrxy,
+                        "mode": MoveModes.absolute,
+                        "transformation": TransformationModes.instrxy,
                         },
         "save_act": debug_save_act,
         "save_data": debug_save_data,
