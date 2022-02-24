@@ -34,7 +34,7 @@ class cmd_exception(ValueError):
         self.args = arg
 
 
-class galil:
+class Galil:
     def __init__(self, action_serv: Base):
 
         self.base = action_serv

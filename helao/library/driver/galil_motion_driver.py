@@ -5,31 +5,43 @@ library. Class methods are specific to Galil devices. Device configuration is re
 config/config.py. 
 """
 
-__all__ = ["galil",
-           "move_modes",
-           "transformation_mode"]
+__all__ = ["Galil",
+           "MoveModes",
+           "TransformationModes"]
 
-import os
 import numpy as np
 import time
-import pathlib
 import asyncio
 from enum import Enum
-from typing import List
+from functools import partial
+
+from bokeh.server.server import Server
+from bokeh.models import ColumnDataSource, CheckboxButtonGroup, RadioButtonGroup
+from bokeh.models.widgets import Paragraph
+from bokeh.plotting import figure
+from bokeh.models.widgets import Div
+from bokeh.layouts import layout, Spacer
+from bokeh.models import Button, TextAreaInput, TextInput, Select, CheckboxGroup, Toggle, CustomJS
+from bokeh.events import ButtonClick, DoubleTap
+from bokeh.models import TapTool
+
 
 from helaocore.server.base import Base
 from helaocore.error import ErrorCodes
 from helaocore.schema import Action
 from helaocore.error import ErrorCodes
+from helaocore.server.vis import Vis
+from helaocore.server.make_vis_serv import makeVisServ
+from helaocore.data.legacy import HTELegacyAPI
+from helaocore.model.active import ActiveParams
+from helaocore.model.file import FileConnParams, HloHeaderModel
+from helaocore.model.data import DataModel
 
-
-driver_path = os.path.dirname(__file__)
+# driver_path = os.path.dirname(__file__)
 
 # install galil driver first
 # (helao) c:\Program Files (x86)\Galil\gclib\source\wrappers\python>python setup.py install
 import gclib
-
-# pathlib.Path(os.path.join(helao_root, 'visualizer\styles.css')).read_text()
 
 
 class cmd_exception(ValueError):
@@ -37,7 +49,7 @@ class cmd_exception(ValueError):
         self.args = arg
 
 
-class galil:
+class Galil:
     def __init__(self, action_serv: Base):
 
         self.base = action_serv
@@ -64,7 +76,7 @@ class galil:
         self.xyTransfermatrix = np.matrix(self.config_dict["Transfermatrix"])
 
         # Mplatexy is identity matrix by default
-        self.transform = transformxy(self.base,
+        self.transform = TransformXY(self.base,
             self.config_dict["M_instr"], self.config_dict["axis_id"]
         )
         # only here for testing: will overwrite the default identity matrix
@@ -95,10 +107,57 @@ class galil:
                     self.c(f"{ac}{axl}={av}")
         except Exception:
             self.base.print_message(
-                "severe Galil error ... please power cycle Galil and try again", error = True
+                "severe Galil error ... "
+                "please power cycle Galil and try again",
+                error = True
             )
 
         self.cycle_lights = False
+
+        self.blocked = False
+        self.bokehapp = None
+        self.aligner = None
+        self.aligner_enabled = self.base.server_params.get("enable_aligner", False)
+        if self.aligner_enabled:
+            # asyncio.gather(self.init_Gamry(self.Gamry_devid))
+            self.start_aligner()
+
+    
+
+
+    def start_aligner(self):
+        servHost = self.base.server_cfg["host"]
+        servPort = self.base.server_params.get(
+            "bokeh_port",
+            self.base.server_cfg["port"]+1000
+        )
+        servPy = "Aligner"
+
+
+        self.bokehapp = Server(
+                          {f"/{servPy}": partial(self.makeBokehApp, motor=self)},
+                          port=servPort, 
+                          address=servHost, 
+                          allow_websocket_origin=[f"{servHost}:{servPort}"]
+                          )
+        self.bokehapp.start()
+        self.bokehapp.io_loop.add_callback(self.bokehapp.show, f"/{servPy}")
+
+
+    def makeBokehApp(self, doc, motor):
+        app = makeVisServ(
+            config = self.base.world_cfg,
+            server_key = self.base.server.server_name,
+            doc = doc,
+            server_title = self.base.server.server_name,
+            description = f"{self.base.technique_name} Aligner",
+            version=2.0,
+            driver_class=None,
+        )
+    
+        doc.aligner = Aligner(app.vis, motor)
+        return doc
+
 
 
     async def setaxisref(self):
@@ -118,56 +177,44 @@ class galil:
         if axis is not None:
             # go slow to find the same position every time
             # first a fast move to find the switch
-            retc1 = await self.motor_move(
-                Action({
-                        "action_params": {
-                                "d_mm": [0 for ax in axis],
-                                "axis": axis,
-                                "speed": None,
-                                "mode": move_modes.homing,
-                                "transformation": transformation_mode.motorxy,
-                                },
-                        })
-            )
-            # move back 2mm
-            retc1 = await self.motor_move(
-                Action({
-                        "action_params": {
-                                "d_mm": [2 for ax in axis],
-                                "axis": axis,
-                                "speed": None,
-                                "mode": move_modes.relative,
-                                "transformation": transformation_mode.motorxy,
-                                },
-                        })
-            )
-            # approach switch again very slow to get better zero position
-            retc1 = await self.motor_move(
-                Action({
-                        "action_params": {
-                                "d_mm": [0 for ax in axis],
-                                "axis": axis,
-                                "speed": 1000,
-                                "mode": move_modes.homing,
-                                "transformation": transformation_mode.motorxy,
-                                },
-                        })
+            retc1 = await self._motor_move(
+                d_mm = [0 for ax in axis],
+                axis = axis,
+                speed = None,
+                mode = MoveModes.homing,
+                transformation = TransformationModes.motorxy
             )
 
-            retc2 = await self.motor_move(
-                Action({
-                        "action_params": {
-                                "d_mm":[
+            # move back 2mm
+            retc1 = await self._motor_move(
+                d_mm = [2 for ax in axis],
+                axis = axis,
+                speed = None,
+                mode = MoveModes.relative,
+                transformation = TransformationModes.motorxy
+            )
+
+            # approach switch again very slow to get better zero position
+            retc1 = await self._motor_move(
+                d_mm = [0 for ax in axis],
+                axis = axis,
+                speed = 1000,
+                mode = MoveModes.homing,
+                transformation = TransformationModes.motorxy
+            )
+
+            # move back to configured center coordinates
+            retc2 = await self._motor_move(
+                d_mm = [
                     self.config_dict["axis_zero"][self.config_dict["axis_id"][ax]]
                     for ax in axis
-                                        ],
-                                "axis": axis,
-                                "speed": None,
-                                "mode": move_modes.relative,
-                                "transformation": transformation_mode.motorxy,
-                                },
-                        })
+                ],
+                axis = axis,
+                speed = None,
+                mode = MoveModes.relative,
+                transformation = TransformationModes.motorxy
             )
+
 
             # set absolute zero to current position
             q = self.c("TP")  # query position of all axis
@@ -188,54 +235,107 @@ class galil:
             return "error"
 
 
+    async def run_aligner(self, A: Action):
+        if not self.blocked:
+            if not self.aligner_enabled \
+            or not self.aligner:
+                A.error_code = ErrorCodes.not_available
+                activeDict = A.as_dict()
+            else:
+                self.blocked = True
+                self.aligner.plateid = A.action_params["plateid"]
+                self.aligner.active = await self.base.contain_action(
+                    ActiveParams(
+                                 action = A,
+                                 file_conn_params_dict = {self.base.dflt_file_conn_key():
+                                     FileConnParams(
+                                         # use dflt file conn key for first
+                                         # init
+                                                   file_conn_key = \
+                                                       self.base.dflt_file_conn_key(),
+                                                    sample_global_labels=[],
+                                                    json_data_keys = [
+                                                        "Transfermatrix",
+                                                        "oldTransfermatrix",
+                                                        "errorcode"
+                                                    ],
+                                                    file_type="aligner_helao__file",
+                                                    # hloheader = HloHeaderModel(
+                                                    #     optional = None
+                                                    # ),
+                                                   )
+                                     }
+                    )
+                )
+                self.aligner.g_aligning = True
+                activeDict = self.aligner.active.action.as_dict()
+        else:
+            A.error_code = ErrorCodes.in_progress
+            activeDict = A.as_dict()
+        return activeDict
+
+
     async def motor_move(self, active):
         d_mm = active.action.action_params.get("d_mm",[])
         axis = active.action.action_params.get("axis",[])
         speed = active.action.action_params.get("speed", None)
-        mode = active.action.action_params.get("mode",move_modes.absolute)
-        transformation = active.action.action_params.get("transformation",transformation_mode.motorxy)
-        
-        # in order to enable easy mode fore swagger:
+        mode = active.action.action_params.get("mode",MoveModes.absolute)
+        transformation = active.action.action_params.get("transformation",TransformationModes.motorxy)
+        if not self.blocked:
+            self.blocked = True
+            retval = await self._motor_move(
+                d_mm = d_mm,
+                axis = axis,
+                speed = speed,
+                mode = mode,
+                transformation = transformation
+            ) 
+            self.blocked = False
+            return retval
+        else:
+            return {
+                "moved_axis": None,
+                "speed": None,
+                "accepted_rel_dist": None,
+                "supplied_rel_dist": None,
+                "err_dist": None,
+                "err_code": ErrorCodes.in_progress,
+                "counts": None,
+            }
+
+
+    async def _motor_move(
+                          self, 
+                          d_mm,
+                          axis,
+                          speed,
+                          mode,
+                          transformation
+                         ):
+        # in order to enable easy mode for swagger:
         if type(axis) is not list:
             axis = [axis]
         if type(d_mm) is not list:
             d_mm = [d_mm]
-
-        
         
         error =  ErrorCodes.none
 
         stopping = False  # no stopping of any movement by other actions
-        mode = move_modes(mode)
-        transformation = transformation_mode(transformation)
-        # this function moves the motor by a set amount of milimeters
-        # you have to specify the axis,
-        # if no axis is specified this function throws an error
-        # if no speed is specified we use the default slow speed
-        # as specified in the setupdict
-
-        # example: move the motor 5mm to the positive direction:
-        # motor_move(5,'x')
-        # example: move the motor to absolute 0 mm
-        # motor_move(5,'x',mode='absolute')
-        # home the motor at low speed (the distance is not used)
-        # motor_move(5,'x',mode='homing',speed=10000)
-        # multi axis move:
-        # motor_move([5, 10],['x', 'y'],mode='absolute',speed=10000)
-        # the server call would look like:
-        # http://127.0.0.1:8001/motor/set/move?d_mm=-20&axis=x&mode=relative
-        # http://127.0.0.1:8001/motor/set/move?d_mm=-20&axis=x&mode=absolute
+        mode = MoveModes(mode)
+        transformation = TransformationModes(transformation)
 
         # need to get absolute motor position first
         tmpmotorpos = await self.query_axis_position(
             await self.get_all_axis()
         )
-        self.base.print_message(f"current absolute motor positions: {tmpmotorpos}")
+        self.base.print_message(f"current absolute motor positions: "
+                                f"{tmpmotorpos}")
         # don't use dicts as we do math on these vectors
-        current_positionvec = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # x, y, z, Rx, Ry, Rz
+         # x, y, z, Rx, Ry, Rz
+        current_positionvec = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         # map the request to this
-        #    req_positionvec = [0.0,0.0,0.0,0.0,0.0,0.0] # x, y, z, Rx, Ry, Rz
-        req_positionvec = [None, None, None, None, None, None]  # x, y, z, Rx, Ry, Rz
+        # x, y, z, Rx, Ry, Rz
+        req_positionvec = [None, None, None, None, None, None]
 
         reqdict = dict(zip(axis, d_mm))
         self.base.print_message(f"requested position ({mode}): {reqdict}")
@@ -253,10 +353,10 @@ class galil:
         self.base.print_message(f"motor position vector: {current_positionvec[0:3]}")
         self.base.print_message(f"requested position vector ({mode}) {req_positionvec}")
 
-        if transformation == transformation_mode.motorxy:
+        if transformation == TransformationModes.motorxy:
             # nothing to do
             self.base.print_message(f"motion: got motorxy ({mode}), no transformation necessary")
-        elif transformation == transformation_mode.platexy:
+        elif transformation == TransformationModes.platexy:
             self.base.print_message(f"motion: got platexy ({mode}), converting to motorxy")
             motorxy = [0, 0, 1]
             motorxy[0] = current_positionvec[0]
@@ -264,7 +364,7 @@ class galil:
             current_platexy = self.transform.transform_motorxy_to_platexy(motorxy)
             # transform.transform_motorxyz_to_instrxyz(current_positionvec[0:3])
             self.base.print_message(f"current plate position (calc from motor): {current_platexy}")
-            if mode == move_modes.relative:
+            if mode == MoveModes.relative:
                 new_platexy = [0, 0, 1]
 
                 if req_positionvec[0] is not None:
@@ -284,8 +384,8 @@ class galil:
                 self.base.print_message(f"new motorxy (abs): {new_motorxy}")
                 axis = ["x", "y"]
                 d_mm = [d for d in new_motorxy[0:2]]
-                mode = move_modes.absolute
-            elif mode == move_modes.absolute:
+                mode = MoveModes.absolute
+            elif mode == MoveModes.absolute:
                 new_platexy = [0, 0, 1]
 
                 if req_positionvec[0] is not None:
@@ -306,7 +406,7 @@ class galil:
                 axis = ["x", "y"]
                 d_mm = [d for d in new_motorxy[0:2]]
 
-            elif mode == move_modes.homing:
+            elif mode == MoveModes.homing:
                 # not coordinate conversoion needed as these are not used (but length is still checked)
                 pass
 
@@ -316,7 +416,7 @@ class galil:
                     xyvec[0] = d_mm[0]
                 if ax == "y":
                     xyvec[1] = d_mm[1]
-        elif transformation == transformation_mode.instrxy:
+        elif transformation == TransformationModes.instrxy:
             self.base.print_message(f"mode: {mode}")
             self.base.print_message(f"motion: got instrxyz ({mode}), converting to motorxy")
             current_instrxyz = self.transform.transform_motorxyz_to_instrxyz(
@@ -325,7 +425,7 @@ class galil:
             self.base.print_message(
                 f"current instrument position (calc from motor): {current_instrxyz}"
             )
-            if mode == move_modes.relative:
+            if mode == MoveModes.relative:
                 new_instrxyz = current_instrxyz
                 for i in range(3):
                     if req_positionvec[i] is not None:
@@ -340,8 +440,8 @@ class galil:
                 self.base.print_messagef(f"new motor position (abs): {new_motorxyz}")
                 axis = ["x", "y", "z"]
                 d_mm = [d for d in new_motorxyz[0:3]]
-                mode = move_modes.absolute
-            elif mode == move_modes.absolute:
+                mode = MoveModes.absolute
+            elif mode == MoveModes.absolute:
                 new_instrxyz = current_instrxyz
                 for i in range(3):
                     if req_positionvec[i] is not None:
@@ -355,7 +455,7 @@ class galil:
                 self.base.print_message(f"new motor position (abs): {new_motorxyz}")
                 axis = ["x", "y", "z"]
                 d_mm = [d for d in new_motorxyz[0:3]]
-            elif mode == move_modes.homing:
+            elif mode == MoveModes.homing:
                 # not coordinate conversoion needed as these are not used (but length is still checked)
                 pass
 
@@ -444,7 +544,6 @@ class galil:
                 ret_counts.append(None)
                 continue
 
-            # if 1:
             try:
                 # the logic here is that we assemble a command experiment
                 # here we decide if we move relative, home, or move absolute
@@ -457,11 +556,11 @@ class galil:
                     ]
                 else:
                     cmd_seq = [f"SP{axl}={speed}"]
-                if mode == move_modes.relative:
+                if mode == MoveModes.relative:
                     cmd_seq.append(f"PR{axl}={counts}")
-                elif mode == move_modes.homing:
+                elif mode == MoveModes.homing:
                     cmd_seq.append(f"HM{axl}")
-                elif mode == move_modes.absolute:
+                elif mode == MoveModes.absolute:
                     # now we want an abolute position
                     cmd_seq.append(f"PA{axl}={counts}")
                 else:
@@ -526,6 +625,8 @@ class galil:
             while (time.time() - tstart < tout) \
             and not self.base.actionserver.estop:
                 qmove = await self.query_axis_moving(axis)
+                test = await self.query_axis_position(await self.get_all_axis())
+
                 #                time.sleep(0.5) # TODO: what time is ok to wait and not to overload the Galil
                 await asyncio.sleep(0.5)
                 if all(status == "stopped" for status in qmove["motor_status"]):
@@ -557,6 +658,7 @@ class galil:
         # read final position
         # updates ws buffer
         _ = await self.query_axis_position(axis)
+
 
         # one return for all axis
         return {
@@ -624,6 +726,13 @@ class galil:
                 ret_ax.append(None)
                 ret_position.append(None)
 
+        msg_ret_ax = []
+        msg_ret_position = []
+        for ax, pos in axpos.items():
+            msg_ret_ax.append(ax)
+            msg_ret_position.append(pos)
+        await self.update_aligner(msg = \
+                        {"ax": msg_ret_ax, "position": msg_ret_position})
         return {"ax": ret_ax, "position": ret_position}
 
 
@@ -668,7 +777,10 @@ class galil:
                 ret_err_code.append(ErrorCodes.not_available)
                 pass
 
-        return {"motor_status": ret_status, "err_code": ret_err_code}
+
+        msg = {"motor_status": ret_status, "err_code": ret_err_code}
+        await self.update_aligner(msg = msg)
+        return msg
 
 
     async def reset(self):
@@ -801,25 +913,33 @@ class galil:
         # this gets called when the server is shut down or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
         # self.stop_axis(self.get_all_axis())
+        if self.aligner_enabled and self.aligner:
+            self.aligner.IOtask.cancel()
         self.base.print_message("shutting down galil motion")
         # asyncio.gather(self.motor_off(asyncio.gather(self.get_all_axis()))) # already contains stop command
         self.g.GClose()
         return {"shutdown"}
 
 
-class move_modes(str, Enum):
+    async def update_aligner(self, msg):
+        # await self.interrupt_q.put(self.orchstatusmodel)
+        if self.aligner_enabled and self.aligner:
+            await self.aligner.motorpos_q.put(msg)
+
+
+class MoveModes(str, Enum):
     homing = "homing"
     relative = "relative"
     absolute = "absolute"
 
 
-class transformation_mode(str, Enum):
+class TransformationModes(str, Enum):
     motorxy = "motorxy"
     platexy = "platexy"
     instrxy = "instrxy"
 
 
-class transformxy:
+class TransformXY:
     # Updating plate calibration will automatically update the system transformation
     # matrix. When angles are changed updated them also here and run update_Msystem
     def __init__(self, action_serv: Base, Minstr, seq=None):
@@ -846,6 +966,7 @@ class transformxy:
         # pre calculates the system Matrix M
         self.update_Msystem()
 
+
     def transform_platexy_to_motorxy(self, platexy,*args,**kwargs):
         """simply calculates motorxy based on platexy
         plate warping (z) will be a different call"""
@@ -861,6 +982,7 @@ class transformxy:
         motorxy = np.array(motorxy)[0]
         return motorxy
 
+
     def transform_motorxy_to_platexy(self, motorxy,*args,**kwargs):
         """simply calculates platexy from current motorxy"""
         motorxy = np.asarray(motorxy)
@@ -873,6 +995,7 @@ class transformxy:
         platexy = np.array(platexy)[0]
         return platexy
 
+
     def transform_motorxyz_to_instrxyz(self, motorxyz,*args,**kwargs):
         """simply calculatesinstrxyz from current motorxyz"""
         motorxyz = np.asarray(motorxyz)
@@ -883,6 +1006,7 @@ class transformxy:
         # self.base.print_message(" ... xyz:", motorxyz)
         instrxyz = np.dot(self.Minstrinv, motorxyz)
         return np.array(instrxyz)[0]
+
 
     def transform_instrxyz_to_motorxyz(self, instrxyz,*args,**kwargs):
         """simply calculates motorxyz from current instrxyz"""
@@ -895,6 +1019,7 @@ class transformxy:
         motorxyz = np.dot(self.Minstr, instrxyz)
         return np.array(motorxyz)[0]
 
+
     def Rx(self):
         """returns rotation matrix around x-axis"""
         alphatmp = np.mod(self.alpha, 360)  # this actually takes care of neg. values
@@ -902,11 +1027,32 @@ class transformxy:
         if alphatmp == 0:  # or alphatmp == -0.0:
             return np.asmatrix(np.identity(4))
         elif alphatmp == 90:  # or alphatmp == -270:
-            return np.matrix([[1, 0, 0, 0], [0, 0, -1, 0], [0, 1, 0, 0], [0, 0, 0, 1]])
+            return np.matrix(
+                             [
+                              [1, 0, 0, 0],
+                              [0, 0, -1, 0],
+                              [0, 1, 0, 0],
+                              [0, 0, 0, 1]
+                             ]
+                            )
         elif alphatmp == 180:  # or alphatmp == -180:
-            return np.matrix([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
+            return np.matrix(
+                             [
+                              [1, 0, 0, 0],
+                              [0, -1, 0, 0],
+                              [0, 0, -1, 0],
+                              [0, 0, 0, 1]
+                             ]
+                            )
         elif alphatmp == 270:  # or alphatmp == -90:
-            return np.matrix([[1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, 0], [0, 0, 0, 1]])
+            return np.matrix(
+                             [
+                              [1, 0, 0, 0],
+                              [0, 0, 1, 0],
+                              [0, -1, 0, 0],
+                              [0, 0, 0, 1]
+                             ]
+                            )
         else:
             return np.matrix(
                 [
@@ -927,6 +1073,7 @@ class transformxy:
                 ]
             )
 
+
     def Ry(self):
         """returns rotation matrix around y-axis"""
         betatmp = np.mod(self.beta, 360)  # this actually takes care of neg. values
@@ -934,11 +1081,32 @@ class transformxy:
         if betatmp == 0:  # or betatmp == -0.0:
             return np.asmatrix(np.identity(4))
         elif betatmp == 90:  # or betatmp == -270:
-            return np.matrix([[0, 0, 1, 0], [0, 1, 0, 0], [-1, 0, 0, 0], [0, 0, 0, 1]])
+            return np.matrix(
+                             [
+                              [0, 0, 1, 0],
+                              [0, 1, 0, 0],
+                              [-1, 0, 0, 0],
+                              [0, 0, 0, 1]
+                             ]
+                            )
         elif betatmp == 180:  # or betatmp == -180:
-            return np.matrix([[-1, 0, 0, 0], [0, 1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
+            return np.matrix(
+                             [
+                              [-1, 0, 0, 0],
+                              [0, 1, 0, 0],
+                              [0, 0, -1, 0],
+                              [0, 0, 0, 1]
+                             ]
+                            )
         elif betatmp == 270:  # or betatmp == -90:
-            return np.matrix([[0, 0, -1, 0], [0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 1]])
+            return np.matrix(
+                             [
+                              [0, 0, -1, 0],
+                              [0, 1, 0, 0],
+                              [1, 0, 0, 0],
+                              [0, 0, 0, 1]
+                             ]
+                            )
         else:
             return np.matrix(
                 [
@@ -959,6 +1127,7 @@ class transformxy:
                 ]
             )
 
+
     def Rz(self):
         """returns rotation matrix around z-axis"""
         gammatmp = np.mod(self.gamma, 360)  # this actually takes care of neg. values
@@ -966,11 +1135,32 @@ class transformxy:
         if gammatmp == 0:  # or gammatmp == -0.0:
             return np.asmatrix(np.identity(4))
         elif gammatmp == 90:  # or gammatmp == -270:
-            return np.matrix([[0, -1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+            return np.matrix(
+                             [
+                              [0, -1, 0, 0],
+                              [1, 0, 0, 0],
+                              [0, 0, 1, 0],
+                              [0, 0, 0, 1]
+                             ]
+                            )
         elif gammatmp == 180:  # or gammatmp == -180:
-            return np.matrix([[-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+            return np.matrix(
+                             [
+                              [-1, 0, 0, 0],
+                              [0, -1, 0, 0],
+                              [0, 0, 1, 0],
+                              [0, 0, 0, 1]
+                             ]
+                            )
         elif gammatmp == 270:  # or gammatmp == -90:
-            return np.matrix([[0, 1, 0, 0], [-1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+            return np.matrix(
+                             [
+                              [0, 1, 0, 0],
+                              [-1, 0, 0, 0],
+                              [0, 0, 1, 0],
+                              [0, 0, 0, 1]
+                             ]
+                            )
         else:
             return np.matrix(
                 [
@@ -991,12 +1181,14 @@ class transformxy:
                 ]
             )
 
+
     def Mx(self):
         """returns Mx part of Minstr"""
         Mx = np.asmatrix(np.identity(4))
         Mx[0, 0:4] = self.Minstrxyz[0, 0:4]
         # self.base.print_message(" ... Mx", Mx)
         return Mx
+
 
     def My(self):
         """returns My part of Minstr"""
@@ -1005,6 +1197,7 @@ class transformxy:
         # self.base.print_message(" ... My", My)
         return My
 
+
     def Mz(self):
         """returns Mz part of Minstr"""
         Mz = np.asmatrix(np.identity(4))
@@ -1012,10 +1205,12 @@ class transformxy:
         # self.base.print_message(" ... Mz", Mz)
         return Mz
 
+
     def Mplatewarp(self, platexy):
         """returns plate warp correction matrix (Z-correction. 
         Only valid for a single platexy coordinate"""
         return np.asmatrix(np.identity(4))  # TODO, just returns identity matrix for now
+
 
     def update_Msystem(self):
         """updates the transformation matrix for new plate calibration or
@@ -1073,22 +1268,34 @@ class transformxy:
                 self.Minv = self.M.I
             except Exception:
                 self.base.print_message(
-                    "------------------------------ System Matrix singular ---------------------------"
+                    "System Matrix singular",
+                    error = True
                 )
                 # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
                 self.Minv = np.matrix(
-                    [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, -1]]
+                    [
+                     [0, 0, 0, 0],
+                     [0, 0, 0, 0],
+                     [0, 0, 0, 0],
+                     [0, 0, 0, -1]
+                    ]
                 )
 
             try:
                 self.Minstrinv = self.Minstr.I
             except Exception:
                 self.base.print_message(
-                    "------------------------------ Instrument Matrix singular ---------------------------"
+                    "Instrument Matrix singular",
+                    error = True
                 )
                 # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
                 self.Minstrinv = np.matrix(
-                    [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, -1]]
+                    [
+                     [0, 0, 0, 0],
+                     [0, 0, 0, 0],
+                     [0, 0, 0, 0],
+                     [0, 0, 0, -1]
+                    ]
                 )
 
 
@@ -1136,7 +1343,1356 @@ class transformxy:
             return self.Mplatexy
         except Exception:
             self.base.print_message(
-                "------------------------------ Instrument Matrix singular ---------------------------"
+                "Instrument Matrix singular",
+                error = True
             )
             # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
             self.Minv = np.matrix([[0, 0, 0], [0, 0, 0], [0, 0, -1]])
+
+
+
+
+class Aligner:
+    def __init__(self, visServ: Vis, motor):
+        self.vis = visServ
+        self.motor = motor
+        self.config_dict = self.vis.server_cfg["params"]
+        self.dataAPI = HTELegacyAPI(self.vis)
+        self.motorpos_q = asyncio.Queue()
+
+        # flag to check if we actual should align
+        self.g_aligning = False
+        self.active = None
+        self.plateid = None
+
+        # dummy value, will be updated during init
+        self.g_motor_position = [0,0,1]
+        # to force drawing of marker
+        self.gbuf_motor_position = -1*self.g_motor_position
+        # dummy value, will be updated during init
+        self.g_plate_position = [0,0,1]
+        # to force drawing of marker
+        self.gbuf_plate_position = -1*self.g_plate_position
+
+        # will be updated during init
+        self.g_motor_ismoving = False
+
+        # initial instrument specific TransferMatrix
+        self.initialTransferMatrix = np.matrix(
+                                               [
+                                                [1,0,0],
+                                                [0,1,0],
+                                                [0,0,1]
+                                               ]
+                                              )
+        self.cutoff = np.array(self.config_dict.get("cutoff",6))
+        
+        # this is now used for plate to motor transformation and will be refined
+        self.TransferMatrix = self.initialTransferMatrix
+        
+        self.create_layout()
+        self.motor.aligner = self
+        self.IOtask = asyncio.create_task(self.IOloop_aligner())
+
+        
+    def create_layout(self):
+        
+        self.MarkerColors = [
+                             (255,0,0),
+                             (0,0,255),
+                             (0,255,0),
+                             (255,165,0),
+                             (255,105,180)
+                            ]
+
+        self.MarkerNames = ["Cell", "Blue", "Green", "Orange", "Pink"]
+        self.MarkerSample = [None, None, None, None, None]
+        self.MarkerIndex = [None, None, None, None, None]
+        self.MarkerCode = [None, None, None, None, None]
+        self.MarkerFraction = [None, None, None, None, None]
+
+        # for 2D transformation, the vectors (and Matrix) need to be 3D
+        self.MarkerXYplate = [
+                              (None, None,1),
+                              (None, None,1),
+                              (None, None,1),
+                              (None, None,1),
+                              (None, None,1)
+                             ]
+        # 3dim vector because of transformation matrix
+        self.calib_ptsplate = [
+                               (None, None,1),
+                               (None, None,1),
+                               (None, None,1)
+                              ]
+
+        self.calib_ptsmotor = [
+                               (None, None,1),
+                               (None, None,1),
+                               (None, None,1)
+                              ]
+        
+        
+        # PM data given as parameter or empty and needs to be loaded
+        self.pmdata = []
+        
+        self.totalwidth = 800
+        
+        
+        ######################################################################
+        #### getPM group elements ###
+        ######################################################################
+        
+        self.button_goalign = Button(
+                                     label="Go", 
+                                     button_type="default", 
+                                     width=150
+                                    )
+        self.button_skipalign = Button(
+                                       label="Skip this step", 
+                                       button_type="default", 
+                                       width=150
+                                      )
+        self.button_goalign.on_event(ButtonClick, self.clicked_go_align)
+        self.button_skipalign.on_event(ButtonClick, self.clicked_skipstep)
+        self.status_align = \
+            TextAreaInput(
+                          value="", 
+                          rows=8, 
+                          title="Alignment Status:", 
+                          disabled=True, 
+                          width=150
+                         )
+        
+        
+        self.layout_getPM = layout(
+                                    self.button_goalign,
+                                    self.button_skipalign,
+                                    self.status_align
+                                  )
+        
+        
+        
+        ######################################################################
+        #### Calibration group elements ###
+        ######################################################################
+        
+        self.calib_sel_motor_loc_marker = \
+            Select(
+                   title="Active Marker", 
+                   value=self.MarkerNames[1], 
+                   options=self.MarkerNames[1:], 
+                   width=110-50
+                  )
+        
+        self.calib_button_addpt = \
+            Button(
+                   label="Add Pt", 
+                   button_type="default", 
+                   width=110-50
+                  )
+        self.calib_button_addpt.on_event(ButtonClick, self.clicked_addpoint)
+        
+        #Calc. Motor-Plate Coord. Transform
+        self.calib_button_calc = \
+            Button(
+                   label="Calc", 
+                   button_type="primary", 
+                   width=110-50
+                  )
+        self.calib_button_calc.on_event(ButtonClick, self.clicked_calc)
+        
+        self.calib_button_reset = \
+            Button(
+                   label="Reset", 
+                   button_type="default", 
+                   width=110-50
+                  )
+        self.calib_button_reset.on_event(ButtonClick, self.clicked_reset)
+        
+        self.calib_button_done = \
+            Button(
+                   label="Sub.", 
+                   button_type="danger", 
+                   width=110-50
+                  )
+        self.calib_button_done.on_event(ButtonClick, self.clicked_submit)
+        
+        
+        self.calib_xplate = []
+        self.calib_yplate = []
+        self.calib_xmotor = []
+        self.calib_ymotor = []
+        self.calib_pt_del_button = []
+        for i in range(0,3):
+            buf = "x%d plate" % (i+1)
+            self.calib_xplate.append(
+                                     TextInput(
+                                               value="", 
+                                               title=buf, 
+                                               disabled=True, 
+                                               width=60, 
+                                               height=40
+                                              )
+                                    )
+            buf = "y%d plate" % (i+1)
+            self.calib_yplate.append(
+                                     TextInput(
+                                               value="", 
+                                               title=buf, 
+                                               disabled=True, 
+                                               width=60, 
+                                               height=40
+                                              )
+                                    )
+            buf = "x%d motor" % (i+1)
+            self.calib_xmotor.append(
+                                     TextInput(
+                                               value="", 
+                                               title=buf, 
+                                               disabled=True, 
+                                               width=60, 
+                                               height=40
+                                              )
+                                    )
+            buf = "y%d motor" % (i+1)
+            self.calib_ymotor.append(
+                                     TextInput(
+                                               value="", 
+                                               title=buf, 
+                                               disabled=True, 
+                                               width=60, 
+                                               height=40
+                                              )
+                                    )
+            self.calib_pt_del_button.append(
+                                            Button(
+                                                   label="Del", 
+                                                   button_type="primary", 
+                                                   width=(int)(30), 
+                                                   height=25
+                                                  )
+                                           )
+            self.calib_pt_del_button[i].on_click(
+                partial(self.clicked_calib_del_pt, idx=i)
+            )
+
+
+        self.calib_xscale_text = TextInput(
+                                           value="", 
+                                           title="xscale", 
+                                           disabled=True, 
+                                           width=50, 
+                                           height=40, 
+                                           css_classes=["custom_input1"]
+                                          )
+        self.calib_yscale_text = TextInput(
+                                           value="", 
+                                           title="yscale", 
+                                           disabled=True, 
+                                           width=50, 
+                                           height=40, 
+                                           css_classes=["custom_input1"]
+                                          )
+        self.calib_xtrans_text = TextInput(
+                                           value="", 
+                                           title="x trans", 
+                                           disabled=True, 
+                                           width=50, 
+                                           height=40, 
+                                           css_classes=["custom_input1"]
+                                          )
+        self.calib_ytrans_text = TextInput(
+                                           value="", 
+                                           title="y trans", 
+                                           disabled=True, 
+                                           width=50, 
+                                           height=40, 
+                                           css_classes=["custom_input1"]
+                                          )
+        self.calib_rotx_text = TextInput(
+                                         value="", 
+                                         title="rotx (deg)", 
+                                         disabled=True, 
+                                         width=50, 
+                                         height=40, 
+                                         css_classes=["custom_input1"]
+                                        )
+        self.calib_roty_text = TextInput(
+                                         value="", 
+                                         title="roty (deg)", 
+                                         disabled=True, 
+                                         width=50, 
+                                         height=40, 
+                                         css_classes=["custom_input1"]
+                                        )
+        
+        #calib_plotsmp_check = CheckboxGroup(labels=["don't plot smp 0"], active=[0], width = 50)
+        
+        self.layout_calib = layout([
+            [
+             layout(
+                    self.calib_sel_motor_loc_marker,
+                    self.calib_button_addpt,
+                    self.calib_button_calc,
+                    self.calib_button_reset,
+                    self.calib_button_done,
+                    ),
+             layout([
+                    [
+                     Spacer(width=20), 
+                     Div(
+                         text="<b>Calibration Coordinates</b>",
+                         width=200+50,
+                         height=15
+                        )
+                    ],
+                    layout(
+                        [
+                         [Spacer(height=20),self.calib_pt_del_button[0]],
+                         Spacer(width=10),
+                         self.calib_xplate[0],
+                         self.calib_yplate[0],
+                         self.calib_xmotor[0],
+                         self.calib_ymotor[0]
+                        ],
+                        Spacer(height=10),
+                        Spacer(height=5, background=(0,0,0)),
+                        [
+                          [Spacer(height=20),self.calib_pt_del_button[1]],
+                          Spacer(width=10),
+                          self.calib_xplate[1],
+                          self.calib_yplate[1],
+                          self.calib_xmotor[1],
+                          self.calib_ymotor[1]
+                        ],
+                        Spacer(height=10),
+                        Spacer(height=5, background=(0,0,0)),
+                        [
+                          [Spacer(height=20),self.calib_pt_del_button[2]],
+                          Spacer(width=10),
+                          self.calib_xplate[2], 
+                          self.calib_yplate[2],
+                          self.calib_xmotor[2],
+                          self.calib_ymotor[2]
+                        ],
+                        Spacer(height=10),
+                        background="#C0C0C0"),
+                   ]),
+            ],
+            [
+              layout([[
+                      self.calib_xscale_text,
+                      self.calib_xtrans_text,
+                      self.calib_rotx_text,
+                      Spacer(width=10),
+                      self.calib_yscale_text,
+                      self.calib_ytrans_text,
+                      self.calib_roty_text
+                    ]]),
+            ],
+        ])
+        
+        ######################################################################
+        #### Motor group elements ####
+        ######################################################################
+        self.motor_movexabs_text = TextInput(
+                                             value="0", 
+                                             title="abs x (mm)", 
+                                             disabled=False, 
+                                             width=60, 
+                                             height=40
+                                            )
+        self.motor_moveyabs_text = TextInput(
+                                             value="0", 
+                                             title="abs y (mm)", 
+                                             disabled=False, 
+                                             width=60, 
+                                             height=40
+                                            )
+        self.motor_moveabs_button = Button(
+                                           label="Move", 
+                                           button_type="primary", 
+                                           width=60
+                                          )
+        self.motor_moveabs_button.on_event(ButtonClick, self.clicked_moveabs)
+        
+        self.motor_movexrel_text = TextInput(
+                                             value="0", 
+                                             title="rel x (mm)", 
+                                             disabled=False, 
+                                             width=60, 
+                                             height=40
+                                            )
+        self.motor_moveyrel_text = TextInput(
+                                             value="0", 
+                                             title="rel y (mm)", 
+                                             disabled=False, 
+                                             width=60, 
+                                             height=40
+                                            )
+        self.motor_moverel_button = Button(
+                                           label="Move", 
+                                           button_type="primary", 
+                                           width=60
+                                          )
+        self.motor_moverel_button.on_event(ButtonClick, self.clicked_moverel)
+        
+        self.motor_readxmotor_text = TextInput(
+                                               value="0", 
+                                               title="motor x (mm)", 
+                                               disabled=True, 
+                                               width=60, 
+                                               height=40
+                                              )
+        self.motor_readymotor_text = TextInput(
+                                               value="0", 
+                                               title="motor y (mm)", 
+                                               disabled=True, 
+                                               width=60, 
+                                               height=40
+                                              )
+        
+        
+        self.motor_read_button = Button(
+                                        label="Read", 
+                                        button_type="primary", 
+                                        width=60
+                                       )
+        self.motor_read_button.on_event(
+                                        ButtonClick, 
+                                        self.clicked_readmotorpos
+                                       )
+        
+        
+        self.motor_move_indicator = Toggle(
+                                           label="Stage Moving", 
+                                           disabled=True, 
+                                           button_type="danger", 
+                                           width=50
+                                          ) #success: green, danger: red
+        
+        self.motor_movedist_text = TextInput(
+                                             value="0", 
+                                             title="move (mm)", 
+                                             disabled=False, 
+                                             width=40, 
+                                             height=40
+                                            )
+        self.motor_move_check = CheckboxGroup(
+                                              labels=["Arrows control motor"], 
+                                              width=40
+                                             )
+        
+        self.layout_motor = layout([
+            layout(
+                [
+                 [Spacer(height=20),self.motor_moveabs_button],
+                 self.motor_movexabs_text,
+                 Spacer(width=10),
+                 self.motor_moveyabs_text
+                ],
+                [
+                 [Spacer(height=20),self.motor_moverel_button],
+                 self.motor_movexrel_text,
+                 Spacer(width=10),
+                 self.motor_moveyrel_text
+                ],
+                [
+                 [Spacer(height=20),self.motor_read_button],
+                  self.motor_readxmotor_text,
+                  Spacer(width=10),
+                  self.motor_readymotor_text
+                ],
+                self.motor_move_indicator,
+                Spacer(height=15,width=240),
+                background="#008080"
+            ),
+            layout(
+                [
+                 self.motor_movedist_text,Spacer(width=10),
+                 [Spacer(height=25),self.motor_move_check]
+                ],
+                Spacer(height=10,width=240),
+                background="#808000"
+            ),
+        ])
+        
+        ##############################################################################
+        #### Marker group elements ####
+        ##############################################################################
+        self.marker_type_text = []
+        self.marker_move_button = []
+        self.marker_buttonsel = []
+        self.marker_index = []
+        self.marker_sample = []
+        self.marker_x = []
+        self.marker_y = []
+        self.marker_code = []
+        self.marker_fraction = []
+        self.marker_layout = []
+        
+        
+        for idx in range(len(self.MarkerNames)):
+            self.marker_type_text.append(
+                                         Paragraph(
+                                                   text=f"{self.MarkerNames[idx]} Marker", 
+                                                   width=120, 
+                                                   height=15
+                                                  )
+                                        )
+            self.marker_move_button.append(
+                                           Button(
+                                                  label="Move", 
+                                                  button_type="primary", 
+                                                  width=(int)(self.totalwidth/5-40), 
+                                                  height=25
+                                                 )
+                                          )
+            self.marker_index.append(
+                                     TextInput(
+                                               value="", 
+                                               title="Index", 
+                                               disabled=True,
+                                               width=40, 
+                                               height=40, 
+                                               css_classes=["custom_input2"]
+                                              )
+                                    )
+            self.marker_sample.append(
+                                      TextInput(
+                                                value="", 
+                                                title="Sample", 
+                                                disabled=True, 
+                                                width=40, 
+                                                height=40, 
+                                                css_classes=["custom_input2"]
+                                               )
+                                     )
+            self.marker_x.append(
+                                 TextInput(
+                                           value="", 
+                                           title="x(mm)", 
+                                           disabled=True, 
+                                           width=40, 
+                                           height=40, 
+                                           css_classes=["custom_input2"]
+                                          )
+                                )
+            self.marker_y.append(
+                                 TextInput(
+                                           value="", 
+                                           title="y(mm)", 
+                                           disabled=True, width=40, 
+                                           height=40, 
+                                           css_classes=["custom_input2"]
+                                          )
+                                )
+            self.marker_code.append(
+                                    TextInput(
+                                              value="", 
+                                              title="code", 
+                                              disabled=True, 
+                                              width=40, 
+                                              height=40, 
+                                              css_classes=["custom_input2"]
+                                             )
+                                   )
+            self.marker_fraction.append(
+                                        TextInput(
+                                                  value="", 
+                                                  title="fraction", 
+                                                  disabled=True, 
+                                                  width=120, 
+                                                  height=40, 
+                                                  css_classes=["custom_input2"]
+                                                 )
+                                       )
+            buf = ("custom_button_Marker%d") % (idx+1)
+            self.marker_buttonsel.append(
+                                         Button(
+                                                label="", 
+                                                button_type="default", 
+                                                disabled=False, 
+                                                width=40, 
+                                                height=40,
+                                                css_classes=[buf]
+                                               )
+                                        )
+            self.marker_buttonsel[idx].on_click(
+                partial(self.clicked_buttonsel, idx=idx)
+            )
+            
+            self.marker_move_button[idx].on_click(
+                partial(self.clicked_button_marker_move, idx=idx)
+            )
+            
+            buf = """<svg width="40" height="40">
+                     <rect width="40" height="40" 
+                     style="fill:rgb(%d,%d,%d);stroke-width:3;stroke:rgb(%d,%d,%d)"/>
+                     </svg>""" \
+                % (
+                   self.MarkerColors[idx][0],
+                   self.MarkerColors[idx][1],
+                   self.MarkerColors[idx][2],
+                   self.MarkerColors[idx][0],
+                   self.MarkerColors[idx][1],
+                   self.MarkerColors[idx][2]
+                  )
+            self.marker_layout.append(
+                layout(
+                       self.marker_type_text[idx],
+                       [
+                        self.marker_buttonsel[idx],
+                        self.marker_index[idx], 
+                        self.marker_sample[idx]
+                       ],
+                       [
+                        self.marker_x[idx],
+                        self.marker_y[idx],
+                        self.marker_code[idx]
+                       ],
+                       self.marker_fraction[idx],
+                       Spacer(height=5),
+                       self.marker_move_button[idx]
+                       , width=(int)((self.totalwidth-4*5)/5)
+                )
+            )
+        
+        
+        # disbale cell marker
+        self.marker_move_button[0].disabled=True
+        self.marker_buttonsel[0].disabled=True
+        
+        # combine marker group layouts
+        self.layout_markers = layout(
+            [[
+             self.marker_layout[0], 
+             Spacer(width=5, background=(0,0,0)),
+             self.marker_layout[1], 
+             Spacer(width=5, background=(0,0,0)),
+             self.marker_layout[2], 
+             Spacer(width=5, background=(0,0,0)),
+             self.marker_layout[3], 
+             Spacer(width=5, background=(0,0,0)),
+             self.marker_layout[4]
+            ]],
+            background="#C0C0C0"
+        )
+        
+        
+        ######################################################################
+        ## pm plot
+        ######################################################################
+        self.plot_mpmap = figure(
+                                 title="PlateMap", 
+                                 height=300,
+                                 x_axis_label="X (mm)",
+                                 y_axis_label="Y (mm)",
+                                 width = self.totalwidth
+                                )
+        self.taptool = self.plot_mpmap.select(type=TapTool)
+        self.plot_mpmap.on_event(DoubleTap, self.clicked_pmplot)
+        
+        
+        ######################################################################
+        # add all to alignerwebdoc
+        ######################################################################
+        
+        self.divmanual = Div(text="""<b>Hotkeys:</b> Not supported by bokeh. Will be added later.<svg width="20" height="20">
+        <rect width="20" height="20" style="fill:{{supplied_color_str}};stroke-width:3;stroke:rgb(0,0,0)" />
+        </svg>""",
+        width=self.totalwidth, height=200)
+        self.css_styles = Div(text=
+            """<style>
+            .custom_button_Marker1 button.bk.bk-btn.bk-btn-default {
+                color: black;
+                background-color: #ff0000;
+            }
+            
+            .custom_button_Marker2 button.bk.bk-btn.bk-btn-default {
+                color: black;
+                background-color: #0000ff;
+            }
+            
+            .custom_button_Marker3 button.bk.bk-btn.bk-btn-default {
+                color: black;
+                background-color: #00ff00;
+            }
+            
+            .custom_button_Marker4 button.bk.bk-btn.bk-btn-default {
+                color: black;
+                background-color: #FFA500;
+            }
+            
+            .custom_button_Marker5 button.bk.bk-btn.bk-btn-default {
+                color: black;
+                background-color: #FF69B4;
+            }
+            </style>""")
+
+        self.vis.doc.add_root(self.css_styles)
+        self.vis.doc.add_root(
+                              layout(
+                                  [[
+                                    self.layout_getPM,
+                                    self.layout_calib, 
+                                    self.layout_motor
+                                  ]]
+                              )
+        )
+        self.vis.doc.add_root(
+            Spacer(height = 5,width = self.totalwidth, background=(0,0,0))
+        )
+        self.vis.doc.add_root(self.layout_markers)
+        self.vis.doc.add_root(
+            Spacer(height = 5, width = self.totalwidth, background=(0,0,0))
+        )
+        self.vis.doc.add_root(self.plot_mpmap)
+        self.vis.doc.add_root(self.divmanual)
+        
+        # init all controls
+        self.init_mapaligner()
+
+
+    def clicked_reset(self):
+        """resets aligner to initial params"""
+        self.init_mapaligner()
+        
+    
+    def clicked_addpoint(self, event):
+        """Add new point to calibration point list and removing last point"""
+        # (1) get selected marker
+        selMarker = self.MarkerNames.index(self.calib_sel_motor_loc_marker.value)
+        # (2) add new platexy point to end of plate point list
+        self.calib_ptsplate.append(self.MarkerXYplate[selMarker])
+        # (3) get current motor position
+        motorxy = self.g_motor_position # gets the displayed position    
+        # (4) add new motorxy to motor point list
+        self.calib_ptsmotor.append(motorxy)
+        self.vis.print_message(f"motorxy: {motorxy}")
+        self.vis.print_message(f"platexy: {self.MarkerXYplate[selMarker]}")
+        self.vis.doc.add_next_tick_callback(
+            partial(
+                    self.update_status,
+                    f"added Point:\nMotorxy:\n"
+                    f"{motorxy}\nPlatexy:\n"+
+                    f"{self.MarkerXYplate[selMarker]}"
+                   )
+        )
+    
+        # remove first point from calib list
+        self.calib_ptsplate.pop(0)
+        self.calib_ptsmotor.pop(0)
+        # display points
+        for i in range(0,3):
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_calpointdisplay,i)
+            )
+    
+    
+    def clicked_submit(self):
+        """submit final results back to aligner server"""
+        asyncio.gather(self.finish_alignment(self.TransferMatrix,0))
+    
+    
+    def clicked_go_align(self):
+        """start a new alignment procedure"""
+        # init the aligner
+        self.init_mapaligner()
+        
+        if self.g_aligning:
+            asyncio.gather(self.get_pm())
+        else:
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_status,"Error!\nAlign is invalid!")
+            )
+    
+    
+    def clicked_moveabs(self):
+        """move motor to abs position"""
+        asyncio.gather(
+            self.motor_move(
+                mode = MoveModes.absolute,
+                x = (float)(self.motor_movexabs_text.value), 
+                y = (float)(self.motor_moveyabs_text.value)
+            )
+        )
+    
+    
+    def clicked_moverel(self):
+        """move motor by relative amount"""
+        asyncio.gather(
+            self.motor_move(
+                mode = MoveModes.relative,
+                x = (float)(self.motor_movexrel_text.value), 
+                y = (float)(self.motor_moveyrel_text.value)
+            )
+        )
+    
+    
+    def clicked_readmotorpos(self):
+        """gets current motor position"""
+        asyncio.gather(self.motor_getxy()) # updates g_motor_position
+    
+    
+    def clicked_calc(self):
+        """wrapper for async calc call"""
+        asyncio.gather(self.align_calc())
+    
+    
+    def clicked_skipstep(self):
+        """Calculate Transformation Matrix from given points"""
+        asyncio.gather(self.finish_alignment(self.initialTransferMatrix,0))
+    
+    
+    def clicked_buttonsel(self, idx):
+        """Selects the Marker by clicking on colored buttons"""
+        self.calib_sel_motor_loc_marker.value = self.MarkerNames[idx]
+    
+    
+    def clicked_calib_del_pt(self, idx):
+        """remove cal point"""
+        # remove first point from calib list
+        self.calib_ptsplate.pop(idx)
+        self.calib_ptsmotor.pop(idx)
+        self.calib_ptsplate.insert(0,(None, None, 1))
+        self.calib_ptsmotor.insert(0,(None, None, 1))
+        # display points
+        for i in range(0,3):
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_calpointdisplay,i)
+            )
+    
+    
+    def clicked_button_marker_move(self, idx):
+        """move motor to maker position"""
+        if not self.marker_x[idx].value == "None" and not self.marker_y[idx].value == "None":
+            asyncio.gather(
+                self.motor_move(
+                    mode = MoveModes.absolute,
+                    x = (float)(self.marker_x[idx].value),
+                    y = (float)(self.marker_y[idx].value)
+                )
+            )
+    
+    
+    def clicked_pmplot(self, event):
+        """double click/tap on PM plot to add/move marker"""
+        # get selected Marker
+        selMarker = self.MarkerNames.index(self.calib_sel_motor_loc_marker.value)
+        # get coordinates of doubleclick
+        platex = event.x
+        platey = event.y
+        # transform to nearest sample point
+        PMnum = self.get_samples([platex], [platey])
+        buf = ""
+        if PMnum is not None:
+            if PMnum[0] is not None: # need to check as this can also happen
+                platex = self.pmdata[PMnum[0]]['x']
+                platey = self.pmdata[PMnum[0]]['y']
+                self.MarkerXYplate[selMarker] = (platex,platey,1)
+                self.MarkerSample[selMarker] = self.pmdata[PMnum[0]]["Sample"]
+                self.MarkerIndex[selMarker] = PMnum[0]
+                self.MarkerCode[selMarker] = self.pmdata[PMnum[0]]["code"]
+        
+                # only display non zero fractions
+                buf = ""
+                # TODO: test on other platemap
+                for fraclet in ("A", "B", "C", "D", "E", "F", "G", "H"):
+                    if self.pmdata[PMnum[0]][fraclet] > 0:
+                        buf = "%s%s%d " % (buf,fraclet, self.pmdata[PMnum[0]][fraclet]*100)
+                if len(buf) == 0:
+                    buf = "-"
+                self.MarkerFraction[selMarker] = buf
+            ##    elif:
+            # remove old Marker point
+            old_point = self.plot_mpmap.select(name=self.MarkerNames[selMarker])
+            if len(old_point)>0:
+                self.plot_mpmap.renderers.remove(old_point[0])
+            # plot new Marker point
+            self.plot_mpmap.square(
+                                   platex, 
+                                   platey, 
+                                   size=7,
+                                   line_width=2, 
+                                   color=None, 
+                                   alpha=1.0, 
+                                   line_color=self.MarkerColors[selMarker], 
+                                   name=self.MarkerNames[selMarker]
+                                  )
+            # add Marker positions to list
+            self.update_Markerdisplay(selMarker)
+    
+    
+    async def finish_alignment(self, newTransfermatrix, errorcode):
+        """sends finished alignment back to FastAPI server"""
+        if self.active:
+            await self.active.enqueue_data(datamodel = \
+                   DataModel(
+                             data = {self.active.action.file_conn_keys[0]:\
+                                        {
+                                            "Transfermatrix":f"{newTransfermatrix}",
+                                            "oldTransfermatrix":f"{self.initialTransferMatrix}",
+                                            "errorcode":f"{errorcode}"
+                                        }
+                                     },
+                             errors = []
+                       
+                            )
+            )
+            _ = await self.active.finish()
+            self.active = None
+            self.plateid = None
+            self.g_aligning = False
+            self.motor.blocked = False
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_status,"Submitted!")
+            )
+        else:
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_status,"Error!\nAlign is invalid!")
+            )
+
+
+    async def motor_move(self, mode, x, y):
+        """moves the motor by submitting a request to aligner server"""
+        if self.g_aligning:
+            _ = await self.motor._motor_move(
+                d_mm = [x, y],
+                axis = ["x", "y"],
+                speed = None,
+                mode = mode,#MoveModes.absolute,
+                transformation = TransformationModes.platexy
+            )
+
+
+    async def motor_getxy(self):
+        """gets current motor position from alignment server"""
+        if self.g_aligning:
+            _ = await self.motor.query_axis_position(axis = ["x", "y"])
+        else:
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_status,"Error!\nAlign is invalid!")
+            )
+        
+    
+    async def get_pm(self):
+        """gets plate map"""
+        if self.g_aligning:
+            self.pmdata = self.dataAPI.get_platemap_plateid(self.plateid)
+            if self.pmdata:
+                self.vis.doc.add_next_tick_callback(
+                    partial(self.update_pm_plot_title, self.plateid)
+                )
+                self.vis.doc.add_next_tick_callback(
+                   partial(self.update_status,f"Got plateID:\n {self.plateid}")
+                )
+                self.vis.doc.add_next_tick_callback(
+                    partial(self.update_status,"PM loaded")
+                )
+                self.vis.doc.add_next_tick_callback(
+                    partial(self.update_pm_plot)
+                )
+            else:
+                self.vis.doc.add_next_tick_callback(
+                    partial(self.update_status,"Error!\nInvalid plateid!")
+                )
+                self.g_aligning = False
+        else:
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_status,"Error!\nAlign is invalid!")
+            )
+        
+    
+    def xy_to_sample(self, xy, pmapxy):
+        """get point from pmap closest to xy"""
+        if len(pmapxy):
+            diff = pmapxy - xy
+            sumdiff = (diff ** 2).sum(axis=1)
+            return np.int(np.argmin(sumdiff))
+        else:
+            return None
+    
+    
+    def get_samples(self, X, Y):
+        """get list of samples row number closest to xy"""
+        # X and Y are vectors
+        xyarr = np.array((X, Y)).T
+        pmxy = np.array([[col['x'], col['y']] for col in self.pmdata])
+        samples = list(np.apply_along_axis(self.xy_to_sample, 1, xyarr, pmxy))
+        return samples
+    
+    
+    def remove_allMarkerpoints(self):
+        """Removes all Markers from plot"""
+        for idx in range(len(self.MarkerNames)):
+            # remove old Marker point
+            old_point = self.plot_mpmap.select(name=self.MarkerNames[idx])
+            if len(old_point)>0:
+                self.plot_mpmap.renderers.remove(old_point[0])
+
+
+    def align_1p(self, xyplate, xymotor):
+        """One point alignment"""
+        # can only calculate the xy offset
+        xoff = xymotor[0][0]-xyplate[0][0]
+        yoff = xymotor[0][1]-xyplate[0][1]
+        M = np.matrix([[1,0,xoff],
+                       [0,1,yoff],
+                       [0,0,1]])
+        return M
+    
+    
+    async def align_calc(self):
+        """Calculate Transformation Matrix from given points"""
+        global calib_ptsplate, calib_ptsmotor
+        global TransferMatrix
+        global cutoff
+        validpts = []
+    
+        # check for duplicate points
+        platepts, motorpts = self.align_uniquepts(self.calib_ptsplate,self.calib_ptsmotor)
+    
+        # check if points are not None
+        for idx in range(len(platepts)):
+            if not self.align_test_point(platepts[idx]) and not self.align_test_point(motorpts[idx]):
+                validpts.append(idx)
+    
+        # select the correct alignment procedure
+        if len(validpts) == 3:
+            # Three point alignment
+            self.vis.print_message("3P alignment")
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_status,"3P alignment")
+            )
+            M = self.align_3p(platepts, motorpts)
+        elif len(validpts) == 2:
+            # Two point alignment
+            self.vis.print_message("2P alignment")
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_status,"2P alignment")
+            )
+    #        # only scale and offsets, no rotation
+    #        M = align_2p([platepts[validpts[0]],platepts[validpts[1]]],
+    #                     [motorpts[validpts[0]],motorpts[validpts[1]]])
+            # only scale and rotation, offsets == 0
+            M = self.align_3p([platepts[validpts[0]],platepts[validpts[1]],(0,0,1)],
+                         [motorpts[validpts[0]],motorpts[validpts[1]],(0,0,1)])
+        elif len(validpts) == 1:
+            # One point alignment
+            self.vis.print_message("1P alignment")
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_status,"1P alignment")
+            )
+            M = self.align_1p([platepts[validpts[0]]],
+                         [motorpts[validpts[0]]])
+        else:
+            # No alignment
+            self.vis.print_message("0P alignment")
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_status,"0P alignment")
+            )
+            M = self.TransferMatrix
+            
+        M = self.motor.transform.get_Mplate_Msystem(Mxy = M)
+        
+        self.TransferMatrix = self.cutoffdigits(M, self.cutoff)
+        self.vis.print_message("new TransferMatrix:")
+        self.vis.print_message(M)
+    
+    
+        self.vis.doc.add_next_tick_callback(partial(self.update_TranferMatrixdisplay))
+        self.vis.doc.add_next_tick_callback(partial(self.update_status,'New Matrix:\n'+(str)(M)))
+    
+    
+    ################################################################################
+    # Two point alignment
+    ################################################################################
+    #def align_2p(xyplate,xymotor):
+    #    # A = M*B --> M = A*B-1
+    #    # A .. xymotor
+    #    # B .. xyplate
+    #    A = np.matrix([[xymotor[0][0],xymotor[1][0]],
+    #                   [xymotor[0][1],xymotor[1][1]]])
+    #    B = np.matrix([[xyplate[0][0],xyplate[1][0]],
+    #                   [xyplate[0][1],xyplate[1][1]]])
+    
+    
+    #    M = np.matrix([[1,0,xoff],
+    #                   [0,1,yoff],
+    #                   [0,0,1]])
+    #    return M
+    
+    
+    def align_3p(self, xyplate, xymotor):
+        """Three point alignment"""
+        
+        self.vis.print_message("Solving: xyMotor = M * xyPlate")
+        # can calculate the full transfer matrix
+        # A = M*B --> M = A*B-1
+        # A .. xymotor
+        # B .. xyplate
+        A = np.matrix([[xymotor[0][0],xymotor[1][0],xymotor[2][0]],
+                       [xymotor[0][1],xymotor[1][1],xymotor[2][1]],
+                       [xymotor[0][2],xymotor[1][2],xymotor[2][2]]])
+        B = np.matrix([[xyplate[0][0],xyplate[1][0],xyplate[2][0]],
+                       [xyplate[0][1],xyplate[1][1],xyplate[2][1]],
+                       [xyplate[0][2],xyplate[1][2],xyplate[2][2]]])
+        # solve linear system of equations
+        self.vis.print_message(f"xyMotor:\n {A}")
+        self.vis.print_message(f"xyPlate:\n {B}")
+    
+        try:
+            M = np.dot(A,B.I)
+        except Exception:
+            # should not happen when all xyplate coordinates are unique
+            # (previous function removes all duplicate xyplate points)
+            # but can still produce a not valid Matrix
+            # as xymotor plates might not be unique/faulty
+            self.vis.print_message("Matrix singular")
+            M = TransferMatrix
+        return M
+    
+    
+    def align_test_point(self, test_list):
+        """Test if point is valid for aligning procedure"""
+        return [i for i in range(len(test_list)) if test_list[i] == None] 
+    
+    
+    def align_uniquepts(self, x, y): 
+        unique_x = []
+        unique_y = []
+        for i in range(len(x)):
+            if x[i] not in unique_x:
+                unique_x.append(x[i])
+                unique_y.append(y[i])
+        return unique_x, unique_y
+
+    
+    def cutoffdigits(self, M, digits):
+        for i in range(len(M)):
+            for j in range(len(M)):
+                M[i,j] = round(M[i,j],digits)
+        return M
+    
+    
+    ################################################################################
+    # 
+    ################################################################################
+    def update_calpointdisplay(self, ptid):
+        """Updates the calibration point display"""
+        self.calib_xplate[ptid].value = (str)(self.calib_ptsplate[ptid][0])
+        self.calib_yplate[ptid].value = (str)(self.calib_ptsplate[ptid][1]) 
+        self.calib_xmotor[ptid].value = (str)(self.calib_ptsmotor[ptid][0])
+        self.calib_ymotor[ptid].value = (str)(self.calib_ptsmotor[ptid][1])
+    
+    
+    def update_status(self, updatestr, reset = 0):
+        """updates the web interface status field"""
+        if reset:
+            self.status_align.value = updatestr
+        else:
+            oldstatus = self.status_align.value
+            self.status_align.value = updatestr+'\n######\n'+oldstatus
+    
+    
+    def update_pm_plot(self):
+        """plots the plate map"""
+        x = [col['x'] for col in self.pmdata]
+        y = [col['y'] for col in self.pmdata]
+        # remove old Pmplot
+        old_point = self.plot_mpmap.select(name="PMplot")
+        if len(old_point)>0:
+            self.plot_mpmap.renderers.remove(old_point[0])
+        self.plot_mpmap.square(
+                               x, 
+                               y, 
+                               size=5, 
+                               color=None, 
+                               alpha=0.5, 
+                               line_color="black",
+                               name="PMplot"
+                              )
+    
+    
+    
+    def update_Markerdisplay(self, selMarker):
+        """updates the Marker display elements"""
+        self.marker_x[selMarker].value = (str)(self.MarkerXYplate[selMarker][0])
+        self.marker_y[selMarker].value = (str)(self.MarkerXYplate[selMarker][1])
+        self.marker_index[selMarker].value = (str)((self.MarkerIndex[selMarker]))
+        self.marker_sample[selMarker].value = (str)((self.MarkerSample[selMarker]))
+        self.marker_code[selMarker].value = (str)((self.MarkerCode[selMarker]))
+        self.marker_fraction[selMarker].value = (str)(self.MarkerFraction[selMarker])
+    
+    
+    def update_TranferMatrixdisplay(self):
+        self.calib_xscale_text.value = f"{self.TransferMatrix[0, 0]:.1E}"
+        self.calib_yscale_text.value = f"{self.TransferMatrix[1, 1]:.1E}"
+        self.calib_xtrans_text.value = f"{self.TransferMatrix[0, 2]:.1E}"
+        self.calib_ytrans_text.value = f"{self.TransferMatrix[1, 2]:.1E}"
+        self.calib_rotx_text.value = f"{self.TransferMatrix[0, 1]:.1E}"
+        self.calib_roty_text.value = f"{self.TransferMatrix[1, 0]:.1E}"
+
+
+    def update_pm_plot_title(self, plateid):
+        self.plot_mpmap.title.text = (f"PlateMap: {plateid}")
+
+
+    def init_mapaligner(self):
+        """resets all parameters"""
+        self.TransferMatrix = self.initialTransferMatrix
+        self.calib_ptsplate = [
+                               (None, None,1),
+                               (None, None,1),
+                               (None, None,1)
+                              ]
+        self.calib_ptsmotor = [
+                               (None, None,1),
+                               (None, None,1),
+                               (None, None,1)
+                              ]
+        self.MarkerSample = [None, None, None, None, None]
+        self.MarkerIndex = [None, None, None, None, None]
+        self.MarkerCode = [None, None, None, None, None]
+        self.MarkerXYplate = [
+                              (None, None,1),
+                              (None, None,1),
+                              (None, None,1),
+                              (None, None,1),
+                              (None, None,1)
+                             ]
+        self.MarkerFraction = [None, None, None, None, None]
+        for idx in range(len(self.MarkerNames)):
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_Markerdisplay,idx)
+            )
+        for i in range(0,3):
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_calpointdisplay,i)
+            )
+        self.remove_allMarkerpoints()
+        self.vis.doc.add_next_tick_callback(
+            partial(self.update_TranferMatrixdisplay)
+        )
+        self.vis.doc.add_next_tick_callback(
+            partial(
+                    self.update_status,
+                    "Press ""Go"" to start alignment procedure.",
+                    reset = 1
+            )
+        )
+        
+        # initialize motor position variables
+        # by simply moving relative 0
+        asyncio.gather(
+            self.motor_move(
+                mode = MoveModes.relative,
+                x = 0,
+                y = 0
+            )
+        )
+        
+        # force redraw of cell marker
+        self.gbuf_motor_position = -1*self.gbuf_motor_position
+        self.gbuf_plate_position = -1*self.gbuf_plate_position
+        
+    
+    async def IOloop_aligner(self): # non-blocking coroutine, updates data source
+        """IOloop for updating web interface"""
+        while True:
+            try:
+                await asyncio.sleep(0.1)
+                self.vis.doc.add_next_tick_callback(partial(self.IOloop_helper))
+
+                msg = await self.motorpos_q.get()
+                self.vis.print_message(f"Aligner IO got new pos {msg}",
+                                        info = True)
+                if "ax" in msg:
+                    if 'x' in msg['ax']:
+                        idx = msg['ax'].index('x')
+                        xmotor = msg['position'][idx]
+                    else:
+                        xmotor = None
+                
+                    if 'y' in msg['ax']:
+                        idx = msg['ax'].index('y')
+                        ymotor = msg['position'][idx]
+                    else:
+                        ymotor = None
+                    self.g_motor_position = [xmotor, ymotor, 1] # dim needs to be always + 1 for later transformations
+    
+                    self.vis.print_message(f"Motor :{self.g_motor_position}",
+                                            info = True)
+                elif "motor_status" in msg:
+                    if all(status == "stopped" for status in msg["motor_status"]):
+                        self.g_motor_ismoving = False
+                    else:
+                        self.g_motor_ismoving = True
+
+                    
+                self.motorpos_q.task_done()
+            except Exception as e:
+                print(e)
+
+
+
+    def IOloop_helper(self):
+        self.motor_readxmotor_text.value = (str)(self.g_motor_position[0])
+        self.motor_readymotor_text.value = (str)(self.g_motor_position[1])
+        if self.g_motor_ismoving:
+            self.motor_move_indicator.label = "Stage Moving"
+            self.motor_move_indicator.button_type = "danger"
+        else:
+            self.motor_move_indicator.label = "Stage Stopped"
+            self.motor_move_indicator.button_type = "success"
+    
+        # only update marker when positions differ
+        # to remove flicker
+        if not self.gbuf_motor_position == self.g_motor_position:
+            # convert motorxy to platexy # todo, replace with wsdatapositionbuffer
+            tmpplate = self.motor.transform.transform_motorxy_to_platexy(motorxy = self.g_motor_position)
+            self.vis.print_message(f"Plate: {tmpplate}", info = True)
+            
+            # update cell marker position in plot
+            # remove old Marker point
+            old_point = self.plot_mpmap.select(name=self.MarkerNames[0])
+            if len(old_point)>0:
+                self.plot_mpmap.renderers.remove(old_point[0])
+            # plot new Marker point
+            self.plot_mpmap.square(
+                                   tmpplate[0], 
+                                   tmpplate[1], 
+                                   size=7,
+                                   line_width=2, 
+                                   color=None, 
+                                   alpha=1.0, 
+                                   line_color=self.MarkerColors[0], 
+                                   name=self.MarkerNames[0]
+                                  )
+    
+            self.MarkerXYplate[0] = (tmpplate[0],tmpplate[1],1)
+            # get rest of values from nearest point 
+            PMnum = self.get_samples([tmpplate[0]], [tmpplate[1]])
+            buf = ""
+            if PMnum is not None:
+                if PMnum[0] is not None: # need to check as this can also happen
+                    self.MarkerSample[0] = self.pmdata[PMnum[0]]["Sample"]
+                    self.MarkerIndex[0] = PMnum[0]
+                    self.MarkerCode[0] = self.pmdata[PMnum[0]]["code"]
+            
+                    # only display non zero fractions
+                    buf = ""
+                    # TODO: test on other platemap
+                    for fraclet in ("A", "B", "C", "D", "E", "F", "G", "H"):
+                        if self.pmdata[PMnum[0]][fraclet] > 0:
+                            buf = "%s%s%d " % (buf,fraclet, self.pmdata[PMnum[0]][fraclet]*100)
+                    if len(buf) == 0:
+                        buf = "-"
+                    self.MarkerFraction[0] = buf
+    
+            self.update_Markerdisplay(0)
+    
+        # buffer position
+        self.gbuf_motor_position = self.g_motor_position

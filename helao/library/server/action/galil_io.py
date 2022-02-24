@@ -15,7 +15,7 @@ from typing import Optional
 from fastapi import Body
 from importlib import import_module
 from helaocore.server.base import makeActionServ
-from helao.library.driver.galil_io_driver import galil
+from helao.library.driver.galil_io_driver import Galil
 from helaocore.schema import Action
 from helaocore.error import ErrorCodes
 
@@ -29,7 +29,7 @@ def makeApp(confPrefix, servKey):
         server_title=servKey, 
         description="Galil IO server", 
         version=2.0, 
-        driver_class=galil
+        driver_class=Galil
     )
 
 

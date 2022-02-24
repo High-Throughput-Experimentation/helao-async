@@ -33,16 +33,6 @@ config["servers"] = dict(
     ##########################################################################
     # Instrument Servers
     ##########################################################################
-    # DATA=dict(
-    #     host=hostip,
-    #     port=8002,
-    #     group="action",
-    #     fast="HTEdata_server",
-    #     mode="legacy",  # lagcy; modelyst
-    #     # cmd_print=False,
-    #     params=dict(
-    #     ),
-    # ),
     MOTOR=dict(
         host=hostip,
         port=8003,
@@ -50,6 +40,9 @@ config["servers"] = dict(
         fast="galil_motion",
         # cmd_print=False,
         params=dict(
+            enable_aligner = True,
+            bokeh_port = 5003,
+            cutoff=6,  # cutoff of digits for TransferMatrix calculation
             Transfermatrix = [[1,0,0],[0,1,0],[0,0,1]], # default Transfermatrix for plate calibration
             
             # 4x6 plate
@@ -93,18 +86,6 @@ config["servers"] = dict(
             dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
         ),
     ),
-    # aligner=dict(
-    #     host=hostip,
-    #     port=8005,
-    #     group="action",
-    #     fast="alignment_server",
-    #     params=dict(
-    #         data_server="data",  # will use this to get PM_map temporaily, else need to parse it as JSON later
-    #         motor_server="motor",  # will use this to get PM_map temporaily, else need to parse it as JSON later
-    #         vis_server="aligner_vis",  # will use this to get PM_map temporaily, else need to parse it as JSON later
-    #         cutoff=6,  # cutoff of digits for TransferMatrix calculation
-    #     ),
-    # ),
     NI=dict(
         host="127.0.0.1",
         port=8006,
@@ -259,13 +240,4 @@ config["servers"] = dict(
             ws_potentiostat = 'PSTAT',
         )
     ),
-    # aligner_vis=dict(
-    #     host=hostip,
-    #     port=5003,
-    #     group="action",
-    #     bokeh="bokeh_platealigner",
-    #     params=dict(
-    #         aligner_server="aligner",  # aligner and aligner_vis should be in tandem
-    #     ),
-    # ),
 )
