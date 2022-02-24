@@ -22,9 +22,9 @@ from bokeh.plotting import figure
 from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
 from bokeh.models import Button, TextAreaInput, TextInput, Select, CheckboxGroup, Toggle, CustomJS
-from bokeh.events import ButtonClick, DoubleTap
-from bokeh.models import TapTool
-
+from bokeh.events import ButtonClick, DoubleTap, MouseWheel, Pan
+from bokeh.models import TapTool, PanTool
+from bokeh.layouts import gridplot
 
 from helaocore.server.base import Base
 from helaocore.error import ErrorCodes
@@ -1376,7 +1376,9 @@ class Aligner:
 
         # will be updated during init
         self.g_motor_ismoving = False
-
+        
+        self.manual_step = 1 # mm
+        self.mouse_control = False
         # initial instrument specific TransferMatrix
         self.initialTransferMatrix = np.matrix(
                                                [
@@ -1692,6 +1694,7 @@ class Aligner:
                     ]]),
             ],
         ])
+
         
         ######################################################################
         #### Motor group elements ####
@@ -1817,10 +1820,172 @@ class Aligner:
                 background="#808000"
             ),
         ])
+
+
+        dimarrow = 20
+        self.motor_buttonup = \
+                        Button(
+                               label="\u2191", 
+                               button_type="danger", 
+                               disabled=False, 
+                               width=dimarrow, 
+                               height=dimarrow,
+                               # css_classes=[buf]
+                              )
+        self.motor_buttondown = \
+                        Button(
+                               label="\u2193", 
+                               button_type="danger", 
+                               disabled=False, 
+                               width=dimarrow,
+                               height=dimarrow,
+                               # css_classes=[buf]
+                              )
+        self.motor_buttonleft = \
+                        Button(
+                               label="\u2190", 
+                               button_type="danger", 
+                               disabled=False, 
+                               width=dimarrow,
+                               height=dimarrow,
+                               # css_classes=[buf]
+                              )
+        self.motor_buttonright = \
+                        Button(
+                               label="\u2192", 
+                               button_type="danger", 
+                               disabled=False, 
+                               width=dimarrow,
+                               height=dimarrow,
+                               # css_classes=[buf]
+                              )
+
+        self.motor_buttonupleft = \
+                        Button(
+                               label="\u2196", 
+                               button_type="warning", 
+                               disabled=False, 
+                               width=dimarrow, 
+                               height=dimarrow,
+                               # css_classes=[buf]
+                              )
+        self.motor_buttondownleft = \
+                        Button(
+                               label="\u2199", 
+                               button_type="warning", 
+                               disabled=False, 
+                               width=dimarrow,
+                               height=dimarrow,
+                               # css_classes=[buf]
+                              )
+        self.motor_buttonupright = \
+                        Button(
+                               label="\u2197", 
+                               button_type="warning", 
+                               disabled=False, 
+                               width=dimarrow,
+                               height=dimarrow,
+                               # css_classes=[buf]
+                              )
+        self.motor_buttondownright = \
+                        Button(
+                               label="\u2198", 
+                               button_type="warning", 
+                               disabled=False, 
+                               width=dimarrow,
+                               height=dimarrow,
+                               # css_classes=[buf]
+                              )
+
+        self.motor_step = TextInput(
+                                    value=f"{self.manual_step}", 
+                                    title="step (mm)", 
+                                    disabled=False, 
+                                    width=200, 
+                                    height=40, 
+                                    # css_classes=["custom_input1"]
+                                   )
+
+
+        self.motor_buttonup.on_click(
+            partial(self.clicked_move_up)
+        )
+        self.motor_buttondown.on_click(
+            partial(self.clicked_move_down)
+        )
+        self.motor_buttonleft.on_click(
+            partial(self.clicked_move_left)
+        )
+        self.motor_buttonright.on_click(
+            partial(self.clicked_move_right)
+        )
+
+        self.motor_buttonupleft.on_click(
+            partial(self.clicked_move_upleft)
+        )
+        self.motor_buttondownleft.on_click(
+            partial(self.clicked_move_downleft)
+        )
+        self.motor_buttonupright.on_click(
+            partial(self.clicked_move_upright)
+        )
+        self.motor_buttondownright.on_click(
+            partial(self.clicked_move_downright)
+        )
+
+        self.motor_step.on_change(
+            "value", 
+            partial(self.callback_changed_motorstep, sender=self.motor_step)
+        )
+
+        self.motor_mousemove_check = CheckboxGroup(
+                                              labels=["Mouse control motor"], 
+                                              width=40,
+                                              active=[]
+                                             )
+        self.motor_mousemove_check.on_click(
+            partial(self.clicked_motor_mousemove_check)
+        )
+
+
+        self.layout_manualmotor = \
+             layout([
+                        [
+                         Spacer(width=20), 
+                         Div(
+                             text="<b>Manual Motor Control</b>",
+                             width=200+50,
+                             height=15
+                            )
+                        ],
+                        [gridplot(
+                                    [[
+                                     self.motor_buttonupleft,
+                                     self.motor_buttonup,
+                                     self.motor_buttonupright
+                                    ],
+                                    [
+                                     self.motor_buttonleft,
+                                     None,
+                                     self.motor_buttonright,
+                                    ],
+                                    [
+                                     self.motor_buttondownleft,
+                                     self.motor_buttondown,
+                                     self.motor_buttondownright,
+                                    ]],
+                                    width=50,
+                                    height=50
+                        )],
+                        [self.motor_step],
+                        [self.motor_mousemove_check],
+                   ])
+
+
         
-        ##############################################################################
+        ######################################################################
         #### Marker group elements ####
-        ##############################################################################
+        ######################################################################
         self.marker_type_text = []
         self.marker_move_button = []
         self.marker_buttonsel = []
@@ -1908,7 +2073,7 @@ class Aligner:
                                                   css_classes=["custom_input2"]
                                                  )
                                        )
-            buf = ("custom_button_Marker%d") % (idx+1)
+            buf = f"custom_button_Marker{(idx+1)}"
             self.marker_buttonsel.append(
                                          Button(
                                                 label="", 
@@ -1927,18 +2092,6 @@ class Aligner:
                 partial(self.clicked_button_marker_move, idx=idx)
             )
             
-            buf = """<svg width="40" height="40">
-                     <rect width="40" height="40" 
-                     style="fill:rgb(%d,%d,%d);stroke-width:3;stroke:rgb(%d,%d,%d)"/>
-                     </svg>""" \
-                % (
-                   self.MarkerColors[idx][0],
-                   self.MarkerColors[idx][1],
-                   self.MarkerColors[idx][2],
-                   self.MarkerColors[idx][0],
-                   self.MarkerColors[idx][1],
-                   self.MarkerColors[idx][2]
-                  )
             self.marker_layout.append(
                 layout(
                        self.marker_type_text[idx],
@@ -1979,8 +2132,7 @@ class Aligner:
             ]],
             background="#C0C0C0"
         )
-        
-        
+
         ######################################################################
         ## pm plot
         ######################################################################
@@ -1991,9 +2143,11 @@ class Aligner:
                                  y_axis_label="Y (mm)",
                                  width = self.totalwidth
                                 )
-        self.taptool = self.plot_mpmap.select(type=TapTool)
+        # self.taptool = self.plot_mpmap.select(type=TapTool)
+        # self.pantool = self.plot_mpmap.select(type=PanTool)
         self.plot_mpmap.on_event(DoubleTap, self.clicked_pmplot)
-        
+        self.plot_mpmap.on_event(MouseWheel, self.clicked_pmplot_mousewheel)
+        self.plot_mpmap.on_event(Pan, self.clicked_pmplot_mousepan)
         
         ######################################################################
         # add all to alignerwebdoc
@@ -2037,7 +2191,8 @@ class Aligner:
                                   [[
                                     self.layout_getPM,
                                     self.layout_calib, 
-                                    self.layout_motor
+                                    self.layout_motor,
+                                    self.layout_manualmotor
                                   ]]
                               )
         )
@@ -2055,6 +2210,117 @@ class Aligner:
         self.init_mapaligner()
 
 
+    def clicked_move_up(self):
+        asyncio.gather(
+            self.motor_move(
+                mode = MoveModes.relative,
+                x = 0,
+                y = self.manual_step
+            )
+        )
+
+    def clicked_move_down(self):
+        asyncio.gather(
+            self.motor_move(
+                mode = MoveModes.relative,
+                x = 0,
+                y = -self.manual_step
+            )
+        )
+
+
+    def clicked_move_left(self):
+        asyncio.gather(
+            self.motor_move(
+                mode = MoveModes.relative,
+                x = -self.manual_step,
+                y = 0
+            )
+        )
+
+
+    def clicked_move_right(self):
+        asyncio.gather(
+            self.motor_move(
+                mode = MoveModes.relative,
+                x = self.manual_step,
+                y = 0
+            )
+        )
+
+
+    def clicked_move_upright(self):
+        asyncio.gather(
+            self.motor_move(
+                mode = MoveModes.relative,
+                x = self.manual_step,
+                y = self.manual_step
+            )
+        )
+
+    def clicked_move_downright(self):
+        asyncio.gather(
+            self.motor_move(
+                mode = MoveModes.relative,
+                x = self.manual_step,
+                y = -self.manual_step
+            )
+        )
+
+
+    def clicked_move_upleft(self):
+        asyncio.gather(
+            self.motor_move(
+                mode = MoveModes.relative,
+                x = -self.manual_step,
+                y = self.manual_step
+            )
+        )
+
+
+    def clicked_move_downleft(self):
+        asyncio.gather(
+            self.motor_move(
+                mode = MoveModes.relative,
+                x = -self.manual_step,
+                y = -self.manual_step
+            )
+        )
+
+    def clicked_motor_mousemove_check(self, new):
+        if new:
+            self.mouse_control = True
+        else:
+            self.mouse_control = False
+
+
+    def callback_changed_motorstep(self, attr, old, new, sender):
+        """callback for plateid text input"""
+        def to_float(val):
+            try:
+                return float(val)
+            except ValueError:
+                return None
+
+        newstep = to_float(new)
+        oldstep =  to_float(old)
+
+        if newstep is not None:
+            self.manual_step = newstep
+        else:
+            if oldstep is not None:
+                self.manual_step = oldstep
+            else:
+                self.manual_step = 1
+        self.vis.doc.add_next_tick_callback(
+            partial(self.update_input_value,sender,f"{self.manual_step}")
+        )
+
+
+    def update_input_value(self, sender, value):
+        sender.value = value
+
+
     def clicked_reset(self):
         """resets aligner to initial params"""
         self.init_mapaligner()
@@ -2063,7 +2329,8 @@ class Aligner:
     def clicked_addpoint(self, event):
         """Add new point to calibration point list and removing last point"""
         # (1) get selected marker
-        selMarker = self.MarkerNames.index(self.calib_sel_motor_loc_marker.value)
+        selMarker = \
+            self.MarkerNames.index(self.calib_sel_motor_loc_marker.value)
         # (2) add new platexy point to end of plate point list
         self.calib_ptsplate.append(self.MarkerXYplate[selMarker])
         # (3) get current motor position
@@ -2167,7 +2434,8 @@ class Aligner:
     
     def clicked_button_marker_move(self, idx):
         """move motor to maker position"""
-        if not self.marker_x[idx].value == "None" and not self.marker_y[idx].value == "None":
+        if not self.marker_x[idx].value == "None" \
+        and not self.marker_y[idx].value == "None":
             asyncio.gather(
                 self.motor_move(
                     mode = MoveModes.absolute,
@@ -2175,12 +2443,44 @@ class Aligner:
                     y = (float)(self.marker_y[idx].value)
                 )
             )
-    
-    
+
+
+    def clicked_pmplot_mousepan(self, event):
+        if self.mouse_control:
+            asyncio.gather(
+                self.motor_move(
+                    mode = MoveModes.relative,
+                    x = self.manual_step*event.delta_x/100,
+                    y = self.manual_step*event.delta_y/100
+                )
+            )
+
+
+    def clicked_pmplot_mousewheel(self, event):
+        if self.mouse_control:
+            if event.delta > 0:
+                new_manual_step = self.manual_step*(2*abs(event.delta)/1000)
+            else:
+                new_manual_step = self.manual_step/(2*abs(event.delta)/1000)
+
+            if new_manual_step < 0.01:
+                new_manual_step = 0.01                
+            if new_manual_step > 10:
+                new_manual_step = 10
+                
+            self.callback_changed_motorstep(
+                attr = "value",
+                old = f"{self.manual_step}",
+                new = f"{new_manual_step}",
+                sender = self.motor_step
+            )
+
+
     def clicked_pmplot(self, event):
         """double click/tap on PM plot to add/move marker"""
         # get selected Marker
-        selMarker = self.MarkerNames.index(self.calib_sel_motor_loc_marker.value)
+        selMarker = \
+            self.MarkerNames.index(self.calib_sel_motor_loc_marker.value)
         # get coordinates of doubleclick
         platex = event.x
         platey = event.y
@@ -2201,7 +2501,7 @@ class Aligner:
                 # TODO: test on other platemap
                 for fraclet in ("A", "B", "C", "D", "E", "F", "G", "H"):
                     if self.pmdata[PMnum[0]][fraclet] > 0:
-                        buf = "%s%s%d " % (buf,fraclet, self.pmdata[PMnum[0]][fraclet]*100)
+                        buf = f"{buf}{fraclet}{self.pmdata[PMnum[0]][fraclet]*100} "
                 if len(buf) == 0:
                     buf = "-"
                 self.MarkerFraction[selMarker] = buf
