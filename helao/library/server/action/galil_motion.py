@@ -15,6 +15,7 @@ __all__ = ["makeApp"]
 from importlib import import_module
 from typing import Optional, List, Union
 from fastapi import Body
+import numpy as np
 
 
 from helao.library.driver.galil_motion_driver import (
@@ -64,7 +65,40 @@ def makeApp(confPrefix, servKey):
             return finished_action.as_dict()
 
 
-    @app.post(f"/{servKey}/run_aligner")
+    @app.post(f"/{servKey}/reset_alignment", tags=["public_aligner"])
+    async def reset_alignment(
+                              action: Optional[Action] = \
+                                      Body({}, embed=True)
+                             ):
+            active = await app.base.setup_and_contain_action()
+            app.driver.reset_transfermatrix()
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+
+    @app.post(f"/{servKey}/load_alignment", tags=["public_aligner"])
+    async def load_alignment(
+                              action: Optional[Action] = \
+                                      Body({}, embed=True),
+                              matrix: Optional[List] = [
+                                                        [1,0,0],
+                                                        [0,1,0],
+                                                        [0,0,1]
+                                                       ]
+                             ):
+            active = await app.base.setup_and_contain_action(
+                json_data_keys = ["matrix"]
+            )
+            newmatrix = app.driver.update_transfermatrix(newtransfermatrix = \
+                                     np.matrix(active.action.action_params["matrix"])
+            )
+            await active.enqueue_data_dflt(datadict = \
+               {"matrix": newmatrix.tolist()})
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+
+    @app.post(f"/{servKey}/run_aligner", tags=["public_aligner"])
     async def run_aligner(
                                            action: Optional[Action] = \
                                                    Body({}, embed=True),
@@ -267,7 +301,7 @@ def makeApp(confPrefix, servKey):
                                               action_abbr = "query_position"
             )
             await active.enqueue_data_dflt(datadict = \
-               await app.driver.query_axis_position(await app.driver.get_all_axis()))
+               await app.driver.query_axis_position(app.driver.get_all_axis()))
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -390,7 +424,7 @@ def makeApp(confPrefix, servKey):
                                           action_abbr = "stop"
         )
         datadict = \
-            await app.driver.motor_off(axis = await app.driver.get_all_axis())
+            await app.driver.motor_off(axis = app.driver.get_all_axis())
         active.action.error_code = \
             app.base.get_main_error(
                 datadict.get("err_code", ErrorCodes.unspecified)
