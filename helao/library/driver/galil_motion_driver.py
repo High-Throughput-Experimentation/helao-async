@@ -17,30 +17,36 @@ from functools import partial
 import json
 import os
 from socket import gethostname
+import base64
 
 from bokeh.server.server import Server
-from bokeh.models import ColumnDataSource, CheckboxButtonGroup, RadioButtonGroup
+from bokeh.models import ColumnDataSource
 from bokeh.models.widgets import Paragraph
 from bokeh.plotting import figure
 from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
-from bokeh.models import Button, TextAreaInput, TextInput, Select, CheckboxGroup, Toggle, CustomJS
+from bokeh.models import (
+                          Button, 
+                          TextAreaInput, 
+                          TextInput, 
+                          Select, 
+                          CheckboxGroup, 
+                          Toggle, 
+                         )
 from bokeh.events import ButtonClick, DoubleTap, MouseWheel, Pan
-from bokeh.models import TapTool, PanTool
+# from bokeh.models import TapTool, PanTool
 from bokeh.layouts import gridplot
+from bokeh.models.widgets import FileInput
 
 from helaocore.server.base import Base
 from helaocore.error import ErrorCodes
 from helaocore.schema import Action
-from helaocore.error import ErrorCodes
 from helaocore.server.vis import Vis
 from helaocore.server.make_vis_serv import makeVisServ
 from helaocore.data.legacy import HTELegacyAPI
 from helaocore.model.active import ActiveParams
-from helaocore.model.file import FileConnParams, HloHeaderModel
+from helaocore.model.file import FileConnParams
 from helaocore.model.data import DataModel
-
-# driver_path = os.path.dirname(__file__)
 
 # install galil driver first
 # (helao) c:\Program Files (x86)\Galil\gclib\source\wrappers\python>python setup.py install
@@ -58,6 +64,13 @@ class Galil:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
 
+        self.dflt_matrix = np.matrix(
+                                     [
+                                      [1,0,0],
+                                      [0,1,0],
+                                      [0,0,1]
+                                     ]
+                                    )
 
 
         self.file_backup_transfermatrix = None
@@ -70,7 +83,7 @@ class Galil:
         self.load_transfermatrix(file = self.file_backup_transfermatrix)
         self.save_transfermatrix(file = self.file_backup_transfermatrix)
 
-
+        self.motor_timeout = self.config_dict.get("timeout", 60)
 
         # need to check if config settings exist
         # else need to create empty ones
@@ -85,8 +98,10 @@ class Galil:
 
         self.xyTransfermatrix = np.matrix([
                                            [1, 0, 0],
-                                           [0, 1, 0],[0, 0, 1]
+                                           [0, 1, 0],
+                                           [0, 0, 1]
                                           ])
+
 
         # Mplatexy is identity matrix by default
         self.transform = TransformXY(self.base,
@@ -135,10 +150,7 @@ class Galil:
         self.aligner = None
         self.aligner_enabled = self.base.server_params.get("enable_aligner", False)
         if self.aligner_enabled:
-            # asyncio.gather(self.init_Gamry(self.Gamry_devid))
             self.start_aligner()
-
-    
 
 
     def start_aligner(self):
@@ -178,7 +190,7 @@ class Galil:
 
     async def setaxisref(self):
         # home all axis first
-        axis = await self.get_all_axis()
+        axis = self.get_all_axis()
         self.base.print_message(f"axis: {axis}")
         if "Rx" in axis:
             axis.remove("Rx")
@@ -355,7 +367,7 @@ class Galil:
 
         # need to get absolute motor position first
         tmpmotorpos = await self.query_axis_position(
-            await self.get_all_axis()
+            self.get_all_axis()
         )
         self.base.print_message(f"current absolute motor positions: "
                                 f"{tmpmotorpos}")
@@ -647,24 +659,18 @@ class Galil:
 
             # check if all axis stopped
             tstart = time.time()
-            if "timeout" in self.config_dict:
-                tout = self.config_dict["timeout"]
-            else:
-                tout = 60
 
-            while (time.time() - tstart < tout) \
+            while (time.time() - tstart < self.motor_timeout) \
             and not self.base.actionserver.estop:
                 qmove = await self.query_axis_moving(axis)
-                test = await self.query_axis_position(await self.get_all_axis())
-
-                #                time.sleep(0.5) # TODO: what time is ok to wait and not to overload the Galil
+                # test = await self.query_axis_position(self.get_all_axis())
                 await asyncio.sleep(0.5)
                 if all(status == "stopped" for status in qmove["motor_status"]):
                     break
 
             if not self.base.actionserver.estop:
                 # stop of motor movement (motor still on)
-                if time.time() - tstart > tout:
+                if time.time() - tstart > self.motor_timeout:
                     await self.stop_axis(axis)
                 # check which axis had the timeout
                 newret_err_code = []
@@ -722,9 +728,10 @@ class Galil:
 
         # first get the relative position (actual only the current position of the encoders)
         # to get how many axis are present
-        q = self.c("TP")  # query position of all axis
+        qTP = self.c("TP")  # query position of all axis
+        self.base.print_message(f"q (TP): {qTP}")
         cmd = "PA "
-        for i in range(len(q.split(","))):
+        for i in range(len(qTP.split(","))):
             if i == 0:
                 cmd += "?"
             else:
@@ -732,7 +739,7 @@ class Galil:
         q = self.c(cmd)  # query position of all axis
         # _ = self.c("PF 10.4")  # set format
         # q = self.c("TP")  # query position of all axis
-        self.base.print_message(f"q: {q}")
+        self.base.print_message(f"q (PA): {q}")
         # now we need to map these outputs to the ABCDEFG... channels
         # and then map that to xyz so it is humanly readable
         axlett = "ABCDEFGH"
@@ -827,8 +834,8 @@ class Galil:
         # release estop: switch=false
         self.base.print_message("Axis Estop")
         if switch == True:
-            await self.stop_axis(await self.get_all_axis())
-            await self.motor_off(await self.get_all_axis())
+            await self.stop_axis(self.get_all_axis())
+            await self.motor_off(self.get_all_axis())
             # set flag (move command need to check for it)
             self.base.actionserver.estop = True
         else:
@@ -925,7 +932,7 @@ class Galil:
         self.c("\x1a")  # terminator "<cntrl>Z"
 
 
-    async def get_all_axis(self):
+    def get_all_axis(self):
         return [ax for ax in self.axis_id]
 
     async def get_all_digital_out(self):
@@ -953,7 +960,6 @@ class Galil:
 
 
     async def update_aligner(self, msg):
-        # await self.interrupt_q.put(self.orchstatusmodel)
         if self.aligner_enabled and self.aligner:
             await self.aligner.motorpos_q.put(msg)
 
@@ -967,40 +973,50 @@ class Galil:
                 os.makedirs(filedir, exist_ok=True)
 
             with open(file, "w") as f:
-                # f.write(json.dumps(f"{self.TransferMatrix}"))
                 f.write(json.dumps(self.transfermatrix.tolist()))
 
 
     def load_transfermatrix(self, file):
-        matrix = np.matrix(
-                      [
-                       [1,0,0],
-                       [0,1,0],
-                       [0,0,1]
-                      ]
-                     )
         if os.path.exists(file):
             with open(file, "r") as f:
                 try:
                     data = f.readline()
                     new_matrix = np.matrix(json.loads(data))
-                    if new_matrix.shape != matrix.shape:
-                        self.base.print_message(f"matrix {new_matrix} "
+                    if new_matrix.shape != self.dflt_matrix.shape:
+                        self.base.print_message(f"matrix '{new_matrix}' "
                                                "has wrong shape",
                                                error = True)
-                        return matrix
+                        return self.dflt_matrix
                     else:
-                        self.base.print_message(f"loaded matrix {new_matrix}")
+                        self.base.print_message(f"loaded matrix '{new_matrix}'")
                         return new_matrix
                     
                 except Exception:
                     self.base.print_message(f"error loading matrix for '{file}'",
                                            error = True)
-                    return matrix
+                    return self.dflt_matrix
         else:
             self.base.print_message(f"matrix file '{file}' not found",
                                    error = True)
-            return matrix
+            return self.dflt_matrix
+
+
+    def update_transfermatrix(self, newtransfermatrix):
+        if newtransfermatrix.shape != self.dflt_matrix.shape:
+            self.base.print_message(f"matrix '{newtransfermatrix}' "
+                                   "has wrong shape, using dflt.",
+                                   error = True)
+            matrix = self.dflt_matrix
+        else:
+            matrix = newtransfermatrix
+        self.transfermatrix = matrix
+        self.transform.update_Mplatexy(Mxy = self.transfermatrix)
+        return self.transfermatrix
+
+
+    def reset_transfermatrix(self):
+        self.update_transfermatrix(
+            newtransfermatrix = self.dflt_matrix)
 
 
 class MoveModes(str, Enum):
@@ -1469,11 +1485,19 @@ class Aligner:
         # this is now used for plate to motor transformation and will be refined
         self.TransferMatrix = self.initialTransferMatrix
         
+        self.markerdata = ColumnDataSource({"x0": [0], "y0": [0]})
         self.create_layout()
         self.motor.aligner = self
         self.IOtask = asyncio.create_task(self.IOloop_aligner())
+        self.vis.doc.on_session_destroyed(self.cleanup_session)
 
-        
+
+    def cleanup_session(self, session_context):
+        self.vis.print_message("Bokeh session closed",
+                                error = True)
+        self.IOtask.cancel()
+
+
     def create_layout(self):
         
         self.MarkerColors = [
@@ -1978,7 +2002,7 @@ class Aligner:
                                     value=f"{self.manual_step}", 
                                     title="step (mm)", 
                                     disabled=False, 
-                                    width=200, 
+                                    width=150, 
                                     height=40, 
                                     # css_classes=["custom_input1"]
                                    )
@@ -2025,6 +2049,14 @@ class Aligner:
         )
 
 
+        self.calib_file_input = FileInput(
+                                          width=150,
+                                          accept=".json"
+                                         )
+        self.calib_file_input.on_change('value', self.callback_calib_file_input)
+
+
+
         self.layout_manualmotor = \
              layout([
                         [
@@ -2056,6 +2088,15 @@ class Aligner:
                         )],
                         [self.motor_step],
                         [self.motor_mousemove_check],
+                        [[
+                         Spacer(width=20), 
+                         Div(
+                             text="<b>calib file:</b>",
+                             width=200+50,
+                             height=15
+                            ),
+                         self.calib_file_input
+                        ]]
                    ])
 
 
@@ -2220,6 +2261,33 @@ class Aligner:
                                  y_axis_label="Y (mm)",
                                  width = self.totalwidth
                                 )
+
+        self.plot_mpmap.square(
+                               source=self.markerdata,
+                               x="x0",
+                               y="y0",
+                               size=7,
+                               line_width=2, 
+                               color=None, 
+                               alpha=1.0, 
+                               line_color=self.MarkerColors[0], 
+                               name=self.MarkerNames[0]
+                              )
+
+        self.plot_mpmap.rect(
+                              6.0*25.4/2,
+                              4.0*25.4/2.0,
+                              width = 6.0*25.4,
+                              height = 4.0*25.4,
+                              angle = 0.0,
+                              angle_units="rad",
+                              fill_alpha=0.0,
+                              fill_color="gray",
+                              line_width=2,
+                              alpha=1.0,
+                              line_color=(0,0,0),
+                              name="plate_boundary")
+
         # self.taptool = self.plot_mpmap.select(type=TapTool)
         # self.pantool = self.plot_mpmap.select(type=PanTool)
         self.plot_mpmap.on_event(DoubleTap, self.clicked_pmplot)
@@ -2369,6 +2437,19 @@ class Aligner:
             self.mouse_control = True
         else:
             self.mouse_control = False
+
+
+    def callback_calib_file_input(self, attr, old, new):
+        filecontent = base64.b64decode(new.encode('ascii')).decode('ascii')
+        try:
+            new_matrix = np.matrix(json.loads(filecontent))
+        except Exception:
+            self.vis.print_message("error loading matrix",
+                                   error = True)
+            new_matrix = self.motor.dflt_matrix
+
+        self.vis.print_message(f"loaded matrix '{new_matrix}'")
+        self.motor.update_transfermatrix(newtransfermatrix = new_matrix)
 
 
     def callback_changed_motorstep(self, attr, old, new, sender):
@@ -2582,7 +2663,6 @@ class Aligner:
                 if len(buf) == 0:
                     buf = "-"
                 self.MarkerFraction[selMarker] = buf
-            ##    elif:
             # remove old Marker point
             old_point = self.plot_mpmap.select(name=self.MarkerNames[selMarker])
             if len(old_point)>0:
@@ -2605,8 +2685,7 @@ class Aligner:
     async def finish_alignment(self, newTransfermatrix, errorcode):
         """sends finished alignment back to FastAPI server"""
         if self.active:
-            self.motor.transfermatrix = newTransfermatrix
-            self.motor.transform.update_Mplatexy(Mxy = self.motor.transfermatrix)
+            self.motor.update_transfermatrix(newtransfermatrix = newTransfermatrix)
             self.motor.save_transfermatrix(file = self.motor.file_backup_transfermatrix)
             self.motor.save_transfermatrix(file = os.path.join(self.motor.base.db_root, "plate_calib",
                              f"{gethostname()}_plate_{self.plateid}_calib.json")
@@ -2721,9 +2800,9 @@ class Aligner:
     
     def remove_allMarkerpoints(self):
         """Removes all Markers from plot"""
-        for idx in range(len(self.MarkerNames)):
+        for idx in range(len(self.MarkerNames)-1):
             # remove old Marker point
-            old_point = self.plot_mpmap.select(name=self.MarkerNames[idx])
+            old_point = self.plot_mpmap.select(name=self.MarkerNames[idx+1])
             if len(old_point)>0:
                 self.plot_mpmap.renderers.remove(old_point[0])
 
@@ -2968,6 +3047,7 @@ class Aligner:
             self.vis.doc.add_next_tick_callback(
                 partial(self.update_calpointdisplay,i)
             )
+
         self.remove_allMarkerpoints()
         self.vis.doc.add_next_tick_callback(
             partial(self.update_TranferMatrixdisplay)
@@ -3033,7 +3113,6 @@ class Aligner:
                 print(e)
 
 
-
     def IOloop_helper(self):
         self.motor_readxmotor_text.value = (str)(self.g_motor_position[0])
         self.motor_readymotor_text.value = (str)(self.g_motor_position[1])
@@ -3052,22 +3131,7 @@ class Aligner:
             self.vis.print_message(f"Plate: {tmpplate}", info = True)
             
             # update cell marker position in plot
-            # remove old Marker point
-            old_point = self.plot_mpmap.select(name=self.MarkerNames[0])
-            if len(old_point)>0:
-                self.plot_mpmap.renderers.remove(old_point[0])
-            # plot new Marker point
-            self.plot_mpmap.square(
-                                   tmpplate[0], 
-                                   tmpplate[1], 
-                                   size=7,
-                                   line_width=2, 
-                                   color=None, 
-                                   alpha=1.0, 
-                                   line_color=self.MarkerColors[0], 
-                                   name=self.MarkerNames[0]
-                                  )
-    
+            self.markerdata.data = {"x0": [tmpplate[0]], "y0": [tmpplate[1]]}    
             self.MarkerXYplate[0] = (tmpplate[0],tmpplate[1],1)
             # get rest of values from nearest point 
             PMnum = self.get_samples([tmpplate[0]], [tmpplate[1]])
