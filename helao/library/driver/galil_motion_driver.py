@@ -114,31 +114,42 @@ class Galil:
         self.g = gclib.py()
         self.base.print_message(f"gclib version: {self.g.GVersion()}")
         # TODO: error checking here: Galil can crash an dcarsh program
+        galil_ip = self.config_dict.get("galil_ip_str", None)
+        self.galil_enabled = None
         try:
-            self.g.GOpen("%s --direct -s ALL" % (self.config_dict["galil_ip_str"]))
-            self.base.print_message(self.g.GInfo())
-            self.c = self.g.GCommand  # alias the command callable
-            # The SH commands tells the controller to use the current 
-            # motor position as the command position and to enable servo control here.
-            # The SH command changes the coordinate system.
-            # Therefore, all position commands given prior to SH, 
-            # must be repeated. Otherwise, the controller produces incorrect motion.
-            self.c("SH; PF 10.4")
-            axis_init = [
-                        ("MT", 2), # Specifies Step motor with active low step pulses
-                        ("CE", 4), # Configure Encoder: Normal pulse and direction
-                        ("TW", 32000),  # Timeout for IN Position (MC) in ms
-                        ("SD", 256000), # sets the linear deceleration rate of the motors when a limit switch has been reached.
-                        ]
-            for axl in self.config_dict['axis_id'].values():
-                for ac, av in axis_init:
-                    self.c(f"{ac}{axl}={av}")
+            if galil_ip:
+                self.g.GOpen("%s --direct -s ALL" % (galil_ip))
+                self.base.print_message(self.g.GInfo())
+                self.c = self.g.GCommand  # alias the command callable
+                # The SH commands tells the controller to use the current 
+                # motor position as the command position and to enable servo control here.
+                # The SH command changes the coordinate system.
+                # Therefore, all position commands given prior to SH, 
+                # must be repeated. Otherwise, the controller produces incorrect motion.
+                self.c("SH; PF 10.4")
+                axis_init = [
+                            ("MT", 2), # Specifies Step motor with active low step pulses
+                            ("CE", 4), # Configure Encoder: Normal pulse and direction
+                            ("TW", 32000),  # Timeout for IN Position (MC) in ms
+                            ("SD", 256000), # sets the linear deceleration rate of the motors when a limit switch has been reached.
+                            ]
+                for axl in self.config_dict['axis_id'].values():
+                    for ac, av in axis_init:
+                        self.c(f"{ac}{axl}={av}")
+                self.galil_enabled = True
+            else:
+                self.base.print_message(
+                    "no Galil IP configured",
+                    error = True
+                )
+                self.galil_enabled = False
         except Exception:
             self.base.print_message(
                 "severe Galil error ... "
                 "please power cycle Galil and try again",
                 error = True
             )
+            self.galil_enabled = False
 
         self.cycle_lights = False
 
@@ -149,7 +160,7 @@ class Galil:
         self.bokehapp = None
         self.aligner = None
         self.aligner_enabled = self.base.server_params.get("enable_aligner", False)
-        if self.aligner_enabled:
+        if self.aligner_enabled and self.galil_enabled:
             self.start_aligner()
 
 

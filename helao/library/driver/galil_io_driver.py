@@ -57,14 +57,25 @@ class Galil:
         self.g = gclib.py()
         self.base.print_message(f"gclib version: {self.g.GVersion()}")
         # TODO: error checking here: Galil can crash an dcarsh program
+        galil_ip = self.config_dict.get("galil_ip_str", None)
+        self.galil_enabled = None
         try:
-            self.g.GOpen("%s --direct -s ALL" % (self.config_dict["galil_ip_str"]))
-            self.base.print_message(self.g.GInfo())
-            self.c = self.g.GCommand  # alias the command callable
+            if galil_ip:
+                self.g.GOpen("%s --direct -s ALL" % (galil_ip))
+                self.base.print_message(self.g.GInfo())
+                self.c = self.g.GCommand  # alias the command callable
+                self.galil_enabled = True
+            else:
+                self.base.print_message(
+                    "no Galil IP configured",
+                    error = True
+                )
+                self.galil_enabled = False
         except Exception:
             self.base.print_message(
                 "severe Galil error ... please power cycle Galil and try again", error = True
             )
+            self.galil_enabled = False
 
         self.cycle_lights = False
 
