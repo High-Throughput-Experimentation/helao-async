@@ -56,14 +56,15 @@ class Gamry_modes(str, Enum):
 #     mode14 = "300A"
 #     mode15 = "3kA"
 
+
 # for IFC1010
 class Gamry_IErange_IFC1010(str, Enum):
     # NOTE: The ranges listed below are for 300 mA or 30 mA models. For 750 mA models, multiply the ranges by 2.5. For 600 mA models, multiply the ranges by 2.0.
     auto = "auto"
-    # mode0 = "1pA"  # N/A
-    # mode1 = "10pA"  # N/A
-    # mode2 = "100pA"  # N/A
-    # mode3 = "1nA"  # N/A
+    # mode0 = "N/A"
+    # mode1 = "N/A"
+    # mode2 = "N/A"
+    # mode3 = "N/A"
     mode4 = "10nA"
     mode5 = "100nA"
     mode6 = "1μA"
@@ -73,15 +74,14 @@ class Gamry_IErange_IFC1010(str, Enum):
     mode10 = "10mA"
     mode11 = "100mA"
     mode12 = "1A"
-    # mode13 = "10A"  # N/A
-    # mode14 = "100A"  # N/A
-    # mode15 = "1kA"  # N/A
+    # mode13 = "N/A"
+    # mode14 = "N/A"
+    # mode15 = "N/A"
 
 
 class Gamry_IErange_REF600(str, Enum):
-    # NOTE: The ranges listed below are for 300 mA or 30 mA models. For 750 mA models, multiply the ranges by 2.5. For 600 mA models, multiply the ranges by 2.0.
     auto = "auto"
-    # mode0 = "6pA"
+    # mode0 = "N/A"
     mode1 = "60pA"
     mode2 = "600pA"
     mode3 = "6nA"
@@ -93,18 +93,58 @@ class Gamry_IErange_REF600(str, Enum):
     mode9 = "6mA"
     mode10 = "60mA"
     mode11 = "600mA"
-    # mode12 = "6A"  # N/A
-    # mode13 = "60A"  # N/A
-    # mode14 = "600A"  # N/A
-    # mode15 = "6kA"  # N/A
+    # mode12 = "N/A"
+    # mode13 = "N/A"
+    # mode14 = "N/A"
+    # mode15 = "N/A"
+
+
+# G750 is 7.5nA to 750mA
+class Gamry_IErange_PCI4G300(str, Enum):
+    auto = "auto"
+    # mode0 = "N/A"
+    # mode1 = "N/A"
+    # mode2 = "N/A"
+    mode3 = "3nA"
+    mode4 = "30nA"
+    mode5 = "300nA"
+    mode6 = "3μA"
+    mode7 = "30μA"
+    mode8 = "300μA"
+    mode9 = "3mA"
+    mode10 = "30mA"
+    mode11 = "300mA"
+    # mode12 = "N/A"
+    # mode13 = "N/A"
+    # mode14 = "N/A"
+    # mode15 = "N/A"
+
+
+class Gamry_IErange_PCI4G750(str, Enum):
+    auto = "auto"
+    # mode0 = "N/A"
+    # mode1 = "N/A"
+    # mode2 = "N/A"
+    mode3 = "7.5nA"
+    mode4 = "75nA"
+    mode5 = "750nA"
+    mode6 = "7.5μA"
+    mode7 = "75μA"
+    mode8 = "750μA"
+    mode9 = "7.5mA"
+    mode10 = "75mA"
+    mode11 = "750mA"
+    # mode12 = "N/A"
+    # mode13 = "N/A"
+    # mode14 = "N/A"
+    # mode15 = "N/A"
 
 
 class Gamry_IErange_dflt(str, Enum):
-    # NOTE: The ranges listed below are for 300 mA or 30 mA models. For 750 mA models, multiply the ranges by 2.5. For 600 mA models, multiply the ranges by 2.0.
     auto = "auto"
-    mode0 = "mode0"  # doesnt go that low
-    mode1 = "mode1"  # doesnt go that low
-    mode2 = "mode2"  # doesnt go that low
+    mode0 = "mode0"
+    mode1 = "mode1"
+    mode2 = "mode2"
     mode3 = "mode3"
     mode4 = "mode4"
     mode5 = "mode5"
@@ -118,6 +158,7 @@ class Gamry_IErange_dflt(str, Enum):
     mode13 = "mode13"
     mode14 = "mode14"
     mode15 = "mode15"
+
 
 def gamry_error_decoder(e):
     if isinstance(e, comtypes.COMError):
@@ -196,30 +237,17 @@ class gamry:
         self.pstat = None
         self.action = None  # for passing action object from technique method to measure loop
         self.active = None  # for holding active action object, clear this at end of measurement
-        self.samples_in=[]
+        self.samples_in = []
         # status is handled through active, call active.finish()
         self.gamry_range_enum = Gamry_IErange_dflt
-
-        if not "dev_id" in self.config_dict:
-            self.config_dict["dev_id"] = 0
-        # if not 'dev_family' in self.config_dict:
-        #     self.config_dict['dev_family'] = 'Reference'
-
-        # if not 'local_data_dump' in self.config_dict:
-        #     self.config_dict['local_data_dump'] = 'C:\\INST\\RUNS'
-
-        # self.local_data_dump = self.config_dict['local_data_dump']
-
-        self.Gamry_devid = self.config_dict["dev_id"]
-        # self.Gamry_family = self.config_dict['dev_family']
+        self.allow_no_sample = self.config_dict.get("allow_no_sample", False)
+        self.Gamry_devid = self.config_dict.get("dev_id", 0)
 
         asyncio.gather(self.init_Gamry(self.Gamry_devid))
 
         # for Dtaq
         self.dtaqsink = dummy_sink()
         self.dtaq = None
-        # empty the data before new one is collected
-        # self.data = collections.defaultdict(list)
 
         # for global IOloop
         # replaces while loop w/async trigger
@@ -238,14 +266,9 @@ class gamry:
 
         # for saving data localy
         self.FIFO_epoch = None
-        # self.FIFO_header = ''
         self.FIFO_gamryheader = dict() # measuement specific, will be reset each measurement
-        # self.FIFO_name = ''
-        # self.FIFO_dir = ''
         self.FIFO_column_headings = []
         self.FIFO_Gamryname = ""
-        # holds all sample information
-        # self.FIFO_sample = sample_class()
         
         # signals return to endpoint after active was created
         self.IO_continue = False
@@ -308,7 +331,7 @@ class gamry:
                     _ = await self.active.finish()
                     self.active = None
                     self.action = None
-                    self.samples_in=[]
+                    self.samples_in = []
 
                 # endpoint can return even we got errors
                 self.IO_continue = True
@@ -352,10 +375,16 @@ class gamry:
 
                 if self.FIFO_Gamryname.find("IFC") == 0:
                     self.pstat = client.CreateObject("GamryCOM.GamryPC6Pstat")
-                    self.base.print_message(f"Gamry, using Interface {self.pstat}")
+                    self.base.print_message(f"Gamry, using Interface {self.pstat}",
+                                            info = True)
                 elif self.FIFO_Gamryname.find("REF") == 0:
                     self.pstat = client.CreateObject("GamryCOM.GamryPC5Pstat")
-                    self.base.print_message(f"Gamry, using Reference {self.pstat}")
+                    self.base.print_message(f"Gamry, using Reference {self.pstat}",
+                                            info = True)
+                elif self.FIFO_Gamryname.find("PCI") == 0:
+                    self.pstat = client.CreateObject('GamryCOM.GamryPstat')
+                    self.base.print_message(f"Gamry, using PCI {self.pstat}",
+                                            info = True)
                 # else: # old version before Framework 7.06
                 #     self.pstat = client.CreateObject('GamryCOM.GamryPstat')
                 #     self.base.print_message('Gamry, using Farmework , 7.06?', self.pstat)
@@ -364,6 +393,10 @@ class gamry:
                     self.gamry_range_enum = Gamry_IErange_IFC1010
                 elif self.FIFO_Gamryname.find("REF600") == 0:
                     self.gamry_range_enum = Gamry_IErange_REF600
+                elif self.FIFO_Gamryname.find("PCI4G300") == 0:
+                    self.gamry_range_enum = Gamry_IErange_PCI4G300
+                elif self.FIFO_Gamryname.find("PCI4G750") == 0:
+                    self.gamry_range_enum = Gamry_IErange_PCI4G750
                 else:
                     self.gamry_range_enum = Gamry_IErange_dflt
 
@@ -623,13 +656,16 @@ class gamry:
 
                 if error is ErrorCodes.none:  
                     try:
+                        self.base.print_message(f"creating dtaq '{Dtaqmode}'", info = True)
                         self.dtaq = client.CreateObject(Dtaqmode)
+                        print(self.dtaq)
                         if Dtaqtype:
                             self.dtaq.Init(self.pstat, Dtaqtype, *argv)
                         else:
                             self.dtaq.Init(self.pstat, *argv)
                     except Exception as e:
-                        self.base.print_message(f"Gamry Error: {gamry_error_decoder(e)}", error=True)
+                        self.base.print_message(f"Gamry Error during setup: "
+                                                f"{gamry_error_decoder(e)}", error=True)
         
                     # This method, when enabled,
                     # allows for longer experiments with fewer points,
@@ -728,8 +764,8 @@ class gamry:
             # self.pstat.SetDigitalOut
             # self.pstat.DigitalIn
 
-            self.base.print_message(f"DigiOut: {self.pstat.DigitalOut()}")
-            self.base.print_message(f"DigiIn: {self.pstat.DigitalIn()}")
+            self.base.print_message(f"Gamry DigiOut state: {self.pstat.DigitalOut()}")
+            self.base.print_message(f"Gamry DigiIn state: {self.pstat.DigitalIn()}")
             # first, wait for trigger
             if self.IO_TTLwait >= 0:
                 while self.IO_do_meas:
@@ -924,10 +960,11 @@ class gamry:
         act.action_etc = eta
         act.error_code = ErrorCodes.none
         samples_in = await self.unified_db.get_sample(act.samples_in)
-        if not samples_in:
+        if not samples_in and not self.allow_no_sample:
             self.base.print_message("Gamry got no valid sample, "
                                     "cannot start measurement!",
                                     error = True)
+            act.samples_in = []
             act.error_code = ErrorCodes.no_sample
             activeDict = act.as_dict()
  
@@ -955,6 +992,7 @@ class gamry:
                     
                     self.samples_in = samples_in
                     self.action = act
+                    self.action.samples_in = []
 
                     # signal the IOloop to start the measrurement
                     await self.set_IO_signalq(True)
