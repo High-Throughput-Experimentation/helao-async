@@ -580,7 +580,7 @@ def makeBokehApp(doc, confPrefix, servKey):
     
                 
     app.vis.doc.add_root(layout(
-        [Spacer(width=20), Div(text=f"<b>{app.vis.server_cfg['params'].get('doc_name','visualizer')} on {gethostname()}</b>", width=1004, height=32, style={'font-size': '200%', 'color': 'red'})],
+        [Spacer(width=20), Div(text=f"<b>Visualizer on {gethostname()}</b>", width=1004, height=32, style={'font-size': '200%', 'color': 'red'})],
         background="#C0C0C0",width=1024))
     app.vis.doc.add_root(Spacer(height=10))
 

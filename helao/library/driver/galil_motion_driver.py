@@ -631,8 +631,8 @@ class Galil:
                 # time = counts/ counts_per_second
 
                 # continue
-            except Exception:
-                self.base.print_message("motor error",
+            except Exception as e:
+                self.base.print_message("motor error: '{e}'",
                                         error = True)
                 ret_moved_axis.append(None)
                 ret_speed.append(None)

@@ -48,6 +48,8 @@ class cNIMAX:
         self.dev_liquidvalve = self.config_dict.get("dev_liquidvalve",dict())
         self.dev_liquidvalveitems = make_str_enum("dev_liquidvalve",{key:key for key in self.dev_liquidvalve})
 
+        self.allow_no_sample = self.config_dict.get("allow_no_sample", False)
+
         self.base.print_message("init NI-MAX")
 
         self.action = None  # for passing action object from technique method to measure loop
@@ -410,7 +412,7 @@ class cNIMAX:
         if not self.IO_do_meas:
             # first validate the provided samples
             samples_in = await self.unified_db.get_sample(A.samples_in)
-            if not samples_in:
+            if not samples_in and not self.allow_no_sample:
                 self.base.print_message("NI got no valid sample, "
                                         "cannot start measurement!",
                                         error = True)
