@@ -31,78 +31,13 @@ from helaocore.model.data import DataPackageModel
 from helaocore.server.make_vis_serv import makeVisServ
 from helaocore.server.vis import Vis
 
-# ##############################################################################
-# # motor module class
-# ##############################################################################
-# class C_motorvis:
-#     def __init__(self, config):
-#         self.config = config
-#         self.data_url = config["wsdata_url"]
-#         self.stat_url = config["wsstat_url"]
-#         self.IOloop_data_run = False
-#         self.axis_id = config["axis_id"]
-#         self.params = config["params"]
-
-#         self.data = dict()
-#         # buffered version
-#         self.dataold = copy.deepcopy(self.data)
-
-#         # create visual elements
-#         self.layout = []
-#         self.motorlayout_axis = []
-#         self.motorlayout_stat = []
-#         self.motorlayout_err = []
-#         # display of axis positions and status
-#         self.axisvaldisp = []
-#         self.axisstatdisp = []
-#         self.axiserrdisp = []
-#         tmpidx = 0
-#         for axkey, axitem in self.axis_id.items():
-#             self.axisvaldisp.append(TextInput(value="", title=axkey+"(mm)", disabled=True, width=100, height=40, css_classes=["custom_input2"]))
-#             self.motorlayout_axis.append(layout([[self.axisvaldisp[tmpidx],Spacer(width=40)]]))
-#             self.axisstatdisp.append(TextInput(value="", title=axkey+" status", disabled=True, width=100, height=40, css_classes=["custom_input2"]))
-#             self.motorlayout_stat.append(layout([[self.axisstatdisp[tmpidx],Spacer(width=40)]]))
-#             self.axiserrdisp.append(TextInput(value="", title=axkey+" Error code", disabled=True, width=100, height=40, css_classes=["custom_input2"]))
-#             self.motorlayout_err.append(layout([[self.axiserrdisp[tmpidx],Spacer(width=40)]]))
-#             tmpidx = tmpidx+1
-
-#         # add a 2D map for xy
-#         ratio = (self.params["xmax"]-self.params["xmin"])/(self.params["ymax"]-self.params["ymin"])
-#         self.plot_motor = figure(title="xy MotorPlot", height=300,x_axis_label="plate X (mm)", y_axis_label="plate Y (mm)",width = 800, aspect_ratio=ratio)
-#         self.plot_motor.x_range=Range1d(self.params["xmin"], self.params["xmax"])
-#         self.plot_motor.y_range=Range1d(self.params["ymin"], self.params["ymax"])
-
-#         # combine all sublayouts into a single one
-#         self.layout = layout([
-#             [Spacer(width=20), Div(text="<b>Motor Visualizer module</b>", width=200+50, height=15)],
-#             layout([self.motorlayout_axis]),
-#             Spacer(height=10),
-#             layout([self.motorlayout_stat]),
-#             Spacer(height=10),
-#             layout([self.motorlayout_err]),
-#             Spacer(height=10),
-#             layout([self.plot_motor]),
-#             Spacer(height=10)
-#             ],background="#C0C0C0")
-
-
-#     async def IOloop_data(self): # non-blocking coroutine, updates data source
-#         async with websockets.connect(self.data_url) as ws:
-#             self.IOloop_data_run = True
-#             while self.IOloop_data_run:
-#                 try:
-#                     self.data =  await ws.recv()
-#                     self.vis.print_message(" ... VisulizerWSrcv:",self.data)
-#                 except Exception:
-#                     self.IOloop_data_run = False
-
-
 class C_nidaqmxvis:
     """NImax visualizer module class"""
     def __init__(self, visServ: Vis, nidaqmx_key: str):
         self.vis = visServ
         self.config_dict = self.vis.server_cfg["params"]
         self.show = False
+        self.max_points = 500
 
         nidaqmxserv_config = self.vis.world_cfg["servers"].get(nidaqmx_key, None)
         if nidaqmxserv_config is None:
@@ -111,7 +46,6 @@ class C_nidaqmxvis:
         nidaqmxserv_port = nidaqmxserv_config.get("port", None)
         
         self.show = True
-
         
         self.data_url = f"ws://{nidaqmxserv_config['host']}:{nidaqmxserv_config['port']}/ws_data"
         # self.stat_url = f"ws://{nidaqmxserv_config["host"]}:{nidaqmxserv_config["port"]}/ws_status"
@@ -122,37 +56,51 @@ class C_nidaqmxvis:
 
         self.activeCell = [True for _ in range(9)]
 
-        self.datakeys = ["t_s",
-                    "Icell1_A",
-                    "Icell2_A",
-                    "Icell3_A",
-                    "Icell4_A",
-                    "Icell5_A",
-                    "Icell6_A",
-                    "Icell7_A",
-                    "Icell8_A",
-                    "Icell9_A",
-                    "Ecell1_V",
-                    "Ecell2_V",
-                    "Ecell3_V",
-                    "Ecell4_V",
-                    "Ecell5_V",
-                    "Ecell6_V",
-                    "Ecell7_V",
-                    "Ecell8_V",
-                    "Ecell9_V"]
+        self.data_dict_keys = ["t_s",
+                               "Icell1_A",
+                               "Icell2_A",
+                               "Icell3_A",
+                               "Icell4_A",
+                               "Icell5_A",
+                               "Icell6_A",
+                               "Icell7_A",
+                               "Icell8_A",
+                               "Icell9_A",
+                               "Ecell1_V",
+                               "Ecell2_V",
+                               "Ecell3_V",
+                               "Ecell4_V",
+                               "Ecell5_V",
+                               "Ecell6_V",
+                               "Ecell7_V",
+                               "Ecell8_V",
+                               "Ecell9_V"]
 
 
-        datadict = {key:[] for key in self.datakeys}
+        self.data_dict = {key:[] for key in self.data_dict_keys}
 
-        self.sourceIV = ColumnDataSource(data=datadict)
-        self.sourceIV_prev = ColumnDataSource(data=datadict)
+        self.sourceIV = ColumnDataSource(data=self.data_dict)
+        self.sourceIV_prev = ColumnDataSource(data=deepcopy(self.data_dict))
 
         self.cur_action_uuid = ""
         self.prev_action_uuid = ""
 
         # create visual elements
         self.layout = []
+
+        self.input_max_points = TextInput(
+                                          value=f"{self.max_points}", 
+                                          title="max datapoints", 
+                                          disabled=False, 
+                                          width=150, 
+                                          height=40, 
+                                   )
+        self.input_max_points.on_change(
+            "value", 
+            partial(self.callback_input_max_points, sender=self.input_max_points)
+        )
+
+
         
         self.paragraph1 = Paragraph(text="""cells:""", width=50, height=15)
         self.yaxis_selector_group = CheckboxButtonGroup(
@@ -174,6 +122,7 @@ class C_nidaqmxvis:
         # combine all sublayouts into a single one
         self.layout = layout([
             [Spacer(width=20), Div(text=f'<b>NImax Visualizer module for server <a href="http://{nidaqmxserv_host}:{nidaqmxserv_port}/docs#/" target="_blank">\'{nidaqmx_key}\'</a></b>', width=1004, height=15)],
+            [self.input_max_points],
             [self.paragraph1],
             [self.yaxis_selector_group],
             Spacer(height=10),
@@ -187,24 +136,72 @@ class C_nidaqmxvis:
         self.vis.doc.add_root(Spacer(height=10))
 
 
-    def add_points(self, datapackage: DataPackageModel):
-        self.reset_plot(str(datapackage.action_uuid))
+    def callback_input_max_points(self, attr, old, new, sender):
+        """callback for input_max_points"""
+        def to_int(val):
+            try:
+                return int(val)
+            except ValueError:
+                return None
 
-        tmpdata = {key:[] for key in self.datakeys}
+        newpts = to_int(new)
+        oldpts =  to_int(old)
+
+        if newpts is None:
+            if oldpts is not None:
+                newpts = oldpts
+            else:
+                newpts = 500
+
+        if newpts < 2:
+            newpts = 2
+        if newpts > 10000:
+            newpts = 10000
+
+        self.max_points = newpts
+
+        self.vis.doc.add_next_tick_callback(
+            partial(self.update_input_value,sender,f"{self.max_points}")
+        )
+
+
+    def update_input_value(self, sender, value):
+        sender.value = value
+
+
+    def add_points(self, datapackage: DataPackageModel):
+        def _add_helper(datadict, pointlist):
+            for pt in pointlist:
+                datadict.append(pt)
+
+        self.reset_plot(str(datapackage.action_uuid))
+        if len(self.data_dict[self.data_dict_keys[0]]) > self.max_points:
+            delpts = len(self.data_dict[self.data_dict_keys[0]]) - self.max_points
+            for key in self.data_dict_keys:
+                del self.data_dict[key][:delpts]
+
         # they are all in sequence of cell1 to cell9 in the dict
         cellnum = 1
 
         for fileconnkey, data_dict in datapackage.datamodel.data.items():
-
-            for key, val in data_dict.items():
-                if key == "t_s":
-                    tmpdata[key] = val
+            for key in data_dict:
+                if key == "t_s" \
+                and cellnum == 1:
+                    _add_helper(datadict = self.data_dict[key],
+                                pointlist = data_dict.get(key, [0])
+                    )
                 elif key == "Icell_A":
-                    tmpdata[f"Icell{cellnum}_A"] = val
+                    _add_helper(datadict = self.data_dict[f"Icell{cellnum}_A"],
+                                pointlist = data_dict.get(key, [0])
+                    )
                 elif key == "Ecell_V":
-                    tmpdata[f"Ecell{cellnum}_V"] = val
+                    _add_helper(datadict = self.data_dict[f"Ecell{cellnum}_V"],
+                                pointlist = data_dict.get(key, [0])
+                    )
+
             cellnum += 1
-        self.sourceIV.stream(tmpdata)
+
+        self.sourceIV.data = self.data_dict
 
 
     async def IOloop_data(self): # non-blocking coroutine, updates data source
@@ -273,8 +270,9 @@ class C_nidaqmxvis:
             self.cur_action_uuid = new_action_uuid
 
             # copy old data to "prev" plot
-            self.sourceIV_prev.data = {deepcopy(key): deepcopy(val) for key, val in self.sourceIV.data.items()}        
-            self.sourceIV.data = {k: [] for k in self.sourceIV.data}
+            self.sourceIV_prev.data = {deepcopy(key): deepcopy(val) for key, val in self.sourceIV.data.items()}
+            self.data_dict = {key:[] for key in self.data_dict_keys}
+            self.sourceIV.data = self.data_dict
             self._add_plots()
 
         elif (self.yselect != self.yaxis_selector_group.active):
@@ -289,7 +287,6 @@ class C_potvis:
         # self.vis = app
         self.config_dict = self.vis.server_cfg["params"]
         self.show = False
-        # todo add input field for this
         self.max_points = 500
 
         potserv_config = self.vis.world_cfg["servers"].get(potentiostat_key, None)
