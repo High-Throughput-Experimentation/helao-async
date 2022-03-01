@@ -12,8 +12,14 @@ import json
 from functools import partial
 from socket import gethostname
 from uuid import UUID
+from copy import deepcopy
 
-from bokeh.models import ColumnDataSource, CheckboxButtonGroup, RadioButtonGroup
+from bokeh.models import (
+                          ColumnDataSource,
+                          CheckboxButtonGroup,
+                          RadioButtonGroup,
+                          TextInput
+                         )
 from bokeh.models.widgets import Paragraph
 from bokeh.plotting import figure
 from bokeh.palettes import small_palettes
@@ -24,7 +30,6 @@ from bokeh.layouts import layout, Spacer
 from helaocore.model.data import DataPackageModel
 from helaocore.server.make_vis_serv import makeVisServ
 from helaocore.server.vis import Vis
-
 
 # ##############################################################################
 # # motor module class
@@ -94,15 +99,16 @@ from helaocore.server.vis import Vis
 
 class C_nidaqmxvis:
     """NImax visualizer module class"""
-    def __init__(self, visServ: Vis):
+    def __init__(self, visServ: Vis, nidaqmx_key: str):
         self.vis = visServ
         self.config_dict = self.vis.server_cfg["params"]
         self.show = False
 
-        nidaqmx_key = self.config_dict.get("ws_nidaqmx", None)
         nidaqmxserv_config = self.vis.world_cfg["servers"].get(nidaqmx_key, None)
         if nidaqmxserv_config is None:
             return
+        nidaqmxserv_host = nidaqmxserv_config.get("host", None)
+        nidaqmxserv_port = nidaqmxserv_config.get("port", None)
         
         self.show = True
 
@@ -167,7 +173,7 @@ class C_nidaqmxvis:
 
         # combine all sublayouts into a single one
         self.layout = layout([
-            [Spacer(width=20), Div(text="<b>NImax Visualizer module</b>", width=1004, height=15)],
+            [Spacer(width=20), Div(text=f'<b>NImax Visualizer module for server <a href="http://{nidaqmxserv_host}:{nidaqmxserv_port}/docs#/" target="_blank">\'{nidaqmx_key}\'</a></b>', width=1004, height=15)],
             [self.paragraph1],
             [self.yaxis_selector_group],
             Spacer(height=10),
@@ -267,7 +273,7 @@ class C_nidaqmxvis:
             self.cur_action_uuid = new_action_uuid
 
             # copy old data to "prev" plot
-            self.sourceIV_prev.data = {key: val for key, val in self.sourceIV.data.items()}        
+            self.sourceIV_prev.data = {deepcopy(key): deepcopy(val) for key, val in self.sourceIV.data.items()}        
             self.sourceIV.data = {k: [] for k in self.sourceIV.data}
             self._add_plots()
 
@@ -278,17 +284,19 @@ class C_nidaqmxvis:
 
 class C_potvis:
     """potentiostat visualizer module class"""
-    def __init__(self, visServ: Vis):
+    def __init__(self, visServ: Vis, potentiostat_key: str):
         self.vis = visServ
         # self.vis = app
         self.config_dict = self.vis.server_cfg["params"]
         self.show = False
+        # todo add input field for this
+        self.max_points = 500
 
-
-        potentiostat_key = self.config_dict.get("ws_potentiostat", None)
         potserv_config = self.vis.world_cfg["servers"].get(potentiostat_key, None)
         if potserv_config is None:
             return
+        potserv_host = potserv_config.get("host", None)
+        potserv_port = potserv_config.get("port", None)
         self.show = True
 
         self.data_url = f"ws://{potserv_config['host']}:{potserv_config['port']}/ws_data"
@@ -299,8 +307,11 @@ class C_potvis:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.datasource = ColumnDataSource(data=dict(pt=[], t_s=[], Ewe_V=[], Ach_V=[], I_A=[]))
-        self.datasource_prev = ColumnDataSource(data=dict(pt=[], t_s=[], Ewe_V=[], Ach_V=[], I_A=[]))
+        self.data_dict_keys = ["t_s", "Ewe_V", "Ach_V", "I_A"]
+        self.data_dict = {key:[] for key in self.data_dict_keys}
+
+        self.datasource = ColumnDataSource(data=self.data_dict)
+        self.datasource_prev = ColumnDataSource(data=deepcopy(self.data_dict))
         self.cur_action_uuid = ""
         self.prev_action_uuid = ""
  
@@ -308,18 +319,32 @@ class C_potvis:
         self.layout = []
 
 
-        self.xaxis_selector_group = RadioButtonGroup(labels=["t_s", "Ewe_V", "Ach_V", "I_A"], active=0, width = 500)
-        self.yaxis_selector_group = CheckboxButtonGroup(labels=["t_s", "Ewe_V", "Ach_V", "I_A"], active=[1,3], width = 500)
+        self.input_max_points = TextInput(
+                                          value=f"{self.max_points}", 
+                                          title="max datapoints", 
+                                          disabled=False, 
+                                          width=150, 
+                                          height=40, 
+                                   )
+        self.input_max_points.on_change(
+            "value", 
+            partial(self.callback_input_max_points, sender=self.input_max_points)
+        )
+
+
+
+        self.xaxis_selector_group = RadioButtonGroup(labels=self.data_dict_keys, active=0, width = 500)
+        self.yaxis_selector_group = CheckboxButtonGroup(labels=self.data_dict_keys, active=[1,3], width = 500)
         
         
         self.plot = figure(title="Title", height=300, width=500)
 
 
         self.plot_prev = figure(title="Title", height=300, width=500)
-
         # combine all sublayouts into a single one
         self.layout = layout([
-            [Spacer(width=20), Div(text="<b>Potentiostat Visualizer module</b>", width=1004, height=15)],
+            [Spacer(width=20), Div(text=f'<b>Potentiostat Visualizer module for server <a href="http://{potserv_host}:{potserv_port}/docs#/" target="_blank">\'{potentiostat_key}\'</a></b>', width=1004, height=15)],
+            [self.input_max_points],
             [Paragraph(text="""x-axis:""", width=500, height=15), Paragraph(text="""y-axis:""", width=500, height=15)],
             [self.xaxis_selector_group, self.yaxis_selector_group],
             Spacer(height=10),
@@ -337,23 +362,57 @@ class C_potvis:
         self.vis.doc.add_root(Spacer(height=10))
 
 
+    def callback_input_max_points(self, attr, old, new, sender):
+        """callback for input_max_points"""
+        def to_int(val):
+            try:
+                return int(val)
+            except ValueError:
+                return None
+
+        newpts = to_int(new)
+        oldpts =  to_int(old)
+
+        if newpts is None:
+            if oldpts is not None:
+                newpts = oldpts
+            else:
+                newpts = 500
+
+        if newpts < 2:
+            newpts = 2
+        if newpts > 10000:
+            newpts = 10000
+
+        self.max_points = newpts
+
+        self.vis.doc.add_next_tick_callback(
+            partial(self.update_input_value,sender,f"{self.max_points}")
+        )
+
+
+    def update_input_value(self, sender, value):
+        sender.value = value
+
+
     def add_points(self, datapackage: DataPackageModel):
+        def _add_helper(datadict, pointlist):
+            for pt in pointlist:
+                datadict.append(pt)
 
         self.reset_plot(str(datapackage.action_uuid))
-        
-        
-        tmpdata = {"pt":[0]}
-        # for some techniques not all data is present
-        # we should only get one data point at the time
+        if len(self.data_dict[self.data_dict_keys[0]]) > self.max_points:
+            delpts = len(self.data_dict[self.data_dict_keys[0]]) - self.max_points
+            for key in self.data_dict_keys:
+                del self.data_dict[key][:delpts]
         
         for fileconnkey, data_dict in datapackage.datamodel.data.items():
-            tmpdata = {"pt":[0]}
-            tmpdata["t_s"] = data_dict.get("t_s", [0])
-            tmpdata["Ewe_V"] = data_dict.get("Ewe_V", [0])
-            tmpdata["Ach_V"] = data_dict.get("Ach_V", [0])
-            tmpdata["I_A"] = data_dict.get("I_A", [0])
-            self.datasource.stream(tmpdata)
-            # break # we only measure/display first sample
+            for key in self.data_dict_keys:
+                _add_helper(datadict = self.data_dict[key],
+                            pointlist = data_dict.get(key, [0])
+                )
+
+        self.datasource.data = self.data_dict
 
 
     async def IOloop_data(self): # non-blocking coroutine, updates data source
@@ -435,124 +494,29 @@ class C_potvis:
             self.cur_action_uuid = new_action_uuid
         
             # copy old data to "prev" plot
-            self.datasource_prev.data = {key: val for key, val in self.datasource.data.items()}
-            self.datasource.data = {k: [] for k in self.datasource.data}
+            self.datasource_prev.data = {deepcopy(key): deepcopy(val) for key, val in self.datasource.data.items()}
+            self.data_dict = {key:[] for key in self.data_dict_keys}
+            self.datasource.data = self.data_dict
             self._add_plots()
 
         elif  (self.xselect != self.xaxis_selector_group.active) or (self.yselect != self.yaxis_selector_group.active):
             self.xselect = self.xaxis_selector_group.active
             self.yselect = self.yaxis_selector_group.active
             self._add_plots()
-   
 
 
-# ##############################################################################
-# # job queue module class
-# # for visualizing the content of the orch queue (with params), just a simple table
-# # TODO: work in progress
-# ##############################################################################
-# class C_jobvis:
-#     def __init__(self, config):
-#         self.config = config
-#         self.data_url = config["wsdata_url"]
-#         self.stat_url = config["wsstat_url"]
+def find_server_names(vis:Vis, fast_key:str) -> list:
+    """finds server name for a given fast driver"""
+    server_names = []
+    for server_name, server_config \
+    in vis.world_cfg["servers"].items():
+        if server_config.get("fast", "") == fast_key:
+            vis.print_message(f"found server: '{fast_key}' "
+                                   f"under '{server_name}'",
+                                   info = True)
+            server_names.append(server_name)
 
-
-# ##############################################################################
-# # data module class
-# ##############################################################################
-# class C_datavis:
-#     def __init__(self, config):
-#         self.config = config
-#         self.data_url = config["wsdata_url"]
-#         self.stat_url = config["wsstat_url"]
-#         self.data = dict()
-#         # buffered version
-#         self.dataold = copy.deepcopy(self.data)
-        
-        
-#     async def IOloop_data(self): # non-blocking coroutine, updates data source
-#         async with websockets.connect(self.data_url) as ws:
-#             self.IOloop_data_run = True
-#             while self.IOloop_data_run:
-#                 try:
-#                     self.data =  await ws.recv()
-#                     self.vis.print_message(" ... VisulizerWSrcv: pm data")
-#                 except Exception:
-#                     self.IOloop_data_run = False
-
-
-# ##############################################################################
-# # update loop for visualizer document
-# ##############################################################################
-# async def IOloop_visualizer():
-#     pass
-#     # update if motor is present
-#     if datavis:
-#         if datavis.data:
-#             # update only if changed
-#             if not datavis.data == datavis.dataold:
-#                 datavis.dataold = copy.deepcopy(datavis.data)
-#                 pmdata = json.loads(datavis.data)["map"]
-#                 # plot only if motorvis is active
-#                 if motorvis:
-#                     x = [col["x"] for col in pmdata]
-#                     y = [col["y"] for col in pmdata]
-#                     # remove old Pmplot
-#                     old_point = motorvis.plot_motor.select(name="PMplot")
-#                     if len(old_point)>0:
-#                         motorvis.plot_motor.renderers.remove(old_point[0])
-#                     motorvis.plot_motor.square(x, y, size=5, color=None, alpha=0.5, line_color="black",name="PMplot")
-
-            
-#     if motorvis:
-#         MarkerColors = [(255,0,0),(0,0,255),(0,255,0),(255,165,0),(255,105,180)]
-#         if motorvis.data:
-#             # update only if changed
-#             if not motorvis.data == motorvis.dataold:
-#                 motorvis.dataold = copy.deepcopy(motorvis.data)
-#                 tmpmotordata = json.loads(motorvis.data)                
-#                 for idx in range(len(motorvis.axisvaldisp)):
-#                     motorvis.axisvaldisp[idx].value = (str)(tmpmotordata["position"][idx])
-#                     motorvis.axisstatdisp[idx].value = (str)(tmpmotordata["motor_status"][idx])
-#                     motorvis.axiserrdisp[idx].value = (str)(tmpmotordata["err_code"][idx])
-#                 # check if x and y motor is present and plot it
-#                 pangle = 0.0
-#                 if "Rz" in tmpmotordata["axis"]:
-#                     pangle = tmpmotordata["position"][tmpmotordata["axis"].index("Rz")]
-#                     pangle = math.pi/180.0*pangle # TODO
-# #                if "x" in tmpmotordata["axis"] and "y" in tmpmotordata["axis"]:
-# #                    ptx = tmpmotordata["position"][tmpmotordata["axis"].index("x")]
-# #                    pty = tmpmotordata["position"][tmpmotordata["axis"].index("y")]
-#                 if "platexy" in tmpmotordata:
-#                     ptx = tmpmotordata["platexy"][0]
-#                     pty = tmpmotordata["platexy"][1]
-                    
-#                     # update plot
-#                     old_point = motorvis.plot_motor.select(name="motor_xy")
-#                     if len(old_point)>0:
-#                         for oldpoint in old_point:
-#                             motorvis.plot_motor.renderers.remove(oldpoint)
-
-#                     motorvis.plot_motor.rect(6.0*25.4/2,  4.0*25.4/2.0, width = 6.0*25.4, height = 4.0*25.4, angle = 0.0, angle_units="rad", fill_alpha=0.0, fill_color="gray", line_width=2, alpha=1.0, line_color=(0,0,0), name="motor_xy")
-#                     # plot new Marker point
-#                     if S.params.ws_motor_params.sample_marker_type == 0:
-#                         # standard square marker
-#                         motorvis.plot_motor.square(ptx, pty, size=7,line_width=2, color=None, alpha=1.0, line_color=MarkerColors[0], name="motor_xy")
-
-#                     elif S.params.ws_motor_params.sample_marker_type == 1: # RSHS
-#                         # marker symbold for ANEC2, need exact dimensions for final marker
-#                         sample_size = 5
-#                         sample_spacing = 0.425*25.4
-#                         sample_count = 9;
-#                         # the square box
-#                         motorvis.plot_motor.rect(ptx, pty, width = sample_size+10, height = (sample_count-1)*sample_spacing+10, angle = -1.0*pangle, angle_units="rad", fill_alpha=0.0, fill_color="gray", line_width=2, alpha=1.0, line_color=(255,0,0), name="motor_xy")
-#                         # and the different sample circles
-#                         motorvis.plot_motor.ellipse(ptx, pty, width = sample_size, height = sample_size, fill_alpha=0.0, fill_color=None, line_width=2, alpha=1.0, line_color=(0,0,255), name="motor_xy")
-#                         for i in range(1,(int)((sample_count-1)/2)+1):
-#                             motorvis.plot_motor.ellipse(ptx+i*sample_spacing*math.sin(pangle), pty+i*sample_spacing*math.cos(pangle), width = sample_size, height = sample_size, fill_alpha=0.0, fill_color="gray", line_width=2, alpha=1.0, line_color=(255,0,0), name="motor_xy")
-#                             motorvis.plot_motor.ellipse(ptx-i*sample_spacing*math.sin(pangle), pty-i*sample_spacing*math.cos(pangle), width = sample_size, height = sample_size, fill_alpha=0.0, fill_color="gray", line_width=2, alpha=1.0, line_color=(255,0,0), name="motor_xy")
-
+    return server_names
 
 
 def makeBokehApp(doc, confPrefix, servKey):
@@ -569,15 +533,7 @@ def makeBokehApp(doc, confPrefix, servKey):
         driver_class=None,
     )
 
-
-
-
-    # is there any better way to inlcude external CSS? 
-    # css_styles = Div(text="""<style>%s</style>""" % pathlib.Path(os.path.join(helao_root, "visualizer\styles.css")).read_text())
-    # doc.add_root(css_styles)
-
     visoloop = asyncio.get_event_loop()
-    
                 
     app.vis.doc.add_root(layout(
         [Spacer(width=20), Div(text=f"<b>Visualizer on {gethostname()}</b>", width=1004, height=32, style={'font-size': '200%', 'color': 'red'})],
@@ -586,59 +542,28 @@ def makeBokehApp(doc, confPrefix, servKey):
 
     # create visualizer objects for defined instruments
 
-    if "ws_potentiostat" in app.server_params:
-        potvis = C_potvis(app.vis)
-        if potvis.show:
-            visoloop.create_task(potvis.IOloop_data())
-        # visoloop.create_task(potvis.IOloop_stat())
-    else:
-        app.vis.print_message("No potentiostat visualizer configured")
-        potvis = []
+    # find all configured gamry servers
+    potservnames = find_server_names(vis = app.vis,
+                      fast_key = "gamry_server")
+    potvis = []
+    for potservname in potservnames:
+        potvis.append(
+            C_potvis(visServ = app.vis, potentiostat_key = potservname)
+        )
+        if potvis[-1].show:
+            visoloop.create_task(potvis[-1].IOloop_data())
 
 
-    if "ws_nidaqmx" in app.server_params:
-        NImaxvis = C_nidaqmxvis(app.vis)
-        if NImaxvis.show:
-            visoloop.create_task(NImaxvis.IOloop_data())
-    else:
-        app.vis.print_message("No NImax visualizer configured")
-        NImaxvis = []
+    # find all configured NI servers
+    niservnames = find_server_names(vis = app.vis,
+                      fast_key = "nidaqmx_server")
 
+    NImaxvis = []
+    for niservname in niservnames:
+        NImaxvis.append(
+            C_nidaqmxvis(visServ = app.vis, nidaqmx_key = niservname))
+        if NImaxvis[-1].show:
+            visoloop.create_task(NImaxvis[-1].IOloop_data())
 
-# if "ws_data" in S.params:
-#     tmpserv = S.params.ws_data
-#     dataserv["serv"] = tmpserv
-#     dataserv["wsdata_url"] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_data"
-#     dataserv["wsstat_url"] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_status"
-#     self.vis.print_message(f"Create Visualizer for {dataserv['serv']}")
-#     datavis = C_datavis(dataserv)
-#     visoloop.create_task(datavis.IOloop_data())
-# else:
-#     app.vis.print_message("No data visualizer configured")
-#     datavis = []
-
-# if "ws_motor" in S.params:    
-#     tmpserv = S.params.ws_motor
-#     motorserv["serv"] = tmpserv
-#     motorserv["params"]  = S.params.ws_motor_params
-#     motorserv["axis_id"] = C[tmpserv].params.axis_id
-#     motorserv["wsdata_url"] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_motordata"
-#     motorserv["wsstat_url"] = f"ws://{C[tmpserv].host}:{C[tmpserv].port}/{tmpserv}/ws_status"
-#     if not "sample_marker_type" in S.params.ws_motor_params:
-#         S.params.ws_motor_params.sample_marker_type = 0
-#     app.vis.print_message(f"Create Visualizer for {motorserv['serv']}")
-#     motorvis = C_motorvis(motorserv)
-#     doc.add_root(layout([motorvis.layout]))
-#     doc.add_root(layout(Spacer(height=10)))
-#     visoloop.create_task(motorvis.IOloop_data())
-# else:
-#     app.vis.print_message("No motor visualizer configured")
-#     motorvis = []
-
-
-
-    # web interface update loop
-    # todo put his in the respective classes?
-    # app.doc.add_periodic_callback(IOloop_visualizer,500) # time in ms
 
     return doc

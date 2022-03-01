@@ -994,12 +994,12 @@ class Galil:
                     data = f.readline()
                     new_matrix = np.matrix(json.loads(data))
                     if new_matrix.shape != self.dflt_matrix.shape:
-                        self.base.print_message(f"matrix '{new_matrix}' "
+                        self.base.print_message(f"matrix \n'{new_matrix}' "
                                                "has wrong shape",
                                                error = True)
                         return self.dflt_matrix
                     else:
-                        self.base.print_message(f"loaded matrix '{new_matrix}'")
+                        self.base.print_message(f"loaded matrix \n'{new_matrix}'")
                         return new_matrix
                     
                 except Exception:
@@ -1014,7 +1014,7 @@ class Galil:
 
     def update_transfermatrix(self, newtransfermatrix):
         if newtransfermatrix.shape != self.dflt_matrix.shape:
-            self.base.print_message(f"matrix '{newtransfermatrix}' "
+            self.base.print_message(f"matrix \n'{newtransfermatrix}' "
                                    "has wrong shape, using dflt.",
                                    error = True)
             matrix = self.dflt_matrix
@@ -2459,12 +2459,12 @@ class Aligner:
                                    error = True)
             new_matrix = self.motor.dflt_matrix
 
-        self.vis.print_message(f"loaded matrix '{new_matrix}'")
+        self.vis.print_message(f"loaded matrix \n'{new_matrix}'")
         self.motor.update_transfermatrix(newtransfermatrix = new_matrix)
 
 
     def callback_changed_motorstep(self, attr, old, new, sender):
-        """callback for plateid text input"""
+        """callback for motor_step input"""
         def to_float(val):
             try:
                 return float(val)
@@ -2474,13 +2474,19 @@ class Aligner:
         newstep = to_float(new)
         oldstep =  to_float(old)
 
-        if newstep is not None:
-            self.manual_step = newstep
-        else:
+        if newstep is None:
             if oldstep is not None:
-                self.manual_step = oldstep
+                newstep = oldstep
             else:
-                self.manual_step = 1
+                newstep = 1
+
+        if newstep < 0.01:
+            newstep = 0.01
+        if newstep > 10:
+            newstep = 10
+
+        self.manual_step = newstep
+
         self.vis.doc.add_next_tick_callback(
             partial(self.update_input_value,sender,f"{self.manual_step}")
         )
