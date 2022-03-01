@@ -16,7 +16,7 @@ __all__ = ["makeApp"]
 
 from importlib import import_module
 
-from fastapi import Body
+from fastapi import Body,  Query
 from typing import Optional, List
 from socket import gethostname
 
@@ -341,10 +341,14 @@ def makeApp(confPrefix, servKey):
                          fast_samples_in: Optional[List[SampleUnion]] = \
                           Body([], embed=True),
                          Tval: Optional[float] = 10.0,
-                         SampleRate: Optional[float] = 1.0, 
+                         SampleRate: Optional[int] = Query(1.0, ge=1), 
                          TTLwait: Optional[int] = -1,  # -1 disables, else select TTL channel
                         ):
-            """Runs multi cell IV measurement."""
+            """Runs multi cell IV measurement.\n
+               Args: \n
+                    SampleRate: samples per second\n
+                    Tval: time of measurement in seconds\n
+                    TTLwait: trigger channel, -1 disables, else select TTL channel"""
             A = await app.base.setup_action()
             A.action_abbr = "multiCV"
             active_dict = await app.driver.run_cell_IV(A)
