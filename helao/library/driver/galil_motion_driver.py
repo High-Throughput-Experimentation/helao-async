@@ -1498,13 +1498,15 @@ class Aligner:
         self.markerdata = ColumnDataSource({"x0": [0], "y0": [0]})
         self.create_layout()
         self.motor.aligner = self
+        self.IOloop_run = False
         self.IOtask = asyncio.create_task(self.IOloop_aligner())
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
 
     def cleanup_session(self, session_context):
-        self.vis.print_message("Bokeh session closed",
+        self.vis.print_message("Aligner Bokeh session closed",
                                 error = True)
+        self.IOloop_run = False
         self.IOtask.cancel()
 
 
@@ -3099,7 +3101,8 @@ class Aligner:
     
     async def IOloop_aligner(self): # non-blocking coroutine, updates data source
         """IOloop for updating web interface"""
-        while True:
+        self.IOloop_run = True
+        while self.IOloop_run:
             try:
                 await asyncio.sleep(0.1)
                 self.vis.doc.add_next_tick_callback(partial(self.IOloop_helper))

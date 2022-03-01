@@ -272,17 +272,22 @@ class gamry:
         
         # signals return to endpoint after active was created
         self.IO_continue = False
+        self.IOloop_run = False
+
+
 
     async def set_IO_signalq(self, val: bool) -> None:
         if self.IO_signalq.full():
             _ = await self.IO_signalq.get()
         await self.IO_signalq.put(val)
 
+
     async def IOloop(self):
         """This is main Gamry measurement loop which always needs to run
         else if measurement is done in FastAPI calls we will get timeouts"""
+        self.IOloop_run = True
         try:
-            while True:
+            while self.IOloop_run:
                 self.IO_do_meas = await self.IO_signalq.get()
                 if self.IO_do_meas and not self.IO_measuring:
                     # are we in estop?

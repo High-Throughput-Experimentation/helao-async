@@ -471,7 +471,7 @@ class PAL:
             self.cams = None
 
         self.palauxheader = ["Date", "Method", "Tool", "Source", "DestinationTray", "DestinationSlot", "DestinationVial", "Volume"]
-                
+        self.IOloop_run = False
 
     async def _poll_start(self) -> bool:
         starttime = time.time()
@@ -2115,8 +2115,8 @@ class PAL:
         """This is the main dispatch loop for the PAL.
         Its start when self.IO_do_meas is set to True
         and works on the current content of self.IO_palcam."""
-
-        while True:
+        self.IOloop_run = True
+        while self.IOloop_run:
             await asyncio.sleep(1)
             if self.IO_do_meas:
                 if not self.base.actionserver.estop:
