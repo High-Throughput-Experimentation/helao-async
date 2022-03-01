@@ -24,134 +24,226 @@ async def galil_dyn_endpoints(app = None):
     servKey = app.base.server.server_name
 
     if app.driver.galil_enabled is True:
-            
-        @app.post(f"/{servKey}/get_analog_in")
-        async def get_analog_in(
-                                action: Optional[Action] = \
-                                        Body({}, embed=True),
-                                port:Optional[int] = None
-                               ):
-            active = await app.base.setup_and_contain_action(
-                                              json_data_keys = [
-                                                                "error_code", 
-                                                                "port", 
-                                                                "name", 
-                                                                "type", 
-                                                                "value"
-                                                               ],
-                                              action_abbr = "get_ai"
-            )
-            datadict = \
-                await app.driver.get_analog_in(**active.action.action_params)
-            active.action.error_code = \
-                datadict.get("error_code", ErrorCodes.unspecified)
-            await active.enqueue_data_dflt(datadict = datadict)
-            finished_action = await active.finish()
-            return finished_action.as_dict()
+
+        if app.driver.dev_ai:
+            @app.post(f"/{servKey}/get_analog_in")
+            async def get_analog_in(
+                                    action: Optional[Action] = \
+                                            Body({}, embed=True),
+                                    ai_item:Optional[app.driver.dev_aiitems] = None
+                                   ):
+                active = await app.base.setup_and_contain_action(
+                                                  json_data_keys = [
+                                                                    "error_code", 
+                                                                    "port", 
+                                                                    "name", 
+                                                                    "type", 
+                                                                    "value"
+                                                                   ],
+                                                  action_abbr = "get_ai"
+                )
+                active.action.action_params["ai_port"] = \
+                    app.driver.dev_do[active.action.action_params["ai_item"]]
+                active.action.action_params["ai_name"] = \
+                    active.action.action_params["ai_item"]
+                datadict = \
+                    await app.driver.get_analog_in(**active.action.action_params)
+                active.action.error_code = \
+                    datadict.get("error_code", ErrorCodes.unspecified)
+                await active.enqueue_data_dflt(datadict = datadict)
+                finished_action = await active.finish()
+                return finished_action.as_dict()
+
+
+        if app.driver.dev_ao:
+            @app.post(f"/{servKey}/set_analog_out")
+            async def set_analog_out(
+                                     action: Optional[Action] = \
+                                             Body({}, embed=True),
+                                     ao_item:Optional[app.driver.dev_aoitems] = None,
+                                     value:Optional[float] = None
+                                    ):
+                active = await app.base.setup_and_contain_action(
+                                                  json_data_keys = [
+                                                                    "error_code", 
+                                                                    "port", 
+                                                                    "name", 
+                                                                    "type", 
+                                                                    "value"
+                                                                   ],
+                                                  action_abbr = "set_ao"
+                )
+                active.action.action_params["ao_port"] = \
+                    app.driver.dev_do[active.action.action_params["ao_item"]]
+                active.action.action_params["ao_name"] = \
+                    active.action.action_params["ao_item"]
+                datadict = \
+                    await app.driver.set_analog_out(**active.action.action_params)
+                active.action.error_code = \
+                    datadict.get("error_code", ErrorCodes.unspecified)
+                await active.enqueue_data_dflt(datadict = datadict)
+                finished_action = await active.finish()
+                return finished_action.as_dict()
+
     
-    
-        @app.post(f"/{servKey}/set_analog_out")
-        async def set_analog_out(
-                                 action: Optional[Action] = \
-                                         Body({}, embed=True),
-                                 port:Optional[int] = None,
-                                 value:Optional[float] = None
-                                ):
-            active = await app.base.setup_and_contain_action(
-                                              json_data_keys = [
-                                                                "error_code", 
-                                                                "port", 
-                                                                "name", 
-                                                                "type", 
-                                                                "value"
-                                                               ],
-                                              action_abbr = "set_ao"
-            )
-            datadict = \
-                await app.driver.set_analog_out(**active.action.action_params)
-            active.action.error_code = \
-                datadict.get("error_code", ErrorCodes.unspecified)
-            await active.enqueue_data_dflt(datadict = datadict)
-            finished_action = await active.finish()
-            return finished_action.as_dict()
-    
-    
-        @app.post(f"/{servKey}/get_digital_in")
-        async def get_digital_in(
-                                 action: Optional[Action] = \
-                                         Body({}, embed=True),
-                                 port:Optional[int] = None
-                                ):
-            active = await app.base.setup_and_contain_action(
-                                              json_data_keys = [
-                                                                "error_code", 
-                                                                "port", 
-                                                                "name", 
-                                                                "type", 
-                                                                "value"
-                                                               ],
-                                              action_abbr = "get_di"
-            )
-            datadict = \
-                await app.driver.get_digital_in(**active.action.action_params)
-            active.action.error_code = \
-                datadict.get("error_code", ErrorCodes.unspecified)
-            await active.enqueue_data_dflt(datadict = datadict)
-            finished_action = await active.finish()
-            return finished_action.as_dict()
-    
-    
-        @app.post(f"/{servKey}/get_digital_out")
-        async def get_digital_out(
-                                  action: Optional[Action] = \
-                                          Body({}, embed=True),
-                                  port:Optional[int] = None
-                                 ):
-            active = await app.base.setup_and_contain_action(
-                                              json_data_keys = [
-                                                                "error_code", 
-                                                                "port", 
-                                                                "name", 
-                                                                "type", 
-                                                                "value"
-                                                               ],
-                                              action_abbr = "get_do"
-            )
-            datadict = \
-                await app.driver.get_digital_out(**active.action.action_params)
-            active.action.error_code = \
-                datadict.get("error_code", ErrorCodes.unspecified)
-            await active.enqueue_data_dflt(datadict = datadict)
-            finished_action = await active.finish()
-            return finished_action.as_dict()
-    
-    
-        @app.post(f"/{servKey}/set_digital_out")
-        async def set_digital_out(
-                                  action: Optional[Action] = \
-                                          Body({}, embed=True),
-                                  port:Optional[int] = None, 
-                                  on:Optional[bool] = False
-                                 ):
-            active = await app.base.setup_and_contain_action(
-                                              json_data_keys = [
-                                                                "error_code", 
-                                                                "port", 
-                                                                "name", 
-                                                                "type", 
-                                                                "value"
-                                                               ],
-                                              action_abbr = "set_do"
-            )
-            datadict = \
-                await app.driver.set_digital_out(**active.action.action_params)
-            active.action.error_code = \
-                datadict.get("error_code", ErrorCodes.unspecified)
-            await active.enqueue_data_dflt(datadict = datadict)
-            finished_action = await active.finish()
-            return finished_action.as_dict()
-    
-    
+        if app.driver.dev_di:
+            @app.post(f"/{servKey}/get_digital_in")
+            async def get_digital_in(
+                                     action: Optional[Action] = \
+                                             Body({}, embed=True),
+                                     di_item:Optional[app.driver.dev_diitems] = None
+                                    ):
+                active = await app.base.setup_and_contain_action(
+                                                  json_data_keys = [
+                                                                    "error_code", 
+                                                                    "port", 
+                                                                    "name", 
+                                                                    "type", 
+                                                                    "value"
+                                                                   ],
+                                                  action_abbr = "get_di"
+                )
+                active.action.action_params["di_port"] = \
+                    app.driver.dev_do[active.action.action_params["di_item"]]
+                active.action.action_params["di_name"] = \
+                    active.action.action_params["di_item"]
+                datadict = \
+                    await app.driver.get_digital_in(**active.action.action_params)
+                active.action.error_code = \
+                    datadict.get("error_code", ErrorCodes.unspecified)
+                await active.enqueue_data_dflt(datadict = datadict)
+                finished_action = await active.finish()
+                return finished_action.as_dict()
+
+
+        if app.driver.dev_do:
+            @app.post(f"/{servKey}/get_digital_out")
+            async def get_digital_out(
+                                      action: Optional[Action] = \
+                                              Body({}, embed=True),
+                                      do_item:Optional[app.driver.dev_doitems] = None
+                                     ):
+                active = await app.base.setup_and_contain_action(
+                                                  json_data_keys = [
+                                                                    "error_code", 
+                                                                    "port", 
+                                                                    "name", 
+                                                                    "type", 
+                                                                    "value"
+                                                                   ],
+                                                  action_abbr = "get_do"
+                )
+                active.action.action_params["do_port"] = \
+                    app.driver.dev_do[active.action.action_params["do_item"]]
+                active.action.action_params["do_name"] = \
+                    active.action.action_params["do_item"]
+                datadict = \
+                    await app.driver.get_digital_out(**active.action.action_params)
+                active.action.error_code = \
+                    datadict.get("error_code", ErrorCodes.unspecified)
+                await active.enqueue_data_dflt(datadict = datadict)
+                finished_action = await active.finish()
+                return finished_action.as_dict()
+
+
+        if app.driver.dev_do:
+            @app.post(f"/{servKey}/set_digital_out")
+            async def set_digital_out(
+                                      action: Optional[Action] = \
+                                              Body({}, embed=True),
+                                      do_item:Optional[app.driver.dev_doitems] = None, 
+                                      on:Optional[bool] = False
+                                     ):
+                active = await app.base.setup_and_contain_action(
+                                                  json_data_keys = [
+                                                                    "error_code", 
+                                                                    "port", 
+                                                                    "name", 
+                                                                    "type", 
+                                                                    "value"
+                                                                   ],
+                                                  action_abbr = "set_do"
+                )
+                active.action.action_params["do_port"] = \
+                    app.driver.dev_do[active.action.action_params["do_item"]]
+                active.action.action_params["do_name"] = \
+                    active.action.action_params["do_item"]
+                datadict = \
+                    await app.driver.set_digital_out(**active.action.action_params)
+                active.action.error_code = \
+                    datadict.get("error_code", ErrorCodes.unspecified)
+                await active.enqueue_data_dflt(datadict = datadict)
+                finished_action = await active.finish()
+                return finished_action.as_dict()
+
+
+        if app.driver.dev_di \
+        and app.driver.dev_do:
+            @app.post(f"/{servKey}/set_digital_cycle")
+            async def set_digital_cycle(
+                                        action: Optional[Action] = \
+                                              Body({}, embed=True),
+                                        trigger_item:Optional[app.driver.dev_diitems] = None,
+                                        out_item:Optional[app.driver.dev_doitems] = None,
+                                        out_item_gamry:Optional[app.driver.dev_doitems] = None,
+                                        t_on:Optional[float] = None,
+                                        t_off:Optional[float] = None,
+                                     ):
+                active = await app.base.setup_and_contain_action(
+                                                   json_data_keys = [
+                                                                     "error_code", 
+                                                  #                   "port", 
+                                                  #                   "name", 
+                                                  #                   "type", 
+                                                  #                   "value"
+                                                                    ],
+                                                  # action_abbr = "set_do"
+                )
+
+                active.action.action_params["trigger_port"] = \
+                    app.driver.dev_di[active.action.action_params["trigger_item"]]
+                active.action.action_params["trigger_name"] = \
+                    active.action.action_params["trigger_item"]
+
+                active.action.action_params["out_port"] = \
+                    app.driver.dev_do[active.action.action_params["out_item"]]
+                active.action.action_params["out_name"] = \
+                    active.action.action_params["out_item"]
+
+                active.action.action_params["out_port_gamry"] = \
+                    app.driver.dev_do[active.action.action_params["out_item_gamry"]]
+                active.action.action_params["out_name_gamry"] = \
+                    active.action.action_params["out_item_gamry"]
+
+
+                datadict = \
+                    await app.driver.set_digital_cycle(**active.action.action_params)
+                active.action.error_code = \
+                    datadict.get("error_code", ErrorCodes.unspecified)
+                await active.enqueue_data_dflt(datadict = datadict)
+                finished_action = await active.finish()
+                return finished_action.as_dict()
+
+
+        if app.driver.dev_di \
+        and app.driver.dev_do:
+            @app.post(f"/{servKey}/stop_digital_cycle")
+            async def stop_digital_cycle(
+                                        action: Optional[Action] = \
+                                              Body({}, embed=True),
+                                     ):
+                active = await app.base.setup_and_contain_action()
+
+
+                datadict = \
+                    await app.driver.stop_digital_cycle()
+                active.action.error_code = \
+                    datadict.get("error_code", ErrorCodes.unspecified)
+                # await active.enqueue_data_dflt(datadict = datadict)
+                finished_action = await active.finish()
+                return finished_action.as_dict()
+
+
         @app.post(f"/{servKey}/reset")
         async def reset(
                         action: Optional[Action] = \

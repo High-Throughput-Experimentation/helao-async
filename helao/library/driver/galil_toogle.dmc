@@ -3,27 +3,29 @@
 'to start executing at a specific label or line number.
 'The code will execute until an EN ends the program or subroutine.
 
-'#AUTO;                  'Label for auto-start (runs on power up)
-'                        'Initialize variables
-'    t_freq = {t_time};      ' use 1000ms as default
-'    t_output = {p_trigger};       ' output 1 as default        
-'    t_trigger = {p_output};      ' input 1 as default
-'EN;                     'End of initialization
-
 #main;                  'main program-thread 0
+    CB {p_output};    'clear output
+    CB {p_output_gamry};    'set output
     AI {p_trigger};       'after input 1 high
     AT 0;               'set reference time
-    XQ #toogle, 1;      'execute thread 1
-    AI -{p_trigger};      'pause this thread until after input 1 is low
-    HX;                 'halt all threads
+    IF ( {t_time_on} > 0 );
+        IF ( {t_time_off} > 0 );
+            XQ #toogle, 1;      'execute thread 1
+            AI -{p_trigger};      'pause this thread until after input 1 is low
+        ENDIF;
+    ENDIF;
+    HX1;                 'halt all threads
+    CB {p_output};    'clear output
+    CB {p_output_gamry};    'set output
+
 EN;                     'end program
 
 #toogle;                'toogle loop
-    IF ({t_time}>0);
-        SB {p_output};    'set output 1
-        AT {t_time};      'wait xy msec
-        CB {p_output};    'clear output 1
-        AT -{t_time}      'at xy msec reset timer
-        JP #toogle;     'repeat
-    ENDIF;
+    CB {p_output};    'set output 0
+    CB {p_output_gamry};    'set output 0
+    AT {t_time_on};      'wait xy msec
+    SB {p_output};    'set output 1
+    SB {p_output_gamry};    'set output 1
+    AT -{t_time_off}-{t_time_on};      'at xy msec reset timer
+    JP #toogle;     'repeat
 EN;                     'end thread

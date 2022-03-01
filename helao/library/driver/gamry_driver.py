@@ -368,7 +368,8 @@ class gamry:
         """connect to a Gamry"""
         try:
             self.devices = client.CreateObject("GamryCOM.GamryDeviceList")
-            self.base.print_message(f"GamryDeviceList: {self.devices.EnumSections()}")
+            self.base.print_message(f"GamryDeviceList: "
+                                    f"{self.devices.EnumSections()}")
             # self.base.print_message(f"{len(self.devices.EnumSections())}")
             if len(self.devices.EnumSections()) >= devid + 1:
                 self.FIFO_Gamryname = self.devices.EnumSections()[devid]
@@ -802,18 +803,18 @@ class gamry:
                     self.pstat.SetDigitalOut(self.IO_TTLsend, self.IO_TTLsend)
                 )  # bitmask on
             #                self.base.print_message(self.pstat.SetDigitalOut(0,self.IO_TTLsend)) # bitmask off
-            # if self.IO_TTLsend == 0:
-            #     #0001
-            #     self.pstat.SetDigitalOut(1,1)
-            # elif self.IO_TTLsend == 1:
-            #     #0010
-            #     self.pstat.SetDigitalOut(2,2)
-            # elif self.IO_TTLsend == 2:
-            #     #0100
-            #     self.pstat.SetDigitalOut(4,4)
-            # elif self.IO_TTLsend == 3:
-            #     #1000
-            #     self.pstat.SetDigitalOut(8,8)
+                # if self.IO_TTLsend == 0:
+                #     #0001
+                #     self.pstat.SetDigitalOut(1,1)
+                # elif self.IO_TTLsend == 1:
+                #     #0010
+                #     self.pstat.SetDigitalOut(2,2)
+                # elif self.IO_TTLsend == 2:
+                #     #0100
+                #     self.pstat.SetDigitalOut(4,4)
+                # elif self.IO_TTLsend == 3:
+                #     #1000
+                #     self.pstat.SetDigitalOut(8,8)
 
             # turn on the potentiostat output
             if self.IO_meas_mode == Gamry_modes.OCV:

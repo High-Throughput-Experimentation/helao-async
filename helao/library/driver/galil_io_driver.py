@@ -18,6 +18,7 @@ from helaocore.server.base import Base
 from helaocore.error import ErrorCodes
 from helaocore.schema import Action
 from helaocore.error import ErrorCodes
+from helaocore.helper.make_str_enum import make_str_enum
 
 
 driver_path = os.path.dirname(__file__)
@@ -40,18 +41,20 @@ class Galil:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
 
-        if "Din_id" not in self.config_dict:
-            self.config_dict["Din_id"] = dict()
+        self.dev_ai = self.config_dict.get("dev_ai",dict())
+        self.dev_aiitems = make_str_enum("dev_ai",{key:key for key in self.dev_ai})
+        
+        self.dev_ao = self.config_dict.get("dev_ao",dict())
+        self.dev_aoitems = make_str_enum("dev_ao",{key:key for key in self.dev_ao})
 
-        if "Dout_id" not in self.config_dict:
-            self.config_dict["Dout_id"] = dict()
+        self.dev_di = self.config_dict.get("dev_di",dict())
+        self.dev_diitems = make_str_enum("dev_di",{key:key for key in self.dev_di})
 
-        if "Aout_id" not in self.config_dict:
-            self.config_dict["Aout_id"] = dict()
+        self.dev_do = self.config_dict.get("dev_do",dict())
+        self.dev_doitems = make_str_enum("dev_do",{key:key for key in self.dev_do})
 
-        if "Ain_id" not in self.config_dict:
-            self.config_dict["Ain_id"] = dict()
-
+        self.digital_cycle_out = None
+        self.digital_cycle_out_gamry = None
 
         # if this is the main instance let us make a galil connection
         self.g = gclib.py()
@@ -63,7 +66,9 @@ class Galil:
             if galil_ip:
                 self.g.GOpen("%s --direct -s ALL" % (galil_ip))
                 self.base.print_message(self.g.GInfo())
-                self.c = self.g.GCommand  # alias the command callable
+                self.galilcmd = self.g.GCommand  # alias the command callable
+                # downloads a DMC program to galil
+                self.galilprgdownload = self.g.GProgramDownload
                 self.galil_enabled = True
             else:
                 self.base.print_message(
@@ -90,7 +95,6 @@ class Galil:
         # release estop: switch=false
         self.base.print_message("IO Estop")
         if switch == True:
-            await self.break_infinite_digital_cycles()
             await self.digital_out_off(await self.get_all_digital_out())
             await self.set_analog_out(await self.get_all_analoh_out(), 0)
             # set flag
@@ -102,20 +106,22 @@ class Galil:
 
 
     async def get_analog_in(self, 
-                            port:int,
+                            ai_port:str,
                             ai_name:str="analog_in",
                             *args,**kwargs):
         err_code = ErrorCodes.none
         ret = None
-        if port in self.config_dict["Ain_id"]:
-            pID = self.config_dict["Ain_id"][port]
-            ret = self.c(f"@AN[{int(pID)}]")
+        if ai_name in self.dev_ai \
+        and self.dev_ai[ai_name] == ai_port:
+            cmd = f"MG @AN[{int(ai_port)}]"
+            self.base.print_message(f"cmd: '{cmd}'", info = True)
+            ret = self.galilcmd(cmd)
         else:
             err_code = ErrorCodes.not_available
 
         return {
                 "error_code": err_code,
-                "port": port,
+                "port": ai_port,
                 "name": ai_name,
                 "type": "analog_in",
                 "value": ret
@@ -123,20 +129,22 @@ class Galil:
 
 
     async def get_digital_in(self, 
-                             port:int, 
+                             di_port:str,
                              di_name:str="digital_in",
                              *args,**kwargs):
         err_code = ErrorCodes.none
         ret = None
-        if port in self.config_dict["Din_id"]:
-            pID = self.config_dict["Din_id"][port]
-            ret = self.c(f"@IN[{int(pID)}]")
+        if di_name in self.dev_di \
+        and self.dev_di[di_name] == di_port:
+            cmd = f"MG @IN[{int(di_port)}]"
+            self.base.print_message(f"cmd: '{cmd}'", info = True)
+            ret = self.galilcmd(cmd)
         else:
             err_code = ErrorCodes.not_available
 
         return {
                 "error_code": err_code,
-                "port": port,
+                "port": di_port,
                 "name": di_name,
                 "type": "digital_in",
                 "value": ret
@@ -144,20 +152,22 @@ class Galil:
 
 
     async def get_digital_out(self, 
-                              port:int,
+                              do_port:str,
                               do_name:str="digital_out",
                               *args,**kwargs):
         err_code = ErrorCodes.none
         ret = None
-        if port in self.config_dict["Dout_id"]:
-            pID = self.config_dict["Dout_id"][port]
-            ret = self.c(f"@OUT[{int(pID)}]")
+        if do_name in self.dev_do \
+        and self.dev_do[do_name] == do_port:
+            cmd = f"MG @OUT[{int(do_port)}]"
+            self.base.print_message(f"cmd: '{cmd}'", info = True)
+            ret = self.galilcmd(cmd)
         else:
             err_code = ErrorCodes.not_available
 
         return {
                 "error_code": err_code,
-                "port": port,
+                "port": do_port,
                 "name": do_name,
                 "type": "digital_out",
                 "value": ret
@@ -166,7 +176,7 @@ class Galil:
 
     # def set_analog_out(self, ports, handle: int, module: int, bitnum: int, multi_value):
     async def set_analog_out(self, 
-                             port:int, 
+                             ao_port:int, 
                              value:float,
                              ao_name:str="analog_out",
                              *args,**kwargs):
@@ -178,10 +188,10 @@ class Galil:
         # bitnum is the IO point in the module from 1-4
         # the fist value n_0
         # n_0 = handle * 1000 + (module - 1) * 4 + bitnum
-        # _ = self.c("AO {},{}".format(port, value))
+        # _ = self.galilcmd("AO {},{}".format(port, value))
         return {
                 "error_code": err_code,
-                "port": port,
+                "port": ao_port,
                 "name": ao_name,
                 "type": "analog_out",
                 "value": None
@@ -189,26 +199,30 @@ class Galil:
 
 
     async def set_digital_out(self, 
-                              port:int, 
+                              do_port:str,
                               on:bool, 
-                              do_name:str="digital_out",
+                              do_name:str="",
                               *args,**kwargs):
         err_code = ErrorCodes.none
         on = bool(on)
         ret = None
-        if port in self.config_dict["Dout_id"]:
-            pID = self.config_dict["Dout_id"][port]
+        if do_name in self.dev_do \
+        and self.dev_do[do_name] == do_port:
             if on:
-                _ = self.c(f"SB {int(pID)}")
+                cmd = f"SB {int(do_port)}"
             else:
-                _ = self.c(f"CB {int(pID)}")
-            ret = self.c(f"@OUT[{int(pID)}]")
+                cmd = f"CB {int(do_port)}"
+            self.base.print_message(f"cmd: '{cmd}'", info = True)
+            _ = self.galilcmd(cmd)
+            cmd = f"MG @OUT[{int(do_port)}]"
+            self.base.print_message(f"cmd: '{cmd}'", info = True)
+            ret = self.galilcmd(cmd)
         else:
             err_code = ErrorCodes.not_available
 
         return {
                 "error_code": err_code,
-                "port": port,
+                "port": do_port,
                 "name": do_name,
                 "type": "digital_out",
                 "value": ret
@@ -216,45 +230,72 @@ class Galil:
 
 
     async def upload_DMC(self, DMC_prog):
-        self.c("UL;")  # begin upload
+        # self.galilcmd("UL;")  # begin upload
         # upload line by line from DMC_prog
-        for DMC_prog_line in DMC_prog.split("\n"):
-            self.c(DMC_prog_line)
-        self.c("\x1a")  # terminator "<cntrl>Z"
-
-    async def set_digital_cycle(self, trigger_port:int, out_port:int, t_cycle:float,*args,**kwargs):
-        DMC_prog = pathlib.Path(
-            os.path.join(driver_path, "galil_toogle.dmc")
-        ).read_text()
-        DMC_prog = DMC_prog.format(
-            p_trigger=trigger_port, p_output=out_port, t_time=t_cycle
-        )
-        self.upload_DMC(DMC_prog)
-        # self.c("XQ")
-        self.c("XQ #main")  # excecute main routine
+        self.galilprgdownload("DL;")
+        self.base.print_message(f"DMC prg:\n{DMC_prog}", info = True)
+        self.galilprgdownload(DMC_prog+"\x00")
 
 
-    async def infinite_digital_cycles(
-        self, on_time:float=0.2, off_time:float=0.2, port:int=0, init_time:float=0,*args,**kwargs
-    ):
-        self.cycle_lights = True
-        time.sleep(init_time)
-        while self.cycle_lights:
-            await self.set_digital_out(port, True)
-            time.sleep(on_time)
-            await self.set_digital_out(port, False)
-            time.sleep(off_time)
+    async def set_digital_cycle(
+                                self, 
+                                trigger_port:str, 
+                                trigger_name:str, 
+                                out_port:str,
+                                out_name:str,
+                                out_port_gamry:str,
+                                out_name_gamry:str,
+                                t_on:float,
+                                t_off:float,
+                                *args,
+                                **kwargs
+                               ):
+        err_code = ErrorCodes.none
+        if trigger_name in self.dev_di \
+        and self.dev_di[trigger_name] == trigger_port\
+        and out_name in self.dev_do \
+        and self.dev_do[out_name] == out_port \
+        and out_name_gamry in self.dev_do \
+        and self.dev_do[out_name_gamry] == out_port_gamry:
+    
+            self.digital_cycle_out = out_port
+            self.digital_cycle_out_gamry = out_port_gamry
+
+    
+            DMC_prog = pathlib.Path(
+                os.path.join(driver_path, "galil_toogle.dmc")
+            ).read_text()
+            DMC_prog = DMC_prog.format(
+                p_trigger=trigger_port, 
+                p_output=out_port, 
+                p_output_gamry=out_port_gamry, 
+                t_time_on=t_on,
+                t_time_off=t_off
+            )
+            await self.upload_DMC(DMC_prog)
+            self.galilcmd("XQ #main")  # excecute main routine
+            # self.galilcmd("XQ #toogle, 1")  # excecute main routine
+        else:
+            err_code = ErrorCodes.not_available
+
         return {
-            "ports": port,
-            "value": "ran_infinite_light_cycles",
-            "type": "digital_out",
-        }
+                "error_code": err_code
+               }
 
 
-    async def break_infinite_digital_cycles(
-        self, on_time=0.2, off_time=0.2, port=0, init_time=0
-    ):
-        self.cycle_lights = False
+    async def stop_digital_cycle(self):
+            if self.digital_cycle_out:
+                self.galilcmd("HX1")  # stops main routine
+                self.galilcmd("HX0")  # stops main routine
+                cmd = f"CB {int(self.digital_cycle_out)}"
+                _ = self.galilcmd(cmd)
+                cmd = f"CB {int(self.digital_cycle_out_gamry)}"
+                _ = self.galilcmd(cmd)
+                self.digital_cycle_out = None
+                self.digital_cycle_out_gamry = None
+
+
+            return dict()
 
 
     def shutdown_event(self):
