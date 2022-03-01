@@ -235,9 +235,7 @@ def makeApp(confPrefix, servKey):
                              ):
         """Will return 'idle' or 'measuring'. 
         Should be used in conjuction with eta to async.sleep loop poll"""
-        active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["status"]
-        )
+        active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(datadict = \
                                        {"status": await app.driver.status()})
         finished_action = await active.finish()
@@ -252,7 +250,6 @@ def makeApp(confPrefix, servKey):
                   ):
         """Stops measurement in a controlled way."""
         active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["stop"],
                                           action_abbr = "stop"
         )
         await active.enqueue_data_dflt(datadict = \

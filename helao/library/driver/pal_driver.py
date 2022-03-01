@@ -2216,7 +2216,6 @@ class PAL:
                                file_conn_key = \
                                    self.base.dflt_file_conn_key(),
                                # sample_global_labels=[],
-                               json_data_keys = self.FIFO_column_headings,
                                file_type="pal_helao__file",
                               )
                              }

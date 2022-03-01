@@ -50,7 +50,6 @@ async def galil_dyn_endpoints(app = None):
                 (3) moving by center counts back, 
                 (4) set abs zero"""
                 active = await app.base.setup_and_contain_action(
-                                                  json_data_keys = ["setref"],
                                                   action_abbr = "setmotionref"
                 )
                 await active.enqueue_data_dflt(datadict = \
@@ -80,9 +79,7 @@ async def galil_dyn_endpoints(app = None):
                                                             [0,0,1]
                                                            ]
                                  ):
-                active = await app.base.setup_and_contain_action(
-                    json_data_keys = ["matrix"]
-                )
+                active = await app.base.setup_and_contain_action()
                 newmatrix = app.driver.update_transfermatrix(newtransfermatrix = \
                                          np.matrix(active.action.action_params["matrix"])
                 )
@@ -113,7 +110,6 @@ async def galil_dyn_endpoints(app = None):
                                               ):
             """Converts plate to motor xy"""
             active = await app.base.setup_and_contain_action(
-                                              json_data_keys = ["motorxy"],
                                               action_abbr = "tomotorxy"
             )
             await active.enqueue_data_dflt(datadict = \
@@ -131,7 +127,6 @@ async def galil_dyn_endpoints(app = None):
                                               ):
             """Converts motor to plate xy"""
             active = await app.base.setup_and_contain_action(
-                                              json_data_keys = ["platexy"],
                                               action_abbr = "toplatexy"
             )
             await active.enqueue_data_dflt(datadict = \
@@ -148,7 +143,6 @@ async def galil_dyn_endpoints(app = None):
                              ):
             """removes Minstr from Msystem to obtain Mplate for alignment"""
             active = await app.base.setup_and_contain_action(
-                                              json_data_keys = ["mplate"],
                                               action_abbr = "mxytomplate"
             )
             await active.enqueue_data_dflt(datadict = \
@@ -166,7 +160,6 @@ async def galil_dyn_endpoints(app = None):
                returns the xy part of the platecalibration.
             """
             active = await app.base.setup_and_contain_action(
-                                              json_data_keys = ["mplatexy"],
                                               action_abbr = "get_mplatexy"
             )
             await active.enqueue_data_dflt(datadict = \
@@ -185,7 +178,6 @@ async def galil_dyn_endpoints(app = None):
                Updates the xy part of the plate calibration.
             """
             active = await app.base.setup_and_contain_action(
-                                              json_data_keys = ["uploaded"],
                                               action_abbr = "upload_mplatexy"
             )
             await active.enqueue_data_dflt(datadict = \
@@ -209,15 +201,6 @@ async def galil_dyn_endpoints(app = None):
                 Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.
                 No z, Rx, Ry, Rz when platexy selected."""
                 active = await app.base.setup_and_contain_action(
-                                                  json_data_keys = [
-                                                                    "moved_axis",
-                                                                    "speed",
-                                                                    "accepted_rel_dist",
-                                                                    "supplied_rel_dist",
-                                                                    "err_dist",
-                                                                    "err_code",
-                                                                    "counts"
-                                                                   ],
                                                   action_abbr = "move"
                 )
                 datadict = await app.driver.motor_move(active)
@@ -245,15 +228,6 @@ async def galil_dyn_endpoints(app = None):
                 Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.
                 No z, Rx, Ry, Rz when platexy selected."""
                 active = await app.base.setup_and_contain_action(
-                                                  json_data_keys = [
-                                                                    "moved_axis",
-                                                                    "speed",
-                                                                    "accepted_rel_dist",
-                                                                    "supplied_rel_dist",
-                                                                    "err_dist",
-                                                                    "err_code",
-                                                                    "counts"
-                                                                   ],
                                                   action_abbr = "move"
                 )
                 datadict = await app.driver.motor_move(active)
@@ -272,7 +246,6 @@ async def galil_dyn_endpoints(app = None):
                                      Body({}, embed=True),
                             ):
             active = await app.base.setup_and_contain_action(
-                                              json_data_keys = ["connection"],
                                               action_abbr = "disconnect"
             )
             await active.enqueue_data_dflt(datadict = \
@@ -288,10 +261,6 @@ async def galil_dyn_endpoints(app = None):
                                               Body({}, embed=True),
                                      ):
                 active = await app.base.setup_and_contain_action(
-                                                  json_data_keys = [
-                                                                    "ax",
-                                                                    "position"
-                                                                   ],
                                                   action_abbr = "query_position"
                 )
                 await active.enqueue_data_dflt(datadict = \
@@ -309,10 +278,6 @@ async def galil_dyn_endpoints(app = None):
                                      axis: Optional[dev_axisitems] = None
             ):
                 active = await app.base.setup_and_contain_action(
-                                                  json_data_keys = [
-                                                                    "ax",
-                                                                    "position"
-                                                                   ],
                                                   action_abbr = "query_position"
                 )
                 await active.enqueue_data_dflt(datadict = \
@@ -329,10 +294,6 @@ async def galil_dyn_endpoints(app = None):
                                    axis: Optional[Union[List[str], str]] = None
                                   ):
                 active = await app.base.setup_and_contain_action(
-                                                  json_data_keys = [
-                                                                    "motor_status",
-                                                                    "err_code"
-                                                                   ],
                                                   action_abbr = "query_moving"
                 )
                 datadict = await app.driver.query_axis_moving(**active.action.action_params)
@@ -355,12 +316,6 @@ async def galil_dyn_endpoints(app = None):
                               ):
                 # http://127.0.0.1:8001/motor/set/off?axis=x
                 active = await app.base.setup_and_contain_action(
-                                                  json_data_keys = [
-                                                                    "motor_status",
-                                                                    "ax",
-                                                                    "position",
-                                                                    "err_code"
-                                                                   ],
                                                   action_abbr = "axis_off"
                 )
                 datadict = \
@@ -383,12 +338,6 @@ async def galil_dyn_endpoints(app = None):
                               axis: Optional[dev_axisitems] = None
                              ):
                 active = await app.base.setup_and_contain_action(
-                                                  json_data_keys = [
-                                                                    "motor_status",
-                                                                    "ax",
-                                                                    "position",
-                                                                    "err_code"
-                                                                   ],
                                                   action_abbr = "axis_on"
                 )
                 datadict = \
@@ -409,12 +358,6 @@ async def galil_dyn_endpoints(app = None):
                                Body({}, embed=True),
                       ):
             active = await app.base.setup_and_contain_action(
-                                              json_data_keys = [
-                                                                "motor_status",
-                                                                "ax",
-                                                                "position",
-                                                                "err_code"
-                                                               ],
                                               action_abbr = "stop"
             )
             datadict = \
@@ -437,9 +380,6 @@ async def galil_dyn_endpoints(app = None):
                resets galil device. 
             """
             active = await app.base.setup_and_contain_action(
-                                              json_data_keys = [
-                                                                "reset",
-                                                               ],
                                               action_abbr = "reset"
             )
             await active.enqueue_data_dflt(datadict = \
