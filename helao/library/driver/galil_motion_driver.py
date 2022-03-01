@@ -120,13 +120,13 @@ class Galil:
             if galil_ip:
                 self.g.GOpen("%s --direct -s ALL" % (galil_ip))
                 self.base.print_message(self.g.GInfo())
-                self.c = self.g.GCommand  # alias the command callable
+                self.galilcmd = self.g.GCommand  # alias the command callable
                 # The SH commands tells the controller to use the current 
                 # motor position as the command position and to enable servo control here.
                 # The SH command changes the coordinate system.
                 # Therefore, all position commands given prior to SH, 
                 # must be repeated. Otherwise, the controller produces incorrect motion.
-                self.c("SH; PF 10.4")
+                self.galilcmd("SH; PF 10.4")
                 axis_init = [
                             ("MT", 2), # Specifies Step motor with active low step pulses
                             ("CE", 4), # Configure Encoder: Normal pulse and direction
@@ -135,7 +135,7 @@ class Galil:
                             ]
                 for axl in self.config_dict['axis_id'].values():
                     for ac, av in axis_init:
-                        self.c(f"{ac}{axl}={av}")
+                        self.galilcmd(f"{ac}{axl}={av}")
                 self.galil_enabled = True
             else:
                 self.base.print_message(
@@ -256,7 +256,7 @@ class Galil:
 
 
             # set absolute zero to current position
-            q = self.c("TP")  # query position of all axis
+            q = self.galilcmd("TP")  # query position of all axis
             self.base.print_message(f"q1: {q}")
             cmd = "DP "
             for i in range(len(q.split(","))):
@@ -267,7 +267,7 @@ class Galil:
             self.base.print_message(f"cmd: {cmd}")
 
             # sets abs zero here
-            _ = self.c(cmd)
+            _ = self.galilcmd(cmd)
 
             return retc2
         else:
@@ -629,7 +629,7 @@ class Galil:
                 # it can happen that it crashes below for some reasons
                 # when more then two axis move are requested
                 for cmd in cmd_seq:
-                    _ = self.c(cmd)
+                    _ = self.galilcmd(cmd)
                     # ret.join(_)
                 self.base.print_message(f"Galil cmd: {cmd_seq}")
                 ret_moved_axis.append(axl)
@@ -739,7 +739,7 @@ class Galil:
 
         # first get the relative position (actual only the current position of the encoders)
         # to get how many axis are present
-        qTP = self.c("TP")  # query position of all axis
+        qTP = self.galilcmd("TP")  # query position of all axis
         self.base.print_message(f"q (TP): {qTP}")
         cmd = "PA "
         for i in range(len(qTP.split(","))):
@@ -747,9 +747,9 @@ class Galil:
                 cmd += "?"
             else:
                 cmd += ",?"
-        q = self.c(cmd)  # query position of all axis
-        # _ = self.c("PF 10.4")  # set format
-        # q = self.c("TP")  # query position of all axis
+        q = self.galilcmd(cmd)  # query position of all axis
+        # _ = self.galilcmd("PF 10.4")  # set format
+        # q = self.galilcmd("TP")  # query position of all axis
         self.base.print_message(f"q (PA): {q}")
         # now we need to map these outputs to the ABCDEFG... channels
         # and then map that to xyz so it is humanly readable
@@ -787,7 +787,7 @@ class Galil:
 
     async def query_axis_moving(self, axis,*args,**kwargs):
         # this functions queries the status of the axis
-        q = self.c("SC")
+        q = self.galilcmd("SC")
         axlett = "ABCDEFGH"
         axlett = axlett[0 : len(q.split(","))]
         # convert single axis move to list
@@ -836,7 +836,7 @@ class Galil:
         # The RS command resets the state of the actionor to its power-on condition.
         # The previously saved state of the controller,
         # along with parameter values, and saved experiments are restored.
-        return self.c("RS")
+        return self.galilcmd("RS")
 
 
     async def estop(self, switch:bool, *args, **kwargs):
@@ -866,7 +866,7 @@ class Galil:
         for ax in axis:
             if ax in self.axis_id:
                 axl = self.axis_id[ax]
-                self.c(f"ST{axl}")
+                self.galilcmd(f"ST{axl}")
 
         ret = await self.query_axis_moving(axis)
         ret.update(await self.query_axis_position(axis))
@@ -898,7 +898,7 @@ class Galil:
             cmd_seq = [f"ST{axl}", f"MO{axl}"]
 
             for cmd in cmd_seq:
-                _ = self.c(cmd)
+                _ = self.galilcmd(cmd)
 
         ret = await self.query_axis_moving(axis)
         ret.update(await self.query_axis_position(axis))
@@ -928,7 +928,7 @@ class Galil:
             cmd_seq = [f"ST{axl}", f"SH{axl}"]
 
             for cmd in cmd_seq:
-                _ = self.c(cmd)
+                _ = self.galilcmd(cmd)
 
         ret = await self.query_axis_moving(axis)
         ret.update(await self.query_axis_position(axis))
@@ -936,11 +936,11 @@ class Galil:
 
 
     async def upload_DMC(self, DMC_prog):
-        self.c("UL;")  # begin upload
+        self.galilcmd("UL;")  # begin upload
         # upload line by line from DMC_prog
         for DMC_prog_line in DMC_prog.split("\n"):
-            self.c(DMC_prog_line)
-        self.c("\x1a")  # terminator "<cntrl>Z"
+            self.galilcmd(DMC_prog_line)
+        self.galilcmd("\x1a")  # terminator "<cntrl>Z"
 
 
     def get_all_axis(self):
