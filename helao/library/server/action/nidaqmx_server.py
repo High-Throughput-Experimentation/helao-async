@@ -79,13 +79,6 @@ def makeApp(confPrefix, servKey):
                              on: Optional[bool] = True
                             ):
             active = await app.base.setup_and_contain_action(
-                                              json_data_keys = [
-                                                                "error_code", 
-                                                                "port", 
-                                                                "name", 
-                                                                "type", 
-                                                                "value"
-                                                               ],
                                               action_abbr = "mcell"
             )
             # some additional params in order to call the same driver functions 
@@ -112,13 +105,6 @@ def makeApp(confPrefix, servKey):
                              on: Optional[bool] = True
                             ):
             active = await app.base.setup_and_contain_action(
-                                              json_data_keys = [
-                                                                "error_code", 
-                                                                "port", 
-                                                                "name", 
-                                                                "type", 
-                                                                "value"
-                                                               ],
                                               action_abbr = "acell"
             )
             # some additional params in order to call the same driver functions 
@@ -145,13 +131,6 @@ def makeApp(confPrefix, servKey):
                        on: Optional[bool] = True
                       ):
             active = await app.base.setup_and_contain_action(
-                                              json_data_keys = [
-                                                                "error_code", 
-                                                                "port", 
-                                                                "name", 
-                                                                "type", 
-                                                                "value"
-                                                               ],
                                               action_abbr = "pump"
             )
             # some additional params in order to call the same driver functions 
@@ -178,13 +157,6 @@ def makeApp(confPrefix, servKey):
                            on: Optional[bool] = True
                           ):
             active = await app.base.setup_and_contain_action(
-                                              json_data_keys = [
-                                                                "error_code", 
-                                                                "port", 
-                                                                "name", 
-                                                                "type", 
-                                                                "value"
-                                                               ],
                                               action_abbr = "gfv"
             )
             # some additional params in order to call the same driver functions 
@@ -211,13 +183,6 @@ def makeApp(confPrefix, servKey):
                               on: Optional[bool] = True
                              ):
             active = await app.base.setup_and_contain_action(
-                                              json_data_keys = [
-                                                                "error_code", 
-                                                                "port", 
-                                                                "name", 
-                                                                "type", 
-                                                                "value"
-                                                               ],
                                               action_abbr = "lfv"
             )
             # some additional params in order to call the same driver functions 
@@ -244,13 +209,6 @@ def makeApp(confPrefix, servKey):
                       on: Optional[bool] = True
                      ):
             active = await app.base.setup_and_contain_action(
-                                              json_data_keys = [
-                                                                "error_code", 
-                                                                "port", 
-                                                                "name", 
-                                                                "type", 
-                                                                "value"
-                                                               ],
                                               action_abbr = "led"
             )
             # some additional params in order to call the same driver functions 
@@ -277,13 +235,6 @@ def makeApp(confPrefix, servKey):
                          on: Optional[bool] = True
                         ):
             active = await app.base.setup_and_contain_action(
-                                              json_data_keys = [
-                                                                "error_code", 
-                                                                "port", 
-                                                                "name", 
-                                                                "type", 
-                                                                "value"
-                                                               ],
                                               action_abbr = "fswbcd"
             )
             # some additional params in order to call the same driver functions 
@@ -309,13 +260,6 @@ def makeApp(confPrefix, servKey):
                       fsw: Optional[dev_fswitems] = None,
                      ):
             active = await app.base.setup_and_contain_action(
-                                              json_data_keys = [
-                                                                "error_code", 
-                                                                "port", 
-                                                                "name", 
-                                                                "type", 
-                                                                "value"
-                                                               ],
                                               action_abbr = "fsw"
             )
             # some additional params in order to call the same driver functions 
@@ -362,7 +306,6 @@ def makeApp(confPrefix, servKey):
                   ):
         """Stops measurement in a controlled way."""
         active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["stop"],
                                           action_abbr = "stop"
         )
         await active.enqueue_data_dflt(datadict = \

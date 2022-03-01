@@ -84,6 +84,9 @@ class Galil:
         self.save_transfermatrix(file = self.file_backup_transfermatrix)
 
         self.motor_timeout = self.config_dict.get("timeout", 60)
+        self.motor_max_speed_count_sec = self.config_dict.get("max_speed_count_sec", 25000)
+        self.motor_def_speed_count_sec = self.config_dict.get("def_speed_count_sec", 10000)
+
 
         # need to check if config settings exist
         # else need to create empty ones
@@ -133,7 +136,7 @@ class Galil:
                             ("TW", 32000),  # Timeout for IN Position (MC) in ms
                             ("SD", 256000), # sets the linear deceleration rate of the motors when a limit switch has been reached.
                             ]
-                for axl in self.config_dict['axis_id'].values():
+                for axl in self.axis_id.values():
                     for ac, av in axis_init:
                         self.galilcmd(f"{ac}{axl}={av}")
                 self.galil_enabled = True
@@ -216,25 +219,25 @@ class Galil:
         if axis is not None:
             # go slow to find the same position every time
             # first a fast move to find the switch
-            retc1 = await self._motor_move(
+            _ = await self._motor_move(
                 d_mm = [0 for ax in axis],
                 axis = axis,
-                speed = None,
+                speed = self.motor_max_speed_count_sec,
                 mode = MoveModes.homing,
                 transformation = TransformationModes.motorxy
             )
 
             # move back 2mm
-            retc1 = await self._motor_move(
+            _ = await self._motor_move(
                 d_mm = [2 for ax in axis],
                 axis = axis,
-                speed = None,
+                speed = self.motor_max_speed_count_sec,
                 mode = MoveModes.relative,
                 transformation = TransformationModes.motorxy
             )
 
             # approach switch again very slow to get better zero position
-            retc1 = await self._motor_move(
+            _ = await self._motor_move(
                 d_mm = [0 for ax in axis],
                 axis = axis,
                 speed = 1000,
@@ -283,6 +286,7 @@ class Galil:
             else:
                 self.blocked = True
                 self.aligner.plateid = A.action_params["plateid"]
+                # A.error_code = ErrorCodes.none
                 self.aligner.active = await self.base.contain_action(
                     ActiveParams(
                                  action = A,
@@ -293,11 +297,6 @@ class Galil:
                                                    file_conn_key = \
                                                        self.base.dflt_file_conn_key(),
                                                     sample_global_labels=[],
-                                                    json_data_keys = [
-                                                        "Transfermatrix",
-                                                        "oldTransfermatrix",
-                                                        "errorcode"
-                                                    ],
                                                     file_type="aligner_helao__file",
                                                     # hloheader = HloHeaderModel(
                                                     #     optional = None
@@ -577,12 +576,12 @@ class Galil:
 
                 # check if a speed was upplied otherwise set it to standart
                 if speed == None:
-                    speed = self.config_dict["def_speed_count_sec"]
+                    speed = self.motor_def_speed_count_sec
                 else:
                     speed = int(np.floor(speed))
 
-                if speed > self.config_dict["max_speed_count_sec"]:
-                    speed = self.config_dict["max_speed_count_sec"]
+                if speed > self.motor_max_speed_count_sec:
+                    speed = self.motor_max_speed_count_sec
                 self._speed = speed
             except Exception:
                 self.base.print_message("motor numerical error",
@@ -643,7 +642,7 @@ class Galil:
 
                 # continue
             except Exception as e:
-                self.base.print_message("motor error: '{e}'",
+                self.base.print_message(f"motor error: '{e}'",
                                         error = True)
                 ret_moved_axis.append(None)
                 ret_speed.append(None)
@@ -2535,7 +2534,9 @@ class Aligner:
     
     def clicked_submit(self):
         """submit final results back to aligner server"""
-        asyncio.gather(self.finish_alignment(self.TransferMatrix,0))
+        asyncio.gather(
+            self.finish_alignment(self.TransferMatrix,ErrorCodes.none)
+        )
     
     
     def clicked_go_align(self):
@@ -2585,7 +2586,9 @@ class Aligner:
     
     def clicked_skipstep(self):
         """Calculate Transformation Matrix from given points"""
-        asyncio.gather(self.finish_alignment(self.initialTransferMatrix,0))
+        asyncio.gather(
+            self.finish_alignment(self.initialTransferMatrix,ErrorCodes.none)
+        )
     
     
     def clicked_buttonsel(self, idx):
@@ -2707,6 +2710,8 @@ class Aligner:
             self.motor.save_transfermatrix(file = os.path.join(self.motor.base.db_root, "plate_calib",
                              f"{gethostname()}_plate_{self.plateid}_calib.json")
             )
+            self.active.action.error_code = \
+                self.motor.base.get_main_error(errorcode)
             await self.active.write_file(
                 file_type = "plate_calib",
                 filename = f"{gethostname()}_plate_{self.plateid}_calib.json",
@@ -2722,7 +2727,7 @@ class Aligner:
                                         {
                                             "Transfermatrix":self.motor.transfermatrix.tolist(),
                                             "oldTransfermatrix":self.initialTransferMatrix.tolist(),
-                                            "errorcode":f"{errorcode}"
+                                            "err_code":f"{errorcode}"
                                         }
                                      },
                              errors = []
@@ -3100,8 +3105,8 @@ class Aligner:
                 self.vis.doc.add_next_tick_callback(partial(self.IOloop_helper))
 
                 msg = await self.motorpos_q.get()
-                self.vis.print_message(f"Aligner IO got new pos {msg}",
-                                        info = True)
+                # self.vis.print_message(f"Aligner IO got new pos {msg}",
+                #                         info = True)
                 if "ax" in msg:
                     if 'x' in msg['ax']:
                         idx = msg['ax'].index('x')

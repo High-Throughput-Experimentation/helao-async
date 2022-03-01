@@ -33,13 +33,6 @@ async def galil_dyn_endpoints(app = None):
                                     ai_item:Optional[app.driver.dev_aiitems] = None
                                    ):
                 active = await app.base.setup_and_contain_action(
-                                                  json_data_keys = [
-                                                                    "error_code", 
-                                                                    "port", 
-                                                                    "name", 
-                                                                    "type", 
-                                                                    "value"
-                                                                   ],
                                                   action_abbr = "get_ai"
                 )
                 active.action.action_params["ai_port"] = \
@@ -64,13 +57,6 @@ async def galil_dyn_endpoints(app = None):
                                      value:Optional[float] = None
                                     ):
                 active = await app.base.setup_and_contain_action(
-                                                  json_data_keys = [
-                                                                    "error_code", 
-                                                                    "port", 
-                                                                    "name", 
-                                                                    "type", 
-                                                                    "value"
-                                                                   ],
                                                   action_abbr = "set_ao"
                 )
                 active.action.action_params["ao_port"] = \
@@ -94,13 +80,6 @@ async def galil_dyn_endpoints(app = None):
                                      di_item:Optional[app.driver.dev_diitems] = None
                                     ):
                 active = await app.base.setup_and_contain_action(
-                                                  json_data_keys = [
-                                                                    "error_code", 
-                                                                    "port", 
-                                                                    "name", 
-                                                                    "type", 
-                                                                    "value"
-                                                                   ],
                                                   action_abbr = "get_di"
                 )
                 active.action.action_params["di_port"] = \
@@ -124,13 +103,6 @@ async def galil_dyn_endpoints(app = None):
                                       do_item:Optional[app.driver.dev_doitems] = None
                                      ):
                 active = await app.base.setup_and_contain_action(
-                                                  json_data_keys = [
-                                                                    "error_code", 
-                                                                    "port", 
-                                                                    "name", 
-                                                                    "type", 
-                                                                    "value"
-                                                                   ],
                                                   action_abbr = "get_do"
                 )
                 active.action.action_params["do_port"] = \
@@ -155,13 +127,6 @@ async def galil_dyn_endpoints(app = None):
                                       on:Optional[bool] = False
                                      ):
                 active = await app.base.setup_and_contain_action(
-                                                  json_data_keys = [
-                                                                    "error_code", 
-                                                                    "port", 
-                                                                    "name", 
-                                                                    "type", 
-                                                                    "value"
-                                                                   ],
                                                   action_abbr = "set_do"
                 )
                 active.action.action_params["do_port"] = \
@@ -189,16 +154,7 @@ async def galil_dyn_endpoints(app = None):
                                         t_on:Optional[float] = None,
                                         t_off:Optional[float] = None,
                                      ):
-                active = await app.base.setup_and_contain_action(
-                                                   json_data_keys = [
-                                                                     "error_code", 
-                                                  #                   "port", 
-                                                  #                   "name", 
-                                                  #                   "type", 
-                                                  #                   "value"
-                                                                    ],
-                                                  # action_abbr = "set_do"
-                )
+                active = await app.base.setup_and_contain_action()
 
                 active.action.action_params["trigger_port"] = \
                     app.driver.dev_di[active.action.action_params["trigger_item"]]
@@ -253,9 +209,6 @@ async def galil_dyn_endpoints(app = None):
                resets galil device. 
             """
             active = await app.base.setup_and_contain_action(
-                                              json_data_keys = [
-                                                                "reset",
-                                                               ],
                                               action_abbr = "reset"
             )
             await active.enqueue_data_dflt(datadict = \

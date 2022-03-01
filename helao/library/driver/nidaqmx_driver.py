@@ -465,7 +465,6 @@ class cNIMAX:
                                                     file_conn_key = \
                                                         self.base.dflt_file_conn_key(),
                                                     sample_global_labels=file_sample_label[self.FIFO_cell_keys[0]],
-                                                    json_data_keys = self.FIFO_column_headings,
                                                     file_type="ni_helao__file",
                                                     # only add optional keys to header
                                                     # rest will be added later
@@ -491,7 +490,6 @@ class cNIMAX:
                                            self.base.dflt_file_conn_key(),
                                        sample_global_labels=\
                                            file_sample_label[self.FIFO_cell_keys[i+1]],
-                                       json_data_keys = self.FIFO_column_headings,
                                        file_type="ni_helao__file",
                                        # only add optional keys to header
                                        # rest will be added later

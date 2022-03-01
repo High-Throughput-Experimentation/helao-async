@@ -501,7 +501,6 @@ def makeApp(confPrefix, servKey):
                                       vial: Optional[int] = None,
                                      ):
         active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["sample", "error_code"],
                                           action_abbr = "query_sample"
         )
         error, sample = \
@@ -526,7 +525,6 @@ def makeApp(confPrefix, servKey):
                                     ):
         """Resets app.driver vial table."""
         active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["unloaded","tray_dict"],
                                           action_abbr = "unload_sample"
         )
         unloaded, sample_in, sample_out, tray_dict = \
@@ -554,7 +552,6 @@ def makeApp(confPrefix, servKey):
                                 vial: Optional[int] = None,
                                ):
         active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["error_code","sample"],
                                           action_abbr = "load_sample",
         )
         error_code, loaded_sample = await app.driver.archive.tray_load(**active.action.action_params)
@@ -578,7 +575,6 @@ def makeApp(confPrefix, servKey):
                                  ):
         """Resets app.driver vial table."""
         active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["unloaded","tray_dict"],
                                           action_abbr = "unload_sample"
         )
         unloaded, sample_in, sample_out, tray_dict = \
@@ -605,10 +601,7 @@ def makeApp(confPrefix, servKey):
         """Returns an empty vial position for given max volume.\n
         For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.\n
         It will select the first empty vial which has the smallest volume that still can hold req_vol"""
-        active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["tray", "slot", "vial"],
-                                          # action_abbr = ""
-        )
+        active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(datadict = \
                                        await app.driver.archive.tray_new_position(**active.action.action_params)
                                        )
@@ -626,10 +619,7 @@ def makeApp(confPrefix, servKey):
         vial: Optional[int] = None,
     ):
         """Updates app.driver vial Table. If sucessful (vial-slot was empty) returns True, else it returns False."""
-        active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["update"],
-                                          # action_abbr = ""
-        )
+        active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(datadict = \
                                        {"update": await app.driver.archive.tray_update_position(**active.action.action_params),
                                        })
@@ -645,7 +635,6 @@ def makeApp(confPrefix, servKey):
         slot: Optional[int] = None
     ):
         active = await app.base.setup_and_contain_action(
-                                          json_data_keys = app.driver.archive.tray_get_keys(),
                                           action_abbr = "traytojson",
                                           file_type="palvialtable_helao__file",
         )
@@ -711,7 +700,6 @@ def makeApp(confPrefix, servKey):
                                   load_sample_in: Optional[SampleUnion] = Body(LiquidSample(**{"sample_no":1,"machine_name":gethostname()}), embed=True),
                                  ):
         active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["loaded","customs_dict"],
                                           action_abbr = "load_sample",
         )
         loaded, loaded_sample, customs_dict = await app.driver.archive.custom_load(**active.action.action_params)
@@ -733,7 +721,6 @@ def makeApp(confPrefix, servKey):
                                     custom: Optional[dev_customitems] = None,
                                    ):
         active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["unloaded","customs_dict"],
                                           action_abbr = "unload_sample",
         )
         unloaded, sample_in, sample_out, customs_dict = \
@@ -757,7 +744,6 @@ def makeApp(confPrefix, servKey):
                                                Body({}, embed=True),
                                       ):
         active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["unloaded","customs_dict"],
                                           action_abbr = "unload_sample",
         )
         unloaded, sample_in, sample_out, customs_dict = \
@@ -782,7 +768,6 @@ def makeApp(confPrefix, servKey):
                                     custom: Optional[dev_customitems] = None,
                                        ):
         active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["sample", "error_code"],
                                           action_abbr = "query_sample",
         )
         error, sample = \
@@ -807,9 +792,7 @@ def makeApp(confPrefix, servKey):
                         ):
         """Positive sample_no will get it from the beginng, negative
         from the end of the db."""
-        active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["sample"],
-        )
+        active = await app.base.setup_and_contain_action()
         sample = await app.driver.db_get_sample(active.action.samples_in)
         await active.enqueue_data_dflt(datadict = \
                                        {'sample': sample.as_dict()})
@@ -839,9 +822,7 @@ def makeApp(confPrefix, servKey):
         and action_params empty and servkey on "data".
         If its the very first liquid (no source in database exists) 
         leave source and source_ml empty."""
-        active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["sample"],
-        )
+        active = await app.base.setup_and_contain_action()
         samples = await app.driver.db_new_sample(active.action.samples_in)
         await active.enqueue_data_dflt(datadict = \
                                        {'sample': [sample.as_dict() for sample in samples]})

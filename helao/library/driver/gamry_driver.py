@@ -712,7 +712,6 @@ class gamry:
                                                file_conn_key = \
                                                    self.base.dflt_file_conn_key(),
                                                 sample_global_labels=[sample.get_global_label() for sample in self.samples_in],
-                                                json_data_keys = self.FIFO_column_headings,
                                                 file_type="pstat_helao__file",
                                                 # only add optional keys to header
                                                 # rest will be added later

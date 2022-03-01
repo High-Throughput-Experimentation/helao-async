@@ -51,9 +51,7 @@ def makeApp(confPrefix, servKey):
                                    plateid: Optional[int]=None
                                   ):
         """Gets the elements from the screening print in the info file"""
-        active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["elements"],
-        )
+        active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(datadict = \
                                        {"elements": \
                app.driver.get_elements_plateid(**active.action.action_params)})
@@ -68,9 +66,7 @@ def makeApp(confPrefix, servKey):
                                    plateid: Optional[int]=None
                                   ):
         """gets platemap"""
-        active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["platemap"],
-        )
+        active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(datadict = \
                                        {"platemap": \
                app.driver.get_platemap_plateid(**active.action.action_params)})
@@ -85,9 +81,7 @@ def makeApp(confPrefix, servKey):
                                      plateid: Optional[int]=None
                                     ):
         """gets saved plate alignment matrix"""
-        active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["platecal"],
-        )
+        active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(datadict = \
                                        {"platecal": \
              app.driver.get_platexycalibration(**active.action.action_params)})
@@ -102,9 +96,7 @@ def makeApp(confPrefix, servKey):
                                       plateid: Optional[int]=None
                                      ):
         """saves alignment matrix"""
-        active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["platecal"],
-        )
+        active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(datadict = \
                                        {"platecal": \
             app.driver.save_platexycalibration(**active.action.action_params)})
@@ -119,9 +111,7 @@ def makeApp(confPrefix, servKey):
                             plateid: Optional[int]=None
                            ):
         """checks that the plate_id (info file) exists"""
-        active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["plateid"],
-        )
+        active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(datadict = \
                                        {"plateid": \
                       app.driver.check_plateid(**active.action.action_params)})
@@ -136,9 +126,7 @@ def makeApp(confPrefix, servKey):
                                         plateid: Optional[int]=None
                                        ):
         """checks that a print record exist in the info file"""
-        active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["printrecord"],
-        )
+        active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(datadict = \
                                        {"printrecord": \
           app.driver.check_printrecord_plateid(**active.action.action_params)})
@@ -153,9 +141,7 @@ def makeApp(confPrefix, servKey):
                                          plateid: Optional[int]=None
                                         ):
         """checks that a anneal record exist in the info file"""
-        active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["annealrecord"],
-        )
+        active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(datadict = \
                                        {"annealrecord": \
          app.driver.check_annealrecord_plateid(**active.action.action_params)})
@@ -169,9 +155,7 @@ def makeApp(confPrefix, servKey):
                                        Body({}, embed=True),
                                plateid: Optional[int]=None
                               ):
-        active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["info"],
-        )
+        active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(datadict = \
                                        {"info": \
                    app.driver.get_info_plateid(**active.action.action_params)})
@@ -185,9 +169,7 @@ def makeApp(confPrefix, servKey):
                                       Body({}, embed=True),
                               plateid: Optional[int]=None
                              ):
-        active = await app.base.setup_and_contain_action(
-                                          json_data_keys = ["rcp"],
-        )
+        active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(datadict = \
                                        {"rcp": \
                     app.driver.get_rcp_plateid(**active.action.action_params)})
