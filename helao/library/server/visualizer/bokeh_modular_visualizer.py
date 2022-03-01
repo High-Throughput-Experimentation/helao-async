@@ -36,16 +36,13 @@ class C_nidaqmxvis:
     def __init__(self, visServ: Vis, nidaqmx_key: str):
         self.vis = visServ
         self.config_dict = self.vis.server_cfg["params"]
-        self.show = False
         self.max_points = 500
-
-        nidaqmxserv_config = self.vis.world_cfg["servers"].get(nidaqmx_key, None)
+        self.nidaqmx_key = nidaqmx_key
+        nidaqmxserv_config = self.vis.world_cfg["servers"].get(self.nidaqmx_key, None)
         if nidaqmxserv_config is None:
             return
         nidaqmxserv_host = nidaqmxserv_config.get("host", None)
         nidaqmxserv_port = nidaqmxserv_config.get("port", None)
-        
-        self.show = True
         
         self.data_url = f"ws://{nidaqmxserv_config['host']}:{nidaqmxserv_config['port']}/ws_data"
         # self.stat_url = f"ws://{nidaqmxserv_config["host"]}:{nidaqmxserv_config["port"]}/ws_status"
@@ -121,7 +118,7 @@ class C_nidaqmxvis:
 
         # combine all sublayouts into a single one
         self.layout = layout([
-            [Spacer(width=20), Div(text=f'<b>NImax Visualizer module for server <a href="http://{nidaqmxserv_host}:{nidaqmxserv_port}/docs#/" target="_blank">\'{nidaqmx_key}\'</a></b>', width=1004, height=15)],
+            [Spacer(width=20), Div(text=f'<b>NImax Visualizer module for server <a href="http://{nidaqmxserv_host}:{nidaqmxserv_port}/docs#/" target="_blank">\'{self.nidaqmx_key}\'</a></b>', width=1004, height=15)],
             [self.input_max_points],
             [self.paragraph1],
             [self.yaxis_selector_group],
@@ -134,6 +131,16 @@ class C_nidaqmxvis:
 
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
+        self.IOtask = asyncio.create_task(self.IOloop_data())
+        self.vis.doc.on_session_destroyed(self.cleanup_session)
+
+
+    def cleanup_session(self, session_context):
+        self.vis.print_message(f"'{self.nidaqmx_key}' "
+                               "Bokeh session closed",
+                                error = True)
+        self.IOloop_data_run = False
+        self.IOtask.cancel()
 
 
     def callback_input_max_points(self, attr, old, new, sender):
@@ -218,12 +225,18 @@ class C_nidaqmxvis:
                                 self.vis.doc.add_next_tick_callback(partial(self.add_points, datapackage))
                         except Exception:
                             self.IOloop_data_run = False
+                    ws.close()
+                    self.IOloop_data_run = False
             except Exception:
                 self.vis.print_message(f"failed to subscribe to "
                                    f"{self.data_url}"
                                    "trying again in 1sec",
                                    error = True)
                 await asyncio.sleep(1) 
+            if not self.IOloop_data_run:
+                self.vis.print_message("IOloop closed",
+                                   info = True)
+                break
 
 
     def _add_plots(self):
@@ -284,17 +297,15 @@ class C_potvis:
     """potentiostat visualizer module class"""
     def __init__(self, visServ: Vis, potentiostat_key: str):
         self.vis = visServ
-        # self.vis = app
         self.config_dict = self.vis.server_cfg["params"]
-        self.show = False
         self.max_points = 500
 
-        potserv_config = self.vis.world_cfg["servers"].get(potentiostat_key, None)
+        self.potentiostat_key = potentiostat_key
+        potserv_config = self.vis.world_cfg["servers"].get(self.potentiostat_key, None)
         if potserv_config is None:
             return
         potserv_host = potserv_config.get("host", None)
         potserv_port = potserv_config.get("port", None)
-        self.show = True
 
         self.data_url = f"ws://{potserv_config['host']}:{potserv_config['port']}/ws_data"
         # self.stat_url = f"ws://{potserv_config["host"]}:{potserv_config["port"]}/ws_status"
@@ -340,7 +351,7 @@ class C_potvis:
         self.plot_prev = figure(title="Title", height=300, width=500)
         # combine all sublayouts into a single one
         self.layout = layout([
-            [Spacer(width=20), Div(text=f'<b>Potentiostat Visualizer module for server <a href="http://{potserv_host}:{potserv_port}/docs#/" target="_blank">\'{potentiostat_key}\'</a></b>', width=1004, height=15)],
+            [Spacer(width=20), Div(text=f'<b>Potentiostat Visualizer module for server <a href="http://{potserv_host}:{potserv_port}/docs#/" target="_blank">\'{self.potentiostat_key}\'</a></b>', width=1004, height=15)],
             [self.input_max_points],
             [Paragraph(text="""x-axis:""", width=500, height=15), Paragraph(text="""y-axis:""", width=500, height=15)],
             [self.xaxis_selector_group, self.yaxis_selector_group],
@@ -357,6 +368,16 @@ class C_potvis:
 
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
+        self.IOtask = asyncio.create_task(self.IOloop_data())
+        self.vis.doc.on_session_destroyed(self.cleanup_session)
+
+
+    def cleanup_session(self, session_context):
+        self.vis.print_message(f"'{self.potentiostat_key}' "
+                               "Bokeh session closed",
+                                error = True)
+        self.IOloop_data_run = False
+        self.IOtask.cancel()
 
 
     def callback_input_max_points(self, attr, old, new, sender):
@@ -433,12 +454,18 @@ class C_potvis:
                                 self.vis.doc.add_next_tick_callback(partial(self.add_points, datapackage))
                         except Exception:
                             self.IOloop_data_run = False
+                    ws.close()
+                    self.IOloop_data_run = False
             except Exception:
                 self.vis.print_message(f"failed to subscribe to "
                                    f"{self.data_url}"
                                    "trying again in 1sec",
                                    error = True)
                 await asyncio.sleep(1) 
+            if not self.IOloop_data_run:
+                self.vis.print_message("IOloop closed",
+                                   info = True)
+                break
     
 
     def _add_plots(self):
@@ -530,7 +557,6 @@ def makeBokehApp(doc, confPrefix, servKey):
         driver_class=None,
     )
 
-    visoloop = asyncio.get_event_loop()
                 
     app.vis.doc.add_root(layout(
         [Spacer(width=20), Div(text=f"<b>Visualizer on {gethostname()}</b>", width=1004, height=32, style={'font-size': '200%', 'color': 'red'})],
@@ -547,8 +573,6 @@ def makeBokehApp(doc, confPrefix, servKey):
         potvis.append(
             C_potvis(visServ = app.vis, potentiostat_key = potservname)
         )
-        if potvis[-1].show:
-            visoloop.create_task(potvis[-1].IOloop_data())
 
 
     # find all configured NI servers
@@ -559,8 +583,6 @@ def makeBokehApp(doc, confPrefix, servKey):
     for niservname in niservnames:
         NImaxvis.append(
             C_nidaqmxvis(visServ = app.vis, nidaqmx_key = niservname))
-        if NImaxvis[-1].show:
-            visoloop.create_task(NImaxvis[-1].IOloop_data())
 
 
     return doc

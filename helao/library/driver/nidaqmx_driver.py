@@ -113,6 +113,7 @@ class cNIMAX:
         myloop = asyncio.get_event_loop()
         # add meas IOloop
         myloop.create_task(self.IOloop())
+        self.IOloop_run = False
 
 
     def create_IVtask(self):
@@ -279,8 +280,9 @@ class cNIMAX:
         """only monitors the status and keeps track of time for the 
         multi cell iv task. This one will also handle estop, stop,
         finishes the active object etc."""
+        self.IOloop_run = True
         try:
-            while True:
+            while self.IOloop_run:
                 self.IO_do_meas = await self.IO_signalq.get()
                 if self.IO_do_meas and not self.IO_measuring:
                     # are we in estop?
