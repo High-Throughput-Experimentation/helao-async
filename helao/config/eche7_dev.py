@@ -106,8 +106,6 @@ config["servers"] = dict(
         group="visualizer",
         bokeh="bokeh_modular_visualizer",
         params = dict(
-            ws_nidaqmx="NI",
-            ws_potentiostat = 'PSTAT',
         )
     ),
 )
