@@ -5,6 +5,11 @@ library. Class methods are specific to Galil devices. Device configuration is re
 config/config.py. 
 """
 
+__all__ = [
+            "Galil",
+            "TriggerType",
+          ]
+
 
 import os
 import numpy as np
@@ -35,6 +40,11 @@ class cmd_exception(ValueError):
         self.args = arg
 
 
+class TriggerType(str, Enum):
+    risingedge = "risingedge"
+    fallingedge = "fallingedge"
+
+
 class Galil:
     def __init__(self, action_serv: Base):
 
@@ -55,6 +65,9 @@ class Galil:
 
         self.digital_cycle_out = None
         self.digital_cycle_out_gamry = None
+        self.digital_cycle_mainthread = None
+        self.digital_cycle_subthread = None
+
 
         # if this is the main instance let us make a galil connection
         self.g = gclib.py()
@@ -241,12 +254,15 @@ class Galil:
                                 self, 
                                 trigger_port:str, 
                                 trigger_name:str, 
+                                triggertype:TriggerType,
                                 out_port:str,
                                 out_name:str,
                                 out_port_gamry:str,
                                 out_name_gamry:str,
                                 t_on:float,
                                 t_off:float,
+                                mainthread:int,
+                                subthread:int,
                                 *args,
                                 **kwargs
                                ):
@@ -256,10 +272,21 @@ class Galil:
         and out_name in self.dev_do \
         and self.dev_do[out_name] == out_port \
         and out_name_gamry in self.dev_do \
-        and self.dev_do[out_name_gamry] == out_port_gamry:
+        and self.dev_do[out_name_gamry] == out_port_gamry \
+        and mainthread != subthread:
     
             self.digital_cycle_out = out_port
             self.digital_cycle_out_gamry = out_port_gamry
+            self.digital_cycle_mainthread = mainthread
+            self.digital_cycle_subthread = subthread
+            
+            # di (AI n): 
+            # if n is positive, galil waits for input to go high (rising edge)
+            # if n is negative, galil waits for input to go low (falling edge)
+            if triggertype == TriggerType.risingedge:
+                trigger_port = f"{abs(int(trigger_port))}"
+            elif triggertype == TriggerType.fallingedge:
+                trigger_port = f"-{abs(int(trigger_port))}"
 
     
             DMC_prog = pathlib.Path(
@@ -270,10 +297,12 @@ class Galil:
                 p_output=out_port, 
                 p_output_gamry=out_port_gamry, 
                 t_time_on=t_on,
-                t_time_off=t_off
+                t_time_off=t_off,
+                subthread = subthread,
+               mainthread = mainthread
             )
             await self.upload_DMC(DMC_prog)
-            self.galilcmd("XQ #main")  # excecute main routine
+            self.galilcmd(f"XQ #main{mainthread},{mainthread}")  # excecute main routine
             # self.galilcmd("XQ #toogle, 1")  # excecute main routine
         else:
             err_code = ErrorCodes.not_available
@@ -285,14 +314,16 @@ class Galil:
 
     async def stop_digital_cycle(self):
             if self.digital_cycle_out:
-                self.galilcmd("HX1")  # stops main routine
-                self.galilcmd("HX0")  # stops main routine
+                self.galilcmd(f"HX{self.digital_cycle_mainthread}")  # stops main routine
+                self.galilcmd("HX{self.digital_cycle_subthread}")  # stops main routine
                 cmd = f"CB {int(self.digital_cycle_out)}"
                 _ = self.galilcmd(cmd)
                 cmd = f"CB {int(self.digital_cycle_out_gamry)}"
                 _ = self.galilcmd(cmd)
                 self.digital_cycle_out = None
                 self.digital_cycle_out_gamry = None
+                self.digital_cycle_mainthread = None
+                self.digital_cycle_subthread = None
 
 
             return dict()

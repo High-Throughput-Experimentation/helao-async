@@ -93,7 +93,7 @@ async def galil_dyn_endpoints(app = None):
         async def run_aligner(
                                                action: Optional[Action] = \
                                                        Body({}, embed=True),
-                                               plateid: Optional[int] = None
+                                               plateid: Optional[int] = 6353#None
                                               ):
             """starts the plate aligning process, matrix is return when fully done"""
             A = await app.base.setup_action()
