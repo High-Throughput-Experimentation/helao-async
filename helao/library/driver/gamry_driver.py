@@ -802,23 +802,30 @@ class gamry:
             # if its in different state
             # and reset it after meas
             if self.IO_TTLsend >= 0:
-                #                self.pstat.SetDigitalOut(self.IO_TTLsend,self.IO_TTLsend)
-                self.base.print_message(
-                    self.pstat.SetDigitalOut(self.IO_TTLsend, self.IO_TTLsend)
-                )  # bitmask on
-            #                self.base.print_message(self.pstat.SetDigitalOut(0,self.IO_TTLsend)) # bitmask off
-                # if self.IO_TTLsend == 0:
-                #     #0001
-                #     self.pstat.SetDigitalOut(1,1)
-                # elif self.IO_TTLsend == 1:
-                #     #0010
-                #     self.pstat.SetDigitalOut(2,2)
-                # elif self.IO_TTLsend == 2:
-                #     #0100
-                #     self.pstat.SetDigitalOut(4,4)
-                # elif self.IO_TTLsend == 3:
-                #     #1000
-                #     self.pstat.SetDigitalOut(8,8)
+                # SetDigitalOut([in] short Out, # New output setting in the lowest 4 bits
+                #               [in] short Mask, # Identify the bits to be changed
+                #              )	
+                # returns [out]	OutSet	Output setting as set
+                # The Out parameter is used to show the desired bit pattern 
+                # and to show the range of bits to be changed. 
+                # Each of the lowest 4 bits of the Out argument corresponds 
+                # to one of the output bits. A bit will only be changed if 
+                # the mask argument has a one in that bit's bit position. 
+                # A mask argument of 0x0003 would allow changes in Output0 
+                # and Output1. With this mask value, Output 2 and Output 3 
+                # will not be changed regardless of the bit pattern argument.
+                if self.IO_TTLsend == 0:
+                    #0001
+                    self.pstat.SetDigitalOut(1,1)
+                elif self.IO_TTLsend == 1:
+                    #0010
+                    self.pstat.SetDigitalOut(2,2)
+                elif self.IO_TTLsend == 2:
+                    #0100
+                    self.pstat.SetDigitalOut(4,4)
+                elif self.IO_TTLsend == 3:
+                    #1000
+                    self.pstat.SetDigitalOut(8,8)
 
             # turn on the potentiostat output
             if self.IO_meas_mode == Gamry_modes.OCV:
