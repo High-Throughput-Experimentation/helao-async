@@ -548,11 +548,11 @@ def makeBokehApp(doc, confPrefix, servKey):
     config = import_module(f"helao.config.{confPrefix}").config
 
     app = makeVisServ(
-        config,
-        servKey,
-        doc,
-        servKey,
-        "Modular Visualizer",
+        config=config,
+        server_key=servKey,
+        doc=doc,
+        server_title=servKey,
+        description="Modular Visualizer",
         version=2.0,
         driver_class=None,
     )
