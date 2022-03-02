@@ -12,10 +12,10 @@ driver code, and hard-coded to use 'galil' class (see "__main__").
 __all__ = ["makeApp"]
 
 from typing import Optional
-from fastapi import Body
+from fastapi import Body, Query
 from importlib import import_module
 from helaocore.server.base import makeActionServ
-from helao.library.driver.galil_io_driver import Galil
+from helao.library.driver.galil_io_driver import Galil, TriggerType
 from helaocore.schema import Action
 from helaocore.error import ErrorCodes
 
@@ -148,12 +148,24 @@ async def galil_dyn_endpoints(app = None):
             async def set_digital_cycle(
                                         action: Optional[Action] = \
                                               Body({}, embed=True),
-                                        trigger_item:Optional[app.driver.dev_diitems] = None,
-                                        out_item:Optional[app.driver.dev_doitems] = None,
-                                        out_item_gamry:Optional[app.driver.dev_doitems] = None,
-                                        t_on:Optional[float] = None,
-                                        t_off:Optional[float] = None,
+                                        trigger_item:Optional[app.driver.dev_diitems] = "gamry_ttl0",
+                                        triggertype:Optional[TriggerType] = TriggerType.risingedge,
+                                        out_item:Optional[app.driver.dev_doitems] = "led",
+                                        out_item_gamry:Optional[app.driver.dev_doitems] = "gamry_aux",
+                                        t_on:Optional[float] = 1000,
+                                        t_off:Optional[float] = 1000,
+                                        mainthread:Optional[int] = Query(0, ge=0, le=8),
+                                        subthread:Optional[int] = Query(1, ge=0, le=8)
                                      ):
+
+                
+                """Toggles output.\n
+                   Args: \n
+                       trigger_item: di on which the toggle starts\n
+                       out_item: do_item for toggle output\n
+                       out_item_gamry: do which is connected to gamry aux input\n
+                       t_on: time (ms) out_item is on\n
+                       t_off: time (ms) out_item is off"""
                 active = await app.base.setup_and_contain_action()
 
                 active.action.action_params["trigger_port"] = \

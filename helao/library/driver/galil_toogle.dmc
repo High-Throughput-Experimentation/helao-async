@@ -3,14 +3,14 @@
 'to start executing at a specific label or line number.
 'The code will execute until an EN ends the program or subroutine.
 
-#main;                  'main program-thread 0
+#main{mainthread};                  'main program-thread 0
     CB {p_output};    'clear output
     CB {p_output_gamry};    'set output
     AI {p_trigger};       'after input 1 high
     AT 0;               'set reference time
     IF ( {t_time_on} > 0 );
         IF ( {t_time_off} > 0 );
-            XQ #toogle, 1;      'execute thread 1
+            XQ #toogle{subthread}, {subthread};      'execute thread 1
             AI -{p_trigger};      'pause this thread until after input 1 is low
         ENDIF;
     ENDIF;
@@ -20,12 +20,12 @@
 
 EN;                     'end program
 
-#toogle;                'toogle loop
+#toogle{subthread};                'toogle loop
     CB {p_output};    'set output 0
     CB {p_output_gamry};    'set output 0
     AT {t_time_on};      'wait xy msec
     SB {p_output};    'set output 1
     SB {p_output_gamry};    'set output 1
     AT -{t_time_off}-{t_time_on};      'at xy msec reset timer
-    JP #toogle;     'repeat
+    JP #toogle{subthread};     'repeat
 EN;                     'end thread
