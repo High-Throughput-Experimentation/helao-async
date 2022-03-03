@@ -422,6 +422,7 @@ class PAL:
 
         # for global IOloop
         self.IO_do_meas = False
+        self.IO_measuring = False  # status flag of measurement
         # holds the parameters for the PAL
         self.IO_palcam = PalCam()
         # check for that to final FASTapi post
@@ -472,6 +473,20 @@ class PAL:
 
         self.palauxheader = ["Date", "Method", "Tool", "Source", "DestinationTray", "DestinationSlot", "DestinationVial", "Volume"]
         self.IOloop_run = False
+        self.IO_signalq = asyncio.Queue(1)
+
+
+    def set_IO_signalq_nowait(self, val: bool) -> None:
+        if self.IO_signalq.full():
+            _ = self.IO_signalq.get_nowait()
+        self.IO_signalq.put_nowait(val)
+
+
+    async def set_IO_signalq(self, val: bool) -> None:
+        if self.IO_signalq.full():
+            _ = await self.IO_signalq.get()
+        await self.IO_signalq.put(val)
+
 
     async def _poll_start(self) -> bool:
         starttime = time.time()
@@ -481,17 +496,24 @@ class PAL:
             task.di_channels.add_di_chan(
                 self.triggerport_start, line_grouping=LineGrouping.CHAN_PER_LINE
             )
-            while self.trigger_start == False:
+            while self.trigger_start == False \
+            and self.IO_measuring:
+                if not self.IO_signalq.empty():
+                    self.IO_measuring = await self.IO_signalq.get()
                 data = task.read(number_of_samples_per_channel=1)
                 if any(data) == True:
                     self.base.print_message("got PAL 'start' trigger poll", info = True)
                     self.trigger_start_epoch = self.active.set_realtime_nowait()
                     self.trigger_start = True
-                    return True
+                    return self.IO_measuring
                 if (time.time() - starttime) > self.timeout:
                     return False
                 await asyncio.sleep(1)
-        return True
+        return self.IO_measuring
+
+
+
+
 
 
     async def _poll_continue(self) -> bool:
@@ -502,17 +524,20 @@ class PAL:
             task.di_channels.add_di_chan(
                 self.triggerport_continue, line_grouping=LineGrouping.CHAN_PER_LINE
             )
-            while self.trigger_continue == False:
+            while self.trigger_continue == False \
+            and self.IO_measuring:
+                if not self.IO_signalq.empty():
+                    self.IO_measuring = await self.IO_signalq.get()
                 data = task.read(number_of_samples_per_channel=1)
                 if any(data) == True:
                     self.base.print_message("got PAL 'continue' trigger poll", info = True)
                     self.trigger_continue_epoch = self.active.set_realtime_nowait()
                     self.trigger_continue = True
-                    return True
+                    return self.IO_measuring
                 if (time.time() - starttime) > self.timeout:
                     return False
                 await asyncio.sleep(1)
-        return True
+        return self.IO_measuring
 
 
     async def _poll_done(self) -> bool:
@@ -523,17 +548,20 @@ class PAL:
             task.di_channels.add_di_chan(
                 self.triggerport_done, line_grouping=LineGrouping.CHAN_PER_LINE
             )
-            while self.trigger_done == False:
+            while self.trigger_done == False \
+            and self.IO_measuring:
+                if not self.IO_signalq.empty():
+                    self.IO_measuring = await self.IO_signalq.get()
                 data = task.read(number_of_samples_per_channel=1)
                 if any(data) == True:
                     self.base.print_message("got PAL 'done' trigger poll", info = True)
                     self.trigger_done_epoch = self.active.set_realtime_nowait()
                     self.trigger_done = True
-                    return True
+                    return self.IO_measuring
                 if (time.time() - starttime) > self.timeout:
                     return False
                 await asyncio.sleep(1)
-        return True
+        return self.IO_measuring
 
 
     async def _sendcommand_main(self, palcam: PalCam) -> ErrorCodes:
@@ -560,9 +588,22 @@ class PAL:
         # wait for each microcam cam
         self.base.print_message("Waiting now for all microcams")
         for microcam in palcam.microcam:
+
+            if not self.IO_signalq.empty():
+                self.IO_measuring = await self.IO_signalq.get()
+            if not self.IO_measuring:
+                break
+
+
+
+
             self.base.print_message(f"waiting now '{microcam.method}'")
             # wait for each repeat of the same microcam
             for palaction in microcam.run:
+                if not self.IO_signalq.empty():
+                    self.IO_measuring = await self.IO_signalq.get()
+                if not self.IO_measuring:
+                    break
                 self.base.print_message("waiting now for palaction")
                 # waiting now for all three PAL triggers
                 # continue is used as the sampling timestamp
@@ -782,7 +823,6 @@ class PAL:
         self.base.print_message(f"waiting {tmp_time}sec for PAL to close", info = True)
         await asyncio.sleep(tmp_time)
         self.base.print_message(f"done waiting {tmp_time}sec for PAL to close", info = True)
-        print(self.PAL_pid)
         if self.PAL_pid is not None:
             self.base.print_message("waiting for PAL pid to finish", info = True)
             self.PAL_pid.communicate()
@@ -1800,20 +1840,24 @@ class PAL:
         error =  ErrorCodes.none
         # only wait if triggers are configured
         if self.triggers:
-            self.base.print_message("waiting for PAL start trigger", info = True)
+            self.base.print_message("waiting for PAL start trigger",
+                                    info = True)
             val = await self._poll_start()
             if not val:
-                self.base.print_message("PAL start trigger timeout", error = True)
+                self.base.print_message("PAL start trigger timeout",
+                                        error = True)
                 error = ErrorCodes.start_timeout
                 self.IO_error = error
                 self.IO_continue = True
             else:
                 self.base.print_message("got PAL start trigger", info = True)
-                self.base.print_message("waiting for PAL continue trigger", info = True)
+                self.base.print_message("waiting for PAL continue trigger",
+                                        info = True)
                 palaction.start_time = self.trigger_start_epoch
                 val = await self._poll_continue()
                 if not val:
-                    self.base.print_message("PAL continue trigger timeout", error = True)
+                    self.base.print_message("PAL continue trigger timeout",
+                                            error = True)
                     error = ErrorCodes.continue_timeout
                     self.IO_error = error
                     self.IO_continue = True
@@ -1821,15 +1865,19 @@ class PAL:
                     self.IO_continue = (
                         True  # signal to return FASTAPI, but not yet status
                     )
-                    self.base.print_message("got PAL continue trigger", info = True)
-                    self.base.print_message("waiting for PAL done trigger", info = True)
+                    self.base.print_message("got PAL continue trigger",
+                                            info = True)
+                    self.base.print_message("waiting for PAL done trigger",
+                                            info = True)
                     palaction.continue_time = self.trigger_continue_epoch
                     val = await self._poll_done()
                     if not val:
-                        self.base.print_message("PAL done trigger timeout", error = True)
+                        self.base.print_message("PAL done trigger timeout",
+                                                error = True)
                         error = ErrorCodes.done_timeout
                     else:
-                        self.base.print_message("got PAL done trigger", info = True)
+                        self.base.print_message("got PAL done trigger",
+                                                info = True)
                         palaction.done_time = self.trigger_done_epoch
         else:
             self.base.print_message("No triggers configured", error = True)
@@ -1893,9 +1941,11 @@ class PAL:
                     mysshclient.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                     mysshclient.connect(hostname=self.sshhost, username=self.sshuser, pkey=k)
                     ssh_connected = True
-                except Exception:
+                except Exception as e:
                     ssh_connected = False
-                    self.base.print_message("SSH connection error. Retrying in 1 seconds.")
+                    self.base.print_message(f"SSH connection error. "
+                                            f"Retrying in 1 seconds.\n{e}",
+                                            error = True)
                     await asyncio.sleep(1)
     
     
@@ -1952,7 +2002,7 @@ class PAL:
     
             except Exception as e:
                 self.base.print_message(
-                    "SSH connection error 1. Could not send commands.",
+                    f"SSH connection error 1. Could not send commands.\n{e}",
                     error = True
                 )
                 self.base.print_message(
@@ -1973,9 +2023,9 @@ class PAL:
                     ) = mysshclient.exec_command(cmd_to_execute)
                     mysshclient.close()
      
-            except Exception:
+            except Exception as e:
                 self.base.print_message(
-                    "SSH connection error 2. Could not send commands.",
+                    f"SSH connection error 2. Could not send commands.\n{e}",
                     error = True
                 )
                 error = ErrorCodes.ssh_error
@@ -2093,7 +2143,7 @@ class PAL:
             self.IO_palcam = palcam
             self.action = A
             self.IO_continue = False
-            self.IO_do_meas = True
+            await self.set_IO_signalq(True)
             # wait for first continue trigger
             A.error_code = ErrorCodes.none
             while not self.IO_continue:
@@ -2118,8 +2168,10 @@ class PAL:
         self.IOloop_run = True
         while self.IOloop_run:
             await asyncio.sleep(1)
-            if self.IO_do_meas:
+            self.IO_do_meas = await self.IO_signalq.get()
+            if self.IO_do_meas and not self.IO_measuring:
                 if not self.base.actionserver.estop:
+                    self.IO_measuring = True
                     # create active and check sample_in
                     await self._PAL_IOloop_meas_start_helper()
 
@@ -2156,7 +2208,9 @@ class PAL:
                         # between send ssh and continue (or any other offset)
                         
                         if len(self.IO_palcam.sampleperiod) < (run+1):
-                            self.base.print_message("len(self.IO_palcam.sampleperiod) < (run), using 0.0", info = True)
+                            self.base.print_message("len(sampleperiod) < "
+                                                    "(run), using 0.0",
+                                                    info = True)
                             sampleperiod = 0.0
                         else:
                             sampleperiod = self.IO_palcam.sampleperiod[run]
@@ -2164,35 +2218,63 @@ class PAL:
                         if self.IO_palcam.spacingmethod == Spacingmethod.linear:
                             self.base.print_message("PAL linear scheduling")
                             cur_time = time.time()
-                            self.base.print_message(f"time since last PAL run {(cur_time-last_run_time)}", info = True)
-                            self.base.print_message(f"requested time between PAL runs {sampleperiod-self.IO_palcam.timeoffset}", info = True)
+                            self.base.print_message(f"time since last PAL run"
+                                                    f" {(cur_time-last_run_time)}",
+                                                    info = True)
+                            self.base.print_message(f"requested time between "
+                                                    f"PAL runs "
+                                                    f"{sampleperiod-self.IO_palcam.timeoffset}",
+                                                    info = True)
                             diff_time = sampleperiod-(cur_time-last_run_time)-self.IO_palcam.timeoffset
                         elif self.IO_palcam.spacingmethod == Spacingmethod.geometric:
                             self.base.print_message("PAL geometric scheduling")
                             timepoint = (self.IO_palcam.spacingfactor ** run) * sampleperiod
-                            self.base.print_message(f"time since last PAL run {(cur_time-last_run_time)}", info = True)
-                            self.base.print_message(f"requested time between PAL runs {timepoint-prev_timepoint-self.IO_palcam.timeoffset}", info = True)
+                            self.base.print_message(f"time since last PAL run "
+                                                    f"{(cur_time-last_run_time)}",
+                                                    info = True)
+                            self.base.print_message(f"requested time between "
+                                                    f"PAL runs {timepoint-prev_timepoint-self.IO_palcam.timeoffset}",
+                                                    info = True)
                             diff_time = timepoint-prev_timepoint-(cur_time-last_run_time)-self.IO_palcam.timeoffset
                             prev_timepoint = timepoint # todo: consider time lag
                         elif self.IO_palcam.spacingmethod == Spacingmethod.custom:
                             self.base.print_message("PAL custom scheduling")
                             cur_time = time.time()
-                            self.base.print_message(f"time since PAL start {(cur_time-start_time)}", info = True)
-                            self.base.print_message(f"time for next PAL run since start {sampleperiod-self.IO_palcam.timeoffset}", info = True)
+                            self.base.print_message(f"time since PAL start "
+                                                    f"{(cur_time-start_time)}",
+                                                    info = True)
+                            self.base.print_message(f"time for next PAL run "
+                                                    f"since start "
+                                                    f"{sampleperiod-self.IO_palcam.timeoffset}",
+                                                    info = True)
                             diff_time = sampleperiod-(cur_time-start_time)-self.IO_palcam.timeoffset
 
 
                         # only wait for positive time
-                        self.base.print_message(f"PAL waits {diff_time} for sending next command", info = True)
+                        self.base.print_message(f"PAL waits {diff_time} "
+                                                f"for sending next command",
+                                                info = True)
+                        IO_do_meas = True
                         if (diff_time > 0):
-                            await asyncio.sleep(diff_time)
+                            for ii in range(round(diff_time)):
+                                await asyncio.sleep(1)
+                                if not self.IO_signalq.empty():
+                                    self.IO_measuring = await self.IO_signalq.get()
+                                    if not self.IO_measuring:
+                                        break
 
+                        if not self.IO_measuring:
+                            break
 
                         # finally submit a single PAL run
                         last_run_time = time.time()
-                        self.base.print_message("PAL sendcommand def start", info = True)
-                        self.IO_error = await self._sendcommand_main(run_palcam)
-                        self.base.print_message("PAL sendcommand def end", info = True)
+                        self.base.print_message("PAL sendcommand def start",
+                                                info = True)
+                        self.IO_error = \
+                            await self._sendcommand_main(run_palcam)
+                        self.base.print_message("PAL sendcommand def end",
+                                                info = True)
+
 
 
                     # update samples_in/out in prc
@@ -2844,3 +2926,40 @@ class PAL:
             A = A,
             palcam = palcam,
         )
+
+
+    def shutdown(self):
+        self.base.print_message("shutting down pal")
+        self.set_IO_signalq_nowait(False)
+        retries = 0
+        while self.active is not None \
+        and retries < 10:
+            self.base.print_message(f"Got shutdown, "
+                                    f"but Active is not yet done!, "
+                                    f"retry {retries}",
+                                    info = True)
+            # set it again
+            self.set_IO_signalq_nowait(False)
+            time.sleep(1)
+            retries +=1
+        # stop IOloop
+        self.IOloop_run = False
+        
+        
+    async def stop(self):
+        """stops measurement, writes all data and returns from meas loop"""
+        # turn off cell and run before stopping meas loop
+        if self.IO_do_meas:
+            await self.set_IO_signalq(False)
+
+
+    async def estop(self, switch:bool, *args, **kwargs):
+        """same as estop, but also sets flag"""
+        switch = bool(switch)
+        self.base.actionserver.estop = switch
+        if self.IO_do_meas:
+            if switch:
+                await self.set_IO_signalq(False)
+                if self.active:
+                    await self.active.set_estop()
+        return switch

@@ -47,6 +47,21 @@ def makeApp(confPrefix, servKey):
     dev_customitems = make_str_enum("dev_custom",{key:key for key in dev_custom.keys()})
 
 
+    @app.post(f"/{servKey}/stop")
+    async def stop(
+                   action: Optional[Action] = \
+                           Body({}, embed=True),
+                  ):
+        """Stops measurement in a controlled way."""
+        active = await app.base.setup_and_contain_action(
+                                          action_abbr = "stop"
+        )
+        await active.enqueue_data_dflt(datadict = \
+                                       {"stop": await app.driver.stop()})
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+
     @app.post(f"/{servKey}/convert_v1DB", tags=["convert DBs"])
     async def convert_v1DB(
                            action: Optional[Action] = \
@@ -837,6 +852,8 @@ def makeApp(confPrefix, servKey):
 
     @app.on_event("shutdown")
     def shutdown_event():
-        return ""
+        app.base.print_message("pal shutdown")
+        app.driver.shutdown()
+        return {"shutdown"}
 
     return app

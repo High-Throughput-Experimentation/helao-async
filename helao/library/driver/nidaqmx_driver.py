@@ -570,6 +570,7 @@ class cNIMAX:
                     await self.active.set_estop()
         return switch
 
+
     def shutdown(self):
         self.base.print_message("shutting down nidaqmx")
         self.set_IO_signalq_nowait(False)
