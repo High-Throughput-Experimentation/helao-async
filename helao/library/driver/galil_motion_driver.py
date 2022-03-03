@@ -642,8 +642,8 @@ class Galil:
                 if speed > self.motor_max_speed_count_sec:
                     speed = self.motor_max_speed_count_sec
                 self._speed = speed
-            except Exception:
-                self.base.print_message("motor numerical error",
+            except Exception as e:
+                self.base.print_message(f"motor numerical error {e}",
                                         error = True)
                 # something went wrong in the numerical part so we give that as feedback
                 ret_moved_axis.append(None)
@@ -1052,7 +1052,7 @@ class Galil:
             self.g.GClose()
         except Exception as e:
             self.base.print_message(f"could not close galil connection: {e}",
-                                    info = True)
+                                    error = True)
         if self.aligner_enabled and self.aligner:
             self.aligner.IOtask.cancel()
         self.base.print_message("shutting down galil motion")
@@ -1091,8 +1091,9 @@ class Galil:
                         self.base.print_message(f"loaded matrix \n'{new_matrix}'")
                         return new_matrix
                     
-                except Exception:
-                    self.base.print_message(f"error loading matrix for '{file}'",
+                except Exception as e:
+                    self.base.print_message(f"error loading matrix for "
+                                            f"'{file}': {e}",
                                            error = True)
                     return None
         else:
@@ -1463,9 +1464,9 @@ class TransformXY:
             # precalculate the inverse as we also need it a lot
             try:
                 self.Minv = self.M.I
-            except Exception:
+            except Exception as e:
                 self.base.print_message(
-                    "System Matrix singular",
+                    f"System Matrix singular {e}",
                     error = True
                 )
                 # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
@@ -1480,9 +1481,9 @@ class TransformXY:
 
             try:
                 self.Minstrinv = self.Minstr.I
-            except Exception:
+            except Exception as e:
                 self.base.print_message(
-                    "Instrument Matrix singular",
+                    f"Instrument Matrix singular {e}",
                     error = True
                 )
                 # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
@@ -1538,9 +1539,9 @@ class TransformXY:
             self.Mplatexy[1, 2] = Mtmp[1, 3]
 
             return self.Mplatexy
-        except Exception:
+        except Exception as e:
             self.base.print_message(
-                "Instrument Matrix singular",
+                f"Instrument Matrix singular {e}",
                 error = True
             )
             # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
@@ -2557,8 +2558,8 @@ class Aligner:
         filecontent = base64.b64decode(new.encode('ascii')).decode('ascii')
         try:
             new_matrix = np.matrix(json.loads(filecontent))
-        except Exception:
-            self.vis.print_message("error loading matrix",
+        except Exception as e:
+            self.vis.print_message(f"error loading matrix {e}",
                                    error = True)
             new_matrix = self.motor.dflt_matrix
 
@@ -3047,12 +3048,12 @@ class Aligner:
     
         try:
             M = np.dot(A,B.I)
-        except Exception:
+        except Exception as e:
             # should not happen when all xyplate coordinates are unique
             # (previous function removes all duplicate xyplate points)
             # but can still produce a not valid Matrix
             # as xymotor plates might not be unique/faulty
-            self.vis.print_message("Matrix singular")
+            self.vis.print_message(f"Matrix singular {e}", error = True)
             M = TransferMatrix
         return M
     
