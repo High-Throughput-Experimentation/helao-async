@@ -160,7 +160,13 @@ class Pidd:
             if group in pidd.A:
                 G = pidd.A[group]
                 for server in G:
-                    print_message({}, "launcher", f"Killing {server}.")
+                    twait = 2
+                    print_message({}, "launcher",
+                                  f"waiting {twait}sec before "
+                                  f"killing server {server}")
+                    time.sleep(twait)
+                    print_message({}, "launcher",
+                                  f"Killing {server}.")
                     if server in activeserver:
                         self.kill_server(server)
 
@@ -380,7 +386,9 @@ if __name__ == "__main__":
                         # will produce a 404 if not found
                         requests.post(f"http://{S.host}:{S.port}/shutdown")
                     except Exception as e:
-                        print_message({}, "launcher", " ... got error: ", e, error = True)
+                        print_message({}, "launcher", 
+                                      f" ... got error: "
+                                      f"\n{e}", error = True)
 
         pidd.close()
     else:

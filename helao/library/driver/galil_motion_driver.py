@@ -79,39 +79,53 @@ class Galil:
                 os.path.join(self.base.states_root, 
                              f"{gethostname()}_motor_calib.json")
  
-        self.transfermatrix = \
+        self.plate_transfermatrix = \
         self.load_transfermatrix(file = self.file_backup_transfermatrix)
         self.save_transfermatrix(file = self.file_backup_transfermatrix)
+        self.base.print_message(f"plate_transfermatrix is: \n"
+                                f"{self.plate_transfermatrix}", info = True)
+
+        self.ref_plateid = self.config_dict.get("ref_plateid", None)
+        if self.ref_plateid:
+            self.base.print_message(f"Got reference plateid "
+                                    f"'{self.ref_plateid}', "
+                                    f"using it for Minstr",
+                                    info = True)
+            Mplate = self.load_transfermatrix(
+                file = os.path.join(self.base.db_root, "plate_calib",
+                       f"{gethostname()}_plate_{self.ref_plateid}_calib.json")
+                )
+            self.M_instr = self.convert_Mplate_to_Minstr(Mplate = Mplate.tolist())
+        else:
+            self.base.print_message("Did not find refernce plate, "
+                                    "loading Minstr from config")
+
+            self.M_instr = self.config_dict.get("M_instr", [
+                    [1, 0, 0, 0],
+                    [0, 1, 0, 0],
+                    [0, 0, 1, 0],
+                    [0, 0, 0, 1],
+                ])
+        self.base.print_message(f"Minstr is: {self.M_instr}", info = True)
+
 
         self.motor_timeout = self.config_dict.get("timeout", 60)
-        self.motor_max_speed_count_sec = self.config_dict.get("max_speed_count_sec", 25000)
-        self.motor_def_speed_count_sec = self.config_dict.get("def_speed_count_sec", 10000)
+        self.motor_max_speed_count_sec = \
+            self.config_dict.get("max_speed_count_sec", 25000)
+        self.motor_def_speed_count_sec = \
+            self.config_dict.get("def_speed_count_sec", 10000)
 
 
         # need to check if config settings exist
         # else need to create empty ones
         self.axis_id = self.config_dict.get("axis_id", dict())
 
-        self.M_instr = self.config_dict.get("M_instr", [
-                [1, 0, 0, 0],
-                [0, 1, 0, 0],
-                [0, 0, 1, 0],
-                [0, 0, 0, 1],
-            ])
-
-        self.xyTransfermatrix = np.matrix([
-                                           [1, 0, 0],
-                                           [0, 1, 0],
-                                           [0, 0, 1]
-                                          ])
-
-
         # Mplatexy is identity matrix by default
         self.transform = TransformXY(self.base,
             self.M_instr, self.axis_id
         )
         # only here for testing: will overwrite the default identity matrix
-        self.transform.update_Mplatexy(Mxy = self.transfermatrix)
+        self.transform.update_Mplatexy(Mxy = self.plate_transfermatrix)
 
         # if this is the main instance let us make a galil connection
         self.g = gclib.py()
@@ -129,7 +143,7 @@ class Galil:
                 # The SH command changes the coordinate system.
                 # Therefore, all position commands given prior to SH, 
                 # must be repeated. Otherwise, the controller produces incorrect motion.
-                self.galilcmd("SH; PF 10.4")
+                self.galilcmd("PF 10.4")
                 axis_init = [
                             ("MT", 2), # Specifies Step motor with active low step pulses
                             ("CE", 4), # Configure Encoder: Normal pulse and direction
@@ -137,8 +151,20 @@ class Galil:
                             ("SD", 256000), # sets the linear deceleration rate of the motors when a limit switch has been reached.
                             ]
                 for axl in self.axis_id.values():
+                    cmd = f"MG _MO{axl}"
+                    self.base.print_message(f"init axis {axl}: {cmd}", info = True)
+                    q = self.galilcmd(cmd)
+                    self.base.print_message(f"Motor off?: {q} {float(q)==1}")
+                    if float(q)==1:
+                        cmd = f"SH{axl}"
+                        self.base.print_message(f"init axis {axl}: {cmd}", info = True)
+                        self.galilcmd(cmd)
                     for ac, av in axis_init:
-                        self.galilcmd(f"{ac}{axl}={av}")
+                        cmd = f"{ac}{axl}={av}"
+                        self.base.print_message(f"init axis {axl}: {cmd}", info = True)
+                        self.galilcmd(cmd)
+
+
                 self.galil_enabled = True
             else:
                 self.base.print_message(
@@ -146,15 +172,15 @@ class Galil:
                     error = True
                 )
                 self.galil_enabled = False
-        except Exception:
+        except Exception as e:
             self.base.print_message(
-                "severe Galil error ... "
-                "please power cycle Galil and try again",
+                f"severe Galil error ... "
+                f"please power cycle Galil and try again: "
+                f"{e}",
                 error = True
             )
             self.galil_enabled = False
 
-        self.cycle_lights = False
 
         # block gamry
         self.blocked = False
@@ -162,10 +188,28 @@ class Galil:
         self.motor_busy = False
         self.bokehapp = None
         self.aligner = None
+        self.aligning_enabled = False
+        self.aligner_plateid = None
+        self.aligner_active = None
         self.aligner_enabled = self.base.server_params.get("enable_aligner", False)
         if self.aligner_enabled and self.galil_enabled:
             self.start_aligner()
 
+
+    def convert_Mplate_to_Minstr(self, Mplate):
+        Minstr = [
+                  [1, 0, 0, 0],
+                  [0, 1, 0, 0],
+                  [0, 0, 1, 0],
+                  [0, 0, 0, 1],
+                 ]
+        # assign the xy part
+        Minstr[0][0:2] = Mplate[0][0:2]
+        Minstr[1][0:2] = Mplate[1][0:2]
+        # assign offset part
+        Minstr[0][3] = Mplate[0][2]
+        Minstr[1][3] = Mplate[1][2]
+        return Minstr        
 
     def start_aligner(self):
         servHost = self.base.server_cfg["host"]
@@ -285,9 +329,9 @@ class Galil:
                 activeDict = A.as_dict()
             else:
                 self.blocked = True
-                self.aligner.plateid = A.action_params["plateid"]
+                self.aligner_plateid = A.action_params["plateid"]
                 # A.error_code = ErrorCodes.none
-                self.aligner.active = await self.base.contain_action(
+                self.aligner_active = await self.base.contain_action(
                     ActiveParams(
                                  action = A,
                                  file_conn_params_dict = {self.base.dflt_file_conn_key():
@@ -305,8 +349,11 @@ class Galil:
                                      }
                     )
                 )
-                self.aligner.g_aligning = True
-                activeDict = self.aligner.active.action.as_dict()
+                self.aligning_enabled = True
+                activeDict = self.aligner_active.action.as_dict()
+                
+                _ = await self.query_axis_moving(axis = self.get_all_axis())
+                
         else:
             A.error_code = ErrorCodes.in_progress
             activeDict = A.as_dict()
@@ -377,7 +424,7 @@ class Galil:
 
         # need to get absolute motor position first
         tmpmotorpos = await self.query_axis_position(
-            self.get_all_axis()
+            axis = self.get_all_axis()
         )
         self.base.print_message(f"current absolute motor positions: "
                                 f"{tmpmotorpos}")
@@ -672,8 +719,7 @@ class Galil:
 
             while (time.time() - tstart < self.motor_timeout) \
             and not self.base.actionserver.estop:
-                qmove = await self.query_axis_moving(axis)
-                # test = await self.query_axis_position(self.get_all_axis())
+                qmove = await self.query_axis_moving(axis = axis)
                 await asyncio.sleep(0.5)
                 if all(status == "stopped" for status in qmove["motor_status"]):
                     break
@@ -703,7 +749,7 @@ class Galil:
 
         # read final position
         # updates ws buffer
-        _ = await self.query_axis_position(axis)
+        _ = await self.query_axis_position(axis = axis)
 
 
         # one return for all axis
@@ -867,8 +913,8 @@ class Galil:
                 axl = self.axis_id[ax]
                 self.galilcmd(f"ST{axl}")
 
-        ret = await self.query_axis_moving(axis)
-        ret.update(await self.query_axis_position(axis))
+        ret = await self.query_axis_moving(axis = axis)
+        ret.update(await self.query_axis_position(axis = axis))
         return ret
 
     async def motor_off(self, axis,*args,**kwargs):
@@ -890,18 +936,33 @@ class Galil:
                 axl = self.axis_id[ax]
             else:
                 continue
-                # ret = self.query_axis_moving(axis)
-                # ret.update(self.query_axis_position(axis))
-                # return ret
 
             cmd_seq = [f"ST{axl}", f"MO{axl}"]
 
             for cmd in cmd_seq:
                 _ = self.galilcmd(cmd)
 
-        ret = await self.query_axis_moving(axis)
-        ret.update(await self.query_axis_position(axis))
+        ret = await self.query_axis_moving(axis = axis)
+        ret.update(await self.query_axis_position(axis = axis))
         return ret
+
+
+    def motor_off_shutdown(self, axis,*args,**kwargs):
+        if type(axis) is not list:
+            axis = [axis]
+
+        for ax in axis:
+
+            if ax in self.axis_id:
+                axl = self.axis_id[ax]
+            else:
+                continue
+
+            cmd_seq = [f"ST{axl}", f"MO{axl}"]
+
+            for cmd in cmd_seq:
+                _ = self.galilcmd(cmd)
+
 
     async def motor_on(self, axis,*args,**kwargs):
         # sometimes it is useful to turn the motors back on for manual alignment
@@ -921,16 +982,26 @@ class Galil:
                 axl = self.axis_id[ax]
             else:
                 continue
-                # ret = self.query_axis_moving(axis)
-                # ret.update(self.query_axis_position(axis))
-                # return ret
-            cmd_seq = [f"ST{axl}", f"SH{axl}"]
 
-            for cmd in cmd_seq:
-                _ = self.galilcmd(cmd)
+            cmd = f"MG _MO{axl}"
+            q = self.galilcmd(cmd)
+            if float(q)==1:
+                self.base.print_message(f"turning on motor for axis '{axl}' ",
+                                        error = True)
+                cmd_seq = [
+                           f"ST{axl}", 
+                           f"SH{axl}"
+                          ]
+    
+                for cmd in cmd_seq:
+                    _ = self.galilcmd(cmd)
+            else:
+                self.base.print_message(f"motor for axis '{axl}' "
+                                        f"is already on", error = True)
 
-        ret = await self.query_axis_moving(axis)
-        ret.update(await self.query_axis_position(axis))
+
+        ret = await self.query_axis_moving(axis = axis)
+        ret.update(await self.query_axis_position(axis = axis))
         return ret
 
 
@@ -958,14 +1029,21 @@ class Galil:
         return [port for port in self.config_dict["Ain_id"]]
 
     def shutdown_event(self):
-        # this gets called when the server is shut down or reloaded to ensure a clean
+        # this gets called when the server is shut down 
+        # or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
         # self.stop_axis(self.get_all_axis())
+        try:
+            # self.base.print_message("turning all motors off", info = True)
+            # self.motor_off_shutdown(axis = self.get_all_axis())
+            self.base.print_message("closing galil connection", info = True)
+            self.g.GClose()
+        except Exception as e:
+            self.base.print_message(f"could not close galil connection: {e}",
+                                    info = True)
         if self.aligner_enabled and self.aligner:
             self.aligner.IOtask.cancel()
         self.base.print_message("shutting down galil motion")
-        # asyncio.gather(self.motor_off(asyncio.gather(self.get_all_axis()))) # already contains stop command
-        self.g.GClose()
         return {"shutdown"}
 
 
@@ -983,7 +1061,7 @@ class Galil:
                 os.makedirs(filedir, exist_ok=True)
 
             with open(file, "w") as f:
-                f.write(json.dumps(self.transfermatrix.tolist()))
+                f.write(json.dumps(self.plate_transfermatrix.tolist()))
 
 
     def load_transfermatrix(self, file):
@@ -1011,7 +1089,7 @@ class Galil:
             return self.dflt_matrix
 
 
-    def update_transfermatrix(self, newtransfermatrix):
+    def update_plate_transfermatrix(self, newtransfermatrix):
         if newtransfermatrix.shape != self.dflt_matrix.shape:
             self.base.print_message(f"matrix \n'{newtransfermatrix}' "
                                    "has wrong shape, using dflt.",
@@ -1019,13 +1097,18 @@ class Galil:
             matrix = self.dflt_matrix
         else:
             matrix = newtransfermatrix
-        self.transfermatrix = matrix
-        self.transform.update_Mplatexy(Mxy = self.transfermatrix)
-        return self.transfermatrix
+        self.plate_transfermatrix = matrix
+        self.transform.update_Mplatexy(Mxy = self.plate_transfermatrix)
+        self.save_transfermatrix(file = self.file_backup_transfermatrix)
+        self.base.print_message(f"updated plate_transfermatrix is: \n"
+                                f"{self.plate_transfermatrix}", info = True)
+        return self.plate_transfermatrix
 
 
-    def reset_transfermatrix(self):
-        self.update_transfermatrix(
+
+
+    def reset_plate_transfermatrix(self):
+        self.update_plate_transfermatrix(
             newtransfermatrix = self.dflt_matrix)
 
 
@@ -1463,9 +1546,7 @@ class Aligner:
         self.motorpos_q = asyncio.Queue()
 
         # flag to check if we actual should align
-        self.g_aligning = False
-        self.active = None
-        self.plateid = None
+
 
         # dummy value, will be updated during init
         self.g_motor_position = [0,0,1]
@@ -1482,8 +1563,8 @@ class Aligner:
         self.manual_step = 1 # mm
         self.mouse_control = False
         # initial instrument specific TransferMatrix
-        self.initialTransferMatrix = self.motor.transfermatrix
-        # self.initialTransferMatrix = np.matrix(
+        self.initial_plate_transfermatrix = self.motor.plate_transfermatrix
+        # self.initial_plate_transfermatrix = np.matrix(
         #                                        [
         #                                         [1,0,0],
         #                                         [0,1,0],
@@ -1493,7 +1574,7 @@ class Aligner:
         self.cutoff = np.array(self.config_dict.get("cutoff",6))
         
         # this is now used for plate to motor transformation and will be refined
-        self.TransferMatrix = self.initialTransferMatrix
+        self.plate_transfermatrix = self.initial_plate_transfermatrix
         
         self.markerdata = ColumnDataSource({"x0": [0], "y0": [0]})
         self.create_layout()
@@ -1560,7 +1641,7 @@ class Aligner:
         
         self.button_goalign = Button(
                                      label="Go", 
-                                     button_type="default", 
+                                     button_type="danger", 
                                      width=150
                                     )
         self.button_skipalign = Button(
@@ -1578,12 +1659,21 @@ class Aligner:
                           disabled=True, 
                           width=150
                          )
+
+
+        self.aligner_enabled_status = Toggle(
+                                           label="Disabled", 
+                                           disabled=True, 
+                                           button_type="danger", 
+                                           width=50
+                                          ) #success: green, danger: red
         
         
         self.layout_getPM = layout(
                                     self.button_goalign,
                                     self.button_skipalign,
-                                    self.status_align
+                                    self.status_align,
+                                    self.aligner_enabled_status
                                   )
         
         
@@ -2461,7 +2551,7 @@ class Aligner:
             new_matrix = self.motor.dflt_matrix
 
         self.vis.print_message(f"loaded matrix \n'{new_matrix}'")
-        self.motor.update_transfermatrix(newtransfermatrix = new_matrix)
+        self.motor.update_plate_transfermatrix(newtransfermatrix = new_matrix)
 
 
     def callback_changed_motorstep(self, attr, old, new, sender):
@@ -2537,7 +2627,7 @@ class Aligner:
     def clicked_submit(self):
         """submit final results back to aligner server"""
         asyncio.gather(
-            self.finish_alignment(self.TransferMatrix,ErrorCodes.none)
+            self.finish_alignment(self.plate_transfermatrix,ErrorCodes.none)
         )
     
     
@@ -2546,7 +2636,7 @@ class Aligner:
         # init the aligner
         self.init_mapaligner()
         
-        if self.g_aligning:
+        if self.motor.aligning_enabled:
             asyncio.gather(self.get_pm())
         else:
             self.vis.doc.add_next_tick_callback(
@@ -2589,7 +2679,7 @@ class Aligner:
     def clicked_skipstep(self):
         """Calculate Transformation Matrix from given points"""
         asyncio.gather(
-            self.finish_alignment(self.initialTransferMatrix,ErrorCodes.none)
+            self.finish_alignment(self.initial_plate_transfermatrix,ErrorCodes.none)
         )
     
     
@@ -2706,29 +2796,30 @@ class Aligner:
 
     async def finish_alignment(self, newTransfermatrix, errorcode):
         """sends finished alignment back to FastAPI server"""
-        if self.active:
-            self.motor.update_transfermatrix(newtransfermatrix = newTransfermatrix)
-            self.motor.save_transfermatrix(file = self.motor.file_backup_transfermatrix)
+        if self.motor.aligner_active:
+            self.motor.update_plate_transfermatrix(newtransfermatrix = newTransfermatrix)
+            # state is now saved within update
+            # self.motor.save_transfermatrix(file = self.motor.file_backup_transfermatrix)
             self.motor.save_transfermatrix(file = os.path.join(self.motor.base.db_root, "plate_calib",
-                             f"{gethostname()}_plate_{self.plateid}_calib.json")
+                             f"{gethostname()}_plate_{self.motor.aligner_plateid}_calib.json")
             )
-            self.active.action.error_code = \
+            self.motor.aligner_active.action.error_code = \
                 self.motor.base.get_main_error(errorcode)
-            await self.active.write_file(
+            await self.motor.aligner_active.write_file(
                 file_type = "plate_calib",
-                filename = f"{gethostname()}_plate_{self.plateid}_calib.json",
-                output_str = json.dumps(self.motor.transfermatrix.tolist()),
+                filename = f"{gethostname()}_plate_{self.motor.aligner_plateid}_calib.json",
+                output_str = json.dumps(self.motor.plate_transfermatrix.tolist()),
                 # header = ";".join(["global_sample_label", "Survey Runs", "Main Runs", "Rack", "Vial", "Dilution Factor"]),
                 # sample_str = None
                 )
 
 
-            await self.active.enqueue_data(datamodel = \
+            await self.motor.aligner_active.enqueue_data(datamodel = \
                    DataModel(
-                             data = {self.active.action.file_conn_keys[0]:\
+                             data = {self.motor.aligner_active.action.file_conn_keys[0]:\
                                         {
-                                            "Transfermatrix":self.motor.transfermatrix.tolist(),
-                                            "oldTransfermatrix":self.initialTransferMatrix.tolist(),
+                                            "Transfermatrix":self.motor.plate_transfermatrix.tolist(),
+                                            "oldTransfermatrix":self.initial_plate_transfermatrix.tolist(),
                                             "err_code":f"{errorcode}"
                                         }
                                      },
@@ -2736,14 +2827,15 @@ class Aligner:
                        
                             )
             )
-            _ = await self.active.finish()
-            self.active = None
-            self.plateid = None
-            self.g_aligning = False
+            _ = await self.motor.aligner_active.finish()
+            self.motor.aligner_active = None
+            self.motor.aligner_plateid = None
+            self.motor.aligning_enabled = False
             self.motor.blocked = False
             self.vis.doc.add_next_tick_callback(
                 partial(self.update_status,"Submitted!")
             )
+            self.vis.doc.add_next_tick_callback(partial(self.IOloop_helper))
         else:
             self.vis.doc.add_next_tick_callback(
                 partial(self.update_status,"Error!\nAlign is invalid!")
@@ -2752,7 +2844,7 @@ class Aligner:
 
     async def motor_move(self, mode, x, y):
         """moves the motor by submitting a request to aligner server"""
-        if self.g_aligning \
+        if self.motor.aligning_enabled \
         and not self.motor.motor_busy:
             _ = await self.motor._motor_move(
                 d_mm = [x, y],
@@ -2767,7 +2859,7 @@ class Aligner:
 
     async def motor_getxy(self):
         """gets current motor position from alignment server"""
-        if self.g_aligning:
+        if self.motor.aligning_enabled:
             _ = await self.motor.query_axis_position(axis = ["x", "y"])
         else:
             self.vis.doc.add_next_tick_callback(
@@ -2777,14 +2869,14 @@ class Aligner:
     
     async def get_pm(self):
         """gets plate map"""
-        if self.g_aligning:
-            self.pmdata = self.dataAPI.get_platemap_plateid(self.plateid)
+        if self.motor.aligning_enabled:
+            self.pmdata = self.dataAPI.get_platemap_plateid(self.motor.aligner_plateid)
             if self.pmdata:
                 self.vis.doc.add_next_tick_callback(
-                    partial(self.update_pm_plot_title, self.plateid)
+                    partial(self.update_pm_plot_title, self.motor.aligner_plateid)
                 )
                 self.vis.doc.add_next_tick_callback(
-                   partial(self.update_status,f"Got plateID:\n {self.plateid}")
+                   partial(self.update_status,f"Got plateID:\n {self.motor.aligner_plateid}")
                 )
                 self.vis.doc.add_next_tick_callback(
                     partial(self.update_status,"PM loaded")
@@ -2796,7 +2888,7 @@ class Aligner:
                 self.vis.doc.add_next_tick_callback(
                     partial(self.update_status,"Error!\nInvalid plateid!")
                 )
-                self.g_aligning = False
+                self.motor.aligning_enabled = False
         else:
             self.vis.doc.add_next_tick_callback(
                 partial(self.update_status,"Error!\nAlign is invalid!")
@@ -2891,11 +2983,11 @@ class Aligner:
             self.vis.doc.add_next_tick_callback(
                 partial(self.update_status,"0P alignment")
             )
-            M = self.TransferMatrix
+            M = self.plate_transfermatrix
             
         M = self.motor.transform.get_Mplate_Msystem(Mxy = M)
         
-        self.TransferMatrix = self.cutoffdigits(M, self.cutoff)
+        self.plate_transfermatrix = self.cutoffdigits(M, self.cutoff)
         self.vis.print_message("new TransferMatrix:")
         self.vis.print_message(M)
     
@@ -3026,12 +3118,12 @@ class Aligner:
     
     
     def update_TranferMatrixdisplay(self):
-        self.calib_xscale_text.value = f"{self.TransferMatrix[0, 0]:.1E}"
-        self.calib_yscale_text.value = f"{self.TransferMatrix[1, 1]:.1E}"
-        self.calib_xtrans_text.value = f"{self.TransferMatrix[0, 2]:.1E}"
-        self.calib_ytrans_text.value = f"{self.TransferMatrix[1, 2]:.1E}"
-        self.calib_rotx_text.value = f"{self.TransferMatrix[0, 1]:.1E}"
-        self.calib_roty_text.value = f"{self.TransferMatrix[1, 0]:.1E}"
+        self.calib_xscale_text.value = f"{self.plate_transfermatrix[0, 0]:.1E}"
+        self.calib_yscale_text.value = f"{self.plate_transfermatrix[1, 1]:.1E}"
+        self.calib_xtrans_text.value = f"{self.plate_transfermatrix[0, 2]:.1E}"
+        self.calib_ytrans_text.value = f"{self.plate_transfermatrix[1, 2]:.1E}"
+        self.calib_rotx_text.value = f"{self.plate_transfermatrix[0, 1]:.1E}"
+        self.calib_roty_text.value = f"{self.plate_transfermatrix[1, 0]:.1E}"
 
 
     def update_pm_plot_title(self, plateid):
@@ -3040,8 +3132,8 @@ class Aligner:
 
     def init_mapaligner(self):
         """resets all parameters"""
-        self.initialTransferMatrix = self.motor.transfermatrix
-        self.TransferMatrix = self.initialTransferMatrix
+        self.initial_plate_transfermatrix = self.motor.plate_transfermatrix
+        self.plate_transfermatrix = self.initial_plate_transfermatrix
         self.calib_ptsplate = [
                                (None, None,1),
                                (None, None,1),
@@ -3135,7 +3227,8 @@ class Aligner:
                     
                 self.motorpos_q.task_done()
             except Exception as e:
-                print(e)
+                self.vis.print_message(f"IOloop_aligne error: {e}",
+                                       error = True)
 
 
     def IOloop_helper(self):
@@ -3178,6 +3271,16 @@ class Aligner:
                     self.MarkerFraction[0] = buf
     
             self.update_Markerdisplay(0)
+
+        if self.motor.aligning_enabled:
+            self.aligner_enabled_status.label = "Enabled"
+            self.aligner_enabled_status.button_type = "success"
+            self.button_goalign.button_type = "success"
+
+        else:
+            self.aligner_enabled_status.label = "Disabled"
+            self.aligner_enabled_status.button_type = "danger"            
+            self.button_goalign.button_type = "danger"
     
         # buffer position
         self.gbuf_motor_position = self.g_motor_position
