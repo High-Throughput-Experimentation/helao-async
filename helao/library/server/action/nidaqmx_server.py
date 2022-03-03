@@ -318,8 +318,11 @@ def makeApp(confPrefix, servKey):
     def post_shutdown():
         shutdown_event()
 
+
     @app.on_event("shutdown")
     def shutdown_event():
-        return ""
+        app.base.print_message("nidaqmx shutdown")
+        app.driver.shutdown()
+        return {"shutdown"}
 
     return app

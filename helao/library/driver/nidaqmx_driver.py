@@ -116,6 +116,19 @@ class cNIMAX:
         self.IOloop_run = False
 
 
+    def set_IO_signalq_nowait(self, val: bool) -> None:
+        if self.IO_signalq.full():
+            _ = self.IO_signalq.get_nowait()
+        self.IO_signalq.put_nowait(val)
+
+
+    async def set_IO_signalq(self, val: bool) -> None:
+        if self.IO_signalq.full():
+            _ = await self.IO_signalq.get()
+        await self.IO_signalq.put(val)
+
+
+
     def create_IVtask(self):
         """configures a NImax task for multi cell IV measurements"""
         # Voltage reading is MASTER
@@ -245,8 +258,9 @@ class cNIMAX:
                                     )
                     )
 
-            except Exception:
-                self.base.print_message("canceling NImax IV stream")
+            except Exception as e:
+                self.base.print_message(f"canceling NImax IV stream: {e}",
+                                        error = True)
 
         elif self.base.actionserver.estop and self.IO_do_meas:
             _ = self.task_cellcurrent.read(
@@ -299,14 +313,20 @@ class cNIMAX:
                         # wait for first callback interrupt 
                         while not self.IO_measuring:
                             await asyncio.sleep(0.5)
+                        self.base.print_message("got IO_measuring", info= True)
 
                         # get timecode and correct for offset from first interrupt
                         self.IOloopstarttime = time.time()#-self.buffersizeread/self.samplingrate 
 
-                        while (time.time() - self.IOloopstarttime < self.duration) and self.IO_do_meas:
+                        while (time.time() - self.IOloopstarttime < self.duration)\
+                        and self.IO_do_meas:
                             if not self.IO_signalq.empty():
                                 self.IO_do_meas = await self.IO_signalq.get()
-                            await asyncio.sleep(1.0)
+                            await asyncio.sleep(0.5)
+
+                        self.base.print_message(f"NImax IV finished with "
+                                                f"IO_do_meas {self.IO_do_meas}",
+                                                info = True)
 
 
                         # await self.IO_signalq.put(False)
@@ -322,21 +342,23 @@ class cNIMAX:
 
                         if self.base.actionserver.estop:
                             self.base.print_message("NImax IV task is in estop.")
-                            # await self.stat.set_estop()
                         else:
                             self.base.print_message("setting NImax IV task to idle")
-                            # await self.stat.set_idle()
                         self.base.print_message("NImax IV task measurement is done")
                     else:
                         self.IO_do_meas = False
                         self.base.print_message("NImax IV task is in estop.")
-                        # await self.stat.set_estop()
+
                 elif self.IO_do_meas and self.IO_measuring:
                     self.base.print_message("got measurement request but NImax IV task is busy")
                 elif not self.IO_do_meas and self.IO_measuring:
                     self.base.print_message("got stop request, measurement will stop next cycle")
                 else:
                     self.base.print_message("got stop request but NImax IV task is idle")
+
+
+            self.base.print_message(f"IOloop got IOloop_run {self.IOloop_run}")
+
         except asyncio.CancelledError:
             self.base.print_message("IOloop task was cancelled")
 
@@ -484,6 +506,7 @@ class cNIMAX:
                                                 IO="in"
                                                )
     
+                
                 # now add the rest
                 for i in range(len(self.FIFO_cell_keys)-1):
                     new_file_conn_keys = await self.active.split(new_fileconnparams = 
@@ -513,8 +536,7 @@ class cNIMAX:
     
                 # create the cell IV task
                 self.create_IVtask()
-                
-                await self.IO_signalq.put(True)
+                await self.set_IO_signalq(True)
     
                 self.active.action.error_code = ErrorCodes.none
     
@@ -534,7 +556,7 @@ class cNIMAX:
         """stops measurement, writes all data and returns from meas loop"""
         # turn off cell and run before stopping meas loop
         if self.IO_measuring:
-            await self.IO_signalq.put(False)
+            await self.set_IO_signalq(False)
 
 
     async def estop(self, switch:bool, *args, **kwargs):
@@ -543,7 +565,24 @@ class cNIMAX:
         self.base.actionserver.estop = switch
         if self.IO_measuring:
             if switch:
-                await self.IO_signalq.put(False)
+                await self.set_IO_signalq(False)
                 if self.active:
                     await self.active.set_estop()
         return switch
+
+    def shutdown(self):
+        self.base.print_message("shutting down nidaqmx")
+        self.set_IO_signalq_nowait(False)
+        retries = 0
+        while self.active is not None \
+        and retries < 10:
+            self.base.print_message(f"Got shutdown, "
+                                    f"but Active is not yet done!, "
+                                    f"retry {retries}",
+                                    info = True)
+            # set it again
+            self.set_IO_signalq_nowait(False)
+            time.sleep(1)
+            retries +=1
+        # stop IOloop
+        self.IOloop_run = False

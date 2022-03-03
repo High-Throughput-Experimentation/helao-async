@@ -982,11 +982,16 @@ class gamry:
             self.set_IO_signalq_nowait(False)
 
         # give some time to finish all data
-        while self.active is not None:
-            self.base.print_message("Got shutdown, "
-                                    "but Active is not yet done!",
+        retries = 0
+        while self.active is not None \
+        and retries < 10:
+            self.base.print_message(f"Got shutdown, "
+                                    f"but Active is not yet done!, "
+                                    f"retry {retries}",
                                     info = True)
-            time.sleep(0.5)
+            self.set_IO_signalq_nowait(False)
+            time.sleep(1)
+            retries += 1
         # stop IOloop
         self.IOloop_run = False
 
