@@ -260,17 +260,15 @@ def makeApp(confPrefix, servKey):
 
     @app.post("/shutdown")
     def post_shutdown():
-        # asyncio.gather(app.driver.close_connection())
-        app.driver.kill_GamryCom()
-
-    #    shutdown_event()
+        shutdown_event()
 
 
     @app.on_event("shutdown")
     def shutdown_event():
         # this gets called when the server is shut down or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
-        asyncio.gather(app.driver.close_connection())
+        app.base.print_message("gamry shutdown")
+        app.driver.shutdown()
         app.driver.kill_GamryCom()
         return {"shutdown"}
 
