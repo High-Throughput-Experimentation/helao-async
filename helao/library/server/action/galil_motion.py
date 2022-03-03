@@ -58,19 +58,19 @@ async def galil_dyn_endpoints(app = None):
                 return finished_action.as_dict()
     
     
-        @app.post(f"/{servKey}/reset_alignment", tags=["public_aligner"])
-        async def reset_alignment(
+        @app.post(f"/{servKey}/reset_plate_alignment", tags=["public_aligner"])
+        async def reset_plate_alignment(
                                   action: Optional[Action] = \
                                           Body({}, embed=True)
                                  ):
                 active = await app.base.setup_and_contain_action()
-                app.driver.reset_transfermatrix()
+                app.driver.reset_plate_transfermatrix()
                 finished_action = await active.finish()
                 return finished_action.as_dict()
     
     
-        @app.post(f"/{servKey}/load_alignment", tags=["public_aligner"])
-        async def load_alignment(
+        @app.post(f"/{servKey}/load_plate_alignment", tags=["public_aligner"])
+        async def load_plater_alignment(
                                   action: Optional[Action] = \
                                           Body({}, embed=True),
                                   matrix: Optional[List] = [
@@ -80,7 +80,7 @@ async def galil_dyn_endpoints(app = None):
                                                            ]
                                  ):
                 active = await app.base.setup_and_contain_action()
-                newmatrix = app.driver.update_transfermatrix(newtransfermatrix = \
+                newmatrix = app.driver.update_plate_transfermatrix(newtransfermatrix = \
                                          np.matrix(active.action.action_params["matrix"])
                 )
                 await active.enqueue_data_dflt(datadict = \
@@ -151,39 +151,39 @@ async def galil_dyn_endpoints(app = None):
             return finished_action.as_dict()
     
     
-        @app.post(f"/{servKey}/download_alignmentmatrix")
-        async def download_alignmentmatrix(
-                                           action: Optional[Action] = \
-                                                   Body({}, embed=True),
-                                          ):
-            """Get current in use Alignment from motion server
-               returns the xy part of the platecalibration.
-            """
-            active = await app.base.setup_and_contain_action(
-                                              action_abbr = "get_mplatexy"
-            )
-            await active.enqueue_data_dflt(datadict = \
-               {"mplatexy": app.driver.transform.get_Mplatexy()})
-            finished_action = await active.finish()
-            return finished_action.as_dict()
+        # @app.post(f"/{servKey}/download_alignmentmatrix")
+        # async def download_alignmentmatrix(
+        #                                    action: Optional[Action] = \
+        #                                            Body({}, embed=True),
+        #                                   ):
+        #     """Get current in use Alignment from motion server
+        #        returns the xy part of the platecalibration.
+        #     """
+        #     active = await app.base.setup_and_contain_action(
+        #                                       action_abbr = "get_mplatexy"
+        #     )
+        #     await active.enqueue_data_dflt(datadict = \
+        #        {"mplatexy": app.driver.transform.get_Mplatexy()})
+        #     finished_action = await active.finish()
+        #     return finished_action.as_dict()
     
     
-        @app.post(f"/{servKey}/upload_alignmentmatrix")
-        async def upload_alignmentmatrix(
-                                         action: Optional[Action] = \
-                                                 Body({}, embed=True),
-                                         Mxy: Optional[str] = None
-                                        ):
-            """Send new Alignment to motion server.
-               Updates the xy part of the plate calibration.
-            """
-            active = await app.base.setup_and_contain_action(
-                                              action_abbr = "upload_mplatexy"
-            )
-            await active.enqueue_data_dflt(datadict = \
-               {"uploaded": app.driver.transform.update_Mplatexy(**active.action.action_params)})
-            finished_action = await active.finish()
-            return finished_action.as_dict()
+        # @app.post(f"/{servKey}/upload_alignmentmatrix")
+        # async def upload_alignmentmatrix(
+        #                                  action: Optional[Action] = \
+        #                                          Body({}, embed=True),
+        #                                  Mxy: Optional[str] = None
+        #                                 ):
+        #     """Send new Alignment to motion server.
+        #        Updates the xy part of the plate calibration.
+        #     """
+        #     active = await app.base.setup_and_contain_action(
+        #                                       action_abbr = "upload_mplatexy"
+        #     )
+        #     await active.enqueue_data_dflt(datadict = \
+        #        {"uploaded": app.driver.transform.update_Mplatexy(**active.action.action_params)})
+        #     finished_action = await active.finish()
+        #     return finished_action.as_dict()
     
     
         if dev_axis:
@@ -264,7 +264,7 @@ async def galil_dyn_endpoints(app = None):
                                                   action_abbr = "query_position"
                 )
                 await active.enqueue_data_dflt(datadict = \
-                   await app.driver.query_axis_position(app.driver.get_all_axis()))
+                   await app.driver.query_axis_position(axis = app.driver.get_all_axis()))
                 finished_action = await active.finish()
                 return finished_action.as_dict()
     
@@ -405,13 +405,13 @@ def makeApp(confPrefix, servKey):
 
     @app.post("/shutdown")
     def post_shutdown():
-        app.base.print_message("motion shutdown")
+        app.base.print_message("motion /shutdown")
         app.driver.shutdown_event()
-    #    shutdown_event()
 
 
     @app.on_event("shutdown")
     def shutdown_event():
+        app.base.print_message("motion shutdown")
         app.driver.shutdown_event()
 
     return app
