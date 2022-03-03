@@ -81,10 +81,14 @@ class Galil:
  
         self.plate_transfermatrix = \
         self.load_transfermatrix(file = self.file_backup_transfermatrix)
+        if self.plate_transfermatrix is None:
+            self.plate_transfermatrix = self.dflt_matrix
+
         self.save_transfermatrix(file = self.file_backup_transfermatrix)
         self.base.print_message(f"plate_transfermatrix is: \n"
                                 f"{self.plate_transfermatrix}", info = True)
 
+        self.M_instr = None
         self.ref_plateid = self.config_dict.get("ref_plateid", None)
         if self.ref_plateid:
             self.base.print_message(f"Got reference plateid "
@@ -95,17 +99,25 @@ class Galil:
                 file = os.path.join(self.base.db_root, "plate_calib",
                        f"{gethostname()}_plate_{self.ref_plateid}_calib.json")
                 )
-            self.M_instr = self.convert_Mplate_to_Minstr(Mplate = Mplate.tolist())
-        else:
+            
+            if Mplate is not None:
+                self.M_instr = self.convert_Mplate_to_Minstr(
+                    Mplate = Mplate.tolist()
+                )
+
+        if self.M_instr is None:
             self.base.print_message("Did not find refernce plate, "
                                     "loading Minstr from config")
 
-            self.M_instr = self.config_dict.get("M_instr", [
-                    [1, 0, 0, 0],
-                    [0, 1, 0, 0],
-                    [0, 0, 1, 0],
-                    [0, 0, 0, 1],
-                ])
+            self.M_instr = self.config_dict.get(
+                                                "M_instr", 
+                                                [
+                                                 [1, 0, 0, 0],
+                                                 [0, 1, 0, 0],
+                                                 [0, 0, 1, 0],
+                                                 [0, 0, 0, 1],
+                                                ]
+                                               )
         self.base.print_message(f"Minstr is: {self.M_instr}", info = True)
 
 
@@ -1074,7 +1086,7 @@ class Galil:
                         self.base.print_message(f"matrix \n'{new_matrix}' "
                                                "has wrong shape",
                                                error = True)
-                        return self.dflt_matrix
+                        return None
                     else:
                         self.base.print_message(f"loaded matrix \n'{new_matrix}'")
                         return new_matrix
@@ -1082,11 +1094,11 @@ class Galil:
                 except Exception:
                     self.base.print_message(f"error loading matrix for '{file}'",
                                            error = True)
-                    return self.dflt_matrix
+                    return None
         else:
             self.base.print_message(f"matrix file '{file}' not found",
                                    error = True)
-            return self.dflt_matrix
+            return None
 
 
     def update_plate_transfermatrix(self, newtransfermatrix):

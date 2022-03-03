@@ -1,13 +1,3 @@
-# shell: uvicorn motion_server:app --reload
-""" A FastAPI service definition for a motion/IO server, e.g. Galil.
-
-The motion/IO service defines RESTful methods for sending commmands and retrieving data
-from a motion controller driver class such as 'galil_driver' or 'galil_simulate' using
-FastAPI. The methods provided by this service are not device-specific. Appropriate code
-must be written in the driver class to ensure that the service methods are generic, i.e.
-calls to 'motion.*' are not device-specific. Currently inherits configuration from
-driver code, and hard-coded to use 'galil' class (see "__main__").
-"""
 
 __all__ = ["makeApp"]
 
@@ -247,13 +237,12 @@ def makeApp(confPrefix, servKey):
     
     @app.post("/shutdown")
     def post_shutdown():
-        app.base.print_message("motion /shutdown")
-        app.driver.shutdown_event()
+        shutdown_event()
 
 
     @app.on_event("shutdown")
     def shutdown_event():
-        app.base.print_message("motion shutdown")
+        app.base.print_message("IO shutdown")
         app.driver.shutdown_event()
 
     return app

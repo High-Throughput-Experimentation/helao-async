@@ -237,6 +237,7 @@ class gamry:
         self.pstat = None
         self.action = None  # for passing action object from technique method to measure loop
         self.active = None  # for holding active action object, clear this at end of measurement
+        self.pstat_connection = None
         self.samples_in = []
         # status is handled through active, call active.finish()
         self.gamry_range_enum = Gamry_IErange_dflt
@@ -274,6 +275,11 @@ class gamry:
         self.IO_continue = False
         self.IOloop_run = False
 
+
+    def set_IO_signalq_nowait(self, val: bool) -> None:
+        if self.IO_signalq.full():
+            _ = self.IO_signalq.get_nowait()
+        self.IO_signalq.put_nowait(val)
 
 
     async def set_IO_signalq(self, val: bool) -> None:
@@ -447,10 +453,9 @@ class gamry:
             return ErrorCodes.critical
 
 
-    async def close_connection(self):
+    def close_connection(self):
         """Close connection to Gamry"""
         # this just tries to close a connection with try/catch
-        await asyncio.sleep(0.001)
         try:
             if self.pstat:
                 self.pstat.Close()
@@ -461,6 +466,25 @@ class gamry:
         except Exception:
             # self.pstat = None
             return ErrorCodes.critical
+
+
+    def close_pstat_connection(self):
+        if self.IO_measuring:
+            self.IO_do_meas = False # will stop meas loop
+            self.IO_measuring = False
+            self.dtaq.Run(False)
+            self.pstat.SetCell(self.GamryCOM.CellOff)
+            self.base.print_message("signaling IOloop to stop")
+            self.set_IO_signalq_nowait(False)
+
+            # delete this at the very last step
+            self.close_connection()
+            self.pstat_connection = None
+            self.dtaqsink = dummy_sink()    
+            self.dtaq = None
+            
+        else:
+            pass
 
 
     async def measurement_setup(self, AcqFreq, mode: Gamry_modes = None, *argv):
@@ -664,7 +688,6 @@ class gamry:
                     try:
                         self.base.print_message(f"creating dtaq '{Dtaqmode}'", info = True)
                         self.dtaq = client.CreateObject(Dtaqmode)
-                        print(self.dtaq)
                         if Dtaqtype:
                             self.dtaq.Init(self.pstat, Dtaqtype, *argv)
                         else:
@@ -694,11 +717,17 @@ class gamry:
 
         return error
 
+
     async def measure(self):
         """performing a measurement with the Gamry
         this is the main function for the instrument"""
         await asyncio.sleep(0.001)
-        if self.pstat:
+
+        if not self.pstat:
+            self.IO_measuring = False
+            return {"measure": "not initialized"}
+
+        else:
 
             # write header lines with one function call
             self.FIFO_gamryheader.update(
@@ -835,7 +864,7 @@ class gamry:
 
             # Use the following code to discover events:
             # client.ShowEvents(dtaqcpiv)
-            connection = client.GetEvents(self.dtaq, self.dtaqsink)
+            self.pstat_connection = client.GetEvents(self.dtaq, self.dtaqsink)
 
             try:
                 # get current time and start measurement
@@ -845,10 +874,8 @@ class gamry:
             except Exception as e:
                 self.base.print_message("gamry error run")
                 self.base.print_message(gamry_error_decoder(e))
-                self.pstat.SetCell(self.GamryCOM.CellOff)
-                del connection
+                self.close_pstat_connection()
                 return {"measure": "run_error"}
-
 
 
             realtime = await self.active.set_realtime()
@@ -912,27 +939,15 @@ class gamry:
                 sink_status = self.dtaqsink.status
 
 
-
-            self.IO_measuring = False
-            self.dtaq.Run(False)
-            self.pstat.SetCell(self.GamryCOM.CellOff)
-            self.base.print_message("signaling IOloop to stop")
-            await self.close_connection()
-            await self.set_IO_signalq(False)
-            # # delete this at the very last step
-            del connection
-            # connection will be closed in IOloop
-            self.dtaqsink = dummy_sink()
-
+            self.close_pstat_connection()
             return {"measure": f"done_{self.IO_meas_mode}"}
-        else:
-            self.IO_measuring = False
-            return {"measure": "not initialized"}
+
 
     async def status(self):
         """return status of data structure"""
         await asyncio.sleep(0.001)
         return self.dtaqsink.status
+
 
     async def stop(self):
         """stops measurement, writes all data and returns from meas loop"""
@@ -958,6 +973,24 @@ class gamry:
         return switch
 
 
+    def shutdown(self):
+        # close all connection and objects to gamry
+        self.base.print_message("shutting down gamry")
+        if self.IO_measuring:
+            # file and Gamry connection will be closed with the meas loop
+            self.IO_do_meas = False # will stop meas loop
+            self.set_IO_signalq_nowait(False)
+
+        # give some time to finish all data
+        while self.active is not None:
+            self.base.print_message("Got shutdown, "
+                                    "but Active is not yet done!",
+                                    info = True)
+            time.sleep(0.5)
+        # stop IOloop
+        self.IOloop_run = False
+
+
     async def technique_wrapper(
         self, 
         act, 
@@ -980,68 +1013,65 @@ class gamry:
             act.error_code = ErrorCodes.no_sample
             activeDict = act.as_dict()
  
-        if act.error_code is ErrorCodes.none:
+
+        if self.pstat \
+        and not self.IO_do_meas \
+        and act.error_code is ErrorCodes.none:
             # open connection, will be closed after measurement in IOloop
             act.error_code = await self.open_connection()
 
+        elif self.IO_measuring:
+            activeDict = act.as_dict()
+            act.error_code = ErrorCodes.in_progress
+
+        else:
+            act.error_code = ErrorCodes.not_initialized
+            activeDict = act.as_dict()
+
+
         if act.error_code is ErrorCodes.none:
-            if self.pstat and not self.IO_do_meas:
-                # set parameters for IOloop meas
-                self.IO_meas_mode = measmode
-                act.error_code = await self.measurement_setup(
-                    1.0 / samplerate, self.IO_meas_mode, *setupargs
-                )
-                if act.error_code is ErrorCodes.none:
-                    # setup the experiment specific signal ramp
-                    self.IO_sigramp = client.CreateObject(sigfunc)
-                    try:
-                        self.IO_sigramp.Init(*sigfunc_params)
-                        act.error_code = ErrorCodes.none
-                    except Exception as e:
-                        act.error_code = gamry_error_decoder(e)
-                        self.base.print_message(f"IO_sigramp.Init error: "
-                                                f"{act.error_code}", error = True)
-                    
-                    self.samples_in = samples_in
-                    self.action = act
-                    self.action.samples_in = []
-
-                    # signal the IOloop to start the measrurement
-                    await self.set_IO_signalq(True)
-                    # wait for data to appear in multisubscriber queue before returning active dict
-                    # async for data_msg in self.base.data_q.subscribe():
-                    #     for act_uuid, _ in data_msg.items():
-                    #         if act.action_uuid == act_uuid:
-                    #             activeDict = self.active.action.as_dict()
-                    #     if activeDict:
-                    #         break
-
-                    # need to wait now for the activation of the meas routine
-                    # and that the active object is activated and sets action status
-
-                    while not self.IO_continue:
-                        await asyncio.sleep(1)
-
-                    # reset continue flag
-                    self.IO_continue = False
-    
+            # set parameters for IOloop meas
+            self.IO_meas_mode = measmode
+            act.error_code = await self.measurement_setup(
+                1.0 / samplerate, self.IO_meas_mode, *setupargs
+            )
+            if act.error_code is ErrorCodes.none:
+                # setup the experiment specific signal ramp
+                self.IO_sigramp = client.CreateObject(sigfunc)
+                try:
+                    self.IO_sigramp.Init(*sigfunc_params)
                     act.error_code = ErrorCodes.none
-    
-                    if self.active:
-                        activeDict = self.active.action.as_dict()
-                    else:
-                        activeDict = act.as_dict()
+                except Exception as e:
+                    act.error_code = gamry_error_decoder(e)
+                    self.base.print_message(f"IO_sigramp.Init error: "
+                                            f"{act.error_code}", error = True)
+                
+                self.samples_in = samples_in
+                self.action = act
+                self.action.samples_in = []
+
+                # signal the IOloop to start the measrurement
+                await self.set_IO_signalq(True)
+
+                # need to wait now for the activation of the meas routine
+                # and that the active object is activated and sets action status
+                while not self.IO_continue:
+                    await asyncio.sleep(1)
+
+                # reset continue flag
+                self.IO_continue = False
+
+                if self.active:
+                    activeDict = self.active.action.as_dict()
                 else:
                     activeDict = act.as_dict()
-                    
-
-            elif self.IO_measuring:
-                activeDict = act.as_dict()                
-                act.error_code = ErrorCodes.in_progress
             else:
-                act.error_code = ErrorCodes.not_initialized
+                self.close_connection()
                 activeDict = act.as_dict()
+
         else:
+            # could not open connection
+            # open_connection already set the error_code
             activeDict = act.as_dict()                
 
 
