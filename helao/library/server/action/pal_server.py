@@ -518,15 +518,15 @@ def makeApp(confPrefix, servKey):
         active = await app.base.setup_and_contain_action(
                                           action_abbr = "query_sample"
         )
-        error, sample = \
+        error_code, sample = \
             await app.driver.archive.tray_query_sample(**active.action.action_params)
-
+        active.action.error_code = error_code
         await active.append_sample(samples = [sample],
                             IO="in"
                            )
         await active.enqueue_data_dflt(datadict = \
                                        {'sample': sample.as_dict(),
-                                        'error_code':error}
+                                        'error_code':error_code}
                                       )
         active.action.action_params.update({"_fast_sample_in":[sample.as_dict()]})
         finished_action = await active.finish()
@@ -569,13 +569,15 @@ def makeApp(confPrefix, servKey):
         active = await app.base.setup_and_contain_action(
                                           action_abbr = "load_sample",
         )
-        error_code, loaded_sample = await app.driver.archive.tray_load(**active.action.action_params)
+        error_code, loaded_sample = \
+            await app.driver.archive.tray_load(**active.action.action_params)
+        active.action.error_code = error_code
         if loaded_sample != NoneSample():
             await active.append_sample(samples = [loaded_sample],
                                 IO="in"
                                )
         await active.enqueue_data_dflt(datadict = \
-                                       {"error_code":error_code.name,
+                                       {"error_code":error_code,
                                         "sample": loaded_sample.as_dict()})
         finished_act = await active.finish()
         return finished_act.as_dict()
@@ -785,15 +787,47 @@ def makeApp(confPrefix, servKey):
         active = await app.base.setup_and_contain_action(
                                           action_abbr = "query_sample",
         )
-        error, sample = \
+        error_code, sample = \
             await app.driver.archive.custom_query_sample(**active.action.action_params)
+        active.action.error_code = error_code
         await active.append_sample(samples = [sample],
                             IO="in"
                            )
         await active.enqueue_data_dflt(datadict = \
                                        {"sample": sample.as_dict(),
-                                        "error_code":error})
+                                        "error_code":error_code})
         active.action.action_params.update({"_fast_sample_in":[sample.as_dict()]})
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+
+    @app.post(f"/{servKey}/archive_custom_add_liquid", tags=["public_archive"])
+    async def archive_custom_add_liquid(
+                                        action: Optional[Action] = \
+                                                Body({}, embed=True),
+                                        custom: Optional[dev_customitems] = None,
+                                        source_liquid_in: Optional[SampleUnion] = Body(LiquidSample(**{"sample_no":1,"machine_name":gethostname()}), embed=True),
+                                        volume_ml: float = 0.0
+                                       ):
+        active = await app.base.setup_and_contain_action(
+                                          action_abbr = "add_liquid",
+        )
+        error_code, samples_in, samples_out = \
+            await app.driver.archive.custom_add_liquid(
+                custom = active.action.action_params["custom"],
+                source_liquid_in = active.action.action_params["source_liquid_in"],
+                volume_ml = active.action.action_params["volume_ml"],
+                action = active.action
+            )
+        active.action.error_code = error_code
+        await active.append_sample(samples = samples_in,
+                            IO="in"
+                           )
+        await active.append_sample(samples = samples_out,
+                            IO="out"
+                           )
+        await active.enqueue_data_dflt(datadict = \
+                                        {"error_code":error_code})
         finished_action = await active.finish()
         return finished_action.as_dict()
 

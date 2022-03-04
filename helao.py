@@ -160,7 +160,7 @@ class Pidd:
             if group in pidd.servers:
                 G = pidd.servers[group]
                 for server in G:
-                    twait = 2
+                    twait = 0.5
                     print_message({}, "launcher",
                                   f"waiting {twait}sec before "
                                   f"killing server {server}")
