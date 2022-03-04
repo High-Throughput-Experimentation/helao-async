@@ -77,7 +77,7 @@ class Galil:
         if self.base.states_root is not None:
             self.file_backup_transfermatrix = \
                 os.path.join(self.base.states_root, 
-                             f"{gethostname()}_motor_calib.json")
+                             f"{gethostname()}_last_plate_calib.json")
  
         self.plate_transfermatrix = \
         self.load_transfermatrix(file = self.file_backup_transfermatrix)
@@ -89,21 +89,15 @@ class Galil:
                                 f"{self.plate_transfermatrix}", info = True)
 
         self.M_instr = None
-        self.ref_plateid = self.config_dict.get("ref_plateid", None)
-        if self.ref_plateid:
-            self.base.print_message(f"Got reference plateid "
-                                    f"'{self.ref_plateid}', "
-                                    f"using it for Minstr",
-                                    info = True)
-            Mplate = self.load_transfermatrix(
-                file = os.path.join(self.base.db_root, "plate_calib",
-                       f"{gethostname()}_plate_{self.ref_plateid}_calib.json")
-                )
-            
-            if Mplate is not None:
-                self.M_instr = self.convert_Mplate_to_Minstr(
-                    Mplate = Mplate.tolist()
-                )
+        Mplate = self.load_transfermatrix(
+            file = os.path.join(self.base.db_root, "plate_calib",
+                   f"{gethostname()}_instrument_calib.json")
+            )
+        
+        if Mplate is not None:
+            self.M_instr = self.convert_Mplate_to_Minstr(
+                Mplate = Mplate.tolist()
+            )
 
         if self.M_instr is None:
             self.base.print_message("Did not find refernce plate, "
@@ -2206,7 +2200,7 @@ class Aligner:
                         [[
                          Spacer(width=20), 
                          Div(
-                             text="<b>calib file:</b>",
+                             text="<b>load pltaer calib file:</b>",
                              width=200+50,
                              height=15
                             ),
@@ -2370,7 +2364,7 @@ class Aligner:
         ## pm plot
         ######################################################################
         self.plot_mpmap = figure(
-                                 title="PlateMap", 
+                                 title="PlateID", 
                                  height=300,
                                  x_axis_label="X (mm)",
                                  y_axis_label="Y (mm)",
