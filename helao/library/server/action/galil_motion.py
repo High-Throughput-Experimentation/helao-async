@@ -403,14 +403,4 @@ def makeApp(confPrefix, servKey):
     )
     
 
-    @app.post("/shutdown")
-    def post_shutdown():
-        shutdown_event()
-
-
-    @app.on_event("shutdown")
-    def shutdown_event():
-        app.base.print_message("motion shutdown")
-        app.driver.shutdown_event()
-
     return app

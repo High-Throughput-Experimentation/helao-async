@@ -313,16 +313,4 @@ def makeApp(confPrefix, servKey):
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-
-    @app.post("/shutdown", tags=["private"])
-    def post_shutdown():
-        shutdown_event()
-
-
-    @app.on_event("shutdown")
-    def shutdown_event():
-        app.base.print_message("nidaqmx shutdown")
-        app.driver.shutdown()
-        return {"shutdown"}
-
     return app

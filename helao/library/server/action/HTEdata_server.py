@@ -177,15 +177,6 @@ def makeApp(confPrefix, servKey):
         return finished_action.as_dict()
 
 
-    @app.post("/shutdown")
-    def post_shutdown():
-        shutdown_event()
-
-
-    @app.on_event("shutdown")
-    def shutdown_event():
-        return ""
-
     return app
 
         

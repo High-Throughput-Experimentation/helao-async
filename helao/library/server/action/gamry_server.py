@@ -258,18 +258,4 @@ def makeApp(confPrefix, servKey):
         return finished_action.as_dict()
 
 
-    @app.post("/shutdown")
-    def post_shutdown():
-        shutdown_event()
-
-
-    @app.on_event("shutdown")
-    def shutdown_event():
-        # this gets called when the server is shut down or reloaded to ensure a clean
-        # disconnect ... just restart or terminate the server
-        app.base.print_message("gamry shutdown")
-        app.driver.shutdown()
-        app.driver.kill_GamryCom()
-        return {"shutdown"}
-
     return app
