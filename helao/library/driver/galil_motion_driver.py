@@ -1034,22 +1034,22 @@ class Galil:
     async def get_all_analog_in(self):
         return [port for port in self.config_dict["Ain_id"]]
 
-    def shutdown_event(self):
+
+    def shutdown(self):
         # this gets called when the server is shut down 
         # or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
         # self.stop_axis(self.get_all_axis())
+        self.base.print_message("shutting down galil motion")
         try:
             # self.base.print_message("turning all motors off", info = True)
             # self.motor_off_shutdown(axis = self.get_all_axis())
-            self.base.print_message("closing galil connection", info = True)
             self.g.GClose()
         except Exception as e:
             self.base.print_message(f"could not close galil connection: {e}",
                                     error = True)
         if self.aligner_enabled and self.aligner:
             self.aligner.IOtask.cancel()
-        self.base.print_message("shutting down galil motion")
         return {"shutdown"}
 
 

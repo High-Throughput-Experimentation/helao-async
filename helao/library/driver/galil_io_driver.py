@@ -333,11 +333,11 @@ class Galil:
             return dict()
 
 
-    def shutdown_event(self):
+    def shutdown(self):
         # this gets called when the server is shut down or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
+        self.base.print_message("shutting down galil io")
         try:
-            self.base.print_message("shutting down galil io")
             self.g.GClose()
         except Exception as e:
             self.base.print_message(f"could not close galil connection: {e}",

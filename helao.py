@@ -151,14 +151,14 @@ class Pidd:
 
     def close(self):
         active = self.list_active()
-        print_message({}, "launcher", active)
+        print_message({}, "launcher", f"active pidds: {active}")
 
         activeserver = [k for k, _, _, _ in active]
         KILL_ORDER = ["operator", "visualizer", "action", "orchestrator"]
         for group in KILL_ORDER:
             print_message({}, "launcher", f"Killing {group} group.")
-            if group in pidd.A:
-                G = pidd.A[group]
+            if group in pidd.servers:
+                G = pidd.servers[group]
                 for server in G:
                     twait = 2
                     print_message({}, "launcher",
@@ -282,12 +282,12 @@ def launcher(confPrefix, confDict):
         k: {sk: sv for sk, sv in confDict["servers"].items() if sv["group"] == k}
         for k in LAUNCH_ORDER
     }
-    pidd.A = munchify(allGroup)
+    pidd.servers = munchify(allGroup)
     pidd.orchServs = []
     for group in LAUNCH_ORDER:
         print_message({}, "launcher", f"Launching {group} group.")
-        if group in pidd.A:
-            G = pidd.A[group]
+        if group in pidd.servers:
+            G = pidd.servers[group]
             for server in G:
                 S = G[server]
                 codeKey = [k for k in S if k in pidd.codeKeys]
@@ -320,7 +320,7 @@ def launcher(confPrefix, confDict):
                         f"Launching {server} at {servHost}:{servPort} using helao/library/server/{group}/{servPy}.py"
                     )
                     if codeKey == "fast":
-                        if group == "orchestrators":
+                        if group == "orchestrator":
                             pidd.orchServs.append(server)
                         cmd = ["python", "fast_launcher.py", confPrefix, server]
                         p = subprocess.Popen(cmd, cwd=helao_root)
@@ -367,18 +367,18 @@ if __name__ == "__main__":
         for server in pidd.orchServs:
             try:
                 print_message({}, "launcher", f"Unsubscribing {server} websockets.")
-                S = pidd.A["orchestrators"][server]
+                S = pidd.servers["orchestrator"][server]
                 requests.post(f"http://{S.host}:{S.port}/shutdown")
             except Exception as e:
                 print_message({}, "launcher", " ... got error: ", e, error = True)
         # in case a /shutdown is added to other FastAPI servers (not the shutdown without '/')
         # KILL_ORDER = ["visualizer", "action", "server"] # orch are killed above
         # no /shutdown in visualizers
-        KILL_ORDER = ["action", "server"]  # orch are killed above
+        KILL_ORDER = ["action"]  # orch are killed above
         for group in KILL_ORDER:
             print_message({}, "launcher", f"Shutting down {group} group.")
-            if group in pidd.A:
-                G = pidd.A[group]
+            if group in pidd.servers:
+                G = pidd.servers[group]
                 for server in G:
                     try:
                         print_message({}, "launcher", f"Shutting down {server}.")

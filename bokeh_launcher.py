@@ -7,6 +7,8 @@ from functools import partial
 
 from bokeh.server.server import Server
 
+from helaocore.helper.print_message import print_message
+
 
 confPrefix = sys.argv[1]
 servKey = sys.argv[2]
@@ -20,6 +22,9 @@ servPy = S["bokeh"]
 makeApp = import_module(f"helao.library.server.{S['group']}.{S['bokeh']}").makeBokehApp
 
 if __name__ == "__main__":
+    print_message({}, "bokeh_launcher", f" ---- starting  {servKey} ----",
+                  info = True)
+
     bokehapp = Server(
                       {f"/{servPy}": partial(makeApp, confPrefix=confPrefix, servKey=servKey)}, 
                       port=servPort, 

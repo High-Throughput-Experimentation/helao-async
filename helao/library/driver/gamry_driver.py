@@ -375,6 +375,7 @@ class gamry:
                 self.base.print_message("Failed to terminate server GamryCom after 3 retries.")
                 return False
 
+
     async def init_Gamry(self, devid):
         """connect to a Gamry"""
         try:
@@ -994,6 +995,7 @@ class gamry:
             retries += 1
         # stop IOloop
         self.IOloop_run = False
+        self.kill_GamryCom()
 
 
     async def technique_wrapper(
