@@ -307,6 +307,8 @@ class Galil:
             self.galilcmd(f"XQ #main{mainthread},{mainthread}")  # excecute main routine
             # self.galilcmd("XQ #toogle, 1")  # excecute main routine
         else:
+            self.base.print_message("set_digital_cycle parameters are not valid",
+                                    error = True)
             err_code = ErrorCodes.not_available
 
         return {
