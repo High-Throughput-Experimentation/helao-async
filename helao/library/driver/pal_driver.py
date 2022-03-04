@@ -22,7 +22,6 @@ from helaocore.server.base import Base
 from helaocore.error import ErrorCodes
 from helaocore.helper.helaodict import HelaoDict
 
-from helaocore.data.sample import UnifiedSampleDataAPI
 from helaocore.model.sample import (
                                     SampleUnion, 
                                     NoneSample, 
@@ -31,7 +30,8 @@ from helaocore.model.sample import (
                                     SolidSample,
                                     AssemblySample,
                                     SampleStatus,
-                                    SampleInheritance
+                                    SampleInheritance,
+                                    SampleType
                                     )
 from helaocore.model.file import FileConnParams
 from helaocore.model.active import ActiveParams
@@ -68,11 +68,6 @@ class _palcmd(BaseModel):
     method: str = ""
     params: str = ""
 
-class _sampletype(str, Enum):
-    liquid = "liquid"
-    gas = "gas"
-    solid = "solid"
-    assembly = "assembly"
 
 class GCsampletype(str, Enum):
     liquid = "liquid"
@@ -86,7 +81,7 @@ class CAMS(Enum):
 
     transfer_tray_tray = _cam(name="transfer_tray_tray",
                    file_name = "", # filled in from config later
-                   sample_out_type = _sampletype.liquid,
+                   sample_out_type = SampleType.liquid,
                    source = _positiontype.tray,
                    dest = _positiontype.tray,
                   )
@@ -94,7 +89,7 @@ class CAMS(Enum):
 
     transfer_custom_tray = _cam(name="transfer_custom_tray",
                    file_name = "", # filled in from config later
-                   sample_out_type = _sampletype.liquid,
+                   sample_out_type = SampleType.liquid,
                    source = _positiontype.custom,
                    dest = _positiontype.tray,
                   )
@@ -102,7 +97,7 @@ class CAMS(Enum):
 
     transfer_tray_custom = _cam(name="transfer_tray_custom",
                    file_name = "", # filled in from config later
-                   sample_out_type = _sampletype.liquid,
+                   sample_out_type = SampleType.liquid,
                    source = _positiontype.tray,
                    dest = _positiontype.custom,
                   )
@@ -110,7 +105,7 @@ class CAMS(Enum):
 
     transfer_custom_custom = _cam(name="transfer_tray_custom",
                    file_name = "", # filled in from config later
-                   sample_out_type = _sampletype.liquid,
+                   sample_out_type = SampleType.liquid,
                    source = _positiontype.custom,
                    dest = _positiontype.custom,
                   )
@@ -118,7 +113,7 @@ class CAMS(Enum):
 
     injection_custom_GC_gas_wait = _cam(name="injection_custom_GC_gas_wait",
                    file_name = "", # filled in from config later
-                   sample_out_type = _sampletype.gas,
+                   sample_out_type = SampleType.gas,
                    source = _positiontype.custom,
                    dest = _positiontype.custom,
                   )
@@ -126,7 +121,7 @@ class CAMS(Enum):
 
     injection_custom_GC_gas_start = _cam(name="injection_custom_GC_gas_start",
                    file_name = "", # filled in from config later
-                   sample_out_type = _sampletype.gas,
+                   sample_out_type = SampleType.gas,
                    source = _positiontype.custom,
                    dest = _positiontype.custom,
                   )
@@ -134,7 +129,7 @@ class CAMS(Enum):
 
     injection_custom_GC_liquid_wait = _cam(name="injection_custom_GC_liquid_wait",
                    file_name = "", # filled in from config later
-                   sample_out_type = _sampletype.liquid,
+                   sample_out_type = SampleType.liquid,
                    source = _positiontype.custom,
                    dest = _positiontype.custom,
                   )
@@ -142,7 +137,7 @@ class CAMS(Enum):
 
     injection_custom_GC_liquid_start = _cam(name="injection_custom_GC_liquid_start",
                    file_name = "", # filled in from config later
-                   sample_out_type = _sampletype.liquid,
+                   sample_out_type = SampleType.liquid,
                    source = _positiontype.custom,
                    dest = _positiontype.custom,
                   )
@@ -150,7 +145,7 @@ class CAMS(Enum):
 
     injection_tray_GC_liquid_wait = _cam(name="injection_tray_GC_liquid_wait",
                    file_name = "", # filled in from config later
-                   sample_out_type = _sampletype.liquid,
+                   sample_out_type = SampleType.liquid,
                    source = _positiontype.tray,
                    dest = _positiontype.custom,
                   )
@@ -158,14 +153,14 @@ class CAMS(Enum):
 
     injection_tray_GC_liquid_start = _cam(name="injection_tray_GC_liquid_start",
                    file_name = "", # filled in from config later
-                   sample_out_type = _sampletype.liquid,
+                   sample_out_type = SampleType.liquid,
                    source = _positiontype.tray,
                    dest = _positiontype.custom,
                   )
 
     injection_tray_GC_gas_wait = _cam(name="injection_tray_GC_gas_wait",
                    file_name = "", # filled in from config later
-                   sample_out_type = _sampletype.gas,
+                   sample_out_type = SampleType.gas,
                    source = _positiontype.tray,
                    dest = _positiontype.custom,
                   )
@@ -173,7 +168,7 @@ class CAMS(Enum):
 
     injection_tray_GC_gas_start = _cam(name="injection_tray_GC_gas_start",
                    file_name = "", # filled in from config later
-                   sample_out_type = _sampletype.gas,
+                   sample_out_type = SampleType.gas,
                    source = _positiontype.tray,
                    dest = _positiontype.custom,
                   )
@@ -181,7 +176,7 @@ class CAMS(Enum):
 
     injection_custom_HPLC = _cam(name="injection_custom_HPLC",
                    file_name = "", # filled in from config later
-                   sample_out_type = _sampletype.liquid,
+                   sample_out_type = SampleType.liquid,
                    source = _positiontype.custom,
                    dest = _positiontype.custom,
                   )
@@ -189,7 +184,7 @@ class CAMS(Enum):
 
     injection_tray_HPLC = _cam(name="injection_tray_HPLC",
                    file_name = "", # filled in from config later
-                   sample_out_type = _sampletype.liquid,
+                   sample_out_type = SampleType.liquid,
                    source = _positiontype.tray,
                    dest = _positiontype.custom,
                   )
@@ -205,7 +200,7 @@ class CAMS(Enum):
     
     # transfer_liquid = _cam(name="transfer_liquid",
     #                       file_name = "lcfc_transfer.cam", # from config later
-    #                       sample_out_type = _sampletype.liquid,
+    #                       sample_out_type = SampleType.liquid,
     #                       source = _positiontype.custom,
     #                       dest = _positiontype.next_empty_vial,
     #                      )
@@ -213,7 +208,7 @@ class CAMS(Enum):
 
     archive = _cam(name="archive",
                     file_name = "", # from config later
-                    sample_out_type = _sampletype.liquid,
+                    sample_out_type = SampleType.liquid,
                     source = _positiontype.custom,
                     dest = _positiontype.next_empty_vial,
                   )
@@ -221,14 +216,14 @@ class CAMS(Enum):
 
     # fillfixed = _cam(name="fillfixed",
     #                   file_name = "lcfc_fill_hardcodedvolume.cam", # from config later
-    #                   sample_out_type = _sampletype.liquid,
+    #                   sample_out_type = SampleType.liquid,
     #                   source = _positiontype.custom,
     #                   dest = _positiontype.custom,
     #                 )
     
     # fill = _cam(name="fill",
     #             file_name = "lcfc_fill.cam", # from config later
-    #             sample_out_type = _sampletype.liquid,
+    #             sample_out_type = SampleType.liquid,
     #             source = _positiontype.custom,
     #             dest = _positiontype.custom,
     #          )
@@ -239,14 +234,14 @@ class CAMS(Enum):
 
     # autodilute = _cam(name="autodilute",
     #               file_name = "lcfc_dilute.cam", # from config later
-    #               sample_out_type = _sampletype.liquid,
+    #               sample_out_type = SampleType.liquid,
     #               source = _positiontype.custom,
     #               dest = _positiontype.next_full_vial,
     #              )
 
     # dilute = _cam(name="dilute",
     #               file_name = "lcfc_dilute.cam", # from config later
-    #               sample_out_type = _sampletype.liquid,
+    #               sample_out_type = SampleType.liquid,
     #               source = _positiontype.custom,
     #               dest = _positiontype.tray,
     #              )
@@ -358,9 +353,6 @@ class PAL:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
-
-        self.unified_db = UnifiedSampleDataAPI(self.base)
-        asyncio.gather(self.unified_db.init_db())
 
         self.archive = Archive(self.base)
 
@@ -700,7 +692,7 @@ class PAL:
 
 
                     # if sample_out is an assembly we need to update its parts
-                    if isinstance(sample_out, AssemblySample):
+                    if sample_out.sample_type == SampleType.assembly:
                         # could also check if it has parts attribute?
                         # reset source
                         sample_out.source = []
@@ -745,15 +737,15 @@ class PAL:
 
                 # -- (6) --
                 # update all samples also in the local sample sqlite db
-                await self.unified_db.update_sample(palaction.sample_in)
+                await self.archive.unified_db.update_sample(palaction.sample_in)
 
                 for sample_out in palaction.sample_out:
                     # if sample_out is an assembly we need to update its parts
-                    if isinstance(sample_out, AssemblySample):
+                    if sample_out.sample_type == SampleType.assembly:
                         sample_out.parts = \
                             await self.db_get_sample(sample_out.parts)
                     # save it back to the db
-                    await self.unified_db.update_sample([sample_out])
+                    await self.archive.unified_db.update_sample([sample_out])
 
 
 
@@ -829,130 +821,6 @@ class PAL:
             self.PAL_pid = None
 
         return error
-
-
-    async def _sendcommand_add_listA_to_listB(self, listA, listB) -> list:
-        for item in listA:
-            listB.append(copy.deepcopy(item))
-        return listB
-
-
-    async def _sendcommand_new_ref_samples(
-                                          self, 
-                                          samples_in: List[SampleUnion],
-                                          samples_out_type: str = "",
-                                          samples_position: str = ""
-                                         ) -> Tuple[bool, List[SampleUnion]]:
-
-        """ volume_ml and sample_position need to be updated after the 
-        function call by the function calling this."""
-
-        error = ErrorCodes.none
-        samples: List[SampleUnion] = []
-
-        if not samples_in:
-            self.base.print_message("no sample_in to create sample_out", error = True)
-            error = ErrorCodes.not_available
-        elif len(samples_in) == 1:
-            source_chemical = []
-            source_mass = []
-            source_supplier = []
-            source_lotnumber = []
-            for sample in samples_in:
-                source_chemical = \
-                    await self._sendcommand_add_listA_to_listB(
-                                                               sample.chemical, 
-                                                               source_chemical
-                                                              )
-                source_mass = \
-                    await self._sendcommand_add_listA_to_listB(
-                                                               sample.mass, 
-                                                               source_mass
-                                                              )
-                source_supplier = \
-                    await self._sendcommand_add_listA_to_listB(
-                                                               sample.supplier, 
-                                                               source_supplier
-                                                              )
-                source_lotnumber = \
-                    await self._sendcommand_add_listA_to_listB(
-                                                               sample.lot_number,
-                                                               source_lotnumber
-                                                              )
-
-            source = [sample.get_global_label() for sample in samples_in]
-            self.base.print_message(f"source_global_label: '{source}'")
-            self.base.print_message(f"source_chemical: {source_chemical}")
-            self.base.print_message(f"source_mass: {source_mass}")
-            self.base.print_message(f"source_supplier: {source_supplier}")
-            self.base.print_message(f"source_lotnumber: {source_lotnumber}")
-
-            if samples_out_type == _sampletype.liquid:
-                # this is a sample reference, it needs to be added
-                # to the db later
-                samples.append(LiquidSample(
-                        action_uuid=[self.active.action.action_uuid],
-                        sample_creation_action_uuid = self.active.action.action_uuid,
-                        sample_creation_experiment_uuid = self.active.action.experiment_uuid,
-                        source=source,
-                        action_timestamp=self.active.action.action_timestamp,
-                        chemical=source_chemical,
-                        mass=source_mass,
-                        supplier=source_supplier,
-                        lot_number=source_lotnumber,
-                        status=[SampleStatus.created],
-                        inheritance=SampleInheritance.receive_only
-                        ))
-            elif samples_out_type == _sampletype.gas:
-                samples.append(GasSample(
-                        action_uuid=[self.active.action.action_uuid],
-                        sample_creation_action_uuid = self.active.action.action_uuid,
-                        sample_creation_experiment_uuid = self.active.action.experiment_uuid,
-                        source=source,
-                        action_timestamp=self.active.action.action_timestamp,
-                        chemical=source_chemical,
-                        mass=source_mass,
-                        supplier=source_supplier,
-                        lot_number=source_lotnumber,
-                        status=[SampleStatus.created],
-                        inheritance=SampleInheritance.receive_only
-                        ))
-            elif samples_out_type == _sampletype.assembly:
-                samples.append(AssemblySample(
-                        parts = samples_in,
-                        sample_position = samples_position,
-                        action_uuid=[self.active.action.action_uuid],
-                        sample_creation_action_uuid = self.active.action.action_uuid,
-                        sample_creation_experiment_uuid = self.active.action.experiment_uuid,
-                        source=source,
-                        action_timestamp=self.active.action.action_timestamp,
-                        status=[SampleStatus.created],
-                        inheritance=SampleInheritance.receive_only
-                        ))
-    
-            else:
-                self.base.print_message(f"sample_out type {samples_out_type} is not supported yet.", error = True)
-                error = ErrorCodes.not_available
-
-
-        elif len(samples_in) > 1:
-            # we always create an assembly for more than one sample_in
-            samples.append(AssemblySample(
-                parts = [sample for sample in samples_in],
-                #sample_position = "", # is updated later
-                status=[SampleStatus.created],
-                inheritance=SampleInheritance.receive_only,
-                source = [sample.get_global_label() for sample in samples_in],
-                experiment_uuid=self.active.action.experiment_uuid,
-                action_uuid=[self.active.action.action_uuid],
-                action_timestamp=self.active.action.action_timestamp,
-                ))
-        else:
-            # this should never happen, else we found a bug
-            self.base.print_message("found a BUG in new_ref_sample", error = True)
-            error = ErrorCodes.bug
-
-        return error, samples
 
 
     async def _sendcommand_next_full_vial(
@@ -1245,10 +1113,11 @@ class PAL:
             
             
             
-            error, sample_out_list = await self._sendcommand_new_ref_samples(
+            error, sample_out_list = await self.archive.new_ref_samples(
                                       samples_in = microcam.run[-1].sample_in, # this should hold a sample already from "check source call"
                                       samples_out_type =  microcam.cam.sample_out_type,
-                                      samples_position = dest
+                                      samples_position = dest,
+                                      action = self.active.action
                                      )
 
             if error != ErrorCodes.none:
@@ -1330,10 +1199,11 @@ class PAL:
                 return PALposition(error = ErrorCodes.bug), sample_out_list
 
             # this should actually never create an assembly
-            error, sample_out_list = await self._sendcommand_new_ref_samples(
+            error, sample_out_list = await self.archive.new_ref_samples(
                                       samples_in = microcam.run[-1].sample_in,
                                       samples_out_type =  microcam.cam.sample_out_type,
-                                      samples_position = dest
+                                      samples_position = dest,
+                                      action = self.active.action
                                      )
 
             if error != ErrorCodes.none:
@@ -1354,7 +1224,7 @@ class PAL:
             self.base.print_message(f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'", info = True)
 
 
-            if isinstance(sample_in, AssemblySample):
+            if sample_in.sample_type == SampleType.assembly:
                 # need to check if we already go the same type in
                 # the assembly and then would dilute too
                 # else we add a new sample to that assembly
@@ -1369,16 +1239,16 @@ class PAL:
 
 
                 test = False
-                if isinstance(microcam.run[-1].sample_in[-1], LiquidSample):
+                if microcam.run[-1].sample_in[-1].sample_type == SampleType.liquid:
                     test = await self._sendcommand_check_for_assemblytypes(
-                        sample_type = _sampletype.liquid,
+                        sample_type = SampleType.liquid,
                         assembly = sample_in
                         )
-                elif isinstance(microcam.run[-1].sample_in[-1], SolidSample):
+                elif microcam.run[-1].sample_in[-1].sample_type == SampleType.solid:
                     test = False # always add it as a new part
-                elif isinstance(microcam.run[-1].sample_in[-1], GasSample):
+                elif microcam.run[-1].sample_in[-1].sample_type == SampleType.gas:
                     test = await self._sendcommand_check_for_assemblytypes(
-                        sample_type = _sampletype.gas,
+                        sample_type = SampleType.gas,
                         assembly = sample_in
                         )
                 else:
@@ -1413,10 +1283,11 @@ class PAL:
                     
                     # first create a new sample from the source sample 
                     # which is then incoporarted into the assembly
-                    error, sample_out_list = await self._sendcommand_new_ref_samples(
+                    error, sample_out_list = await self.archive.new_ref_samples(
                                               samples_in = microcam.run[-1].sample_in, # this should hold a sample already from "check source call"
                                               samples_out_type =  microcam.cam.sample_out_type,
-                                              samples_position = dest
+                                              samples_position = dest,
+                                              action = self.active.action
                                              )
     
                     if error != ErrorCodes.none:
@@ -1464,7 +1335,7 @@ class PAL:
                 if not self.archive.custom_assembly_allowed(dest):
                     # no assembly allowed
                     self.base.print_message(f"PAL_dest: Assembly not allowed for PAL dest '{dest}' for 'custom' position method.", error = True)
-                    return PALposition(error = ErrorCodes.critical), sample_out_list
+                    return PALposition(error = ErrorCodes.not_allowed), sample_out_list
     
                 # cannot create an assembly from an assembly
                 if len(microcam.run[-1].sample_in) > 1:
@@ -1475,10 +1346,11 @@ class PAL:
                 # dest_sample = sample_in
                 # first create a new sample from the source sample 
                 # which is then incoporarted into the assembly
-                error, sample_out_list = await self._sendcommand_new_ref_samples(
+                error, sample_out_list = await self.archive.new_ref_samples(
                                           samples_in = microcam.run[-1].sample_in,
                                           samples_out_type =  microcam.cam.sample_out_type,
-                                          samples_position = dest
+                                          samples_position = dest,
+                                          action = self.active.action
                                          )
     
                 if error != ErrorCodes.none:
@@ -1507,10 +1379,11 @@ class PAL:
                 # and also add the newly created sample ref to it
                 tmp_sample_in.append(sample_out_list[0])
                 self.base.print_message(f"PAL_dest: Creating assembly from '{[sample.global_label for sample in tmp_sample_in]}' in position '{dest}'", info = True)
-                error, sample_out2_list = await self._sendcommand_new_ref_samples(
+                error, sample_out2_list = await self.archive.new_ref_samples(
                       samples_in = tmp_sample_in,
-                      samples_out_type =  _sampletype.assembly,
-                      samples_position = dest
+                      samples_out_type =  SampleType.assembly,
+                      samples_position = dest,
+                      action = self.active.action
                      )
 
 
@@ -1572,10 +1445,11 @@ class PAL:
         dest_vial = newvialpos["vial"]
         self.base.print_message(f"PAL_dest: archiving liquid sample to tray {dest_tray}, slot {dest_slot}, vial {dest_vial}")
 
-        error, sample_out_list = await self._sendcommand_new_ref_samples(
+        error, sample_out_list = await self.archive.new_ref_samples(
                                   samples_in = microcam.run[-1].sample_in, # this should hold a sample already from "check source call"
                                   samples_out_type =  microcam.cam.sample_out_type,
-                                  samples_position = dest
+                                  samples_position = dest,
+                                  action = self.active.action
                                  )
 
         self.base.print_message(f"new reference sample for empty vial: {sample_out_list}")
@@ -2126,8 +2000,8 @@ class PAL:
             return
 
         for i, sample in enumerate(palaction.sample_in):
-            if isinstance(sample, AssemblySample):
-            # if sample.sample_type == _sampletype.assembly:
+            if sample.sample_type == SampleType.assembly:
+            # if sample.sample_type == SampleType.assembly:
                 for part in sample.parts:
                     if part.sample_type == palaction.dilute_type[i]:
                         part.update_vol(palaction.sample_in_delta_vol_ml[i], palaction.dilute[i])
@@ -2254,7 +2128,6 @@ class PAL:
                         self.base.print_message(f"PAL waits {diff_time} "
                                                 f"for sending next command",
                                                 info = True)
-                        IO_do_meas = True
                         if (diff_time > 0):
                             for ii in range(round(diff_time)):
                                 await asyncio.sleep(1)
@@ -2349,14 +2222,14 @@ class PAL:
                             self, 
                             samples: List[SampleUnion]
                            ) -> List[SampleUnion]:
-        return await self.unified_db.get_sample(samples=samples)
+        return await self.archive.unified_db.get_sample(samples=samples)
 
 
     async def db_new_sample(
                             self, 
                             samples: List[SampleUnion]
                            ) -> List[SampleUnion]:
-        return await self.unified_db.new_sample(samples=samples)
+        return await self.archive.unified_db.new_sample(samples=samples)
     
     
     async def method_arbitrary(self, A: Action) -> dict:
