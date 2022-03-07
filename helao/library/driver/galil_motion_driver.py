@@ -44,9 +44,11 @@ from helaocore.schema import Action
 from helaocore.server.vis import Vis
 from helaocore.server.make_vis_serv import makeVisServ
 from helaocore.data.legacy import HTELegacyAPI
+from helaocore.data.sample import UnifiedSampleDataAPI
 from helaocore.model.active import ActiveParams
 from helaocore.model.file import FileConnParams
 from helaocore.model.data import DataModel
+from helaocore.model.sample import SolidSample
 
 # install galil driver first
 # (helao) c:\Program Files (x86)\Galil\gclib\source\wrappers\python>python setup.py install
@@ -63,6 +65,8 @@ class Galil:
 
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
+        self.unified_db = UnifiedSampleDataAPI(self.base)
+
 
         self.dflt_matrix = np.matrix(
                                      [
@@ -1119,6 +1123,23 @@ class Galil:
     def reset_plate_transfermatrix(self):
         self.update_plate_transfermatrix(
             newtransfermatrix = self.dflt_matrix)
+
+
+    async def solid_get_platemap(
+                                 self,
+                                 plate_id: int = None
+                  ) -> dict:
+        return {"platemap":await self.unified_db.get_platemap([SolidSample(plate_id = plate_id)])
+               }
+
+
+    async def solid_get_sample_xy(
+                                  self,
+                                  plate_id: int = None,
+                                  sample_no: int = None,
+                                 ) -> dict:
+        return {"platexy":await self.unified_db.get_sample_xy([SolidSample(plate_id = plate_id, sample_no = sample_no)])
+               }
 
 
 class MoveModes(str, Enum):

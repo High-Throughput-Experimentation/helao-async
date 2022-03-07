@@ -254,7 +254,7 @@ class Archive():
         self.position_config = self.config_dict.get("positions", None)
         self.archivepck = None
         if self.base.states_root is not None:
-            self.archivepck = os.path.join(self.base.states_root, f"{gethostname()}_archive.pck")
+            self.archivepck = os.path.join(self.base.states_root, f"{gethostname()}_{self.base.server.server_name}_archive.pck")
         self.config = {}
 
 
@@ -840,7 +840,7 @@ class Archive():
             return False, NoneSample()
 
         if custom in self.custom_positions:
-            if sample.sample_type == "assembly" \
+            if sample.sample_type == SampleType.assembly \
             and not self.custom_positions[custom].assembly_allowed():
                 return False, NoneSample()
 
@@ -871,7 +871,7 @@ class Archive():
 
 
         if custom in self.custom_positions:
-            if sample.sample_type == "assembly" \
+            if sample.sample_type == SampleType.assembly \
             and not self.custom_positions[custom].assembly_allowed():
                 return False, NoneSample()
 
@@ -1030,7 +1030,10 @@ class Archive():
                               samples_in: List[SampleUnion],
                               samples_out_type: str = "",
                               samples_position: str = "",
-                              action: Action = None
+                              action: Action = None,
+                              # combine multiple liquids into a new
+                              # liquid sample
+                              combine_liquids: bool = False
                              ) -> Tuple[bool, List[SampleUnion]]:
         """ volume_ml and sample_position need to be updated after the 
         function call by the function calling this."""
@@ -1047,39 +1050,45 @@ class Archive():
         if not samples_in:
             self.base.print_message("no sample_in to create sample_out", error = True)
             error = ErrorCodes.not_available
-        elif len(samples_in) == 1:
-            source_chemical = []
-            source_mass = []
-            source_supplier = []
-            source_lotnumber = []
-            for sample in samples_in:
-                source_chemical = \
-                    await self._add_listA_to_listB(
-                                                   sample.chemical, 
-                                                   source_chemical
-                                                  )
-                source_mass = \
-                    await self._add_listA_to_listB(
-                                                   sample.mass, 
-                                                   source_mass
-                                                  )
-                source_supplier = \
-                    await self._add_listA_to_listB(
-                                                   sample.supplier, 
-                                                   source_supplier
-                                                  )
-                source_lotnumber = \
-                    await self._add_listA_to_listB(
-                                                   sample.lot_number,
-                                                   source_lotnumber
-                                                  )
+            return error, []
 
-            source = [sample.get_global_label() for sample in samples_in]
-            self.base.print_message(f"source_global_label: '{source}'")
-            self.base.print_message(f"source_chemical: {source_chemical}")
-            self.base.print_message(f"source_mass: {source_mass}")
-            self.base.print_message(f"source_supplier: {source_supplier}")
-            self.base.print_message(f"source_lotnumber: {source_lotnumber}")
+
+        source_chemical = []
+        source_mass = []
+        source_supplier = []
+        source_lotnumber = []
+        for sample in samples_in:
+            source_chemical = \
+                await self._add_listA_to_listB(
+                                               sample.chemical, 
+                                               source_chemical
+                                              )
+            source_mass = \
+                await self._add_listA_to_listB(
+                                               sample.mass, 
+                                               source_mass
+                                              )
+            source_supplier = \
+                await self._add_listA_to_listB(
+                                               sample.supplier, 
+                                               source_supplier
+                                              )
+            source_lotnumber = \
+                await self._add_listA_to_listB(
+                                               sample.lot_number,
+                                               source_lotnumber
+                                              )
+
+        source = [sample.get_global_label() for sample in samples_in]
+        self.base.print_message(f"source_global_label: '{source}'")
+        self.base.print_message(f"source_chemical: {source_chemical}")
+        self.base.print_message(f"source_mass: {source_mass}")
+        self.base.print_message(f"source_supplier: {source_supplier}")
+        self.base.print_message(f"source_lotnumber: {source_lotnumber}")
+
+
+        if len(samples_in) == 1:
+
 
             if samples_out_type == SampleType.liquid:
                 # this is a sample reference, it needs to be added
@@ -1131,16 +1140,35 @@ class Archive():
 
         elif len(samples_in) > 1:
             # we always create an assembly for more than one sample_in
-            samples.append(AssemblySample(
-                parts = [sample for sample in samples_in],
-                #sample_position = "", # is updated later
-                status=[SampleStatus.created],
-                inheritance=SampleInheritance.receive_only,
-                source = [sample.get_global_label() for sample in samples_in],
-                experiment_uuid=action.experiment_uuid,
-                action_uuid=[action.action_uuid],
-                action_timestamp=action.action_timestamp,
-                ))
+            if all(sample.sample_type == SampleType.liquid for sample in samples_in) \
+            and combine_liquids:
+                self.base.print_message(f"combining liquids '{source}' "
+                                        f"into new liquid reference",
+                                        info = True)
+                samples.append(LiquidSample(
+                        action_uuid=[action.action_uuid],
+                        sample_creation_action_uuid = action.action_uuid,
+                        sample_creation_experiment_uuid = action.experiment_uuid,
+                        source=source,
+                        action_timestamp=action.action_timestamp,
+                        chemical=source_chemical,
+                        mass=source_mass,
+                        supplier=source_supplier,
+                        lot_number=source_lotnumber,
+                        status=[SampleStatus.created],
+                        inheritance=SampleInheritance.receive_only
+                        ))
+            else:
+                samples.append(AssemblySample(
+                    parts = [sample for sample in samples_in],
+                    #sample_position = "", # is updated later
+                    status=[SampleStatus.created],
+                    inheritance=SampleInheritance.receive_only,
+                    source = [sample.get_global_label() for sample in samples_in],
+                    experiment_uuid=action.experiment_uuid,
+                    action_uuid=[action.action_uuid],
+                    action_timestamp=action.action_timestamp,
+                    ))
         else:
             # this should never happen, else we found a bug
             self.base.print_message("found a BUG in new_ref_sample", error = True)
@@ -1154,31 +1182,47 @@ class Archive():
                                 custom: str = None,
                                 source_liquid_in: LiquidSample = None,
                                 volume_ml:float = 0.0,
+                                combine_liquids: bool = False,
+                                dilute_liquids: bool = True,
                                 action: Action = None
                                 )  -> Tuple[bool, List[SampleUnion], List[SampleUnion]]:
         """adds new liquid from a 'reservoir' to a custom position"""
+
         error = ErrorCodes.none
         samples_in = []
         samples_out = []
 
+
+        # (1) check if source_liquid_in is not None 
+        # and its a valid sample (add it to samples_in list)
         if source_liquid_in is None:
             error = ErrorCodes.no_sample
-            return error, samples_in, samples_out
+            return error, [], []
+        else:
+            # check if source_liquid_in is valid
+            # converts source_liquid_in to a list
+            samples_in = await self.unified_db.get_sample(samples=[source_liquid_in])
+            if not samples_in:
+                error = ErrorCodes.no_sample
+                return error, [], []
+            
 
-        
+        # (2) verify if custom is a valid position
+        # and get sample from custom position
         if custom in self.custom_positions:
             custom_sample = copy.deepcopy(self.custom_positions[custom].sample)
         else:
             error = ErrorCodes.not_available
-            return error, samples_in, samples_out
+            return error, [], []
 
-        # check if sample in custom position is valid
+
+        # (3) check if sample in custom position is valid
         if custom_sample != NoneSample():
             custom_samples_in = await self.unified_db.get_sample(samples=[custom_sample])
             if not custom_samples_in:
                 self.base.print_message("invalid sample in custom position", error = True)
                 error = ErrorCodes.critical
-                return error, samples_in, samples_out
+                return error, [], []
             else:
                 custom_sample = custom_samples_in[0]
 
@@ -1186,18 +1230,9 @@ class Archive():
         self.base.print_message(f"sample in custom position '{custom}' is "
                                 f"{custom_sample.prc_dict()}")
 
-
-
-        # check if source_liquid_in is valid
-        # converts source_liquid_in to a list
-        samples_in = await self.unified_db.get_sample(samples=[source_liquid_in])
-        if not samples_in:
-            error = ErrorCodes.no_sample
-            return error, samples_in, samples_out
-
-
-        # create a new ref sample first
-        error, refsample_out_list = await self.new_ref_samples(
+        # (4) create a new ref sample first for the amount we
+        # take from sample_in
+        error, ref_samples_out = await self.new_ref_samples(
                               # sample check cobverted source_liquid_in
                               # to a list already
                               samples_in = samples_in,
@@ -1207,14 +1242,25 @@ class Archive():
                               )
 
         if error != ErrorCodes.none:
-            return error, samples_in, samples_out
+            return error, [], []
+
+        # set the volume to the requested value
+        ref_samples_out[0].sample_position = custom
+        ref_samples_out[0].volume_ml = volume_ml
+
+        # (5) now decide what the new sample should be
+        # (5-1) custom is empty --> new sample is ref_samples_out[0]
+        # (5-2) we combine liquid from custom with ref_samples_out[0]
+        #       and create a new liquid (combine_liquids is True)
+        # (5-3) we create an assembly with custom_sample and ref_samples_out[0]
 
 
+        # (5-1)
         if custom_sample == NoneSample():
-            samples_out = await self.unified_db.new_sample(samples = refsample_out_list)
+            samples_out = await self.unified_db.new_sample(samples = ref_samples_out)
             if not samples_out:
                 error = ErrorCodes.no_sample
-                return error, samples_in, samples_out
+                return error, [], []
             # replace sample in custom position
             replaced, sample = await self.custom_replace_sample(
                                 custom = custom,
@@ -1226,47 +1272,64 @@ class Archive():
                                         error = True)
                 error = ErrorCodes.critical
 
-        else:
-            # custom holds a sample and we need to create an assembly
-            # if allowed
-            
-            
-            
-            
-            
-            if self.custom_assembly_allowed(custom = custom):
-                # convert the ref samples that gets added to a real sample
-                samples_out = await self.unified_db.new_sample(samples = refsample_out_list)
+        # (5-2)
+        elif custom_sample.sample_type == SampleType.liquid:
+            # convert the ref samples that gets added to a real sample
+            if self.custom_dilution_allowed(custom = custom):
+                samples_out = await self.unified_db.new_sample(samples = ref_samples_out)
                 if not samples_out:
                     error = ErrorCodes.no_sample
-                    return error, samples_in, samples_out
+                    return error, [], []
 
-                # add the new sample to the samples in 
+
+                if error != ErrorCodes.none:
+                    return error, [], []
+
+
+                # add the custom sample to the samples_in
                 samples_in.append(custom_sample)
 
-                # create a new ref sample first
-                error, refsample_out_list2 = await self.new_ref_samples(
+
+                # create a new ref sample which combines both liquid samples
+                error, ref_samples_out2 = await self.new_ref_samples(
                                       # input for assembly is the custom sample 
                                       # and the new sample from source_liquid_in
                                       samples_in = [custom_sample, samples_out[0]],
                                       samples_out_type = SampleType.assembly,
                                       samples_position = custom,
-                                      action = action
+                                      action = action,
+                                      combine_liquids = True
                                       )
-                
-                if error != ErrorCodes.none:
-                    # something went wrong when creating the referenceassembly
-                    return error, samples_in, samples_out
-                
+
+                ref_samples_out2[0].sample_position = custom
+                ref_samples_out2[0].volume_ml = custom_sample.volume_ml
+                ref_samples_out2[0].update_vol(
+                                               delta_vol_ml = samples_out[0].volume_ml, 
+                                               dilute = dilute_liquids
+                                              )
+
                 # a reference assembly was successfully created
                 # convert it now to a real sample
-                samples_out2 = await self.unified_db.new_sample(samples = refsample_out_list2)
+                samples_out2 = await self.unified_db.new_sample(samples = ref_samples_out2)
+
                 if not samples_out2:
                     # reference could not be converted to a real sample
                     self.base.print_message("could not convert reference "
                                             "assembly to real assembly",
                                             error = True)
-                    return ErrorCodes.critical, samples_in, samples_out
+                    return ErrorCodes.critical, [], []
+
+
+                # mark old liquid sample as destroyed/consumed
+                samples_out[0].status.append(SampleStatus.merged)
+                custom_sample.status.append(SampleStatus.merged)
+
+                # update all sample in the db
+                await self.unified_db.update_sample(
+                    samples = [samples_out[0], custom_sample]
+                )
+
+
                 
                 # add new reference to samples out list
                 samples_out.append(samples_out2[0])
@@ -1281,11 +1344,75 @@ class Archive():
                     self.base.print_message("could not replace sample with "
                                             "assembly when adding liquid", 
                                             error = True)
-                    error = ErrorCodes.critical
+                    return ErrorCodes.critical, [], []
+
+            else:
+                 return ErrorCodes.not_allowed, [], []
+
+        # (5-3)
+        else:
+            # custom holds a sample and we need to create an assembly
+            if self.custom_assembly_allowed(custom = custom):
+                # convert the ref samples that gets added to a real sample
+                samples_out = await self.unified_db.new_sample(samples = ref_samples_out)
+                if not samples_out:
+                    error = ErrorCodes.no_sample
+                    return error, [], []
+
+                # add the custom sample to the samples_in
+                samples_in.append(custom_sample)
+
+                # create a new ref sample first
+                error, ref_samples_out2 = await self.new_ref_samples(
+                                      # input for assembly is the custom sample 
+                                      # and the new sample from source_liquid_in
+                                      samples_in = [custom_sample, samples_out[0]],
+                                      samples_out_type = SampleType.assembly,
+                                      samples_position = custom,
+                                      action = action
+                                      )
+                
+                if error != ErrorCodes.none:
+                    # something went wrong when creating the referenceassembly
+                    return error, [], []
+
+
+                # mark old liquid sample as destroyed/consumed
+                samples_out[0].status.append(SampleStatus.incorporated)
+                custom_sample.status.append(SampleStatus.incorporated)
+
+                # update all sample in the db
+                await self.unified_db.update_sample(
+                    samples = [samples_out[0], custom_sample]
+                )
+                
+                # a reference assembly was successfully created
+                # convert it now to a real sample
+                samples_out2 = await self.unified_db.new_sample(samples = ref_samples_out2)
+                if not samples_out2:
+                    # reference could not be converted to a real sample
+                    self.base.print_message("could not convert reference "
+                                            "assembly to real assembly",
+                                            error = True)
+                    return ErrorCodes.critical, [], []
+                
+                # add new reference to samples out list
+                samples_out.append(samples_out2[0])
+                # and update the custom position with the new sample
+
+
+                replaced, sample = await self.custom_replace_sample(
+                                    custom = custom,
+                                    sample = samples_out2[0]
+                                   )
+                if not replaced:
+                    self.base.print_message("could not replace sample with "
+                                            "assembly when adding liquid", 
+                                            error = True)
+                    return ErrorCodes.critical, [], []
 
                 
             else:
-                 error = ErrorCodes.not_allowed
+                 return ErrorCodes.not_allowed, [], []
 
-        # sample = await self._update_sample(sample)
         return error, samples_in, samples_out

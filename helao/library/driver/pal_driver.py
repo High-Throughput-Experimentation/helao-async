@@ -922,16 +922,20 @@ class PAL:
         source = microcam.requested_source.position # custom position name
 
         if source is None:
-            self.base.print_message("PAL_source: Invalid PAL source 'NONE' for 'custom' position method.", error = True)
+            self.base.print_message("PAL_source: Invalid PAL source "
+                                    "'NONE' for 'custom' position method.",
+                                    error = True)
             return PALposition(error = ErrorCodes.not_available)
 
         error, sample_in = await self.archive.custom_query_sample(microcam.requested_source.position)
 
         if error != ErrorCodes.none:
-            self.base.print_message("PAL_source: Requested custom position does not exist.", error = True)
+            self.base.print_message("PAL_source: Requested custom position "
+                                    "does not exist.", error = True)
             error = ErrorCodes.critical
         elif sample_in == NoneSample():
-            self.base.print_message(f"PAL_source: No sample in custom position '{source}'", error = True)
+            self.base.print_message(f"PAL_source: No sample in custom "
+                                    f"position '{source}'", error = True)
             error = ErrorCodes.not_available
         
         return PALposition(
@@ -1334,12 +1338,18 @@ class PAL:
                 # we now create an assembly if allowed
                 if not self.archive.custom_assembly_allowed(dest):
                     # no assembly allowed
-                    self.base.print_message(f"PAL_dest: Assembly not allowed for PAL dest '{dest}' for 'custom' position method.", error = True)
+                    self.base.print_message(f"PAL_dest: Assembly not allowed "
+                                            f"for PAL dest '{dest}' for "
+                                            f"'custom' position method.",
+                                            error = True)
                     return PALposition(error = ErrorCodes.not_allowed), sample_out_list
     
                 # cannot create an assembly from an assembly
                 if len(microcam.run[-1].sample_in) > 1:
-                    self.base.print_message("PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here.", error = True)
+                    self.base.print_message("PAL_dest: Found a BUG: "
+                                            "Too many input samples. "
+                                            "Cannot create an assembly here.",
+                                            error = True)
                     return PALposition(error = ErrorCodes.bug), sample_out_list
 
 
@@ -1378,7 +1388,9 @@ class PAL:
                 tmp_sample_in = [sample_in]
                 # and also add the newly created sample ref to it
                 tmp_sample_in.append(sample_out_list[0])
-                self.base.print_message(f"PAL_dest: Creating assembly from '{[sample.global_label for sample in tmp_sample_in]}' in position '{dest}'", info = True)
+                self.base.print_message(f"PAL_dest: Creating assembly from "
+                                        f"'{[sample.global_label for sample in tmp_sample_in]}'"
+                                        f" in position '{dest}'", info = True)
                 error, sample_out2_list = await self.archive.new_ref_samples(
                       samples_in = tmp_sample_in,
                       samples_out_type =  SampleType.assembly,

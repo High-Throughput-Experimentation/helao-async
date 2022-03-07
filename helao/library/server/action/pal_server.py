@@ -807,8 +807,21 @@ def makeApp(confPrefix, servKey):
                                                 Body({}, embed=True),
                                         custom: Optional[dev_customitems] = None,
                                         source_liquid_in: Optional[SampleUnion] = Body(LiquidSample(**{"sample_no":1,"machine_name":gethostname()}), embed=True),
-                                        volume_ml: float = 0.0
+                                        volume_ml: float = 0.0,
+                                        combine_liquids: bool = False,
+                                        dilute_liquids: bool = True
                                        ):
+        """Adds 'volume_ml' of 'source_liquid_in' to the sample 'custom'.\n
+           Args: \n
+                custom: custom position where liquid will be added
+                source_liquid_in: the liquid from which volume_ml will be added
+                                  to custom
+                volume_ml: the volume in ml which will be added
+                combine_liquids: combines liquid in 'custom' and 'source_liquid_in'
+                                 in a new liquid
+                dilute_liquids: calculates a dilutes factor (use with combine liquids)
+        """
+
         active = await app.base.setup_and_contain_action(
                                           action_abbr = "add_liquid",
         )
@@ -817,6 +830,8 @@ def makeApp(confPrefix, servKey):
                 custom = active.action.action_params["custom"],
                 source_liquid_in = active.action.action_params["source_liquid_in"],
                 volume_ml = active.action.action_params["volume_ml"],
+                combine_liquids = active.action.action_params["combine_liquids"],
+                dilute_liquids = active.action.action_params["dilute_liquids"],
                 action = active.action
             )
         active.action.error_code = error_code
