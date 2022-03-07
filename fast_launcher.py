@@ -3,6 +3,7 @@ __all__ = []
 
 
 import sys
+import os
 from importlib import import_module
 from uvicorn.config import LOGGING_CONFIG
 
@@ -20,6 +21,11 @@ S = C[servKey]
 
 makeApp = import_module(f"helao.library.server.{S['group']}.{S['fast']}").makeApp
 app = makeApp(confPrefix, servKey)
+root =  config.get("root", None)
+if root is not None:
+    log_root = os.path.join(root, "LOGS")
+else:
+    log_root = None
 
 if __name__ == "__main__":
     # LOGGING_CONFIG["formatters"]["default"]["fmt"] = "%(asctime)s [%(name)s] %(levelprefix)s %(message)s"
@@ -34,6 +40,6 @@ if __name__ == "__main__":
     LOGGING_CONFIG["formatters"]["access"]["use_colors"] = False
 
     print_message({}, "fast_launcher", f" ---- starting  {servKey} ----",
+                  log_dir = log_root,
                   info = True)
-    uvicorn.run(app, host=S['host'], port=S['port'])
-    
+    fastapp = uvicorn.run(app, host=S['host'], port=S['port'])

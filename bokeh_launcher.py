@@ -2,6 +2,7 @@
 __all__ = []
 
 import sys
+import os
 from importlib import import_module
 from functools import partial
 
@@ -20,9 +21,16 @@ servPort = S["port"]
 servPy = S["bokeh"]
 
 makeApp = import_module(f"helao.library.server.{S['group']}.{S['bokeh']}").makeBokehApp
+root =  config.get("root", None)
+if root is not None:
+    log_root = os.path.join(root, "LOGS")
+else:
+    log_root = None
+
 
 if __name__ == "__main__":
     print_message({}, "bokeh_launcher", f" ---- starting  {servKey} ----",
+                  log_dir = log_root,
                   info = True)
 
     bokehapp = Server(
@@ -31,6 +39,9 @@ if __name__ == "__main__":
                       address=servHost, 
                       allow_websocket_origin=[f"{servHost}:{servPort}"]
                       )
+    print_message({}, "bokeh_launcher", f"started {servKey} {bokehapp}",
+                      log_dir = log_root,
+                      info = True)
     bokehapp.start()
     bokehapp.io_loop.add_callback(bokehapp.show, f"/{servPy}")
     bokehapp.io_loop.start()
