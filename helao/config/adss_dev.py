@@ -43,8 +43,6 @@ config["servers"] = dict(
             enable_aligner = True,
             bokeh_port = 5003,
             cutoff=6,  # cutoff of digits for TransferMatrix calculation
-            Transfermatrix = [[1,0,0],[0,1,0],[0,0,1]], # default Transfermatrix for plate calibration
-            
             # 4x6 plate
             #M_instr = [[1,0,0,-76.525],[0,1,0,-50.875],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
             # 100mm wafer
@@ -83,6 +81,7 @@ config["servers"] = dict(
         simulate=False,  # choose between simulator(default) or real device
         # cmd_print=False,
         params=dict(
+            allow_no_sample = True,
             dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
         ),
     ),
@@ -93,6 +92,7 @@ config["servers"] = dict(
         fast="nidaqmx_server",
         # cmd_print=False,
         params = dict(
+            allow_no_sample = True,
             dev_cellcurrent_trigger = 'PFI1', #P1.1
             dev_cellvoltage_trigger = 'PFI1', #P1.1
             dev_cellcurrent = {
@@ -235,9 +235,6 @@ config["servers"] = dict(
         group="visualizer",
         bokeh="bokeh_modular_visualizer",
         params = dict(
-            doc_name = "ADSS visualizer",
-            ws_nidaqmx="NI",
-            ws_potentiostat = 'PSTAT',
         )
     ),
 )
