@@ -232,6 +232,8 @@ class Galil:
                           address=servHost, 
                           allow_websocket_origin=[f"{servHost}:{servPort}"]
                           )
+        self.base.print_message(f"started bokeh server {self.bokehapp}",
+                                info = True)
         self.bokehapp.start()
         self.bokehapp.io_loop.add_callback(self.bokehapp.show, f"/{servPy}")
 
