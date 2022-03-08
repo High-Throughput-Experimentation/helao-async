@@ -15,7 +15,9 @@ from helao.library.driver.pal_driver import (
                                              PALtools,
                                              PalMicroCam,
                                              PALposition,
-                                             GCsampletype
+                                             GCsampletype,
+                                             SampleInheritance,
+                                             SampleStatus
                                             ) 
 from helaocore.model.sample import LiquidSample, SampleUnion, NoneSample
 from helaocore.helper.make_str_enum import make_str_enum
@@ -857,9 +859,15 @@ def makeApp(confPrefix, servKey):
         """Positive sample_no will get it from the beginng, negative
         from the end of the db."""
         active = await app.base.setup_and_contain_action()
-        sample = await app.driver.db_get_sample(active.action.samples_in)
+        samples = await app.driver.archive.unified_db.get_sample(samples=active.action.samples_in)
+        # clear sample_in
+        active.action.samples_in = []
+        await active.append_sample(samples = samples,
+                                   IO="in"
+                                  )
+        
         await active.enqueue_data_dflt(datadict = \
-                                       {'sample': sample.as_dict()})
+                                       {'samples': [sample.as_dict() for sample in samples]})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -887,9 +895,24 @@ def makeApp(confPrefix, servKey):
         If its the very first liquid (no source in database exists) 
         leave source and source_ml empty."""
         active = await app.base.setup_and_contain_action()
-        samples = await app.driver.db_new_sample(active.action.samples_in)
+        for sample in active.action.samples_in:
+            sample.action_uuid=[action.action_uuid]
+            sample.sample_creation_action_uuid = action.action_uuid
+            sample.sample_creation_experiment_uuid = action.experiment_uuid
+            sample.status=[SampleStatus.created]
+            sample.inheritance=SampleInheritance.receive_only
+
+        samples = await app.driver.archive.unified_db.new_sample(samples=active.action.samples_in)
+        # clear sample_in and sample_out
+        active.action.samples_in = []
+        active.action.samples_out = []
+        await active.append_sample(samples = samples,
+                                   IO="out"
+                                  )
+        
+
         await active.enqueue_data_dflt(datadict = \
-                                       {'sample': [sample.as_dict() for sample in samples]})
+                                       {'samples': [sample.as_dict() for sample in samples]})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
