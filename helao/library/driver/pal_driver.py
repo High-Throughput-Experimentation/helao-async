@@ -652,19 +652,19 @@ class PAL:
                 # -- (1) -- get most recent information for all sample_in
                 # palaction.sample_in should always be non ref samples
                 palaction.sample_in = \
-                    await self.db_get_sample(palaction.sample_in)
+                    await self.archive.unified_db.get_sample(samples=palaction.sample_in)
                 # as palaction.sample_in contains both source and dest samples
                 # we had them saved separately (this is for the hlo file)
 
                 # palaction.source should also always contain non ref samples
                 palaction.source.sample_initial = \
-                    await self.db_get_sample(palaction.source.sample_initial)
+                    await self.archive.unified_db.get_sample(samples=palaction.source.sample_initial)
 
                 # dest can also contain ref samples, and these are not yet in the db
                 for dest_i, dest_sample in enumerate(palaction.dest.sample_initial):
                     if dest_sample.global_label is not None:
                         dest_tmp = \
-                            await self.db_get_sample([dest_sample])
+                            await self.archive.unified_db.get_sample(samples=[dest_sample])
                         if dest_tmp:
                             palaction.dest.sample_initial[dest_i] = \
                                 copy.deepcopy(dest_tmp[0])
@@ -698,14 +698,14 @@ class PAL:
                         sample_out.source = []
                         for part_i, part in enumerate(sample_out.parts):
                             if part.global_label is not None:
-                                tmp_part = await self.db_get_sample([part])
+                                tmp_part = await self.archive.unified_db.get_sample(samples=[part])
                                 sample_out.parts[part_i] = \
                                     copy.deepcopy(tmp_part[0])
                             else:
                                 # the assembly contains a ref sample which 
                                 # first need to be updated and converted
                                 part.sample_creation_timecode = palaction.continue_time
-                                tmp_part = await self.db_new_sample([part])
+                                tmp_part = await self.archive.unified_db.new_sample(samples=[part])
                                 sample_out.parts[part_i] = \
                                     copy.deepcopy(tmp_part[0])
                             # now add the real samples back to the source list
@@ -714,7 +714,7 @@ class PAL:
 
                 # -- (3) -- convert samples_out references to real sample
                 #           by adding them to the to db
-                palaction.sample_out = await self.db_new_sample(palaction.sample_out)
+                palaction.sample_out = await self.archive.unified_db.new_sample(samples=palaction.sample_out)
 
                 # -- (4) -- add palaction samples to action object
                 # add palaction sample_in out to main palcam
@@ -743,7 +743,7 @@ class PAL:
                     # if sample_out is an assembly we need to update its parts
                     if sample_out.sample_type == SampleType.assembly:
                         sample_out.parts = \
-                            await self.db_get_sample(sample_out.parts)
+                            await self.archive.unified_db.get_sample(samples=sample_out.parts)
                     # save it back to the db
                     await self.archive.unified_db.update_sample([sample_out])
 
@@ -1937,7 +1937,7 @@ class PAL:
 
         # update source and dest final samples
         palaction.source.sample_final = \
-             await self.db_get_sample(palaction.source.sample_initial)
+             await self.archive.unified_db.get_sample(samples=palaction.source.sample_initial)
         if palaction.dest.sample_final:
             # should always only contain one sample
             if palaction.dest.sample_final[0].global_label is None:
@@ -1949,7 +1949,7 @@ class PAL:
                 pass
             else:
                 palaction.dest.sample_final = \
-                      await self.db_get_sample(palaction.dest.sample_final)
+                      await self.archive.unified_db.get_sample(samples=palaction.dest.sample_final)
 
 
 
@@ -2197,7 +2197,7 @@ class PAL:
         self.base.print_message(f"PAL_sample_in: {self.IO_palcam.sample_in}")
         # update sample list with correct information from db if possible
         self.base.print_message("getting current sample information for all sample_in from db")
-        self.IO_palcam.sample_in = await self.db_get_sample(samples = self.IO_palcam.sample_in)
+        self.IO_palcam.sample_in = await self.archive.unified_db.get_sample(samples = self.IO_palcam.sample_in)
 
 
     async def _PAL_IOloop_meas_end_helper(self) -> None:
@@ -2230,20 +2230,6 @@ class PAL:
         self.base.print_message("PAL is done")
 
 
-    async def db_get_sample(
-                            self, 
-                            samples: List[SampleUnion]
-                           ) -> List[SampleUnion]:
-        return await self.archive.unified_db.get_sample(samples=samples)
-
-
-    async def db_new_sample(
-                            self, 
-                            samples: List[SampleUnion]
-                           ) -> List[SampleUnion]:
-        return await self.archive.unified_db.new_sample(samples=samples)
-    
-    
     async def method_arbitrary(self, A: Action) -> dict:
         palcam = PalCam(**A.action_params)
         palcam.sample_in = A.samples_in
