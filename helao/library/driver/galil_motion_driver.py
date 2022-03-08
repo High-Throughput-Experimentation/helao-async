@@ -2289,7 +2289,7 @@ class Aligner:
                                            value="", 
                                            title="x(mm)", 
                                            disabled=True, 
-                                           width=40, 
+                                           width=140, 
                                            height=40, 
                                            css_classes=["custom_input2"]
                                           )
@@ -2298,7 +2298,8 @@ class Aligner:
                                  TextInput(
                                            value="", 
                                            title="y(mm)", 
-                                           disabled=True, width=40, 
+                                           disabled=True,
+                                           width=140, 
                                            height=40, 
                                            css_classes=["custom_input2"]
                                           )
@@ -2318,7 +2319,7 @@ class Aligner:
                                                   value="", 
                                                   title="fraction", 
                                                   disabled=True, 
-                                                  width=120, 
+                                                  width=90, 
                                                   height=40, 
                                                   css_classes=["custom_input2"]
                                                  )
@@ -2350,12 +2351,12 @@ class Aligner:
                         self.marker_index[idx], 
                         self.marker_sample[idx]
                        ],
+                       self.marker_x[idx],
+                       self.marker_y[idx],
                        [
-                        self.marker_x[idx],
-                        self.marker_y[idx],
-                        self.marker_code[idx]
+                        self.marker_code[idx],
+                        self.marker_fraction[idx],
                        ],
-                       self.marker_fraction[idx],
                        Spacer(height=5),
                        self.marker_move_button[idx]
                        , width=(int)((self.totalwidth-4*5)/5)
