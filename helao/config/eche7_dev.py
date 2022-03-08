@@ -7,8 +7,8 @@ config = dict()
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
-#config["experiment_libraries"] = []
-#config["sequence_libraries"] = []
+config["experiment_libraries"] = ["SDC_exp"]
+# config["sequence_libraries"] = []
 config["technique_name"] = "sdc"
 config["root"] = r"C:\INST_dev2"
 # config["local_db_path"] = r"C:\INST_dev2\DATABASE"
@@ -43,13 +43,22 @@ config["servers"] = dict(
             enable_aligner = True,
             bokeh_port = 5003,
             cutoff = 6,
+            ref_plateid = 6353, # 63537
             # 4x6 plate
-            M_instr = [[1,0,0,-76.525],[0,1,0,-50.875],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
+            # x, y, z, 1
+            # M_plate are always x, y, 1
+            M_instr = [
+                       [1,0,0,0],
+                       [0,1,0,0],
+                       [0,0,1,0],
+                       [0,0,0,1]
+                       ], # instrument specific calibration
             count_to_mm=dict(
                 A=1.0/6396.87,
                 B=1.0/6390.30,
             ),
             galil_ip_str="192.168.200.236",
+            # galil_ip_str="192.168.200.234",
             def_speed_count_sec=10000,
             max_speed_count_sec=25000,
             ipstr="192.168.200.23",
@@ -58,8 +67,8 @@ config["servers"] = dict(
                 y="A",
                 ),
             axis_zero=dict(
-                A=70, #z
-                B=70.0, #y
+                A=76.8, #z
+                B=77.1, #y
                 ),
             timeout = 10*60, # timeout for axis stop in sec
         )
@@ -72,7 +81,7 @@ config["servers"] = dict(
         simulate=False,  # choose between simulator(default) or real device
         # cmd_print=False,
         params=dict(
-            allow_no_sample = True,
+            # allow_no_sample = True,
             dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
         ),
     ),
@@ -84,17 +93,37 @@ config["servers"] = dict(
         # cmd_print=False,
         params=dict(
             galil_ip_str="192.168.200.236",
+            # galil_ip_str="192.168.200.234",
             dev_ai = {
                 },
             dev_ao = {
                 },
             dev_di = {
-                "gamry":1,
+                "gamry_ttl0":1,
                 },
             dev_do = {
-                "led":7,
-                "gamry":1,
+                "gamry_aux":1,
+                "led":2,
+                "pump_ref_flush":3,
+                "doric_led1":4,
+                "unknown2":5,
+                "doric_led2":6,
+                "doric_led3":7,
+                "doric_led4":8,
                 },
+        )
+    ),
+    PAL=dict(
+        host=hostip,
+        port=8007,
+        group="action",
+        fast="pal_server",
+        params = dict(
+            positions = {
+                          "custom":{
+                                    "cell1_we":"cell",
+                                  }
+                        },
         )
     ),
     # #########################################################################
@@ -106,6 +135,7 @@ config["servers"] = dict(
         group="visualizer",
         bokeh="bokeh_modular_visualizer",
         params = dict(
+            doc_name = "ECHE7 Visualizer",
         )
     ),
 )
