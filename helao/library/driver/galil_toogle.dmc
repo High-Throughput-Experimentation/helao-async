@@ -21,11 +21,13 @@
 EN;                     'end program
 
 #toogle{subthread};                'toogle loop
+    AT 0
     CB {p_output};    'set output 0
     CB {p_output_gamry};    'set output 0
     AT {t_time_on};      'wait xy msec
     SB {p_output};    'set output 1
     SB {p_output_gamry};    'set output 1
-    AT -{t_time_off}-{t_time_on};      'at xy msec reset timer
+'    AT -{t_time_off}-{t_time_on};      'at xy msec reset timer
+    AT {t_time_off}+{t_time_on};      'at xy msec reset timer
     JP #toogle{subthread};     'repeat
 EN;                     'end thread
