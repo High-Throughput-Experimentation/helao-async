@@ -1565,8 +1565,6 @@ class TransformXY:
             self.Minv = np.matrix([[0, 0, 0], [0, 0, 0], [0, 0, -1]])
 
 
-
-
 class Aligner:
     def __init__(self, visServ: Vis, motor):
         self.vis = visServ
@@ -2223,7 +2221,7 @@ class Aligner:
                         [[
                          Spacer(width=20), 
                          Div(
-                             text="<b>load pltaer calib file:</b>",
+                             text="<b>load plate calib file:</b>",
                              width=200+50,
                              height=15
                             ),
@@ -2573,16 +2571,21 @@ class Aligner:
 
 
     def callback_calib_file_input(self, attr, old, new):
-        filecontent = base64.b64decode(new.encode('ascii')).decode('ascii')
-        try:
-            new_matrix = np.matrix(json.loads(filecontent))
-        except Exception as e:
-            self.vis.print_message(f"error loading matrix {e}",
-                                   error = True)
-            new_matrix = self.motor.dflt_matrix
-
-        self.vis.print_message(f"loaded matrix \n'{new_matrix}'")
-        self.motor.update_plate_transfermatrix(newtransfermatrix = new_matrix)
+        if self.motor.aligning_enabled:
+            filecontent = base64.b64decode(new.encode('ascii')).decode('ascii')
+            try:
+                new_matrix = np.matrix(json.loads(filecontent))
+            except Exception as e:
+                self.vis.print_message(f"error loading matrix {e}",
+                                       error = True)
+                new_matrix = self.motor.dflt_matrix
+    
+            self.vis.print_message(f"loaded matrix \n'{new_matrix}'")
+            self.motor.update_plate_transfermatrix(newtransfermatrix = new_matrix)
+        else:
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_status,"Error!\nAlign is invalid!")
+            )
 
 
     def callback_changed_motorstep(self, attr, old, new, sender):
