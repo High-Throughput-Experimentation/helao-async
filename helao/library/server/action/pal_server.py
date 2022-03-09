@@ -751,6 +751,8 @@ def makeApp(confPrefix, servKey):
         await active.enqueue_data_dflt(datadict = \
                                        {"unloaded": unloaded,
                                         "customs_dict": customs_dict})
+        first_unloaded_solid = [s for s in sample_out if s.sample_type=="solid"][0]
+        active.action.action_params.update({"_unloaded_solid": first_unloaded_solid})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
