@@ -19,7 +19,12 @@ from helao.library.driver.pal_driver import (
                                              SampleInheritance,
                                              SampleStatus
                                             ) 
-from helaocore.model.sample import LiquidSample, SampleUnion, NoneSample
+from helaocore.model.sample import (
+                                    SampleType,
+                                    LiquidSample, 
+                                    SampleUnion, 
+                                    NoneSample
+                                   )
 from helaocore.helper.make_str_enum import make_str_enum
 from helaocore.schema import Action
 
@@ -756,7 +761,9 @@ def makeApp(confPrefix, servKey):
         await active.enqueue_data_dflt(datadict = \
                                        {"unloaded": unloaded,
                                         "customs_dict": customs_dict})
-        first_unloaded_solid = [s for s in sample_out if s.sample_type=="solid"][0]
+        unloaded_solids = [s for s in samples_out if s.sample_type==SampleType.solid]
+        if unloaded_solids:
+            first_unloaded_solid = unloaded_solids[0]
         active.action.action_params.update({"_unloaded_solid": first_unloaded_solid})
         finished_act = await active.finish()
         return finished_act.as_dict()
@@ -903,21 +910,16 @@ def makeApp(confPrefix, servKey):
         If its the very first liquid (no source in database exists) 
         leave source and source_ml empty."""
         active = await app.base.setup_and_contain_action()
-        for sample in active.action.samples_in:
-            sample.action_uuid=[active.action.action_uuid]
-            sample.sample_creation_action_uuid = active.action.action_uuid
-            sample.sample_creation_experiment_uuid = active.action.experiment_uuid
-            sample.status=[SampleStatus.created]
-            sample.inheritance=SampleInheritance.receive_only
-
-        samples = await app.driver.archive.unified_db.new_sample(samples=active.action.samples_in)
+        samples = await app.driver.archive.create_samples(
+            reference_samples_in=active.action.samples_in,
+            action = active.action
+        )
         # clear samples_in and samples_out
         active.action.samples_in = []
         active.action.samples_out = []
         await active.append_sample(samples = samples,
                                    IO="out"
                                   )
-        
         await active.enqueue_data_dflt(datadict = \
                                        {'samples': [sample.as_dict() for sample in samples]})
         finished_action = await active.finish()
