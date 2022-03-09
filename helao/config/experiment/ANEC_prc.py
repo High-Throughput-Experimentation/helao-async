@@ -59,7 +59,7 @@ z_engage = 2.5
 z_seal = 4.5
 
 
-def ANEC_GC_preparation(pg_Obj: Experiment,
+def ANEC_GC_preparation(experiment: Experiment,
                         toolGC: Optional[str] = "HS 2",
                         source: Optional[str] = "cell1_we",
                         volume_ul_GC: Optional[int] = 300
@@ -73,13 +73,13 @@ def ANEC_GC_preparation(pg_Obj: Experiment,
     (5) Fill cell with liquid for 90 seconds
 
     Args:
-        pg_Obj (Experiment): Active experiment object supplied by Orchestrator
+        experiment (Experiment): Active experiment object supplied by Orchestrator
         toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
         volume_ul_GC: GC injection volume
         
     """
 
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
     ###### Drain cell and flush with CO2
 
@@ -418,7 +418,7 @@ def ANEC_GC_preparation(pg_Obj: Experiment,
 
 
 
-def ANEC_run_CA(pg_Obj: Experiment,
+def ANEC_run_CA(experiment: Experiment,
                         toolGC: Optional[str] = "HS 2",
                         toolarchive: Optional[str] = "LS 3",
                         source: Optional[str] = "cell1_we",
@@ -444,13 +444,13 @@ def ANEC_run_CA(pg_Obj: Experiment,
     (5) Drain cell and purge with CO2 for 60 seconds
 
     Args:
-        pg_Obj (Experiment): Active experiment object supplied by Orchestrator
+        experiment (Experiment): Active experiment object supplied by Orchestrator
         toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
         volume_ul_GC: GC injection volume
         
     """
 
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
     
 
     ###### Fill cell with liquid
@@ -817,7 +817,7 @@ def ANEC_run_CA(pg_Obj: Experiment,
     return sq.action_list
 
 
-def ANEC_cleanup(pg_Obj: Experiment):
+def ANEC_cleanup(experiment: Experiment):
     """Flush and purge ANEC cell
     
     (1) Drain cell and purge with CO2 for 10 seconds
@@ -827,13 +827,13 @@ def ANEC_cleanup(pg_Obj: Experiment):
     (5) Fill cell with liquid for 90 seconds
 
     Args:
-        pg_Obj (Experiment): Active experiment object supplied by Orchestrator
+        experiment (Experiment): Active experiment object supplied by Orchestrator
         toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
         volume_ul_GC: GC injection volume
         
     """
 
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
 
     ###### Fill cell with liquid
@@ -1058,7 +1058,7 @@ def ANEC_cleanup(pg_Obj: Experiment):
 
     return sq.action_list
 
-# def CA(pg_Obj: Experiment,
+# def CA(experiment: Experiment,
 #        CA_potential_V: Optional[float] = 0.0,
 #        CA_duration_sec: Optional[float] = 10.0,
 #        samplerate_sec: Optional[float] = 1.0,
@@ -1068,9 +1068,9 @@ def ANEC_cleanup(pg_Obj: Experiment):
     
 #     # todo, I will try to write a function which will do this later
 #     # I assume we need a base experiment class for this
-#     CA_potential_V = pg_Obj.experiment_params.get("CA_potential_V", CA_potential_V)
-#     CA_duration_sec = pg_Obj.experiment_params.get("CA_duration_sec", CA_duration_sec)
-#     samplerate_sec = pg_Obj.experiment_params.get("samplerate_sec", samplerate_sec)
+#     CA_potential_V = experiment.experiment_params.get("CA_potential_V", CA_potential_V)
+#     CA_duration_sec = experiment.experiment_params.get("CA_duration_sec", CA_duration_sec)
+#     samplerate_sec = experiment.experiment_params.get("samplerate_sec", samplerate_sec)
 
 
 
@@ -1079,7 +1079,7 @@ def ANEC_cleanup(pg_Obj: Experiment):
     
     
 #     # apply potential
-#     action_dict = pg_Obj.as_dict()
+#     action_dict = experiment.as_dict()
 #     action_dict.update({
 #         "action_server_name": f"{PSTAT_name}",
 #         "action_name": "run_CA",
@@ -1101,17 +1101,17 @@ def ANEC_cleanup(pg_Obj: Experiment):
 #     return action_list
 
 
-# def OCV_sqtest(pg_Obj: Experiment,
+# def OCV_sqtest(experiment: Experiment,
 #                OCV_duration_sec: Optional[float] = 10.0,
 #                samplerate_sec: Optional[float] = 1.0,
 #               ):
 
 #     """This is the description of the experiment which will be displayed
-#        in the operator webgui. For all function parameters (except pg_Obj)
+#        in the operator webgui. For all function parameters (except experiment)
 #        a input field will be (dynamically) presented in the OP webgui.""" 
     
     
-#     sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+#     sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
 #     sq.add_action(
 #         {
@@ -1133,7 +1133,7 @@ def ANEC_cleanup(pg_Obj: Experiment):
 #     return sq.action_list # returns complete action list to orch
 
 
-# def CA_sqtest(pg_Obj: Experiment,
+# def CA_sqtest(experiment: Experiment,
 #               Ewe_vs_RHE: Optional[float] = 0.0,
 #               Eref: Optional[float] = 0.2,
 #               pH: Optional[float] = 10.0,
@@ -1142,11 +1142,11 @@ def ANEC_cleanup(pg_Obj: Experiment):
 #               ):
 
 #     """This is the description of the experiment which will be displayed
-#        in the operator webgui. For all function parameters (except pg_Obj)
+#        in the operator webgui. For all function parameters (except experiment)
 #        a input field will be (dynamically) presented in the OP webgui.""" 
     
     
-#     sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+#     sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
 #     sq.add_action(
 #         {

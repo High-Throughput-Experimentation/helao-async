@@ -73,7 +73,7 @@ z_seal = 4.5
 debug_save_act = True
 debug_save_data = True
 
-def debug(pg_Obj: Experiment, 
+def debug(experiment: Experiment, 
              d_mm: Optional[str] = "1.0", 
              x_mm: Optional[float] = 0.0, 
              y_mm: Optional[float] = 0.0
@@ -93,7 +93,7 @@ def debug(pg_Obj: Experiment,
     # 3: (or other): orch is waiting for all action_dq to finish
 
     additional_local_var_added_to_sq = 12
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": PAL_server,
@@ -150,10 +150,10 @@ def debug(pg_Obj: Experiment,
 
 
 
-def ADSS_slave_unloadall_customs(pg_Obj: Experiment):
+def ADSS_slave_unloadall_customs(experiment: Experiment):
     """last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": PAL_server,
@@ -167,14 +167,14 @@ def ADSS_slave_unloadall_customs(pg_Obj: Experiment):
 
 
 def ADSS_slave_load_solid(
-                          pg_Obj: Experiment, 
+                          experiment: Experiment, 
                           solid_custom_position: Optional[str] = "cell1_we",
                           solid_plate_id: Optional[int] = 4534,
                           solid_sample_no: Optional[int] = 1
                          ):
     """last functionality test: 11/29/2021"""
     
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
     sq.add_action({
         "action_server": PAL_server,
         "action_name": "archive_custom_load",
@@ -191,13 +191,13 @@ def ADSS_slave_load_solid(
 
 
 def ADSS_slave_load_liquid(
-                          pg_Obj: Experiment, 
+                          experiment: Experiment, 
                           liquid_custom_position: Optional[str] = "elec_res1",
                           liquid_sample_no: Optional[int] = 1
                          ):
     """last functionality test: 11/29/2021"""
     
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
     sq.add_action({
         "action_server": PAL_server,
         "action_name": "archive_custom_load",
@@ -212,7 +212,7 @@ def ADSS_slave_load_liquid(
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_startup(pg_Obj: Experiment,
+def ADSS_slave_startup(experiment: Experiment,
               solid_custom_position: Optional[str] = "cell1_we",
               solid_plate_id: Optional[int] = 4534,
               solid_sample_no: Optional[int] = 1,
@@ -231,23 +231,23 @@ def ADSS_slave_startup(pg_Obj: Experiment,
     last functionality test: 11/29/2021"""
 
     
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
 
     # unload all samples from custom positions
-    sq.add_action_list(ADSS_slave_unloadall_customs(pg_Obj=pg_Obj))
+    sq.add_action_list(ADSS_slave_unloadall_customs(experiment=experiment))
 
 
     # load new requested samples 
     sq.add_action_list(ADSS_slave_load_solid(
-        pg_Obj=pg_Obj,
+        experiment=experiment,
         solid_custom_position = sq.pars.solid_custom_position,
         solid_plate_id = sq.pars.solid_plate_id, 
         solid_sample_no =sq.pars.solid_sample_no
         ))
     
     sq.add_action_list( ADSS_slave_load_liquid(
-        pg_Obj=pg_Obj,
+        experiment=experiment,
         liquid_custom_position = sq.pars.liquid_custom_position,
         liquid_sample_no =sq.pars.liquid_sample_no
         ))
@@ -277,7 +277,7 @@ def ADSS_slave_startup(pg_Obj: Experiment,
 
 
     # move z to home
-    sq.add_action_list(ADSS_slave_disengage(pg_Obj))
+    sq.add_action_list(ADSS_slave_disengage(experiment))
 
     # move to position
     sq.add_action({
@@ -295,12 +295,12 @@ def ADSS_slave_startup(pg_Obj: Experiment,
         })
 
     # seal cell
-    sq.add_action_list(ADSS_slave_engage(pg_Obj))
+    sq.add_action_list(ADSS_slave_engage(experiment))
 
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_shutdown(pg_Obj: Experiment):
+def ADSS_slave_shutdown(experiment: Experiment):
     """Slave experiment
     (1) Deep clean PAL tool
     (2) pump liquid out off cell
@@ -309,10 +309,10 @@ def ADSS_slave_shutdown(pg_Obj: Experiment):
     
     last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
     # deep clean
-    sq.add_action_list(ADSS_slave_clean_PALtool(pg_Obj, clean_tool = PALtools.LS3, clean_volume_ul = 500))
+    sq.add_action_list(ADSS_slave_clean_PALtool(experiment, clean_tool = PALtools.LS3, clean_volume_ul = 500))
     # sq.add_action({
     #     "action_server": PAL_server,
     #     "action_name": "PAL_deepclean",
@@ -349,7 +349,7 @@ def ADSS_slave_shutdown(pg_Obj: Experiment):
 
 
     # drain, TODO
-    # sq.add_action_list(ADSS_slave_drain(pg_Obj))
+    # sq.add_action_list(ADSS_slave_drain(experiment))
 
 
     # turn pump off
@@ -378,30 +378,30 @@ def ADSS_slave_shutdown(pg_Obj: Experiment):
 
     # move z to home
     # cannot do this without proper drain for now
-    # sq.add_action_list(ADSS_slave_disengage(pg_Obj))
+    # sq.add_action_list(ADSS_slave_disengage(experiment))
 
 
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_drain(pg_Obj: Experiment):
+def ADSS_slave_drain(experiment: Experiment):
     """DUMMY Slave experiment
     Drains electrochemical cell.
     
     last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
     # TODO
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_engage(pg_Obj: Experiment):
+def ADSS_slave_engage(experiment: Experiment):
     """Slave experiment
     Engages and seals electrochemical cell.
     
     last functionality test: 11/29/2021"""
     
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
     # engage
     sq.add_action({
@@ -436,13 +436,13 @@ def ADSS_slave_engage(pg_Obj: Experiment):
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_disengage(pg_Obj: Experiment):
+def ADSS_slave_disengage(experiment: Experiment):
     """Slave experiment
     Disengages and seals electrochemical cell.
     
     last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": MOTOR_server,
@@ -461,7 +461,7 @@ def ADSS_slave_disengage(pg_Obj: Experiment):
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_clean_PALtool(pg_Obj: Experiment, 
+def ADSS_slave_clean_PALtool(experiment: Experiment, 
                              clean_tool: Optional[str] = PALtools.LS3, 
                              clean_volume_ul: Optional[int] = 500
                              ):
@@ -471,7 +471,7 @@ def ADSS_slave_clean_PALtool(pg_Obj: Experiment,
     last functionality test: 11/29/2021"""
 
 
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
     
     # deep clean
     sq.add_action({
@@ -487,11 +487,11 @@ def ADSS_slave_clean_PALtool(pg_Obj: Experiment,
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_fillfixed(pg_Obj: Experiment, 
+def ADSS_slave_fillfixed(experiment: Experiment, 
                          fill_vol_ul: Optional[int] = 10000,
                          filltime_sec: Optional[float] = 10.0
                          ):
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
     # fill liquid, no wash (assume it was cleaned before)
     sq.add_action({
@@ -547,8 +547,8 @@ def ADSS_slave_fillfixed(pg_Obj: Experiment,
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_fill(pg_Obj: Experiment, fill_vol_ul: Optional[int] = 1000):
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+def ADSS_slave_fill(experiment: Experiment, fill_vol_ul: Optional[int] = 1000):
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
     # fill liquid, no wash (assume it was cleaned before)
     sq.add_action({
@@ -570,7 +570,7 @@ def ADSS_slave_fill(pg_Obj: Experiment, fill_vol_ul: Optional[int] = 1000):
     return sq.action_list # returns complete action list to orch
 
 
-def ADSS_slave_CA(pg_Obj: Experiment,
+def ADSS_slave_CA(experiment: Experiment,
               CA_potential: Optional[float] = 0.0,
               ph: float = 9.53,
               ref_vs_nhe: float = 0.21,
@@ -581,7 +581,7 @@ def ADSS_slave_CA(pg_Obj: Experiment,
               ):
     """last functionality test: 11/29/2021"""
     
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
     # get sample for gamry
     sq.add_action({
@@ -710,7 +710,7 @@ def ADSS_slave_CA(pg_Obj: Experiment,
 
 
 def ADSS_slave_tray_unload(
-                     pg_Obj: Experiment,
+                     experiment: Experiment,
                      tray: Optional[int] = 2,
                      slot: Optional[int] = 1,
                      survey_runs: Optional[int] = 1,
@@ -730,7 +730,7 @@ def ADSS_slave_tray_unload(
     rack: position of the tray in the icpms instrument, usually 2.
     """
     
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": PAL_server,
