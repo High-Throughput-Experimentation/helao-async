@@ -2,11 +2,10 @@ hostip = "127.0.0.1"
 config = dict()
 
 # action library provides generator functions which produce actions
-config["experiment_libraries"] = ["ANEC_prc"]
+config["experiment_libraries"] = ["ANEC_prc", "samples_exp"]
 config["sequence_libraries"] = ["ANEC_seq"]
 config["technique_name"] = "anec"
 config["root"] = r"C:\INST_dev2"
-# config["local_db_path"] = r"C:\INST_dev2\DATABASE"
 
 
 # we define all the servers here so that the overview is a bit better
@@ -27,28 +26,22 @@ config["servers"] = dict(
     ##########################################################################
     # Instrument Servers
     ##########################################################################
-    # DATA=dict(
-    #     host=hostip,
-    #     port=8002,
-    #     group="action",
-    #     fast="HTEdata_server",
-    #     mode="legacy",  # lagcy; modelyst
-    #     params=dict(
-    #     ),
-    # ),
     MOTOR=dict(
         host=hostip,
         port=8003,
         group="action",
         fast="galil_motion",
         params=dict(
-            Transfermatrix = [[1,0,0],[0,1,0],[0,0,1]], # default Transfermatrix for plate calibration
-            
-            # 4x6 plate, FIXME
-            #M_instr = [[1,0,0,-76.525],[0,1,0,-50.875],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
-            # 100mm wafer, FIXME
-            M_instr = [[1,0,0,-76.525+(3*25.4-50)-0.5+0.75+1.5+0.25],[0,1,0,-50.875+2.71+5-3+1],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
-
+            enable_aligner = True,
+            bokeh_port = 5003,
+            # backup if f"{gethostname()}_instrument_calib.json" is not found
+            # instrument specific calibration
+            M_instr = [
+                       [1,0,0,0],
+                       [0,1,0,0],
+                       [0,0,1,0],
+                       [0,0,0,1]
+                       ],
             count_to_mm=dict(
                 A=1.0/16282.23,
                 B=1.0/6397.56,
@@ -81,18 +74,6 @@ config["servers"] = dict(
             dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
         ),
     ),
-    # aligner=dict(
-    #     host=hostip,
-    #     port=8005,
-    #     group="action",
-    #     fast="alignment_server",
-    #     params=dict(
-    #         data_server="data",  # will use this to get PM_map temporaily, else need to parse it as JSON later
-    #         motor_server="motor",  # will use this to get PM_map temporaily, else need to parse it as JSON later
-    #         vis_server="aligner_vis",  # will use this to get PM_map temporaily, else need to parse it as JSON later
-    #         cutoff=6,  # cutoff of digits for TransferMatrix calculation
-    #     ),
-    # ),
     NI=dict(
         host="127.0.0.1",
         port=8006,
@@ -104,7 +85,6 @@ config["servers"] = dict(
                 'PeriPump2':'cDAQ1Mod1/port0/line7',
                 'Direction':'cDAQ1Mod1/port0/line8',
                 },
-
             dev_gasvalve = {
                 "CO2":"cDAQ1Mod1/port0/line0",
                 "Ar":"cDAQ1Mod1/port0/line2",
@@ -162,24 +142,13 @@ config["servers"] = dict(
     # #########################################################################
     # Visualizers (bokeh servers)
     # #########################################################################
-    VIS=dict(#simple dumb modular visualizer
+    VIS=dict(
         host=hostip,
         port=5001,
         group="visualizer",
         bokeh="bokeh_modular_visualizer",
         params = dict(
             doc_name = "ANEC Visualizer",
-            # ws_nidaqmx="NI",
-            ws_potentiostat = 'PSTAT',
         )
     ),
-    # aligner_vis=dict(
-    #     host=hostip,
-    #     port=5003,
-    #     group="action",
-    #     bokeh="bokeh_platealigner",
-    #     params=dict(
-    #         aligner_server="aligner",  # aligner and aligner_vis should be in tandem
-    #     ),
-    # ),
 )

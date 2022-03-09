@@ -333,6 +333,15 @@ class Galil:
             return "error"
 
 
+    async def stop_aligner(self) -> ErrorCodes:
+        if self.aligner_enabled \
+        and self.aligner:
+            self.aligner.stop_align()
+            return ErrorCodes.none
+        else:
+            return ErrorCodes.not_available
+
+
     async def run_aligner(self, A: Action):
         if not self.blocked:
             if not self.aligner_enabled \
@@ -2387,10 +2396,12 @@ class Aligner:
         ######################################################################
         self.plot_mpmap = figure(
                                  title="PlateID", 
-                                 height=300,
+                                 # height=300,
                                  x_axis_label="X (mm)",
                                  y_axis_label="Y (mm)",
-                                 width = self.totalwidth
+                                 width = self.totalwidth,
+                                 aspect_ratio  = 6/4,#1,
+                                 aspect_scale = 1
                                 )
 
         self.plot_mpmap.square(
@@ -2715,6 +2726,12 @@ class Aligner:
         asyncio.gather(
             self.finish_alignment(self.initial_plate_transfermatrix,ErrorCodes.none)
         )
+    
+    
+    def stop_align(self):
+        asyncio.gather(
+            self.finish_alignment(self.motor.plate_transfermatrix,ErrorCodes.stop)
+        )        
     
     
     def clicked_buttonsel(self, idx):
