@@ -1,6 +1,7 @@
 
 __all__ = [
-           "create_liquid", 
+           "create_liquid_sample",
+           "create_gas_sample",
           ]
 
 
@@ -10,7 +11,6 @@ from socket import gethostname
 from helaocore.schema import Experiment, ActionPlanMaker
 from helaocore.model.action_start_condition import ActionStartCondition
 from helaocore.model.sample import (
-                                    SolidSample,
                                     LiquidSample,
                                     GasSample
                                    )
@@ -25,16 +25,17 @@ PAL_server = MachineModel(
              ).json_dict()
 
 
-def create_liquid(experiment: Experiment, 
-                  volume_ml: Optional[float] = 1.0, 
-                  source: Optional[List[str]] = ["source1","source2"],
-                  mass:  Optional[List[str]] = ["mass1","mass2"],
-                  chemical: Optional[List[str]] = ["chemical1","chemical2"],
-                  supplier: Optional[List[str]] = ["supplier1","supplier2"],
-                  lot_number: Optional[List[str]] = ["lot1","lot2"],
-                  comment: Optional[str] = "comment"
-                 ):
-    """creates a custom liquid sample"""
+def create_liquid_sample(experiment: Experiment, 
+                         volume_ml: Optional[float] = 1.0, 
+                         source: Optional[List[str]] = ["source1","source2"],
+                         mass:  Optional[List[str]] = ["mass1","mass2"],
+                         chemical: Optional[List[str]] = ["chemical1","chemical2"],
+                         supplier: Optional[List[str]] = ["supplier1","supplier2"],
+                         lot_number: Optional[List[str]] = ["lot1","lot2"],
+                         comment: Optional[str] = "comment"
+                        ):
+    """creates a custom liquid sample
+       input fields contain json strings"""
     sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
     sq.add_action({
@@ -43,6 +44,41 @@ def create_liquid(experiment: Experiment,
         "action_params": {
                           "fast_samples_in": 
                               [LiquidSample(**{
+                                              "machine_name":gethostname(),
+                                              "source": sq.pars.source,
+                                              "volume_ml": sq.pars.volume_ml,
+                                              "chemical": sq.pars.chemical,
+                                              "mass": sq.pars.mass,
+                                              "supplier": sq.pars.supplier,
+                                              "lot_number": sq.pars.lot_number,
+                                              "comment": sq.pars.comment,
+                             })],
+                          },
+        "start_condition": ActionStartCondition.wait_for_all,
+        })
+
+    return sq.action_list # returns complete action list to orch
+
+
+def create_gas_sample(experiment: Experiment, 
+                      volume_ml: Optional[float] = 1.0, 
+                      source: Optional[List[str]] = ["source1","source2"],
+                      mass:  Optional[List[str]] = ["mass1","mass2"],
+                      chemical: Optional[List[str]] = ["chemical1","chemical2"],
+                      supplier: Optional[List[str]] = ["supplier1","supplier2"],
+                      lot_number: Optional[List[str]] = ["lot1","lot2"],
+                      comment: Optional[str] = "comment"
+                     ):
+    """creates a custom gas sample
+       input fields contain json strings"""
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+
+    sq.add_action({
+        "action_server": PAL_server,
+        "action_name": "db_new_sample",
+        "action_params": {
+                          "fast_samples_in": 
+                              [GasSample(**{
                                               "machine_name":gethostname(),
                                               "source": sq.pars.source,
                                               "volume_ml": sq.pars.volume_ml,

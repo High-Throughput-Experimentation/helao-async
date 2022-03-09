@@ -1561,12 +1561,12 @@ class Archive():
 
 
 
-        # update all sample in the db
+        # update all samples_out in the db
         await self.unified_db.update_sample(
             samples = samples_out
         )
 
-        # update all sample in the db
+        # update all samples_in in the db
         await self.unified_db.update_sample(
             samples = samples_in
         )
@@ -1646,4 +1646,41 @@ class Archive():
         )
         
         return ret_samples
-                                        
+
+
+    async def create_samples(
+                             self, 
+                             reference_samples_in: List[SampleUnion],
+                             action: Action = None
+                            ) -> List[SampleUnion]:
+        """creates new samples in the db from provided refernces samples"""
+        samples_out = []
+
+        if action is None:
+            self.base.print_message("no action defined", error = True)
+            return samples_out
+
+        for sample in reference_samples_in:
+            sample.action_uuid=[action.action_uuid]
+            sample.sample_creation_action_uuid = action.action_uuid
+            sample.sample_creation_experiment_uuid = action.experiment_uuid
+            sample.status=[SampleStatus.created]
+            sample.inheritance=SampleInheritance.receive_only
+            # need to update the parts of an assembly first
+            if sample.sample_type == SampleType.assembly:
+                sample.parts = await self.unified_db.get_sample(
+                    samples=sample.parts
+                )
+                for part in sample.parts:
+                    part.status = [SampleStatus.incorporated]
+                    part.inheritance=SampleInheritance.allow_both
+                    part.action_uuid=[action.action_uuid]
+                # now write all samples back to the db
+                # update all sample in the db
+                await self.unified_db.update_sample(
+                    samples = sample.parts
+                )
+
+        samples_out = await self.unified_db.new_sample(samples=reference_samples_in)
+
+        return samples_out
