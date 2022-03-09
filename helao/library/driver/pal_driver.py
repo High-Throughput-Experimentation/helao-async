@@ -688,7 +688,7 @@ class PAL:
                     # destroyed: destination was waste or injector
                     # for newly created samples
                     if SampleStatus.destroyed in sample_out.status:
-                        sample_out.zero_volume()
+                        sample_out.destroy_sample()
 
 
                     # if sample_out is an assembly we need to update its parts
