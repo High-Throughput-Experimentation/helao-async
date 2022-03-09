@@ -60,7 +60,7 @@ def ANEC_normal_state(
     - WE chamber CO2 inlet valve is ON (open).
 
     Args:
-        exp (Experiment): Experiment object provided by Orch
+        experiment (Experiment): Experiment object provided by Orch
     """
 
     apm = ActionPlanMaker(experiment)
@@ -251,7 +251,7 @@ def ANEC_load_solid(
     apm.add_action_list(ANEC_drain_cell(experiment))
     apm.add_action_list(
         ANEC_flush_fill_cell(
-            exp=exp,
+            experiment=experiment,
             reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
         )
     )
