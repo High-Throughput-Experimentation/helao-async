@@ -5,51 +5,36 @@ server_key must be a FastAPI action server defined in config
 """
 
 __all__ = [
-           "ANEC_GC_preparation",
-           "ANEC_cleanup",
-           "ANEC_run_CA",
-         #   "OCV_sqtest",
-         #   "CA_sqtest"
-          ]
+    "ANEC_drain_cell",
+    "ANEC_flush_fill_cell",
+    "ANEC_load_solid",
+    "ANEC_unload_cell",
+    "ANEC_unload_liquid",
+    "ANEC_normal_state",
+    "ANEC_GC_preparation",
+    "ANEC_cleanup",
+    "ANEC_run_CA",
+]
 
 ###
 from socket import gethostname
-from typing import Optional, List, Union
+from typing import Optional, List
 
-from helaocore.schema import Action, Experiment, ActionPlanMaker
+from helaocore.schema import Experiment, ActionPlanMaker
 from helaocore.model.action_start_condition import ActionStartCondition
 from helao.library.driver.pal_driver import Spacingmethod, PALtools
-from helaocore.model.sample import (
-                                    SolidSample,
-                                    LiquidSample
-                                   )
+from helaocore.model.sample import SolidSample, LiquidSample
 from helaocore.model.machine import MachineModel
 
-# list valid experiment functions 
+# list valid experiment functions
 EXPERIMENTS = __all__
 
-PSTAT_name = MachineModel(
-                server_name = "PSTAT",
-                machine_name = gethostname()
-             ).json_dict()
-
-MOTOR_name = MachineModel(
-                server_name = "MOTOR",
-                machine_name = gethostname()
-             ).json_dict()
-
-NI_name = MachineModel(
-                server_name = "NI",
-                machine_name = gethostname()
-             ).json_dict()
-ORCH_name = MachineModel(
-                server_name = "ORCH",
-                machine_name = gethostname()
-             ).json_dict()
-PAL_name = MachineModel(
-                server_name = "PAL",
-                machine_name = gethostname()
-             ).json_dict()
+ORCH_HOST = gethostname()
+PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).json_dict()
+MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).json_dict()
+NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).json_dict()
+ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).json_dict()
+PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).json_dict()
 
 # z positions for ADSS cell
 z_home = 0.0
@@ -59,384 +44,245 @@ z_engage = 2.5
 z_seal = 4.5
 
 
-def ANEC_GC_preparation(pg_Obj: Experiment,
-                        toolGC: Optional[str] = "HS 2",
-                        source: Optional[str] = "cell1_we",
-                        volume_ul_GC: Optional[int] = 300
-                        ):
-    """Flush and purge ANEC cell
-    
-    (1) Drain cell and purge with CO2 for 10 seconds
-    (2) Fill cell with liquid for 90 seconds
-    (3) Equilibrate for 15 seconds
-    (4) Drain cell and purge with CO2 for 60 seconds
-    (5) Fill cell with liquid for 90 seconds
+def ANEC_normal_state(
+    exp: Experiment,
+):
+    """Set ANEC to 'normal' state.
+
+    All experiments begin and end in the following 'normal' state:
+    - Counter electrode (CE) chamber recirculation pump is ON.
+    - Working electrode (WE) chamber outlet pump is ON.
+    - CE chamber recirculation pump direction is ON (forward).
+    - WE chamber liquid drain valve is ON (open).
+    - WE chamber liquid fill valve is OFF (closed).
+    - Liquid reservoir valve is OFF (closed).
+    - WE chamber gas flow-through valve is OFF (closed).
+    - WE chamber CO2 inlet valve is ON (open).
 
     Args:
-        pg_Obj (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
-        
+        exp (Experiment): Experiment object provided by Orch
     """
 
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
-
-    ###### Drain cell and flush with CO2
-
-    # step 1
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "PeriPump1",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 2
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "Direction",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 3
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "down",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 4
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gas_valve": "CO2",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 5
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "PeriPump2",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 6
-    sq.add_action({
-        "action_server": f"{ORCH_name}",
-        "action_name": "wait",
-        "action_params": {
-                        "waittime":10,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-
-    ###### Fill cell with liquid
-
-    # step 7
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "down",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 8
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "up",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 9
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "Direction",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 10
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "CO2",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 11
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "liquid",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 12
-    sq.add_action({
-        "action_server": f"{ORCH_name}",
-        "action_name": "wait",
-        "action_params": {
-                        "waittime":90,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-
-    ###### Equilibration
-
-    # step 13
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "liquid",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 14
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "CO2",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 15
-    sq.add_action({
-        "action_server": f"{ORCH_name}",
-        "action_name": "wait",
-        "action_params": {
-                        "waittime":15,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-
-    # step 16
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "atm",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 17
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "up",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 18
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "PeriPump2",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 19
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "CO2",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 20
-    sq.add_action({
-        "action_server": f"{ORCH_name}",
-        "action_name": "wait",
-        "action_params": {
-                        "waittime":1,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-
-    # step 21
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "atm",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 22
-    sq.add_action({
-        "action_server": f"{ORCH_name}",
-        "action_name": "wait",
-        "action_params": {
-                        "waittime":60,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-
-    ###### Drain cell and flush with CO2
-
-    # step 23
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "PeriPump1",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 24
-    sq.add_action({
-        "action_server": f"{PAL_name}",
-        "action_name": "PAL_ANEC_GC",
-        "action_params": {
-            "toolGC": PALtools(toolGC),
-            "source": source,
-            "volume_ul_GC": volume_ul_GC,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 25
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "PeriPump1",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 26
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "Direction",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 27
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "down",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 28
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "CO2",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 29
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "PeriPump2",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 30
-    sq.add_action({
-        "action_server": f"{ORCH_name}",
-        "action_name": "wait",
-        "action_params": {
-                        "waittime":90,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-
-    return sq.action_list
+    apm = ActionPlanMaker(exp)
+    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "PeriPump2", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquid_valve": "down", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquid_valve": "up", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "liquid", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gas_valve": "atm", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gas_valve": "CO2", "on": 1})
+    return apm.action_list
 
 
+def ANEC_flush_fill_cell(
+    exp: Experiment,
+    liquid_flush_time: Optional[float] = 90,
+    co2_purge_time: Optional[float] = 15,
+    equilibration_time: Optional[float] = 1,
+    reservoir_liquid_sample_no: Optional[int] = 0,
+    volume_ul_cell_liquid: Optional[int] = 1000,
+):
+    """Add liquid volume to cell position.
 
-def ANEC_run_CA(pg_Obj: Experiment,
-                        toolGC: Optional[str] = "HS 2",
-                        toolarchive: Optional[str] = "LS 3",
-                        source: Optional[str] = "cell1_we",
-                        volume_ul_GC: Optional[int] = 300,
-                        volume_ul_archive: Optional[int] = 500,
-                        wash1: Optional[bool] = True,
-                        wash2: Optional[bool] = True,
-                        wash3: Optional[bool] = True,
-                        wash4: Optional[bool] = False,
-                        Vval: Optional[float] = 0.0,
-                        Tval: Optional[float] = 10.0,
-                        SampleRate: Optional[float] = 0.01,
-                        TTLwait: Optional[int] = -1,
-                        TTLsend: Optional[int] = -1,
-                        IErange: Optional[str]= 'auto'
-                        ):
+    (1) create liquid sample using volume_ul_cell and liquid_sample_no
+    """
+
+    apm = ActionPlanMaker(exp)
+
+    # Wait for 10 seconds to equilibrate normal state
+    apm.add(ORCH_server, "wait", {"waittime": 10})
+    # Fill cell with liquid
+    apm.add(NI_server, "liquidvalve", {"liquid_valve": "down", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquid_valve": "up", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "Direction", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "liquid", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.liquid_flush_time})
+    # Stop flow and start CO2 purge
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "liquid", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2_purge_time})
+    # Open headspace flow-through, stop purge
+    apm.add(NI_server, "gasvalve", {"gasvalve": "atm", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "up", "on": 0})
+    apm.add(NI_server, "pump", {"pump": "PeriPump2", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 0})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.equilibration_time})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "atm", "on": 0})
+    # Equilibrate for 1 minute
+    apm.add(ORCH_server, "wait", {"waittime": 60})
+    # (3) Create liquid sample and add to assembly
+    apm.add(
+        PAL_server,
+        "archive_custom_add_liquid",
+        {
+            "custom": "cell1_we",
+            "source_liquid_in": LiquidSample(
+                sample_no=apm.pars.reservoir_liquid_sample_no, machine_name=ORCH_HOST
+            ).dict(),
+            "volume_ml": apm.pars.volume_ul_cell_liquid,
+            "combine_liquids": True,
+            "dilute_liquids": True,
+        },
+    )
+    # TODO: perhaps we don't want to end in normal state
+    apm.add_action_list(ANEC_normal_state(exp))
+    return apm.action_list
+
+
+def ANEC_unload_cell(exp: Experiment):
+    """Unload Sample at 'cell1_we' position."""
+
+    apm = ActionPlanMaker(exp)
+    apm.add(PAL_server, "archive_custom_unloadall", {})
+    return apm.action_list
+
+
+def ANEC_unload_liquid(exp: Experiment):
+    """Unload liquid sample at 'cell1_we' position and reload solid sample."""
+
+    apm = ActionPlanMaker(exp)
+    apm.add(
+        PAL_server, "archive_custom_unloadall", {}, to_global_params=["_unloaded_solid"]
+    )
+    apm.add(
+        PAL_server,
+        "archive_custom_load",
+        {"custom": "cell1_we"},
+        from_global_params={"_unloaded_solid": "load_sample_in"},
+    )
+    return apm.action_list
+
+
+def ANEC_drain_cell(
+    exp: Experiment,
+    co2_purge_time: Optional[float] = 10.0,
+):
+    """Drain liquid from cell and unload liquid sample."""
+
+    apm = ActionPlanMaker(exp)
+    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquid_valve": "down", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "PeriPump2", "on": 1})
+    apm.add_action_list(ANEC_unload_liquid(exp))
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2_purge_time})
+    apm.add_action_list(ANEC_normal_state(exp))
+    return apm.action_list
+
+
+def ANEC_cleanup(
+    exp: Experiment,
+    reservoir_liquid_sample_no: Optional[int] = 0,
+):
+    """Flush and purge ANEC cell.
+
+    (1) Flush/fill cell
+    (2) Drain cell
+
+    Args:
+        exp (Experiment): Active experiment object supplied by Orchestrator
+        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
+        volume_ul_GC: GC injection volume
+
+    """
+
+    apm = ActionPlanMaker(exp)  # exposes function parameters via apm.pars
+    apm.add_action_list(
+        ANEC_flush_fill_cell(
+            exp=exp,
+            reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
+        )
+    )
+    apm.add_action_list(ANEC_drain_cell(exp))
+    return apm.action_list
+
+
+def ANEC_GC_preparation(
+    exp: Experiment,
+    toolGC: Optional[str] = "HS 2",
+    volume_ul_GC: Optional[int] = 300,
+):
+    """Sample headspace in cell1_we and inject into GC
+
+    Args:
+        exp (Experiment): Active experiment object supplied by Orchestrator
+        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
+        volume_ul_GC: GC injection volume
+
+    """
+
+    apm = ActionPlanMaker(exp)  # exposes function parameters via apm.pars
+    apm.add(
+        PAL_server,
+        "PAL_ANEC_GC",
+        {
+            "toolGC": PALtools(apm.pars.toolGC),
+            "source": "cell1_we",
+            "volume_ul_GC": apm.pars.volume_ul_GC,
+        },
+    )
+    return apm.action_list
+
+
+def ANEC_load_solid(
+    exp: Experiment,
+    solid_plate_id: Optional[int] = 0,
+    solid_sample_no: Optional[int] = 0,
+    reservoir_liquid_sample_no: Optional[int] = 0,
+    equilibration_time: Optional[float] = 60,
+):
+    """Load solid and clean cell."""
+
+    apm = ActionPlanMaker(exp)
+    apm.add_action_list(ANEC_unload_cell(exp))
+    apm.add(
+        PAL_server,
+        "archive_custom_load",
+        {
+            "custom": "cell1_we",
+            "load_sample_in": SolidSample(
+                sample_no=apm.pars.solid_sample_no,
+                plate_id=apm.pars.solid_plate_id,
+                machine_name="legacy",
+            ).dict(),
+        },
+    )
+    apm.add_action_list(ANEC_drain_cell(exp))
+    apm.add_action_list(
+        ANEC_flush_fill_cell(
+            exp=exp,
+            reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
+        )
+    )
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.equilibration_time})
+    # TODO: still needed? flush/fill results in normal state
+    apm.add_action_list(ANEC_drain_cell(exp))
+    return apm.action_list
+
+
+def ANEC_run_CA(
+    exp: Experiment,
+    toolGC: Optional[str] = "HS 2",
+    toolarchive: Optional[str] = "LS 3",
+    source: Optional[str] = "cell1_we",
+    volume_ul_GC: Optional[int] = 300,
+    volume_ul_archive: Optional[int] = 500,
+    wash1: Optional[bool] = True,
+    wash2: Optional[bool] = True,
+    wash3: Optional[bool] = True,
+    wash4: Optional[bool] = False,
+    Vval: Optional[float] = 0.0,
+    Tval: Optional[float] = 10.0,
+    SampleRate: Optional[float] = 0.01,
+    TTLwait: Optional[int] = -1,
+    TTLsend: Optional[int] = -1,
+    IErange: Optional[str] = "auto",
+):
     """Flush and purge ANEC cell
-    
+
     (1) Fill cell with liquid for 90 seconds
     (2) Equilibrate for 15 seconds
     (3) run CA
@@ -444,726 +290,382 @@ def ANEC_run_CA(pg_Obj: Experiment,
     (5) Drain cell and purge with CO2 for 60 seconds
 
     Args:
-        pg_Obj (Experiment): Active experiment object supplied by Orchestrator
+        exp (Experiment): Active experiment object supplied by Orchestrator
         toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
         volume_ul_GC: GC injection volume
-        
+
     """
 
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
-    
-
-    ###### Fill cell with liquid
-
-    # step 1
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "down",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 2
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "up",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 3
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "Direction",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 4
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "CO2",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 5
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "liquid",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 6
-    sq.add_action({
-        "action_server": f"{ORCH_name}",
-        "action_name": "wait",
-        "action_params": {
-                        "waittime":90,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-
-    ###### Equilibration
-
-    # step 7
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "liquid",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 8
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "CO2",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 9
-    sq.add_action({
-        "action_server": f"{ORCH_name}",
-        "action_name": "wait",
-        "action_params": {
-                        "waittime":15,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-
-    # step 10
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "atm",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 11
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "up",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 12
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "PeriPump2",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 13
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "CO2",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 14
-    sq.add_action({
-        "action_server": f"{ORCH_name}",
-        "action_name": "wait",
-        "action_params": {
-                        "waittime":1,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-
-    # step 15
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "atm",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    #start echem
-    # step 16
-    sq.add_action({
-        "action_server": f"{PSTAT_name}",
-        "action_name": "run_CA",
-        "action_params": {
-                        "Vval": Vval,
-                        "Tval": Tval,
-                       " SampleRate": SampleRate,
-                        "TTLwait": TTLwait,
-                        "TTLsend": TTLsend,
-                        "IErange": IErange
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-
-    ###### mixing and taking aliquot
-    # step 17
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "Direction",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-    
-    # step 18
-    sq.add_action({
-        "action_server": f"{PSTAT_name}",
-        "action_name": "run_CA",
-        "action_params": {
-                        "waittime":60,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-    
-    # step 19
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "Direction",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-    
-    # step 20
-    sq.add_action({
-        "action_server": f"{PSTAT_name}",
-        "action_name": "run_CA",
-        "action_params": {
-                        "waittime":30,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-    
-    # step 21
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "Direction",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-    
-    # step 22
-    sq.add_action({
-        "action_server": f"{PSTAT_name}",
-        "action_name": "run_CA",
-        "action_params": {
-                        "waittime":60,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-    
-    # step 23
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "Direction",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-    
-    # step 24
-    sq.add_action({
-        "action_server": f"{PSTAT_name}",
-        "action_name": "run_CA",
-        "action_params": {
-                        "waittime":30,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-    # step 25
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "PeriPump1",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 26
-    sq.add_action({
-        "action_server": f"{PAL_name}",
-        "action_name": "PAL_ANEC_aliquot",
-        "action_params": {
-            "toolGC": PALtools(toolGC),
-            "toolarchive": PALtools(toolarchive),
-            "source": source,
-            "volume_ul_GC": volume_ul_GC,
-            "volume_ul_archive": volume_ul_archive,
-            "wash1": wash1,
-            "wash2": wash2,
-            "wash3": wash3,
-            "wash4": wash4,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-    
-    # drain the cell and flush with CO2
-    # step 27
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "PeriPump1",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 28
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "Direction",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 29
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "down",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 30
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "CO2",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 31
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "PeriPump2",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 32
-    sq.add_action({
-        "action_server": f"{ORCH_name}",
-        "action_name": "wait",
-        "action_params": {
-                        "waittime":90,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-
-    return sq.action_list
+    apm = ActionPlanMaker(exp)  # exposes function parameters via apm.pars
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {"custom": "cell1_we"},
+        to_global_params=["_fast_sample_in"],
+    )
+    apm.add(
+        PSTAT_server,
+        "run_CA",
+        {
+            "Vval": apm.pars.Vval,
+            "Tval": apm.pars.Tval,
+            "SampleRate": apm.pars.SampleRate,
+            "TTLwait": apm.pars.TTLwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": apm.pars.TTLsend,  # -1 disables, else select TTL 0-3
+            "IErange": apm.pars.IErange,
+        },
+        from_global_params={"_fast_sample_in": "fast_samples_in"},
+    )
+    apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": 60})
+    apm.add(NI_server, "pump", {"pump": "Direction", "on": 0})
+    apm.add(ORCH_server, "wait", {"waittime": 30})
+    apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": 60})
+    apm.add(NI_server, "pump", {"pump": "Direction", "on": 0})
+    apm.add(ORCH_server, "wait", {"waittime": 30})
+    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 0})
+    apm.add(
+        PAL_server,
+        "PAL_ANEC_aliquot",
+        {
+            "toolGC": apm.pars.toolGC,
+            "toolarchive": apm.pars.toolarchive,
+            "source": "cell1_we",
+            "volume_ul_GC": apm.pars.volume_ul_GC,
+            "volume_ul_archive": apm.pars.volume_ul_archive,
+            "wash1": apm.pars.wash1,
+            "wash2": apm.pars.wash2,
+            "wash3": apm.pars.wash3,
+            "wash4": apm.pars.wash4,
+        },
+    )
+    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
+    apm.add_action_list(ANEC_unload_liquid(exp))
+    apm.add_action_list(ANEC_normal_state(exp))
+    return apm.action_list
 
 
-def ANEC_cleanup(pg_Obj: Experiment):
-    """Flush and purge ANEC cell
-    
-    (1) Drain cell and purge with CO2 for 10 seconds
-    (2) Fill cell with liquid for 90 seconds
-    (3) Equilibrate for 15 seconds
-    (4) Drain cell and purge with CO2 for 60 seconds
-    (5) Fill cell with liquid for 90 seconds
+# def ANEC_slave_engage(exp: Experiment):
+#     """Slave experiment
+#     Engages and seals electrochemical cell.
 
-    Args:
-        pg_Obj (Experiment): Active experiment object supplied by Orchestrator
-        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
-        volume_ul_GC: GC injection volume
-        
-    """
+#     last functionality test: untested"""
 
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+#     apm = ActionPlanMaker(exp)  # exposes function parameters via apm.pars
 
-
-    ###### Fill cell with liquid
-
-    # step 1
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "down",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 2
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "up",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 3
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "Direction",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 4
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "CO2",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 5
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "liquid",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 6
-    sq.add_action({
-        "action_server": f"{ORCH_name}",
-        "action_name": "wait",
-        "action_params": {
-                        "waittime":90,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-
-    ###### Equilibration
-
-    # step 7
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "liquid",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 8
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "CO2",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 9
-    sq.add_action({
-        "action_server": f"{ORCH_name}",
-        "action_name": "wait",
-        "action_params": {
-                        "waittime":15,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-
-    # step 10
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "atm",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 11
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "up",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 12
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "PeriPump2",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 13
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "CO2",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 14
-    sq.add_action({
-        "action_server": f"{ORCH_name}",
-        "action_name": "wait",
-        "action_params": {
-                        "waittime":1,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-
-    # step 15
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "atm",
-            "on": 0,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 16
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "Direction",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 17
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "liquidvalve",
-        "action_params": {
-            "liquidvalve": "down",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 18
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "gasvalve",
-        "action_params": {
-            "gasvalve": "CO2",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 19
-    sq.add_action({
-        "action_server": f"{NI_name}",
-        "action_name": "pump",
-        "action_params": {
-            "pump": "PeriPump2",
-            "on": 1,
-            },
-        "start_condition": ActionStartCondition.wait_for_all
-    })
-
-    # step 20
-    sq.add_action({
-        "action_server": f"{ORCH_name}",
-        "action_name": "wait",
-        "action_params": {
-                        "waittime":90,
-                        },
-        "start_condition": ActionStartCondition.wait_for_all,
-        })
-
-    return sq.action_list
-
-# def CA(pg_Obj: Experiment,
-#        CA_potential_V: Optional[float] = 0.0,
-#        CA_duration_sec: Optional[float] = 10.0,
-#        samplerate_sec: Optional[float] = 1.0,
-       
-#        ):
-#     """Perform a CA measurement."""
-    
-#     # todo, I will try to write a function which will do this later
-#     # I assume we need a base experiment class for this
-#     CA_potential_V = pg_Obj.experiment_params.get("CA_potential_V", CA_potential_V)
-#     CA_duration_sec = pg_Obj.experiment_params.get("CA_duration_sec", CA_duration_sec)
-#     samplerate_sec = pg_Obj.experiment_params.get("samplerate_sec", samplerate_sec)
-
-
-
-#     # list to hold all actions
-#     action_list = []
-    
-    
-#     # apply potential
-#     action_dict = pg_Obj.as_dict()
-#     action_dict.update({
-#         "action_server_name": f"{PSTAT_name}",
-#         "action_name": "run_CA",
-#         "action_params": {
-#                         "Vval": CA_potential_V,
-#                         "Tval": CA_duration_sec,
-#                         "SampleRate": samplerate_sec,
-#                         "TTLwait": -1,  # -1 disables, else select TTL 0-3
-#                         "TTLsend": -1,  # -1 disables, else select TTL 0-3
-#                         "IErange": "auto",
-#                         },
-#         "save_act": True,
-#         "save_data": True,
-#         "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
-#         # "plate_id": None,
-#         })
-#     action_list.append(Action(inputdict=action_dict))
-
-#     return action_list
-
-
-# def OCV_sqtest(pg_Obj: Experiment,
-#                OCV_duration_sec: Optional[float] = 10.0,
-#                samplerate_sec: Optional[float] = 1.0,
-#               ):
-
-#     """This is the description of the experiment which will be displayed
-#        in the operator webgui. For all function parameters (except pg_Obj)
-#        a input field will be (dynamically) presented in the OP webgui.""" 
-    
-    
-#     sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
-
-#     sq.add_action(
+#     # engage
+#     apm.add_action(
 #         {
-#         "action_server_name": f"{PSTAT_name}",
-#         "action_name": "run_OCV",
-#         "action_params": {
-#                         "Tval": sq.pars.OCV_duration_sec,
-#                         "SampleRate": sq.pars.samplerate_sec,
-#                         "TTLwait": -1,  # -1 disables, else select TTL 0-3
-#                         "TTLsend": -1,  # -1 disables, else select TTL 0-3
-#                         "IErange": "auto",
-#                         },
-#         "save_act": True,
-#         "save_data": True,
-#         "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
+#             "action_server": MOTOR_server,
+#             "action_name": "move",
+#             "action_params": {
+#                 "d_mm": [z_engage],
+#                 "axis": ["z"],
+#                 "mode": MoveModes.absolute,
+#                 "transformation": TransformationModes.instrxy,
+#             },
+#             "save_act": debug_save_act,
+#             "save_data": debug_save_data,
+#             "start_condition": ActionStartCondition.wait_for_all,
 #         }
 #     )
 
-#     return sq.action_list # returns complete action list to orch
-
-
-# def CA_sqtest(pg_Obj: Experiment,
-#               Ewe_vs_RHE: Optional[float] = 0.0,
-#               Eref: Optional[float] = 0.2,
-#               pH: Optional[float] = 10.0,
-#               duration_sec: Optional[float] = 10.0,
-#               samplerate_sec: Optional[float] = 1.0,
-#               ):
-
-#     """This is the description of the experiment which will be displayed
-#        in the operator webgui. For all function parameters (except pg_Obj)
-#        a input field will be (dynamically) presented in the OP webgui.""" 
-    
-    
-#     sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
-
-#     sq.add_action(
+#     # seal
+#     apm.add_action(
 #         {
-#         "action_server_name": f"{PSTAT_name}",
-#         "action_name": "run_CA",
-#         "action_params": {
-#                         "Vval": sq.pars.Ewe_vs_RHE-1.0*sq.pars.Eref-0.059*sq.pars.pH,
-#                         "Tval": sq.pars.duration_sec,
-#                         "SampleRate": sq.pars.samplerate_sec,
-#                         "TTLwait": -1,  # -1 disables, else select TTL 0-3
-#                         "TTLsend": -1,  # -1 disables, else select TTL 0-3
-#                         "IErange": "auto",
-#                         },
-#         "save_act": True,
-#         "save_data": True,
-#         "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
+#             "action_server": MOTOR_server,
+#             "action_name": "move",
+#             "action_params": {
+#                 "d_mm": [z_seal],
+#                 "axis": ["z"],
+#                 "mode": MoveModes.absolute,
+#                 "transformation": TransformationModes.instrxy,
+#             },
+#             "save_act": debug_save_act,
+#             "save_data": debug_save_data,
+#             "start_condition": ActionStartCondition.wait_for_all,
 #         }
 #     )
 
-#     return sq.action_list # returns complete action list to orch
+#     return apm.action_list  # returns complete action list to orch
+
+
+# def ANEC_slave_disengage(exp: Experiment):
+#     """Slave experiment
+#     Disengages and seals electrochemical cell.
+
+#     last functionality test: untested"""
+
+#     apm = ActionPlanMaker(exp)  # exposes function parameters via apm.pars
+
+#     apm.add_action(
+#         {
+#             "action_server": MOTOR_server,
+#             "action_name": "move",
+#             "action_params": {
+#                 "d_mm": [z_home],
+#                 "axis": ["z"],
+#                 "mode": MoveModes.absolute,
+#                 "transformation": TransformationModes.instrxy,
+#             },
+#             "save_act": debug_save_act,
+#             "save_data": debug_save_data,
+#             "start_condition": ActionStartCondition.wait_for_all,
+#         }
+#     )
+
+#     return apm.action_list  # returns complete action list to orch
+
+
+# def ANEC_slave_clean_PALtool(
+#     exp: Experiment,
+#     clean_tool: Optional[str] = PALtools.LS3,
+#     clean_volume_ul: Optional[int] = 500,
+# ):
+#     """Slave experiment
+#     Performs deep clean of selected PAL tool.
+
+#     last functionality test: untested"""
+
+#     apm = ActionPlanMaker(exp)  # exposes function parameters via apm.pars
+
+#     # deep clean
+#     apm.add_action(
+#         {
+#             "action_server": PAL_server,
+#             "action_name": "PAL_deepclean",
+#             "action_params": {
+#                 "tool": apm.pars.clean_tool,
+#                 "volume_ul": apm.pars.clean_volume_ul,
+#             },
+#             "start_condition": ActionStartCondition.wait_for_all,
+#         }
+#     )
+
+#     return apm.action_list  # returns complete action list to orch
+
+
+# def ANEC_slave_CA(
+#     exp: Experiment,
+#     CA_potential: Optional[float] = 0.0,
+#     ph: float = 9.53,
+#     ref_vs_nhe: float = 0.21,
+#     samplerate_sec: Optional[float] = 1,
+#     OCV_duration_sec: Optional[float] = 60,
+#     CA_duration_sec: Optional[float] = 1320,
+#     aliquot_times_sec: Optional[List[float]] = [60, 600, 1140],
+# ):
+#     """last functionality test: untested"""
+
+#     apm = ActionPlanMaker(exp)  # exposes function parameters via apm.pars
+
+#     # get sample for gamry
+#     apm.add_action(
+#         {
+#             "action_server": PAL_server,
+#             "action_name": "archive_custom_query_sample",
+#             "action_params": {
+#                 "custom": "cell1_we",
+#             },
+#             "to_global_params": [
+#                 "_fast_sample_in"
+#             ],  # save new liquid_sample_no of eche cell to globals
+#             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#         }
+#     )
+
+#     # OCV
+#     apm.add_action(
+#         {
+#             "action_server": PSTAT_server,
+#             "action_name": "run_OCV",
+#             "action_params": {
+#                 "Tval": apm.pars.OCV_duration_sec,
+#                 "SampleRate": apm.pars.samplerate_sec,
+#                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
+#                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
+#                 "IErange": "auto",
+#             },
+#             "from_global_params": {"_fast_sample_in": "fast_samples_in"},
+#             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#         }
+#     )
+
+#     # take liquid sample
+#     apm.add_action(
+#         {
+#             "action_server": PAL_server,
+#             "action_name": "PAL_archive",
+#             "action_params": {
+#                 "tool": PALtools.LS3,
+#                 "source": "cell1_we",
+#                 "volume_ul": 200,
+#                 "sampleperiod": [0.0],
+#                 "spacingmethod": Spacingmethod.linear,
+#                 "spacingfactor": 1.0,
+#                 "timeoffset": 0.0,
+#                 "wash1": 0,
+#                 "wash2": 0,
+#                 "wash3": 0,
+#                 "wash4": 0,
+#             },
+#             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#         }
+#     )
+
+#     apm.add_action(
+#         {
+#             "action_server": PAL_server,
+#             "action_name": "archive_custom_query_sample",
+#             "action_params": {
+#                 "custom": "cell1_we",
+#             },
+#             "to_global_params": [
+#                 "_fast_sample_in"
+#             ],  # save new liquid_sample_no of eche cell to globals
+#             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#         }
+#     )
+
+#     # apmply potential
+#     potential = apm.pars.CA_potential - 1.0 * apm.pars.ref_vs_nhe - 0.059 * apm.pars.ph
+#     print(f"ANEC_slave_CA potential: {potential}")
+#     apm.add_action(
+#         {
+#             "action_server": PSTAT_server,
+#             "action_name": "run_CA",
+#             "action_params": {
+#                 "Vval": potential,
+#                 "Tval": apm.pars.CA_duration_sec,
+#                 "SampleRate": apm.pars.samplerate_sec,
+#                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
+#                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
+#                 "IErange": "auto",
+#             },
+#             "from_global_params": {"_fast_sample_in": "fast_samples_in"},
+#             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#         }
+#     )
+
+#     # take multiple scheduled liquid samples
+#     apm.add_action(
+#         {
+#             "action_server": PAL_server,
+#             "action_name": "PAL_archive",
+#             "action_params": {
+#                 "tool": PALtools.LS3,
+#                 "source": "cell1_we",
+#                 "volume_ul": 200,
+#                 "sampleperiod": apm.pars.aliquot_times_sec,  # 1min, 10min, 10min
+#                 "spacingmethod": Spacingmethod.custom,
+#                 "spacingfactor": 1.0,
+#                 "timeoffset": 60.0,
+#                 "wash1": 0,
+#                 "wash2": 0,
+#                 "wash3": 0,
+#                 "wash4": 0,
+#             },
+#             "start_condition": ActionStartCondition.wait_for_endpoint,  # orch is waiting for all action_dq to finish
+#         }
+#     )
+
+#     # take last liquid sample and clean
+#     apm.add_action(
+#         {
+#             "action_server": PAL_server,
+#             "action_name": "PAL_archive",
+#             "action_params": {
+#                 "tool": PALtools.LS3,
+#                 "source": "cell1_we",
+#                 "volume_ul": 200,
+#                 "sampleperiod": [0.0],
+#                 "spacingmethod": Spacingmethod.linear,
+#                 "spacingfactor": 1.0,
+#                 "timeoffset": 0.0,
+#                 "wash1": 1,  # dont use True or False but 0 AND 1
+#                 "wash2": 1,
+#                 "wash3": 1,
+#                 "wash4": 1,
+#             },
+#             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#         }
+#     )
+
+#     return apm.action_list  # returns complete action list to orch
+
+
+# def ANEC_slave_tray_unload(
+#     exp: Experiment,
+#     tray: Optional[int] = 2,
+#     slot: Optional[int] = 1,
+#     survey_runs: Optional[int] = 1,
+#     main_runs: Optional[int] = 3,
+#     rack: Optional[int] = 2,
+# ):
+#     """Unloads a selected tray from PAL position tray-slot and creates
+#     (1) json
+#     (2) csv
+#     (3) icpms
+#     exports.
+
+#     Parameters for ICPMS export are
+#     survey_runs: rough sweep over the whole mass range
+#     main_runs: sweep channel centered on element mass
+#     rack: position of the tray in the icpms instrument, usually 2.
+#     """
+
+#     apm = ActionPlanMaker(exp)  # exposes function parameters via apm.pars
+
+#     apm.add_action(
+#         {
+#             "action_server": PAL_server,
+#             "action_name": "archive_tray_export_json",
+#             "action_params": {
+#                 "tray": apm.pars.tray,
+#                 "slot": apm.pars.slot,
+#             },
+#             "start_condition": ActionStartCondition.wait_for_all,
+#         }
+#     )
+
+#     apm.add_action(
+#         {
+#             "action_server": PAL_server,
+#             "action_name": "archive_tray_export_csv",
+#             "action_params": {
+#                 "tray": apm.pars.tray,
+#                 "slot": apm.pars.slot,
+#             },
+#             "start_condition": ActionStartCondition.wait_for_all,
+#         }
+#     )
+
+#     apm.add_action(
+#         {
+#             "action_server": PAL_server,
+#             "action_name": "archive_tray_export_icpms",
+#             "action_params": {
+#                 "tray": apm.pars.tray,
+#                 "slot": apm.pars.slot,
+#                 "survey_runs": apm.pars.survey_runs,
+#                 "main_runs": apm.pars.main_runs,
+#                 "rack": apm.pars.rack,
+#             },
+#             "start_condition": ActionStartCondition.wait_for_all,
+#         }
+#     )
+
+#     apm.add_action(
+#         {
+#             "action_server": PAL_server,
+#             "action_name": "archive_tray_unload",
+#             "action_params": {
+#                 "tray": apm.pars.tray,
+#                 "slot": apm.pars.slot,
+#             },
+#             "start_condition": ActionStartCondition.wait_for_all,
+#         }
+#     )
+
+#     return apm.action_list  # returns complete action list to orch
