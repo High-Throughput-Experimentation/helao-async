@@ -7,11 +7,10 @@ config = dict()
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
-config["experiment_libraries"] = ["ADSS_prc"]
+config["experiment_libraries"] = ["ADSS_prc", "samples_exp"]
 config["sequence_libraries"] = ["ADSS_seq"]
 config["technique_name"] = "adss"
 config["root"] = r"C:\INST_dev2"
-# config["local_db_path"] = r"C:\INST_dev2\DATABASE"
 
 
 # we define all the servers here so that the overview is a bit better
@@ -28,7 +27,6 @@ config["servers"] = dict(
             enable_op = True,
             bokeh_port = 5002,
         )
-        # cmd_print = False
     ),
     ##########################################################################
     # Instrument Servers
@@ -38,16 +36,17 @@ config["servers"] = dict(
         port=8003,
         group="action",
         fast="galil_motion",
-        # cmd_print=False,
         params=dict(
             enable_aligner = True,
             bokeh_port = 5003,
-            cutoff=6,  # cutoff of digits for TransferMatrix calculation
-            # 4x6 plate
-            #M_instr = [[1,0,0,-76.525],[0,1,0,-50.875],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
-            # 100mm wafer
-            M_instr = [[1,0,0,-76.525+(3*25.4-50)-0.5+0.75+1.5+0.25],[0,1,0,-50.875+2.71+5-3+1],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
-
+            # backup if f"{gethostname()}_instrument_calib.json" is not found
+            # instrument specific calibration
+            M_instr = [
+                       [1,0,0,0],
+                       [0,1,0,0],
+                       [0,0,1,0],
+                       [0,0,0,1]
+                       ],
             count_to_mm=dict(
                 A=1.0/15835.31275,#1.0/15690.3,
                 B=1.0/6398.771436,#1.0/6395.45,
@@ -78,8 +77,6 @@ config["servers"] = dict(
         port=8004,
         group="action",
         fast="gamry_server",
-        simulate=False,  # choose between simulator(default) or real device
-        # cmd_print=False,
         params=dict(
             allow_no_sample = True,
             dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
@@ -90,7 +87,6 @@ config["servers"] = dict(
         port=8006,
         group="action",
         fast="nidaqmx_server",
-        # cmd_print=False,
         params = dict(
             allow_no_sample = True,
             dev_cellcurrent_trigger = 'PFI1', #P1.1
@@ -180,7 +176,6 @@ config["servers"] = dict(
         port=8007,
         group="action",
         fast="pal_server",
-        # cmd_print=False,
         params = dict(
             user = 'RSHS',
             key = r'c:\helao\sshkeys\rshs_private3.ppk', # needs to be in new openssh file format
@@ -229,7 +224,7 @@ config["servers"] = dict(
     # #########################################################################
     # Visualizers (bokeh servers)
     # #########################################################################
-    VIS=dict(#simple dumb modular visualizer
+    VIS=dict(
         host=hostip,
         port=5001,
         group="visualizer",
