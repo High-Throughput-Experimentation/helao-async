@@ -265,6 +265,10 @@ def ANEC_load_solid(
 
 def ANEC_run_CA(
     experiment: Experiment,
+    CA_potential_vsRHE: Optional[float] = 0.0,
+    CA_duration_sec: Optional[float] = 0.1,
+    solution_ph: Optional[float] = 9.0,
+    ref_vs_nhe: Optional[float] = 0.21,
     toolGC: Optional[str] = "HS 2",
     toolarchive: Optional[str] = "LS 3",
     source: Optional[str] = "cell1_we",
@@ -274,8 +278,6 @@ def ANEC_run_CA(
     wash2: Optional[bool] = True,
     wash3: Optional[bool] = True,
     wash4: Optional[bool] = False,
-    Vval: Optional[float] = 0.0,
-    Tval: Optional[float] = 10.0,
     SampleRate: Optional[float] = 0.01,
     TTLwait: Optional[int] = -1,
     TTLsend: Optional[int] = -1,
@@ -297,6 +299,11 @@ def ANEC_run_CA(
     """
 
     apm = ActionPlanMaker(experiment)  # exposes function parameters via apm.pars
+    potential_vsWE = (
+        apm.pars.CA_potential_vsRHE
+        - 1.0 * apm.pars.ref_vs_nhe
+        - 0.059 * apm.pars.solution_ph
+    )
     apm.add(
         PAL_server,
         "archive_custom_query_sample",
@@ -307,8 +314,8 @@ def ANEC_run_CA(
         PSTAT_server,
         "run_CA",
         {
-            "Vval": apm.pars.Vval,
-            "Tval": apm.pars.Tval,
+            "Vval": potential_vsWE,
+            "Tval": apm.pars.CA_duration_sec,
             "SampleRate": apm.pars.SampleRate,
             "TTLwait": apm.pars.TTLwait,  # -1 disables, else select TTL 0-3
             "TTLsend": apm.pars.TTLsend,  # -1 disables, else select TTL 0-3
