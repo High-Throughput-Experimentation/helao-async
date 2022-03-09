@@ -15,7 +15,9 @@ from helao.library.driver.pal_driver import (
                                              PALtools,
                                              PalMicroCam,
                                              PALposition,
-                                             GCsampletype
+                                             GCsampletype,
+                                             SampleInheritance,
+                                             SampleStatus
                                             ) 
 from helaocore.model.sample import LiquidSample, SampleUnion, NoneSample
 from helaocore.helper.make_str_enum import make_str_enum
@@ -47,7 +49,7 @@ def makeApp(confPrefix, servKey):
     dev_customitems = make_str_enum("dev_custom",{key:key for key in dev_custom.keys()})
 
 
-    @app.post(f"/{servKey}/stop")
+    @app.post(f"/{servKey}/stop", tags=["public"])
     async def stop(
                    action: Optional[Action] = \
                            Body({}, embed=True),
@@ -62,7 +64,7 @@ def makeApp(confPrefix, servKey):
         return finished_action.as_dict()
 
 
-    @app.post(f"/{servKey}/convert_v1DB", tags=["convert DBs"])
+    @app.post(f"/{servKey}/convert_v1DB", tags=["public_db"])
     async def convert_v1DB(
                            action: Optional[Action] = \
                                    Body({}, embed=True)
@@ -528,7 +530,7 @@ def makeApp(confPrefix, servKey):
                                        {'sample': sample.as_dict(),
                                         'error_code':error_code}
                                       )
-        active.action.action_params.update({"_fast_sample_in":[sample.as_dict()]})
+        active.action.action_params.update({"_fast_samples_in":[sample.as_dict()]})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -542,13 +544,13 @@ def makeApp(confPrefix, servKey):
         active = await app.base.setup_and_contain_action(
                                           action_abbr = "unload_sample"
         )
-        unloaded, sample_in, sample_out, tray_dict = \
+        unloaded, samples_in, samples_out, tray_dict = \
             await app.driver.archive.tray_unloadall(**active.action.action_params)
         await active.append_sample(
-              samples = sample_in,
+              samples = samples_in,
               IO="in")
         await active.append_sample(
-              samples = sample_out,
+              samples = samples_out,
               IO="out")
         await active.enqueue_data_dflt(datadict = \
                                        {"unloaded": unloaded,
@@ -594,13 +596,13 @@ def makeApp(confPrefix, servKey):
         active = await app.base.setup_and_contain_action(
                                           action_abbr = "unload_sample"
         )
-        unloaded, sample_in, sample_out, tray_dict = \
+        unloaded, samples_in, samples_out, tray_dict = \
             await app.driver.archive.tray_unload(**active.action.action_params)
         await active.append_sample(
-              samples = sample_in,
+              samples = samples_in,
               IO="in")
         await active.append_sample(
-              samples = sample_out,
+              samples = samples_out,
               IO="out")
         await active.enqueue_data_dflt(datadict = \
                                        {"unloaded": unloaded,
@@ -736,17 +738,20 @@ def makeApp(confPrefix, servKey):
                                     action: Optional[Action] = \
                                             Body({}, embed=True),
                                     custom: Optional[dev_customitems] = None,
+                                    destroy_liquid: Optional[bool] = False,
+                                    destroy_gas: Optional[bool] = False,
+                                    destroy_solid: Optional[bool] = False,
                                    ):
         active = await app.base.setup_and_contain_action(
                                           action_abbr = "unload_sample",
         )
-        unloaded, sample_in, sample_out, customs_dict = \
+        unloaded, samples_in, samples_out, customs_dict = \
             await app.driver.archive.custom_unload(**active.action.action_params)
         await active.append_sample(
-              samples = sample_in,
+              samples = samples_in,
               IO="in")
         await active.append_sample(
-              samples = sample_out,
+              samples = samples_out,
               IO="out")
         await active.enqueue_data_dflt(datadict = \
                                        {"unloaded": unloaded,
@@ -761,17 +766,20 @@ def makeApp(confPrefix, servKey):
     async def archive_custom_unloadall(
                                        action: Optional[Action] = \
                                                Body({}, embed=True),
+                                       destroy_liquid: Optional[bool] = False,
+                                       destroy_gas: Optional[bool] = False,
+                                       destroy_solid: Optional[bool] = False,
                                       ):
         active = await app.base.setup_and_contain_action(
                                           action_abbr = "unload_sample",
         )
-        unloaded, sample_in, sample_out, customs_dict = \
+        unloaded, samples_in, samples_out, customs_dict = \
             await app.driver.archive.custom_unloadall(**active.action.action_params)
         await active.append_sample(
-              samples = sample_in,
+              samples = samples_in,
               IO="in")
         await active.append_sample(
-              samples = sample_out,
+              samples = samples_out,
               IO="out")
         await active.enqueue_data_dflt(datadict = \
                                        {"unloaded": unloaded,
@@ -798,7 +806,7 @@ def makeApp(confPrefix, servKey):
         await active.enqueue_data_dflt(datadict = \
                                        {"sample": sample.as_dict(),
                                         "error_code":error_code})
-        active.action.action_params.update({"_fast_sample_in":[sample.as_dict()]})
+        active.action.action_params.update({"_fast_samples_in":[sample.as_dict()]})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -849,7 +857,7 @@ def makeApp(confPrefix, servKey):
         return finished_action.as_dict()
 
 
-    @app.post(f"/{servKey}/db_get_sample")
+    @app.post(f"/{servKey}/db_get_sample", tags=["public_db"])
     async def db_get_sample(
                          action: Optional[Action] = \
                                  Body({}, embed=True),
@@ -859,14 +867,20 @@ def makeApp(confPrefix, servKey):
         """Positive sample_no will get it from the beginng, negative
         from the end of the db."""
         active = await app.base.setup_and_contain_action()
-        sample = await app.driver.db_get_sample(active.action.samples_in)
+        samples = await app.driver.archive.unified_db.get_sample(samples=active.action.samples_in)
+        # clear samples_in
+        active.action.samples_in = []
+        await active.append_sample(samples = samples,
+                                   IO="in"
+                                  )
+        
         await active.enqueue_data_dflt(datadict = \
-                                       {'sample': sample.as_dict()})
+                                       {'samples': [sample.as_dict() for sample in samples]})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
 
-    @app.post(f"/{servKey}/db_new_sample")
+    @app.post(f"/{servKey}/db_new_sample", tags=["public_db"])
     async def db_new_sample(
                          action: Optional[Action] = \
                                  Body({}, embed=True),
@@ -889,9 +903,23 @@ def makeApp(confPrefix, servKey):
         If its the very first liquid (no source in database exists) 
         leave source and source_ml empty."""
         active = await app.base.setup_and_contain_action()
-        samples = await app.driver.db_new_sample(active.action.samples_in)
+        for sample in active.action.samples_in:
+            sample.action_uuid=[active.action.action_uuid]
+            sample.sample_creation_action_uuid = active.action.action_uuid
+            sample.sample_creation_experiment_uuid = active.action.experiment_uuid
+            sample.status=[SampleStatus.created]
+            sample.inheritance=SampleInheritance.receive_only
+
+        samples = await app.driver.archive.unified_db.new_sample(samples=active.action.samples_in)
+        # clear samples_in and samples_out
+        active.action.samples_in = []
+        active.action.samples_out = []
+        await active.append_sample(samples = samples,
+                                   IO="out"
+                                  )
+        
         await active.enqueue_data_dflt(datadict = \
-                                       {'sample': [sample.as_dict() for sample in samples]})
+                                       {'samples': [sample.as_dict() for sample in samples]})
         finished_action = await active.finish()
         return finished_action.as_dict()
 

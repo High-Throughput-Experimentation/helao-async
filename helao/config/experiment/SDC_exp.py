@@ -54,10 +54,10 @@ PAL_server = MachineModel(
              ).json_dict()
 
 
-def SDC_slave_unloadall_customs(pg_Obj: Experiment):
+def SDC_slave_unloadall_customs(experiment: Experiment):
     """last functionality test: -"""
 
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": PAL_server,
@@ -71,14 +71,14 @@ def SDC_slave_unloadall_customs(pg_Obj: Experiment):
 
 
 def SDC_slave_load_solid(
-                          pg_Obj: Experiment, 
+                          experiment: Experiment, 
                           solid_custom_position: Optional[str] = "cell1_we",
                           solid_plate_id: Optional[int] = 4534,
                           solid_sample_no: Optional[int] = 1
                          ):
     """last functionality test: -"""
     
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": PAL_server,
@@ -96,7 +96,7 @@ def SDC_slave_load_solid(
     return sq.action_list # returns complete action list to orch
 
 
-def SDC_slave_startup(pg_Obj: Experiment,
+def SDC_slave_startup(experiment: Experiment,
               solid_custom_position: Optional[str] = "cell1_we",
               solid_plate_id: Optional[int] = 4534,
               solid_sample_no: Optional[int] = 1,
@@ -107,16 +107,16 @@ def SDC_slave_startup(pg_Obj: Experiment,
        last functionality test: -"""
 
     
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
 
     # unload all samples from custom positions
-    sq.add_action_list(SDC_slave_unloadall_customs(pg_Obj=pg_Obj))
+    sq.add_action_list(SDC_slave_unloadall_customs(experiment=experiment))
 
 
     # load new requested samples 
     sq.add_action_list(SDC_slave_load_solid(
-        pg_Obj=pg_Obj,
+        experiment=experiment,
         solid_custom_position = sq.pars.solid_custom_position,
         solid_plate_id = sq.pars.solid_plate_id, 
         solid_sample_no =sq.pars.solid_sample_no
@@ -173,12 +173,12 @@ def SDC_slave_startup(pg_Obj: Experiment,
     return sq.action_list # returns complete action list to orch
 
 
-def SDC_slave_shutdown(pg_Obj: Experiment):
+def SDC_slave_shutdown(experiment: Experiment):
     """Slave experiment
     
     last functionality test: -"""
 
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
 
     return sq.action_list # returns complete action list to orch
@@ -186,7 +186,7 @@ def SDC_slave_shutdown(pg_Obj: Experiment):
 
 
 
-def SDC_slave_CA_toggle(pg_Obj: Experiment,
+def SDC_slave_CA_toggle(experiment: Experiment,
               CA_potential_vsRHE: Optional[float] = 0.0,
               ph: float = 9.53,
               ref_vs_nhe: float = 0.21,
@@ -197,7 +197,7 @@ def SDC_slave_CA_toggle(pg_Obj: Experiment,
               ):
     """last functionality test: -"""
     
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
     # get sample for gamry
     sq.add_action({
@@ -206,7 +206,7 @@ def SDC_slave_CA_toggle(pg_Obj: Experiment,
         "action_params": {
                         "custom": "cell1_we",
                         },
-        "to_global_params":["_fast_sample_in"], # save new liquid_sample_no of eche cell to globals
+        "to_global_params":["_fast_samples_in"], # save new liquid_sample_no of eche cell to globals
         "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })
 
@@ -245,7 +245,7 @@ def SDC_slave_CA_toggle(pg_Obj: Experiment,
                         "IErange": "auto",
                         },
         "from_global_params":{
-                    "_fast_sample_in":"fast_samples_in"
+                    "_fast_samples_in":"fast_samples_in"
                     },
         "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
         })

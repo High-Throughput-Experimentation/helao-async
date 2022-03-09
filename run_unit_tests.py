@@ -1,5 +1,7 @@
 
-from helao.test.unit_test_sample_models import sample_model_unit_test
+__all__ = []
 
 
-print(sample_model_unit_test())
+import helao.test.unit_test_sample_models
+
+print("passed model test:", helao.test.unit_test_sample_models.sample_model_unit_test())
