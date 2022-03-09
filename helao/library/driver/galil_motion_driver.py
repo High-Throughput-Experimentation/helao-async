@@ -333,6 +333,15 @@ class Galil:
             return "error"
 
 
+    async def stop_aligner(self) -> ErrorCodes:
+        if self.aligner_enabled \
+        and self.aligner:
+            self.aligner.stop_align()
+            return ErrorCodes.none
+        else:
+            return ErrorCodes.not_available
+
+
     async def run_aligner(self, A: Action):
         if not self.blocked:
             if not self.aligner_enabled \
@@ -2715,6 +2724,12 @@ class Aligner:
         asyncio.gather(
             self.finish_alignment(self.initial_plate_transfermatrix,ErrorCodes.none)
         )
+    
+    
+    def stop_align(self):
+        asyncio.gather(
+            self.finish_alignment(self.motor.plate_transfermatrix,ErrorCodes.stop)
+        )        
     
     
     def clicked_buttonsel(self, idx):

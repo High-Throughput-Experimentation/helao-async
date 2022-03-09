@@ -91,16 +91,28 @@ async def galil_dyn_endpoints(app = None):
     
         @app.post(f"/{servKey}/run_aligner", tags=["public_aligner"])
         async def run_aligner(
-                                               action: Optional[Action] = \
-                                                       Body({}, embed=True),
-                                               plateid: Optional[int] = 6353#None
-                                              ):
+                              action: Optional[Action] = \
+                                      Body({}, embed=True),
+                              plateid: Optional[int] = 6353#None
+                             ):
             """starts the plate aligning process, matrix is return when fully done"""
             A = await app.base.setup_action()
             active_dict = await app.driver.run_aligner(A)
             return active_dict
-    
-    
+
+
+        @app.post(f"/{servKey}/stop_aligner", tags=["public_aligner"])
+        async def stop_aligner(
+                               action: Optional[Action] = \
+                                       Body({}, embed=True),
+                              ):
+            """starts the plate aligning process, matrix is return when fully done"""
+            active = await app.base.setup_and_contain_action()
+            active.action.error_code = await app.driver.stop_aligner()
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+
         # parse as {'M':json.dumps(np.matrix(M).tolist()),'platexy':json.dumps(np.array(platexy).tolist())}
         @app.post(f"/{servKey}/toMotorXY")
         async def transform_platexy_to_motorxy(
@@ -149,43 +161,8 @@ async def galil_dyn_endpoints(app = None):
                {"mplate": app.driver.transform.get_Mplate_Msystem(**active.action.action_params)})
             finished_action = await active.finish()
             return finished_action.as_dict()
-    
-    
-        # @app.post(f"/{servKey}/download_alignmentmatrix")
-        # async def download_alignmentmatrix(
-        #                                    action: Optional[Action] = \
-        #                                            Body({}, embed=True),
-        #                                   ):
-        #     """Get current in use Alignment from motion server
-        #        returns the xy part of the platecalibration.
-        #     """
-        #     active = await app.base.setup_and_contain_action(
-        #                                       action_abbr = "get_mplatexy"
-        #     )
-        #     await active.enqueue_data_dflt(datadict = \
-        #        {"mplatexy": app.driver.transform.get_Mplatexy()})
-        #     finished_action = await active.finish()
-        #     return finished_action.as_dict()
-    
-    
-        # @app.post(f"/{servKey}/upload_alignmentmatrix")
-        # async def upload_alignmentmatrix(
-        #                                  action: Optional[Action] = \
-        #                                          Body({}, embed=True),
-        #                                  Mxy: Optional[str] = None
-        #                                 ):
-        #     """Send new Alignment to motion server.
-        #        Updates the xy part of the plate calibration.
-        #     """
-        #     active = await app.base.setup_and_contain_action(
-        #                                       action_abbr = "upload_mplatexy"
-        #     )
-        #     await active.enqueue_data_dflt(datadict = \
-        #        {"uploaded": app.driver.transform.update_Mplatexy(**active.action.action_params)})
-        #     finished_action = await active.finish()
-        #     return finished_action.as_dict()
-    
-    
+
+
         if dev_axis:
             @app.post(f"/{servKey}/move")
             async def move(
@@ -334,7 +311,6 @@ async def galil_dyn_endpoints(app = None):
             async def axis_on(
                               action: Optional[Action] = \
                                       Body({}, embed=True),
-                              # axis: Optional[Union[List[str], str]] = None
                               axis: Optional[dev_axisitems] = None
                              ):
                 active = await app.base.setup_and_contain_action(
@@ -353,10 +329,10 @@ async def galil_dyn_endpoints(app = None):
 
         @app.post(f"/{servKey}/solid_get_platemap")
         async def solid_get_platemap(
-                       action: Optional[Action] = \
-                               Body({}, embed=True),
-                       plate_id: Optional[int] = None
-                      ):
+                                     action: Optional[Action] = \
+                                             Body({}, embed=True),
+                                     plate_id: Optional[int] = None
+                                    ):
             active = await app.base.setup_and_contain_action()
             datadict = \
                 await app.driver.solid_get_platemap(**active.action.action_params)
