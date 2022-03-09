@@ -1660,6 +1660,7 @@ class Archive():
             self.base.print_message("no action defined", error = True)
             return samples_out
 
+
         for sample in reference_samples_in:
             sample.action_uuid=[action.action_uuid]
             sample.sample_creation_action_uuid = action.action_uuid
@@ -1680,6 +1681,11 @@ class Archive():
                 await self.unified_db.update_sample(
                     samples = sample.parts
                 )
+                # create a sourcelist from all parts
+                source = [s.get_global_label() for s in sample.parts]
+                # add the source list to the sample source
+                for s in source:
+                    sample.source.append(s)
 
         samples_out = await self.unified_db.new_sample(samples=reference_samples_in)
 
