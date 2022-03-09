@@ -45,7 +45,7 @@ z_seal = 4.5
 
 
 def ANEC_normal_state(
-    exp: Experiment,
+    experiment: Experiment,
 ):
     """Set ANEC to 'normal' state.
 
@@ -63,7 +63,7 @@ def ANEC_normal_state(
         exp (Experiment): Experiment object provided by Orch
     """
 
-    apm = ActionPlanMaker(exp)
+    apm = ActionPlanMaker(experiment)
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
     apm.add(NI_server, "pump", {"pump": "PeriPump2", "on": 1})
     apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
@@ -76,7 +76,7 @@ def ANEC_normal_state(
 
 
 def ANEC_flush_fill_cell(
-    exp: Experiment,
+    experiment: Experiment,
     liquid_flush_time: Optional[float] = 90,
     co2_purge_time: Optional[float] = 15,
     equilibration_time: Optional[float] = 1,
@@ -88,7 +88,7 @@ def ANEC_flush_fill_cell(
     (1) create liquid sample using volume_ul_cell and liquid_sample_no
     """
 
-    apm = ActionPlanMaker(exp)
+    apm = ActionPlanMaker(experiment)
 
     # Wait for 10 seconds to equilibrate normal state
     apm.add(ORCH_server, "wait", {"waittime": 10})
@@ -127,22 +127,22 @@ def ANEC_flush_fill_cell(
         },
     )
     # TODO: perhaps we don't want to end in normal state
-    apm.add_action_list(ANEC_normal_state(exp))
+    apm.add_action_list(ANEC_normal_state(experiment))
     return apm.action_list
 
 
-def ANEC_unload_cell(exp: Experiment):
+def ANEC_unload_cell(experiment: Experiment):
     """Unload Sample at 'cell1_we' position."""
 
-    apm = ActionPlanMaker(exp)
+    apm = ActionPlanMaker(experiment)
     apm.add(PAL_server, "archive_custom_unloadall", {})
     return apm.action_list
 
 
-def ANEC_unload_liquid(exp: Experiment):
+def ANEC_unload_liquid(experiment: Experiment):
     """Unload liquid sample at 'cell1_we' position and reload solid sample."""
 
-    apm = ActionPlanMaker(exp)
+    apm = ActionPlanMaker(experiment)
     apm.add(
         PAL_server, "archive_custom_unloadall", {}, to_global_params=["_unloaded_solid"]
     )
@@ -156,25 +156,25 @@ def ANEC_unload_liquid(exp: Experiment):
 
 
 def ANEC_drain_cell(
-    exp: Experiment,
+    experiment: Experiment,
     co2_purge_time: Optional[float] = 10.0,
 ):
     """Drain liquid from cell and unload liquid sample."""
 
-    apm = ActionPlanMaker(exp)
+    apm = ActionPlanMaker(experiment)
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
     apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquid_valve": "down", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 1})
     apm.add(NI_server, "pump", {"pump": "PeriPump2", "on": 1})
-    apm.add_action_list(ANEC_unload_liquid(exp))
+    apm.add_action_list(ANEC_unload_liquid(experiment))
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2_purge_time})
-    apm.add_action_list(ANEC_normal_state(exp))
+    apm.add_action_list(ANEC_normal_state(experiment))
     return apm.action_list
 
 
 def ANEC_cleanup(
-    exp: Experiment,
+    experiment: Experiment,
     reservoir_liquid_sample_no: Optional[int] = 0,
 ):
     """Flush and purge ANEC cell.
@@ -189,19 +189,19 @@ def ANEC_cleanup(
 
     """
 
-    apm = ActionPlanMaker(exp)  # exposes function parameters via apm.pars
+    apm = ActionPlanMaker(experiment)  # exposes function parameters via apm.pars
     apm.add_action_list(
         ANEC_flush_fill_cell(
             exp=exp,
             reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
         )
     )
-    apm.add_action_list(ANEC_drain_cell(exp))
+    apm.add_action_list(ANEC_drain_cell(experiment))
     return apm.action_list
 
 
 def ANEC_GC_preparation(
-    exp: Experiment,
+    experiment: Experiment,
     toolGC: Optional[str] = "HS 2",
     volume_ul_GC: Optional[int] = 300,
 ):
@@ -214,7 +214,7 @@ def ANEC_GC_preparation(
 
     """
 
-    apm = ActionPlanMaker(exp)  # exposes function parameters via apm.pars
+    apm = ActionPlanMaker(experiment)  # exposes function parameters via apm.pars
     apm.add(
         PAL_server,
         "PAL_ANEC_GC",
@@ -228,7 +228,7 @@ def ANEC_GC_preparation(
 
 
 def ANEC_load_solid(
-    exp: Experiment,
+    experiment: Experiment,
     solid_plate_id: Optional[int] = 0,
     solid_sample_no: Optional[int] = 0,
     reservoir_liquid_sample_no: Optional[int] = 0,
@@ -236,8 +236,8 @@ def ANEC_load_solid(
 ):
     """Load solid and clean cell."""
 
-    apm = ActionPlanMaker(exp)
-    apm.add_action_list(ANEC_unload_cell(exp))
+    apm = ActionPlanMaker(experiment)
+    apm.add_action_list(ANEC_unload_cell(experiment))
     apm.add(
         PAL_server,
         "archive_custom_load",
@@ -250,7 +250,7 @@ def ANEC_load_solid(
             ).dict(),
         },
     )
-    apm.add_action_list(ANEC_drain_cell(exp))
+    apm.add_action_list(ANEC_drain_cell(experiment))
     apm.add_action_list(
         ANEC_flush_fill_cell(
             exp=exp,
@@ -259,12 +259,12 @@ def ANEC_load_solid(
     )
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.equilibration_time})
     # TODO: still needed? flush/fill results in normal state
-    apm.add_action_list(ANEC_drain_cell(exp))
+    apm.add_action_list(ANEC_drain_cell(experiment))
     return apm.action_list
 
 
 def ANEC_run_CA(
-    exp: Experiment,
+    experiment: Experiment,
     toolGC: Optional[str] = "HS 2",
     toolarchive: Optional[str] = "LS 3",
     source: Optional[str] = "cell1_we",
@@ -296,7 +296,7 @@ def ANEC_run_CA(
 
     """
 
-    apm = ActionPlanMaker(exp)  # exposes function parameters via apm.pars
+    apm = ActionPlanMaker(experiment)  # exposes function parameters via apm.pars
     apm.add(
         PAL_server,
         "archive_custom_query_sample",
@@ -341,18 +341,18 @@ def ANEC_run_CA(
         },
     )
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
-    apm.add_action_list(ANEC_unload_liquid(exp))
-    apm.add_action_list(ANEC_normal_state(exp))
+    apm.add_action_list(ANEC_unload_liquid(experiment))
+    apm.add_action_list(ANEC_normal_state(experiment))
     return apm.action_list
 
 
-# def ANEC_slave_engage(exp: Experiment):
+# def ANEC_slave_engage(experiment: Experiment):
 #     """Slave experiment
 #     Engages and seals electrochemical cell.
 
 #     last functionality test: untested"""
 
-#     apm = ActionPlanMaker(exp)  # exposes function parameters via apm.pars
+#     apm = ActionPlanMaker(experiment)  # exposes function parameters via apm.pars
 
 #     # engage
 #     apm.add_action(
@@ -391,13 +391,13 @@ def ANEC_run_CA(
 #     return apm.action_list  # returns complete action list to orch
 
 
-# def ANEC_slave_disengage(exp: Experiment):
+# def ANEC_slave_disengage(experiment: Experiment):
 #     """Slave experiment
 #     Disengages and seals electrochemical cell.
 
 #     last functionality test: untested"""
 
-#     apm = ActionPlanMaker(exp)  # exposes function parameters via apm.pars
+#     apm = ActionPlanMaker(experiment)  # exposes function parameters via apm.pars
 
 #     apm.add_action(
 #         {
@@ -419,7 +419,7 @@ def ANEC_run_CA(
 
 
 # def ANEC_slave_clean_PALtool(
-#     exp: Experiment,
+#     experiment: Experiment,
 #     clean_tool: Optional[str] = PALtools.LS3,
 #     clean_volume_ul: Optional[int] = 500,
 # ):
@@ -428,7 +428,7 @@ def ANEC_run_CA(
 
 #     last functionality test: untested"""
 
-#     apm = ActionPlanMaker(exp)  # exposes function parameters via apm.pars
+#     apm = ActionPlanMaker(experiment)  # exposes function parameters via apm.pars
 
 #     # deep clean
 #     apm.add_action(
@@ -447,7 +447,7 @@ def ANEC_run_CA(
 
 
 # def ANEC_slave_CA(
-#     exp: Experiment,
+#     experiment: Experiment,
 #     CA_potential: Optional[float] = 0.0,
 #     ph: float = 9.53,
 #     ref_vs_nhe: float = 0.21,
@@ -458,7 +458,7 @@ def ANEC_run_CA(
 # ):
 #     """last functionality test: untested"""
 
-#     apm = ActionPlanMaker(exp)  # exposes function parameters via apm.pars
+#     apm = ActionPlanMaker(experiment)  # exposes function parameters via apm.pars
 
 #     # get sample for gamry
 #     apm.add_action(
@@ -596,7 +596,7 @@ def ANEC_run_CA(
 
 
 # def ANEC_slave_tray_unload(
-#     exp: Experiment,
+#     experiment: Experiment,
 #     tray: Optional[int] = 2,
 #     slot: Optional[int] = 1,
 #     survey_runs: Optional[int] = 1,
@@ -615,7 +615,7 @@ def ANEC_run_CA(
 #     rack: position of the tray in the icpms instrument, usually 2.
 #     """
 
-#     apm = ActionPlanMaker(exp)  # exposes function parameters via apm.pars
+#     apm = ActionPlanMaker(experiment)  # exposes function parameters via apm.pars
 
 #     apm.add_action(
 #         {
