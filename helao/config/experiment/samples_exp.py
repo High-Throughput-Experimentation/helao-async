@@ -25,7 +25,7 @@ PAL_server = MachineModel(
              ).json_dict()
 
 
-def create_liquid(pg_Obj: Experiment, 
+def create_liquid(experiment: Experiment, 
                   volume_ml: Optional[float] = 1.0, 
                   source: Optional[List[str]] = ["source1","source2"],
                   mass:  Optional[List[str]] = ["mass1","mass2"],
@@ -35,7 +35,7 @@ def create_liquid(pg_Obj: Experiment,
                   comment: Optional[str] = "comment"
                  ):
     """creates a custom liquid sample"""
-    sq = ActionPlanMaker(pg_Obj) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": PAL_server,
