@@ -2396,10 +2396,12 @@ class Aligner:
         ######################################################################
         self.plot_mpmap = figure(
                                  title="PlateID", 
-                                 height=300,
+                                 # height=300,
                                  x_axis_label="X (mm)",
                                  y_axis_label="Y (mm)",
-                                 width = self.totalwidth
+                                 width = self.totalwidth,
+                                 aspect_ratio  = 6/4,#1,
+                                 aspect_scale = 1
                                 )
 
         self.plot_mpmap.square(
