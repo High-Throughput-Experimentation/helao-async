@@ -2,7 +2,7 @@ hostip = "127.0.0.1"
 config = dict()
 
 # action library provides generator functions which produce actions
-config["experiment_libraries"] = ["ANEC_prc"]
+config["experiment_libraries"] = ["ANEC_prc", "samples_exp"]
 config["sequence_libraries"] = ["ANEC_seq"]
 config["technique_name"] = "anec"
 config["root"] = r"C:\INST_dev2"
@@ -34,12 +34,14 @@ config["servers"] = dict(
         params=dict(
             enable_aligner = True,
             bokeh_port = 5003,
-            cutoff = 6,            
-            # 4x6 plate, FIXME
-            #M_instr = [[1,0,0,-76.525],[0,1,0,-50.875],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
-            # 100mm wafer, FIXME
-            M_instr = [[1,0,0,-76.525+(3*25.4-50)-0.5+0.75+1.5+0.25],[0,1,0,-50.875+2.71+5-3+1],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
-
+            # backup if f"{gethostname()}_instrument_calib.json" is not found
+            # instrument specific calibration
+            M_instr = [
+                       [1,0,0,0],
+                       [0,1,0,0],
+                       [0,0,1,0],
+                       [0,0,0,1]
+                       ],
             count_to_mm=dict(
                 A=1.0/16282.23,
                 B=1.0/6397.56,
@@ -140,7 +142,7 @@ config["servers"] = dict(
     # #########################################################################
     # Visualizers (bokeh servers)
     # #########################################################################
-    VIS=dict(#simple dumb modular visualizer
+    VIS=dict(
         host=hostip,
         port=5001,
         group="visualizer",
