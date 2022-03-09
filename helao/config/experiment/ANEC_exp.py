@@ -126,8 +126,6 @@ def ANEC_flush_fill_cell(
             "dilute_liquids": True,
         },
     )
-    # TODO: perhaps we don't want to end in normal state
-    apm.add_action_list(ANEC_normal_state(experiment))
     return apm.action_list
 
 
