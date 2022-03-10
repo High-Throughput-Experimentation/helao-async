@@ -1229,7 +1229,7 @@ class PAL:
             error, samples_out_list = await self.archive.new_ref_samples(
                                       samples_in = microcam.run[-1].samples_in,
                                       sample_out_type =  microcam.cam.sample_out_type,
-                                      samples_position = dest,
+                                      sample_position = dest,
                                       action = self.active.action
                                      )
 

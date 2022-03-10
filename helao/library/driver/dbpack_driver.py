@@ -1,20 +1,27 @@
-__all__ = ["DBPack", "ActYml", "ExpYml"]
+__all__ = ["DBPack", "ActYml", "ExpYml", "HelaoPath"]
 
 import os
-from glob import glob
-from datetime import datetime
-from typing import Union, List, Dict
-from collections import UserDict, defaultdict
+import io
+import codecs
 import json
 import yaml
-import pyaml
-import boto3
+import configparser
 from pathlib import Path
-from pydantic import BaseModel
+from glob import glob
+from datetime import datetime
+from typing import Union
+from collections import UserDict, defaultdict
 
+import pyaml
+import botocore
+import boto3
 from helaocore.server.base import Base
-from helaocore.model.process import ProcessModel, ShortActionModel
+from helaocore.model.process import ProcessModel
+from helaocore.model.action import ShortActionModel, ActionModel
+from helaocore.model.experiment import ExperimentModel
+from helaocore.model.experiment_sequence import ExperimentSequenceModel
 from helaocore.helper.gen_uuid import gen_uuid
+from helaocore.helper.read_hlo import read_hlo
 
 # from helaocore.error import ErrorCodes
 
@@ -39,6 +46,22 @@ from helaocore.helper.gen_uuid import gen_uuid
 
 test_flag = False
 
+modmap = {
+    "action": ActionModel,
+    "experiment": ExperimentModel,
+    "sequence": ExperimentSequenceModel,
+}
+
+
+def dict2json(input_dict: dict):
+    """Converts dict to file-like object containing json."""
+    bio = io.BytesIO()
+    StreamWriter = codecs.getwriter("utf-8")
+    wrapper_file = StreamWriter(bio)
+    json.dump(input_dict, wrapper_file)
+    bio.seek(0)
+    return bio
+
 
 class HelaoPath(type(Path())):
     """Helao data path helper attributes."""
@@ -46,49 +69,45 @@ class HelaoPath(type(Path())):
     def __str__(self):
         return os.path.join(*self.parts)
 
+    def rename(self, status: str):
+        tempparts = list(self.parts)
+        tempparts[self.status_idx] = status
+        return HelaoPath(os.path.join(*tempparts))
+
+    @property
+    def status_idx(self):
+        valid_statuses = ("ACTIVE", "FINISHED", "SYNCED")
+        return [any([x in valid_statuses]) for x in self.parts].index(True)
+
+    @property
+    def relative(self):
+        return "/".join(list(self.parts)[self.status_idx + 1 :])
+
     @property
     def active(self):
-        self._tempparts = list(self.parts)
-        self.status_idx = [
-            any([x in ("ACTIVE", "FINISHED", "SYNCED")]) for x in self.parts
-        ].index(True)
-        self._tempparts[self.status_idx] = "ACTIVE"
-        return HelaoPath(os.path.join(*self._tempparts))
+        return self.rename("ACTIVE")
 
     @property
     def finished(self):
-        self._tempparts = list(self.parts)
-        self.status_idx = [
-            any([x in ("ACTIVE", "FINISHED", "SYNCED")]) for x in self.parts
-        ].index(True)
-        self._tempparts[self.status_idx] = "FINISHED"
-        return HelaoPath(os.path.join(*self._tempparts))
+        return self.rename("FINISHED")
 
     @property
     def synced(self):
-        self._tempparts = list(self.parts)
-        self.status_idx = [
-            any([x in ("ACTIVE", "FINISHED", "SYNCED")]) for x in self.parts
-        ].index(True)
-        self._tempparts[self.status_idx] = "SYNCED"
-        return HelaoPath(os.path.join(*self._tempparts))
+        return self.rename("SYNCED")
 
     def cleanup(self):
         """Remove empty directories in ACTIVE or FINISHED."""
-        self._tempparts = list(self.parts)
-        self.status_idx = [
-            any([x in ("ACTIVE", "FINISHED", "SYNCED")]) for x in self.parts
-        ].index(True)
-        steps = len(self._tempparts) - self.status_idx
+        tempparts = list(self.parts)
+        steps = len(tempparts) - self.status_idx
         for i in range(1, steps):
-            check_dir = Path(os.path.join(*self._tempparts[:-i]))
-            contents = [x for x in check_dir.glob("*") if x!=check_dir]
+            check_dir = Path(os.path.join(*tempparts[:-i]))
+            contents = [x for x in check_dir.glob("*") if x != check_dir]
             if contents:
                 break
             check_dir.rmdir()
 
 
-class PackYml:
+class HelaoYml:
     def __init__(self, yml_path: Union[HelaoPath, str], dry_run: bool = test_flag):
         self.dry_run = dry_run
         self.parse_yml(yml_path)
@@ -123,6 +142,9 @@ class PackYml:
         self.progress = Progress(self)
         if self.status == "FINISHED":
             self.progress[self.yml_key]["ready"] = True
+            self.progress[self.yml_key]["meta"] = modmap[self.yml_type](
+                **self.yml_dict
+            ).clean_dict()
             self.progress.write()
 
     @property
@@ -135,68 +157,15 @@ class PackYml:
     def name(self):
         return self.yml_dict[f"{self.yml_type}_name"]
 
-    def to_api(self, progress_key: Union[str, int], retry_num: int = 5):
-        """Submit to modelyst DB"""
-        # create http request
-        # post request
-        # verify success and retry
-        pass
-
-    def to_s3(self, progress_key: Union[str, int], retry_num: int = 5):
-        """Upload data_files and yml/json to S3"""
-        if isinstance(progress_key, int): # process group
-            pass
-        pdict = self.progress[progress_key]
-        metad = self.yml_dict
-        hlo_data = [x for x in self.data_files if x.name.endswith('.hlo')]
-        aux_data = [x for x in self.data_files if not x.name.endswith('.hlo')]
-        json_yml = json.dumps(pdict['meta'])
-        # create s3 api request
-        # post request
-        # verify success and retry
-        pass
-
-    def to_finished(self):
-        """Moves yml and data folder from ACTIVE to FINISHED path."""
-        if self.status == "ACTIVE":
-            if self.dry_run:
-                print("Moving files:")
-                for file_path in self.data_files:
-                    print(file_path.finished)
-                print(self.target.finished)
-                return
-            for file_path in self.data_files:
-                file_path.finished.parent.mkdir(parents=True, exist_ok=True)
-                file_path.replace(file_path.finished)
-            self.target.finished.parent.mkdir(parents=True, exist_ok=True)
-            new_target = self.target.replace(self.target.finished)
-            self.target.cleanup()
-            self.parse_yml(new_target)
-        else:
-            print("Yml status is not ACTIVE, cannot move.")
-
-    def to_synced(self):
-        """Moves yml and data folder from FINISHED to SYNCED path. Final state."""
-        if self.status == "FINISHED" and self.progress[self.yml_key]['done']:
-            if self.dry_run:
-                print("Moving files:")
-                for file_path in self.data_files:
-                    print(file_path.synced)
-                print(self.target.synced)
-                return
-            for file_path in self.data_files:
-                file_path.synced.parent.mkdir(parents=True, exist_ok=True)
-                file_path.replace(file_path.synced)
-            self.target.synced.parent.mkdir(parents=True, exist_ok=True)
-            new_target = self.target.replace(self.target.synced)
-            self.target.cleanup()
-            self.parse_yml(new_target)
-
 
 class Progress(UserDict):
-    """Custom dict that wraps getter and setter ops with read/writes to progress file."""
+    """Custom dict that wraps getter/setter ops with read/writes to progress file.
 
-    def __init__(self, pack_yml: PackYml):
+    Note: getter-setter ops only work for root keys, setting a nested key-value requires
+    an additional call to Progress.write()
+    """
+
+    def __init__(self, pack_yml: HelaoYml):
         super().__init__()
         self.pack_yml = pack_yml
         self.yml_key = pack_yml.yml_key
@@ -282,14 +251,14 @@ class Progress(UserDict):
         return iter(self.data)
 
 
-class ActYml(PackYml):
+class ActYml(HelaoYml):
     def __init__(self, yml_path: Union[HelaoPath, str]):
         super().__init__(yml_path)
         self.finisher = self.yml_dict.get("process_finish", False)
         self.contribs = self.yml_dict.get("process_contrib", False)
 
 
-class ExpYml(PackYml):
+class ExpYml(HelaoYml):
     def __init__(self, yml_path: Union[HelaoPath, str]):
         super().__init__(yml_path)
         self.get_actions()
@@ -397,61 +366,8 @@ class ExpYml(PackYml):
         self.progress[group_idx]["meta"] = ProcessModel(**base_process).clean_dict()
         self.progress.write()
 
-    def sync_process(self):
-        """Push finished process, upload files and yml to S3."""
-        for prck in self.grouped_actions.keys():
-            prcp = self.progress[prck]
-            if prcp['ready'] and prcp['meta']:
-        # push hlo data as json
-        # update data_file progress
-        # push aux data
-        # update data_file progress
-        # push yaml as json
-        # update progress
-        # push api
-                json_yml = json.dumps(prcp['meta'])
-        # update progress
-        # if all done, set ready=False, done=True
-        # move to SYNCED
-        pass
 
-    def sync_ungrouped(self):
-        """Push finished non-process actions, upload yml to S3."""
-        for act in self.ungrouped_actions:
-            actp = self.progress[act.yml_key]
-            if actp['ready']:
-                # push hlo data as json
-                # update data_file progress
-                # push aux data
-                # update data_file progress
-                # push yaml as json
-                # update progress   
-                # push api
-                json_yml = json.dumps(act.yml_dict)
-                # update progress
-                # if all done, set ready=False, done=True
-                # move to SYNCED
-                pass
-        pass
-
-    def sync_grouped(self):
-        """Push finished process actions, upload yml to S3."""
-        for grp_idx, grp in self.grouped_actions:
-                # push hlo data as json
-                # update data_file progress
-                # push aux data
-                # update data_file progress
-                # push yaml as json
-                # update progress
-                # push api
-                # update progress
-                # if all done, set ready=False, done=True
-                # move to SYNCED
-            pass
-        pass
-
-
-class SeqYml(PackYml):
+class SeqYml(HelaoYml):
     def __init__(self, yml_path: Union[HelaoPath, str]):
         super().__init__(yml_path)
         self.get_experiments()
@@ -490,23 +406,120 @@ class SeqYml(PackYml):
                 if self.progress[group_idx]["meta"] is None:
                     self.create_process(group_idx)
 
-
     def sync_sequence(self):
         """Push finished sequence, upload yml to S3."""
         pass
 
 
 class DBPack:
+    """Driver class for API push and S3 upload operations.
+
+    config_dict = {
+        "aws_config_path": "path_to_AWS_CONFIG_FILE",
+        "aws_bucket": "helao.data.testing"
+    }
+    """
+
     def __init__(self, action_serv: Base):
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
+        self.aws_config = configparser.ConfigParser()
+        self.aws_config.read(self.config_dict["aws_config_path"])["default"]
+        self.aws_session = boto3.Session(
+            region_name=self.aws_config["region"],
+            aws_access_key_id=self.aws_config["aws_access_key_id"],
+            aws_secret_access_key=self.aws_config["aws_secret_access_key"],
+        )
+        self.bucket = self.aws_config["aws_bucket"]
+        self.s3 = self.aws_session.client("s3")
 
-    def finish_yml(self, yml_path: str):
-        yml = PackYml(yml_path)
-        if yml.status == "ACTIVE":
-            yml.to_finished()
-            yml.read_progress()
-            self.base.print_message(f"Moved {yml_path} from ACTIVE to FINISHED.")
+
+class YmlOps:
+    def __init__(self, dbp: DBPack, helao_yml: Union[ActYml, ExpYml, SeqYml]):
+        self.dbp = dbp
+        self.yml = helao_yml
+
+    def to_api(self, progress_key: Union[str, int], retry_num: int = 5):
+        """Submit to modelyst DB"""
+        # create http request
+        # post request
+        # verify success and retry
+        pass
+
+    def _to_s3(self, input: Union[dict, str], target: str, retry_num: int = 5):
+        if isinstance(input, dict):
+            uploaded = dict2json(input)
+            uploader = self.dbp.s3.upload_fileobj
         else:
-            self.base.print_message("Can only finish ACTIVE data.")
+            uploader = self.dbp.s3.upload_file
+        for i in range(retry_num):
+            try:
+                uploader(uploaded, self.dbp.bucket, target)
+                return True
+            except botocore.exceptions.ClientError as e:
+                self.dbp.base.print_message(e)
+                self.dbp.base.print_message(
+                    f"Retry S3 upload [{i}/{retry_num}]: {self.dbp.bucket}, {target}"
+                )
+        return False
+
+    def to_s3(self, progress_key: Union[str, int], retry_num: int = 5):
+        """Upload data_files and yml/json to S3"""
+
+        pdict = self.yml.progress[progress_key]
+        tech = self.dbp.world_config["technique_name"]
+        if isinstance(progress_key, int):  # process group
+            meta_type = "process"
+        else:
+            meta_type = self.yml.yml_type.lower()
+
+        # push
+        meta_s3_key = f"{meta_type}/{tech}/{self.yml.target.relative}.json"
+        meta_success = self._to_s3(pdict["meta"], meta_s3_key)
+        if meta_success:
+            pdict["s3"] = True
+            self.yml.progress.write()
+
+        hlo_data = [x for x in self.yml.data_files if x.name.endswith(".hlo")]
+        aux_data = [x for x in self.yml.data_files if not x.name.endswith(".hlo")]
+        # create s3 api request
+        # post request
+        # verify success and retry
+        pass
+
+    def to_finished(self):
+        """Moves yml and data folder from ACTIVE to FINISHED path."""
+        if self.yml.status == "ACTIVE":
+            if self.yml.dry_run:
+                print("Moving files:")
+                for file_path in self.yml.data_files:
+                    print(file_path.finished)
+                print(self.yml.target.finished)
+                return
+            for file_path in self.yml.data_files:
+                file_path.finished.parent.mkdir(parents=True, exist_ok=True)
+                file_path.replace(file_path.finished)
+            self.yml.target.finished.parent.mkdir(parents=True, exist_ok=True)
+            new_target = self.yml.target.replace(self.target.finished)
+            self.yml.target.cleanup()
+            self.yml.parse_yml(new_target)
+        else:
+            print("Yml status is not ACTIVE, cannot move.")
+
+    def to_synced(self):
+        """Moves yml and data folder from FINISHED to SYNCED path. Final state."""
+        if self.yml.status == "FINISHED" and self.progress[self.yml_key]["done"]:
+            if self.yml.dry_run:
+                print("Moving files:")
+                for file_path in self.yml.data_files:
+                    print(file_path.synced)
+                print(self.yml.target.synced)
+                return
+            for file_path in self.yml.data_files:
+                file_path.synced.parent.mkdir(parents=True, exist_ok=True)
+                file_path.replace(file_path.synced)
+            self.yml.target.synced.parent.mkdir(parents=True, exist_ok=True)
+            new_target = self.yml.target.replace(self.target.synced)
+            self.yml.target.cleanup()
+            self.yml.parse_yml(new_target)
