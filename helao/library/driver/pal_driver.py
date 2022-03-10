@@ -709,12 +709,15 @@ class PAL:
                         for part_i, part in enumerate(sample_out.parts):
                             if part.global_label is not None:
                                 tmp_part = await self.archive.unified_db.get_sample(samples=[part])
+                                for sample in tmp_part:
+                                    sample.action_uuid=[self.active.action.action_uuid]
                                 sample_out.parts[part_i] = \
                                     copy.deepcopy(tmp_part[0])
                             else:
                                 # the assembly contains a ref sample which 
                                 # first need to be updated and converted
                                 part.sample_creation_timecode = palaction.continue_time
+                                part.action_uuid=[self.active.action.action_uuid]
                                 tmp_part = await self.archive.unified_db.new_sample(samples=[part])
                                 sample_out.parts[part_i] = \
                                     copy.deepcopy(tmp_part[0])
