@@ -3,10 +3,12 @@ __all__ = [
            "create_liquid_sample",
            "create_gas_sample",
            "create_assembly_sample",
+           "sort_plate_sample_no_list",
+           "generate_sample_no_list",
           ]
 
 
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from socket import gethostname
 
 from helaocore.schema import Experiment, ActionPlanMaker
@@ -148,5 +150,46 @@ def create_assembly_sample(experiment: Experiment,
                                               "comment": apm.pars.comment,
                              })],
                           })
+
+    return apm.action_list # returns complete action list to orch
+
+
+def sort_plate_sample_no_list(
+                              experiment: Experiment,
+                              plate_sample_no_list: list = [2],
+                             ):
+    """tbd"""
+    
+    apm = ActionPlanMaker() # exposes function parameters via apm.pars
+
+    return apm.action_list # returns complete action list to orch
+
+
+def generate_sample_no_list(
+                            experiment: Experiment,
+                            plate_id: Optional[int] = 1,
+                            sample_code: Optional[int] = 0,
+                            skip_n_samples: Optional[int] = 0,
+                            direction: Optional[str] = None,
+                            sample_nos: Optional[List[int]] = [],
+                            sample_nos_operator: Optional[str] = "",
+                            # platemap_xys: List[Tuple[int, int]] = [],
+                            platemap_xys: List[Tuple[int, int]] = [(None, None)],
+                            platemap_xys_operator: Optional[str] = "",
+                           ):
+    """tbd"""
+
+    apm = ActionPlanMaker() # exposes function parameters via apm.pars
+
+    apm.add(PAL_server, "generate_plate_sample_no_list",{
+        "plate_id":apm.pars.plate_id,
+        "sample_code":apm.pars.sample_code,
+        "skip_n_samples":apm.pars.skip_n_samples,
+        # "direction":apm.pars.direction,
+        # "sample_nos":apm.pars.sample_nos,
+        # "sample_nos_operator":apm.pars.sample_nos_operator,
+        # "platemap_xys":apm.pars.platemap_xys,
+        # "platemap_xys_operator":apm.pars.platemap_xys_operator,
+        })
 
     return apm.action_list # returns complete action list to orch

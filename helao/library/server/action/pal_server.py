@@ -5,8 +5,8 @@ from importlib import import_module
 from socket import gethostname
 from time import strftime
 
-from fastapi import Body
-from typing import Optional, List
+from fastapi import Body, Query
+from typing import Optional, List, Tuple
 
 from helaocore.server.base import makeActionServ
 from helao.library.driver.pal_driver import (
@@ -19,6 +19,11 @@ from helao.library.driver.pal_driver import (
                                              SampleInheritance,
                                              SampleStatus
                                             ) 
+from helao.library.driver.archive_driver import (
+                                                 ScanDirection,
+                                                 ScanOperator
+                                                )
+
 from helaocore.model.sample import (
                                     SampleType,
                                     LiquidSample, 
@@ -684,9 +689,9 @@ def makeApp(confPrefix, servKey):
                                           action_abbr = "traytoicpms",
         )
         await app.driver.archive.tray_export_icpms(
-             tray = tray,
-             slot = slot,
              myactive = active,
+             tray = active.action.action_params.get("tray", None),
+             slot = active.action.action_params.get("slot", None),
              survey_runs = active.action.action_params.get("survey_runs", None),
              main_runs = active.action.action_params.get("main_runs", None),
              rack = active.action.action_params.get("rack", None),
@@ -925,5 +930,34 @@ def makeApp(confPrefix, servKey):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
+
+    @app.post(f"/{servKey}/generate_plate_sample_no_list", tags=["public_db"])
+    async def generate_plate_sample_no_list(
+                                      action: Optional[Action] = \
+                                              Body({}, embed=True),
+                                      plate_id: Optional[int] = 1,
+                                      sample_code: Optional[int] = Query(0, ge=0, le=2),
+                                      skip_n_samples: Optional[int] = Query(0, ge=0),
+                                      direction: Optional[ScanDirection] = None,
+                                      sample_nos: Optional[List[int]] = [],
+                                      sample_nos_operator: Optional[ScanOperator] = None,
+                                      # platemap_xys: Optional[List[Tuple[int, int]]] = [],
+                                      platemap_xys: Optional[list] = [],
+                                      platemap_xys_operator: Optional[ScanOperator] = None,
+                                     ):
+        active = await app.base.setup_and_contain_action()
+        await app.driver.archive.generate_plate_sample_no_list(
+            active=active,
+            plate_id=active.action.action_params.get("plate_id", None),
+            sample_code=active.action.action_params.get("sample_code", None),
+            skip_n_samples=active.action.action_params.get("skip_n_samples", None),
+            direction=active.action.action_params.get("direction", None),
+            sample_nos=active.action.action_params.get("sample_nos", None),
+            sample_nos_operator=active.action.action_params.get("sample_nos_operator", None),
+            platemap_xys=active.action.action_params.get("platemap_xys", None),
+            platemap_xys_operator=active.action.action_params.get("platemap_xys_operator", None),
+        )
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
     return app

@@ -35,6 +35,21 @@ from helaocore.data.sample import UnifiedSampleDataAPI
 from helaocore.schema import Action
 
 
+class ScanDirection(str, Enum):
+    raster_rows = "raster_rows"
+    raster_columns = "raster_columns"
+    left_to_right = "left_to_right"
+    top_to_bottom = "top_to_bottom"
+
+    
+class ScanOperator(str, Enum):
+    so_gt = "gt"
+    so_gte = "gte"
+    so_lt = "lt"
+    so_lte = "lte"
+    so_not = "not" # cannot have not, thats why I added so_ to each
+
+
 class CustomTypes(str, Enum):
     cell = "cell"
     reservoir = "reservoir"
@@ -1690,3 +1705,58 @@ class Archive():
         samples_out = await self.unified_db.new_sample(samples=reference_samples_in)
 
         return samples_out
+
+
+    async def generate_plate_sample_no_list(
+                                      self,
+                                      active = None,
+                                      plate_id: int = None,
+                                      sample_code: int = None,
+                                      skip_n_samples: int = None,
+                                      direction: ScanDirection = None,
+                                      sample_nos: List[int] = [],
+                                      sample_nos_operator: ScanOperator = None,
+                                      platemap_xys: List[Tuple[int, int]] = [],
+                                      platemap_xys_operator: ScanOperator = None,
+                                     ):
+        """generate the sample list based on filters:
+           - which direction to move 
+             (raster rows, raster columns, left-to-right, top-to-bottom)
+           - platemap composition (A>0 and/or B=0)
+           - platemap sample codes (code=0, code!=1)
+           - skip every N samples
+           - sample number equals, gt, gte, lt, lte, not
+           - platemap x,y equals, gt, gte, lt, lte, not"""
+        if active is None \
+        or plate_id is None \
+        or sample_code is None\
+        or skip_n_samples is None:
+            return False
+
+        # put all sample numbers in here
+        sample_nos_list = [] # need to be a list of str
+
+
+        # (1) check if plate_id is valid
+        solid = SolidSample(plate_id=plate_id)
+        pmmap = await self.unified_db.get_platemap(samples=[solid])
+        if not pmmap:
+            return False
+        pmmap = pmmap[0]
+        lasti = -1
+        for i, col in enumerate(pmmap):
+            if (i - lasti)-1 == skip_n_samples:
+                if col["code"] == sample_code:
+                    sample_nos_list.append(f"{col['sample_no']}")
+                    lasti = i
+
+        # write the sample no list to a file
+        await active.write_file(
+            file_type = "plate_sample_no_list_file",
+            filename = f"{plate_id}.txt",
+            output_str = "\n".join(sample_nos_list),
+            header = None,
+            sample_str = None
+            )
+
+        return True
