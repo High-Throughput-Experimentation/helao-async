@@ -145,7 +145,7 @@ async def gamry_dyn_endpoints(app = None):
                          Vfinal: Optional[float] = 0.0,  # Final value in volts or amps.
                          ScanRate: Optional[
                                             float
-                         ] = 1.0,  # Apex scan rate in volts/second or amps/second.
+                         ] = 1.0,  # scan rate in volts/second or amps/second.
                          SampleRate: Optional[float] = 0.01,  # Time between data acquisition steps.
                          Cycles: Optional[int] = 1,
                          TTLwait: Optional[int] = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
