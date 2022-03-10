@@ -92,8 +92,7 @@ def debug(experiment: Experiment,
     # 2: orch is waiting for server to become available
     # 3: (or other): orch is waiting for all action_dq to finish
 
-    additional_local_var_added_to_sq = 12
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": PAL_server,
@@ -153,7 +152,7 @@ def debug(experiment: Experiment,
 def ADSS_slave_unloadall_customs(experiment: Experiment):
     """last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": PAL_server,
@@ -174,7 +173,7 @@ def ADSS_slave_load_solid(
                          ):
     """last functionality test: 11/29/2021"""
     
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
     sq.add_action({
         "action_server": PAL_server,
         "action_name": "archive_custom_load",
@@ -197,7 +196,7 @@ def ADSS_slave_load_liquid(
                          ):
     """last functionality test: 11/29/2021"""
     
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
     sq.add_action({
         "action_server": PAL_server,
         "action_name": "archive_custom_load",
@@ -231,7 +230,7 @@ def ADSS_slave_startup(experiment: Experiment,
     last functionality test: 11/29/2021"""
 
     
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
 
 
     # unload all samples from custom positions
@@ -309,7 +308,7 @@ def ADSS_slave_shutdown(experiment: Experiment):
     
     last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
 
     # deep clean
     sq.add_action_list(ADSS_slave_clean_PALtool(experiment, clean_tool = PALtools.LS3, clean_volume_ul = 500))
@@ -390,7 +389,7 @@ def ADSS_slave_drain(experiment: Experiment):
     
     last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
     # TODO
     return sq.action_list # returns complete action list to orch
 
@@ -401,7 +400,7 @@ def ADSS_slave_engage(experiment: Experiment):
     
     last functionality test: 11/29/2021"""
     
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
 
     # engage
     sq.add_action({
@@ -442,7 +441,7 @@ def ADSS_slave_disengage(experiment: Experiment):
     
     last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": MOTOR_server,
@@ -471,7 +470,7 @@ def ADSS_slave_clean_PALtool(experiment: Experiment,
     last functionality test: 11/29/2021"""
 
 
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
     
     # deep clean
     sq.add_action({
@@ -491,7 +490,7 @@ def ADSS_slave_fillfixed(experiment: Experiment,
                          fill_vol_ul: Optional[int] = 10000,
                          filltime_sec: Optional[float] = 10.0
                          ):
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
 
     # fill liquid, no wash (assume it was cleaned before)
     sq.add_action({
@@ -548,7 +547,7 @@ def ADSS_slave_fillfixed(experiment: Experiment,
 
 
 def ADSS_slave_fill(experiment: Experiment, fill_vol_ul: Optional[int] = 1000):
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
 
     # fill liquid, no wash (assume it was cleaned before)
     sq.add_action({
@@ -581,7 +580,7 @@ def ADSS_slave_CA(experiment: Experiment,
               ):
     """last functionality test: 11/29/2021"""
     
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
 
     # get sample for gamry
     sq.add_action({
@@ -730,7 +729,7 @@ def ADSS_slave_tray_unload(
     rack: position of the tray in the icpms instrument, usually 2.
     """
     
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": PAL_server,

@@ -39,7 +39,7 @@ def create_liquid_sample(experiment: Experiment,
                         ):
     """creates a custom liquid sample
        input fields contain json strings"""
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": PAL_server,
@@ -74,7 +74,7 @@ def create_gas_sample(experiment: Experiment,
                      ):
     """creates a custom gas sample
        input fields contain json strings"""
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": PAL_server,
@@ -120,7 +120,7 @@ def create_assembly_sample(experiment: Experiment,
            solid_plate_ids: plate ids
            solid_sample_nos: sample_no on plate (one plate_id for each sample_no)
            """
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
     # check first 
     if len(sq.pars.solid_plate_ids) != len(sq.pars.solid_sample_nos):
         print(f"!!! ERROR: len(solid_plate_ids) != len(solid_sample_nos): "
