@@ -653,12 +653,18 @@ class PAL:
                 # palaction.samples_in should always be non ref samples
                 palaction.samples_in = \
                     await self.archive.unified_db.get_sample(samples=palaction.samples_in)
+                # update the action_uuid
+                for sample in palaction.samples_in:
+                    sample.action_uuid=[self.active.action.action_uuid]
                 # as palaction.samples_in contains both source and dest samples
                 # we had them saved separately (this is for the hlo file)
 
                 # palaction.source should also always contain non ref samples
                 palaction.source.samples_initial = \
                     await self.archive.unified_db.get_sample(samples=palaction.source.samples_initial)
+                # update the action_uuid
+                for sample in palaction.source.samples_initial:
+                    sample.action_uuid=[self.active.action.action_uuid]
 
                 # dest can also contain ref samples, and these are not yet in the db
                 for dest_i, dest_sample in enumerate(palaction.dest.samples_initial):
@@ -674,6 +680,10 @@ class PAL:
                     else:
                             self.base.print_message("palaction.dest.samples_initial should not contain ref samples", error = True)
                             return ErrorCodes.bug
+                # update the action_uuid
+                for sample in palaction.dest.samples_initial:
+                    sample.action_uuid=[self.active.action.action_uuid]
+
 
                 # -- (2) -- update sample_out
                 # only samples in sample_out should be new ones (ref samples)
@@ -710,7 +720,15 @@ class PAL:
                                     copy.deepcopy(tmp_part[0])
                             # now add the real samples back to the source list
                             sample_out.source.append(part.get_global_label())
-                        
+                        # update the action_uuid
+                        for sample in sample_out.parts:
+                            sample.action_uuid=[self.active.action.action_uuid]
+
+
+                # update the action_uuid
+                for sample in palaction.samples_out:
+                    sample.action_uuid=[self.active.action.action_uuid]
+
 
                 # -- (3) -- convert samples_out references to real sample
                 #           by adding them to the to db
@@ -744,6 +762,8 @@ class PAL:
                     if sample_out.sample_type == SampleType.assembly:
                         sample_out.parts = \
                             await self.archive.unified_db.get_sample(samples=sample_out.parts)
+                    # update the action_uuid
+                    sample_out.action_uuid=[self.active.action.action_uuid]
                     # save it back to the db
                     await self.archive.unified_db.update_sample([sample_out])
 
@@ -1938,6 +1958,11 @@ class PAL:
         # update source and dest final samples
         palaction.source.samples_final = \
              await self.archive.unified_db.get_sample(samples=palaction.source.samples_initial)
+        # update the action_uuid
+        for sample in palaction.source.samples_final:
+            sample.action_uuid=[self.active.action.action_uuid]
+
+
         if palaction.dest.samples_final:
             # should always only contain one sample
             if palaction.dest.samples_final[0].global_label is None:
@@ -1951,7 +1976,9 @@ class PAL:
                 palaction.dest.samples_final = \
                       await self.archive.unified_db.get_sample(samples=palaction.dest.samples_final)
 
-
+        # update the action_uuid
+        for sample in palaction.dest.samples_final:
+            sample.action_uuid=[self.active.action.action_uuid]
 
         error = ErrorCodes.none
         retval = False
