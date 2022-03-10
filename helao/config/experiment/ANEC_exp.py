@@ -189,7 +189,7 @@ def ANEC_cleanup(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add_action_list(
         ANEC_flush_fill_cell(
-            exp=exp,
+            experiment=experiment,
             reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
         )
     )
