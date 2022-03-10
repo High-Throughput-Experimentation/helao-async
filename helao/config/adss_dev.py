@@ -7,7 +7,7 @@ config = dict()
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
-config["experiment_libraries"] = ["ADSS_prc", "samples_exp"]
+config["experiment_libraries"] = ["ADSS_exp", "samples_exp"]
 config["sequence_libraries"] = ["ADSS_seq"]
 config["technique_name"] = "adss"
 config["root"] = r"C:\INST_dev2"
