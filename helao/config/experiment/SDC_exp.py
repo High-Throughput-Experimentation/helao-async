@@ -57,7 +57,7 @@ PAL_server = MachineModel(
 def SDC_slave_unloadall_customs(experiment: Experiment):
     """last functionality test: -"""
 
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": PAL_server,
@@ -78,7 +78,7 @@ def SDC_slave_load_solid(
                          ):
     """last functionality test: -"""
     
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
 
     sq.add_action({
         "action_server": PAL_server,
@@ -107,7 +107,7 @@ def SDC_slave_startup(experiment: Experiment,
        last functionality test: -"""
 
     
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
 
 
     # unload all samples from custom positions
@@ -178,7 +178,7 @@ def SDC_slave_shutdown(experiment: Experiment):
     
     last functionality test: -"""
 
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
 
 
     return sq.action_list # returns complete action list to orch
@@ -197,7 +197,7 @@ def SDC_slave_CA_toggle(experiment: Experiment,
               ):
     """last functionality test: -"""
     
-    sq = ActionPlanMaker(experiment) # exposes function parameters via sq.pars
+    sq = ActionPlanMaker() # exposes function parameters via sq.pars
 
     # get sample for gamry
     sq.add_action({

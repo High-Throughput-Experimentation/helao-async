@@ -62,7 +62,7 @@ def ANEC_normal_state(
         experiment (Experiment): Experiment object provided by Orch
     """
 
-    apm = ActionPlanMaker(experiment)
+    apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
     apm.add(NI_server, "pump", {"pump": "PeriPump2", "on": 1})
     apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
@@ -87,7 +87,7 @@ def ANEC_flush_fill_cell(
     (1) create liquid sample using volume_ul_cell and liquid_sample_no
     """
 
-    apm = ActionPlanMaker(experiment)
+    apm = ActionPlanMaker()
 
     # Wait for 10 seconds to equilibrate normal state
     apm.add(ORCH_server, "wait", {"waittime": 10})
@@ -131,7 +131,7 @@ def ANEC_flush_fill_cell(
 def ANEC_unload_cell(experiment: Experiment):
     """Unload Sample at 'cell1_we' position."""
 
-    apm = ActionPlanMaker(experiment)
+    apm = ActionPlanMaker()
     apm.add(PAL_server, "archive_custom_unloadall", {})
     return apm.action_list
 
@@ -139,7 +139,7 @@ def ANEC_unload_cell(experiment: Experiment):
 def ANEC_unload_liquid(experiment: Experiment):
     """Unload liquid sample at 'cell1_we' position and reload solid sample."""
 
-    apm = ActionPlanMaker(experiment)
+    apm = ActionPlanMaker()
     apm.add(
         PAL_server, "archive_custom_unloadall", {}, to_global_params=["_unloaded_solid"]
     )
@@ -158,7 +158,7 @@ def ANEC_drain_cell(
 ):
     """Drain liquid from cell and unload liquid sample."""
 
-    apm = ActionPlanMaker(experiment)
+    apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
     apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquid_valve": "down", "on": 1})
@@ -186,7 +186,7 @@ def ANEC_cleanup(
 
     """
 
-    apm = ActionPlanMaker(experiment)  # exposes function parameters via apm.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add_action_list(
         ANEC_flush_fill_cell(
             exp=exp,
@@ -211,7 +211,7 @@ def ANEC_GC_preparation(
 
     """
 
-    apm = ActionPlanMaker(experiment)  # exposes function parameters via apm.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
         PAL_server,
         "PAL_ANEC_GC",
@@ -233,7 +233,7 @@ def ANEC_load_solid(
 ):
     """Load solid and clean cell."""
 
-    apm = ActionPlanMaker(experiment)
+    apm = ActionPlanMaker()
     apm.add_action_list(ANEC_unload_cell(experiment))
     apm.add(
         PAL_server,
@@ -295,7 +295,7 @@ def ANEC_run_CA(
 
     """
 
-    apm = ActionPlanMaker(experiment)  # exposes function parameters via apm.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     potential_vsWE = (
         apm.pars.CA_potential_vsRHE
         - 1.0 * apm.pars.ref_vs_nhe
@@ -356,7 +356,7 @@ def ANEC_run_CA(
 
 #     last functionality test: untested"""
 
-#     apm = ActionPlanMaker(experiment)  # exposes function parameters via apm.pars
+#     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
 #     # engage
 #     apm.add_action(
@@ -401,7 +401,7 @@ def ANEC_run_CA(
 
 #     last functionality test: untested"""
 
-#     apm = ActionPlanMaker(experiment)  # exposes function parameters via apm.pars
+#     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
 #     apm.add_action(
 #         {
@@ -432,7 +432,7 @@ def ANEC_run_CA(
 
 #     last functionality test: untested"""
 
-#     apm = ActionPlanMaker(experiment)  # exposes function parameters via apm.pars
+#     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
 #     # deep clean
 #     apm.add_action(
@@ -462,7 +462,7 @@ def ANEC_run_CA(
 # ):
 #     """last functionality test: untested"""
 
-#     apm = ActionPlanMaker(experiment)  # exposes function parameters via apm.pars
+#     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
 #     # get sample for gamry
 #     apm.add_action(
@@ -619,7 +619,7 @@ def ANEC_run_CA(
 #     rack: position of the tray in the icpms instrument, usually 2.
 #     """
 
-#     apm = ActionPlanMaker(experiment)  # exposes function parameters via apm.pars
+#     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
 #     apm.add_action(
 #         {
