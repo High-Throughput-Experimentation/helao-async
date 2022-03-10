@@ -225,7 +225,7 @@ class C_nidaqmxvis:
                                 self.vis.doc.add_next_tick_callback(partial(self.add_points, datapackage))
                         except Exception:
                             self.IOloop_data_run = False
-                    ws.close()
+                    await ws.close()
                     self.IOloop_data_run = False
             except Exception:
                 self.vis.print_message(f"failed to subscribe to "
@@ -454,7 +454,7 @@ class C_potvis:
                                 self.vis.doc.add_next_tick_callback(partial(self.add_points, datapackage))
                         except Exception:
                             self.IOloop_data_run = False
-                    ws.close()
+                    await ws.close()
                     self.IOloop_data_run = False
             except Exception:
                 self.vis.print_message(f"failed to subscribe to "

@@ -1170,8 +1170,8 @@ class Archive():
     async def new_ref_samples(
                               self, 
                               samples_in: List[SampleUnion],
-                              samples_out_type: str = "",
-                              samples_position: str = "",
+                              sample_out_type: str = "",
+                              sample_position: str = "",
                               action: Action = None,
                               # combine multiple liquids into a new
                               # liquid sample
@@ -1240,27 +1240,27 @@ class Archive():
             "lot_number":source_lotnumber,
             "status":[SampleStatus.created],
             "inheritance":SampleInheritance.receive_only,
-            "sample_position":samples_position,
+            "sample_position":sample_position,
         }
 
 
         if len(samples_in) == 1:
-            if samples_out_type == SampleType.liquid:
+            if sample_out_type == SampleType.liquid:
                 # this is a sample reference, it needs to be added
                 # to the db later
                 samples.append(LiquidSample(**sample_dict))
 
-            elif samples_out_type == SampleType.gas:
+            elif sample_out_type == SampleType.gas:
                 samples.append(GasSample(**sample_dict))
 
-            elif samples_out_type == SampleType.assembly:
+            elif sample_out_type == SampleType.assembly:
                 sample_dict.update(
                         {"parts":samples_in}
                 )
                 samples.append(AssemblySample(**sample_dict))
     
             else:
-                self.base.print_message(f"samples_out type {samples_out_type} "
+                self.base.print_message(f"samples_out type {sample_out_type} "
                                         f"is not supported yet.",
                                         error = True)
                 error = ErrorCodes.not_available
@@ -1374,8 +1374,8 @@ class Archive():
                               # sample check cobverted source_liquid_in
                               # to a list already
                               samples_in = samples_in,
-                              samples_out_type = SampleType.liquid,
-                              samples_position = custom,
+                              sample_out_type = SampleType.liquid,
+                              sample_position = custom,
                               action = action
                               )
 
@@ -1461,8 +1461,8 @@ class Archive():
                                   # input for assembly is the custom sample 
                                   # and the new sample from source_liquid_in
                                   samples_in = [custom_sample, samples_out[0]],
-                                  samples_out_type = SampleType.assembly,
-                                  samples_position = custom,
+                                  sample_out_type = SampleType.assembly,
+                                  sample_position = custom,
                                   action = action,
                                   combine_liquids = True
                                   )
@@ -1532,8 +1532,8 @@ class Archive():
                                   # input for assembly is the custom sample 
                                   # and the new sample from source_liquid_in
                                   samples_in = [custom_sample, samples_out[0]],
-                                  samples_out_type = SampleType.assembly,
-                                  samples_position = custom,
+                                  sample_out_type = SampleType.assembly,
+                                  sample_position = custom,
                                   action = action
                                   )
             

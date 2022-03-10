@@ -66,11 +66,11 @@ def ANEC_normal_state(
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
     apm.add(NI_server, "pump", {"pump": "PeriPump2", "on": 1})
     apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
-    apm.add(NI_server, "liquidvalve", {"liquid_valve": "down", "on": 1})
-    apm.add(NI_server, "liquidvalve", {"liquid_valve": "up", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "down", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "up", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "liquid", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gas_valve": "atm", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gas_valve": "CO2", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "atm", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 1})
     return apm.action_list
 
 
@@ -89,11 +89,9 @@ def ANEC_flush_fill_cell(
 
     apm = ActionPlanMaker()
 
-    # Wait for 10 seconds to equilibrate normal state
-    apm.add(ORCH_server, "wait", {"waittime": 10})
     # Fill cell with liquid
-    apm.add(NI_server, "liquidvalve", {"liquid_valve": "down", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquid_valve": "up", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "down", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "up", "on": 1})
     apm.add(NI_server, "pump", {"pump": "Direction", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "liquid", "on": 1})
@@ -109,8 +107,6 @@ def ANEC_flush_fill_cell(
     apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.equilibration_time})
     apm.add(NI_server, "gasvalve", {"gasvalve": "atm", "on": 0})
-    # Equilibrate for 1 minute
-    apm.add(ORCH_server, "wait", {"waittime": 60})
     # (3) Create liquid sample and add to assembly
     apm.add(
         PAL_server,
@@ -154,18 +150,18 @@ def ANEC_unload_liquid(experiment: Experiment):
 
 def ANEC_drain_cell(
     experiment: Experiment,
-    co2_purge_time: Optional[float] = 10.0,
+    drain_time: Optional[float] = 60.0,
 ):
     """Drain liquid from cell and unload liquid sample."""
 
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
     apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
-    apm.add(NI_server, "liquidvalve", {"liquid_valve": "down", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "down", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 1})
     apm.add(NI_server, "pump", {"pump": "PeriPump2", "on": 1})
     apm.add_action_list(ANEC_unload_liquid(experiment))
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2_purge_time})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.drain_time})
     apm.add_action_list(ANEC_normal_state(experiment))
     return apm.action_list
 
@@ -230,6 +226,8 @@ def ANEC_load_solid(
     solid_sample_no: Optional[int] = 0,
     reservoir_liquid_sample_no: Optional[int] = 0,
     equilibration_time: Optional[float] = 60,
+    toolGC: Optional[str] = "HS 2",
+    volume_ul_GC: Optional[int] = 300,
 ):
     """Load solid and clean cell."""
 
@@ -255,7 +253,17 @@ def ANEC_load_solid(
         )
     )
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.equilibration_time})
-    # TODO: still needed? flush/fill results in normal state
+    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 0})
+    apm.add(
+        PAL_server,
+        "PAL_ANEC_GC",
+        {
+            "toolGC": PALtools(apm.pars.toolGC),
+            "source": "cell1_we",
+            "volume_ul_GC": apm.pars.volume_ul_GC,
+        },
+    )
+    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
     apm.add_action_list(ANEC_drain_cell(experiment))
     return apm.action_list
 
