@@ -1143,7 +1143,7 @@ class PAL:
             error, samples_out_list = await self.archive.new_ref_samples(
                                       samples_in = microcam.run[-1].samples_in, # this should hold a sample already from "check source call"
                                       sample_out_type =  microcam.cam.sample_out_type,
-                                      samples_position = dest,
+                                      sample_position = dest,
                                       action = self.active.action
                                      )
 
@@ -1313,7 +1313,7 @@ class PAL:
                     error, samples_out_list = await self.archive.new_ref_samples(
                                               samples_in = microcam.run[-1].samples_in, # this should hold a sample already from "check source call"
                                               sample_out_type =  microcam.cam.sample_out_type,
-                                              samples_position = dest,
+                                              sample_position = dest,
                                               action = self.active.action
                                              )
     
@@ -1382,7 +1382,7 @@ class PAL:
                 error, samples_out_list = await self.archive.new_ref_samples(
                                           samples_in = microcam.run[-1].samples_in,
                                           sample_out_type =  microcam.cam.sample_out_type,
-                                          samples_position = dest,
+                                          sample_position = dest,
                                           action = self.active.action
                                          )
     
@@ -1417,7 +1417,7 @@ class PAL:
                 error, samples_out2_list = await self.archive.new_ref_samples(
                       samples_in = tmp_samples_in,
                       sample_out_type =  SampleType.assembly,
-                      samples_position = dest,
+                      sample_position = dest,
                       action = self.active.action
                      )
 
@@ -1483,7 +1483,7 @@ class PAL:
         error, samples_out_list = await self.archive.new_ref_samples(
                                   samples_in = microcam.run[-1].samples_in, # this should hold a sample already from "check source call"
                                   sample_out_type =  microcam.cam.sample_out_type,
-                                  samples_position = dest,
+                                  sample_position = dest,
                                   action = self.active.action
                                  )
 
