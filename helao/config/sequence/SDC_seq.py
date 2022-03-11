@@ -35,12 +35,13 @@ def SDC_4CA_toggle_1CV_toggle(
                    CV_scanrate_voltsec: float = 0.02,
                    CV_samplerate_mV: float = 1,
                    CV_cycles: int = 1,
+                   IErange: str = "auto",
                    liquid_volume_ml: float = 1.0,
                    samplerate_sec: float = 0.05, 
-                   wavelength1: float = 385,
-                   wavelength2: float = 455,
-                   wavelength3: float = 515,
-                   wavelength4: float = 590,
+                   wavelength_nm1: float = 385,
+                   wavelength_nm2: float = 455,
+                   wavelength_nm3: float = 515,
+                   wavelength_nm4: float = 590,
                    t_onCA: float = 500,
                    t_offCA: float = 500,
                    t_onCV: float = 2000,
@@ -75,8 +76,9 @@ def SDC_4CA_toggle_1CV_toggle(
                          "ref_vs_nhe":ref_vs_nhe,
                          "samplerate_sec":samplerate_sec, 
                          "CA_duration_sec":CA1_duration_sec, 
+                         "IErange":IErange,
                          "led":"doric_led1",
-                         "wavelength":wavelength1,
+                         "wavelength_nm":wavelength_nm1,
                          "t_on":t_onCA,
                          "t_off":t_offCA,
                         }
@@ -90,8 +92,9 @@ def SDC_4CA_toggle_1CV_toggle(
                          "ref_vs_nhe":ref_vs_nhe,
                          "samplerate_sec":samplerate_sec, 
                          "CA_duration_sec":CA2_duration_sec, 
+                         "IErange":IErange,
                          "led":"doric_led2",
-                         "wavelength":wavelength2,
+                         "wavelength_nm":wavelength_nm2,
                          "t_on":t_onCA,
                          "t_off":t_offCA,
                         }
@@ -105,8 +108,9 @@ def SDC_4CA_toggle_1CV_toggle(
                          "ref_vs_nhe":ref_vs_nhe,
                          "samplerate_sec":samplerate_sec, 
                          "CA_duration_sec":CA3_duration_sec, 
+                         "IErange":IErange,
                          "led":"doric_led3",
-                         "wavelength":wavelength3,
+                         "wavelength_nm":wavelength_nm3,
                          "t_on":t_onCA,
                          "t_off":t_offCA,
                         }
@@ -120,8 +124,9 @@ def SDC_4CA_toggle_1CV_toggle(
                          "ref_vs_nhe":ref_vs_nhe,
                          "samplerate_sec":samplerate_sec, 
                          "CA_duration_sec":CA4_duration_sec, 
+                         "IErange":IErange,
                          "led":"doric_led4",
-                         "wavelength":wavelength4,
+                         "wavelength_nm":wavelength_nm4,
                          "t_on":t_onCA,
                          "t_off":t_offCA,
                         }
@@ -138,10 +143,11 @@ def SDC_4CA_toggle_1CV_toggle(
                          "scanrate_voltsec":CV_scanrate_voltsec,
                          "samplerate_sec": CV_samplerate_mV/(CV_scanrate_voltsec*1000),
                          "cycles":CV_cycles,
+                         "IErange":IErange,
                          "ph":ph,
                          "ref_vs_nhe":ref_vs_nhe,
                          "led":"doric_led1",
-                         "wavelength":wavelength1,
+                         "wavelength_nm":wavelength_nm1,
                          "t_on": t_onCV,
                          "t_off": t_offCV,
                         }
@@ -149,9 +155,5 @@ def SDC_4CA_toggle_1CV_toggle(
 
 
         pl.add_experiment("SDC_slave_shutdown", {})
-
-
-
-
 
     return pl.experiment_plan_list # returns complete experiment list

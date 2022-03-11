@@ -224,9 +224,10 @@ def SDC_slave_CA_toggle(experiment: Experiment,
               ph: float = 9.53,
               ref_vs_nhe: float = 0.21,
               samplerate_sec: Optional[float] = 0.1, 
-              CA_duration_sec: Optional[float] = 60, 
+              CA_duration_sec: Optional[float] = 60,
+              IErange: Optional[str] = "auto",
               led: Optional[str] = "doric_led1",
-              wavelength: Optional[str] = "nm",
+              wavelength_nm: Optional[float] = 0.0,
               t_on: Optional[float] = 1000,
               t_off: Optional[float] = 1000,
               t_offset:Optional[int] =  0,
@@ -282,7 +283,7 @@ def SDC_slave_CA_toggle(experiment: Experiment,
                         "SampleRate": apm.pars.samplerate_sec,
                         "TTLwait": -1,  # -1 disables, else select TTL 0-3
                         "TTLsend": 0,  # -1 disables, else select TTL 0-3
-                        "IErange": "auto",
+                        "IErange": apm.pars.IErange,
                         },
         "from_global_params":{
                     "_fast_samples_in":"fast_samples_in"
@@ -300,6 +301,7 @@ def SDC_slave_CA(experiment: Experiment,
               ref_vs_nhe: float = 0.21,
               samplerate_sec: Optional[float] = 0.1, 
               CA_duration_sec: Optional[float] = 60, 
+              IErange: Optional[str] = "auto",
               comment: Optional[str] = "",
               ):
     """last functionality test: -"""
@@ -330,7 +332,7 @@ def SDC_slave_CA(experiment: Experiment,
                         "SampleRate": apm.pars.samplerate_sec,
                         "TTLwait": -1,  # -1 disables, else select TTL 0-3
                         "TTLsend": -1,  # -1 disables, else select TTL 0-3
-                        "IErange": "auto",
+                        "IErange": apm.pars.IErange,
                         },
         "from_global_params":{
                     "_fast_samples_in":"fast_samples_in"
@@ -350,10 +352,11 @@ def SDC_slave_CV_toggle(experiment: Experiment,
                         scanrate_voltsec: Optional[float] = 0.02,  # scan rate in volts/second or amps/second.
                         samplerate_sec: Optional[float] = 0.1, 
                         cycles: Optional[int] = 1,
+                        IErange: Optional[str] = "auto",
                         ph: float = 0,
                         ref_vs_nhe: float = 0.21,
                         led: Optional[str] = "doric_led1",
-                        wavelength: Optional[str] = "nm",
+                        wavelength_nm: Optional[float] = 0.0,
                         t_on: Optional[float] = 1000,
                         t_off: Optional[float] = 1000,
                         t_offset:Optional[int] =  0,
@@ -411,7 +414,7 @@ def SDC_slave_CV_toggle(experiment: Experiment,
                          "Cycles":apm.pars.cycles,
                          "TTLwait": -1,  # -1 disables, else select TTL 0-3
                          "TTLsend": 0,  # -1 disables, else select TTL 0-3
-                         "IErange": "auto",
+                         "IErange": apm.pars.IErange,
                         },
         "from_global_params":{
                     "_fast_samples_in":"fast_samples_in"
@@ -431,6 +434,7 @@ def SDC_slave_CV(experiment: Experiment,
                  scanrate_voltsec: Optional[float] = 0.020,  # scan rate in volts/second or amps/second.
                  samplerate_sec: Optional[float] = 0.1, 
                  cycles: Optional[int] = 1,
+                 IErange: Optional[str] = "auto",
                  ph: float = 0,
                  ref_vs_nhe: float = 0.21,
                  comment: Optional[str] = "",
@@ -465,7 +469,7 @@ def SDC_slave_CV(experiment: Experiment,
                          "Cycles":apm.pars.cycles,
                          "TTLwait": -1,  # -1 disables, else select TTL 0-3
                          "TTLsend": -1,  # -1 disables, else select TTL 0-3
-                         "IErange": "auto",
+                         "IErange": apm.pars.IErange,
                         },
         "from_global_params":{
                     "_fast_samples_in":"fast_samples_in"
