@@ -888,6 +888,8 @@ class Archive():
                                    ) -> Tuple[bool, SampleUnion]:
         if sample is None:
             return False, NoneSample()
+        sample = object_to_sample(sample)
+
 
         if custom in self.custom_positions:
             if sample.sample_type == SampleType.assembly \
@@ -918,6 +920,8 @@ class Archive():
 
         if sample is None:
             return False, NoneSample()
+
+        sample = object_to_sample(sample)
 
 
         if custom in self.custom_positions:
@@ -1371,7 +1375,7 @@ class Archive():
         # status=[SampleStatus.created]
         # inheritance=SampleInheritance.receive_only
         error, ref_samples_out = await self.new_ref_samples(
-                              # sample check cobverted source_liquid_in
+                              # sample check converted source_liquid_in
                               # to a list already
                               samples_in = samples_in,
                               sample_out_type = SampleType.liquid,
