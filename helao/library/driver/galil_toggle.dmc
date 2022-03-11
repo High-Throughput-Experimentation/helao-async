@@ -1,0 +1,39 @@
+'To execute programs, download the code into the controller and
+'then issue XQ to start executing from the top. Issue XQ #label
+'to start executing at a specific label or line number.
+'The code will execute until an EN ends the program or subroutine.
+
+#main{mainthread};                  'main program-thread 0
+    CB {p_output};CB {p_output_gamry};    'clear output
+    AI {p_trigger};       'after input 1 high
+    var1 = {f_maxcount}; 'counter variable for toggle loop
+    MG var1
+    AT 0;               'set reference time
+    AT {t_offset};
+    AT 0;
+    IF ( {t_time_on} > 0 );
+        IF ( {t_time_off} > 0 );
+            XQ #toggle{subthread}, {subthread};      'execute thread 1
+            AI -{p_trigger};      'pause this thread until after input 1 is low
+        ENDIF;
+    ENDIF;
+    HX1;                 'halt all threads
+    CB {p_output};CB {p_output_gamry};    'clear output
+EN; 'end program
+
+' faster when mulitple commands separated by ;
+#toggle{subthread};                'toggle routine entry
+    var1 = {f_maxcount}; 'counter variable for toggle loop
+    #jt{subthread}; ' jump adress for toggle loop
+    AT 0;SB {p_output};SB {p_output_gamry};    ' reset timer and set output 0
+    AT {t_time_on};CB {p_output};CB {p_output_gamry};    'wait xy msec then set output 1
+    AT {t_time_off}+{t_time_on};   ' wait more before jumping back
+    var1 = var1 - 1;
+    IF (var1 < -1);
+        var1 = -1;
+    ENDIF;
+    IF (var1 <> 0); 
+        JP #jt{subthread};
+    ENDIF; ' repeat
+    CB {p_output}; CB {p_output_gamry};    ' set output 0
+EN; 'end thread

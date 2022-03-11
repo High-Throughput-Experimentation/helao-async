@@ -261,8 +261,10 @@ class Galil:
                                 out_name:str,
                                 out_port_gamry:str,
                                 out_name_gamry:str,
-                                t_on:float,
-                                t_off:float,
+                                t_on:int,
+                                t_off:int,
+                                t_offset:int,
+                                t_duration:int,
                                 mainthread:int,
                                 subthread:int,
                                 *args,
@@ -290,9 +292,16 @@ class Galil:
             elif triggertype == TriggerType.fallingedge:
                 trigger_port = f"-{abs(int(trigger_port))}"
 
-    
+            print(t_duration)
+            print((t_on+t_off))
+            print(t_duration/(t_on+t_off))
+            f_maxcount=round(t_duration/(t_on+t_off))
+            self.base.print_message(f"toggle count: {f_maxcount}",
+                        info = True)
+            
+
             DMC_prog = pathlib.Path(
-                os.path.join(driver_path, "galil_toogle.dmc")
+                os.path.join(driver_path, "galil_toggle.dmc")
             ).read_text()
             DMC_prog = DMC_prog.format(
                 p_trigger=trigger_port, 
@@ -300,12 +309,14 @@ class Galil:
                 p_output_gamry=out_port_gamry, 
                 t_time_on=t_on,
                 t_time_off=t_off,
+                t_offset=t_offset,
+                f_maxcount=f_maxcount,
                 subthread = subthread,
-               mainthread = mainthread
+                mainthread = mainthread
             )
             await self.upload_DMC(DMC_prog)
             self.galilcmd(f"XQ #main{mainthread},{mainthread}")  # excecute main routine
-            # self.galilcmd("XQ #toogle, 1")  # excecute main routine
+            # self.galilcmd("XQ #toggle, 1")  # excecute main routine
         else:
             self.base.print_message("set_digital_cycle parameters are not valid",
                                     error = True)

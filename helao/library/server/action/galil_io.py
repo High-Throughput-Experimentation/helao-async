@@ -139,11 +139,13 @@ async def galil_dyn_endpoints(app = None):
                                         action: Optional[Action] = \
                                               Body({}, embed=True),
                                         trigger_item:Optional[app.driver.dev_diitems] = "gamry_ttl0",
-                                        triggertype:Optional[TriggerType] = TriggerType.risingedge,
+                                        triggertype:Optional[TriggerType] = TriggerType.fallingedge,
                                         out_item:Optional[app.driver.dev_doitems] = "led",
                                         out_item_gamry:Optional[app.driver.dev_doitems] = "gamry_aux",
-                                        t_on:Optional[float] = 1000,
-                                        t_off:Optional[float] = 1000,
+                                        t_on:Optional[int] = 1000,
+                                        t_off:Optional[int] = 1000,
+                                        t_offset:Optional[int] =  Query(0, ge=0),
+                                        t_duration:Optional[int] = Query(-1, ge=-1),
                                         mainthread:Optional[int] = Query(0, ge=0, le=8),
                                         subthread:Optional[int] = Query(1, ge=0, le=8)
                                      ):
@@ -155,7 +157,11 @@ async def galil_dyn_endpoints(app = None):
                        out_item: do_item for toggle output\n
                        out_item_gamry: do which is connected to gamry aux input\n
                        t_on: time (ms) out_item is on\n
-                       t_off: time (ms) out_item is off"""
+                       t_off: time (ms) out_item is off\n
+                       t_offset: offset time in ms after which toggle starts\n
+                       t_duration: time (ms) for total  toggle time (max is duration of trigger_item)\n
+                                   negative value will run as long trigger_item is applied\n
+                       !!! toggle cycle is ON/OFF !!!"""
                 active = await app.base.setup_and_contain_action()
 
                 active.action.action_params["trigger_port"] = \
