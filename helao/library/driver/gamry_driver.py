@@ -16,6 +16,7 @@ import asyncio
 import time
 from enum import Enum
 import psutil
+import numpy as np
 
 from helaocore.schema import Action
 from helaocore.server.base import Base
@@ -24,6 +25,7 @@ from helaocore.model.sample import SampleInheritance, SampleStatus
 from helaocore.model.data import DataModel
 from helaocore.model.file import FileConnParams, HloHeaderModel
 from helaocore.model.active import ActiveParams
+from helaocore.model.hlostatus import HloStatus
 from helaocore.data.sample import UnifiedSampleDataAPI
 from helaocore.model.hlostatus import HloStatus
 
@@ -906,39 +908,43 @@ class gamry:
                 # need some await points
                 await asyncio.sleep(0.001)
                 client.PumpEvents(0.001)
-                if counter < len(self.dtaqsink.acquired_points):
-                    tmp_datapoints = self.dtaqsink.acquired_points[counter]
-                    # Need to get additional data for EIS
-                    if self.IO_meas_mode == Gamry_modes.EIS:
-                        test = list(tmp_datapoints)
-                        test.append(self.dtaqsink.dtaq.Zreal())
-                        test.append(self.dtaqsink.dtaq.Zimag())
-                        test.append(self.dtaqsink.dtaq.Zsig())
-                        test.append(self.dtaqsink.dtaq.Zphz())
-                        test.append(self.dtaqsink.dtaq.Zfreq())
-                        test.append(self.dtaqsink.dtaq.Zmod())
-                        tmp_datapoints = tuple(test)
+                tmpc = len(self.dtaqsink.acquired_points)
+                if counter < tmpc:
+                    tmp_datapoints = self.dtaqsink.acquired_points[counter:tmpc]
+                    # print(counter, tmpc, len(tmp_datapoints))
+                    # EIS needs to be tested and fixed 
+                    # # Need to get additional data for EIS
+                    # if self.IO_meas_mode == Gamry_modes.EIS:
+                    #     test = list(tmp_datapoints)
+                    #     test.append(self.dtaqsink.dtaq.Zreal())
+                    #     test.append(self.dtaqsink.dtaq.Zimag())
+                    #     test.append(self.dtaqsink.dtaq.Zsig())
+                    #     test.append(self.dtaqsink.dtaq.Zphz())
+                    #     test.append(self.dtaqsink.dtaq.Zfreq())
+                    #     test.append(self.dtaqsink.dtaq.Zmod())
+                    #     tmp_datapoints = tuple(test)
     
                     if self.active:
                         if self.active.action.save_data:
+                            data = {self.active.action.file_conn_keys[0]:\
+                                       {
+                                           k: v
+                                           for k, v in zip(
+                                               self.FIFO_column_headings, 
+                                               np.matrix(tmp_datapoints).T.tolist()
+                                           )
+                                       }
+                                    }
                             await self.active.enqueue_data(datamodel = \
                                    DataModel(
-                                             data = {self.active.action.file_conn_keys[0]:\
-                                                        {
-                                                            k: [v]
-                                                            for k, v in zip(
-                                                                self.FIFO_column_headings, tmp_datapoints
-                                                            )
-                                                        }
-                                                     },
-                                             errors = []
-                                       
+                                             data = data,
+                                             errors = [],
+                                             status = HloStatus.active
                                             )
-                            )
-                    counter += 1
+                                )
+                    counter = tmpc
 
                 sink_status = self.dtaqsink.status
-
 
             self.close_pstat_connection()
             return {"measure": f"done_{self.IO_meas_mode}"}
