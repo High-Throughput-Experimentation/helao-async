@@ -3,7 +3,7 @@ Sequence library for SDC
 """
 
 __all__ = [
-           "SDC_CA_toogle",
+           "SDC_4CA_toggle_1CV_toggle",
           ]
 
 
@@ -14,16 +14,144 @@ from helaocore.schema import ExperimentPlanMaker
 SEQUENCES = __all__
 
 
-def SDC_CA_toogle(
-                 plate_sample_no_list: list = [2],
-                ):
+def SDC_4CA_toggle_1CV_toggle(
+                   plate_id: int = 1,
+                   plate_sample_no_list: list = [2],
+                   reservoir_liquid_sample_no: int = 1,
+                   ph: float = 9.53,
+                   ref_vs_nhe: float = 0.21,
+                   CA1_potential_vsRHE: float = 1.23,
+                   CA1_duration_sec: float = 15, 
+                   CA2_potential_vsRHE: float = 1.23,
+                   CA2_duration_sec: float = 4, 
+                   CA3_potential_vsRHE: float = 1.23,
+                   CA3_duration_sec: float = 4, 
+                   CA4_potential_vsRHE: float = 1.23,
+                   CA4_duration_sec: float = 4, 
+                   CV_Vinit_vsRHE: float = 1.23,
+                   CV_Vapex1_vsRHE: float = 0.73,
+                   CV_Vapex2_vsRHE: float = 1.73,
+                   CV_Vfinal_vsRHE: float = 1.73,
+                   CV_scanrate_voltsec: float = 0.02,
+                   CV_samplerate_mV: float = 1,
+                   CV_cycles: int = 1,
+                   liquid_volume_ml: float = 1.0,
+                   samplerate_sec: float = 0.05, 
+                   wavelength1: float = 385,
+                   wavelength2: float = 455,
+                   wavelength3: float = 515,
+                   wavelength4: float = 590,
+                   t_onCA: float = 500,
+                   t_offCA: float = 500,
+                   t_onCV: float = 2000,
+                   t_offCV: float = 1000,
+                  ):
+
     pl = ExperimentPlanMaker()
     
-    # pl.add_experiment(
-    #                "nameofexp", 
-    #                {
-    #                 }
-    #                )
+    # (1) house keeping
+    pl.add_experiment("SDC_slave_unloadall_customs", {})
+    
+    
+    for plate_sample in plate_sample_no_list:
+        
+        
+        pl.add_experiment(
+                        "SDC_slave_startup", 
+                        {
+                         "solid_custom_position":"cell1_we",
+                         "solid_plate_id":plate_id,
+                         "solid_sample_no":plate_sample,
+                         "reservoir_liquid_sample_no":reservoir_liquid_sample_no,
+                         "liquid_volume_ml":liquid_volume_ml
+                        }
+                        )
+        # CA1
+        pl.add_experiment(
+                        "SDC_slave_CA_toggle", 
+                        {
+                         "CA_potential_vsRHE":CA1_potential_vsRHE,
+                         "ph":ph,
+                         "ref_vs_nhe":ref_vs_nhe,
+                         "samplerate_sec":samplerate_sec, 
+                         "CA_duration_sec":CA1_duration_sec, 
+                         "led":"doric_led1",
+                         "wavelength":wavelength1,
+                         "t_on":t_onCA,
+                         "t_off":t_offCA,
+                        }
+                       )
+        # CA2
+        pl.add_experiment(
+                        "SDC_slave_CA_toggle", 
+                        {
+                         "CA_potential_vsRHE":CA2_potential_vsRHE,
+                         "ph":ph,
+                         "ref_vs_nhe":ref_vs_nhe,
+                         "samplerate_sec":samplerate_sec, 
+                         "CA_duration_sec":CA2_duration_sec, 
+                         "led":"doric_led2",
+                         "wavelength":wavelength2,
+                         "t_on":t_onCA,
+                         "t_off":t_offCA,
+                        }
+                       )
+        # CA3
+        pl.add_experiment(
+                        "SDC_slave_CA_toggle", 
+                        {
+                         "CA_potential_vsRHE":CA3_potential_vsRHE,
+                         "ph":ph,
+                         "ref_vs_nhe":ref_vs_nhe,
+                         "samplerate_sec":samplerate_sec, 
+                         "CA_duration_sec":CA3_duration_sec, 
+                         "led":"doric_led3",
+                         "wavelength":wavelength3,
+                         "t_on":t_onCA,
+                         "t_off":t_offCA,
+                        }
+                       )
+        # CA4
+        pl.add_experiment(
+                        "SDC_slave_CA_toggle", 
+                        {
+                         "CA_potential_vsRHE":CA4_potential_vsRHE,
+                         "ph":ph,
+                         "ref_vs_nhe":ref_vs_nhe,
+                         "samplerate_sec":samplerate_sec, 
+                         "CA_duration_sec":CA4_duration_sec, 
+                         "led":"doric_led4",
+                         "wavelength":wavelength4,
+                         "t_on":t_onCA,
+                         "t_off":t_offCA,
+                        }
+                       )
+
+        # CV1
+        pl.add_experiment(
+                        "SDC_slave_CV_toggle", 
+                        {
+                         "Vinit_vsRHE":CV_Vinit_vsRHE,
+                         "Vapex1_vsRHE":CV_Vapex1_vsRHE,
+                         "Vapex2_vsRHE":CV_Vapex2_vsRHE,
+                         "Vfinal_vsRHE":CV_Vfinal_vsRHE,
+                         "scanrate_voltsec":CV_scanrate_voltsec,
+                         "samplerate_sec": CV_samplerate_mV/(CV_scanrate_voltsec*1000),
+                         "cycles":CV_cycles,
+                         "ph":ph,
+                         "ref_vs_nhe":ref_vs_nhe,
+                         "led":"doric_led1",
+                         "wavelength":wavelength1,
+                         "t_on": t_onCV,
+                         "t_off": t_offCV,
+                        }
+                       )
+
+
+        pl.add_experiment("SDC_slave_shutdown", {})
+
+
+
 
 
     return pl.experiment_plan_list # returns complete experiment list
