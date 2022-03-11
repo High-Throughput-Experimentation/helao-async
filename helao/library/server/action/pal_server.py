@@ -796,9 +796,9 @@ def makeApp(confPrefix, servKey):
         unloaded_liquids = [s for s in samples_out if s.sample_type==SampleType.liquid]
         if unloaded_solids:
             first_unloaded_solid = unloaded_solids[0]
-        active.action.action_params.update({
-            "_unloaded_solid": first_unloaded_solid,
-            "_unloaded_liquids": unloaded_liquids})
+            active.action.action_params.update({"_unloaded_solid": first_unloaded_solid})
+        if unloaded_liquids:
+            active.action.action_params.update({"_unloaded_liquids": unloaded_liquids})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
