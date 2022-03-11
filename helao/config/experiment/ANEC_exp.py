@@ -298,6 +298,8 @@ def ANEC_run_CA(
     CA_duration_sec: Optional[float] = 0.1,
     solution_ph: Optional[float] = 9.0,
     ref_vs_nhe: Optional[float] = 0.21,
+    reservoir_liquid_sample_no: Optional[int] = 0,
+    volume_ul_cell_liquid: Optional[int] = 1000,
     toolGC: Optional[str] = "HS 2",
     toolarchive: Optional[str] = "LS 3",
     source: Optional[str] = "cell1_we",
@@ -312,8 +314,8 @@ def ANEC_run_CA(
     TTLsend: Optional[int] = -1,
     IErange: Optional[str] = "auto",
 ):
-    """Flush and purge ANEC cell
-
+    """Flush and fill cell, run CA, and drain.
+    
     (1) Fill cell with liquid for 90 seconds
     (2) Equilibrate for 15 seconds
     (3) run CA
@@ -338,6 +340,13 @@ def ANEC_run_CA(
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
         to_global_params=["_fast_sample_in"],
+    )
+    apm.add_action_list(
+        ANEC_flush_fill_cell(
+            experiment=experiment,
+            reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
+            volume_ul_cell_liquid=apm.pars.volume_ul_cell_liquid,
+        )
     )
     apm.add(
         PSTAT_server,
@@ -377,7 +386,7 @@ def ANEC_run_CA(
         },
     )
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
-    apm.add_action_list(ANEC_unload_liquid(experiment))
+    apm.add_action_list(ANEC_drain_cell(experiment))
     apm.add_action_list(ANEC_normal_state(experiment))
     return apm.action_list
 
