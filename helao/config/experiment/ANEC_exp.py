@@ -7,6 +7,7 @@ server_key must be a FastAPI action server defined in config
 __all__ = [
     "ANEC_drain_cell",
     "ANEC_flush_fill_cell",
+    "ANEC_load_solid_only",
     "ANEC_load_solid",
     "ANEC_unload_cell",
     "ANEC_unload_liquid",
@@ -78,7 +79,7 @@ def ANEC_flush_fill_cell(
     experiment: Experiment,
     liquid_flush_time: Optional[float] = 90,
     co2_purge_time: Optional[float] = 15,
-    equilibration_time: Optional[float] = 1,
+    equilibration_time: Optional[float] = 1.0,
     reservoir_liquid_sample_no: Optional[int] = 0,
     volume_ul_cell_liquid: Optional[int] = 1000,
 ):
@@ -220,12 +221,35 @@ def ANEC_GC_preparation(
     return apm.action_list
 
 
+def ANEC_load_solid_only(
+    experiment: Experiment,
+    solid_plate_id: Optional[int] = 0,
+    solid_sample_no: Optional[int] = 0,
+):
+    """Load solid and clean cell."""
+    
+    apm = ActionPlanMaker()
+    apm.add_action_list(ANEC_unload_cell(experiment))
+    apm.add(
+        PAL_server,
+        "archive_custom_load",
+        {
+            "custom": "cell1_we",
+            "load_sample_in": SolidSample(
+                sample_no=apm.pars.solid_sample_no,
+                plate_id=apm.pars.solid_plate_id,
+                machine_name="legacy",
+            ).dict(),
+        },
+    )
+    return apm.action_list
+
 def ANEC_load_solid(
     experiment: Experiment,
     solid_plate_id: Optional[int] = 0,
     solid_sample_no: Optional[int] = 0,
     reservoir_liquid_sample_no: Optional[int] = 0,
-    equilibration_time: Optional[float] = 60,
+    recirculation_time: Optional[float] = 60,
     toolGC: Optional[str] = "HS 2",
     volume_ul_GC: Optional[int] = 300,
 ):
@@ -252,7 +276,7 @@ def ANEC_load_solid(
             reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
         )
     )
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.equilibration_time})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.recirculation_time})
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 0})
     apm.add(
         PAL_server,

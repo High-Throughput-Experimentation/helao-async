@@ -1153,10 +1153,10 @@ class Archive():
 
 
     async def _update_sample(self, sample: SampleUnion) -> SampleUnion:
-        tmp_sample = \
+        tmp_samples = \
             await self.unified_db.get_sample(samples=[sample])
-        if tmp_sample:
-            return tmp_sample[0]
+        if tmp_samples:
+            return tmp_samples[0]
         else:
             return NoneSample()
 
