@@ -244,6 +244,7 @@ def ANEC_load_solid_only(
     )
     return apm.action_list
 
+
 def ANEC_load_solid(
     experiment: Experiment,
     solid_plate_id: Optional[int] = 0,
@@ -335,18 +336,18 @@ def ANEC_run_CA(
         - 1.0 * apm.pars.ref_vs_nhe
         - 0.059 * apm.pars.solution_ph
     )
-    apm.add(
-        PAL_server,
-        "archive_custom_query_sample",
-        {"custom": "cell1_we"},
-        to_global_params=["_fast_sample_in"],
-    )
     apm.add_action_list(
         ANEC_flush_fill_cell(
             experiment=experiment,
             reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
             volume_ul_cell_liquid=apm.pars.volume_ul_cell_liquid,
         )
+    )
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {"custom": "cell1_we"},
+        to_global_params=["_fast_samples_in"],
     )
     apm.add(
         PSTAT_server,
@@ -359,7 +360,7 @@ def ANEC_run_CA(
             "TTLsend": apm.pars.TTLsend,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
         },
-        from_global_params={"_fast_sample_in": "fast_samples_in"},
+        from_global_params={"_fast_samples_in": "fast_samples_in"},
     )
     apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": 60})
