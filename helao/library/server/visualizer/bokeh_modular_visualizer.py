@@ -28,8 +28,13 @@ from bokeh.layouts import layout, Spacer
 
 
 from helaocore.model.data import DataPackageModel
+from helaocore.model.hlostatus import HloStatus
 from helaocore.server.make_vis_serv import makeVisServ
 from helaocore.server.vis import Vis
+
+
+valid_data_status = (None,HloStatus.active,)
+
 
 class C_nidaqmxvis:
     """NImax visualizer module class"""
@@ -191,19 +196,20 @@ class C_nidaqmxvis:
         cellnum = 1
 
         for fileconnkey, data_dict in datapackage.datamodel.data.items():
+            datalen = len(list(data_dict.values())[0])
             for key in data_dict:
                 if key == "t_s" \
                 and cellnum == 1:
                     _add_helper(datadict = self.data_dict[key],
-                                pointlist = data_dict.get(key, [0])
+                                pointlist = data_dict.get(key, [0 for i in range(datalen)])
                     )
                 elif key == "Icell_A":
                     _add_helper(datadict = self.data_dict[f"Icell{cellnum}_A"],
-                                pointlist = data_dict.get(key, [0])
+                                pointlist = data_dict.get(key, [0 for i in range(datalen)])
                     )
                 elif key == "Ecell_V":
                     _add_helper(datadict = self.data_dict[f"Ecell{cellnum}_V"],
-                                pointlist = data_dict.get(key, [0])
+                                pointlist = data_dict.get(key, [0 for i in range(datalen)])
                     )
 
             cellnum += 1
@@ -221,7 +227,9 @@ class C_nidaqmxvis:
                     while self.IOloop_data_run:
                         try:
                             datapackage = DataPackageModel(**json.loads(await ws.recv()))
-                            if datapackage.action_name in ("cellIV"):
+                            datastatus = datapackage.datamodel.status
+                            if datapackage.action_name in ("cellIV") \
+                            and datastatus in valid_data_status:
                                 self.vis.doc.add_next_tick_callback(partial(self.add_points, datapackage))
                         except Exception:
                             self.IOloop_data_run = False
@@ -423,11 +431,11 @@ class C_potvis:
             delpts = len(self.data_dict[self.data_dict_keys[0]]) - self.max_points
             for key in self.data_dict_keys:
                 del self.data_dict[key][:delpts]
-        
         for fileconnkey, data_dict in datapackage.datamodel.data.items():
+            datalen = len(list(data_dict.values())[0])
             for key in self.data_dict_keys:
                 _add_helper(datadict = self.data_dict[key],
-                            pointlist = data_dict.get(key, [0])
+                            pointlist = data_dict.get(key, [0 for i in range(datalen)])
                 )
 
         self.datasource.data = self.data_dict
@@ -443,6 +451,7 @@ class C_potvis:
                     while self.IOloop_data_run:
                         try:
                             datapackage = DataPackageModel(**json.loads(await ws.recv()))
+                            datastatus = datapackage.datamodel.status
                             if datapackage.action_name in (
                                     "run_LSV",
                                     "run_CA",
@@ -450,7 +459,8 @@ class C_potvis:
                                     "run_CV",
                                     "run_EIS",
                                     "run_OCV"
-                                        ):
+                                        ) \
+                            and datastatus in valid_data_status:
                                 self.vis.doc.add_next_tick_callback(partial(self.add_points, datapackage))
                         except Exception:
                             self.IOloop_data_run = False
