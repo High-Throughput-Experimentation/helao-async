@@ -47,9 +47,9 @@ class Gamry_modes(str, Enum):
 #     mode3 = "3nA"
 #     mode4 = "30nA"
 #     mode5 = "300nA"
-#     mode6 = "3μA"
-#     mode7 = "30μA"
-#     mode8 = "300μA"
+#     mode6 = "3uA"
+#     mode7 = "30uA"
+#     mode8 = "300uA"
 #     mode9 = "3mA"
 #     mode10 = "30mA"
 #     mode11 = "300mA"
@@ -69,9 +69,9 @@ class Gamry_IErange_IFC1010(str, Enum):
     # mode3 = "N/A"
     mode4 = "10nA"
     mode5 = "100nA"
-    mode6 = "1μA"
-    mode7 = "10μA"
-    mode8 = "100μA"
+    mode6 = "1uA"
+    mode7 = "10uA"
+    mode8 = "100uA"
     mode9 = "1mA"
     mode10 = "10mA"
     mode11 = "100mA"
@@ -89,9 +89,9 @@ class Gamry_IErange_REF600(str, Enum):
     mode3 = "6nA"
     mode4 = "60nA"
     mode5 = "600nA"
-    mode6 = "6μA"
-    mode7 = "60μA"
-    mode8 = "600μA"
+    mode6 = "6uA"
+    mode7 = "60uA"
+    mode8 = "600uA"
     mode9 = "6mA"
     mode10 = "60mA"
     mode11 = "600mA"
@@ -110,9 +110,9 @@ class Gamry_IErange_PCI4G300(str, Enum):
     mode3 = "3nA"
     mode4 = "30nA"
     mode5 = "300nA"
-    mode6 = "3μA"
-    mode7 = "30μA"
-    mode8 = "300μA"
+    mode6 = "3uA"
+    mode7 = "30uA"
+    mode8 = "300uA"
     mode9 = "3mA"
     mode10 = "30mA"
     mode11 = "300mA"
@@ -130,9 +130,9 @@ class Gamry_IErange_PCI4G750(str, Enum):
     mode3 = "7.5nA"
     mode4 = "75nA"
     mode5 = "750nA"
-    mode6 = "7.5μA"
-    mode7 = "75μA"
-    mode8 = "750μA"
+    mode6 = "7.5uA"
+    mode7 = "75uA"
+    mode8 = "750uA"
     mode9 = "7.5mA"
     mode10 = "75mA"
     mode11 = "750mA"
@@ -1004,6 +1004,63 @@ class gamry:
         self.kill_GamryCom()
 
 
+
+    def ierangefinder(self, requested_range=None):
+    
+        def mysplit(s):
+            def to_float(val):
+                try:
+                    return float(val)
+                except ValueError:
+                    return None
+            
+            unit = s.lstrip('0123456789. ')
+            number = s[:-len(unit)]
+            return to_float(number), unit
+    
+        
+        if requested_range is None:
+            self.base.print_message("could not detected IErange, using 'auto'", 
+                                    error=True)
+            return self.gamry_range_enum.auto
+        requested_range = f"{requested_range.lower()}"
+
+        self.base.print_message(f"got IErange request for {requested_range}", 
+                                info=True)
+        
+        names = [e.name.lower() for e in self.gamry_range_enum]
+        vals = [e.value.lower() for e in self.gamry_range_enum]
+        lookupvals = [e.value for e in self.gamry_range_enum]
+    
+            
+        idx = None
+        if requested_range in vals:
+            idx = vals.index(requested_range)
+        elif requested_range in names:
+            idx = names.index(requested_range)
+        else:
+            # try auto detect range based on value and unit pair
+            match_num, match_unit =  mysplit(requested_range)
+            
+            for ret_idx, val in enumerate(vals):
+                val_num, val_unit = mysplit(val)
+                if match_unit == val_unit \
+                and match_num <= val_num:
+                    idx = ret_idx
+                    break
+            if idx is None:
+                self.base.print_message("could not detected IErange, using 'auto'", 
+                                        error=True)
+                return self.gamry_range_enum.auto
+        
+        
+        ret_range = self.gamry_range_enum(lookupvals[idx])
+        self.base.print_message(f"detected IErange: {ret_range}", 
+                                info=True)
+        return ret_range
+    
+
+
     async def technique_wrapper(
         self, 
         act, 
@@ -1126,7 +1183,7 @@ class gamry:
         }
 
         # common
-        self.IO_IErange = self.gamry_range_enum(IErange)
+        self.IO_IErange = self.ierangefinder(requested_range = IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
         activeDict = await self.technique_wrapper(
@@ -1168,7 +1225,7 @@ class gamry:
         }
 
         # common
-        self.IO_IErange = self.gamry_range_enum(IErange)
+        self.IO_IErange = self.ierangefinder(requested_range = IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
         activeDict = await self.technique_wrapper(
@@ -1207,7 +1264,7 @@ class gamry:
         }
 
         # common
-        self.IO_IErange = self.gamry_range_enum(IErange)
+        self.IO_IErange = self.ierangefinder(requested_range = IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
         activeDict = await self.technique_wrapper(
@@ -1291,7 +1348,7 @@ class gamry:
         }
 
         # common
-        self.IO_IErange = self.gamry_range_enum(IErange)
+        self.IO_IErange = self.ierangefinder(requested_range = IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
         activeDict = await self.technique_wrapper(
@@ -1335,7 +1392,7 @@ class gamry:
         }
 
         # common
-        self.IO_IErange = self.gamry_range_enum(IErange)
+        self.IO_IErange = self.ierangefinder(requested_range = IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
         activeDict = await self.technique_wrapper(
@@ -1374,7 +1431,7 @@ class gamry:
         }
 
         # common
-        self.IO_IErange = self.gamry_range_enum(IErange)
+        self.IO_IErange = self.ierangefinder(requested_range = IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
 
