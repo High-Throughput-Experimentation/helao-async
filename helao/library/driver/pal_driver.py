@@ -596,10 +596,25 @@ class PAL:
                     self.IO_measuring = await self.IO_signalq.get()
                 if not self.IO_measuring:
                     break
+
+                # (0) split action
+                # this also writes the action meta file for the parent action
+                # if split, last action is finished when pal endpoint is done
+                # and will update exp and seq
+
+                if self.IO_action_run_counter > 0:
+                    _ = await self.active.split()
+                self.IO_action_run_counter += 1
+                self.active.action.samples_in = []
+                self.active.action.samples_out = []
+                self.active.action.action_sub_name = microcam.method
+                self.IO_palcam.samples_in = []
+                self.IO_palcam.samples_out = []
                 self.base.print_message("waiting now for palaction")
                 # waiting now for all three PAL triggers
                 # continue is used as the sampling timestamp
                 # populates the three trigger timings in palaction
+
                 error = await self._sendcommand_triggerwait(palaction)
 
                 if error is not ErrorCodes.none:
@@ -631,22 +646,6 @@ class PAL:
                 #     with new final samples
                 # (8) write all output files
                 # (9) add samples_in/out to active.action
-
-
-
-                # (0) split action
-                # this also writes the action meta file for the parent action
-                # if split, last action is finished when pal endpoint is done
-                # and will update exp and seq
-
-                if self.IO_action_run_counter > 0:
-                    _ = await self.active.split()
-                self.IO_action_run_counter += 1
-                self.active.action.samples_in = []
-                self.active.action.samples_out = []
-                self.active.action.action_sub_name = microcam.method
-                self.IO_palcam.samples_in = []
-                self.IO_palcam.samples_out = []
 
 
                 # -- (1) -- get most recent information for all samples_in
