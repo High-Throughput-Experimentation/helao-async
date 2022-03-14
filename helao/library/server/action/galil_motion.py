@@ -341,7 +341,7 @@ async def galil_dyn_endpoints(app = None):
             return finished_action.as_dict()
 
 
-        @app.post(f"/{servKey}/solid_get_sample_xy")
+        @app.post(f"/{servKey}/solid_get_samples_xy")
         async def solid_get_samples_xy(
                        action: Optional[Action] = \
                                Body({}, embed=True),

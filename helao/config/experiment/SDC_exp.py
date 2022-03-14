@@ -174,7 +174,7 @@ def SDC_slave_startup(experiment: Experiment,
     # get sample plate coordinates
     apm.add_action({
         "action_server": MOTOR_server,
-        "action_name": "solid_get_sample_xy",
+        "action_name": "solid_get_samples_xy",
         "action_params": {
                         "plate_id":apm.pars.solid_plate_id,
                         "sample_no":apm.pars.solid_sample_no,
