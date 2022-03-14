@@ -1017,10 +1017,35 @@ class gamry:
             unit = s.lstrip('0123456789. ')
             number = s[:-len(unit)]
             return to_float(number), unit
-    
+        
+        def to_amps(number: float, unit: str):
+            unit = unit.lower()
+            exp = None
+            if unit == "aa":
+                exp = 1E-18
+            elif unit == "fa":
+                exp = 1E-15
+            elif unit == "pa":
+                exp = 1E-12
+            elif unit == "na":
+                exp = 1E-9
+            elif unit == "ua":
+                exp = 1E-6
+            elif unit == "ma":
+                exp = 1E-3
+            elif unit == "a":
+                exp = 1
+            elif unit == "ka":
+                exp = 1000
+            
+            if exp is None:
+                return None
+            else:
+                return number*exp
+
         
         if requested_range is None:
-            self.base.print_message("could not detected IErange, using 'auto'", 
+            self.base.print_message("could not detect IErange, using 'auto'", 
                                     error=True)
             return self.gamry_range_enum.auto
         requested_range = f"{requested_range.lower()}"
@@ -1036,20 +1061,31 @@ class gamry:
         idx = None
         if requested_range in vals:
             idx = vals.index(requested_range)
+
         elif requested_range in names:
             idx = names.index(requested_range)
+
         else:
+            # auto should have been detected already above
             # try auto detect range based on value and unit pair
-            match_num, match_unit =  mysplit(requested_range)
-            
+            req_num, req_unit =  mysplit(requested_range)
+            req_num = to_amps(number = req_num, unit = req_unit)
+            if req_num is None:
+                return self.gamry_range_enum.auto
             for ret_idx, val in enumerate(vals):
                 val_num, val_unit = mysplit(val)
-                if match_unit == val_unit \
-                and match_num <= val_num:
+                val_num = to_amps(number = val_num, unit = val_unit)
+                if val_num is None:
+                    # skip auto
+                    continue
+                if req_num <= val_num:
+                    # self.gamry_range_enum is already sort min to max
                     idx = ret_idx
                     break
+
+
             if idx is None:
-                self.base.print_message("could not detected IErange, using 'auto'", 
+                self.base.print_message("could not detect IErange, using 'auto'", 
                                         error=True)
                 return self.gamry_range_enum.auto
         
