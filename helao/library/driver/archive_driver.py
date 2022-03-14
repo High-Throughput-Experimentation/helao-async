@@ -1321,7 +1321,12 @@ class Archive():
             # converts source_liquid_in to a list
             source_liquid_in = object_to_sample(source_liquid_in)
             samples_in = await self.unified_db.get_samples(samples=[source_liquid_in])
+
+
             if not samples_in:
+                self.base.print_message(f"source_liquid_in "
+                                        f"'{source_liquid_in}' is not in db",
+                                         error = True)
                 error = ErrorCodes.no_sample
                 return error, [], []
 
