@@ -1412,7 +1412,7 @@ class Archive():
         if custom_sample == NoneSample():
             # cannot always convert reference sample to real sample 
             # as at last 5-3 not always can do that
-            samples_out = await self.unified_db.new_sample(samples = ref_samples_out)
+            samples_out = await self.unified_db.new_samples(samples = ref_samples_out)
             if not samples_out:
                 error = ErrorCodes.no_sample
                 return error, [], []
@@ -1437,7 +1437,7 @@ class Archive():
         and combine_liquids == True \
         and self.custom_dilution_allowed(custom = custom):
             # convert the ref samples that gets added to a real sample
-            samples_out = await self.unified_db.new_sample(samples = ref_samples_out)
+            samples_out = await self.unified_db.new_samples(samples = ref_samples_out)
             if not samples_out:
                 error = ErrorCodes.no_sample
                 return error, [], []
@@ -1482,7 +1482,7 @@ class Archive():
 
             # a reference assembly was successfully created
             # convert it now to a real sample
-            samples_out2 = await self.unified_db.new_sample(samples = ref_samples_out2)
+            samples_out2 = await self.unified_db.new_samples(samples = ref_samples_out2)
 
             if not samples_out2:
                 # reference could not be converted to a real sample
@@ -1515,7 +1515,7 @@ class Archive():
         # custom holds a sample and we need to create an assembly
         elif self.custom_assembly_allowed(custom = custom):
             # convert the ref samples that gets added to a real sample
-            samples_out = await self.unified_db.new_sample(samples = ref_samples_out)
+            samples_out = await self.unified_db.new_samples(samples = ref_samples_out)
             if not samples_out:
                 error = ErrorCodes.no_sample
                 return error, [], []
@@ -1548,7 +1548,7 @@ class Archive():
             
             # a reference assembly was successfully created
             # convert it now to a real sample
-            samples_out2 = await self.unified_db.new_sample(samples = ref_samples_out2)
+            samples_out2 = await self.unified_db.new_samples(samples = ref_samples_out2)
             if not samples_out2:
                 # reference could not be converted to a real sample
                 self.base.print_message("could not convert reference "
@@ -1706,7 +1706,7 @@ class Archive():
                 for s in source:
                     sample.source.append(s)
 
-        samples_out = await self.unified_db.new_sample(samples=reference_samples_in)
+        samples_out = await self.unified_db.new_samples(samples=reference_samples_in)
 
         return samples_out
 

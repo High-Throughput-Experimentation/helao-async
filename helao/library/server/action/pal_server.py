@@ -897,7 +897,7 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/db_new_sample", tags=["public_db"])
-    async def db_new_sample(
+    async def db_new_samples(
                          action: Optional[Action] = \
                                  Body({}, embed=True),
                          fast_samples_in: Optional[List[SampleUnion]] = Body([LiquidSample(**{
