@@ -186,7 +186,7 @@ class VT_template:
             except Exception:
                 self.vials[i] = False
 
-    def update_sample(self, samples):
+    def update_samples(self, samples):
         for i, sample in enumerate(samples):
             try:
                 self.samples[i] = deepcopy(sample)
@@ -517,7 +517,7 @@ class Archive():
                                                                  sample = load_samples_in[0]
                                                                 )
         # update with information from db                            
-        sample = await self._update_sample(sample)
+        sample = await self._update_samples(sample)
         return error, sample
 
 
@@ -550,10 +550,10 @@ class Archive():
         samples_out = self.append_sample_status(samples = samples_out, newstatus = SampleStatus.unloaded)
         # now write all samples back to the db
         # update all sample in the db
-        await self.unified_db.update_sample(
+        await self.unified_db.update_samples(
             samples = samples_in
         )
-        await self.unified_db.update_sample(
+        await self.unified_db.update_samples(
             samples = samples_out
         )
         return unloaded, samples_in, samples_out, tray_dict
@@ -586,10 +586,10 @@ class Archive():
         samples_out = self.append_sample_status(samples = samples_out, newstatus = SampleStatus.unloaded)
         # now write all samples back to the db
         # update all sample in the db
-        await self.unified_db.update_sample(
+        await self.unified_db.update_samples(
             samples = samples_in
         )
-        await self.unified_db.update_sample(
+        await self.unified_db.update_samples(
             samples = samples_out
         )
         return True, samples_in, samples_out, tray_dict
@@ -718,7 +718,7 @@ class Archive():
                         if self.trays[tray][slot].vials[vial] is not False:
                             sample = deepcopy(self.trays[tray][slot].samples[vial])
                             
-        sample = await self._update_sample(sample)
+        sample = await self._update_samples(sample)
         return error, sample
 
 
@@ -878,7 +878,7 @@ class Archive():
         else:
             error = ErrorCodes.not_available
 
-        sample = await self._update_sample(sample)        
+        sample = await self._update_samples(sample)        
         return error, sample
 
 
@@ -1059,10 +1059,10 @@ class Archive():
         # now write all samples back to the db
         # update all sample in the db
         # (need to write it back as selective_destroy needs it)
-        await self.unified_db.update_sample(
+        await self.unified_db.update_samples(
             samples = samples_in
         )
-        await self.unified_db.update_sample(
+        await self.unified_db.update_samples(
             samples = samples_out
         )
 
@@ -1156,7 +1156,7 @@ class Archive():
         return ret_samples_in, ret_samples_out
 
 
-    async def _update_sample(self, sample: SampleUnion) -> SampleUnion:
+    async def _update_samples(self, sample: SampleUnion) -> SampleUnion:
         tmp_samples = \
             await self.unified_db.get_samples(samples=[sample])
         if tmp_samples:
@@ -1581,12 +1581,12 @@ class Archive():
 
 
         # update all samples_out in the db
-        await self.unified_db.update_sample(
+        await self.unified_db.update_samples(
             samples = samples_out
         )
 
         # update all samples_in in the db
-        await self.unified_db.update_sample(
+        await self.unified_db.update_samples(
             samples = samples_in
         )
 
@@ -1604,7 +1604,7 @@ class Archive():
         # now destroy the sample
         sample.destroy_sample()
         # update all sample in the db
-        await self.unified_db.update_sample(
+        await self.unified_db.update_samples(
             samples = [sample]
         )
         
@@ -1660,7 +1660,7 @@ class Archive():
                 
         # now write all samples back to the db
         # update all sample in the db
-        await self.unified_db.update_sample(
+        await self.unified_db.update_samples(
             samples = ret_samples
         )
         
@@ -1697,7 +1697,7 @@ class Archive():
                     part.action_uuid=[action.action_uuid]
                 # now write all samples back to the db
                 # update all sample in the db
-                await self.unified_db.update_sample(
+                await self.unified_db.update_samples(
                     samples = sample.parts
                 )
                 # create a sourcelist from all parts

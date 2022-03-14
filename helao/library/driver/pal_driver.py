@@ -757,7 +757,7 @@ class PAL:
 
                 # -- (6) --
                 # update all samples also in the local sample sqlite db
-                await self.archive.unified_db.update_sample(palaction.samples_in)
+                await self.archive.unified_db.update_samples(palaction.samples_in)
 
                 for sample_out in palaction.samples_out:
                     # if sample_out is an assembly we need to update its parts
@@ -767,7 +767,7 @@ class PAL:
                     # update the action_uuid
                     sample_out.action_uuid=[self.active.action.action_uuid]
                     # save it back to the db
-                    await self.archive.unified_db.update_sample([sample_out])
+                    await self.archive.unified_db.update_samples([sample_out])
 
 
 
