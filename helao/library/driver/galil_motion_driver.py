@@ -1142,12 +1142,12 @@ class Galil:
                }
 
 
-    async def solid_get_sample_xy(
+    async def solid_get_samples_xy(
                                   self,
                                   plate_id: int = None,
                                   sample_no: int = None,
                                  ) -> dict:
-        return {"platexy":await self.unified_db.get_sample_xy([SolidSample(plate_id = plate_id, sample_no = sample_no)])
+        return {"platexy":await self.unified_db.get_samples_xy([SolidSample(plate_id = plate_id, sample_no = sample_no)])
                }
 
 
