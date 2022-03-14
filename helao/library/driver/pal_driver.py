@@ -651,7 +651,7 @@ class PAL:
                 # -- (1) -- get most recent information for all samples_in
                 # palaction.samples_in should always be non ref samples
                 palaction.samples_in = \
-                    await self.archive.unified_db.get_sample(samples=palaction.samples_in)
+                    await self.archive.unified_db.get_samples(samples=palaction.samples_in)
                 # update the action_uuid
                 for sample in palaction.samples_in:
                     sample.action_uuid=[self.active.action.action_uuid]
@@ -660,7 +660,7 @@ class PAL:
 
                 # palaction.source should also always contain non ref samples
                 palaction.source.samples_initial = \
-                    await self.archive.unified_db.get_sample(samples=palaction.source.samples_initial)
+                    await self.archive.unified_db.get_samples(samples=palaction.source.samples_initial)
                 # update the action_uuid
                 for sample in palaction.source.samples_initial:
                     sample.action_uuid=[self.active.action.action_uuid]
@@ -669,7 +669,7 @@ class PAL:
                 for dest_i, dest_sample in enumerate(palaction.dest.samples_initial):
                     if dest_sample.global_label is not None:
                         dest_tmp = \
-                            await self.archive.unified_db.get_sample(samples=[dest_sample])
+                            await self.archive.unified_db.get_samples(samples=[dest_sample])
                         if dest_tmp:
                             palaction.dest.samples_initial[dest_i] = \
                                 copy.deepcopy(dest_tmp[0])
@@ -707,7 +707,7 @@ class PAL:
                         sample_out.source = []
                         for part_i, part in enumerate(sample_out.parts):
                             if part.global_label is not None:
-                                tmp_part = await self.archive.unified_db.get_sample(samples=[part])
+                                tmp_part = await self.archive.unified_db.get_samples(samples=[part])
                                 for sample in tmp_part:
                                     sample.action_uuid=[self.active.action.action_uuid]
                                 sample_out.parts[part_i] = \
@@ -763,7 +763,7 @@ class PAL:
                     # if sample_out is an assembly we need to update its parts
                     if sample_out.sample_type == SampleType.assembly:
                         sample_out.parts = \
-                            await self.archive.unified_db.get_sample(samples=sample_out.parts)
+                            await self.archive.unified_db.get_samples(samples=sample_out.parts)
                     # update the action_uuid
                     sample_out.action_uuid=[self.active.action.action_uuid]
                     # save it back to the db
@@ -1959,7 +1959,7 @@ class PAL:
 
         # update source and dest final samples
         palaction.source.samples_final = \
-             await self.archive.unified_db.get_sample(samples=palaction.source.samples_initial)
+             await self.archive.unified_db.get_samples(samples=palaction.source.samples_initial)
         # update the action_uuid
         for sample in palaction.source.samples_final:
             sample.action_uuid=[self.active.action.action_uuid]
@@ -1976,7 +1976,7 @@ class PAL:
                 pass
             else:
                 palaction.dest.samples_final = \
-                      await self.archive.unified_db.get_sample(samples=palaction.dest.samples_final)
+                      await self.archive.unified_db.get_samples(samples=palaction.dest.samples_final)
 
         # update the action_uuid
         for sample in palaction.dest.samples_final:
@@ -2226,7 +2226,7 @@ class PAL:
         self.base.print_message(f"PAL_samples_in: {self.IO_palcam.samples_in}")
         # update sample list with correct information from db if possible
         self.base.print_message("getting current sample information for all sample_in from db")
-        self.IO_palcam.samples_in = await self.archive.unified_db.get_sample(samples = self.IO_palcam.samples_in)
+        self.IO_palcam.samples_in = await self.archive.unified_db.get_samples(samples = self.IO_palcam.samples_in)
 
 
     async def _PAL_IOloop_meas_end_helper(self) -> None:

@@ -469,7 +469,7 @@ class Archive():
         only of global_label is not none, else sample is a ref sample"""
         if sample.sample_type != None:
             if sample.global_label is not None:
-                _sample = await self.unified_db.get_sample([sample])
+                _sample = await self.unified_db.get_samples([sample])
                 if _sample: sample = _sample[0]
             else:
                 self.base.print_message(f"Bug found: reference sample was saved in pck file: {sample}", error = True)
@@ -497,7 +497,7 @@ class Archive():
         
         # check if sample actually exists
         load_samples_in = \
-            await self.unified_db.get_sample(
+            await self.unified_db.get_samples(
                 samples = [object_to_sample(load_sample_in)]
             )
 
@@ -1099,7 +1099,7 @@ class Archive():
         
         # check if sample actually exists
         load_samples_in = \
-            await self.unified_db.get_sample(
+            await self.unified_db.get_samples(
                 samples=[object_to_sample(load_sample_in)]
             )
 
@@ -1158,7 +1158,7 @@ class Archive():
 
     async def _update_sample(self, sample: SampleUnion) -> SampleUnion:
         tmp_samples = \
-            await self.unified_db.get_sample(samples=[sample])
+            await self.unified_db.get_samples(samples=[sample])
         if tmp_samples:
             return tmp_samples[0]
         else:
@@ -1320,7 +1320,7 @@ class Archive():
             # check if source_liquid_in is valid
             # converts source_liquid_in to a list
             source_liquid_in = object_to_sample(source_liquid_in)
-            samples_in = await self.unified_db.get_sample(samples=[source_liquid_in])
+            samples_in = await self.unified_db.get_samples(samples=[source_liquid_in])
             if not samples_in:
                 error = ErrorCodes.no_sample
                 return error, [], []
@@ -1355,7 +1355,7 @@ class Archive():
 
         # (3) check if sample in custom position is valid
         if custom_sample != NoneSample():
-            custom_samples_in = await self.unified_db.get_sample(samples=[custom_sample])
+            custom_samples_in = await self.unified_db.get_samples(samples=[custom_sample])
             if not custom_samples_in:
                 self.base.print_message("invalid sample in custom position",
                                         error = True)
@@ -1688,7 +1688,7 @@ class Archive():
             sample.inheritance=SampleInheritance.receive_only
             # need to update the parts of an assembly first
             if sample.sample_type == SampleType.assembly:
-                sample.parts = await self.unified_db.get_sample(
+                sample.parts = await self.unified_db.get_samples(
                     samples=sample.parts
                 )
                 for part in sample.parts:

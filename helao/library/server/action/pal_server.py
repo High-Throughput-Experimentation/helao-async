@@ -874,7 +874,7 @@ def makeApp(confPrefix, servKey):
 
 
     @app.post(f"/{servKey}/db_get_sample", tags=["public_db"])
-    async def db_get_sample(
+    async def db_get_samples(
                          action: Optional[Action] = \
                                  Body({}, embed=True),
                          fast_samples_in: Optional[List[SampleUnion]] = \
@@ -883,7 +883,7 @@ def makeApp(confPrefix, servKey):
         """Positive sample_no will get it from the beginng, negative
         from the end of the db."""
         active = await app.base.setup_and_contain_action()
-        samples = await app.driver.archive.unified_db.get_sample(samples=active.action.samples_in)
+        samples = await app.driver.archive.unified_db.get_samples(samples=active.action.samples_in)
         # clear samples_in
         active.action.samples_in = []
         await active.append_sample(samples = samples,
