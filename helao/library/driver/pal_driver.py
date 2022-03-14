@@ -717,7 +717,7 @@ class PAL:
                                 # first need to be updated and converted
                                 part.sample_creation_timecode = palaction.continue_time
                                 part.action_uuid=[self.active.action.action_uuid]
-                                tmp_part = await self.archive.unified_db.new_sample(samples=[part])
+                                tmp_part = await self.archive.unified_db.new_samples(samples=[part])
                                 sample_out.parts[part_i] = \
                                     copy.deepcopy(tmp_part[0])
                             # now add the real samples back to the source list
@@ -734,7 +734,7 @@ class PAL:
 
                 # -- (3) -- convert samples_out references to real sample
                 #           by adding them to the to db
-                palaction.samples_out = await self.archive.unified_db.new_sample(samples=palaction.samples_out)
+                palaction.samples_out = await self.archive.unified_db.new_samples(samples=palaction.samples_out)
 
                 # -- (4) -- add palaction samples to action object
                 # add palaction samples_in out to main palcam
