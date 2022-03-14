@@ -6,6 +6,7 @@ server_key must be a FastAPI action server defined in config
 __all__ = [
            "SDC_slave_unloadall_customs",
            "SDC_slave_load_solid",
+           "SDC_slave_add_liquid",
            "SDC_slave_startup",
            "SDC_slave_shutdown",
            "SDC_slave_CA_toggle",
