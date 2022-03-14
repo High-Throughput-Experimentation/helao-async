@@ -873,7 +873,7 @@ def makeApp(confPrefix, servKey):
         return finished_action.as_dict()
 
 
-    @app.post(f"/{servKey}/db_get_sample", tags=["public_db"])
+    @app.post(f"/{servKey}/db_get_samples", tags=["public_db"])
     async def db_get_samples(
                          action: Optional[Action] = \
                                  Body({}, embed=True),
@@ -896,7 +896,7 @@ def makeApp(confPrefix, servKey):
         return finished_action.as_dict()
 
 
-    @app.post(f"/{servKey}/db_new_sample", tags=["public_db"])
+    @app.post(f"/{servKey}/db_new_samples", tags=["public_db"])
     async def db_new_samples(
                          action: Optional[Action] = \
                                  Body({}, embed=True),
