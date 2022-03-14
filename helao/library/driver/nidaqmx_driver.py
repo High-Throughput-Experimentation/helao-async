@@ -435,7 +435,7 @@ class cNIMAX:
         A.error_code = ErrorCodes.none
         if not self.IO_do_meas:
             # first validate the provided samples
-            samples_in = await self.unified_db.get_sample(A.samples_in)
+            samples_in = await self.unified_db.get_samples(A.samples_in)
             if not samples_in and not self.allow_no_sample:
                 self.base.print_message("NI got no valid sample, "
                                         "cannot start measurement!",

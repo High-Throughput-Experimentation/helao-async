@@ -1110,7 +1110,7 @@ class gamry:
         activeDict = dict()
         act.action_etc = eta
         act.error_code = ErrorCodes.none
-        samples_in = await self.unified_db.get_sample(act.samples_in)
+        samples_in = await self.unified_db.get_samples(act.samples_in)
         if not samples_in and not self.allow_no_sample:
             self.base.print_message("Gamry got no valid sample, "
                                     "cannot start measurement!",
