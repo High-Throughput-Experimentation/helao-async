@@ -3278,7 +3278,7 @@ class Aligner:
                     
                 self.motorpos_q.task_done()
             except Exception as e:
-                self.vis.print_message(f"IOloop_aligne error: {e}",
+                self.vis.print_message(f"aligner IOloop error: {e}",
                                        error = True)
 
 
