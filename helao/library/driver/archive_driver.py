@@ -1,17 +1,20 @@
 __all__ = [
            "Archive",
-           "CustomTypes"
           ]
 
 import asyncio
 import os
 from datetime import datetime
 from copy import deepcopy
-from typing import List, Tuple
+from typing import List, Optional, Union, Literal, Tuple
+
 from socket import gethostname
 import pickle
 import re
 from enum import Enum
+from pydantic import BaseModel, Field
+import json
+
 
 from helaocore.server.base import Base
 from helaocore.error import ErrorCodes
@@ -29,6 +32,14 @@ from helaocore.model.sample import (
                                    object_to_sample,
                                    SampleType
                                   )
+from helaocore.model.position import (
+                                      Custom,
+                                      VT54,
+                                      VT70,
+                                      VT15,
+                                      Positions,
+                                     )
+
 
 from helaocore.helper.print_message import print_message
 from helaocore.data.sample import UnifiedSampleDataAPI
@@ -50,208 +61,6 @@ class ScanOperator(str, Enum):
     so_not = "not" # cannot have not, thats why I added so_ to each
 
 
-class CustomTypes(str, Enum):
-    cell = "cell"
-    reservoir = "reservoir"
-    injector = "injector"
-    waste = "waste"
-
-
-class Custom:
-    def __init__(self, custom_name, custom_type):
-        self.sample = NoneSample()
-        self.custom_name = custom_name
-        self.custom_type = custom_type
-        self.blocked = False
-        self.max_vol_ml = None
-
-
-    def __repr__(self):
-        return f"<custom_name:{self.custom_name} custom_type:{self.custom_type}>" 
-
-    def __str__(self):
-        return f"custom_name:{self.custom_name}, custom_type:{self.custom_type}" 
-        
-        
-    def assembly_allowed(self) -> bool:
-        if self.custom_type == CustomTypes.cell:
-            return True
-        elif self.custom_type == CustomTypes.reservoir:
-            return False
-        else:
-            print_message({}, "archive", f"invalid 'custom_type': {self.custom_type}", error = True)                
-            return False
-
-
-    def dilution_allowed(self) -> bool:
-        if self.custom_type == CustomTypes.cell:
-            return True
-        elif self.custom_type == CustomTypes.reservoir:
-            return False
-        else:
-            print_message({}, "archive", f"invalid 'custom_type': {self.custom_type}", error = True)                
-            return False
-
-
-    def is_destroyed(self) -> bool:
-        if self.custom_type ==  CustomTypes.injector:
-            return True
-        elif self.custom_type == CustomTypes.waste:
-            return True
-        else:
-            return False
-        
-
-    def dest_allowed(self) -> bool:
-        if self.custom_type == CustomTypes.cell:
-            return True
-        elif self.custom_type ==  CustomTypes.injector:
-            return True
-        elif self.custom_type == CustomTypes.reservoir:
-            return False
-        else:
-            print_message({}, "archive", f"invalid 'custom_type': {self.custom_type}", error = True)                
-            return False
-
-
-    def unload(self) -> SampleUnion:
-        ret_sample = deepcopy(self.sample)
-        self.blocked = False
-        self.max_vol_ml = None
-        self.sample = NoneSample()
-        return ret_sample
-
-    
-    def load(self, sample_in: SampleUnion) -> Tuple[bool, SampleUnion]:
-        if self.sample != NoneSample():
-            print_message({}, "archive", "sample already loaded. Unload first to load new one.", error = True) 
-            return False, NoneSample()
-
-        
-        self.sample = deepcopy(sample_in)
-        self.blocked = False
-        print_message({}, "archive", f"loaded sample {sample_in.global_label}", info = True) 
-        return True, deepcopy(sample_in)
-
-
-    def as_dict(self) -> dict:
-        ret_dict = deepcopy(vars(self)) # it needs a deepcopy
-                                             # else the next line will
-                                             # overwrite self.sample too
-        # ret_dict["sample"] = self.sample.dict()
-        ret_dict["sample"] = self.sample.as_dict()
-        return ret_dict
-
-    
-class VT_template:
-    def __init__(self, max_vol_ml: float = 0.0, VTtype: str = "", positions: int = 0):
-        self.init_max_vol_ml = max_vol_ml
-        self.init_VTtype = VTtype
-        self.init_positions = positions
-        self.type = self.init_VTtype
-        self.max_vol_ml = self.init_max_vol_ml
-        self.vials = None
-        self.blocked = None
-        self.samples = None
-        self.reset_tray()
-
-    def __repr__(self):
-        return f"<{self.init_VTtype} vials:{self.init_positions} max_vol_ml:{self.max_vol_ml}>" 
-
-    def __str__(self):
-        return  f"{self.init_VTtype} with vials:{self.init_positions} and max_vol_ml:{self.max_vol_ml}" 
-
-    def reset_tray(self):
-        self.type = self.init_VTtype
-        self.max_vol_ml: float = self.init_max_vol_ml
-        self.vials: List[bool] = [False for i in range(self.init_positions)]
-        self.blocked: List[bool] = [False for i in range(self.init_positions)]
-        self.samples: List[SampleUnion] = [NoneSample() for i in range(self.init_positions)]
-
-
-    def first_empty(self):
-        res = next((i for i, j in enumerate(self.vials) if not j and not self.blocked[i]), None)
-        return res
-    
-
-    def first_full(self):
-        res = next((i for i, j in enumerate(self.vials) if j), None)
-        return res
-
-
-    def update_vials(self, vial_dict):
-        for i, vial in enumerate(vial_dict):
-            try:
-                self.vials[i] = bool(vial)
-            except Exception:
-                self.vials[i] = False
-
-    def update_samples(self, samples):
-        for i, sample in enumerate(samples):
-            try:
-                self.samples[i] = deepcopy(sample)
-            except Exception:
-                self.samples[i] = NoneSample()
-
-
-    def as_dict(self) -> dict:
-        ret_dict = deepcopy(vars(self)) # it needs a deepcopy
-                                             # else the next line will
-                                             # overwrite self.samples too
-        ret_dict["samples"] = [sample.as_dict() for sample in self.samples]
-        return ret_dict
-
-    def unload(self) -> List[SampleUnion]:
-        ret_sample = []
-        for sample in self.samples:
-            if sample != NoneSample():
-                ret_sample.append(deepcopy(sample))
-        
-        self.reset_tray()
-        return ret_sample
-    
-    
-    def load(
-             self, 
-             sample: SampleUnion,
-             vial: int = None,
-            ) -> SampleUnion:
-        vial -= 1
-        ret_sample = NoneSample()        
-        if sample == NoneSample():
-            return ret_sample
-        
-        if vial+1 <= self.init_positions:
-            if self.samples[vial] == NoneSample() and self.vials[vial] == False:
-                self.vials[vial] = True
-                self.samples[vial] = deepcopy(sample)
-                ret_sample = deepcopy(self.samples[vial])
-
-        return ret_sample
-        
-
-class VT15(VT_template):
-    def __init__(self, max_vol_ml: float = 10.0):
-        super().__init__(max_vol_ml = max_vol_ml, VTtype = "VT15", positions = 15)
-
-
-class VT54(VT_template):
-    def __init__(self, max_vol_ml: float = 2.0):
-        super().__init__(max_vol_ml = max_vol_ml, VTtype = "VT54", positions = 54)
-
-
-class VT70(VT_template):
-    def __init__(self, max_vol_ml: float = 1.0):
-        super().__init__(max_vol_ml = max_vol_ml, VTtype = "VT70", positions = 70)
-
-
-class PALtray:
-    def __init__(self, slot1=None, slot2=None, slot3=None):
-        self.slots = [slot1, slot2, slot3]
-
-    def as_dict(self) -> dict:
-        return vars(self)
-
 
 class Archive():
     def __init__(self, action_serv: Base):
@@ -268,22 +77,20 @@ class Archive():
         self.position_config = self.config_dict.get("positions", None)
         self.archivepck = None
         if self.base.states_root is not None:
-            self.archivepck = os.path.join(self.base.states_root, f"{gethostname()}_{self.base.server.server_name}_archive.pck")
+            self.archivepck = os.path.join(self.base.states_root, f"{gethostname()}_{self.base.server.server_name}_archive.json")
         self.config = {}
 
 
         # configure the tray
-        self.trays = dict()
-        self.custom_positions = dict()
-        self.startup_trays = dict()
-        self.startup_custom_positions = dict()
+        self.positions = Positions()
 
         # get some empty db dicts from default config
-        self.startup_trays, self.startup_custom_positions = self.action_startup_config()
+        
+        self.startup_positions = self.action_startup_config()
         # compare default config to backup
 
         try:
-            self.load_config()
+            self.positions = self.load_config()
         except IOError:
             self.base.print_message(f"'{self.archivepck}' does not exist, writing empty global dict.", error = True)
             self.write_config()
@@ -295,20 +102,20 @@ class Archive():
         
         # check trays
         failed = False
-        if len(self.trays) == len(self.startup_trays):
-            for i, tray in self.trays.items():
-                if i not in self.startup_trays:
+        if len(self.positions.trays_dict) == len(self.startup_positions.trays_dict):
+            for i, tray in self.positions.trays_dict.items():
+                if i not in self.startup_positions.trays_dict:
                     failed = True
                     break
                 else:
-                    if len(tray) == len(self.startup_trays[i]):
+                    if len(tray) == len(self.startup_positions.trays_dict[i]):
                         for slot in tray:
-                            if slot not in self.startup_trays[i]:
+                            if slot not in self.startup_positions.trays_dict[i]:
                                 self.base.print_message("slot not present", error = True)
                                 failed = True
                                 break
                             else:
-                                if type(tray[slot]) != type(self.startup_trays[i][slot]):
+                                if type(tray[slot]) != type(self.startup_positions.trays_dict[i][slot]):
                                     self.base.print_message("not the same slot type", error = True)
                                     failed = True
                                     break
@@ -323,21 +130,21 @@ class Archive():
 
         if failed:
             self.base.print_message("trays did not match", error = True)
-            self.trays = deepcopy(self.startup_trays)
+            self.positions.trays_dict = deepcopy(self.startup_positions.trays_dict)
         else:
             self.base.print_message("trays matched", info = True)
 
 
         # check custom positions
         failed = False
-        if len(self.custom_positions) == len(self.startup_custom_positions):
-            for key, val in self.custom_positions.items():
-                if key not in self.startup_custom_positions:
+        if len(self.positions.customs_dict) == len(self.startup_positions.customs_dict):
+            for key, val in self.positions.customs_dict.items():
+                if key not in self.startup_positions.customs_dict:
                     
                     failed = True
                     break
                 else:
-                    if type(val) != type(self.startup_custom_positions[key]):
+                    if type(val) != type(self.startup_positions.customs_dict[key]):
                         failed = True
                         break
         else:
@@ -346,7 +153,7 @@ class Archive():
 
         if failed:
             self.base.print_message("customs did not match", error = True)
-            self.custom_positions = deepcopy(self.startup_custom_positions)
+            self.positions.customs_dict = deepcopy(self.startup_positions.customs_dict)
         else:
             self.base.print_message("customs matched", info = True)
 
@@ -357,8 +164,9 @@ class Archive():
 
         
     def action_startup_config(self):
-        custom_positions = dict()
-        trays_dict = dict()
+        positions = Positions()
+        # custom_positions = dict()
+        # trays_dict = dict()
 
         pattern = re.compile("([a-zA-Z]+)([0-9]+)")
         if self.position_config != None:
@@ -368,8 +176,12 @@ class Archive():
                 if test is None:
                     if key == "custom":
                         for custom_name, custom_type in val.items():
-                            custom_positions.update({custom_name:
-                                            Custom(custom_name, custom_type)})
+                            positions.customs_dict.update(
+                                {custom_name:
+                                 Custom(custom_name = custom_name,
+                                        custom_type = custom_type)
+                                }
+                            )
 
                 else:
                     tmps, tmpi = test.groups()
@@ -389,45 +201,58 @@ class Archive():
                                     continue
 
                                 if slot_no is not None:
-                                    if tmpi not in trays_dict:
-                                        trays_dict[tmpi] = dict()
+                                    if tmpi not in positions.trays_dict:
+                                        positions.trays_dict[tmpi] = dict()
                                         
                                         
                                     if slot_item is not None:
                                         self.base.print_message(f"got {slot_item}")
                                         if slot_item == "VT54":
-                                            trays_dict[tmpi][slot_no] = VT54()
+                                            positions.trays_dict[tmpi][slot_no] = VT54()
                                         elif slot_item == "VT15":
-                                            trays_dict[tmpi][slot_no] = VT15()
+                                            positions.trays_dict[tmpi][slot_no] = VT15()
                                         elif slot_item == "VT70":
-                                            trays_dict[tmpi][slot_no] = VT70()
+                                            positions.trays_dict[tmpi][slot_no] = VT70()
 
 
                                         else:
                                             self.base.print_message(f"slot type {slot_item} not supported", error = True)
-                                            trays_dict[tmpi][slot_no] = None
+                                            positions.trays_dict[tmpi][slot_no] = None
                                     else:
-                                        trays_dict[tmpi][slot_no] = None
-        self.base.print_message(f"trays: {trays_dict}")
-        self.base.print_message(f"customs: {custom_positions}")
-        return trays_dict, custom_positions
+                                        positions.trays_dict[tmpi][slot_no] = None
+        self.base.print_message(f"trays: {positions.trays_dict}")
+        self.base.print_message(f"customs: {positions.customs_dict}")
+        return positions#trays_dict, custom_positions
 
 
     def load_config(self):
         if self.archivepck is not None:
-            with open(self.archivepck, "rb") as f:
-                data = pickle.load(f)
-                self.trays = data.get("trays", [])
-                self.custom_positions = data.get("customs", {})
-        else:
-            self.trays = []
-            self.custom_positions = {}
+            with open(self.archivepck, "r") as f:
+                try:
+                    data = json.loads(f.readline())
+                    return Positions(**data)
+                except Exception as e:
+                    self.base.print_message(f"error loading {self.archivepck}"
+                                            f": {e}",
+                                           error = True)
+                    return Positions()
+        #         data = pickle.load(f)
+        #         self.positions.trays_dict = data.get("trays", [])
+        #         self.positions.customs_dict = data.get("customs", {})
+        # else:
+        # self.positions.trays_dict = []
+        # self.positions.customs_dict = {}
+
+
 
     def write_config(self):
         if self.archivepck is not None:
-            data = {"customs":self.custom_positions, "trays":self.trays}
-            with open(self.archivepck, "wb") as f:
-                pickle.dump(data, f)
+            with open(self.archivepck, "w") as f:
+                f.write(json.dumps(self.positions.json_dict()))
+        # if self.archivepck is not None:
+        #     data = {"customs":self.positions.customs_dict, "trays":self.positions.trays_dict}
+        #     with open(self.archivepck, "wb") as f:
+        #         pickle.dump(data, f)
 
     async def update_samples_from_db(self):
         self.base.print_message("Updating all samples in position table.", info = True)
@@ -437,19 +262,19 @@ class Archive():
             await asyncio.sleep(0.1)
 
         # first update all custom position samples
-        for custom in self.custom_positions:
-            if self.custom_positions[custom].sample is None:
+        for custom in self.positions.customs_dict:
+            if self.positions.customs_dict[custom].sample is None:
                 # can happen sometimes during a crash
                 # we want to convert None back to NoneSample()
-                self.custom_positions[custom].sample = NoneSample()
+                self.positions.customs_dict[custom].sample = NoneSample()
                 continue
                 
-            if self.custom_positions[custom].sample.sample_type != None:
-                self.custom_positions[custom].sample = \
-                    await self.update_samples_from_db_helper(sample=self.custom_positions[custom].sample)
+            if self.positions.customs_dict[custom].sample.sample_type != None:
+                self.positions.customs_dict[custom].sample = \
+                    await self.update_samples_from_db_helper(sample=self.positions.customs_dict[custom].sample)
 
         # second update all tray samples
-        for tray_key, tray_item in self.trays.items():
+        for tray_key, tray_item in self.positions.trays_dict.items():
             if tray_item is not None:
                 for slot_key, slot_item in tray_item.items():
                     if slot_item is not None:
@@ -477,10 +302,6 @@ class Archive():
         return sample
 
 
-    def tray_get_keys(self):
-        return [key for key in VT_template().as_dict().keys()]
-
-
     async def tray_load(
                         self, 
                         tray: int = None, 
@@ -506,13 +327,13 @@ class Archive():
             print_message({}, "archive", "Sample does not exist in DB.", error = True)
             return error, sample
 
-        if tray in self.trays:
-            if self.trays[tray] is not None:
-                if slot in self.trays[tray]:
-                    if self.trays[tray][slot] is not None:
-                        if self.trays[tray][slot].vials[vial] is not True:
+        if tray in self.positions.trays_dict:
+            if self.positions.trays_dict[tray] is not None:
+                if slot in self.positions.trays_dict[tray]:
+                    if self.positions.trays_dict[tray][slot] is not None:
+                        if self.positions.trays_dict[tray][slot].vials[vial] is not True:
                             error = ErrorCodes.none
-                            sample = self.trays[tray][slot].load(
+                            sample = self.positions.trays_dict[tray][slot].load(
                                                                  vial = vial+1,
                                                                  sample = load_samples_in[0]
                                                                 )
@@ -531,14 +352,14 @@ class Archive():
         unloaded = False
         tray_dict = dict()
 
-        if tray in self.trays:
-            if self.trays[tray] is not None:
-                if slot in self.trays[tray]:
-                    if self.trays[tray][slot] is not None:
+        if tray in self.positions.trays_dict:
+            if self.positions.trays_dict[tray] is not None:
+                if slot in self.positions.trays_dict[tray]:
+                    if self.positions.trays_dict[tray][slot] is not None:
                         unloaded = True
                         tray_dict[tray] = dict()
-                        tray_dict[tray].update({slot:self.trays[tray][slot].as_dict()})
-                        samples = self.trays[tray][slot].unload()
+                        tray_dict[tray].update({slot:self.positions.trays_dict[tray][slot].as_dict()})
+                        samples = self.positions.trays_dict[tray][slot].unload()
         self.write_config() # save current state of table
 
         # update samples with most recent info from db
@@ -562,16 +383,16 @@ class Archive():
     async def tray_unloadall(self, *args, **kwargs) -> Tuple[bool, List[SampleUnion], List[SampleUnion], dict]:
         tray_dict = dict()
         samples = []
-        for tray_key, tray_item in self.trays.items():
+        for tray_key, tray_item in self.positions.trays_dict.items():
             if tray_item is not None:
                 for slot_key, slot_item in tray_item.items():
                     if slot_item is not None:
                         # first get content as dict
                         if tray_key not in tray_dict:
                             tray_dict[tray_key] = dict()
-                        tray_dict[tray_key].update({slot_key:self.trays[tray_key][slot_key].as_dict()})
+                        tray_dict[tray_key].update({slot_key:self.positions.trays_dict[tray_key][slot_key].as_dict()})
                         # then unload (which resets the slot)
-                        _samples = self.trays[tray_key][slot_key].unload()
+                        _samples = self.positions.trays_dict[tray_key][slot_key].unload()
                         for sample in _samples:
                             samples.append(sample)
                     
@@ -604,11 +425,11 @@ class Archive():
                               ):
         self.write_config()
 
-        if tray in self.trays:
-            if self.trays[tray] is not None:
-                if slot in self.trays[tray]:
-                    if self.trays[tray][slot] is not None:
-                        return self.trays[tray][slot].as_dict()
+        if tray in self.positions.trays_dict:
+            if self.positions.trays_dict[tray] is not None:
+                if slot in self.positions.trays_dict[tray]:
+                    if self.positions.trays_dict[tray][slot] is not None:
+                        return self.positions.trays_dict[tray][slot].as_dict()
 
     
     async def tray_export_csv(
@@ -619,17 +440,17 @@ class Archive():
                              ):
         self.write_config() # save backup
 
-        if tray in self.trays:
-            if self.trays[tray] is not None:
-                if slot in self.trays[tray]:
-                    if self.trays[tray][slot] is not None:
+        if tray in self.positions.trays_dict:
+            if self.positions.trays_dict[tray] is not None:
+                if slot in self.positions.trays_dict[tray]:
+                    if self.positions.trays_dict[tray][slot] is not None:
                         tmp_output_str = ""
-                        for i, vial in enumerate(self.trays[tray][slot].vials):
+                        for i, vial in enumerate(self.positions.trays_dict[tray][slot].vials):
                             if tmp_output_str != "":
                                 tmp_output_str += "\n"
 
-                            label = self.trays[tray][slot].samples[i].get_global_label()
-                            vol = self.trays[tray][slot].samples[i].get_vol_ml()
+                            label = self.positions.trays_dict[tray][slot].samples[i].get_global_label()
+                            vol = self.positions.trays_dict[tray][slot].samples[i].get_vol_ml()
 
                             tmp_output_str += ",".join(
                                 [
@@ -662,23 +483,23 @@ class Archive():
         self.write_config() # save backup
         tmp_output_str = ""
 
-        if tray in self.trays:
-            if self.trays[tray] is not None:
-                if slot in self.trays[tray]:
-                    if self.trays[tray][slot] is not None:
-                        for i, vial in enumerate(self.trays[tray][slot].vials):
+        if tray in self.positions.trays_dict:
+            if self.positions.trays_dict[tray] is not None:
+                if slot in self.positions.trays_dict[tray]:
+                    if self.positions.trays_dict[tray][slot] is not None:
+                        for i, vial in enumerate(self.positions.trays_dict[tray][slot].vials):
                             if tmp_output_str != "":
                                 tmp_output_str += "\n"
                             if vial is True \
-                            and self.trays[tray][slot].samples[i] != NoneSample():
+                            and self.positions.trays_dict[tray][slot].samples[i] != NoneSample():
 
                                 if dilution_factor is None:
                                     temp_dilution_factor = \
-                                    self.trays[tray][slot].samples[i].get_dilution_factor()
+                                    self.positions.trays_dict[tray][slot].samples[i].get_dilution_factor()
                                 tmp_output_str += ";".join(
                                     [
                                         str(
-                                            self.trays[tray][slot]
+                                            self.positions.trays_dict[tray][slot]
                                             .samples[i].get_global_label()
                                         ),
                                         str(survey_runs),
@@ -710,13 +531,13 @@ class Archive():
         error = ErrorCodes.not_available
 
 
-        if tray in self.trays:
-            if self.trays[tray] is not None:
-                if slot in self.trays[tray]:
-                    if self.trays[tray][slot] is not None:
+        if tray in self.positions.trays_dict:
+            if self.positions.trays_dict[tray] is not None:
+                if slot in self.positions.trays_dict[tray]:
+                    if self.positions.trays_dict[tray][slot] is not None:
                         error = ErrorCodes.none
-                        if self.trays[tray][slot].vials[vial] is not False:
-                            sample = deepcopy(self.trays[tray][slot].samples[vial])
+                        if self.positions.trays_dict[tray][slot].vials[vial] is not False:
+                            sample = deepcopy(self.positions.trays_dict[tray][slot].samples[vial])
                             
         sample = await self._update_samples(sample)
         return error, sample
@@ -730,28 +551,28 @@ class Archive():
         await asyncio.sleep(0.001)
         lock = asyncio.Lock()
         async with lock:
-            self.base.print_message(self.trays)
+            self.base.print_message(self.positions.trays_dict)
             new_tray = None
             new_slot = None
             new_vial = None
             new_vial_vol = float("inf")
             
             
-            for tray_no in sorted(self.trays):
-                if self.trays[tray_no] is not None:
-                    for slot_no in sorted(self.trays[tray_no]):
-                        if self.trays[tray_no][slot_no] is not None:
+            for tray_no in sorted(self.positions.trays_dict):
+                if self.positions.trays_dict[tray_no] is not None:
+                    for slot_no in sorted(self.positions.trays_dict[tray_no]):
+                        if self.positions.trays_dict[tray_no][slot_no] is not None:
                             if (
-                                self.trays[tray_no][slot_no].max_vol_ml >= req_vol
-                                and new_vial_vol > self.trays[tray_no][slot_no].max_vol_ml
+                                self.positions.trays_dict[tray_no][slot_no].max_vol_ml >= req_vol
+                                and new_vial_vol > self.positions.trays_dict[tray_no][slot_no].max_vol_ml
                             ):
-                                position = self.trays[tray_no][slot_no].first_empty()
+                                position = self.positions.trays_dict[tray_no][slot_no].first_empty()
                                 if position is not None:
                                     new_tray = tray_no
                                     new_slot = slot_no
                                     new_vial = position + 1
-                                    new_vial_vol = self.trays[tray_no][slot_no].max_vol_ml
-                                    self.trays[tray_no][slot_no].blocked[position] = True
+                                    new_vial_vol = self.positions.trays_dict[tray_no][slot_no].max_vol_ml
+                                    self.positions.trays_dict[tray_no][slot_no].blocked[position] = True
     
             self.base.print_message(f"new vial nr. {new_vial} in slot {new_slot} in tray {new_tray}")
             return {"tray": new_tray, "slot": new_slot, "vial": new_vial}
@@ -776,18 +597,18 @@ class Archive():
         new_slot = None
         new_vial = None
         after_vial -= 1;
-        for tray_no in sorted(self.trays):
-            if self.trays[tray_no] is not None:
+        for tray_no in sorted(self.positions.trays_dict):
+            if self.positions.trays_dict[tray_no] is not None:
                 if tray_no < after_tray:
                     continue
                 else:
-                    for slot_no in sorted(self.trays[tray_no]):
-                        if self.trays[tray_no][slot_no] is not None:
+                    for slot_no in sorted(self.positions.trays_dict[tray_no]):
+                        if self.positions.trays_dict[tray_no][slot_no] is not None:
                             if tray_no <= after_tray \
                             and slot_no < after_slot:
                                 continue
                             else:
-                                for vial_no, vial in enumerate(self.trays[tray_no][slot_no].vials):
+                                for vial_no, vial in enumerate(self.positions.trays_dict[tray_no][slot_no].vials):
                                     if vial is not None:
                                         if tray_no <= after_tray \
                                         and slot_no <= after_slot \
@@ -819,12 +640,12 @@ class Archive():
             return False
 
         vial -= 1
-        if tray in self.trays:
-            if self.trays[tray] is not None:
-                if slot in self.trays[tray]:
-                    if self.trays[tray][slot] is not None:
-                        self.trays[tray][slot].vials[vial] = True
-                        self.trays[tray][slot].samples[vial] = deepcopy(sample)
+        if tray in self.positions.trays_dict:
+            if self.positions.trays_dict[tray] is not None:
+                if slot in self.positions.trays_dict[tray]:
+                    if self.positions.trays_dict[tray][slot] is not None:
+                        self.positions.trays_dict[tray][slot].vials[vial] = True
+                        self.positions.trays_dict[tray][slot].samples[vial] = deepcopy(sample)
                         # backup file
                         self.write_config()
                         return True
@@ -837,29 +658,29 @@ class Archive():
            and similar position which fully comsumes and destroyes a 
            sample if selected as a destination"""
 
-        if custom in self.custom_positions:
-            return self.custom_positions[custom].is_destroyed()
+        if custom in self.positions.customs_dict:
+            return self.positions.customs_dict[custom].is_destroyed()
         else:
             return False
 
 
     def custom_assembly_allowed(self, custom: str = None):
-        if custom in self.custom_positions:
-            return self.custom_positions[custom].assembly_allowed()
+        if custom in self.positions.customs_dict:
+            return self.positions.customs_dict[custom].assembly_allowed()
         else:
             return False
 
 
     def custom_dest_allowed(self, custom: str = None):
-        if custom in self.custom_positions:
-            return self.custom_positions[custom].dest_allowed()
+        if custom in self.positions.customs_dict:
+            return self.positions.customs_dict[custom].dest_allowed()
         else:
             return False
 
 
     def custom_dilution_allowed(self, custom: str = None):
-        if custom in self.custom_positions:
-            return self.custom_positions[custom].dilution_allowed()
+        if custom in self.positions.customs_dict:
+            return self.positions.customs_dict[custom].dilution_allowed()
         else:
             return False
 
@@ -873,8 +694,8 @@ class Archive():
         sample = NoneSample()
         error = ErrorCodes.none
         
-        if custom in self.custom_positions:
-            sample = deepcopy(self.custom_positions[custom].sample)
+        if custom in self.positions.customs_dict:
+            sample = deepcopy(self.positions.customs_dict[custom].sample)
         else:
             error = ErrorCodes.not_available
 
@@ -891,16 +712,16 @@ class Archive():
         sample = object_to_sample(sample)
 
 
-        if custom in self.custom_positions:
+        if custom in self.positions.customs_dict:
             if sample.sample_type == SampleType.assembly \
-            and not self.custom_positions[custom].assembly_allowed():
+            and not self.positions.customs_dict[custom].assembly_allowed():
                 return False, NoneSample()
 
             if SampleStatus.destroyed in sample.status:
                 # cannot replace with a destroyed sample
                 return False, NoneSample()
             else:
-                self.custom_positions[custom].sample = deepcopy(sample)
+                self.positions.customs_dict[custom].sample = deepcopy(sample)
 
             self.write_config()
 
@@ -924,17 +745,17 @@ class Archive():
         sample = object_to_sample(sample)
 
 
-        if custom in self.custom_positions:
+        if custom in self.positions.customs_dict:
             if sample.sample_type == SampleType.assembly \
-            and not self.custom_positions[custom].assembly_allowed():
+            and not self.positions.customs_dict[custom].assembly_allowed():
                 return False, NoneSample()
 
             # check if updated sample has destroyed status 
             # and empty position of necessary
             if SampleStatus.destroyed in sample.status:
-                _ = self.custom_positions[custom].unload()
+                _ = self.positions.customs_dict[custom].unload()
             else:
-                self.custom_positions[custom].sample = deepcopy(sample)
+                self.positions.customs_dict[custom].sample = deepcopy(sample)
 
             self.write_config()
 
@@ -942,7 +763,7 @@ class Archive():
 
 
     async def customs_to_dict(self):
-        customdict = deepcopy(self.custom_positions)
+        customdict = deepcopy(self.positions.customs_dict)
         for custom_key in customdict:
             customdict[custom_key] = customdict[custom_key].as_dict()
         return customdict
@@ -980,8 +801,8 @@ class Archive():
                               ) -> Tuple[bool, List[SampleUnion], List[SampleUnion], dict]:
         samples = []
         customs_dict = await self.customs_to_dict()
-        for custom in self.custom_positions:
-            samples.append(self.custom_positions[custom].unload())
+        for custom in self.positions.customs_dict:
+            samples.append(self.positions.customs_dict[custom].unload())
 
         # save current state of table
         self.write_config()
@@ -1010,9 +831,9 @@ class Archive():
         samples = []
         unloaded = False
         customs_dict = dict()
-        if custom in self.custom_positions:
-            customs_dict = self.custom_positions[custom].as_dict()
-            samples.append(self.custom_positions[custom].unload())
+        if custom in self.positions.customs_dict:
+            customs_dict = self.positions.customs_dict[custom].as_dict()
+            samples.append(self.positions.customs_dict[custom].unload())
             unloaded = True
         
         # save current state of table
@@ -1108,10 +929,10 @@ class Archive():
             return False, NoneSample(), dict()
 
 
-        if custom in self.custom_positions:
+        if custom in self.positions.customs_dict:
             loaded, sample = \
-            self.custom_positions[custom].load(load_samples_in[0])
-            customs_dict = self.custom_positions[custom].as_dict()
+            self.positions.customs_dict[custom].load(load_samples_in[0])
+            customs_dict = self.positions.customs_dict[custom].as_dict()
 
         self.write_config() # save current state of table
         sample.status = [SampleStatus.loaded]
@@ -1351,8 +1172,8 @@ class Archive():
 
         # (2) verify if custom is a valid position
         # and get sample from custom position
-        if custom in self.custom_positions:
-            custom_sample = deepcopy(self.custom_positions[custom].sample)
+        if custom in self.positions.customs_dict:
+            custom_sample = deepcopy(self.positions.customs_dict[custom].sample)
         else:
             error = ErrorCodes.not_available
             return error, [], []

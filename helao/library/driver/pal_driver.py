@@ -36,7 +36,7 @@ from helaocore.model.sample import (
 from helaocore.model.file import FileConnParams
 from helaocore.model.active import ActiveParams
 from helaocore.model.data import DataModel
-from helao.library.driver.archive_driver import Archive, CustomTypes
+from helao.library.driver.archive_driver import Archive
 
 
 import nidaqmx
