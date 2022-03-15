@@ -11,7 +11,7 @@ from typing import Optional
 from fastapi import Body
 from importlib import import_module
 from helaocore.server.base import makeActionServ
-from helao.library.driver.dbpack_driver import DBPack
+from helao.library.driver.dbpack_driver import DBPack, YmlType
 from helaocore.schema import Action
 from helaocore.error import ErrorCodes
 
@@ -29,9 +29,10 @@ def makeApp(confPrefix, servKey):
         driver_class=DBPack,
     )
 
-    @app.post(f"/archive_yml")
-    async def archive_yml(yml_path: str):
-        pass
+    @app.post(f"/finish_yml")
+    async def finish_yml(yml_path: str, yml_type: YmlType):
+        progress = await app.driver.finish_yml(yml_path, yml_type)
+        return progress
 
     @app.post("/shutdown")
     def post_shutdown():
