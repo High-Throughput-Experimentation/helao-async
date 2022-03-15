@@ -348,6 +348,7 @@ class Galil:
         # this gets called when the server is shut down or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
         self.base.print_message("shutting down galil io")
+        self.galil_enabled = False
         try:
             self.g.GClose()
         except Exception as e:

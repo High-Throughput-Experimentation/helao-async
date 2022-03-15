@@ -18,6 +18,7 @@ import json
 import os
 from socket import gethostname
 import base64
+from copy import deepcopy
 
 from bokeh.server.server import Server
 from bokeh.models import ColumnDataSource
@@ -143,6 +144,7 @@ class Galil:
         # TODO: error checking here: Galil can crash an dcarsh program
         galil_ip = self.config_dict.get("galil_ip_str", None)
         self.galil_enabled = None
+        self.galilcmd = None
         try:
             if galil_ip:
                 self.g.GOpen("%s --direct -s ALL" % (galil_ip))
@@ -260,6 +262,9 @@ class Galil:
 
     async def setaxisref(self):
         # home all axis first
+        if not self.galil_enabled:
+            return "error"
+
         axis = self.get_all_axis()
         self.base.print_message(f"axis: {axis}")
         if "Rx" in axis:
@@ -343,7 +348,7 @@ class Galil:
 
 
     async def run_aligner(self, A: Action):
-        if not self.blocked:
+        if not self.blocked and self.galil_enabled:
             if not self.aligner_enabled \
             or not self.aligner:
                 A.error_code = ErrorCodes.not_available
@@ -387,7 +392,7 @@ class Galil:
         speed = active.action.action_params.get("speed", None)
         mode = active.action.action_params.get("mode",MoveModes.absolute)
         transformation = active.action.action_params.get("transformation",TransformationModes.motorxy)
-        if not self.blocked:
+        if not self.blocked and self.galil_enabled:
             self.blocked = True
             retval = await self._motor_move(
                 d_mm = d_mm,
@@ -418,7 +423,7 @@ class Galil:
                           mode,
                           transformation
                          ):
-        if self.motor_busy:
+        if self.motor_busy or not self.galil_enabled:
             return {
                 "moved_axis": None,
                 "speed": None,
@@ -605,8 +610,19 @@ class Galil:
                 "counts": None,
             }
 
+        # remove not configured axis
+        for ax in deepcopy(axis):
+            if ax not in self.axis_id:
+                self.base.print_message(f"'{ax}' is not in "
+                                        f"'{self.axis_id}', removing it.",
+                                        info = True)
+                axis.pop(axis.index(ax))
+
+
+        
         # TODO: if same axis is moved twice
         for d, ax in zip(d_mm, axis):
+            print(d, ax)
             # need to remove stopping for multi-axis move
             if len(ret_moved_axis) > 0:
                 stopping = False
@@ -616,7 +632,8 @@ class Galil:
             if ax in self.axis_id:
                 axl = self.axis_id[ax]
             else:
-                self.base.print_message("motor setup error",
+                self.base.print_message(f"motor setup error: "
+                                        f"'{ax}' is not in '{self.axis_id}'",
                                         error = True)
                 ret_moved_axis.append(None)
                 ret_speed.append(None)
@@ -631,7 +648,8 @@ class Galil:
             # recalculate the distance in mm into distance in counts
             # if 1:
             try:
-                self.base.print_message(f"count_to_mm: {axl}, {self.config_dict['count_to_mm'][axl]}")
+                self.base.print_message(f"count_to_mm: {axl}, "
+                                        f"{self.config_dict['count_to_mm'][axl]}")
                 float_counts = (
                     d / self.config_dict["count_to_mm"][axl]
                 )  # calculate float dist from steupd
@@ -652,7 +670,8 @@ class Galil:
                     speed = self.motor_max_speed_count_sec
                 self._speed = speed
             except Exception as e:
-                self.base.print_message(f"motor numerical error {e}",
+                self.base.print_message(f"motor numerical error for axis "
+                                        f"'{ax}': {e}",
                                         error = True)
                 # something went wrong in the numerical part so we give that as feedback
                 ret_moved_axis.append(None)
@@ -798,7 +817,10 @@ class Galil:
         # this only queries the position of a single axis
         # server example:
         # http://127.0.0.1:8000/motor/query/position?axis=x
-
+        if not self.galil_enabled:
+            self.base.print_message("Galil is disabled",
+                                    error = True)
+            return {"ax": [], "position": []}
         # convert single axis move to list
         if type(axis) is not list:
             axis = [axis]
@@ -853,6 +875,11 @@ class Galil:
 
     async def query_axis_moving(self, axis,*args,**kwargs):
         # this functions queries the status of the axis
+        if not self.galil_enabled:
+            self.base.print_message("Galil is disabled",
+                                    error = True)
+            return {"motor_status": [], "err_code": ErrorCodes.not_available}
+
         q = self.galilcmd("SC")
         axlett = "ABCDEFGH"
         axlett = axlett[0 : len(q.split(","))]
@@ -902,7 +929,10 @@ class Galil:
         # The RS command resets the state of the actionor to its power-on condition.
         # The previously saved state of the controller,
         # along with parameter values, and saved experiments are restored.
-        return self.galilcmd("RS")
+        if self.galil_enabled:
+            return self.galilcmd("RS")
+        else:
+            return ""
 
 
     async def estop(self, switch:bool, *args, **kwargs):
@@ -926,13 +956,14 @@ class Galil:
         # but not turn off the motor
         # for stopping and turnuing off use moto_off
 
-        # convert single axis move to list
-        if type(axis) is not list:
-            axis = [axis]
-        for ax in axis:
-            if ax in self.axis_id:
-                axl = self.axis_id[ax]
-                self.galilcmd(f"ST{axl}")
+        if self.galil_enabled:
+            # convert single axis move to list
+            if type(axis) is not list:
+                axis = [axis]
+            for ax in axis:
+                if ax in self.axis_id:
+                    axl = self.axis_id[ax]
+                    self.galilcmd(f"ST{axl}")
 
         ret = await self.query_axis_moving(axis = axis)
         ret.update(await self.query_axis_position(axis = axis))
@@ -947,21 +978,22 @@ class Galil:
 
         # an example would be:
         # http://127.0.0.1:8000/motor/stop
-        # convert single axis move to list
-        if type(axis) is not list:
-            axis = [axis]
-
-        for ax in axis:
-
-            if ax in self.axis_id:
-                axl = self.axis_id[ax]
-            else:
-                continue
-
-            cmd_seq = [f"ST{axl}", f"MO{axl}"]
-
-            for cmd in cmd_seq:
-                _ = self.galilcmd(cmd)
+        if self.galil_enabled:
+            # convert single axis move to list
+            if type(axis) is not list:
+                axis = [axis]
+    
+            for ax in axis:
+    
+                if ax in self.axis_id:
+                    axl = self.axis_id[ax]
+                else:
+                    continue
+    
+                cmd_seq = [f"ST{axl}", f"MO{axl}"]
+    
+                for cmd in cmd_seq:
+                    _ = self.galilcmd(cmd)
 
         ret = await self.query_axis_moving(axis = axis)
         ret.update(await self.query_axis_position(axis = axis))
@@ -969,20 +1001,21 @@ class Galil:
 
 
     def motor_off_shutdown(self, axis,*args,**kwargs):
-        if type(axis) is not list:
-            axis = [axis]
-
-        for ax in axis:
-
-            if ax in self.axis_id:
-                axl = self.axis_id[ax]
-            else:
-                continue
-
-            cmd_seq = [f"ST{axl}", f"MO{axl}"]
-
-            for cmd in cmd_seq:
-                _ = self.galilcmd(cmd)
+        if self.galil_enabled:
+            if type(axis) is not list:
+                axis = [axis]
+    
+            for ax in axis:
+    
+                if ax in self.axis_id:
+                    axl = self.axis_id[ax]
+                else:
+                    continue
+    
+                cmd_seq = [f"ST{axl}", f"MO{axl}"]
+    
+                for cmd in cmd_seq:
+                    _ = self.galilcmd(cmd)
 
 
     async def motor_on(self, axis,*args,**kwargs):
@@ -993,32 +1026,33 @@ class Galil:
         # server example
         # http://127.0.0.1:8000/motor/on?axis=x
 
-        # convert single axis move to list
-        if type(axis) is not list:
-            axis = [axis]
-
-        for ax in axis:
-
-            if ax in self.axis_id:
-                axl = self.axis_id[ax]
-            else:
-                continue
-
-            cmd = f"MG _MO{axl}"
-            q = self.galilcmd(cmd)
-            if float(q)==1:
-                self.base.print_message(f"turning on motor for axis '{axl}' ",
-                                        error = True)
-                cmd_seq = [
-                           f"ST{axl}", 
-                           f"SH{axl}"
-                          ]
+        if self.galil_enabled:
+            # convert single axis move to list
+            if type(axis) is not list:
+                axis = [axis]
     
-                for cmd in cmd_seq:
-                    _ = self.galilcmd(cmd)
-            else:
-                self.base.print_message(f"motor for axis '{axl}' "
-                                        f"is already on", error = True)
+            for ax in axis:
+    
+                if ax in self.axis_id:
+                    axl = self.axis_id[ax]
+                else:
+                    continue
+    
+                cmd = f"MG _MO{axl}"
+                q = self.galilcmd(cmd)
+                if float(q)==1:
+                    self.base.print_message(f"turning on motor for axis '{axl}' ",
+                                            error = True)
+                    cmd_seq = [
+                               f"ST{axl}", 
+                               f"SH{axl}"
+                              ]
+        
+                    for cmd in cmd_seq:
+                        _ = self.galilcmd(cmd)
+                else:
+                    self.base.print_message(f"motor for axis '{axl}' "
+                                            f"is already on", error = True)
 
 
         ret = await self.query_axis_moving(axis = axis)
@@ -1026,28 +1060,8 @@ class Galil:
         return ret
 
 
-    async def upload_DMC(self, DMC_prog):
-        self.galilcmd("UL;")  # begin upload
-        # upload line by line from DMC_prog
-        for DMC_prog_line in DMC_prog.split("\n"):
-            self.galilcmd(DMC_prog_line)
-        self.galilcmd("\x1a")  # terminator "<cntrl>Z"
-
-
     def get_all_axis(self):
         return [ax for ax in self.axis_id]
-
-    async def get_all_digital_out(self):
-        return [port for port in self.config_dict["Dout_id"]]
-
-    async def get_all_digital_in(self):
-        return [port for port in self.config_dict["Din_id"]]
-
-    async def get_all_analog_out(self):
-        return [port for port in self.config_dict["Aout_id"]]
-
-    async def get_all_analog_in(self):
-        return [port for port in self.config_dict["Ain_id"]]
 
 
     def shutdown(self):
@@ -1056,6 +1070,7 @@ class Galil:
         # disconnect ... just restart or terminate the server
         # self.stop_axis(self.get_all_axis())
         self.base.print_message("shutting down galil motion")
+        self.galil_enabled = False
         try:
             # self.base.print_message("turning all motors off", info = True)
             # self.motor_off_shutdown(axis = self.get_all_axis())
