@@ -44,7 +44,7 @@ def create_liquid_sample(experiment: Experiment,
     apm = ActionPlanMaker() # exposes function parameters via apm.pars
     
     
-    apm.add(PAL_server, "db_new_sample",
+    apm.add(PAL_server, "db_new_samples",
                         {
                           "fast_samples_in": 
                               [LiquidSample(**{
@@ -76,7 +76,7 @@ def create_gas_sample(experiment: Experiment,
        input fields contain json strings"""
     apm = ActionPlanMaker() # exposes function parameters via apm.pars
 
-    apm.add(PAL_server, "db_new_sample",
+    apm.add(PAL_server, "db_new_samples",
                           {"fast_samples_in": 
                               [GasSample(**{
                                               "machine_name":gethostname(),
@@ -136,7 +136,7 @@ def create_assembly_sample(experiment: Experiment,
     for solid in solid_list:
         parts.append(solid)
 
-    apm.add(PAL_server, "db_new_sample", 
+    apm.add(PAL_server, "db_new_samples", 
                           {"fast_samples_in": 
                               [AssemblySample(**{
                                               "machine_name":gethostname(),
