@@ -11,7 +11,7 @@ import asyncio
 import os
 import paramiko
 import time
-import copy
+from copy import deepcopy
 from typing import List, Optional, Union, Tuple
 from pydantic import BaseModel, Field
 import aiofiles
@@ -364,26 +364,7 @@ class PAL:
         self.PAL_pid = None
 
         self.triggers = False
-        self.triggerport_start = None
-        self.triggerport_continue = None
-        self.triggerport_done = None
-        self.trigger_start = False
-        self.trigger_continue = False
-        self.trigger_done = False
-
-        self.trigger_start_epoch = False
-        self.trigger_continue_epoch = False
-        self.trigger_done_epoch = False
-
-        # will hold NImax task objects
-        self.task_start = None
-        self.task_continue = None
-        self.task_done = None
-
-        self.buffersize = 2  # finite samples or size of buffer depending on mode
-        self.samplingrate = 10  # samples per second
-
-
+        self.IO_trigger_task = None
         self.dev_trigger = self.config_dict.get("dev_trigger", None)
         self.triggerport_start = None
         self.triggerport_continue = None
@@ -392,11 +373,15 @@ class PAL:
         
            
         if self.dev_trigger == "NImax":
-            self.triggerport_start = self.config_dict["trigger"].get("start", None)
+            self.triggerport_start = self.config_dict["trigger"].get(
+                "start", None
+            )
             self.triggerport_continue = self.config_dict["trigger"].get(
                 "continue", None
             )
-            self.triggerport_done = self.config_dict["trigger"].get("done", None)
+            self.triggerport_done = self.config_dict["trigger"].get(
+                "done", None
+            )
             self.base.print_message(f"PAL start trigger port: {self.triggerport_start}")
             self.base.print_message(f"PAL continue trigger port: {self.triggerport_continue}")
             self.base.print_message(f"PAL done trigger port: {self.triggerport_done}")
@@ -466,6 +451,9 @@ class PAL:
         self.palauxheader = ["Date", "Method", "Tool", "Source", "DestinationTray", "DestinationSlot", "DestinationVial", "Volume"]
         self.IOloop_run = False
         self.IO_signalq = asyncio.Queue(1)
+        self.IO_trigger_startq = asyncio.Queue()
+        self.IO_trigger_continueq = asyncio.Queue()
+        self.IO_trigger_doneq = asyncio.Queue()
 
 
     def set_IO_signalq_nowait(self, val: bool) -> None:
@@ -480,81 +468,88 @@ class PAL:
         await self.IO_signalq.put(val)
 
 
-    async def _poll_start(self) -> bool:
-        starttime = time.time()
-        self.trigger_start = False
-        with nidaqmx.Task() as task:
-            self.base.print_message(f"using trigger port '{self.triggerport_start}' for 'start' trigger", info = True)
-            task.di_channels.add_di_chan(
-                self.triggerport_start, line_grouping=LineGrouping.CHAN_PER_LINE
-            )
-            while self.trigger_start == False \
-            and self.IO_measuring:
-                if not self.IO_signalq.empty():
-                    self.IO_measuring = await self.IO_signalq.get()
-                data = task.read(number_of_samples_per_channel=1)
-                if any(data) == True:
-                    self.base.print_message("got PAL 'start' trigger poll", info = True)
-                    self.trigger_start_epoch = self.active.set_realtime_nowait()
-                    self.trigger_start = True
-                    return self.IO_measuring
-                if (time.time() - starttime) > self.timeout:
-                    return False
-                await asyncio.sleep(1)
-        return self.IO_measuring
+    async def _clear_trigger_qs(self):
+        while not self.IO_trigger_startq.empty():
+            timecode = await self.IO_trigger_startq.get()
+            self.base.print_message(f"startq was not empty: "
+                                   f"'{timecode}'",
+                                   error = True)
+        while not self.IO_trigger_continueq.empty():
+            timecode = await self.IO_trigger_continueq.get()
+            self.base.print_message(f"continyeq was not empty: "
+                                   f"'{timecode}'",
+                                   error = True)
+        while not self.IO_trigger_doneq.empty():
+            timecode = await self.IO_trigger_doneq.get()
+            self.base.print_message(f"doneq was not empty: "
+                                   f"'{timecode}'",
+                                   error = True)
 
 
+    async def _poll_trigger_task(self):
+        prev_start = False
+        prev_continue = False
+        prev_done = False
+        if not self.triggers:
+            return
+        try:
+            with nidaqmx.Task() as task:
+                self.base.print_message(f"using trigger port "
+                                        f"'{self.triggerport_start}' "
+                                        "for 'start' trigger",
+                                        info = True)
+                task.di_channels.add_di_chan(
+                    self.triggerport_start, 
+                    line_grouping=LineGrouping.CHAN_PER_LINE
+                )
+                self.base.print_message(f"using trigger port "
+                                        f"'{self.triggerport_continue}' "
+                                        f"for 'continue' trigger",
+                                        info = True)
+                task.di_channels.add_di_chan(
+                    self.triggerport_continue, 
+                    line_grouping=LineGrouping.CHAN_PER_LINE
+                )
+                self.base.print_message(f"using trigger port "
+                                        f"'{self.triggerport_done}' "
+                                        "for 'done' trigger",
+                                        info = True)
+                task.di_channels.add_di_chan(
+                    self.triggerport_done, 
+                    line_grouping=LineGrouping.CHAN_PER_LINE
+                )
+                while self.IO_measuring:
+                    data = task.read(number_of_samples_per_channel=1)
+                    new_start = data[0][0]
+                    new_continue = data[1][0]
+                    new_done = data[2][0]
+                    if (new_start ^ prev_start) and new_start:
+                        self.IO_trigger_startq.put_nowait(self.active.set_realtime_nowait())
+                        prev_start = deepcopy(new_start)
+                        self.base.print_message("IOq: got PAL 'start' "
+                                                "trigger poll", 
+                                                info = True)
+                    if (new_continue ^ prev_continue) and new_continue:
+                        self.IO_trigger_continueq.put_nowait(self.active.set_realtime_nowait())
+                        prev_continue = deepcopy(new_continue)
+                        self.base.print_message("IOq: got PAL 'continue' "
+                                                "trigger poll", 
+                                                info = True)
+                    if (new_done ^ prev_done) and new_done:
+                        self.IO_trigger_doneq.put_nowait(self.active.set_realtime_nowait())
+                        prev_done = deepcopy(new_done)
+                        self.base.print_message("IOq: got PAL 'done' "
+                                                "trigger poll", 
+                                                info = True)
+                    await asyncio.sleep(0.1)
 
 
+        except Exception as e:
+            self.base.print_message(f"_poll_trigger_task "
+                                    f"excited with error: {e}",
+                                    error = True)
 
-
-    async def _poll_continue(self) -> bool:
-        starttime = time.time()
-        self.trigger_continue = False
-        with nidaqmx.Task() as task:
-            self.base.print_message(f"using trigger port '{self.triggerport_start}' for 'continue' trigger", info = True)
-            task.di_channels.add_di_chan(
-                self.triggerport_continue, line_grouping=LineGrouping.CHAN_PER_LINE
-            )
-            while self.trigger_continue == False \
-            and self.IO_measuring:
-                if not self.IO_signalq.empty():
-                    self.IO_measuring = await self.IO_signalq.get()
-                data = task.read(number_of_samples_per_channel=1)
-                if any(data) == True:
-                    self.base.print_message("got PAL 'continue' trigger poll", info = True)
-                    self.trigger_continue_epoch = self.active.set_realtime_nowait()
-                    self.trigger_continue = True
-                    return self.IO_measuring
-                if (time.time() - starttime) > self.timeout:
-                    return False
-                await asyncio.sleep(1)
-        return self.IO_measuring
-
-
-    async def _poll_done(self) -> bool:
-        starttime = time.time()
-        self.trigger_done = False
-        with nidaqmx.Task() as task:
-            self.base.print_message(f"using trigger port '{self.triggerport_start}' for 'done' trigger", info = True)
-            task.di_channels.add_di_chan(
-                self.triggerport_done, line_grouping=LineGrouping.CHAN_PER_LINE
-            )
-            while self.trigger_done == False \
-            and self.IO_measuring:
-                if not self.IO_signalq.empty():
-                    self.IO_measuring = await self.IO_signalq.get()
-                data = task.read(number_of_samples_per_channel=1)
-                if any(data) == True:
-                    self.base.print_message("got PAL 'done' trigger poll", info = True)
-                    self.trigger_done_epoch = self.active.set_realtime_nowait()
-                    self.trigger_done = True
-                    return self.IO_measuring
-                if (time.time() - starttime) > self.timeout:
-                    return False
-                await asyncio.sleep(1)
-        return self.IO_measuring
-
+        
 
     async def _sendcommand_main(self, palcam: PalCam) -> ErrorCodes:
         """PAL takes liquid from sample_in and puts it in sample_out"""
@@ -672,12 +667,15 @@ class PAL:
                             await self.archive.unified_db.get_samples(samples=[dest_sample])
                         if dest_tmp:
                             palaction.dest.samples_initial[dest_i] = \
-                                copy.deepcopy(dest_tmp[0])
+                                deepcopy(dest_tmp[0])
                         else:
-                            self.base.print_message("Sample does not exist in db", error = True)
+                            self.base.print_message("Sample does not exist in db",
+                                                    error = True)
                             return ErrorCodes.critical
                     else:
-                            self.base.print_message("palaction.dest.samples_initial should not contain ref samples", error = True)
+                            self.base.print_message("palaction.dest.samples_initial "
+                                                    "should not contain ref samples",
+                                                    error = True)
                             return ErrorCodes.bug
                 # update the action_uuid
                 for sample in palaction.dest.samples_initial:
@@ -711,7 +709,7 @@ class PAL:
                                 for sample in tmp_part:
                                     sample.action_uuid=[self.active.action.action_uuid]
                                 sample_out.parts[part_i] = \
-                                    copy.deepcopy(tmp_part[0])
+                                    deepcopy(tmp_part[0])
                             else:
                                 # the assembly contains a ref sample which 
                                 # first need to be updated and converted
@@ -719,7 +717,7 @@ class PAL:
                                 part.action_uuid=[self.active.action.action_uuid]
                                 tmp_part = await self.archive.unified_db.new_samples(samples=[part])
                                 sample_out.parts[part_i] = \
-                                    copy.deepcopy(tmp_part[0])
+                                    deepcopy(tmp_part[0])
                             # now add the real samples back to the source list
                             sample_out.source.append(part.get_global_label())
                         # update the action_uuid
@@ -743,10 +741,10 @@ class PAL:
                 # need a deep copy, else the next modifications would also
                 # modify these samples
                 for sample_in in palaction.samples_in:
-                    self.IO_palcam.samples_in.append(copy.deepcopy(sample_in))
+                    self.IO_palcam.samples_in.append(deepcopy(sample_in))
                 # add palaction sample_out to main palcam
                 for sample in palaction.samples_out:
-                    self.IO_palcam.samples_out.append(copy.deepcopy(sample))
+                    self.IO_palcam.samples_out.append(deepcopy(sample))
 
                 # -- (5) -- convert pal action samples_in
                 # from initial to final
@@ -1081,16 +1079,18 @@ class PAL:
         else:
             # this should never happen
             # else we have a bug in the source checks
-            self.base.print_message(f"BUG PAL_source: "
-                                    f"Got sample no sample in position "
-                                    f"'{palposition.position}'", info = True)
+            if palposition.position is not None:
+                self.base.print_message(f"BUG check PAL_source: "
+                                        f"Got sample no sample in position "
+                                        f"'{palposition.position}'",
+                                        error = True)
 
 
 
         microcam.run.append(
             PalAction(
-                samples_in = copy.deepcopy(palposition.samples_initial),
-                source = copy.deepcopy(palposition),
+                samples_in = deepcopy(palposition.samples_initial),
+                source = deepcopy(palposition),
                 dilute = [False], # initial source is not diluted
                 dilute_type = [microcam.cam.sample_out_type],
                 samples_in_delta_vol_ml = [-1.0*microcam.volume_ul / 1000.0],
@@ -1155,7 +1155,7 @@ class PAL:
             samples_out_list[0].inheritance = SampleInheritance.receive_only
             samples_out_list[0].status = [SampleStatus.created]
             dest_samples_initial = [] # no sample here in the beginning
-            dest_samples_final = copy.deepcopy(samples_out_list)
+            dest_samples_final = deepcopy(samples_out_list)
 
         else:
             # a sample is already present in the tray position
@@ -1167,12 +1167,12 @@ class PAL:
             sample_in.inheritance = SampleInheritance.receive_only
             sample_in.status = [SampleStatus.preserved]
 
-            dest_samples_initial = [copy.deepcopy(sample_in)]
-            dest_samples_final = [copy.deepcopy(sample_in)]
+            dest_samples_initial = [deepcopy(sample_in)]
+            dest_samples_final = [deepcopy(sample_in)]
 
 
             # add that sample to the current sample_in list
-            microcam.run[-1].samples_in.append(copy.deepcopy(sample_in))
+            microcam.run[-1].samples_in.append(deepcopy(sample_in))
             microcam.run[-1].samples_in_delta_vol_ml.append(microcam.volume_ul / 1000.0)
             microcam.run[-1].dilute.append(True)
             microcam.run[-1].dilute_type.append(sample_in.sample_type)
@@ -1201,27 +1201,39 @@ class PAL:
 
         dest = microcam.requested_dest.position
         if dest is None:
-            self.base.print_message("PAL_dest: Invalid PAL dest 'NONE' for 'custom' position method.", error = True)
+            self.base.print_message("PAL_dest: Invalid PAL dest 'NONE' for "
+                                    "'custom' position method.",
+                                    error = True)
             return PALposition(error = ErrorCodes.critical), samples_out_list
 
         if not self.archive.custom_dest_allowed(dest):
-            self.base.print_message(f"PAL_dest: custom position '{dest}' cannot be dest.", error = True)
+            self.base.print_message(f"PAL_dest: custom position "
+                                    "'{dest}' cannot be dest.",
+                                    error = True)
             return PALposition(error = ErrorCodes.critical), samples_out_list
 
 
         error, sample_in = await self.archive.custom_query_sample(dest)
         if error != ErrorCodes.none:
-            self.base.print_message(f"PAL_dest: Invalid PAL dest '{dest}' for 'custom' position method.", error = True)
+            self.base.print_message(f"PAL_dest: Invalid PAL dest "
+                                    "'{dest}' for 'custom' position method.",
+                                    error = True)
             return PALposition(error = error), samples_out_list
 
         # check if a sample is already present in the custom position
         if sample_in == NoneSample():
             # no sample in custom position, create a new sample reference
-            self.base.print_message(f"PAL_dest: No sample in custom position '{dest}', creating new sample reference.", info = True)
+            self.base.print_message(f"PAL_dest: No sample in custom position "
+                                    "'{dest}', creating new "
+                                    "sample reference.",
+                                    info = True)
             
             # cannot create an assembly
             if len(microcam.run[-1].samples_in) > 1:
-                self.base.print_message("PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here.", error = True)
+                self.base.print_message("PAL_dest: Found a BUG: "
+                                        "Too many input samples. "
+                                        "Cannot create an assembly here.",
+                                        error = True)
                 return PALposition(error = ErrorCodes.bug), samples_out_list
 
             # this should actually never create an assembly
@@ -1241,13 +1253,16 @@ class PAL:
             samples_out_list[0].inheritance = SampleInheritance.receive_only
             samples_out_list[0].status = [SampleStatus.created]
             dest_samples_initial = [] # no sample here in the beginning
-            dest_samples_final = copy.deepcopy(samples_out_list)
+            dest_samples_final = deepcopy(samples_out_list)
             
         else:
             # sample is already present
             # either create an assembly or dilute it
             # first check what type is present
-            self.base.print_message(f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'", info = True)
+            self.base.print_message(f"PAL_dest: Got sample "
+                                    "'{sample_in.global_label}' "
+                                    "in position '{dest}'",
+                                    info = True)
 
 
             if sample_in.sample_type == SampleType.assembly:
@@ -1259,7 +1274,10 @@ class PAL:
                 # source input should only hold a single sample
                 # but better check for sure
                 if len(microcam.run[-1].samples_in) > 1:
-                    self.base.print_message("PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here.", error = True)
+                    self.base.print_message("PAL_dest: Found a BUG: "
+                                            "Too many input samples. "
+                                            "Cannot create an assembly here.",
+                                            error = True)
                     return PALposition(error = ErrorCodes.bug), samples_out_list
 
 
@@ -1283,8 +1301,8 @@ class PAL:
 
                 if test is True:
                     # we dilute the assembly sample
-                    dest_samples_initial = copy.deepcopy(samples_out_list)
-                    dest_samples_final = copy.deepcopy(samples_out_list)
+                    dest_samples_initial = deepcopy(samples_out_list)
+                    dest_samples_final = deepcopy(samples_out_list)
 
                     # we can only add liquid to vials 
                     # (diluite them, no assembly here)
@@ -1297,7 +1315,7 @@ class PAL:
                     microcam.run[-1].samples_in_delta_vol_ml.append(microcam.volume_ul / 1000.0)
                     microcam.run[-1].dilute.append(True)
                     # then add the new sample_in
-                    microcam.run[-1].samples_in.append(copy.deepcopy(sample_in))
+                    microcam.run[-1].samples_in.append(deepcopy(sample_in))
                 else:
                     # add a new part to assembly
                     self.base.print_message("PAL_dest: Adding new part to assembly", info = True)
@@ -1332,9 +1350,9 @@ class PAL:
                     sample_in.status = [SampleStatus.preserved]
 
 
-                    dest_samples_initial = [copy.deepcopy(sample_in)]
-                    dest_samples_final = [copy.deepcopy(sample_in)]
-                    microcam.run[-1].samples_in.append(copy.deepcopy(sample_in))
+                    dest_samples_initial = [deepcopy(sample_in)]
+                    dest_samples_final = [deepcopy(sample_in)]
+                    microcam.run[-1].samples_in.append(deepcopy(sample_in))
 
 
 
@@ -1346,11 +1364,11 @@ class PAL:
                 sample_in.inheritance = SampleInheritance.receive_only
                 sample_in.status = [SampleStatus.preserved]
 
-                dest_samples_initial = [copy.deepcopy(sample_in)]
-                dest_samples_final = [copy.deepcopy(sample_in)]
+                dest_samples_initial = [deepcopy(sample_in)]
+                dest_samples_final = [deepcopy(sample_in)]
 
                 microcam.run[-1].dilute_type.append(sample_in.sample_type)
-                microcam.run[-1].samples_in.append(copy.deepcopy(sample_in))
+                microcam.run[-1].samples_in.append(deepcopy(sample_in))
                 microcam.run[-1].samples_in_delta_vol_ml.append(microcam.volume_ul / 1000.0)
                 microcam.run[-1].dilute.append(True)
 
@@ -1399,7 +1417,7 @@ class PAL:
                 sample_in.inheritance = SampleInheritance.allow_both
                 sample_in.status = [SampleStatus.incorporated]
 
-                microcam.run[-1].samples_in.append(copy.deepcopy(sample_in))
+                microcam.run[-1].samples_in.append(deepcopy(sample_in))
                 # we only add the sample to assembly so delta_vol is 0
                 microcam.run[-1].samples_in_delta_vol_ml.append(0.0)
                 microcam.run[-1].dilute.append(False)
@@ -1433,9 +1451,9 @@ class PAL:
                 
                 
                 # intial is the sample initial in the position
-                dest_samples_initial = [copy.deepcopy(sample_in)]
+                dest_samples_initial = [deepcopy(sample_in)]
                 # this will be the new assembly
-                dest_samples_final = copy.deepcopy(samples_out2_list)
+                dest_samples_final = deepcopy(samples_out2_list)
 
 
 
@@ -1496,7 +1514,7 @@ class PAL:
         samples_out_list[0].inheritance = SampleInheritance.receive_only
         samples_out_list[0].status = [SampleStatus.created]
         dest_samples_initial = [] # no sample here in the beginning
-        dest_samples_final =  copy.deepcopy(samples_out_list)
+        dest_samples_final =  deepcopy(samples_out_list)
 
 
         return PALposition(
@@ -1552,8 +1570,8 @@ class PAL:
         microcam.run[-1].dilute.append(True)
         microcam.run[-1].dilute_type.append(sample_in.sample_type)
 
-        dest_samples_initial = [copy.deepcopy(sample_in)]
-        dest_samples_final = [copy.deepcopy(sample_in)]
+        dest_samples_initial = [deepcopy(sample_in)]
+        dest_samples_final = [deepcopy(sample_in)]
 
 
         return PALposition(
@@ -1625,7 +1643,7 @@ class PAL:
                 sample.status.append(SampleStatus.destroyed)
 
         # add validated destination to run
-        microcam.run[-1].dest = copy.deepcopy(palposition)
+        microcam.run[-1].dest = deepcopy(palposition)
 
         # update the rest of sample_in for the run
         for sample in microcam.run[-1].samples_in:
@@ -1747,48 +1765,66 @@ class PAL:
                                       ) -> ErrorCodes:
         error =  ErrorCodes.none
         # only wait if triggers are configured
-        if self.triggers:
-            self.base.print_message("waiting for PAL start trigger",
-                                    info = True)
-            val = await self._poll_start()
-            if not val:
-                self.base.print_message("PAL start trigger timeout",
-                                        error = True)
-                error = ErrorCodes.start_timeout
-                self.IO_error = error
-                self.IO_continue = True
-            else:
-                self.base.print_message("got PAL start trigger", info = True)
-                self.base.print_message("waiting for PAL continue trigger",
-                                        info = True)
-                palaction.start_time = self.trigger_start_epoch
-                val = await self._poll_continue()
-                if not val:
-                    self.base.print_message("PAL continue trigger timeout",
-                                            error = True)
-                    error = ErrorCodes.continue_timeout
-                    self.IO_error = error
-                    self.IO_continue = True
-                else:
-                    self.IO_continue = (
-                        True  # signal to return FASTAPI, but not yet status
-                    )
-                    self.base.print_message("got PAL continue trigger",
-                                            info = True)
-                    self.base.print_message("waiting for PAL done trigger",
-                                            info = True)
-                    palaction.continue_time = self.trigger_continue_epoch
-                    val = await self._poll_done()
-                    if not val:
-                        self.base.print_message("PAL done trigger timeout",
-                                                error = True)
-                        error = ErrorCodes.done_timeout
-                    else:
-                        self.base.print_message("got PAL done trigger",
-                                                info = True)
-                        palaction.done_time = self.trigger_done_epoch
-        else:
+        if not self.triggers:
             self.base.print_message("No triggers configured", error = True)
+            return error
+
+        self.base.print_message("waiting for PAL start trigger",
+                                info = True)
+        try:
+            val = await asyncio.wait_for(
+                self.IO_trigger_startq.get(),
+                self.timeout
+            )
+        except Exception as e:
+            self.base.print_message(f"PAL start trigger "
+                                    f"timeout with error: {e}",
+                                    error = True)
+            # also need to set IO_continue and IO_error
+            # so active can return
+            # else it will return after real first continue trigger
+            self.IO_error = ErrorCodes.done_timeout
+            self.IO_continue = True
+            return ErrorCodes.done_timeout
+
+            
+        palaction.start_time = val
+        self.base.print_message("got PAL start trigger, "
+                                "waiting for PAL continue trigger", 
+                                info = True)
+
+        try:
+            val = await asyncio.wait_for(
+                self.IO_trigger_continueq.get(),
+                self.timeout
+            )
+        except Exception as e:
+            self.base.print_message(f"PAL continue trigger "
+                                    f"timeout with error: {e}",
+                                    error = True)
+            return ErrorCodes.done_timeout
+
+        self.IO_continue = True
+        palaction.continue_time = val
+        self.base.print_message("got PAL continue trigger, "
+                                "waiting for PAL done trigger",
+                                info = True)
+
+        try:
+            val = await asyncio.wait_for(
+                self.IO_trigger_doneq.get(),
+                self.timeout
+            )
+        except Exception as e:
+            self.base.print_message(f"PAL done trigger "
+                                    f"timeout with error: {e}",
+                                    error = True)
+            return ErrorCodes.done_timeout
+
+        palaction.done_time = val
+        self.base.print_message("got PAL done trigger",
+                                info = True)
+
         return error
 
 
@@ -1807,7 +1843,8 @@ class PAL:
                                                ) -> ErrorCodes:
 
         error = ErrorCodes.none
-
+        await self._clear_trigger_qs()
+        self.IO_trigger_task =  asyncio.create_task(self._poll_trigger_task())
         if self.sshhost == "localhost":
             
             FIFO_rshs_dir,rshs_logfile = os.path.split(palcam.aux_output_filepath)
@@ -2053,7 +2090,8 @@ class PAL:
     async def _init_PAL_IOloop(self, A: Action, palcam: PalCam) -> dict:
         """initializes the main PAL IO loop after an action was submitted"""
         activeDict = dict()
-        if not self.IO_do_meas:
+        if not self.IO_do_meas and not self.base.actionserver.estop:
+            self.base.print_message("init PAL IO loop", info = True)
             self.IO_error = ErrorCodes.none
             self.IO_palcam = palcam
             self.action = A
@@ -2061,13 +2099,21 @@ class PAL:
             await self.set_IO_signalq(True)
             # wait for first continue trigger
             A.error_code = ErrorCodes.none
+            self.base.print_message("waiting for first continue", info = True)
             while not self.IO_continue:
                 await asyncio.sleep(1)
+            self.base.print_message("got first continue", info = True)
             A.error_code = self.IO_error
             if self.active:
                 activeDict = self.active.action.as_dict()
             else:
                 activeDict = A.as_dict()
+
+        elif self.base.actionserver.estop:
+            self.base.print_message("PAL is in estop.", error = True)
+            A.error_code = ErrorCodes.estop
+            activeDict = A.as_dict()
+            
         else:
             self.base.print_message("PAL method already in progress.", error = True)
             A.error_code = ErrorCodes.in_progress
@@ -2109,7 +2155,7 @@ class PAL:
                         # need to make a deepcopy as we modify this object during the run
                         # but each run should start from the same initial
                         # params again
-                        run_palcam =  copy.deepcopy(self.IO_palcam)
+                        run_palcam =  deepcopy(self.IO_palcam)
                         run_palcam.cur_run = run
 
                         # # if sampleperiod list is empty 
@@ -2189,6 +2235,9 @@ class PAL:
                         self.base.print_message("PAL sendcommand def end",
                                                 info = True)
 
+                        if self.IO_trigger_task is not None:
+                            self.IO_trigger_task.cancel()
+                            self.IO_trigger_task = None
 
 
                     # update samples_in/out in prc
@@ -2196,7 +2245,8 @@ class PAL:
                     await self._PAL_IOloop_meas_end_helper()
 
                 else:
-                    self.IO_do_meas = False
+                    self.IO_error = ErrorCodes.estop
+                    await self._PAL_IOloop_meas_end_helper()
                     self.base.print_message("PAL is in estop.")
 
 
@@ -2238,6 +2288,10 @@ class PAL:
             self.PAL_pid.communicate()
             self.PAL_pid = None
 
+        if self.IO_trigger_task is not None:
+            self.IO_trigger_task.cancel()
+            self.IO_trigger_task = None
+
         self.IO_continue = True
         # done sending all PAL commands
         self.IO_do_meas = False
@@ -2247,7 +2301,8 @@ class PAL:
         # need to check here again in case estop was triggered during
         # measurement
         # need to set the current meas to idle first
-        _ = await self.active.finish()
+        if self.active:
+            _ = await self.active.finish()
         self.active = None
         self.action = None
 
@@ -2256,6 +2311,7 @@ class PAL:
         else:
             self.base.print_message("setting PAL to idle")
 
+        self.IO_measuring = False
         self.base.print_message("PAL is done")
 
 
