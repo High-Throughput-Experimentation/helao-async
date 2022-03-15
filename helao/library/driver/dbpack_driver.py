@@ -1,4 +1,4 @@
-__all__ = ["DBPack", "ActYml", "ExpYml", "HelaoPath"]
+__all__ = ["DBPack", "ActYml", "ExpYml", "SeqYml", "HelaoPath"]
 
 import os
 import io
@@ -11,6 +11,7 @@ from glob import glob
 from datetime import datetime
 from typing import Union
 from collections import UserDict, defaultdict
+from enum import Enum
 
 import pyaml
 import botocore
@@ -59,6 +60,12 @@ plural = {
     "sequence": "sequences",
     "process": "processes",
 }
+
+
+class YmlType(str, Enum):
+    action = "action"
+    experiment = "experiment"
+    sequence = "sequence"
 
 
 def dict2json(input_dict: dict):
@@ -178,19 +185,26 @@ class Progress(UserDict):
         self.yml = yml
         self.pkey = yml.pkey
         self.progress_path = yml.progress_path
-        self.data_files = yml.data_files
         self.read()
         if self.pkey not in self.data.keys():
             self.data[self.pkey] = {
                 "ready": False,  # ready to start transfer from FINISHED to SYNCED
                 "done": False,  # same as status=='SYNCED'
                 "meta": None,
-                "files_pending": [x.__str__() for x in self.data_files],
-                "files_pushed": {},
-                "api_pushed": False,
-                "s3_pushed": False,
+                "pending": [],
+                "pushed": {},
+                "api": False,
+                "s3": False,
             }
             self.write()
+        pending_files = [
+            str(x)
+            for x in yml.data_files
+            if x.name not in self.data[self.pkey]["pushed"].keys()
+        ]
+        self.data[self.pkey]["pending"] = pending_files
+        self.data[self.pkey]["path"] = str(yml.target)
+        self.write()
 
     def read(self):
         if self.progress_path.exists():
@@ -418,10 +432,6 @@ class SeqYml(HelaoYml):
                 if self.progress[group_idx]["meta"] is None:
                     self.create_process(group_idx)
 
-    def sync_sequence(self):
-        """Push finished sequence, upload yml to S3."""
-        pass
-
 
 class DBPack:
     """Driver class for API push and S3 upload operations.
@@ -446,6 +456,55 @@ class DBPack:
         self.bucket = self.aws_config["aws_bucket"]
         self.s3 = self.aws_session.client("s3")
         self.api_url = self.aws_config["api_host"]
+
+    async def finish_yml(self, yml_path: str, yml_type: YmlType):
+        """Primary function for processing ymls.
+
+        Args
+        yml_path[str]: local path to yml file
+        yml_type[str]: type of yml ('action', 'experiment', 'sequence')
+
+        """
+        hpth = HelaoPath(yml_path)
+        hyml = modmap[yml_type](hpth)
+        ops = YmlOps(self, hyml)
+
+        # finish_yml request should be posted by orchestrator when act/exp/seq completes
+        # calling this method assumes this yml and associated data are complete
+        if hyml.status == "ACTIVE":
+            ops.to_finished()
+
+        # update progress
+        if yml_type == YmlType.sequence:
+            hyml.get_experiments()
+        else:
+            hyml.get_actions()
+
+        # check all 'ready', ignore all 'done'
+        progress = hyml.progress
+        finished = []
+
+        for pkey, pdict in progress.items():
+            if pdict["done"]:
+                continue
+            if pdict["ready"]:
+                if pdict["pending"] or not pdict["s3"]:
+                    ops.to_s3(pkey)
+                if len(pdict["pending"]) == 0 and pdict["s3"]:
+                    await ops.to_api(pkey)
+                    if pdict["api"]:
+                        if isinstance(pkey, str):
+                            ops.to_synced()
+                        pdict["done"] = True
+                        pdict["ready"] = False
+                        progress.write()
+                        finished.append(pkey)
+        return_dict = {
+            k: {dk: dv for dk, dv in d.items() if dk != "meta"}
+            for k, d in progress.items()
+            if k in finished
+        }
+        return return_dict
 
 
 class YmlOps:
@@ -509,14 +568,6 @@ class YmlOps:
         else:
             meta_type = self.yml.type.lower()
 
-        # push
-        if not pdict["s3"]:
-            meta_s3_key = f"{meta_type}/{self.yml.uuid}.json"
-            meta_success = self._to_s3(pdict["meta"], meta_s3_key)
-            if meta_success:
-                pdict["s3"] = True
-                self.yml.progress.write()
-
         hlo_data = [x for x in pdict["pending"] if x.endswith(".hlo")]
         for fpath in hlo_data:
             file_s3_key = f"raw_data/{self.yml.uuid}/{os.path.basename(fpath)}.json"
@@ -525,7 +576,9 @@ class YmlOps:
             file_success = self._to_s3(file_json, file_s3_key)
             if file_success:
                 pdict["pending"] = pdict["pending"].pop(fpath)
-                pdict["pushed"] = pdict["pushed"].update(fpath, datetime.time())
+                pdict["pushed"] = pdict["pushed"].update(
+                    {os.path.basename(fpath): datetime.time()}
+                )
                 self.yml.progress.write()
 
         aux_data = [x for x in pdict["files_pending"] if not x.endswith(".hlo")]
@@ -534,7 +587,16 @@ class YmlOps:
             file_success = self._to_s3(fpath, file_s3_key)
             if file_success:
                 pdict["pending"] = pdict["pending"].pop(fpath)
-                pdict["pushed"] = pdict["pushed"].update(fpath, datetime.time())
+                pdict["pushed"] = pdict["pushed"].update(
+                    {os.path.basename(fpath): datetime.time()}
+                )
+                self.yml.progress.write()
+
+        if not pdict["s3"]:
+            meta_s3_key = f"{meta_type}/{self.yml.uuid}.json"
+            meta_success = self._to_s3(pdict["meta"], meta_s3_key)
+            if meta_success:
+                pdict["s3"] = True
                 self.yml.progress.write()
 
     def to_finished(self):
@@ -558,7 +620,7 @@ class YmlOps:
 
     def to_synced(self):
         """Moves yml and data folder from FINISHED to SYNCED path. Final state."""
-        if self.yml.status == "FINISHED" and self.progress[self.pkey]["done"]:
+        if self.yml.status == "FINISHED":
             if self.yml.dry_run:
                 print("Moving files:")
                 for file_path in self.yml.data_files:
