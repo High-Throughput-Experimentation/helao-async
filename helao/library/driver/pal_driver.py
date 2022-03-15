@@ -333,7 +333,7 @@ class PalCam(BaseModel, HelaoDict):
     samples_in: List[SampleUnion] = Field(default_factory=list)
     samples_out: List[SampleUnion] = Field(default_factory=list)
     
-    microcam: List[PalMicroCam]  = Field(default_factory=list)
+    microcams: List[PalMicroCam]  = Field(default_factory=list)
 
     totalruns: int = 1
     sampleperiod: List[float] = Field(default_factory=list)
@@ -456,6 +456,21 @@ class PAL:
         self.IO_trigger_doneq = asyncio.Queue()
 
 
+    def check_tool(self, req_tool=None):
+        names = [e.name for e in PALtools]
+        vals = [e.value for e in PALtools]
+        idx = None
+        if req_tool in vals:
+            idx = vals.index(req_tool)
+        elif req_tool in names:
+            idx = names.index(req_tool)
+        if idx is None:
+            self.base.print_message(f"unknown PAL tool: {req_tool}", error = True)
+            return None
+        else:
+            return PALtools(vals[idx]).value
+
+
     def set_IO_signalq_nowait(self, val: bool) -> None:
         if self.IO_signalq.full():
             _ = self.IO_signalq.get_nowait()
@@ -574,7 +589,7 @@ class PAL:
 
         # wait for each microcam cam
         self.base.print_message("Waiting now for all microcams")
-        for microcam in palcam.microcam:
+        for microcam in palcam.microcams:
 
             if not self.IO_signalq.empty():
                 self.IO_measuring = await self.IO_signalq.get()
@@ -1691,7 +1706,7 @@ class PAL:
 
 
         # loop over the list of microcams (joblist)
-        for microcam in palcam.microcam:
+        for microcam in palcam.microcams:
             # get the correct cam definition which contains all params 
             # for the correct submission of the job to the PAL
             if microcam.method in [e.name for e in self.cams]:
@@ -2093,17 +2108,30 @@ class PAL:
         if not self.IO_do_meas and not self.base.actionserver.estop:
             self.base.print_message("init PAL IO loop", info = True)
             self.IO_error = ErrorCodes.none
+            # do a check of the PAL tool
+            for microcam in palcam.microcams:
+                microcam.tool = self.check_tool(req_tool=microcam.tool)
+                if microcam.tool is None:
+                    self.IO_error = ErrorCodes.not_available
+                    break
+            
+            A.error_code = self.IO_error
             self.IO_palcam = palcam
             self.action = A
-            self.IO_continue = False
-            await self.set_IO_signalq(True)
-            # wait for first continue trigger
-            A.error_code = ErrorCodes.none
-            self.base.print_message("waiting for first continue", info = True)
-            while not self.IO_continue:
-                await asyncio.sleep(1)
-            self.base.print_message("got first continue", info = True)
-            A.error_code = self.IO_error
+
+            if self.IO_error is ErrorCodes.none:
+                self.IO_continue = False
+                await self.set_IO_signalq(True)
+                # wait for first continue trigger
+                self.base.print_message("waiting for first continue", info = True)
+                while not self.IO_continue:
+                    await asyncio.sleep(1)
+                self.base.print_message("got first continue", info = True)
+                A.error_code = self.IO_error
+            else:
+                self.base.print_message("Error during PAL IOloop init",
+                                        error = True)
+
             if self.active:
                 activeDict = self.active.action.as_dict()
             else:
@@ -2332,7 +2360,7 @@ class PAL:
             spacingmethod = A.action_params.get("spacingmethod",Spacingmethod.linear),
             spacingfactor = A.action_params.get("spacingfactor",1.0),
             timeoffset = A.action_params.get("timeoffset",0.0),
-            microcam = [PalMicroCam(**{
+            microcams = [PalMicroCam(**{
                     "method":"transfer_tray_tray",
                     "tool":A.action_params.get("tool",None),
                     "volume_ul":A.action_params.get("volume_ul",0),
@@ -2368,7 +2396,7 @@ class PAL:
             spacingmethod = A.action_params.get("spacingmethod",Spacingmethod.linear),
             spacingfactor = A.action_params.get("spacingfactor",1.0),
             timeoffset = A.action_params.get("timeoffset",0.0),
-            microcam = [PalMicroCam(**{
+            microcams = [PalMicroCam(**{
                     "method":"transfer_tray_tray",
                     "tool":A.action_params.get("tool",None),
                     "volume_ul":A.action_params.get("volume_ul",0),
@@ -2401,7 +2429,7 @@ class PAL:
             spacingmethod = A.action_params.get("spacingmethod",Spacingmethod.linear),
             spacingfactor = A.action_params.get("spacingfactor",1.0),
             timeoffset = A.action_params.get("timeoffset",0.0),
-            microcam = [PalMicroCam(**{
+            microcams = [PalMicroCam(**{
                     "method":"transfer_tray_tray",
                     "tool":A.action_params.get("tool",None),
                     "volume_ul":A.action_params.get("volume_ul",0),
@@ -2434,7 +2462,7 @@ class PAL:
             spacingmethod = A.action_params.get("spacingmethod",Spacingmethod.linear),
             spacingfactor = A.action_params.get("spacingfactor",1.0),
             timeoffset = A.action_params.get("timeoffset",0.0),
-            microcam = [PalMicroCam(**{
+            microcams = [PalMicroCam(**{
                     "method":"transfer_tray_tray",
                     "tool":A.action_params.get("tool",None),
                     "volume_ul":A.action_params.get("volume_ul",0),
@@ -2463,7 +2491,7 @@ class PAL:
             spacingmethod = A.action_params.get("spacingmethod",Spacingmethod.linear),
             spacingfactor = A.action_params.get("spacingfactor",1.0),
             timeoffset = A.action_params.get("timeoffset",0.0),
-            microcam = [PalMicroCam(**{
+            microcams = [PalMicroCam(**{
                     "method":"archive",
                     "tool":A.action_params.get("tool",None),
                     "volume_ul":A.action_params.get("volume_ul",0),
@@ -2491,7 +2519,7 @@ class PAL:
     #         spacingmethod = Spacingmethod.linear,
     #         spacingfactor = 1.0,
     #         timeoffset = 0.0,
-    #         microcam = [PalMicroCam(**{
+    #         microcams = [PalMicroCam(**{
     #                 "method":"fill",
     #                 "tool":A.action_params.get("tool",None),
     #                 "volume_ul":A.action_params.get("volume_ul",0),
@@ -2521,7 +2549,7 @@ class PAL:
     #         spacingmethod = Spacingmethod.linear,
     #         spacingfactor = 1.0,
     #         timeoffset = 0.0,
-    #         microcam = [PalMicroCam(**{
+    #         microcams = [PalMicroCam(**{
     #                 "method":"fillfixed",
     #                 "tool":A.action_params.get("tool",None),
     #                 "volume_ul":A.action_params.get("volume_ul",0),
@@ -2551,7 +2579,7 @@ class PAL:
             spacingmethod = Spacingmethod.linear,
             spacingfactor = 1.0,
             timeoffset = 0.0,
-            microcam = [
+            microcams = [
                 PalMicroCam(**{
                     "method":"deepclean",
                     "tool":A.action_params.get("tool",None),
@@ -2577,7 +2605,7 @@ class PAL:
     #         spacingmethod = A.action_params.get("spacingmethod",Spacingmethod.linear),
     #         spacingfactor = A.action_params.get("spacingfactor",1.0),
     #         timeoffset = A.action_params.get("timeoffset",0.0),
-    #         microcam = [PalMicroCam(**{
+    #         microcams = [PalMicroCam(**{
     #                 "method":"dilute",
     #                 "tool":A.action_params.get("tool",None),
     #                 "volume_ul":A.action_params.get("volume_ul",0),
@@ -2610,7 +2638,7 @@ class PAL:
     #         spacingmethod = A.action_params.get("spacingmethod",Spacingmethod.linear),
     #         spacingfactor = A.action_params.get("spacingfactor",1.0),
     #         timeoffset = A.action_params.get("timeoffset",0.0),
-    #         microcam = [PalMicroCam(**{
+    #         microcams = [PalMicroCam(**{
     #                 "method":"autodilute",
     #                 "tool":A.action_params.get("tool",None),
     #                 "volume_ul":A.action_params.get("volume_ul",0),
@@ -2648,7 +2676,7 @@ class PAL:
             spacingmethod = Spacingmethod.linear,
             spacingfactor = 1.0,
             timeoffset = 0.0,
-            microcam = [PalMicroCam(**{
+            microcams = [PalMicroCam(**{
                     "method":method,
                     "tool":A.action_params.get("tool",None),
                     "volume_ul":A.action_params.get("volume_ul",0),
@@ -2693,7 +2721,7 @@ class PAL:
             spacingmethod = Spacingmethod.linear,
             spacingfactor = 1.0,
             timeoffset = 0.0,
-            microcam = [PalMicroCam(**{
+            microcams = [PalMicroCam(**{
                     "method":method,
                     "tool":A.action_params.get("tool",None),
                     "volume_ul":A.action_params.get("volume_ul",0),
@@ -2723,7 +2751,7 @@ class PAL:
             spacingmethod = Spacingmethod.linear,
             spacingfactor = 1.0,
             timeoffset = 0.0,
-            microcam = [PalMicroCam(**{
+            microcams = [PalMicroCam(**{
                     "method":"injection_tray_HPLC",
                     "tool":A.action_params.get("tool",None),
                     "volume_ul":A.action_params.get("volume_ul",0),
@@ -2756,7 +2784,7 @@ class PAL:
             spacingmethod = Spacingmethod.linear,
             spacingfactor = 1.0,
             timeoffset = 0.0,
-            microcam = [PalMicroCam(**{
+            microcams = [PalMicroCam(**{
                     "method":"injection_custom_HPLC",
                     "tool":A.action_params.get("tool",None),
                     "volume_ul":A.action_params.get("volume_ul",0),
@@ -2786,7 +2814,7 @@ class PAL:
             spacingmethod = Spacingmethod.linear,
             spacingfactor = 1.0,
             timeoffset = 0.0,
-            microcam = [
+            microcams = [
                 PalMicroCam(**{
                     "method":"injection_custom_GC_gas_wait",
                     "tool":A.action_params.get("toolGC",None),
@@ -2833,7 +2861,7 @@ class PAL:
             spacingmethod = Spacingmethod.linear,
             spacingfactor = 1.0,
             timeoffset = 0.0,
-            microcam = [
+            microcams = [
                 PalMicroCam(**{
                     "method":"injection_custom_GC_gas_wait",
                     "tool":A.action_params.get("toolGC",None),
