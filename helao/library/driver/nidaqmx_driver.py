@@ -377,7 +377,7 @@ class cNIMAX:
             with nidaqmx.Task() as task_do_port:
                 # for pump in pumps:
                 task_do_port.do_channels.add_do_chan(do_port,
-                    line_grouping=LineGrouping.CHAN_FOR_ALL_LINES,
+                    line_grouping=LineGrouping.CHAN_PER_LINE,
                 )
                 cmds.append(on)
                 if cmds:
