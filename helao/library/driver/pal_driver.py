@@ -544,18 +544,29 @@ class PAL:
                         self.base.print_message("IOq: got PAL 'start' "
                                                 "trigger poll", 
                                                 info = True)
+                    if (new_start ^ prev_start) and not new_start:
+                        prev_start = deepcopy(new_start)
+
                     if (new_continue ^ prev_continue) and new_continue:
                         self.IO_trigger_continueq.put_nowait(self.active.set_realtime_nowait())
                         prev_continue = deepcopy(new_continue)
                         self.base.print_message("IOq: got PAL 'continue' "
                                                 "trigger poll", 
                                                 info = True)
+
+                    if (new_continue ^ prev_continue) and not new_continue:
+                        prev_continue = deepcopy(new_continue)
+                        
                     if (new_done ^ prev_done) and new_done:
                         self.IO_trigger_doneq.put_nowait(self.active.set_realtime_nowait())
                         prev_done = deepcopy(new_done)
                         self.base.print_message("IOq: got PAL 'done' "
                                                 "trigger poll", 
                                                 info = True)
+
+                    if (new_done ^ prev_done) and not new_done:
+                        prev_done = deepcopy(new_done)
+
                     await asyncio.sleep(0.1)
 
 
