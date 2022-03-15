@@ -14,7 +14,8 @@ __all__ = [
     "ANEC_normal_state",
     "ANEC_GC_preparation",
     "ANEC_cleanup",
-    "ANEC_run_CA",
+    "ANEC_run_CA_vsRHE",
+    "ANEC_run_CA_vsRef",
 ]
 
 ###
@@ -293,7 +294,104 @@ def ANEC_load_solid(
     return apm.action_list
 
 
-def ANEC_run_CA(
+def ANEC_run_CA_vsRef(
+    experiment: Experiment,
+    CA_potential_vsRef: Optional[float] = 0.0,
+    CA_duration_sec: Optional[float] = 0.1,
+    ref_vs_nhe: Optional[float] = 0.21,
+    reservoir_liquid_sample_no: Optional[int] = 0,
+    volume_ul_cell_liquid: Optional[int] = 1000,
+    toolGC: Optional[str] = "HS 2",
+    toolarchive: Optional[str] = "LS 3",
+    source: Optional[str] = "cell1_we",
+    volume_ul_GC: Optional[int] = 300,
+    volume_ul_archive: Optional[int] = 500,
+    wash1: Optional[bool] = True,
+    wash2: Optional[bool] = True,
+    wash3: Optional[bool] = True,
+    wash4: Optional[bool] = False,
+    SampleRate: Optional[float] = 0.01,
+    TTLwait: Optional[int] = -1,
+    TTLsend: Optional[int] = -1,
+    IErange: Optional[str] = "auto",
+):
+    """Flush and fill cell, run CA, and drain.
+    
+    (1) Fill cell with liquid for 90 seconds
+    (2) Equilibrate for 15 seconds
+    (3) run CA
+    (4) mix product
+    (5) Drain cell and purge with CO2 for 60 seconds
+
+    Args:
+        exp (Experiment): Active experiment object supplied by Orchestrator
+        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
+        volume_ul_GC: GC injection volume
+
+    """
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    potential_vsRef = (
+        apm.pars.CA_potential_vsRef
+        - 1.0 * apm.pars.ref_vs_nhe
+    )
+    apm.add_action_list(
+        ANEC_flush_fill_cell(
+            experiment=experiment,
+            reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
+            volume_ul_cell_liquid=apm.pars.volume_ul_cell_liquid,
+        )
+    )
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {"custom": "cell1_we"},
+        to_global_params=["_fast_samples_in"],
+    )
+    apm.add(
+        PSTAT_server,
+        "run_CA",
+        {
+            "Vval": potential_vsRef, 
+            "Tval": apm.pars.CA_duration_sec,
+            "SampleRate": apm.pars.SampleRate,
+            "TTLwait": apm.pars.TTLwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": apm.pars.TTLsend,  # -1 disables, else select TTL 0-3
+            "IErange": apm.pars.IErange,
+        },
+        from_global_params={"_fast_samples_in": "fast_samples_in"},
+    )
+    apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": 60})
+    apm.add(NI_server, "pump", {"pump": "Direction", "on": 0})
+    apm.add(ORCH_server, "wait", {"waittime": 30})
+    apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": 60})
+    apm.add(NI_server, "pump", {"pump": "Direction", "on": 0})
+    apm.add(ORCH_server, "wait", {"waittime": 30})
+    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 0})
+    apm.add(
+        PAL_server,
+        "PAL_ANEC_aliquot",
+        {
+            "toolGC": apm.pars.toolGC,
+            "toolarchive": apm.pars.toolarchive,
+            "source": "cell1_we",
+            "volume_ul_GC": apm.pars.volume_ul_GC,
+            "volume_ul_archive": apm.pars.volume_ul_archive,
+            "wash1": apm.pars.wash1,
+            "wash2": apm.pars.wash2,
+            "wash3": apm.pars.wash3,
+            "wash4": apm.pars.wash4,
+        },
+    )
+    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
+    apm.add_action_list(ANEC_drain_cell(experiment))
+    apm.add_action_list(ANEC_normal_state(experiment))
+    return apm.action_list
+
+
+def ANEC_run_CA_vsRHE(
     experiment: Experiment,
     CA_potential_vsRHE: Optional[float] = 0.0,
     CA_duration_sec: Optional[float] = 0.1,
