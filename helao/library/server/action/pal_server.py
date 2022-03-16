@@ -751,12 +751,15 @@ def makeApp(confPrefix, servKey):
                                     destroy_liquid: Optional[bool] = False,
                                     destroy_gas: Optional[bool] = False,
                                     destroy_solid: Optional[bool] = False,
+                                    keep_liquid: Optional[bool] = False,
+                                    keep_solid: Optional[bool] = False,
+                                    keep_gas: Optional[bool] = False,
                                    ):
         active = await app.base.setup_and_contain_action(
                                           action_abbr = "unload_sample",
         )
         unloaded, samples_in, samples_out, customs_dict = \
-            await app.driver.archive.custom_unload(**active.action.action_params)
+            await app.driver.archive.custom_unload(**active.action.action_params, action = active.action)
         await active.append_sample(
               samples = samples_in,
               IO="in")
@@ -777,12 +780,15 @@ def makeApp(confPrefix, servKey):
                                        destroy_liquid: Optional[bool] = False,
                                        destroy_gas: Optional[bool] = False,
                                        destroy_solid: Optional[bool] = False,
+                                       keep_liquid: Optional[bool] = False,
+                                       keep_solid: Optional[bool] = False,
+                                       keep_gas: Optional[bool] = False,
                                       ):
         active = await app.base.setup_and_contain_action(
                                           action_abbr = "unload_sample",
         )
         unloaded, samples_in, samples_out, customs_dict = \
-            await app.driver.archive.custom_unloadall(**active.action.action_params)
+            await app.driver.archive.custom_unloadall(**active.action.action_params, action = active.action)
         await active.append_sample(
               samples = samples_in,
               IO="in")

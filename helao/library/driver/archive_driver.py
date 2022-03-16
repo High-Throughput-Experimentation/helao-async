@@ -42,6 +42,8 @@ from helaocore.model.position import (
 
 
 from helaocore.helper.print_message import print_message
+from helaocore.helper.unpack_samples import unpack_samples_helper
+
 from helaocore.data.sample import UnifiedSampleDataAPI
 from helaocore.schema import Action
 
@@ -762,13 +764,6 @@ class Archive():
         return True, sample
 
 
-    async def customs_to_dict(self):
-        customdict = deepcopy(self.positions.customs_dict)
-        for custom_key in customdict:
-            customdict[custom_key] = customdict[custom_key].as_dict()
-        return customdict
-
-
     def assign_new_sample_status(
                              self, 
                              samples: List[SampleUnion],
@@ -796,25 +791,39 @@ class Archive():
                                destroy_liquid: bool = False,
                                destroy_gas: bool = False,
                                destroy_solid: bool = False,
+                               keep_liquid: bool = False,
+                               keep_solid: bool = False,
+                               keep_gas: bool = False,
+                               action: Action = None,
                                *args, 
                                **kwargs
                               ) -> Tuple[bool, List[SampleUnion], List[SampleUnion], dict]:
-        samples = []
-        customs_dict = await self.customs_to_dict()
+        samples_in = []
+        samples_out = []
+
+        customs_dict = dict()
         for custom in self.positions.customs_dict:
-            samples.append(self.positions.customs_dict[custom].unload())
+            unloaded, tmp_samples_in, tmp_samples_out, tmp_customs_dict = \
+                await self.custom_unload(
+                            custom = custom, 
+                            destroy_liquid = destroy_liquid,
+                            destroy_gas = destroy_gas,
+                            destroy_solid = destroy_solid,
+                            keep_liquid = keep_liquid,
+                            keep_solid = keep_solid,
+                            keep_gas = keep_gas,
+                            action = action,
+            )
+
+            for sample in tmp_samples_in:
+                samples_in.append(sample)
+            for sample in tmp_samples_out:
+                samples_out.append(sample)
+            customs_dict.update(tmp_customs_dict)
+
 
         # save current state of table
         self.write_config()
-
-
-        samples_in, samples_out = \
-            await self._unload_custom_helper(
-                                      samples = samples,
-                                      destroy_liquid = destroy_liquid,
-                                      destroy_gas = destroy_gas,
-                                      destroy_solid = destroy_solid
-                                     )
 
         return True, samples_in, samples_out, customs_dict
 
@@ -825,6 +834,10 @@ class Archive():
                             destroy_liquid: bool = False,
                             destroy_gas: bool = False,
                             destroy_solid: bool = False,
+                            keep_liquid: bool = False,
+                            keep_solid: bool = False,
+                            keep_gas: bool = False,
+                            action: Action = None,
                             *args, 
                             **kwargs
                            ) -> Tuple[bool, List[SampleUnion], List[SampleUnion], dict]:
@@ -832,13 +845,29 @@ class Archive():
         unloaded = False
         customs_dict = dict()
         if custom in self.positions.customs_dict:
-            customs_dict = self.positions.customs_dict[custom].as_dict()
+            customs_dict.update({custom:self.positions.customs_dict[custom].as_dict()})
             samples.append(self.positions.customs_dict[custom].unload())
             unloaded = True
-        
+
         # save current state of table
         self.write_config()
-        
+        # unpack samples and check which to keep
+        liquids, solids, gases = unpack_samples_helper(samples = samples)
+        keep_samples = []
+        if keep_liquid:
+            destroy_liquid = False
+            for liquid in liquids:
+                keep_samples.append(liquid)
+        if keep_solid:
+            destroy_solid = False
+            for solid in solids:
+                keep_samples.append(solid)
+        if keep_gas:
+            destroy_gas = False
+            for gas in gases:
+                keep_samples.append(solid)
+
+
         samples_in, samples_out = \
             await self._unload_custom_helper(
                                       samples = samples,
@@ -847,8 +876,55 @@ class Archive():
                                       destroy_solid = destroy_solid
                                      )
 
-        return unloaded, samples_in, samples_out, customs_dict
 
+
+
+        # we keep at least one sample
+        if keep_samples:
+            self.base.print_message(f"trying to keep samples: "
+                                    f"{[s.get_global_label() for s in keep_samples]}",
+                                    info = True)
+            tmp_sample = None
+            tmp_loaded = False
+            if len(keep_samples) == 1:
+                tmp_loaded, tmp_sample, tmp_customs_dict = await self.custom_load(
+                                  custom = custom,
+                                  load_sample_in = keep_samples[0]
+                                 )
+            else:
+                # we need to combine it as an assembly
+                error, ref_samples = await self.new_ref_samples(
+                    samples_in = keep_samples,
+                    sample_out_type = SampleType.assembly,
+                    action = action
+                )
+                if error != ErrorCodes.none:
+                    self.base.print_message("no action provided to generate "
+                                            "assembly in order to keep samples",
+                                            error = True)
+                else:
+                    new_samples = await self.create_samples(
+                        reference_samples_in = ref_samples,
+                        action = action,
+                    )
+                    if new_samples:
+                        tmp_loaded, tmp_sample, tmp_customs_dict = \
+                            await self.custom_load(
+                                  custom = custom,
+                                  load_sample_in = new_samples[0]
+                            )
+                        if tmp_loaded:
+                            tmp_sample.status.append(SampleStatus.created)
+                    else:
+                        self.base.print_message("could not convert reference"
+                                                "to real sample during "
+                                                "custom_unload",
+                                                error = True)
+            # if a new sample has been loaded, add it to samples_out
+            if tmp_loaded and tmp_sample is not None:
+                samples_out.append(tmp_sample)
+
+        return unloaded, samples_in, samples_out, customs_dict
 
 
     async def _unload_custom_helper(
@@ -876,6 +952,7 @@ class Archive():
                                                samples = samples_out, 
                                                newstatus = SampleStatus.unloaded
                                               )
+
 
         # now write all samples back to the db
         # update all sample in the db
