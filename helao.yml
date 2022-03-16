@@ -69,6 +69,7 @@ dependencies:
   - pyaml
   - qt
   - requests
+  - ruamel.yaml
   - setuptools
   - shortuuid
   - sip
