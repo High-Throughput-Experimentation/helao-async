@@ -622,7 +622,6 @@ class Galil:
         
         # TODO: if same axis is moved twice
         for d, ax in zip(d_mm, axis):
-            print(d, ax)
             # need to remove stopping for multi-axis move
             if len(ret_moved_axis) > 0:
                 stopping = False
