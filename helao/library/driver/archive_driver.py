@@ -896,6 +896,7 @@ class Archive():
                 error, ref_samples = await self.new_ref_samples(
                     samples_in = keep_samples,
                     sample_out_type = SampleType.assembly,
+                    sample_position = custom,
                     action = action
                 )
                 if error != ErrorCodes.none:
@@ -1186,7 +1187,7 @@ class Archive():
 
         else:
             # this should never happen, else we found a bug
-            self.base.print_message("found a BUG in new_ref_sample", error = True)
+            self.base.print_message("found a BUG in new_ref_samples", error = True)
             error = ErrorCodes.bug
 
         return error, samples
