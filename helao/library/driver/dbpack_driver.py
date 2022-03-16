@@ -1,11 +1,11 @@
-__all__ = ["DBPack", "ActYml", "ExpYml", "SeqYml", "HelaoPath"]
+__all__ = ["DBPack", "ActYml", "ExpYml", "SeqYml", "HelaoPath", "YmlOps"]
 
 import os
 import io
 import codecs
 import json
-import yaml
 import configparser
+from ruamel.yaml import YAML
 from pathlib import Path
 from glob import glob
 from datetime import datetime
@@ -119,7 +119,11 @@ class HelaoPath(type(Path())):
             contents = [x for x in check_dir.glob("*") if x != check_dir]
             if contents:
                 break
-            check_dir.rmdir()
+            try:
+                check_dir.rmdir()
+                return "success"
+            except PermissionError as e:
+                return e
 
 
 class HelaoYml:
@@ -129,7 +133,8 @@ class HelaoYml:
 
     def parse_yml(self, path):
         self.target = path if isinstance(path, HelaoPath) else HelaoPath(path)
-        self.dict = yaml.safe_load(self.target.read_text())
+        yaml = YAML(typ="safe")
+        self.dict = yaml.load(self.target)
         self.type = self.dict["file_type"]
         self.uuid = self.dict[f"{self.type}_uuid"]
         self.pkey = HelaoPath(self.dict[f"{self.type}_output_dir"]).stem
@@ -155,7 +160,7 @@ class HelaoYml:
         self.progress_path = HelaoPath(os.path.join(*progress_parts))
         self.progress = Progress(self)
         meta_json = modmap[self.type](**self.dict).clean_dict()
-        for file_dict in meta_json["files"]:
+        for file_dict in meta_json.get("files", []):
             if file_dict["file_name"].endswith(".hlo"):
                 file_dict["file_name"] = f"{file_dict['file_name']}.json"
         if self.status == "FINISHED":
@@ -191,6 +196,7 @@ class Progress(UserDict):
                 "ready": False,  # ready to start transfer from FINISHED to SYNCED
                 "done": False,  # same as status=='SYNCED'
                 "meta": None,
+                "type": self.yml.type,
                 "pending": [],
                 "pushed": {},
                 "api": False,
@@ -208,7 +214,8 @@ class Progress(UserDict):
 
     def read(self):
         if self.progress_path.exists():
-            self.data = yaml.safe_load(self.progress_path.read_text())
+            yaml = YAML(typ="safe")
+            self.data = yaml.load(self.progress_path)
 
     def write(self):
         self.progress_path.parent.mkdir(parents=True, exist_ok=True)
@@ -284,7 +291,10 @@ class ExpYml(HelaoYml):
     def __init__(self, path: Union[HelaoPath, str]):
         super().__init__(path)
         self.get_actions()
-        self.max_group = max(self.grouped_actions.keys())
+        if self.grouped_actions:
+            self.max_group = max(self.grouped_actions.keys())
+        else:
+            self.max_group = 0
 
     def get_actions(self):
         """Return a list of ActYml objects belonging to this experiment."""
@@ -321,6 +331,7 @@ class ExpYml(HelaoYml):
                     "ready": False,  # ready to start transfer from FINISHED to SYNCED
                     "done": False,  # status=='SYNCED' for all constituents, api, s3
                     "meta": None,
+                    "type": 'process',
                     "pending": [],
                     "pushed": {},
                     "api": False,
@@ -409,28 +420,12 @@ class SeqYml(HelaoYml):
             [ExpYml(ep) for ep in all_experiment_paths], key=lambda x: x.time
         )
 
-    def update_progress(self):
-        for group_idx, group_acts in self.grouped_actions.items():
-            # init new groups
-            if group_idx not in self.progress.keys():
-                print("creating group", group_idx)
-                self.progress[group_idx] = {
-                    "ready": False,  # ready to start transfer from FINISHED to SYNCED
-                    "done": False,  # status=='SYNCED' for all constituents, api, s3
-                    "meta": None,
-                    "pending": [],
-                    "pushed": {},
-                    "api": False,
-                    "s3": False,
-                }
-                self.progress.write()
-            if self.progress[group_idx]["done"]:
-                continue
-            if all([self.progress[act.pkey]["ready"] for act in group_acts]):
-                self.progress[group_idx]["ready"] = True
-                self.progress.write()
-                if self.progress[group_idx]["meta"] is None:
-                    self.create_process(group_idx)
+
+ymlmap = {
+    "action": ActYml,
+    "experiment": ExpYml,
+    "sequence": SeqYml,
+}
 
 
 class DBPack:
@@ -447,7 +442,8 @@ class DBPack:
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
         self.aws_config = configparser.ConfigParser()
-        self.aws_config.read(self.config_dict["aws_config_path"])["default"]
+        self.aws_config.read(self.config_dict["aws_config_path"])
+        self.aws_config = self.aws_config["default"]
         self.aws_session = boto3.Session(
             region_name=self.aws_config["region"],
             aws_access_key_id=self.aws_config["aws_access_key_id"],
@@ -455,7 +451,22 @@ class DBPack:
         )
         self.bucket = self.aws_config["aws_bucket"]
         self.s3 = self.aws_session.client("s3")
-        self.api_url = self.aws_config["api_host"]
+        self.api_host = self.aws_config["api_host"]
+
+    def finish_exps(self, seq_yml: SeqYml):
+        seq_yml.get_experiments()
+        for exp in seq_yml.current_experiments:
+            if exp.status == "ACTIVE":
+                self.finish_acts(exp)
+                eop = YmlOps(self, exp)
+                eop.to_finished()
+        
+    def finish_acts(self, exp_yml: ExpYml):
+        exp_yml.get_actions()
+        for act in exp_yml.current_actions:
+            if act.status == "ACTIVE":
+                aop = YmlOps(self, act)
+                aop.to_finished()
 
     async def finish_yml(self, yml_path: str, yml_type: YmlType):
         """Primary function for processing ymls.
@@ -466,39 +477,59 @@ class DBPack:
 
         """
         hpth = HelaoPath(yml_path)
-        hyml = modmap[yml_type](hpth)
+        hyml = ymlmap[yml_type](hpth)
         ops = YmlOps(self, hyml)
+
+        # if given a sequence or experiment, check and finish active actions
+        if yml_type == YmlType.sequence:
+            self.finish_exps(hyml)
+        elif yml_type == YmlType.experiment:
+            self.finish_acts(hyml)
 
         # finish_yml request should be posted by orchestrator when act/exp/seq completes
         # calling this method assumes this yml and associated data are complete
         if hyml.status == "ACTIVE":
             ops.to_finished()
 
-        # update progress
+        # update progress again after finishing
         if yml_type == YmlType.sequence:
             hyml.get_experiments()
-        else:
+        elif yml_type == YmlType.experiment:
             hyml.get_actions()
 
         # check all 'ready', ignore all 'done'
         progress = hyml.progress
         finished = []
 
+        # first pass, check for pending uploads
         for pkey, pdict in progress.items():
             if pdict["done"]:
                 continue
             if pdict["ready"]:
                 if pdict["pending"] or not pdict["s3"]:
                     ops.to_s3(pkey)
-                if len(pdict["pending"]) == 0 and pdict["s3"]:
-                    await ops.to_api(pkey)
-                    if pdict["api"]:
-                        if isinstance(pkey, str):
-                            ops.to_synced()
-                        pdict["done"] = True
-                        pdict["ready"] = False
-                        progress.write()
-                        finished.append(pkey)
+        
+        # refresh progress and re-check finished s3
+        progress.read()
+        for pkey, pdict in progress.items():
+            if pdict["done"]:
+                continue
+            if len(pdict["pending"]) == 0 and pdict["s3"]:
+                await ops.to_api(pkey)
+
+        # refresh progress and re-check finished s3
+        progress.read()
+        for pkey, pdict in progress.items():
+            if pdict["done"]:
+                continue
+            if pdict["api"]:
+                if isinstance(pkey, str):
+                    ops.to_synced()
+                pdict["done"] = True
+                pdict["ready"] = False
+                progress.write()
+                finished.append(pkey)
+
         return_dict = {
             k: {dk: dv for dk, dv in d.items() if dk != "meta"}
             for k, d in progress.items()
@@ -519,12 +550,9 @@ class YmlOps:
         if pdict["pending"] or not pdict["s3"]:
             self.dbp.base.print_message("Cannot push to API with S3 upload pending.")
             return False
-        if isinstance(progress_key, int):  # process group
-            meta_type = "process"
-        else:
-            meta_type = self.yml.type.lower()
+        meta_type = pdict["type"]
         req_model = modmap[meta_type](**pdict["meta"]).clean_dict()
-        req = f"http://{self.api_host}/{plural[self.yml.type]}/create"
+        req = f"http://{self.dbp.api_host}/{plural[meta_type]}"
         async with aiohttp.ClientSession() as session:
             for i in range(retry_num):
                 async with session.post(req, json=req_model) as resp:
@@ -532,6 +560,7 @@ class YmlOps:
                         self.dbp.base.print_message(f"API post {self.yml.uuid} success")
                         return True
                     else:
+                        self.dbp.base.print_message(f"API post {self.yml.uuid} failed with status {resp.status}")
                         self.dbp.base.print_message(
                             f"Retry API [{i}/{retry_num}]: {self.yml.uuid}"
                         )
@@ -575,20 +604,20 @@ class YmlOps:
             file_json = {"meta": file_meta, "data": file_data}
             file_success = self._to_s3(file_json, file_s3_key)
             if file_success:
-                pdict["pending"] = pdict["pending"].pop(fpath)
-                pdict["pushed"] = pdict["pushed"].update(
-                    {os.path.basename(fpath): datetime.time()}
+                pdict["pending"].remove(fpath)
+                pdict["pushed"].update(
+                    {os.path.basename(fpath): datetime.now()}
                 )
                 self.yml.progress.write()
 
-        aux_data = [x for x in pdict["files_pending"] if not x.endswith(".hlo")]
+        aux_data = [x for x in pdict["pending"] if not x.endswith(".hlo")]
         for fpath in aux_data:
             file_s3_key = f"raw_data/{self.yml.uuid}/{os.path.basename(fpath)}.json"
             file_success = self._to_s3(fpath, file_s3_key)
             if file_success:
-                pdict["pending"] = pdict["pending"].pop(fpath)
-                pdict["pushed"] = pdict["pushed"].update(
-                    {os.path.basename(fpath): datetime.time()}
+                pdict["pending"].remove(fpath)
+                pdict["pushed"].update(
+                    {os.path.basename(fpath): datetime.now()}
                 )
                 self.yml.progress.write()
 
@@ -612,8 +641,11 @@ class YmlOps:
                 file_path.finished.parent.mkdir(parents=True, exist_ok=True)
                 file_path.replace(file_path.finished)
             self.yml.target.finished.parent.mkdir(parents=True, exist_ok=True)
-            new_target = self.yml.target.replace(self.target.finished)
-            self.yml.target.cleanup()
+            new_target = self.yml.target.replace(self.yml.target.finished)
+            clean_success = self.yml.target.cleanup()
+            if clean_success != "success":
+                self.dbp.base.print_message("Could not clean directory after moving.")
+                self.dbp.base.print_message(clean_success)
             self.yml.parse_yml(new_target)
         else:
             print("Yml status is not ACTIVE, cannot move.")
@@ -632,5 +664,8 @@ class YmlOps:
                 file_path.replace(file_path.synced)
             self.yml.target.synced.parent.mkdir(parents=True, exist_ok=True)
             new_target = self.yml.target.replace(self.target.synced)
-            self.yml.target.cleanup()
+            clean_success = self.yml.target.cleanup()
+            if clean_success != "success":
+                self.dbp.base.print_message("Could not clean directory after moving.")
+                self.dbp.base.print_message(clean_success)
             self.yml.parse_yml(new_target)
