@@ -10,6 +10,8 @@ dependencies:
   - autopep8
   - blas
   - bokeh
+  - boto3
+  - botocore
   - ca-certificates
   - certifi
   - cffi
