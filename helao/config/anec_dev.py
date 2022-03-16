@@ -155,4 +155,16 @@ config["servers"] = dict(
             doc_name="ANEC Visualizer",
         ),
     ),
+    # #########################################################################
+    # DB package server
+    # #########################################################################
+    DB=dict(
+        host=hostip,
+        port=8010,
+        group="action",
+        fast="dbpack_server",
+        params=dict(
+            aws_config_path='k:/users/hte/.credentials/aws_config.ini'
+        ),
+    ),
 )
