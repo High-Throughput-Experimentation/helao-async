@@ -92,7 +92,7 @@ class HelaoPath(type(Path())):
 
     @property
     def status_idx(self):
-        valid_statuses = ("ACTIVE", "FINISHED", "SYNCED")
+        valid_statuses = ("RUNS_ACTIVE", "RUNS_FINISHED", "RUNS_SYNCED")
         return [any([x in valid_statuses]) for x in self.parts].index(True)
 
     @property
@@ -101,18 +101,18 @@ class HelaoPath(type(Path())):
 
     @property
     def active(self):
-        return self.rename("ACTIVE")
+        return self.rename("RUNS_ACTIVE")
 
     @property
     def finished(self):
-        return self.rename("FINISHED")
+        return self.rename("RUNS_FINISHED")
 
     @property
     def synced(self):
-        return self.rename("SYNCED")
+        return self.rename("RUNS_SYNCED")
 
     def cleanup(self):
-        """Remove empty directories in ACTIVE or FINISHED."""
+        """Remove empty directories in RUNS_ACTIVE or RUNS_FINISHED."""
         tempparts = list(self.parts)
         steps = len(tempparts) - self.status_idx
         for i in range(1, steps):
@@ -139,7 +139,7 @@ class HelaoYml:
         self.type = self.dict["file_type"]
         self.uuid = self.dict[f"{self.type}_uuid"]
         self.pkey = HelaoPath(self.dict[f"{self.type}_output_dir"]).stem
-        self.status = self.target.parts[self.target.parts.index("INST") + 1]
+        self.status = self.target.parts[self.target.parts.index("INST") + 1].replace("RUNS_","")
         self.data_dir = self.target.parent
         self.data_files = [
             x
@@ -156,7 +156,7 @@ class HelaoYml:
             progress_parts = list(HelaoPath(all_exp_paths[0]).parts)
         else:
             progress_parts = list(self.target.parts)
-        progress_parts[syncpath_offset[self.type]] = "SYNCED"
+        progress_parts[syncpath_offset[self.type]] = "RUNS_SYNCED"
         progress_parts[-1] = progress_parts[-1].replace(".yml", ".progress")
         self.progress_path = HelaoPath(os.path.join(*progress_parts))
         self.progress = Progress(self)
@@ -551,10 +551,10 @@ class YmlOps:
             return False
         meta_type = pdict["type"]
         req_model = modmap[meta_type](**pdict["meta"]).clean_dict()
-        req = f"http://{self.dbp.api_host}/{plural[meta_type]}"
+        req_url = f"http://{self.dbp.api_host}/{plural[meta_type]}"
         async with aiohttp.ClientSession() as session:
             for i in range(retry_num):
-                async with session.post(req, json=req_model) as resp:
+                async with session.post(req_url, json=req_model) as resp:
                     if resp.status == 200:
                         self.dbp.base.print_message(f"API post {self.yml.uuid} success")
                         return True
@@ -571,11 +571,12 @@ class YmlOps:
         )
         return False
 
-    async def _to_s3(self, input: Union[dict, str], target: str, retry_num: int):
-        if isinstance(input, dict):
-            uploaded = dict2json(input)
+    async def _to_s3(self, msg: Union[dict, str], target: str, retry_num: int):
+        if isinstance(msg, dict):
+            uploaded = dict2json(msg)
             uploader = self.dbp.s3.upload_fileobj
         else:
+            uploaded = msg
             uploader = self.dbp.s3.upload_file
         for i in range(retry_num):
             try:
@@ -662,7 +663,7 @@ class YmlOps:
                 file_path.synced.parent.mkdir(parents=True, exist_ok=True)
                 file_path.replace(file_path.synced)
             self.yml.target.synced.parent.mkdir(parents=True, exist_ok=True)
-            new_target = self.yml.target.replace(self.target.synced)
+            new_target = self.yml.target.replace(self.yml.target.synced)
             clean_success = self.yml.target.cleanup()
             if clean_success != "success":
                 self.dbp.base.print_message("Could not clean directory after moving.")
