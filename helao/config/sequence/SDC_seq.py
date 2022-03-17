@@ -4,10 +4,10 @@ Sequence library for SDC
 
 __all__ = [
            "SDC_4CA_toggle_1CV_toggle",
+           "SDC_CV_CA_CV",
           ]
 
 
-from typing import List
 from helaocore.schema import ExperimentPlanMaker
 
 
@@ -150,6 +150,117 @@ def SDC_4CA_toggle_1CV_toggle(
                          "wavelength_nm":wavelength_nm1,
                          "t_on": t_onCV,
                          "t_off": t_offCV,
+                        }
+                       )
+
+
+        pl.add_experiment("SDC_slave_shutdown", {})
+
+    return pl.experiment_plan_list # returns complete experiment list
+
+
+
+def SDC_CV_CA_CV(
+                   plate_id: int = 1,
+                   plate_sample_no_list: list = [2],
+                   reservoir_liquid_sample_no: int = 1,
+                   ph: float = 9.53,
+                   ref_vs_nhe: float = 0.21,
+                   CV1_Vinit_vsRHE: float = 1.23,
+                   CV1_Vapex1_vsRHE: float = 0.73,
+                   CV1_Vapex2_vsRHE: float = 1.73,
+                   CV1_Vfinal_vsRHE: float = 1.73,
+                   CV1_scanrate_voltsec: float = 0.02,
+                   CV1_samplerate_mV: float = 1,
+                   CV1_cycles: int = 1,
+ 
+                   
+                   CA2_potential_vsRHE: float = 1.23,
+                   CA2_duration_sec: float = 4, 
+
+                   CV3_Vinit_vsRHE: float = 1.23,
+                   CV3_Vapex1_vsRHE: float = 0.73,
+                   CV3_Vapex2_vsRHE: float = 1.73,
+                   CV3_Vfinal_vsRHE: float = 1.73,
+                   CV3_scanrate_voltsec: float = 0.02,
+                   CV3_samplerate_mV: float = 1,
+                   CV3_cycles: int = 1,
+                   IErange: str = "auto",
+                   liquid_volume_ml: float = 1.0,
+                   samplerate_sec: float = 0.05, 
+                 
+                  ):
+
+    pl = ExperimentPlanMaker()
+    
+    # (1) house keeping
+    pl.add_experiment("SDC_slave_unloadall_customs", {})
+    
+    
+    for plate_sample in plate_sample_no_list:
+        
+        
+        pl.add_experiment(
+                        "SDC_slave_startup", 
+                        {
+                         "solid_custom_position":"cell1_we",
+                         "solid_plate_id":plate_id,
+                         "solid_sample_no":plate_sample,
+                         "reservoir_liquid_sample_no":reservoir_liquid_sample_no,
+                         "liquid_volume_ml":liquid_volume_ml
+                        }
+                        )
+
+        # CV1
+        pl.add_experiment(
+                        "SDC_slave_CV", 
+                        {
+                         "Vinit_vsRHE":CV1_Vinit_vsRHE,
+                         "Vapex1_vsRHE":CV1_Vapex1_vsRHE,
+                         "Vapex2_vsRHE":CV1_Vapex2_vsRHE,
+                         "Vfinal_vsRHE":CV1_Vfinal_vsRHE,
+                         "scanrate_voltsec":CV1_scanrate_voltsec,
+                         "samplerate_sec":CV1_samplerate_mV/(CV1_scanrate_voltsec*1000),
+                         "cycles":CV1_cycles,
+                         "IErange":IErange,
+                         "ph":ph,
+                         "ref_vs_nhe":ref_vs_nhe,
+
+                        }
+                    )
+    
+    
+    
+        # CA2
+        pl.add_experiment(
+                        "SDC_slave_CA", 
+                        {
+                         "CA_potential_vsRHE":CA2_potential_vsRHE,
+                         "ph":ph,
+                         "ref_vs_nhe":ref_vs_nhe,
+                         "samplerate_sec":samplerate_sec, 
+                         "CA_duration_sec":CA2_duration_sec, 
+                         "IErange":IErange,
+           
+                        }
+                       )
+
+
+        # CV3
+        pl.add_experiment(
+                        "SDC_slave_CV", 
+                        {
+                         "Vinit_vsRHE":CV3_Vinit_vsRHE,
+                         "Vapex1_vsRHE":CV3_Vapex1_vsRHE,
+                         "Vapex2_vsRHE":CV3_Vapex2_vsRHE,
+                         "Vfinal_vsRHE":CV3_Vfinal_vsRHE,
+                         "scanrate_voltsec":CV3_scanrate_voltsec,
+                         "samplerate_sec":CV3_samplerate_mV/(CV3_scanrate_voltsec*1000),
+                         "cycles":CV3_cycles,
+                         "IErange":IErange,
+                         "ph":ph,
+                         "ref_vs_nhe":ref_vs_nhe,
+
                         }
                        )
 
