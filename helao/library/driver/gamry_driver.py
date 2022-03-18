@@ -311,33 +311,26 @@ class gamry:
                             # await self.stat.set_idle()
                         self.base.print_message("Gamry measurement is done")
                     else:
-                        self.active =  await self.base.contain_action(
-                            ActiveParams(
-                                         action = self.action,
-                        ))
                         self.active.action.action_status.append(HloStatus.estopped)
                         self.IO_do_meas = False
                         self.base.print_message("Gamry is in estop.",
                                                 error=True)
 
                 elif self.IO_do_meas and self.IO_measuring:
-                    self.active =  await self.base.contain_action(
-                        ActiveParams(
-                                     action = self.action,
-                    ))
                     self.active.action.action_status.append(HloStatus.busy)
                     self.active.action.action_status.append(HloStatus.errored)
                     self.base.print_message("got measurement request but Gamry is busy")
 
                 elif not self.IO_do_meas and self.IO_measuring:
-                    self.active =  await self.base.contain_action(
-                        ActiveParams(
-                                     action = self.action,
-                    ))
                     self.base.print_message("got stop request, measurement will stop next cycle")
 
                 else:
                     self.base.print_message("got stop request but Gamry is idle")
+
+
+                # endpoint can return even we got errors
+                self.IO_continue = True
+
 
                 if self.active:
                     self.base.print_message("gamry finishes active action")
@@ -346,8 +339,6 @@ class gamry:
                     self.action = None
                     self.samples_in = []
 
-                # endpoint can return even we got errors
-                self.IO_continue = True
 
         except asyncio.CancelledError:
             # endpoint can return even we got errors
@@ -732,47 +723,11 @@ class gamry:
 
         else:
 
-            # write header lines with one function call
-            self.FIFO_gamryheader.update(
-                    {
-                    "gamry":self.FIFO_Gamryname,
-                    "ierangemode":self.IO_IErange.name,
-                    }
-            )
-            self.active =  await self.base.contain_action(
-                ActiveParams(
-                             action = self.action,
-                             file_conn_params_dict = {self.base.dflt_file_conn_key():
-                                 FileConnParams(
-                                     # use dflt file conn key for first
-                                     # init
-                                               file_conn_key = \
-                                                   self.base.dflt_file_conn_key(),
-                                                sample_global_labels=[sample.get_global_label() for sample in self.samples_in],
-                                                file_type="pstat_helao__file",
-                                                # only add optional keys to header
-                                                # rest will be added later
-                                                hloheader = HloHeaderModel(
-                                                    optional = self.FIFO_gamryheader
-                                                ),
-                                               )
-                                 }
-
-            ))
             # active object is set so we can set the continue flag
             self.IO_continue = True
             
-            for sample in self.samples_in:
-                sample.status = [SampleStatus.preserved]
-                sample.inheritance = SampleInheritance.allow_both
             
             
-            # clear old samples_in first
-            self.active.action.samples_in = []
-            # now add updated samples to sample_in again
-            await self.active.append_sample(samples = [sample_in for sample_in in self.samples_in],
-                                            IO="in"
-                                            )
 
             # TODO:
             # - I/E range: auto, fixed
@@ -1122,9 +1077,23 @@ class gamry:
 
         if self.pstat \
         and not self.IO_do_meas \
+        and not self.IO_measuring \
+        and not self.base.actionserver.estop \
         and act.error_code is ErrorCodes.none:
             # open connection, will be closed after measurement in IOloop
             act.error_code = await self.open_connection()
+
+        elif not self.pstat:
+            activeDict = act.as_dict()
+            act.error_code = ErrorCodes.not_initialized
+
+        elif not self.IO_do_meas:
+            activeDict = act.as_dict()
+            act.error_code = ErrorCodes.in_progress
+
+        elif self.base.actionserver.estop:
+            activeDict = act.as_dict()
+            act.error_code = ErrorCodes.estop
 
         elif self.IO_measuring:
             activeDict = act.as_dict()
@@ -1156,6 +1125,47 @@ class gamry:
                 self.samples_in = samples_in
                 self.action = act
                 self.action.samples_in = []
+
+
+                # write header lines with one function call
+                self.FIFO_gamryheader.update(
+                        {
+                        "gamry":self.FIFO_Gamryname,
+                        "ierangemode":self.IO_IErange.name,
+                        }
+                )
+
+                self.active =  await self.base.contain_action(
+                    ActiveParams(
+                                 action = self.action,
+                                 file_conn_params_dict = {self.base.dflt_file_conn_key():
+                                     FileConnParams(
+                                         # use dflt file conn key for first
+                                         # init
+                                                   file_conn_key = \
+                                                       self.base.dflt_file_conn_key(),
+                                                    sample_global_labels=[sample.get_global_label() for sample in self.samples_in],
+                                                    file_type="pstat_helao__file",
+                                                    # only add optional keys to header
+                                                    # rest will be added later
+                                                    hloheader = HloHeaderModel(
+                                                        optional = self.FIFO_gamryheader
+                                                    ),
+                                                   )
+                                     }
+    
+                ))
+
+                for sample in self.samples_in:
+                    sample.status = [SampleStatus.preserved]
+                    sample.inheritance = SampleInheritance.allow_both
+
+                # clear old samples_in first
+                self.active.action.samples_in = []
+                # now add updated samples to sample_in again
+                await self.active.append_sample(samples = [sample_in for sample_in in self.samples_in],
+                                                IO="in"
+                                                )
 
                 # signal the IOloop to start the measrurement
                 await self.set_IO_signalq(True)
