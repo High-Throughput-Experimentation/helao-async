@@ -55,7 +55,6 @@ def ANEC_repeat_CA_vsRef(
     epm = ExperimentPlanMaker()
 
     # housekeeping
-    
     epm.add_experiment(
         "ANEC_slave_unload_cell",
         {
@@ -129,6 +128,13 @@ def ANEC_repeat_CA_vsRef(
             {
             }
         )
+
+
+    epm.add_experiment(
+        "ANEC_slave_alloff",
+        {
+        }
+    )
 
 
     return epm.experiment_plan_list

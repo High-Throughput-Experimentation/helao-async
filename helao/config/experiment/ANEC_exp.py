@@ -9,6 +9,7 @@ __all__ = [
     "ANEC_slave_flush_fill_cell",
     "ANEC_slave_load_solid_only",
     "ANEC_slave_load_solid",
+    "ANEC_slave_load_solid_and_clean_cell",
     "ANEC_slave_unload_cell",
     "ANEC_slave_unload_liquid",
     "ANEC_slave_normal_state",
@@ -16,6 +17,7 @@ __all__ = [
     "ANEC_slave_cleanup",
     "ANEC_slave_CA_vsRef",
     "ANEC_slave_aliquot",
+    "ANEC_slave_alloff",
 ]
 
 ###
@@ -26,6 +28,8 @@ from helaocore.schema import Experiment, ActionPlanMaker
 from helao.library.driver.pal_driver import PALtools
 from helaocore.model.sample import SolidSample, LiquidSample
 from helaocore.model.machine import MachineModel
+from helaocore.model.action_start_condition import ActionStartCondition
+
 
 # list valid experiment functions
 EXPERIMENTS = __all__
@@ -37,6 +41,7 @@ NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).json_dict()
 ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).json_dict()
 PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).json_dict()
 
+
 # z positions for ADSS cell
 z_home = 0.0
 # touches the bottom of cell
@@ -46,11 +51,9 @@ z_seal = 4.5
 
 
 def ANEC_slave_load_solid(
-    # solid_custom_position: Optional[str] = "cell1_we",
+    experiment: Experiment,
     solid_plate_id: Optional[int] = 4534,
     solid_sample_no: Optional[int] = 1
-        
-        
 ):
     apm = ActionPlanMaker()
 
@@ -63,6 +66,29 @@ def ANEC_slave_load_solid(
                         })
 
     return apm.action_list
+
+
+
+def ANEC_slave_alloff(
+    experiment: Experiment,
+):
+    """
+
+    Args:
+        experiment (Experiment): Experiment object provided by Orch
+    """
+
+    apm = ActionPlanMaker()
+    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 0})
+    apm.add(NI_server, "pump", {"pump": "PeriPump2", "on": 0})
+    apm.add(NI_server, "pump", {"pump": "Direction", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "down", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "up", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "liquid", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "atm", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 0})
+    return apm.action_list
+
 
 
 def ANEC_slave_normal_state(
@@ -244,8 +270,8 @@ def ANEC_slave_GC_preparation(
 
 def ANEC_slave_load_solid_only(
     experiment: Experiment,
-    solid_plate_id: Optional[int] = 0,
-    solid_sample_no: Optional[int] = 0,
+    solid_plate_id: Optional[int] = 1,
+    solid_sample_no: Optional[int] = 1,
 ):
     """Load solid and clean cell."""
     
@@ -266,11 +292,11 @@ def ANEC_slave_load_solid_only(
     return apm.action_list
 
 
-def ANEC_slave_load_solid(
+def ANEC_slave_load_solid_and_clean_cell(
     experiment: Experiment,
-    solid_plate_id: Optional[int] = 0,
-    solid_sample_no: Optional[int] = 0,
-    reservoir_liquid_sample_no: Optional[int] = 0,
+    solid_plate_id: Optional[int] = 1,
+    solid_sample_no: Optional[int] = 1,
+    reservoir_liquid_sample_no: Optional[int] = 1,
     recirculation_time: Optional[float] = 60,
     toolGC: Optional[str] = "HS 2",
     volume_ul_GC: Optional[int] = 300,
@@ -375,7 +401,6 @@ def ANEC_slave_CA_vsRef(
         apm.pars.CA_potential_vsRef
         - 1.0 * apm.pars.ref_vs_nhe
     )
-
     
     apm.add(
         PAL_server,
@@ -396,12 +421,15 @@ def ANEC_slave_CA_vsRef(
         },
         from_global_params={"_fast_samples_in": "fast_samples_in"},
     )
+    
+    # apm.add(ORCH_server, "wait", {"waittime": 10})
+
 
     return apm.action_list
 
 
 
-# need to convert t
+# need to convert to seq
 # def ANEC_run_CA_vsRHE(
 #     experiment: Experiment,
 #     CA_potential_vsRHE: Optional[float] = 0.0,

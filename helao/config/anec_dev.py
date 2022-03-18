@@ -64,7 +64,6 @@ config["servers"] = dict(
         port=8004,
         group="action",
         fast="gamry_server",
-        simulate=False,  # choose between simulator(default) or real device
         params=dict(
             dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
         ),
