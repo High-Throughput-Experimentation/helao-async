@@ -139,7 +139,9 @@ class HelaoYml:
         self.type = self.dict["file_type"]
         self.uuid = self.dict[f"{self.type}_uuid"]
         self.pkey = HelaoPath(self.dict[f"{self.type}_output_dir"]).stem
-        self.status = self.target.parts[self.target.parts.index("INST") + 1].replace("RUNS_","")
+        self.status = self.target.parts[self.target.parts.index("INST") + 1].replace(
+            "RUNS_", ""
+        )
         self.data_dir = self.target.parent
         self.data_files = [
             x
@@ -442,17 +444,11 @@ class DBPack:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
-        self.aws_config = configparser.ConfigParser()
-        self.aws_config.read(self.config_dict["aws_config_path"])
-        self.aws_config = self.aws_config["default"]
-        self.aws_session = boto3.Session(
-            region_name=self.aws_config["region"],
-            aws_access_key_id=self.aws_config["aws_access_key_id"],
-            aws_secret_access_key=self.aws_config["aws_secret_access_key"],
-        )
-        self.bucket = self.aws_config["aws_bucket"]
+        os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
+        self.aws_session = boto3.Session(profile_name=self.config_dict["aws_profile"])
         self.s3 = self.aws_session.client("s3")
-        self.api_host = self.aws_config["api_host"]
+        self.bucket = self.config_dict["aws_bucket"]
+        self.api_host = self.config_dict["api_host"]
 
     async def finish_exps(self, seq_yml: SeqYml):
         seq_yml.get_experiments()
@@ -554,12 +550,21 @@ class YmlOps:
         meta_type = pdict["type"]
         req_model = modmap[meta_type](**pdict["meta"]).json_dict()
         req_url = f"https://{self.dbp.api_host}/{plural[meta_type]}/"
+        update_url = f"https://{self.dbp.api_host}/{plural[meta_type]}/{self.yml.uuid}/"
         async with aiohttp.ClientSession() as session:
-            for i in range(retry_num): 
+            for i in range(retry_num):
                 async with session.post(req_url, json=req_model) as resp:
                     if resp.status == 200:
                         self.dbp.base.print_message(f"API post {self.yml.uuid} success")
                         return True
+                    elif resp.status == 400:
+                        self.dbp.base.print_message(
+                            f"API post {self.yml.uuid} failed with status {resp.status}"
+                        )
+                        update_resp = await session.post(update_url, json=req_model)
+                        self.dbp.base.print_message(
+                            f"Attempted update resulted in status {update_resp.status}"
+                        )
                     else:
                         self.dbp.base.print_message(
                             f"API post {self.yml.uuid} failed with status {resp.status}"

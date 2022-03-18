@@ -5,7 +5,7 @@ config = dict()
 config["experiment_libraries"] = []
 config["sequence_libraries"] = []
 config["technique_name"] = "modelyst_test"
-config["root"] = r"C:\INST"  ### software log and run files saved here
+config["root"] = "/mnt/BIGSTOR/INST"  ### software log and run files saved here
 
 
 # we define all the servers here so that the overview is a bit better
@@ -32,7 +32,10 @@ config["servers"] = dict(
         group="action",
         fast="dbpack_server",
         params=dict(
-            aws_config_path='k:/users/hte/.credentials/aws_config.ini'
+            aws_config_path="/mnt/k/users/hte/.credentials/aws_config.ini",
+            aws_profile="default",
+            aws_bucket="helao.data.testing",
+            api_host="caltech-api.modelyst.com",
         ),
     ),
 )
