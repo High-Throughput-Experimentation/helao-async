@@ -1637,7 +1637,7 @@ class Aligner:
 
     def cleanup_session(self, session_context):
         self.vis.print_message("Aligner Bokeh session closed",
-                                error = True)
+                                info = True)
         self.IOloop_run = False
         self.IOtask.cancel()
 

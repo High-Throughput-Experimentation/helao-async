@@ -110,8 +110,18 @@ class Galil:
         # release estop: switch=false
         self.base.print_message("IO Estop")
         if switch == True:
-            await self.digital_out_off(await self.get_all_digital_out())
-            await self.set_analog_out(await self.get_all_analoh_out(), 0)
+            for ao_name, ao_port in self.dev_ao.items():
+                await self.set_digital_out(
+                    ao_port = ao_port,
+                    value = 0.0,
+                    ao_name = ao_name,
+                )
+            for do_name, do_port in self.dev_do.items():
+                await self.set_digital_out(
+                    do_port = do_port,
+                    on = False,
+                    do_name = do_name,
+                )
             # set flag
             self.base.actionserver.estop = True
         else:

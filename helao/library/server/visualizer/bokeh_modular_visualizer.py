@@ -143,7 +143,7 @@ class C_nidaqmxvis:
     def cleanup_session(self, session_context):
         self.vis.print_message(f"'{self.nidaqmx_key}' "
                                "Bokeh session closed",
-                                error = True)
+                                info = True)
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
@@ -383,7 +383,7 @@ class C_potvis:
     def cleanup_session(self, session_context):
         self.vis.print_message(f"'{self.potentiostat_key}' "
                                "Bokeh session closed",
-                                error = True)
+                                info = True)
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
