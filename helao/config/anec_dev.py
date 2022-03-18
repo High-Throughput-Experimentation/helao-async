@@ -109,15 +109,6 @@ config["servers"] = dict(
                 "done": "cDAQ1Mod2/port0/line3",  # TTL3
             },
             cam_file_path=r"C:\Users\anec\Desktop\psc_methods\active_methods\HELAO",
-            # cams={
-            #     "deepclean": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
-            #     # "injection_custom_HPLC":"HELAO_HPLC_LiquidInjection_Custom_to_HPLCInjector_220215.cam",
-            #     "injection_tray_HPLC": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
-            #     "injection_custom_GC_gas_wait": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
-            #     "injection_custom_GC_gas_start": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
-            #     "injection_tray_GC_liquid_start": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
-            #     "archive": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
-            # },
             cams={
                 "deepclean": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
                 # "injection_custom_HPLC":"HELAO_HPLC_LiquidInjection_Custom_to_HPLCInjector_220215.cam",
@@ -163,7 +154,10 @@ config["servers"] = dict(
         group="action",
         fast="dbpack_server",
         params=dict(
-            aws_config_path='k:/users/hte/.credentials/aws_config.ini'
+            aws_config_path="k:/users/hte/.credentials/aws_config.ini",
+            aws_profile="default",
+            aws_bucket="helao.data.testing",
+            api_host="caltech-api.modelyst.com",
         ),
     ),
 )
