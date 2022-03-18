@@ -1131,7 +1131,8 @@ class gamry:
             act.error_code = ErrorCodes.in_progress
 
         else:
-            act.error_code = ErrorCodes.not_initialized
+            if act.error_code is ErrorCodes.none:
+                act.error_code = ErrorCodes.not_initialized
             activeDict = act.as_dict()
 
 
