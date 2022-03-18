@@ -297,7 +297,7 @@ class gamry:
         try:
             while self.IOloop_run:
                 self.IO_do_meas = await self.IO_signalq.get()
-                if self.IO_do_meas and not self.IO_measuring:
+                if self.IO_do_meas:
                     # are we in estop?
                     if not self.base.actionserver.estop:
                         self.base.print_message("Gamry got measurement request")
@@ -315,18 +315,6 @@ class gamry:
                         self.IO_do_meas = False
                         self.base.print_message("Gamry is in estop.",
                                                 error=True)
-
-                elif self.IO_do_meas and self.IO_measuring:
-                    self.active.action.action_status.append(HloStatus.busy)
-                    self.active.action.action_status.append(HloStatus.errored)
-                    self.base.print_message("got measurement request but Gamry is busy")
-
-                elif not self.IO_do_meas and self.IO_measuring:
-                    self.base.print_message("got stop request, measurement will stop next cycle")
-
-                else:
-                    self.base.print_message("got stop request but Gamry is idle")
-
 
                 # endpoint can return even we got errors
                 self.IO_continue = True
