@@ -48,6 +48,11 @@ class cNIMAX:
         self.dev_liquidvalve = self.config_dict.get("dev_liquidvalve",dict())
         self.dev_liquidvalveitems = make_str_enum("dev_liquidvalve",{key:key for key in self.dev_liquidvalve})
 
+        self.dev_led = self.config_dict.get("dev_led",dict())
+        self.dev_leditems = make_str_enum("dev_led",{key:key for key in self.dev_led})
+
+
+
         self.allow_no_sample = self.config_dict.get("allow_no_sample", False)
 
         self.base.print_message("init NI-MAX")
@@ -563,11 +568,27 @@ class cNIMAX:
         """same as estop, but also sets flag"""
         switch = bool(switch)
         self.base.actionserver.estop = switch
+
+
+        for do_name, do_port in self.dev_led.items():
+            await self.set_digital_out(do_port=do_port, do_name=do_name, on=False)
+
+        for do_name, do_port in self.dev_pump.items():
+            await self.set_digital_out(do_port=do_port, do_name=do_name, on=False)
+
+        for do_name, do_port in  self.dev_gasvalve.items():
+            await self.set_digital_out(do_port=do_port, do_name=do_name, on=False)
+
+        for do_name, do_port in self.dev_liquidvalve.items():
+            await self.set_digital_out(do_port=do_port, do_name=do_name, on=False)
+
+
         if self.IO_measuring:
             if switch:
                 await self.set_IO_signalq(False)
                 if self.active:
                     await self.active.set_estop()
+
         return switch
 
 
