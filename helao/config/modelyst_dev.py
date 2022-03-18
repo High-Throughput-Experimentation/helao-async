@@ -1,0 +1,38 @@
+hostip = "127.0.0.1"
+config = dict()
+
+# action library provides generator functions which produce actions
+config["experiment_libraries"] = []
+config["sequence_libraries"] = []
+config["technique_name"] = "modelyst_test"
+config["root"] = r"C:\INST"  ### software log and run files saved here
+
+
+# we define all the servers here so that the overview is a bit better
+config["servers"] = dict(
+    ##########################################################################
+    # Orchestrator
+    ##########################################################################
+    ORCH=dict(
+        host=hostip,
+        port=8001,
+        group="orchestrator",
+        fast="async_orch2",
+        params=dict(
+            enable_op=True,
+            bokeh_port=5002,
+        ),
+    ),
+    # #########################################################################
+    # DB package server
+    # #########################################################################
+    DB=dict(
+        host=hostip,
+        port=8010,
+        group="action",
+        fast="dbpack_server",
+        params=dict(
+            aws_config_path='k:/users/hte/.credentials/aws_config.ini'
+        ),
+    ),
+)
