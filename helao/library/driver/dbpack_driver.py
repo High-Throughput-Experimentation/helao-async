@@ -501,31 +501,33 @@ class DBPack:
         finished = []
 
         # first pass, check for pending uploads
-        for pkey, pdict in progress.items():
-            if pdict["done"]:
+        # for pkey, pdict in progress.items():
+        for pkey in progress.keys():
+            if progress[pkey]["done"]:
                 continue
-            if pdict["ready"]:
-                if pdict["pending"] or not pdict["s3"]:
+            if progress[pkey]["ready"]:
+                if progress[pkey]["pending"] or not progress[pkey]["s3"]:
                     await ops.to_s3(pkey)
 
         # refresh progress and re-check finished s3
         progress.read()
-        for pkey, pdict in progress.items():
-            if pdict["done"]:
+        for pkey in progress.keys():
+            if progress[pkey]["done"]:
                 continue
-            if len(pdict["pending"]) == 0 and pdict["s3"]:
+            if len(progress[pkey]["pending"]) == 0 and progress[pkey]["s3"]:
                 await ops.to_api(pkey)
 
         # refresh progress and re-check finished s3
         progress.read()
-        for pkey, pdict in progress.items():
-            if pdict["done"]:
+        for pkey in progress.keys():
+
+            if progress[pkey]["done"]:
                 continue
-            if pdict["api"]:
+            if progress[pkey]["api"]:
                 if isinstance(pkey, str):
                     ops.to_synced()
-                pdict["done"] = True
-                pdict["ready"] = False
+                progress[pkey]["done"] = True
+                progress[pkey]["ready"] = False
                 progress.write()
                 finished.append(pkey)
 
@@ -550,10 +552,10 @@ class YmlOps:
             self.dbp.base.print_message("Cannot push to API with S3 upload pending.")
             return False
         meta_type = pdict["type"]
-        req_model = modmap[meta_type](**pdict["meta"]).clean_dict()
-        req_url = f"http://{self.dbp.api_host}/{plural[meta_type]}"
+        req_model = modmap[meta_type](**pdict["meta"]).json_dict()
+        req_url = f"https://{self.dbp.api_host}/{plural[meta_type]}/"
         async with aiohttp.ClientSession() as session:
-            for i in range(retry_num):
+            for i in range(retry_num): 
                 async with session.post(req_url, json=req_model) as resp:
                     if resp.status == 200:
                         self.dbp.base.print_message(f"API post {self.yml.uuid} success")
