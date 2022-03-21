@@ -74,6 +74,18 @@ def makeApp(confPrefix, servKey):
         return finished_action.as_dict()
 
 
+    @app.post(f"/{servKey}/kill_PAL", tags=["public"])
+    async def kill_PAL(
+                   action: Optional[Action] = \
+                           Body({}, embed=True),
+                  ):
+        active = await app.base.setup_and_contain_action()
+        await active.enqueue_data_dflt(datadict = \
+                                       {"kill": app.driver.kill_PAL()})
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+
     @app.post(f"/{servKey}/convert_v1DB", tags=["public_db"])
     async def convert_v1DB(
                            action: Optional[Action] = \
