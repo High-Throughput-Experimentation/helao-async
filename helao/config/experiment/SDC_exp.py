@@ -229,6 +229,7 @@ def SDC_slave_CA_toggle(experiment: Experiment,
               IErange: Optional[str] = "auto",
               led: Optional[str] = "doric_led1",
               wavelength_nm: Optional[float] = 0.0,
+              wavelength_intensity_mw: Optional[float] = 0.0,
               t_on: Optional[float] = 1000,
               t_off: Optional[float] = 1000,
               t_offset:Optional[int] =  0,
@@ -290,6 +291,7 @@ def SDC_slave_CA_toggle(experiment: Experiment,
                     "_fast_samples_in":"fast_samples_in"
                     },
         "start_condition": ActionStartCondition.wait_for_all, # orch is waiting for all action_dq to finish
+
         })
 
 
@@ -358,6 +360,7 @@ def SDC_slave_CV_toggle(experiment: Experiment,
                         ref_vs_nhe: float = 0.21,
                         led: Optional[str] = "doric_led1",
                         wavelength_nm: Optional[float] = 0.0,
+                        wavelength_intensity_mw: Optional[float] = 0.0,
                         t_on: Optional[float] = 1000,
                         t_off: Optional[float] = 1000,
                         t_offset:Optional[int] =  0,
