@@ -16,6 +16,7 @@ from typing import List, Optional, Union, Tuple
 from pydantic import BaseModel, Field
 import aiofiles
 import subprocess
+import psutil
 
 from helaocore.schema import Action
 from helaocore.server.base import Base
@@ -1874,6 +1875,11 @@ class PAL:
         self.IO_trigger_task =  asyncio.create_task(self._poll_trigger_task())
         if self.sshhost == "localhost":
             
+            # kill PAL if program is open
+            killed = self.kill_PAL()
+            if not killed:
+                self.base.print_message("Could not close PAL", error = True)
+                return ErrorCodes.critical
             FIFO_rshs_dir,rshs_logfile = os.path.split(palcam.aux_output_filepath)
             self.base.print_message(f"RSHS saving to: {FIFO_rshs_dir}")
 
@@ -2962,3 +2968,31 @@ class PAL:
                 if self.active:
                     await self.active.set_estop()
         return switch
+
+
+    def kill_PAL(self):
+        pyPids = {
+            p.pid: p
+            for p in psutil.process_iter(["name", "connections"])
+            if p.info["name"].startswith("PAL")
+        }
+
+        for pid in pyPids:
+            self.base.print_message(f"killing PAL on PID: {pid}", info = True)
+            p = psutil.Process(pid)
+            for _ in range(3):
+                # os.kill(p.pid, signal.SIGTERM)
+                p.terminate()
+                time.sleep(0.5)
+                if not psutil.pid_exists(p.pid):
+                    self.base.print_message("Successfully terminated PAL.",
+                                            info = True)
+                    return True
+            if psutil.pid_exists(p.pid):
+                self.base.print_message("Failed to terminate server PAL"
+                                        " after 3 retries.",
+                                        error = True)
+                return False
+
+        # if none is found return True
+        return True

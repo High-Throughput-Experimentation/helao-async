@@ -101,7 +101,7 @@ config["servers"] = dict(
         fast="pal_server",
         params=dict(
             host="localhost",
-            timeout=30 * 60,  # 30min timeout for waiting for TTL
+            timeout=5 * 60,  # 30min timeout for waiting for TTL
             dev_trigger="NImax",
             trigger={  # TTL handshake via NImax
                 "start": "cDAQ1Mod2/port0/line1",  # TTL1
