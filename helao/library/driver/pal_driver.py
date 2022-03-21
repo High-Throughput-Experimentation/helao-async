@@ -1871,15 +1871,17 @@ class PAL:
                                                ) -> ErrorCodes:
 
         error = ErrorCodes.none
+        # kill PAL if program is open
+        error = await self.kill_PAL()
+        if error is not ErrorCodes.none:
+            self.base.print_message("Could not close PAL", error = True)
+            return error
+
+
         await self._clear_trigger_qs()
         self.IO_trigger_task =  asyncio.create_task(self._poll_trigger_task())
         if self.sshhost == "localhost":
             
-            # kill PAL if program is open
-            killed = self.kill_PAL()
-            if not killed:
-                self.base.print_message("Could not close PAL", error = True)
-                return ErrorCodes.critical
             FIFO_rshs_dir,rshs_logfile = os.path.split(palcam.aux_output_filepath)
             self.base.print_message(f"RSHS saving to: {FIFO_rshs_dir}")
 
@@ -2970,7 +2972,67 @@ class PAL:
         return switch
 
 
-    def kill_PAL(self):
+    async def kill_PAL(self) -> ErrorCodes:
+        """kills PAL program if its still open"""
+        error_code = ErrorCodes.none
+        self.base.print_message("killing PAL", info = True)
+
+        if self.sshhost == "localhost":
+            
+            # kill PAL if program is open
+            error_code = await self.kill_PAL_local()
+        elif self.sshhost is not None:
+            error_code = await self.kill_PAL_cygwin()
+            
+        if error_code is not ErrorCodes.none:
+            self.base.print_message("Could not close PAL", error = True)
+    
+        return error_code
+
+
+    async def kill_PAL_cygwin(self) -> bool:
+        ssh_connected = False
+        while not ssh_connected:
+            try:
+                # open SSH to PAL
+                k = paramiko.RSAKey.from_private_key_file(self.sshkey)
+                mysshclient = paramiko.SSHClient()
+                mysshclient.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                mysshclient.connect(hostname=self.sshhost, username=self.sshuser, pkey=k)
+                ssh_connected = True
+            except Exception as e:
+                ssh_connected = False
+                self.base.print_message(f"SSH connection error. "
+                                        f"Retrying in 1 seconds.\n{e}",
+                                        error = True)
+                await asyncio.sleep(1)
+
+
+        try:
+            sshcmd = "tmux new-window taskkill /F /FI 'WINDOWTITLE eq PAL*'"
+            (
+                mysshclient_stdin,
+                mysshclient_stdout,
+                mysshclient_stderr,
+            ) = mysshclient.exec_command(sshcmd)
+            mysshclient.close()
+        
+        except Exception as e:
+            self.base.print_message(
+                f"SSH connection error 1. Could not send commands.\n{e}",
+                error = True
+            )
+            self.base.print_message(
+                e,
+                error = True
+            )
+            
+            return ErrorCodes.ssh_error
+
+        return ErrorCodes.none
+
+
+    async def kill_PAL_local(self) -> bool:
         pyPids = {
             p.pid: p
             for p in psutil.process_iter(["name", "connections"])
@@ -2992,7 +3054,7 @@ class PAL:
                 self.base.print_message("Failed to terminate server PAL"
                                         " after 3 retries.",
                                         error = True)
-                return False
+                return ErrorCodes.critical
 
         # if none is found return True
-        return True
+        return ErrorCodes.none

@@ -80,8 +80,10 @@ def makeApp(confPrefix, servKey):
                            Body({}, embed=True),
                   ):
         active = await app.base.setup_and_contain_action()
+        error_code = await app.driver.kill_PAL() 
+        active.action.error_code = error_code
         await active.enqueue_data_dflt(datadict = \
-                                       {"kill": app.driver.kill_PAL()})
+                                       {"error_code": error_code})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
