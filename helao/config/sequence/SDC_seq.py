@@ -42,6 +42,10 @@ def SDC_4CA_toggle_1CV_toggle(
                    wavelength_nm2: float = 455,
                    wavelength_nm3: float = 515,
                    wavelength_nm4: float = 590,
+                   wavelength_intensity_mw1: float = 1.715,
+                   wavelength_intensity_mw2: float = 1.478,
+                   wavelength_intensity_mw3: float = 0.585,
+                   wavelength_intensity_mw4: float = 0.366,
                    t_onCA: float = 500,
                    t_offCA: float = 500,
                    t_onCV: float = 2000,
@@ -79,6 +83,8 @@ def SDC_4CA_toggle_1CV_toggle(
                          "IErange":IErange,
                          "led":"doric_led1",
                          "wavelength_nm":wavelength_nm1,
+                         "wavelength_intensity_mw":wavelength_intensity_mw1,
+
                          "t_on":t_onCA,
                          "t_off":t_offCA,
                         }
@@ -95,6 +101,7 @@ def SDC_4CA_toggle_1CV_toggle(
                          "IErange":IErange,
                          "led":"doric_led2",
                          "wavelength_nm":wavelength_nm2,
+                         "wavelength_intensity_mw":wavelength_intensity_mw2,
                          "t_on":t_onCA,
                          "t_off":t_offCA,
                         }
@@ -111,6 +118,7 @@ def SDC_4CA_toggle_1CV_toggle(
                          "IErange":IErange,
                          "led":"doric_led3",
                          "wavelength_nm":wavelength_nm3,
+                         "wavelength_intensity_mw":wavelength_intensity_mw3,
                          "t_on":t_onCA,
                          "t_off":t_offCA,
                         }
@@ -127,6 +135,7 @@ def SDC_4CA_toggle_1CV_toggle(
                          "IErange":IErange,
                          "led":"doric_led4",
                          "wavelength_nm":wavelength_nm4,
+                         "wavelength_intensity_mw":wavelength_intensity_mw4,
                          "t_on":t_onCA,
                          "t_off":t_offCA,
                         }
@@ -148,7 +157,8 @@ def SDC_4CA_toggle_1CV_toggle(
                          "ref_vs_nhe":ref_vs_nhe,
                          "led":"doric_led1",
                          "wavelength_nm":wavelength_nm1,
-                         "t_on": t_onCV,
+                         "wavelength_intensity_mw":wavelength_intensity_mw1,
+                        "t_on": t_onCV,
                          "t_off": t_offCV,
                         }
                        )
