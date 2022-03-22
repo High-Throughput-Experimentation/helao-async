@@ -4,7 +4,6 @@ import os
 import io
 import codecs
 import json
-import configparser
 import asyncio
 from ruamel.yaml import YAML
 from pathlib import Path
@@ -139,9 +138,8 @@ class HelaoYml:
         self.type = self.dict["file_type"]
         self.uuid = self.dict[f"{self.type}_uuid"]
         self.pkey = HelaoPath(self.dict[f"{self.type}_output_dir"]).stem
-        self.status = self.target.parts[self.target.parts.index("INST") + 1].replace(
-            "RUNS_", ""
-        )
+        inst_idx = [i for i, p in enumerate(self.target.parts) if "INST" in p]
+        self.status = self.target.parts[inst_idx + 1].replace("RUNS_", "")
         self.data_dir = self.target.parent
         self.data_files = [
             x
