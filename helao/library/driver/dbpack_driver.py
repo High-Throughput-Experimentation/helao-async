@@ -139,6 +139,11 @@ class HelaoYml:
         self.uuid = self.dict[f"{self.type}_uuid"]
         self.pkey = HelaoPath(self.dict[f"{self.type}_output_dir"]).stem
         inst_idx = [i for i, p in enumerate(self.target.parts) if "INST" in p]
+        if inst_idx:
+            inst_idx = inst_idx[0]
+        else:
+            print("'INST' directory was not found in yml path. Cannot proceed.")
+            return False
         self.status = self.target.parts[inst_idx + 1].replace("RUNS_", "")
         self.data_dir = self.target.parent
         self.data_files = [
@@ -291,6 +296,8 @@ class ActYml(HelaoYml):
 class ExpYml(HelaoYml):
     def __init__(self, path: Union[HelaoPath, str]):
         super().__init__(path)
+        self.grouped_actions = defaultdict(list)
+        self.ungrouped_actions = []
         self.get_actions()
         if self.grouped_actions:
             self.max_group = max(self.grouped_actions.keys())
