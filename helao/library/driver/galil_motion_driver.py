@@ -79,9 +79,9 @@ class Galil:
 
 
         self.file_backup_transfermatrix = None
-        if self.base.states_root is not None:
+        if self.base.helaodirs.states_root is not None:
             self.file_backup_transfermatrix = \
-                os.path.join(self.base.states_root, 
+                os.path.join(self.base.helaodirs.states_root, 
                              f"{gethostname()}_last_plate_calib.json")
  
         self.plate_transfermatrix = \
@@ -95,7 +95,7 @@ class Galil:
 
         self.M_instr = None
         Mplate = self.load_transfermatrix(
-            file = os.path.join(self.base.db_root, "plate_calib",
+            file = os.path.join(self.base.helaodirs.db_root, "plate_calib",
                    f"{gethostname()}_instrument_calib.json")
             )
         
@@ -2865,7 +2865,7 @@ class Aligner:
             self.motor.update_plate_transfermatrix(newtransfermatrix = newTransfermatrix)
             # state is now saved within update
             # self.motor.save_transfermatrix(file = self.motor.file_backup_transfermatrix)
-            self.motor.save_transfermatrix(file = os.path.join(self.motor.base.db_root, "plate_calib",
+            self.motor.save_transfermatrix(file = os.path.join(self.motor.base.helaodirs.db_root, "plate_calib",
                              f"{gethostname()}_plate_{self.motor.aligner_plateid}_calib.json")
             )
             self.motor.aligner_active.action.error_code = \
