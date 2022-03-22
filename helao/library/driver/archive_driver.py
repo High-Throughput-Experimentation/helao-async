@@ -78,8 +78,8 @@ class Archive():
         
         self.position_config = self.config_dict.get("positions", None)
         self.archivepck = None
-        if self.base.states_root is not None:
-            self.archivepck = os.path.join(self.base.states_root, f"{gethostname()}_{self.base.server.server_name}_archive.json")
+        if self.base.helaodirs.states_root is not None:
+            self.archivepck = os.path.join(self.base.helaodirs.states_root, f"{gethostname()}_{self.base.server.server_name}_archive.json")
         self.config = {}
 
 
