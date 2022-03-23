@@ -95,7 +95,7 @@ def ANEC_repeat_CA_vsRef(
             {
             "CA_potential_vsRef":CA_potential_vsRef,
             "CA_duration_sec":CA_duration_sec,
-            "SampleRate":SampleRate,
+            "AcqInterval__s":SampleRate,
             "IErange":IErange,
             }
         )
@@ -222,9 +222,9 @@ def ANEC_repeat_CV_vsRef(
             "V_apex1_vsRef": V_apex1_vsRef,
             "V_apex2_vsRef": V_apex2_vsRef,
             "V_final_vsRef": V_final_vsRef,
-            "ScanRate": ScanRate,
+            "ScanRate__V_s": ScanRate,
             "Cycles": Cycles,
-            "SampleRate": SampleRate,
+            "AcqInterval__s": SampleRate,
             "IErange": IErange,
             }
         )

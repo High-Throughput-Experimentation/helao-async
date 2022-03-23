@@ -433,9 +433,9 @@ def ANEC_slave_CA_vsRef(
         PSTAT_server,
         "run_CA",
         {
-            "Vval": potential_vsRef,
-            "Tval": apm.pars.CA_duration_sec,
-            "SampleRate": apm.pars.SampleRate,
+            "Vval__V": potential_vsRef,
+            "Tval__s": apm.pars.CA_duration_sec,
+            "AcqInterval__s": apm.pars.SampleRate,
             "TTLwait": -1,  # -1 disables, else select TTL 0-3
             "TTLsend": -1,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
@@ -483,13 +483,13 @@ def ANEC_slave_CV_vsRef(
         PSTAT_server,
         "run_CV",
         {
-            "Vinit": potential_init_vsRef,
-            "Vapex1": potential_apex1_vsRef,
-            "Vapex2": potential_apex2_vsRef,
-            "Vfinal": potential_final_vsRef,
-            "ScanRate": apm.pars.ScanRate,
+            "Vinit__V": potential_init_vsRef,
+            "Vapex1__V": potential_apex1_vsRef,
+            "Vapex2__V": potential_apex2_vsRef,
+            "Vfinal__V": potential_final_vsRef,
+            "ScanRate__V_s": apm.pars.ScanRate,
             "Cycles": apm.pars.Cycles,
-            "SampleRate": apm.pars.SampleRate,
+            "AcqInterval__s": apm.pars.SampleRate,
             "TTLwait": -1,  # -1 disables, else select TTL 0-3
             "TTLsend": -1,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
