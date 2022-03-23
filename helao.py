@@ -34,16 +34,14 @@ import time
 import requests
 import subprocess
 from importlib import import_module
+from importlib.util import spec_from_file_location
+from importlib.util import module_from_spec
+
 
 from munch import munchify
 from termcolor import cprint
 from pyfiglet import figlet_format
 import colorama
-
-helao_root = os.path.dirname(os.path.realpath(__file__))
-confPrefix = sys.argv[1]
-config = import_module(f"helao.config.{confPrefix}").config
-conf = munchify(config)
 
 from helaocore.version import get_hlo_version
 from helaocore.helper.print_message import print_message
@@ -51,7 +49,7 @@ from helaocore.helper.print_message import print_message
 import helao.test.unit_test_sample_models
 # from helao.test.unit_test_sample_models import sample_model_unit_test
 
-colorama.init(strip=not sys.stdout.isatty()) # strip colors if stdout is redirected 
+
 
 class Pidd:
     def __init__(self, pidFile, retries=3):
@@ -263,7 +261,7 @@ def wait_key():
     return result
 
 
-def launcher(confPrefix, confDict):
+def launcher(confPrefix, confDict, helao_root):
 
     # API server launch priority (matches folders in root helao-dev/)
     LAUNCH_ORDER = ["action", "orchestrator", "visualizer", "operator"]
@@ -356,9 +354,25 @@ def launcher(confPrefix, confDict):
 if __name__ == "__main__":
     if not helao.test.unit_test_sample_models.sample_model_unit_test():
         quit()
+    colorama.init(strip=not sys.stdout.isatty()) # strip colors if stdout is redirected 
+    helao_root = os.path.dirname(os.path.realpath(__file__))
+    confPrefix = sys.argv[1]
+    if confPrefix.endswith(".py") and os.path.exists(confPrefix):
+        print_message({}, "launcher", f"Loading config from {confPrefix}", info=True)
+        conf_spec = spec_from_file_location("config", confPrefix)
+        conf_mod = module_from_spec(conf_spec)
+        conf_spec.loader.exec_module(conf_mod)
+        config = conf_mod.config
+        confPrefix = os.path.basename(confPrefix).replace(".py","")
+    elif confPrefix.endswith(".py") and not os.path.exists(confPrefix):
+        print_message({}, "launcher", f"Config not found at {confPrefix}", error=True)
+        raise FileNotFoundError("Launcher argument ends with .py, expected path not found.")
+    else:
+        print_message({}, "launcher", f"Loading config from helao/config/{confPrefix}.py", info=True)
+        config = import_module(f"helao.config.{confPrefix}").config
     # print("\x1b[2J") # clear screen
     cprint(figlet_format(f"HELAO\nV2.3\n{get_hlo_version()}", font="starwars"),"yellow", "on_red", attrs=["bold"])
-    pidd = launcher(confPrefix, config)
+    pidd = launcher(confPrefix, config, helao_root)
     result = None
     while result not in [b"\x18", b"\x04"]:
         print_message({}, "launcher", "CTRL-x to terminate action group. CTRL-d to disconnect.")
