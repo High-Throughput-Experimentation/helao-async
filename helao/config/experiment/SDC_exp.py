@@ -280,9 +280,9 @@ def SDC_slave_CA_toggle(experiment: Experiment,
         "action_server": PSTAT_server,
         "action_name": "run_CA",
         "action_params": {
-                        "Vval": potential,
-                        "Tval": apm.pars.CA_duration_sec,
-                        "SampleRate": apm.pars.samplerate_sec,
+                        "Vval__V": potential,
+                        "Tval__s": apm.pars.CA_duration_sec,
+                        "AcqInterval__s": apm.pars.samplerate_sec,
                         "TTLwait": -1,  # -1 disables, else select TTL 0-3
                         "TTLsend": 0,  # -1 disables, else select TTL 0-3
                         "IErange": apm.pars.IErange,
@@ -330,9 +330,9 @@ def SDC_slave_CA(experiment: Experiment,
         "action_server": PSTAT_server,
         "action_name": "run_CA",
         "action_params": {
-                        "Vval": potential,
-                        "Tval": apm.pars.CA_duration_sec,
-                        "SampleRate": apm.pars.samplerate_sec,
+                        "Vval__V": potential,
+                        "Tval__s": apm.pars.CA_duration_sec,
+                        "AcqInterval__s": apm.pars.samplerate_sec,
                         "TTLwait": -1,  # -1 disables, else select TTL 0-3
                         "TTLsend": -1,  # -1 disables, else select TTL 0-3
                         "IErange": apm.pars.IErange,
@@ -409,12 +409,12 @@ def SDC_slave_CV_toggle(experiment: Experiment,
         "action_server": PSTAT_server,
         "action_name": "run_CV",
         "action_params": {
-                         "Vinit":apm.pars.Vinit_vsRHE-1.0*apm.pars.ref_vs_nhe-0.059*apm.pars.ph,
-                         "Vapex1":apm.pars.Vapex1_vsRHE-1.0*apm.pars.ref_vs_nhe-0.059*apm.pars.ph,
-                         "Vapex2":apm.pars.Vapex2_vsRHE-1.0*apm.pars.ref_vs_nhe-0.059*apm.pars.ph,
-                         "Vfinal":apm.pars.Vfinal_vsRHE-1.0*apm.pars.ref_vs_nhe-0.059*apm.pars.ph,
-                         "ScanRate":apm.pars.scanrate_voltsec,
-                         "SampleRate":apm.pars.samplerate_sec,
+                         "Vinit__V":apm.pars.Vinit_vsRHE-1.0*apm.pars.ref_vs_nhe-0.059*apm.pars.ph,
+                         "Vapex1__V":apm.pars.Vapex1_vsRHE-1.0*apm.pars.ref_vs_nhe-0.059*apm.pars.ph,
+                         "Vapex2__V":apm.pars.Vapex2_vsRHE-1.0*apm.pars.ref_vs_nhe-0.059*apm.pars.ph,
+                         "Vfinal__V":apm.pars.Vfinal_vsRHE-1.0*apm.pars.ref_vs_nhe-0.059*apm.pars.ph,
+                         "ScanRate__V_s":apm.pars.scanrate_voltsec,
+                         "AcqInterval__s":apm.pars.samplerate_sec,
                          "Cycles":apm.pars.cycles,
                          "TTLwait": -1,  # -1 disables, else select TTL 0-3
                          "TTLsend": 0,  # -1 disables, else select TTL 0-3
@@ -464,12 +464,12 @@ def SDC_slave_CV(experiment: Experiment,
         "action_server": PSTAT_server,
         "action_name": "run_CV",
         "action_params": {
-                         "Vinit":apm.pars.Vinit_vsRHE-1.0*apm.pars.ref_vs_nhe-0.059*apm.pars.ph,
-                         "Vapex1":apm.pars.Vapex1_vsRHE-1.0*apm.pars.ref_vs_nhe-0.059*apm.pars.ph,
-                         "Vapex2":apm.pars.Vapex2_vsRHE-1.0*apm.pars.ref_vs_nhe-0.059*apm.pars.ph,
-                         "Vfinal":apm.pars.Vfinal_vsRHE-1.0*apm.pars.ref_vs_nhe-0.059*apm.pars.ph,
-                         "ScanRate":apm.pars.scanrate_voltsec,
-                         "SampleRate":apm.pars.samplerate_sec,
+                         "Vinit__V":apm.pars.Vinit_vsRHE-1.0*apm.pars.ref_vs_nhe-0.059*apm.pars.ph,
+                         "Vapex1__V":apm.pars.Vapex1_vsRHE-1.0*apm.pars.ref_vs_nhe-0.059*apm.pars.ph,
+                         "Vapex2__V":apm.pars.Vapex2_vsRHE-1.0*apm.pars.ref_vs_nhe-0.059*apm.pars.ph,
+                         "Vfinal__V":apm.pars.Vfinal_vsRHE-1.0*apm.pars.ref_vs_nhe-0.059*apm.pars.ph,
+                         "ScanRate__V_s":apm.pars.scanrate_voltsec,
+                         "AcqInterval__s":apm.pars.samplerate_sec,
                          "Cycles":apm.pars.cycles,
                          "TTLwait": -1,  # -1 disables, else select TTL 0-3
                          "TTLsend": -1,  # -1 disables, else select TTL 0-3

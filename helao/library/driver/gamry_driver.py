@@ -1187,10 +1187,10 @@ class gamry:
         self, A: Action,
     ):
         """LSV definition"""
-        Vinit = A.action_params["Vinit"]
-        Vfinal = A.action_params["Vfinal"]
-        ScanRate = A.action_params["ScanRate"]
-        SampleRate = A.action_params["SampleRate"]
+        Vinit = A.action_params["Vinit__V"]
+        Vfinal = A.action_params["Vfinal__V"]
+        ScanRate = A.action_params["ScanRate__V_s"]
+        SampleRate = A.action_params["AcqInterval__s"]
         TTLwait = A.action_params["TTLwait"]
         TTLsend = A.action_params["TTLsend"]
         IErange = A.action_params["IErange"]
@@ -1210,10 +1210,10 @@ class gamry:
 
         # setup partial header which will be completed in measure loop
         self.FIFO_gamryheader = {
-                "Vinit":Vinit,
-                "Vfinal":Vfinal,
-                "scanrate":ScanRate,
-                "samplerate":SampleRate,
+                "Vinit__V":Vinit,
+                "Vfinal__V":Vfinal,
+                "ScanRate__V_s":ScanRate,
+                "AcqInterval__s":SampleRate,
                 "eta":eta,
         }
 
@@ -1238,9 +1238,9 @@ class gamry:
         self, A: Action,
     ):
         """CA definition"""
-        Vval = A.action_params["Vval"]
-        Tval = A.action_params["Tval"]
-        SampleRate = A.action_params["SampleRate"]
+        Vval = A.action_params["Vval__V"]
+        Tval = A.action_params["Tval__s"]
+        SampleRate = A.action_params["AcqInterval__s"]
         TTLwait = A.action_params["TTLwait"]
         TTLsend = A.action_params["TTLsend"]
         IErange = A.action_params["IErange"]
@@ -1253,9 +1253,9 @@ class gamry:
 
         # setup partial header which will be completed in measure loop
         self.FIFO_gamryheader = {
-                "Vval":Vval,
-                "Tval":Tval,
-                "samplerate":SampleRate,
+                "Vval__V":Vval,
+                "Tval__s":Tval,
+                "AcqInterval__s":SampleRate,
                 "eta":eta,
         }
 
@@ -1278,8 +1278,8 @@ class gamry:
     ):
         """CP definition"""
         Ival = A.action_params["Ival"]
-        Tval = A.action_params["Tval"]
-        SampleRate = A.action_params["SampleRate"]
+        Tval = A.action_params["Tval__s"]
+        SampleRate = A.action_params["AcqInterval__s"]
         TTLwait = A.action_params["TTLwait"]
         TTLsend = A.action_params["TTLsend"]
         IErange = A.action_params["IErange"]
@@ -1293,8 +1293,8 @@ class gamry:
         # setup partial header which will be completed in measure loop
         self.FIFO_gamryheader = {
                 "Ival":Ival,
-                "Tval":Tval,
-                "samplerate":SampleRate,
+                "Tval__s":Tval,
+                "AcqInterval__s":SampleRate,
                 "eta":eta,
         }
 
@@ -1314,19 +1314,19 @@ class gamry:
 
     async def technique_CV(self, A: Action):
         # Initial value in volts or amps.
-        Vinit = A.action_params["Vinit"]
+        Vinit = A.action_params["Vinit__V"]
         # Apex 1 value in volts or amps.
-        Vapex1 = A.action_params["Vapex1"]
+        Vapex1 = A.action_params["Vapex1__V"]
         # Apex 2 value in volts or amps.
-        Vapex2 = A.action_params["Vapex2"]
+        Vapex2 = A.action_params["Vapex2__V"]
         # Final value in volts or amps.
-        Vfinal = A.action_params["Vfinal"]
+        Vfinal = A.action_params["Vfinal__V"]
         # Initial scan rate in volts/second or amps/second.
-        ScanInit = A.action_params["ScanRate"]
+        ScanInit = A.action_params["ScanRate__V_s"]
         # Apex scan rate in volts/second or amps/second.
-        ScanApex = A.action_params["ScanRate"]
+        ScanApex = A.action_params["ScanRate__V_s"]
         # Final scan rate in volts/second or amps/second.
-        ScanFinal = A.action_params["ScanRate"]
+        ScanFinal = A.action_params["ScanRate__V_s"]
         # Time to hold at Apex 1 in seconds
         HoldTime0 = 0.0
         # Time to hold at Apex 2 in seconds
@@ -1334,7 +1334,7 @@ class gamry:
         # Time to hold at Sfinal in seconds
         HoldTime2 = 0.0
         # Time between data acquisition steps.
-        SampleRate = A.action_params["SampleRate"]
+        SampleRate = A.action_params["AcqInterval__s"]
         # The number of cycles the signal is to be run
         Cycles = A.action_params["Cycles"]
         TTLwait = A.action_params["TTLwait"]
@@ -1367,17 +1367,17 @@ class gamry:
 
         # setup partial header which will be completed in measure loop
         self.FIFO_gamryheader = {
-                "Vinit":Vinit,
-                "Vapex1":Vapex1,
-                "Vapex2":Vapex2,
-                "Vfinal":Vfinal,
+                "Vinit__V":Vinit,
+                "Vapex1__V":Vapex1,
+                "Vapex2__V":Vapex2,
+                "Vfinal__V":Vfinal,
                 "scaninit":ScanInit,
                 "scanapex":ScanApex,
                 "scanfinal":ScanFinal,
                 "holdtime0":HoldTime0,
                 "holdtime1":HoldTime1,
                 "holdtime2":HoldTime2,
-                "samplerate":SampleRate,
+                "AcqInterval__s":SampleRate,
                 "cycles":Cycles,
                 "eta":eta,
         }
@@ -1398,12 +1398,12 @@ class gamry:
 
     async def technique_EIS(self, A: Action):
         """EIS definition"""
-        Vval = A.action_params["Vval"]
-        Tval = A.action_params["Tval"]
+        Vval = A.action_params["Vval__V"]
+        Tval = A.action_params["Tval__s"]
         Freq = A.action_params["Freq"]
         RMS = A.action_params["RMS"]
         Precision = A.action_params["Precision"]
-        SampleRate = A.action_params["SampleRate"]
+        SampleRate = A.action_params["AcqInterval__s"]
         TTLwait = A.action_params["TTLwait"]
         TTLsend = A.action_params["TTLsend"]
         IErange = A.action_params["IErange"]
@@ -1417,12 +1417,12 @@ class gamry:
 
         # setup partial header which will be completed in measure loop
         self.FIFO_gamryheader = {
-                "Vval":Vval,
-                "Tval":Tval,
+                "Vval__V":Vval,
+                "Tval__s":Tval,
                 "freq":Freq,
                 "rms":RMS,
                 "precision":Precision,
-                "samplerate":SampleRate,
+                "AcqInterval__s":SampleRate,
                 "eta":eta,
         }
 
@@ -1443,8 +1443,8 @@ class gamry:
 
     async def technique_OCV(self, A: Action):
         """OCV definition"""
-        Tval = A.action_params["Tval"]
-        SampleRate = A.action_params["SampleRate"]
+        Tval = A.action_params["Tval__s"]
+        SampleRate = A.action_params["AcqInterval__s"]
         # runparams = A.action_params['runparams']
         TTLwait = A.action_params["TTLwait"]
         TTLsend = A.action_params["TTLsend"]
@@ -1460,8 +1460,8 @@ class gamry:
 
         # setup partial header which will be completed in measure loop
         self.FIFO_gamryheader = {
-            "Tval":Tval,
-            "samplerate":SampleRate,
+            "Tval__s":Tval,
+            "AcqInterval__s":SampleRate,
             "eta":eta,
         }
 
