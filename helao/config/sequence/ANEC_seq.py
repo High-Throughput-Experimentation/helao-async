@@ -95,7 +95,7 @@ def ANEC_repeat_CA_vsRef(
             {
             "CA_potential_vsRef":CA_potential_vsRef,
             "CA_duration_sec":CA_duration_sec,
-            "AcqInterval__s":SampleRate,
+            "SampleRate":SampleRate,
             "IErange":IErange,
             }
         )
@@ -123,18 +123,20 @@ def ANEC_repeat_CA_vsRef(
             }
         )
 
-        epm.add_experiment(
-            "ANEC_slave_normal_state",
-            {
-            }
-        )
-
-
-    epm.add_experiment(
-        "ANEC_slave_alloff",
-        {
-        }
-    )
+# =============================================================================
+#         epm.add_experiment(
+#             "ANEC_slave_normal_state",
+#             {
+#             }
+#         )
+# 
+# 
+#     epm.add_experiment(
+#         "ANEC_slave_alloff",
+#         {
+#         }
+#     )
+# =============================================================================
 
 
     return epm.experiment_plan_list
@@ -222,9 +224,9 @@ def ANEC_repeat_CV_vsRef(
             "V_apex1_vsRef": V_apex1_vsRef,
             "V_apex2_vsRef": V_apex2_vsRef,
             "V_final_vsRef": V_final_vsRef,
-            "ScanRate__V_s": ScanRate,
+            "ScanRate": ScanRate,
             "Cycles": Cycles,
-            "AcqInterval__s": SampleRate,
+            "SampleRate": SampleRate,
             "IErange": IErange,
             }
         )
@@ -238,17 +240,19 @@ def ANEC_repeat_CV_vsRef(
             }
         )
 
-        epm.add_experiment(
-            "ANEC_slave_normal_state",
-            {
-            }
-        )
-
-
-    epm.add_experiment(
-        "ANEC_slave_alloff",
-        {
-        }
+# =============================================================================
+#         epm.add_experiment(
+#             "ANEC_slave_normal_state",
+#             {
+#             }
+#         )
+# 
+# 
+#     epm.add_experiment(
+#         "ANEC_slave_alloff",
+#         {
+#         }
+# =============================================================================
     )
 
 
