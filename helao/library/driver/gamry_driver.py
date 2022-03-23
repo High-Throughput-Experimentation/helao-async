@@ -1214,7 +1214,7 @@ class gamry:
                 "Vfinal__V":Vfinal,
                 "ScanRate__V_s":ScanRate,
                 "AcqInterval__s":SampleRate,
-                "eta":eta,
+                "ETA__s":eta,
         }
 
         # common
@@ -1256,7 +1256,7 @@ class gamry:
                 "Vval__V":Vval,
                 "Tval__s":Tval,
                 "AcqInterval__s":SampleRate,
-                "eta":eta,
+                "ETA__s":eta,
         }
 
         # common
@@ -1295,7 +1295,7 @@ class gamry:
                 "Ival":Ival,
                 "Tval__s":Tval,
                 "AcqInterval__s":SampleRate,
-                "eta":eta,
+                "ETA__s":eta,
         }
 
         # common
@@ -1371,15 +1371,15 @@ class gamry:
                 "Vapex1__V":Vapex1,
                 "Vapex2__V":Vapex2,
                 "Vfinal__V":Vfinal,
-                "scaninit":ScanInit,
-                "scanapex":ScanApex,
-                "scanfinal":ScanFinal,
-                "holdtime0":HoldTime0,
-                "holdtime1":HoldTime1,
-                "holdtime2":HoldTime2,
+                "ScanInit__V_s":ScanInit,
+                "ScanApex__V_s":ScanApex,
+                "ScanFinal__V_s":ScanFinal,
+                "holdtime0__s":HoldTime0,
+                "holdtime1__s":HoldTime1,
+                "holdtime2__s":HoldTime2,
                 "AcqInterval__s":SampleRate,
                 "cycles":Cycles,
-                "eta":eta,
+                "ETA__s":eta,
         }
 
         # common
@@ -1423,7 +1423,7 @@ class gamry:
                 "rms":RMS,
                 "precision":Precision,
                 "AcqInterval__s":SampleRate,
-                "eta":eta,
+                "ETA__s":eta,
         }
 
         # common
@@ -1462,7 +1462,7 @@ class gamry:
         self.FIFO_gamryheader = {
             "Tval__s":Tval,
             "AcqInterval__s":SampleRate,
-            "eta":eta,
+            "ETA__s":eta,
         }
 
         # common
