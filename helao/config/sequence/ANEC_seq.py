@@ -1,6 +1,6 @@
 """Sequence library for ANEC"""
 
-__all__ = ["ANEC_repeat_CA_vsRef"]
+__all__ = ["ANEC_repeat_CA_vsRef", "ANEC_repeat_CV_vsRef"]
 
 
 from typing import Optional
@@ -114,6 +114,121 @@ def ANEC_repeat_CA_vsRef(
             "wash4":wash4,
             }
         )
+
+
+        epm.add_experiment(
+            "ANEC_slave_drain_cell",
+            {
+             "drain_time":60.0
+            }
+        )
+
+        epm.add_experiment(
+            "ANEC_slave_normal_state",
+            {
+            }
+        )
+
+
+    epm.add_experiment(
+        "ANEC_slave_alloff",
+        {
+        }
+    )
+
+
+    return epm.experiment_plan_list
+
+
+
+def ANEC_repeat_CV_vsRef(
+    num_repeats: int = 1,
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
+    reservoir_liquid_sample_no: int = 1,
+
+    volume_ul_cell_liquid: float = 1000,
+
+    V_init_vsRef: float = 0.0, 
+    V_apex1_vsRef: float = -1.0,  
+    V_apex2_vsRef: float = -1.0, 
+    V_final_vsRef: float = 0.0,  
+    ScanRate: float = 1.0,  
+    Cycles: int = 1,
+    SampleRate: float = 0.01,
+    IErange: str = "auto",
+    ref_offset: float = 0.0,
+):
+    """Repeat CV at the cell1_we position.
+    
+    Flush and fill cell, run CV, and drain.
+    
+    (1) Fill cell with liquid for 90 seconds
+    (2) Equilibrate for 15 seconds
+    (3) run CV
+    (5) Drain cell and purge with CO2 for 60 seconds
+
+    Args:
+        exp (Experiment): Active experiment object supplied by Orchestrator
+        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
+        volume_ul_GC: GC injection volume
+
+    
+    
+    """
+    
+    epm = ExperimentPlanMaker()
+
+    # housekeeping
+    epm.add_experiment(
+        "ANEC_slave_unload_cell",
+        {
+        }
+    )
+
+    epm.add_experiment(
+        "ANEC_slave_normal_state",
+        {
+        }
+    )
+
+    epm.add_experiment(
+        "ANEC_slave_load_solid",
+        {
+        "solid_plate_id":solid_plate_id,
+        "solid_sample_no":solid_sample_no
+        }
+    )
+
+    for _ in range(num_repeats):
+
+        epm.add_experiment(
+            "ANEC_slave_flush_fill_cell",
+            {
+             "liquid_flush_time":90,
+             "co2_purge_time":15,
+             "equilibration_time":1.0,
+             "reservoir_liquid_sample_no":reservoir_liquid_sample_no,
+             "volume_ul_cell_liquid":volume_ul_cell_liquid,
+
+
+            }
+        )
+
+        epm.add_experiment(
+            "ANEC_slave_CV_vsRef",
+            {
+            "V_init_vsRef": V_init_vsRef,
+            "V_apex1_vsRef": V_apex1_vsRef,
+            "V_apex2_vsRef": V_apex2_vsRef,
+            "V_final_vsRef": V_final_vsRef,
+            "ScanRate": ScanRate,
+            "Cycles": Cycles,
+            "SampleRate": SampleRate,
+            "IErange": IErange,
+            }
+        )
+
 
 
         epm.add_experiment(

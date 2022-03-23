@@ -18,6 +18,7 @@ __all__ = [
     "ANEC_slave_CA_vsRef",
     "ANEC_slave_aliquot",
     "ANEC_slave_alloff",
+    "ANEC_slave_CV_vsRef"
 ]
 
 ###
@@ -434,6 +435,60 @@ def ANEC_slave_CA_vsRef(
         {
             "Vval": potential_vsRef,
             "Tval": apm.pars.CA_duration_sec,
+            "SampleRate": apm.pars.SampleRate,
+            "TTLwait": -1,  # -1 disables, else select TTL 0-3
+            "TTLsend": -1,  # -1 disables, else select TTL 0-3
+            "IErange": apm.pars.IErange,
+        },
+        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+
+    # apm.add(ORCH_server, "wait", {"waittime": 10})
+
+    return apm.action_list
+
+
+def ANEC_slave_CV_vsRef(
+    experiment: Experiment,
+    V_init_vsRef: Optional[float] = 0.0, 
+    V_apex1_vsRef: Optional[float] = -1.0,  
+    V_apex2_vsRef: Optional[float] = -1.0, 
+    V_final_vsRef: Optional[float] = 0.0,  
+    ScanRate: Optional[float] = 1.0,  
+    Cycles: Optional[int] = 1,
+    SampleRate: Optional[float] = 0.01,
+    IErange: Optional[str] = "auto",
+    ref_offset: Optional[float] = 0.0,
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    potential_init_vsRef = apm.pars.V_init_vsRef - 1.0 * apm.pars.ref_offset
+    potential_apex1_vsRef = apm.pars.V_apex1_vsRef - 1.0 * apm.pars.ref_offset
+    potential_apex2_vsRef = apm.pars.V_apex2_vsRef - 1.0 * apm.pars.ref_offset
+    potential_final_vsRef = apm.pars.V_final_vsRef - 1.0 * apm.pars.ref_offset
+    
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {"custom": "cell1_we"},
+        to_global_params=["_fast_samples_in"],
+    )
+    apm.add(
+        PSTAT_server,
+        "run_CV",
+        {
+            "Vinit": potential_init_vsRef,
+            "Vapex1": potential_apex1_vsRef,
+            "Vapex2": potential_apex2_vsRef,
+            "Vfinal": potential_final_vsRef,
+            "ScanRate": apm.pars.ScanRate,
+            "Cycles": apm.pars.Cycles,
             "SampleRate": apm.pars.SampleRate,
             "TTLwait": -1,  # -1 disables, else select TTL 0-3
             "TTLsend": -1,  # -1 disables, else select TTL 0-3
