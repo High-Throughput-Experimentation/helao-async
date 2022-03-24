@@ -45,6 +45,7 @@ import colorama
 
 from helaocore.version import get_hlo_version
 from helaocore.helper.print_message import print_message
+from helaocore.helper.helao_dirs import helao_dirs
 
 import helao.test.unit_test_sample_models
 # from helao.test.unit_test_sample_models import sample_model_unit_test
@@ -52,11 +53,10 @@ import helao.test.unit_test_sample_models
 
 
 class Pidd:
-    def __init__(self, pidFile, conf_dict, retries=3):
+    def __init__(self, pidFile, pidPath, retries=3):
         self.PROC_NAMES = ["python.exe", "python"]
         self.pidFile = pidFile
-        self.confDict = conf_dict
-        self.pidPath = os.path.join(self.confDict["root"], self.pidFile)
+        self.pidPath =  os.path.join(pidPath, self.pidFile)
         self.RETRIES = retries
         self.reqKeys = ("host", "port", "group")
         self.codeKeys = ("fast", "bokeh")
@@ -264,11 +264,13 @@ def wait_key():
 
 
 def launcher(confPrefix, confDict, helao_root):
+    #get the BaseModel which contains all the dirs for helao
+    helaodirs = helao_dirs(config)
 
     # API server launch priority (matches folders in root helao-dev/)
     LAUNCH_ORDER = ["action", "orchestrator", "visualizer", "operator"]
 
-    pidd = Pidd(f"pids_{confPrefix}.pck", confDict)
+    pidd = Pidd(pidFile=f"pids_{confPrefix}.pck", pidPath=helaodirs.states_root)
     if not validateConfig(pidd, confDict):
         print_message({}, "launcher", f"Configuration for '{confPrefix}' is invalid.", error = True)
         raise Exception(f"Configuration for '{confPrefix}' is invalid.")
