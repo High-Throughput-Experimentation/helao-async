@@ -55,8 +55,7 @@ import helao.test.unit_test_sample_models
 class Pidd:
     def __init__(self, pidFile, pidPath, retries=3):
         self.PROC_NAMES = ["python.exe", "python"]
-        self.pidFile = pidFile
-        self.pidPath =  os.path.join(pidPath, self.pidFile)
+        self.pidFilePath =  os.path.join(pidPath, pidFile)
         self.RETRIES = retries
         self.reqKeys = ("host", "port", "group")
         self.codeKeys = ("fast", "bokeh")
@@ -64,19 +63,19 @@ class Pidd:
         try:
             self.load_global()
         except IOError:
-            print_message({}, "launcher", f"'{self.pidPath}' does not exist, writing empty global dict.", info = True)
+            print_message({}, "launcher", f"'{self.pidFilePath}' does not exist, writing empty global dict.", info = True)
             self.write_global()
         except Exception:
-            print_message({}, "launcher", f"Error loading '{self.pidPath}', writing empty global dict.", info = True)
+            print_message({}, "launcher", f"Error loading '{self.pidFilePath}', writing empty global dict.", info = True)
             self.write_global()
 
     def load_global(self):
-        with open(self.pidPath, "rb") as f:
+        with open(self.pidFilePath, "rb") as f:
             self.d = pickle.load(f)
-            # print_message({}, "launcher", f"Succesfully loaded '{self.pidFile}'.")
+            # print_message({}, "launcher", f"Succesfully loaded '{self.pidFilePath}'.")
         
     def write_global(self):
-        with open(self.pidPath, "wb") as f:
+        with open(self.pidFilePath, "wb") as f:
             pickle.dump(self.d, f)
 
     def list_pids(self):
@@ -180,8 +179,8 @@ class Pidd:
             for x in active:
                 print_message({}, "launcher", x)
         else:
-            print_message({}, "launcher", f"All actions terminated. Removing '{self.pidFile}'")
-            os.remove(self.pidFile)
+            print_message({}, "launcher", f"All actions terminated. Removing '{self.pidFilePath}'")
+            os.remove(self.pidFilePath)
 
 
 def validateConfig(PIDD, confDict):
