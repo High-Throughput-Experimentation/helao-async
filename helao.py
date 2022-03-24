@@ -52,9 +52,11 @@ import helao.test.unit_test_sample_models
 
 
 class Pidd:
-    def __init__(self, pidFile, retries=3):
+    def __init__(self, pidFile, conf_dict, retries=3):
         self.PROC_NAMES = ["python.exe", "python"]
         self.pidFile = pidFile
+        self.confDict = conf_dict
+        self.pidPath = os.path.join(self.confDict["root"], self.pidFile)
         self.RETRIES = retries
         self.reqKeys = ("host", "port", "group")
         self.codeKeys = ("fast", "bokeh")
@@ -62,19 +64,19 @@ class Pidd:
         try:
             self.load_global()
         except IOError:
-            print_message({}, "launcher", f"'{pidFile}' does not exist, writing empty global dict.", info = True)
+            print_message({}, "launcher", f"'{self.pidPath}' does not exist, writing empty global dict.", info = True)
             self.write_global()
         except Exception:
-            print_message({}, "launcher", f"Error loading '{pidFile}', writing empty global dict.", info = True)
+            print_message({}, "launcher", f"Error loading '{self.pidPath}', writing empty global dict.", info = True)
             self.write_global()
 
     def load_global(self):
-        with open(self.pidFile, "rb") as f:
+        with open(self.pidPath, "rb") as f:
             self.d = pickle.load(f)
             # print_message({}, "launcher", f"Succesfully loaded '{self.pidFile}'.")
         
     def write_global(self):
-        with open(self.pidFile, "wb") as f:
+        with open(self.pidPath, "wb") as f:
             pickle.dump(self.d, f)
 
     def list_pids(self):
@@ -266,7 +268,7 @@ def launcher(confPrefix, confDict, helao_root):
     # API server launch priority (matches folders in root helao-dev/)
     LAUNCH_ORDER = ["action", "orchestrator", "visualizer", "operator"]
 
-    pidd = Pidd(f"pids_{confPrefix}.pck")
+    pidd = Pidd(f"pids_{confPrefix}.pck", confDict)
     if not validateConfig(pidd, confDict):
         print_message({}, "launcher", f"Configuration for '{confPrefix}' is invalid.", error = True)
         raise Exception(f"Configuration for '{confPrefix}' is invalid.")
