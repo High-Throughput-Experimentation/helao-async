@@ -36,6 +36,7 @@ import subprocess
 from importlib import import_module
 from importlib.util import spec_from_file_location
 from importlib.util import module_from_spec
+from importlib.machinery import SourceFileLoader
 
 
 from munch import munchify
@@ -183,7 +184,7 @@ class Pidd:
             os.remove(self.pidFilePath)
 
 
-def validateConfig(PIDD, confDict):
+def validateConfig(PIDD, confDict, helao_root):
     if len(confDict["servers"]) != len(set(confDict["servers"])):
         print_message({}, "launcher", "Server keys are not unique.")
         return False
@@ -222,7 +223,7 @@ def validateConfig(PIDD, confDict):
                 serverDict["group"],
                 serverDict[hasCode[0]] + ".py",
             )
-            if not os.path.exists(os.path.join(os.getcwd(), launchPath)):
+            if not os.path.exists(os.path.join(helao_root, launchPath)):
                 print_message({}, "launcher", 
                     f"{server} server code helao/library/server/{serverDict['group']}/{serverDict[hasCode[0]]+'.py'} does not exist.", 
                     error = True
@@ -264,13 +265,13 @@ def wait_key():
 
 def launcher(confPrefix, confDict, helao_root):
     #get the BaseModel which contains all the dirs for helao
-    helaodirs = helao_dirs(config)
+    helaodirs = helao_dirs(confDict)
 
     # API server launch priority (matches folders in root helao-dev/)
     LAUNCH_ORDER = ["action", "orchestrator", "visualizer", "operator"]
 
     pidd = Pidd(pidFile=f"pids_{confPrefix}.pck", pidPath=helaodirs.states_root)
-    if not validateConfig(pidd, confDict):
+    if not validateConfig(PIDD=pidd, confDict=confDict, helao_root=helao_root):
         print_message({}, "launcher", f"Configuration for '{confPrefix}' is invalid.", error = True)
         raise Exception(f"Configuration for '{confPrefix}' is invalid.")
     else:
@@ -372,10 +373,12 @@ if __name__ == "__main__":
         raise FileNotFoundError("Launcher argument ends with .py, expected path not found.")
     else:
         print_message({}, "launcher", f"Loading config from helao/config/{confPrefix}.py", info=True)
-        config = import_module(f"helao.config.{confPrefix}").config
+        #config = import_module(f"helao.config.{confPrefix}").config
+        config = SourceFileLoader("config", os.path.join(helao_root, "helao","config",f"{confPrefix}.py")).load_module().config
+
     # print("\x1b[2J") # clear screen
     cprint(figlet_format(f"HELAO\nV2.3\n{get_hlo_version()}", font="starwars"),"yellow", "on_red", attrs=["bold"])
-    pidd = launcher(confPrefix, config, helao_root)
+    pidd = launcher(confPrefix=confPrefix, confDict=config, helao_root=helao_root)
     result = None
     while result not in [b"\x18", b"\x04"]:
         print_message({}, "launcher", "CTRL-x to terminate action group. CTRL-d to disconnect.")
