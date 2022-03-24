@@ -138,6 +138,7 @@ class HelaoYml:
         self.type = self.dict["file_type"]
         self.uuid = self.dict[f"{self.type}_uuid"]
         self.pkey = HelaoPath(self.dict[f"{self.type}_output_dir"]).stem
+        self.pkey = f"{self.type}--" + self.pkey
         inst_idx = [i for i, p in enumerate(self.target.parts) if "INST" in p]
         if inst_idx:
             inst_idx = inst_idx[0]
@@ -170,6 +171,10 @@ class HelaoYml:
             if file_dict["file_name"].endswith(".hlo"):
                 file_dict["file_name"] = f"{file_dict['file_name']}.json"
         if self.status == "FINISHED":
+            if self.type == "experiment":
+                group_keys = sorted([k for k in self.progress.keys() if isinstance(k, int)])
+                process_list = [self.progress[k]["meta"]["process_uuid"] for k in group_keys]
+                meta_json["process_list"] = process_list
             self.progress[self.pkey].update({"ready": True, "meta": meta_json})
             self.progress.write()
 
@@ -208,7 +213,7 @@ class Progress(UserDict):
                 "api": False,
                 "s3": False,
             }
-            self.write()
+        # self.write()
         pending_files = [
             str(x)
             for x in yml.data_files
@@ -303,6 +308,8 @@ class ExpYml(HelaoYml):
             self.max_group = max(self.grouped_actions.keys())
         else:
             self.max_group = 0
+        # init again to refresh action and process list
+        super().__init__(path)
 
     def get_actions(self):
         """Return a list of ActYml objects belonging to this experiment."""
@@ -334,7 +341,6 @@ class ExpYml(HelaoYml):
         for group_idx, group_acts in self.grouped_actions.items():
             # init new groups
             if group_idx not in self.progress.keys():
-                print("creating group", group_idx)
                 self.progress[group_idx] = {
                     "ready": False,  # ready to start transfer from FINISHED to SYNCED
                     "done": False,  # status=='SYNCED' for all constituents, api, s3
@@ -345,7 +351,6 @@ class ExpYml(HelaoYml):
                     "api": False,
                     "s3": False,
                 }
-                self.progress.write()
             if self.progress[group_idx]["done"]:
                 continue
             if all([self.progress[act.pkey]["ready"] for act in group_acts]):
@@ -416,6 +421,8 @@ class SeqYml(HelaoYml):
     def __init__(self, path: Union[HelaoPath, str]):
         super().__init__(path)
         self.get_experiments()
+        # init again to refresh experiment list
+        super().__init__(path)
 
     def get_experiments(self):
         """Return a list of ExpYml objects belonging to this experiment."""
