@@ -172,8 +172,12 @@ class HelaoYml:
                 file_dict["file_name"] = f"{file_dict['file_name']}.json"
         if self.status == "FINISHED":
             if self.type == "experiment":
-                group_keys = sorted([k for k in self.progress.keys() if isinstance(k, int)])
-                process_list = [self.progress[k]["meta"]["process_uuid"] for k in group_keys]
+                group_keys = sorted(
+                    [k for k in self.progress.keys() if isinstance(k, int)]
+                )
+                process_list = [
+                    self.progress[k]["meta"]["process_uuid"] for k in group_keys
+                ]
                 meta_json["process_list"] = process_list
             self.progress[self.pkey].update({"ready": True, "meta": meta_json})
             self.progress.write()
@@ -562,32 +566,28 @@ class YmlOps:
         meta_type = pdict["type"]
         req_model = modmap[meta_type](**pdict["meta"]).json_dict()
         req_url = f"https://{self.dbp.api_host}/{plural[meta_type]}/"
-        update_url = f"https://{self.dbp.api_host}/{plural[meta_type]}/{self.yml.uuid}/"
+        try_create = True
         async with aiohttp.ClientSession() as session:
             for i in range(retry_num):
-                async with session.post(req_url, json=req_model) as resp:
+                req_method = session.post if try_create else session.patch
+                api_str = f"API {'POST' if try_create else 'PATCH'}"
+                async with req_method(req_url, json=req_model) as resp:
                     if resp.status == 200:
-                        self.dbp.base.print_message(f"API post {self.yml.uuid} success")
+                        self.dbp.base.print_message(
+                            f"{api_str} {self.yml.uuid} success"
+                        )
                         return True
                     elif resp.status == 400:
-                        self.dbp.base.print_message(
-                            f"API post {self.yml.uuid} failed with status {resp.status}"
-                        )
-                        update_resp = await session.post(update_url, json=req_model)
-                        self.dbp.base.print_message(
-                            f"Attempted update resulted in status {update_resp.status}"
-                        )
-                    else:
-                        self.dbp.base.print_message(
-                            f"API post {self.yml.uuid} failed with status {resp.status}"
-                        )
-                        self.dbp.base.print_message(
-                            f"Retry API [{i}/{retry_num}]: {self.yml.uuid}"
-                        )
-                        await asyncio.sleep(1)
+                        try_create = False
+                    self.dbp.base.print_message(
+                        f"[{i+1}/{retry_num}] {api_str} {self.yml.uuid} returned status {resp.status}"
+                    )
+                await asyncio.sleep(1)
+
         self.dbp.base.print_message(
             f"Did not post {self.yml.uuid} after {retry_num} tries."
         )
+        # TODO: send yml and response status to API endpoint if failure.
         return False
 
     async def _to_s3(self, msg: Union[dict, str], target: str, retry_num: int):
