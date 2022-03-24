@@ -466,6 +466,9 @@ class DBPack:
         self.bucket = self.config_dict["aws_bucket"]
         self.api_host = self.config_dict["api_host"]
 
+    def shutdown(self):
+        self.base.print_message("shutting down db package server")
+
     async def finish_exps(self, seq_yml: SeqYml):
         seq_yml.get_experiments()
         for exp in seq_yml.current_experiments:
