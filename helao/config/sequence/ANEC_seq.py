@@ -1,6 +1,6 @@
 """Sequence library for ANEC"""
 
-__all__ = ["ANEC_repeat_CA_vsRef", "ANEC_repeat_CV_vsRef"]
+__all__ = ["ANEC_repeat_CA", "ANEC_repeat_CV"]
 
 
 from typing import Optional
@@ -10,18 +10,21 @@ from helaocore.schema import ExperimentPlanMaker
 SEQUENCES = __all__
 
 
-def ANEC_repeat_CA_vsRef(
-    sequence_version: int = 2,
+def ANEC_repeat_CA(
+    sequence_version: int = 1,
     num_repeats: int = 1,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: float = 1000,
-    CA_potential_vsRef: float = 0.0,
+    WE_potential__V: float = 0.0,
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 6.8,
     CA_duration_sec: float = 0.1,
     SampleRate: float = 0.01,
     IErange: str = "auto",
-    ref_offset: float = 0.0,
+    ref_offset__V: float = 0.0,
     toolGC: str = "HS 2",
     toolarchive: str = "LS 3",
     volume_ul_GC: int = 300,
@@ -67,7 +70,7 @@ def ANEC_repeat_CA_vsRef(
         epm.add_experiment(
             "ANEC_slave_flush_fill_cell",
             {
-                "liquid_flush_time": 90,
+                "liquid_flush_time": 80,
                 "co2_purge_time": 15,
                 "equilibration_time": 1.0,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
@@ -76,9 +79,13 @@ def ANEC_repeat_CA_vsRef(
         )
 
         epm.add_experiment(
-            "ANEC_slave_CA_vsRef",
+            "ANEC_slave_CA",
             {
-                "CA_potential_vsRef": CA_potential_vsRef,
+                "WE_potential__V": WE_potential__V,
+                "WE_versus": WE_versus,
+                "ref_type": ref_type,
+                "pH": pH,
+                "ref_offset__V": ref_offset__V,
                 "CA_duration_sec": CA_duration_sec,
                 "SampleRate": SampleRate,
                 "IErange": IErange,
@@ -99,23 +106,26 @@ def ANEC_repeat_CA_vsRef(
             },
         )
 
-        epm.add_experiment("ANEC_slave_drain_cell", {"drain_time": 60.0})
+        epm.add_experiment("ANEC_slave_drain_cell", {"drain_time": 50.0})
 
     return epm.experiment_plan_list
 
 
-def ANEC_repeat_CV_vsRef(
+def ANEC_repeat_CV(
     sequence_version: int = 1,
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 6.8,
     num_repeats: int = 1,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: float = 1000,
-    V_init_vsRef: float = 0.0,
-    V_apex1_vsRef: float = -1.0,
-    V_apex2_vsRef: float = -1.0,
-    V_final_vsRef: float = 0.0,
-    ScanRate: float = 1.0,
+    WE_potential_init__V: float = 0.0,
+    WE_potential_apex1__V: float = -1.0,
+    WE_potential_apex2__V: float = -1.0,
+    WE_potential_final__V: float = 0.0,
+    ScanRate_V_s: float = 0.01,
     Cycles: int = 1,
     SampleRate: float = 0.01,
     IErange: str = "auto",
@@ -156,7 +166,7 @@ def ANEC_repeat_CV_vsRef(
         epm.add_experiment(
             "ANEC_slave_flush_fill_cell",
             {
-                "liquid_flush_time": 90,
+                "liquid_flush_time": 80,
                 "co2_purge_time": 15,
                 "equilibration_time": 1.0,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
@@ -165,19 +175,22 @@ def ANEC_repeat_CV_vsRef(
         )
 
         epm.add_experiment(
-            "ANEC_slave_CV_vsRef",
+            "ANEC_slave_CV",
             {
-                "V_init_vsRef": V_init_vsRef,
-                "V_apex1_vsRef": V_apex1_vsRef,
-                "V_apex2_vsRef": V_apex2_vsRef,
-                "V_final_vsRef": V_final_vsRef,
-                "ScanRate": ScanRate,
+                "WE_versus": WE_versus,
+                "ref_type": ref_type,
+                "pH": pH,
+                "WE_potential_init__V": WE_potential_init__V,
+                "WE_potential_apex1__V": WE_potential_apex1__V,
+                "WE_potential_apex2__V": WE_potential_apex2__V,
+                "WE_potential_final__V": WE_potential_final__V,
+                "ScanRate_V_s": ScanRate_V_s,
                 "Cycles": Cycles,
                 "SampleRate": SampleRate,
                 "IErange": IErange,
             },
         )
 
-        epm.add_experiment("ANEC_slave_drain_cell", {"drain_time": 60.0})
+        epm.add_experiment("ANEC_slave_drain_cell", {"drain_time": 50.0})
 
     return epm.experiment_plan_list

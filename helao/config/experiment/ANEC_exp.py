@@ -15,10 +15,10 @@ __all__ = [
     "ANEC_slave_normal_state",
     "ANEC_slave_GC_preparation",
     "ANEC_slave_cleanup",
-    "ANEC_slave_CA_vsRef",
+    "ANEC_slave_CA",
     "ANEC_slave_aliquot",
     "ANEC_slave_alloff",
-    "ANEC_slave_CV_vsRef",
+    "ANEC_slave_CV",
 ]
 
 ###
@@ -31,6 +31,7 @@ from helaocore.model.sample import SolidSample, LiquidSample
 from helaocore.model.machine import MachineModel
 from helaocore.model.action_start_condition import ActionStartCondition
 from helaocore.model.process_contrib import ProcessContrib
+from helaocore.helper.ref_electrode import REF_TABLE
 
 
 # list valid experiment functions
@@ -137,7 +138,7 @@ def ANEC_slave_normal_state(
 def ANEC_slave_flush_fill_cell(
     experiment: Experiment,
     experiment_version: int = 1,
-    liquid_flush_time: Optional[float] = 90,
+    liquid_flush_time: Optional[float] = 80,
     co2_purge_time: Optional[float] = 15,
     equilibration_time: Optional[float] = 1.0,
     reservoir_liquid_sample_no: Optional[int] = 0,
@@ -212,7 +213,7 @@ def ANEC_slave_unload_liquid(experiment: Experiment, experiment_version: int = 1
 def ANEC_slave_drain_cell(
     experiment: Experiment,
     experiment_version: int = 2,
-    drain_time: Optional[float] = 60.0,
+    drain_time: Optional[float] = 50.0,
 ):
     """Drain liquid from cell and unload liquid sample."""
 
@@ -420,18 +421,23 @@ def ANEC_slave_aliquot(
     return apm.action_list
 
 
-def ANEC_slave_CA_vsRef(
+def ANEC_slave_CA(
     experiment: Experiment,
-    experiment_version: int = 2,
-    CA_potential_vsRef: Optional[float] = 0.0,
+    experiment_version: int = 1,
+    WE_potential__V: Optional[float] = 0.0,
+    WE_versus: Optional[str] = "ref",
     CA_duration_sec: Optional[float] = 0.1,
     SampleRate: Optional[float] = 0.01,
     IErange: Optional[str] = "auto",
-    ref_offset: Optional[float] = 0.0,
+    ref_offset__V: Optional[float] = 0.0,
+    ref_type: Optional[str] = "leakless",
+    pH: Optional[float] = 6.8,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    potential_vsRef = apm.pars.CA_potential_vsRef - 1.0 * apm.pars.ref_offset
-
+    if apm.pars.WE_versus == "ref":
+        potential_vsRef = apm.pars.WE_potential__V - 1.0 * apm.pars.ref_offset__V
+    elif apm.pars.WE_versus == "rhe":
+        potential_vsRef = apm.pars.WE_potential__V - 1.0 * apm.pars.ref_offset__V - 0.059 * apm.pars.pH - REF_TABLE[ref_type]
     apm.add(
         PAL_server,
         "archive_custom_query_sample",
@@ -464,25 +470,34 @@ def ANEC_slave_CA_vsRef(
     return apm.action_list
 
 
-def ANEC_slave_CV_vsRef(
+def ANEC_slave_CV(
     experiment: Experiment,
     experiment_version: int = 1,
-    V_init_vsRef: Optional[float] = 0.0,
-    V_apex1_vsRef: Optional[float] = -1.0,
-    V_apex2_vsRef: Optional[float] = -1.0,
-    V_final_vsRef: Optional[float] = 0.0,
-    ScanRate: Optional[float] = 1.0,
+    WE_versus: Optional[str] = "ref",
+    ref_type: Optional[str] = "leakless",
+    pH: Optional[float] = 6.8,
+    WE_potential_init__V: Optional[float] = 0.0,
+    WE_potential_apex1__V: Optional[float] = -1.0,
+    WE_potential_apex2__V: Optional[float] = -1.0,
+    WE_potential_final__V: Optional[float] = 0.0,
+    ScanRate_V_s: Optional[float] = 0.01,
     Cycles: Optional[int] = 1,
     SampleRate: Optional[float] = 0.01,
     IErange: Optional[str] = "auto",
-    ref_offset: Optional[float] = 0.0,
+    ref_offset__V: Optional[float] = 0.0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    potential_init_vsRef = apm.pars.V_init_vsRef - 1.0 * apm.pars.ref_offset
-    potential_apex1_vsRef = apm.pars.V_apex1_vsRef - 1.0 * apm.pars.ref_offset
-    potential_apex2_vsRef = apm.pars.V_apex2_vsRef - 1.0 * apm.pars.ref_offset
-    potential_final_vsRef = apm.pars.V_final_vsRef - 1.0 * apm.pars.ref_offset
-
+    if apm.pars.WE_versus == "ref":
+        potential_init_vsRef = apm.pars.WE_potential_init__V - 1.0 * apm.pars.ref_offset__V
+        potential_apex1_vsRef = apm.pars.WE_potential_apex1__V - 1.0 * apm.pars.ref_offset__V
+        potential_apex2_vsRef = apm.pars.WE_potential_apex2__V - 1.0 * apm.pars.ref_offset__V
+        potential_final_vsRef = apm.pars.WE_potential_final__V - 1.0 * apm.pars.ref_offset__V
+    elif apm.pars.WE_versus == "rhe":
+        potential_init_vsRef = apm.pars.WE_potential_init__V - 1.0 * apm.pars.ref_offset__V - 0.059 * apm.pars.pH - REF_TABLE[ref_type]
+        potential_apex1_vsRef = apm.pars.WE_potential_apex1__V - 1.0 * apm.pars.ref_offset__V - 0.059 * apm.pars.pH - REF_TABLE[ref_type]
+        potential_apex2_vsRef = apm.pars.WE_potential_apex2__V - 1.0 * apm.pars.ref_offset__V - 0.059 * apm.pars.pH - REF_TABLE[ref_type]
+        potential_final_vsRef = apm.pars.WE_potential_final__V - 1.0 * apm.pars.ref_offset__V - 0.059 * apm.pars.pH - REF_TABLE[ref_type]
+        
     apm.add(
         PAL_server,
         "archive_custom_query_sample",
@@ -497,7 +512,7 @@ def ANEC_slave_CV_vsRef(
             "Vapex1__V": potential_apex1_vsRef,
             "Vapex2__V": potential_apex2_vsRef,
             "Vfinal__V": potential_final_vsRef,
-            "ScanRate__V_s": apm.pars.ScanRate,
+            "ScanRate__V_s": apm.pars.ScanRate_V_s,
             "Cycles": apm.pars.Cycles,
             "AcqInterval__s": apm.pars.SampleRate,
             "TTLwait": -1,  # -1 disables, else select TTL 0-3
