@@ -11,7 +11,7 @@ SEQUENCES = __all__
 
 
 def ANEC_repeat_CA_vsRef(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     num_repeats: int = 1,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -21,7 +21,7 @@ def ANEC_repeat_CA_vsRef(
     CA_duration_sec: float = 0.1,
     SampleRate: float = 0.01,
     IErange: str = "auto",
-    ref_vs_nhe: float = 0.21,
+    ref_offset: float = 0.0,
     toolGC: str = "HS 2",
     toolarchive: str = "LS 3",
     volume_ul_GC: int = 300,
