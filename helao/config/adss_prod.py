@@ -7,10 +7,10 @@ config = dict()
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
-config["experiment_libraries"] = ["ADSS_exp"]
+config["experiment_libraries"] = ["ADSS_exp", "samples_exp"]
 config["sequence_libraries"] = ["ADSS_seq"]
 config["technique_name"] = "adss"
-config["root"] = r"C:\INST_prod"
+config["root"] = r"C:\INST"
 
 
 # we define all the servers here so that the overview is a bit better
@@ -23,35 +23,30 @@ config["servers"] = dict(
         port=8001, 
         group="orchestrator", 
         fast="async_orch2",
-        # cmd_print = False
+        params=dict(
+            enable_op = True,
+            bokeh_port = 5002,
+        )
     ),
     ##########################################################################
     # Instrument Servers
     ##########################################################################
-    DATA=dict(
-        host=hostip,
-        port=8002,
-        group="action",
-        fast="HTEdata_server",
-        mode="legacy",  # lagcy; modelyst
-        # cmd_print=False,
-        params=dict(
-        ),
-    ),
     MOTOR=dict(
         host=hostip,
         port=8003,
         group="action",
         fast="galil_motion",
-        # cmd_print=False,
         params=dict(
-            Transfermatrix = [[1,0,0],[0,1,0],[0,0,1]], # default Transfermatrix for plate calibration
-            
-            # 4x6 plate
-            #M_instr = [[1,0,0,-76.525],[0,1,0,-50.875],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
-            # 100mm wafer
-            M_instr = [[1,0,0,-76.525+(3*25.4-50)-0.5+0.75+1.5+0.25],[0,1,0,-50.875+2.71+5-3+1],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
-
+            enable_aligner = True,
+            bokeh_port = 5003,
+            # backup if f"{gethostname()}_instrument_calib.json" is not found
+            # instrument specific calibration
+            M_instr = [
+                       [1,0,0,0],
+                       [0,1,0,0],
+                       [0,0,1,0],
+                       [0,0,0,1]
+                       ],
             count_to_mm=dict(
                 A=1.0/15835.31275,#1.0/15690.3,
                 B=1.0/6398.771436,#1.0/6395.45,
@@ -82,9 +77,8 @@ config["servers"] = dict(
         port=8004,
         group="action",
         fast="gamry_server",
-        simulate=False,  # choose between simulator(default) or real device
-        # cmd_print=False,
         params=dict(
+            allow_no_sample = True,
             dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
         ),
     ),
@@ -93,8 +87,8 @@ config["servers"] = dict(
         port=8006,
         group="action",
         fast="nidaqmx_server",
-        # cmd_print=False,
         params = dict(
+            allow_no_sample = True,
             dev_cellcurrent_trigger = 'PFI1', #P1.1
             dev_cellvoltage_trigger = 'PFI1', #P1.1
             dev_cellcurrent = {
@@ -182,12 +176,10 @@ config["servers"] = dict(
         port=8007,
         group="action",
         fast="pal_server",
-        # cmd_print=False,
         params = dict(
             user = 'RSHS',
             key = r'c:\helao\sshkeys\rshs_private3.ppk', # needs to be in new openssh file format
             host = "10.231.100.169",#r'hte-rshs-01.htejcap.caltech.edu',
-            log_file = r'C:\Users\rshs\Desktop\ADSS\adss_logfile\210512_lcfc_manualwatertest\210512_LCFC_manualwatertest_logfile.txt',
             timeout = 30*60, # 30min timeout for waiting for TTL
             dev_trigger = "NImax",
             trigger = { # TTL handshake via NImax
@@ -195,16 +187,19 @@ config["servers"] = dict(
                 'continue':'PXI-6284/port2/line7',  #P2.7 #PFI15
                 'done':'PXI-6284/port2/line3',  #P2.3 #PFI11
                 },
-            cam_file_path = r'C:\Users\rshs\Desktop\ADSS\adss_psc_methods\lcfc',
+            cam_file_path = r'C:\Users\rshs\Desktop\ADSS\adss_psc_methods\HELAO',
             cams = {
-                    "archive":"lcfc_archive.cam",
-                    "archive_liquid":"lcfc_archive.cam",
-                    "fillfixed":"lcfc_fill_hardcodedvolume.cam",
-                    "fill":"lcfc_fill.cam",
+                    "archive_tray_tray":"tray_to_tray_220214.cam",
+                    "archive_custom_tray":"custom_to_tray_220214.cam",
+                    "archive_tray_custom":"tray_to_custom_220214.cam",
+                    # "archive":"lcfc_archive.cam",
+                    # "archive_liquid":"lcfc_archive.cam",
+                    # "fillfixed":"lcfc_fill_hardcodedvolume.cam",
+                    # "fill":"lcfc_fill.cam",
                     # "test":"relay_actuation_test2.cam",
                     # "dilute":"lcfc_dilute.cam",
                     # "autodilute":"lcfc_dilute.cam",
-                    "deepclean":"lcfc_deep_clean.cam",
+                    "deepclean":"deep_clean_220214.cam",
                     },
             positions = {
                           "tray1":{
@@ -229,28 +224,12 @@ config["servers"] = dict(
     # #########################################################################
     # Visualizers (bokeh servers)
     # #########################################################################
-    VIS=dict(#simple dumb modular visualizer
+    VIS=dict(
         host=hostip,
         port=5001,
         group="visualizer",
         bokeh="bokeh_modular_visualizer",
         params = dict(
-            doc_name = "ADSS visualizer",
-            ws_nidaqmx="NI",
-            ws_potentiostat = 'PSTAT',
-        )
-    ),
-    OP=dict(
-        host=hostip,
-        port=5002,
-        group="operator",
-        bokeh="async_operator",
-        params = dict(
-            doc_name = "ADSS Operator",
-            orch = 'ORCH',
-            pal = 'PAL',
-            # data_server = "data",
-            # servicemode=False,
         )
     ),
 )
