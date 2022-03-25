@@ -76,7 +76,7 @@ def makeApp(confPrefix, servKey):
     @app.post(f"/{servKey}/convert_v1DB", tags=["public_db"])
     async def convert_v1DB(action: Optional[Action] = Body({}, embed=True)):
         # await app.driver.convert_oldDB_to_sqllite()
-        await app.driver.unified_db.liquidAPI.old_jsondb_to_sqlitedb()
+        await app.driver.archive.unified_db.liquidAPI.old_jsondb_to_sqlitedb()
         return {}
 
     if _cams:
