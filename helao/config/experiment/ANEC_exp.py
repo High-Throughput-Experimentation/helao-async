@@ -80,7 +80,7 @@ def ANEC_slave_load_solid(
 
 def ANEC_slave_alloff(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
 ):
     """
 
@@ -92,17 +92,18 @@ def ANEC_slave_alloff(
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 0})
     apm.add(NI_server, "pump", {"pump": "PeriPump2", "on": 0})
     apm.add(NI_server, "pump", {"pump": "Direction", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "down", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "up", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "liquid", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "atm", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 0})
+
     return apm.action_list
 
 
 def ANEC_slave_normal_state(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
 ):
     """Set ANEC to 'normal' state.
 
@@ -122,13 +123,14 @@ def ANEC_slave_normal_state(
 
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "PeriPump2", "on": 1})
     apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "down", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "PeriPump2", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "up", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "liquid", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "atm", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 1})
+
     return apm.action_list
 
 
@@ -183,7 +185,7 @@ def ANEC_slave_flush_fill_cell(
     return apm.action_list
 
 
-def ANEC_slave_unload_cell(experiment: Experiment):
+def ANEC_slave_unload_cell(experiment: Experiment, experiment_version: int = 1):
     """Unload Sample at 'cell1_we' position."""
 
     apm = ActionPlanMaker()
@@ -191,7 +193,7 @@ def ANEC_slave_unload_cell(experiment: Experiment):
     return apm.action_list
 
 
-def ANEC_slave_unload_liquid(experiment: Experiment):
+def ANEC_slave_unload_liquid(experiment: Experiment, experiment_version: int = 1,):
     """Unload liquid sample at 'cell1_we' position and reload solid sample."""
 
     apm = ActionPlanMaker()
@@ -209,20 +211,16 @@ def ANEC_slave_unload_liquid(experiment: Experiment):
 
 def ANEC_slave_drain_cell(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     drain_time: Optional[float] = 60.0,
 ):
     """Drain liquid from cell and unload liquid sample."""
 
     apm = ActionPlanMaker()
-    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "down", "on": 1})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "CO2", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "PeriPump2", "on": 1})
+    apm.add_action_list(ANEC_slave_normal_state(experiment))
     apm.add_action_list(ANEC_slave_unload_liquid(experiment))
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.drain_time})
-    apm.add_action_list(ANEC_slave_normal_state(experiment))
+
     return apm.action_list
 
 
@@ -424,15 +422,15 @@ def ANEC_slave_aliquot(
 
 def ANEC_slave_CA_vsRef(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     CA_potential_vsRef: Optional[float] = 0.0,
     CA_duration_sec: Optional[float] = 0.1,
     SampleRate: Optional[float] = 0.01,
     IErange: Optional[str] = "auto",
-    ref_vs_nhe: Optional[float] = 0.21,
+    ref_offset: Optional[float] = 0.0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    potential_vsRef = apm.pars.CA_potential_vsRef - 1.0 * apm.pars.ref_vs_nhe
+    potential_vsRef = apm.pars.CA_potential_vsRef - 1.0 * apm.pars.ref_offset
 
     apm.add(
         PAL_server,
