@@ -9,7 +9,7 @@ from ruamel.yaml import YAML
 from pathlib import Path
 from glob import glob
 from datetime import datetime
-from typing import Union
+from typing import Union, Optional
 from collections import UserDict, defaultdict
 from enum import Enum
 
@@ -17,6 +17,7 @@ import pyaml
 import botocore
 import boto3
 import aiohttp
+from helaocore.error import ErrorCodes
 from helaocore.server.base import Base
 from helaocore.model.process import ProcessModel
 from helaocore.model.action import ShortActionModel, ActionModel
@@ -25,26 +26,6 @@ from helaocore.model.experiment_sequence import ExperimentSequenceModel
 from helaocore.helper.gen_uuid import gen_uuid
 from helaocore.helper.read_hlo import read_hlo
 
-# from helaocore.error import ErrorCodes
-
-# from helaocore.model.sample import (
-#     SampleUnion,
-#     AssemblySample,
-#     NoneSample,
-#     SampleStatus,
-#     SampleInheritance,
-#     object_to_sample,
-# )
-
-# from helaocore.helper.print_message import print_message
-# from helaocore.data.sample import UnifiedSampleDataAPI
-
-# progress dict has 3 (for action) or 4 (for sequence) or 5 (for experiment) keys:
-# 1) API push [datetime]
-# 2) files push Dict(filename, datetime)
-# 3) yml push [datetime]
-# 4) archived group statuses: Dict(order_key: )
-# 5) ordered processes: Dict(process_timestamp, process_yml)
 
 test_flag = False
 
@@ -217,14 +198,13 @@ class Progress(UserDict):
                 "api": False,
                 "s3": False,
             }
-        # self.write()
+            self.write()
         pending_files = [
             str(x)
             for x in yml.data_files
             if x.name not in self.data[self.pkey]["pushed"].keys()
         ]
-        self.data[self.pkey]["pending"] = pending_files
-        self.data[self.pkey]["path"] = str(yml.target)
+        self.data[self.pkey].update({"pending": pending_files, "path": str(yml.target)})
         self.write()
 
     def read(self):
@@ -465,6 +445,43 @@ class DBPack:
         self.s3 = self.aws_session.client("s3")
         self.bucket = self.config_dict["aws_bucket"]
         self.api_host = self.config_dict["api_host"]
+        self.log_path = Path(
+            os.path.join(self.base.helaodirs.states_root, "db_pending.yml")
+        )
+        self.log_dict = {}
+        if not self.log_path.exists():
+            self.log_path.write_text(pyaml.dump(self.log_dict, safe=True))
+        else:
+            self.log_dict = self.read_log()
+
+    def read_log(self):
+        yaml = YAML(typ="safe")
+        self.log_dict = yaml.load(self.log_path)
+
+    def write_log(self):
+        self.log_path.write_text(pyaml.dump(self.log_dict, safe=True))
+
+    def update_log(self, yml_path, flag_dict: dict):
+        if yml_path not in self.log_dict.keys():
+            self.log_dict[yml_path] = {"s3": False, "api": False}
+        self.log_dict[yml_path].update({flag_dict})
+        self.write_log()
+        if all(self.log_dict[yml_path].values()):
+            self.base.print_message(f"{yml_path} is complete, removing.")
+            self.rm(yml_path)
+
+    def rm(self, yml_path: str):
+        if all(self.log_dict[yml_path].values()):
+            self.log_dict.pop(yml_path)
+        else:
+            self.base.print_message(
+                f"Cannot clear {yml_path} from log when API or S3 ops are still pending.",
+                info=True,
+            )
+        self.write_log()
+
+    def list_pending(self):
+        return self.log_dict
 
     def shutdown(self):
         self.base.print_message("shutting down db package server")
@@ -482,15 +499,32 @@ class DBPack:
             if act.status != "SYNCED":
                 await self.finish_yml(act.target, YmlType.action)
 
-    async def finish_yml(self, yml_path: Union[str, HelaoPath], yml_type: YmlType):
+    async def finish_pending(self):
+        if len(self.log_dict) > 0:
+            self.base.print_message(
+                f"There are {len(self.log_dict)} ymls pending API or S3 push.",
+                info=True,
+            )
+            for yml_path in self.log_dict.keys():
+                self.base.print_message(f"Finishing {yml_path}.")
+                await self.finish_yml(yml_path)
+        else:
+            self.base.print_message(
+                "There are no ymls pending API or S3 push.", info=True
+            )
+        return self.log_dict
+
+    async def finish_yml(self, yml_path: Union[str, HelaoPath]):
         """Primary function for processing ymls.
 
         Args
         yml_path[str]: local path to yml file
-        yml_type[YmlType]: type enum (YmlType.action, YmlType.experiment...)
 
         """
         hpth = HelaoPath(yml_path) if isinstance(yml_path, str) else yml_path
+        if not hpth.exists():
+            return f"{hpth} does not exist."
+        yml_type = HelaoYml(hpth).type
         hyml = ymlmap[yml_type](hpth)
         ops = YmlOps(self, hyml)
 
@@ -541,8 +575,7 @@ class DBPack:
             if progress[pkey]["api"]:
                 if isinstance(pkey, str):
                     ops.to_synced()
-                progress[pkey]["done"] = True
-                progress[pkey]["ready"] = False
+                progress[pkey].update({"done": True, "ready": False})
                 progress.write()
                 finished.append(pkey)
 
@@ -561,37 +594,46 @@ class YmlOps:
 
     async def to_api(self, progress_key: Union[str, int], retry_num: int = 3):
         """Submit to modelyst DB"""
+        # init global log
+
         # no pending files, yml pushed to S3
         pdict = self.yml.progress[progress_key]
         if pdict["pending"] or not pdict["s3"]:
             self.dbp.base.print_message("Cannot push to API with S3 upload pending.")
-            return False
+            return ErrorCodes.not_allowed
         meta_type = pdict["type"]
         req_model = modmap[meta_type](**pdict["meta"]).json_dict()
         req_url = f"https://{self.dbp.api_host}/{plural[meta_type]}/"
         try_create = True
         async with aiohttp.ClientSession() as session:
             for i in range(retry_num):
-                req_method = session.post if try_create else session.patch
-                api_str = f"API {'POST' if try_create else 'PATCH'}"
-                async with req_method(req_url, json=req_model) as resp:
-                    if resp.status == 200:
+                if not pdict["api"]:
+                    req_method = session.post if try_create else session.patch
+                    api_str = f"API {'POST' if try_create else 'PATCH'}"
+                    async with req_method(req_url, json=req_model) as resp:
+                        if resp.status == 200:
+                            pdict["api"] = True
+                            self.yml.progress.write()
+                        elif resp.status == 400:
+                            try_create = False
+                        elif resp.status == 405:
+                            try_create = False
                         self.dbp.base.print_message(
-                            f"{api_str} {self.yml.uuid} success"
+                            f"[{i+1}/{retry_num}] {api_str} {self.yml.uuid} returned status {resp.status}"
                         )
-                        return True
-                    elif resp.status == 400:
-                        try_create = False
-                    self.dbp.base.print_message(
-                        f"[{i+1}/{retry_num}] {api_str} {self.yml.uuid} returned status {resp.status}"
-                    )
-                await asyncio.sleep(1)
+                    await asyncio.sleep(1)
 
-        self.dbp.base.print_message(
-            f"Did not post {self.yml.uuid} after {retry_num} tries."
-        )
+        if pdict["api"]:
+            self.dbp.base.print_message(f"{api_str} {self.yml.uuid} success")
+            self.dbp.update_log(self.yml.target.__str__(), {"api": True})
+            return ErrorCodes.none
+        else:
+            self.dbp.base.print_message(
+                f"Did not post {self.yml.uuid} after {retry_num} tries."
+            )
+            self.dbp.update_log(self.yml.target.__str__(), {"api": False})
+            return ErrorCodes.http
         # TODO: send yml and response status to API endpoint if failure.
-        return False
 
     async def _to_s3(self, msg: Union[dict, str], target: str, retry_num: int):
         if isinstance(msg, dict):
@@ -631,6 +673,7 @@ class YmlOps:
             file_success = await self._to_s3(file_json, file_s3_key, retry_num)
             if file_success:
                 pdict["pending"].remove(fpath)
+                self.yml.progress.write()
                 pdict["pushed"].update({os.path.basename(fpath): datetime.now()})
                 self.yml.progress.write()
 
@@ -640,6 +683,7 @@ class YmlOps:
             file_success = await self._to_s3(fpath, file_s3_key, retry_num)
             if file_success:
                 pdict["pending"].remove(fpath)
+                self.yml.progress.write()
                 pdict["pushed"].update({os.path.basename(fpath): datetime.now()})
                 self.yml.progress.write()
 
@@ -649,6 +693,10 @@ class YmlOps:
             if meta_success:
                 pdict["s3"] = True
                 self.yml.progress.write()
+        if pdict["s3"] and len(pdict["pending"]) == 0:
+            self.dbp.update_log(self.yml.target.__str__(), {"s3": True})
+        else:
+            self.dbp.update_log(self.yml.target.__str__(), {"s3": False})
 
     def to_finished(self):
         """Moves yml and data folder from ACTIVE to FINISHED path."""

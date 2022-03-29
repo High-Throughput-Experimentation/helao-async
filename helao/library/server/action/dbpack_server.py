@@ -31,6 +31,16 @@ def makeApp(confPrefix, servKey):
         progress = await app.driver.finish_yml(yml_path, yml_type)
         return progress
 
+    @app.post(f"/finish_pending")
+    async def finish_pending():
+        pending_dict = await app.driver.finish_pending()
+        return pending_dict
+
+    @app.post(f"/list_pending")
+    async def list_pending():
+        pending_dict = await app.driver.list_pending()
+        return pending_dict
+        
     @app.post("/shutdown")
     def post_shutdown():
         pass
