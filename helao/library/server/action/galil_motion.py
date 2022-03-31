@@ -27,6 +27,7 @@ from helaocore.server.base import makeActionServ
 from helaocore.helper.make_str_enum import make_str_enum
 from helaocore.schema import Action
 from helaocore.error import ErrorCodes
+from helaocore.helper.config_loader import config_loader
 
 
 async def galil_dyn_endpoints(app=None):
@@ -372,9 +373,9 @@ async def galil_dyn_endpoints(app=None):
             return finished_action.as_dict()
 
 
-def makeApp(confPrefix, servKey):
+def makeApp(confPrefix, servKey, helao_root):
 
-    config = import_module(f"helao.config.{confPrefix}").config
+    config = config_loader(confPrefix, helao_root)
 
     app = makeActionServ(
         config=config,

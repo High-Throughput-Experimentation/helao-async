@@ -9,7 +9,7 @@ __all__ = ["appender"]
 
 import os
 import sys
-from importlib import import_module
+from helaocore.helper.config_loader import config_loader
 
 helao_root = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(helao_root, 'config'))
@@ -18,16 +18,17 @@ from helao import launcher
 confPrefix = sys.argv[1]
 appendPrefix = sys.argv[2]
 
+
 def appender(confPrefix, appendPrefix):
-    confDict = import_module(f"{confPrefix}").config
-    appenDict = import_module(f"{appendPrefix}").config
+    confDict = config_loader(confPrefix, helao_root)
+    appenDict = config_loader(appendPrefix, helao_root)
     overlap = [k for k in appenDict["servers"].keys() if k in confDict["servers"].keys()]
     if overlap:
-        print(f"config dict from '{appendPrefix}.py' overlaps with '{confPrefix}.py")
+        print(f"config dict from '{appendPrefix}' overlaps with '{confPrefix}")
         return None
     else:
         confDict["servers"].update(appenDict["servers"])
-        launcher(confPrefix, confDict)
+        launcher(confPrefix, confDict, helao_root)
 
 
 if __name__ == "__main__":
