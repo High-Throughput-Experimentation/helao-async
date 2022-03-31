@@ -1,4 +1,3 @@
-
 __all__ = ["HTEdata"]
 
 # import os
@@ -111,45 +110,37 @@ class HTEdata:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
 
-
         self.dataAPI = HTELegacyAPI(self.base)
 
-
-    def get_platexycalibration(self, plateid: int,*args,**kwargs):
-        return None
-    
-    def save_platexycalibration(self, plateid: int,*args,**kwargs):
+    def get_platexycalibration(self, plateid: int, *args, **kwargs):
         return None
 
+    def save_platexycalibration(self, plateid: int, *args, **kwargs):
+        return None
 
-    def get_rcp_plateid(self, plateid: int,*args,**kwargs):
+    def get_rcp_plateid(self, plateid: int, *args, **kwargs):
         return self.dataAPI.get_rcp_plateid(plateid)
 
-
-    def get_info_plateid(self, plateid: int,*args,**kwargs):
+    def get_info_plateid(self, plateid: int, *args, **kwargs):
         return self.dataAPI.get_info_plateid(plateid)
 
-
-    def check_annealrecord_plateid(self, plateid: int,*args,**kwargs):
+    def check_annealrecord_plateid(self, plateid: int, *args, **kwargs):
         return self.dataAPI.check_annealrecord_plateid(plateid)
 
-
-    def check_printrecord_plateid(self, plateid: int,*args,**kwargs):
+    def check_printrecord_plateid(self, plateid: int, *args, **kwargs):
         return self.dataAPI.check_printrecord_plateid(plateid)
 
-
-    def check_plateid(self, plateid: int,*args,**kwargs):
+    def check_plateid(self, plateid: int, *args, **kwargs):
         return self.dataAPI.check_plateid(plateid)
 
-
-    def get_platemap_plateid(self, plateid: int,*args,**kwargs):
+    def get_platemap_plateid(self, plateid: int, *args, **kwargs):
         return self.dataAPI.get_platemap_plateid(plateid)
 
-
-    def get_elements_plateid(self, plateid: int,*args,**kwargs) -> list:
+    def get_elements_plateid(self, plateid: int, *args, **kwargs) -> list:
         return self.dataAPI.get_elements_plateid(
             plateid,
             multielementink_concentrationinfo_bool=False,
             print_key_or_keyword="screening_print_id",
             exclude_elements_list=[""],
-            return_defaults_if_none=False)
+            return_defaults_if_none=False,
+        )

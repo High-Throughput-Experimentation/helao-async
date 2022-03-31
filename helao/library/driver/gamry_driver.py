@@ -6,9 +6,10 @@ configuration is read from config/config.py.
 
 """
 
-__all__ = ["gamry",
-           "Gamry_modes",
-          ]
+__all__ = [
+    "gamry",
+    "Gamry_modes",
+]
 
 import comtypes
 import comtypes.client as client
@@ -27,7 +28,7 @@ from helaocore.model.file import FileConnParams, HloHeaderModel
 from helaocore.model.active import ActiveParams
 from helaocore.model.hlostatus import HloStatus
 from helaocore.data.sample import UnifiedSampleDataAPI
-from helaocore.model.hlostatus import HloStatus
+
 
 class Gamry_modes(str, Enum):
     CA = "CA"
@@ -36,6 +37,7 @@ class Gamry_modes(str, Enum):
     LSV = "LSV"
     EIS = "EIS"
     OCV = "OCV"
+
 
 # https://www.gamry.com/support/technical-support/frequently-asked-questions/fixed-vs-autoranging/
 # class Gamry_IErange(str, Enum):
@@ -164,10 +166,10 @@ class Gamry_IErange_dflt(str, Enum):
 
 def gamry_error_decoder(e):
     if isinstance(e, comtypes.COMError):
-        hresult = 2 ** 32 + e.args[0]
+        hresult = 2**32 + e.args[0]
         if hresult & 0x20000000:
             return GamryCOMError(
-                "0x{0:08x}: {1}".format(2 ** 32 + e.args[0], e.args[1])
+                "0x{0:08x}: {1}".format(2**32 + e.args[0], e.args[1])
             )
     return e
 
@@ -190,7 +192,7 @@ class GamryDtaqEvents(object):
         count = 1
         while count > 0:
             try:
-                # TODO: how to know from self.dtaq that the 
+                # TODO: how to know from self.dtaq that the
                 # connection to Gamry was closed?
                 count, points = self.dtaq.Cook(1000)
                 # The columns exposed by GamryDtaq.Cook vary by dtaq and are
@@ -237,8 +239,12 @@ class gamry:
         # self.GamryCOM = client.GetModule(self.config_dict["path_to_gamrycom"])
 
         self.pstat = None
-        self.action = None  # for passing action object from technique method to measure loop
-        self.active = None  # for holding active action object, clear this at end of measurement
+        self.action = (
+            None  # for passing action object from technique method to measure loop
+        )
+        self.active = (
+            None  # for holding active action object, clear this at end of measurement
+        )
         self.pstat_connection = None
         self.samples_in = []
         # status is handled through active, call active.finish()
@@ -269,26 +275,25 @@ class gamry:
 
         # for saving data localy
         self.FIFO_epoch = None
-        self.FIFO_gamryheader = dict() # measuement specific, will be reset each measurement
+        self.FIFO_gamryheader = (
+            dict()
+        )  # measuement specific, will be reset each measurement
         self.FIFO_column_headings = []
         self.FIFO_Gamryname = ""
-        
+
         # signals return to endpoint after active was created
         self.IO_continue = False
         self.IOloop_run = False
-
 
     def set_IO_signalq_nowait(self, val: bool) -> None:
         if self.IO_signalq.full():
             _ = self.IO_signalq.get_nowait()
         self.IO_signalq.put_nowait(val)
 
-
     async def set_IO_signalq(self, val: bool) -> None:
         if self.IO_signalq.full():
             _ = await self.IO_signalq.get()
         await self.IO_signalq.put(val)
-
 
     async def IOloop(self):
         """This is main Gamry measurement loop which always needs to run
@@ -304,8 +309,9 @@ class gamry:
                         await self.measure()
                         if self.base.actionserver.estop:
                             self.IO_do_meas = False
-                            self.base.print_message("Gamry is in estop after measurement.",
-                                                    error=True)
+                            self.base.print_message(
+                                "Gamry is in estop after measurement.", error=True
+                            )
                         else:
                             self.base.print_message("setting Gamry to idle")
                             # await self.stat.set_idle()
@@ -313,12 +319,10 @@ class gamry:
                     else:
                         self.active.action.action_status.append(HloStatus.estopped)
                         self.IO_do_meas = False
-                        self.base.print_message("Gamry is in estop.",
-                                                error=True)
+                        self.base.print_message("Gamry is in estop.", error=True)
 
                 # endpoint can return even we got errors
                 self.IO_continue = True
-
 
                 if self.active:
                     self.base.print_message("gamry finishes active action")
@@ -327,12 +331,10 @@ class gamry:
                     self.action = None
                     self.samples_in = []
 
-
         except asyncio.CancelledError:
             # endpoint can return even we got errors
             self.IO_continue = True
             self.base.print_message("IOloop task was cancelled")
-
 
     def kill_GamryCom(self):
         """script can be blocked or crash if GamryCom is still open and busy"""
@@ -353,32 +355,33 @@ class gamry:
                     self.base.print_message("Successfully terminated GamryCom.")
                     return True
             if psutil.pid_exists(p.pid):
-                self.base.print_message("Failed to terminate server GamryCom after 3 retries.")
+                self.base.print_message(
+                    "Failed to terminate server GamryCom after 3 retries."
+                )
                 return False
-
 
     async def init_Gamry(self, devid):
         """connect to a Gamry"""
         try:
             self.devices = client.CreateObject("GamryCOM.GamryDeviceList")
-            self.base.print_message(f"GamryDeviceList: "
-                                    f"{self.devices.EnumSections()}")
+            self.base.print_message(f"GamryDeviceList: {self.devices.EnumSections()}")
             # self.base.print_message(f"{len(self.devices.EnumSections())}")
             if len(self.devices.EnumSections()) >= devid + 1:
                 self.FIFO_Gamryname = self.devices.EnumSections()[devid]
 
                 if self.FIFO_Gamryname.find("IFC") == 0:
                     self.pstat = client.CreateObject("GamryCOM.GamryPC6Pstat")
-                    self.base.print_message(f"Gamry, using Interface {self.pstat}",
-                                            info = True)
+                    self.base.print_message(
+                        f"Gamry, using Interface {self.pstat}", info=True
+                    )
                 elif self.FIFO_Gamryname.find("REF") == 0:
                     self.pstat = client.CreateObject("GamryCOM.GamryPC5Pstat")
-                    self.base.print_message(f"Gamry, using Reference {self.pstat}",
-                                            info = True)
+                    self.base.print_message(
+                        f"Gamry, using Reference {self.pstat}", info=True
+                    )
                 elif self.FIFO_Gamryname.find("PCI") == 0:
-                    self.pstat = client.CreateObject('GamryCOM.GamryPstat')
-                    self.base.print_message(f"Gamry, using PCI {self.pstat}",
-                                            info = True)
+                    self.pstat = client.CreateObject("GamryCOM.GamryPstat")
+                    self.base.print_message(f"Gamry, using PCI {self.pstat}", info=True)
                 # else: # old version before Framework 7.06
                 #     self.pstat = client.CreateObject('GamryCOM.GamryPstat')
                 #     self.base.print_message('Gamry, using Farmework , 7.06?', self.pstat)
@@ -397,15 +400,14 @@ class gamry:
                 self.pstat.Init(self.devices.EnumSections()[devid])
                 # self.base.print_message("", self.pstat)
                 self.base.print_message(
-                    f"Connected to Gamry on DevID {devid}!",
-                    info = True
+                    f"Connected to Gamry on DevID {devid}!", info=True
                 )
 
             else:
                 self.pstat = None
                 self.base.print_message(
                     f"No potentiostat is connected on DevID {devid}! Have you turned it on?",
-                    error = True
+                    error=True,
                 )
 
         except Exception as e:
@@ -426,14 +428,15 @@ class gamry:
                 self.pstat.Open()
                 return ErrorCodes.none
             else:
-                self.base.print_message("open_connection: Gamry not initialized!", error=True)
+                self.base.print_message(
+                    "open_connection: Gamry not initialized!", error=True
+                )
                 return ErrorCodes.not_initialized
 
         except Exception as e:
             # self.pstat = None
             self.base.print_message(f"Gamry error init: {e}", error=True)
             return ErrorCodes.critical
-
 
     def close_connection(self):
         """Close connection to Gamry"""
@@ -443,16 +446,17 @@ class gamry:
                 self.pstat.Close()
                 return ErrorCodes.none
             else:
-                self.base.print_message("close_connection: Gamry not initialized!", error=True)
+                self.base.print_message(
+                    "close_connection: Gamry not initialized!", error=True
+                )
                 return ErrorCodes.not_initialized
         except Exception:
             # self.pstat = None
             return ErrorCodes.critical
 
-
     def close_pstat_connection(self):
         if self.IO_measuring:
-            self.IO_do_meas = False # will stop meas loop
+            self.IO_do_meas = False  # will stop meas loop
             self.IO_measuring = False
             self.dtaq.Run(False)
             self.pstat.SetCell(self.GamryCOM.CellOff)
@@ -462,18 +466,17 @@ class gamry:
             # delete this at the very last step
             self.close_connection()
             self.pstat_connection = None
-            self.dtaqsink = dummy_sink()    
+            self.dtaqsink = dummy_sink()
             self.dtaq = None
-            
+
         else:
             pass
-
 
     async def measurement_setup(self, AcqFreq, mode: Gamry_modes = None, *argv):
         """setting up the measurement parameters
         need to initialize and open connection to gamry first"""
         await asyncio.sleep(0.001)
-        error =  ErrorCodes.none
+        error = ErrorCodes.none
         if self.pstat:
             try:
                 IErangesdict = dict(
@@ -494,13 +497,13 @@ class gamry:
                     mode14=14,
                     mode15=15,
                 )
-    
+
                 # InitializePstat (from exp script)
                 # https://www.gamry.com/application-notes/instrumentation/changing-potentiostat-speed-settings/
                 self.pstat.SetCell(self.GamryCOM.CellOff)
                 #####pstat.InstrumentSpecificInitialize ()
                 self.pstat.SetPosFeedEnable(False)  # False
-    
+
                 # pstat.SetStability (StabilityFast)
                 self.pstat.SetIEStability(self.GamryCOM.StabilityFast)
                 # Fast (0), Medium (1), Slow (2)
@@ -511,9 +514,9 @@ class gamry:
                 # pstat.SetConvention (PHE200_IConvention)
                 # anodic currents are positive
                 self.pstat.SetIConvention(self.GamryCOM.Anodic)
-    
+
                 self.pstat.SetGround(self.GamryCOM.Float)
-    
+
                 # Set current channel range.
                 # Setting the IchRange using a voltage is preferred. The measured current is converted into a voltage on the I channel using the I/E converter.
                 # 0 0.03 V range, 1 0.30 V range, 2 3.00 V range, 3 30.00 V (PCI4) 12V (PC5)
@@ -522,48 +525,50 @@ class gamry:
                 self.pstat.SetIchRangeMode(True)  # auto-set
                 self.pstat.SetIchOffsetEnable(False)
                 self.pstat.SetIchFilter(AcqFreq)
-    
+
                 # Set voltage channel range.
                 self.pstat.SetVchRange(12.0)
                 self.pstat.SetVchRangeMode(True)
                 self.pstat.SetVchOffsetEnable(False)
                 self.pstat.SetVchFilter(AcqFreq)
-    
+
                 # Sets the range of the Auxiliary A/D input.
                 self.pstat.SetAchRange(3.0)
-    
+
                 # pstat.SetIERangeLowerLimit(None)
-    
+
                 # Sets the I/E Range of the potentiostat.
                 self.pstat.SetIERange(0.03)
                 # Enable or disable current measurement auto-ranging.
                 self.pstat.SetIERangeMode(True)
-    
+
                 if self.IO_IErange == self.gamry_range_enum.auto:
                     self.base.print_message("auto I range selected")
                     self.pstat.SetIERange(0.03)
                     self.pstat.SetIERangeMode(True)
                 else:
                     self.base.print_message(f"{self.IO_IErange.value} I range selected")
-                    self.base.print_message(f"{IErangesdict[self.IO_IErange.name]} I range selected")
+                    self.base.print_message(
+                        f"{IErangesdict[self.IO_IErange.name]} I range selected"
+                    )
                     self.pstat.SetIERange(IErangesdict[self.IO_IErange.name])
                     self.pstat.SetIERangeMode(False)
                 # elif self.IO_IErange == self.gamry_range_enum.mode0:
                 #     self.pstat.SetIERangeMode(False)
                 #     self.pstat.SetIERange(0)
-    
+
                 # Sets the voltage of the auxiliary DAC output.
                 self.pstat.SetAnalogOut(0.0)
-    
+
                 # Set the cell voltage of the Pstat.
                 # self.pstat.SetVoltage(0.0)
-    
+
                 # Set the current interrupt IR compensation mode.
                 self.pstat.SetIruptMode(self.GamryCOM.IruptOff)
-    
+
                 # the format of the data array is dependent upon the specific Dtaq
                 # e.g. which subheader to use
-    
+
                 if mode == Gamry_modes.CA:
                     Dtaqmode = "GamryCOM.GamryDtaqChrono"
                     Dtaqtype = self.GamryCOM.ChronoAmp
@@ -665,19 +670,22 @@ class gamry:
                     self.base.print_message(f"'mode {mode} not supported'", error=True)
                     error = ErrorCodes.not_available
 
-
-                if error is ErrorCodes.none:  
+                if error is ErrorCodes.none:
                     try:
-                        self.base.print_message(f"creating dtaq '{Dtaqmode}'", info = True)
+                        self.base.print_message(
+                            f"creating dtaq '{Dtaqmode}'", info=True
+                        )
                         self.dtaq = client.CreateObject(Dtaqmode)
                         if Dtaqtype:
                             self.dtaq.Init(self.pstat, Dtaqtype, *argv)
                         else:
                             self.dtaq.Init(self.pstat, *argv)
                     except Exception as e:
-                        self.base.print_message(f"Gamry Error during setup: "
-                                                f"{gamry_error_decoder(e)}", error=True)
-        
+                        self.base.print_message(
+                            f"Gamry Error during setup: {gamry_error_decoder(e)}",
+                            error=True,
+                        )
+
                     # This method, when enabled,
                     # allows for longer experiments with fewer points,
                     # but still acquires data quickly around each step.
@@ -685,20 +693,24 @@ class gamry:
                         self.dtaq.SetDecimation(False)
                     elif mode == Gamry_modes.CP:
                         self.dtaq.SetDecimation(False)
-        
+
                     self.dtaqsink = GamryDtaqEvents(self.dtaq)
-                    self.base.print_message(f"initialized dtaqsink with status {self.dtaqsink.status} in mode setup_{mode}")
-                    
+                    self.base.print_message(
+                        f"initialized dtaqsink with status {self.dtaqsink.status} in mode setup_{mode}"
+                    )
 
             except comtypes.COMError as e:
-                self.base.print_message(f"Gamry error during measurement setup: {e}", error=True)
+                self.base.print_message(
+                    f"Gamry error during measurement setup: {e}", error=True
+                )
                 error = ErrorCodes.critical
         else:
-            self.base.print_message("measurement_setup: Gamry not initialized!", error=True)
+            self.base.print_message(
+                "measurement_setup: Gamry not initialized!", error=True
+            )
             error = ErrorCodes.not_initialized
 
         return error
-
 
     async def measure(self):
         """performing a measurement with the Gamry
@@ -713,9 +725,6 @@ class gamry:
 
             # active object is set so we can set the continue flag
             self.IO_continue = True
-            
-            
-            
 
             # TODO:
             # - I/E range: auto, fixed
@@ -779,28 +788,28 @@ class gamry:
             if self.IO_TTLsend >= 0:
                 # SetDigitalOut([in] short Out, # New output setting in the lowest 4 bits
                 #               [in] short Mask, # Identify the bits to be changed
-                #              )	
+                #              )
                 # returns [out]	OutSet	Output setting as set
-                # The Out parameter is used to show the desired bit pattern 
-                # and to show the range of bits to be changed. 
-                # Each of the lowest 4 bits of the Out argument corresponds 
-                # to one of the output bits. A bit will only be changed if 
-                # the mask argument has a one in that bit's bit position. 
-                # A mask argument of 0x0003 would allow changes in Output0 
-                # and Output1. With this mask value, Output 2 and Output 3 
+                # The Out parameter is used to show the desired bit pattern
+                # and to show the range of bits to be changed.
+                # Each of the lowest 4 bits of the Out argument corresponds
+                # to one of the output bits. A bit will only be changed if
+                # the mask argument has a one in that bit's bit position.
+                # A mask argument of 0x0003 would allow changes in Output0
+                # and Output1. With this mask value, Output 2 and Output 3
                 # will not be changed regardless of the bit pattern argument.
                 if self.IO_TTLsend == 0:
-                    #0001
-                    self.pstat.SetDigitalOut(1,1)
+                    # 0001
+                    self.pstat.SetDigitalOut(1, 1)
                 elif self.IO_TTLsend == 1:
-                    #0010
-                    self.pstat.SetDigitalOut(2,2)
+                    # 0010
+                    self.pstat.SetDigitalOut(2, 2)
                 elif self.IO_TTLsend == 2:
-                    #0100
-                    self.pstat.SetDigitalOut(4,4)
+                    # 0100
+                    self.pstat.SetDigitalOut(4, 4)
                 elif self.IO_TTLsend == 3:
-                    #1000
-                    self.pstat.SetDigitalOut(8,8)
+                    # 1000
+                    self.pstat.SetDigitalOut(8, 8)
 
             # turn on the potentiostat output
             if self.IO_meas_mode == Gamry_modes.OCV:
@@ -823,30 +832,29 @@ class gamry:
                 self.close_pstat_connection()
                 return {"measure": "run_error"}
 
-
             realtime = await self.active.set_realtime()
             if self.active:
                 self.active.finish_hlo_header(
-                                              realtime=realtime,
-                                              # use firt of currently
-                                              # active file_conn_keys
-                                              # split action will update it
-                                              file_conn_keys = \
-                                               self.active.action.file_conn_keys
-                                              )
-                    
-                    
+                    realtime=realtime,
+                    # use firt of currently
+                    # active file_conn_keys
+                    # split action will update it
+                    file_conn_keys=self.active.action.file_conn_keys,
+                )
+
             # dtaqsink.status might still be 'idle' if sleep is too short
             await asyncio.sleep(0.04)
             client.PumpEvents(0.001)
             sink_status = self.dtaqsink.status
             counter = 0
 
-
             while (
                 # counter < len(self.dtaqsink.acquired_points)
                 self.IO_do_meas
-                and (sink_status != "done" or counter < len(self.dtaqsink.acquired_points))
+                and (
+                    sink_status != "done"
+                    or counter < len(self.dtaqsink.acquired_points)
+                )
             ):
                 # need some await points
                 await asyncio.sleep(0.001)
@@ -855,7 +863,7 @@ class gamry:
                 if counter < tmpc:
                     tmp_datapoints = self.dtaqsink.acquired_points[counter:tmpc]
                     # print(counter, tmpc, len(tmp_datapoints))
-                    # EIS needs to be tested and fixed 
+                    # EIS needs to be tested and fixed
                     # # Need to get additional data for EIS
                     # if self.IO_meas_mode == Gamry_modes.EIS:
                     #     test = list(tmp_datapoints)
@@ -866,25 +874,23 @@ class gamry:
                     #     test.append(self.dtaqsink.dtaq.Zfreq())
                     #     test.append(self.dtaqsink.dtaq.Zmod())
                     #     tmp_datapoints = tuple(test)
-    
+
                     if self.active:
                         if self.active.action.save_data:
-                            data = {self.active.action.file_conn_keys[0]:\
-                                       {
-                                           k: v
-                                           for k, v in zip(
-                                               self.FIFO_column_headings, 
-                                               np.matrix(tmp_datapoints).T.tolist()
-                                           )
-                                       }
-                                    }
-                            await self.active.enqueue_data(datamodel = \
-                                   DataModel(
-                                             data = data,
-                                             errors = [],
-                                             status = HloStatus.active
-                                            )
+                            data = {
+                                self.active.action.file_conn_keys[0]: {
+                                    k: v
+                                    for k, v in zip(
+                                        self.FIFO_column_headings,
+                                        np.matrix(tmp_datapoints).T.tolist(),
+                                    )
+                                }
+                            }
+                            await self.active.enqueue_data(
+                                datamodel=DataModel(
+                                    data=data, errors=[], status=HloStatus.active
                                 )
+                            )
                     counter = tmpc
 
                 sink_status = self.dtaqsink.status
@@ -892,53 +898,48 @@ class gamry:
             self.close_pstat_connection()
             return {"measure": f"done_{self.IO_meas_mode}"}
 
-
     async def status(self):
         """return status of data structure"""
         await asyncio.sleep(0.001)
         return self.dtaqsink.status
-
 
     async def stop(self):
         """stops measurement, writes all data and returns from meas loop"""
         # turn off cell and run before stopping meas loop
         if self.IO_measuring:
             # file and Gamry connection will be closed with the meas loop
-            self.IO_do_meas = False # will stop meas loop
+            self.IO_do_meas = False  # will stop meas loop
             await self.set_IO_signalq(False)
 
-
-    async def estop(self, switch:bool, *args, **kwargs):
+    async def estop(self, switch: bool, *args, **kwargs):
         """same as stop, set or clear estop flag with switch parameter"""
         # should be the same as stop()
         switch = bool(switch)
         self.base.actionserver.estop = switch
         if self.IO_measuring:
             if switch:
-                self.IO_do_meas = False # will stop meas loop
+                self.IO_do_meas = False  # will stop meas loop
                 await self.set_IO_signalq(False)
                 if self.active:
                     # add estop status to active.status
                     await self.active.set_estop()
         return switch
 
-
     def shutdown(self):
         # close all connection and objects to gamry
         self.base.print_message("shutting down gamry")
         if self.IO_measuring:
             # file and Gamry connection will be closed with the meas loop
-            self.IO_do_meas = False # will stop meas loop
+            self.IO_do_meas = False  # will stop meas loop
             self.set_IO_signalq_nowait(False)
 
         # give some time to finish all data
         retries = 0
-        while self.active is not None \
-        and retries < 10:
-            self.base.print_message(f"Got shutdown, "
-                                    f"but Active is not yet done!, "
-                                    f"retry {retries}",
-                                    info = True)
+        while self.active is not None and retries < 10:
+            self.base.print_message(
+                f"Got shutdown, but Active is not yet done!, retry {retries}",
+                info=True,
+            )
             self.set_IO_signalq_nowait(False)
             time.sleep(1)
             retries += 1
@@ -946,61 +947,56 @@ class gamry:
         self.IOloop_run = False
         self.kill_GamryCom()
 
-
-
     def ierangefinder(self, requested_range=None):
-    
         def mysplit(s):
             def to_float(val):
                 try:
                     return float(val)
                 except ValueError:
                     return None
-            
-            unit = s.lstrip('0123456789. ')
-            number = s[:-len(unit)]
+
+            unit = s.lstrip("0123456789. ")
+            number = s[: -len(unit)]
             return to_float(number), unit
-        
+
         def to_amps(number: float, unit: str):
             unit = unit.lower()
             exp = None
             if unit == "aa":
-                exp = 1E-18
+                exp = 1e-18
             elif unit == "fa":
-                exp = 1E-15
+                exp = 1e-15
             elif unit == "pa":
-                exp = 1E-12
+                exp = 1e-12
             elif unit == "na":
-                exp = 1E-9
+                exp = 1e-9
             elif unit == "ua":
-                exp = 1E-6
+                exp = 1e-6
             elif unit == "ma":
-                exp = 1E-3
+                exp = 1e-3
             elif unit == "a":
                 exp = 1
             elif unit == "ka":
                 exp = 1000
-            
+
             if exp is None:
                 return None
             else:
-                return number*exp
+                return number * exp
 
-        
         if requested_range is None:
-            self.base.print_message("could not detect IErange, using 'auto'", 
-                                    error=True)
+            self.base.print_message(
+                "could not detect IErange, using 'auto'", error=True
+            )
             return self.gamry_range_enum.auto
         requested_range = f"{requested_range.lower()}"
 
-        self.base.print_message(f"got IErange request for {requested_range}", 
-                                info=True)
-        
+        self.base.print_message(f"got IErange request for {requested_range}", info=True)
+
         names = [e.name.lower() for e in self.gamry_range_enum]
         vals = [e.value.lower() for e in self.gamry_range_enum]
         lookupvals = [e.value for e in self.gamry_range_enum]
-    
-            
+
         idx = None
         if requested_range in vals:
             idx = vals.index(requested_range)
@@ -1011,13 +1007,13 @@ class gamry:
         else:
             # auto should have been detected already above
             # try auto detect range based on value and unit pair
-            req_num, req_unit =  mysplit(requested_range)
-            req_num = to_amps(number = req_num, unit = req_unit)
+            req_num, req_unit = mysplit(requested_range)
+            req_num = to_amps(number=req_num, unit=req_unit)
             if req_num is None:
                 return self.gamry_range_enum.auto
             for ret_idx, val in enumerate(vals):
                 val_num, val_unit = mysplit(val)
-                val_num = to_amps(number = val_num, unit = val_unit)
+                val_num = to_amps(number=val_num, unit=val_unit)
                 if val_num is None:
                     # skip auto
                     continue
@@ -1026,48 +1022,38 @@ class gamry:
                     idx = ret_idx
                     break
 
-
             if idx is None:
-                self.base.print_message("could not detect IErange, using 'auto'", 
-                                        error=True)
+                self.base.print_message(
+                    "could not detect IErange, using 'auto'", error=True
+                )
                 return self.gamry_range_enum.auto
-        
-        
-        ret_range = self.gamry_range_enum(lookupvals[idx])
-        self.base.print_message(f"detected IErange: {ret_range}", 
-                                info=True)
-        return ret_range
-    
 
+        ret_range = self.gamry_range_enum(lookupvals[idx])
+        self.base.print_message(f"detected IErange: {ret_range}", info=True)
+        return ret_range
 
     async def technique_wrapper(
-        self, 
-        act, 
-        measmode, 
-        sigfunc, 
-        sigfunc_params, 
-        samplerate, 
-        eta=0.0,
-        setupargs=[]
+        self, act, measmode, sigfunc, sigfunc_params, samplerate, eta=0.0, setupargs=[]
     ):
         activeDict = dict()
         act.action_etc = eta
         act.error_code = ErrorCodes.none
         samples_in = await self.unified_db.get_samples(act.samples_in)
         if not samples_in and not self.allow_no_sample:
-            self.base.print_message("Gamry got no valid sample, "
-                                    "cannot start measurement!",
-                                    error = True)
+            self.base.print_message(
+                "Gamry got no valid sample, cannot start measurement!", error=True
+            )
             act.samples_in = []
             act.error_code = ErrorCodes.no_sample
             activeDict = act.as_dict()
- 
 
-        if self.pstat \
-        and not self.IO_do_meas \
-        and not self.IO_measuring \
-        and not self.base.actionserver.estop \
-        and act.error_code is ErrorCodes.none:
+        if (
+            self.pstat
+            and not self.IO_do_meas
+            and not self.IO_measuring
+            and not self.base.actionserver.estop
+            and act.error_code is ErrorCodes.none
+        ):
             # open connection, will be closed after measurement in IOloop
             act.error_code = await self.open_connection()
 
@@ -1092,7 +1078,6 @@ class gamry:
                 act.error_code = ErrorCodes.not_initialized
             activeDict = act.as_dict()
 
-
         if act.error_code is ErrorCodes.none:
             # set parameters for IOloop meas
             self.IO_meas_mode = measmode
@@ -1107,42 +1092,44 @@ class gamry:
                     act.error_code = ErrorCodes.none
                 except Exception as e:
                     act.error_code = gamry_error_decoder(e)
-                    self.base.print_message(f"IO_sigramp.Init error: "
-                                            f"{act.error_code}", error = True)
-                
+                    self.base.print_message(
+                        f"IO_sigramp.Init error: {act.error_code}", error=True
+                    )
+
                 self.samples_in = samples_in
                 self.action = act
                 self.action.samples_in = []
 
-
                 # write header lines with one function call
                 self.FIFO_gamryheader.update(
-                        {
-                        "gamry":self.FIFO_Gamryname,
-                        "ierangemode":self.IO_IErange.name,
-                        }
+                    {
+                        "gamry": self.FIFO_Gamryname,
+                        "ierangemode": self.IO_IErange.name,
+                    }
                 )
 
-                self.active =  await self.base.contain_action(
+                self.active = await self.base.contain_action(
                     ActiveParams(
-                                 action = self.action,
-                                 file_conn_params_dict = {self.base.dflt_file_conn_key():
-                                     FileConnParams(
-                                         # use dflt file conn key for first
-                                         # init
-                                                   file_conn_key = \
-                                                       self.base.dflt_file_conn_key(),
-                                                    sample_global_labels=[sample.get_global_label() for sample in self.samples_in],
-                                                    file_type="pstat_helao__file",
-                                                    # only add optional keys to header
-                                                    # rest will be added later
-                                                    hloheader = HloHeaderModel(
-                                                        optional = self.FIFO_gamryheader
-                                                    ),
-                                                   )
-                                     }
-    
-                ))
+                        action=self.action,
+                        file_conn_params_dict={
+                            self.base.dflt_file_conn_key(): FileConnParams(
+                                # use dflt file conn key for first
+                                # init
+                                file_conn_key=self.base.dflt_file_conn_key(),
+                                sample_global_labels=[
+                                    sample.get_global_label()
+                                    for sample in self.samples_in
+                                ],
+                                file_type="pstat_helao__file",
+                                # only add optional keys to header
+                                # rest will be added later
+                                hloheader=HloHeaderModel(
+                                    optional=self.FIFO_gamryheader
+                                ),
+                            )
+                        },
+                    )
+                )
 
                 for sample in self.samples_in:
                     sample.status = [SampleStatus.preserved]
@@ -1151,9 +1138,9 @@ class gamry:
                 # clear old samples_in first
                 self.active.action.samples_in = []
                 # now add updated samples to sample_in again
-                await self.active.append_sample(samples = [sample_in for sample_in in self.samples_in],
-                                                IO="in"
-                                                )
+                await self.active.append_sample(
+                    samples=[sample_in for sample_in in self.samples_in], IO="in"
+                )
 
                 # signal the IOloop to start the measrurement
                 await self.set_IO_signalq(True)
@@ -1177,14 +1164,13 @@ class gamry:
         else:
             # could not open connection
             # open_connection already set the error_code
-            activeDict = act.as_dict()                
-
+            activeDict = act.as_dict()
 
         return activeDict
 
-
     async def technique_LSV(
-        self, A: Action,
+        self,
+        A: Action,
     ):
         """LSV definition"""
         Vinit = A.action_params["Vinit__V"]
@@ -1210,15 +1196,15 @@ class gamry:
 
         # setup partial header which will be completed in measure loop
         self.FIFO_gamryheader = {
-                "Vinit__V":Vinit,
-                "Vfinal__V":Vfinal,
-                "ScanRate__V_s":ScanRate,
-                "AcqInterval__s":SampleRate,
-                "ETA__s":eta,
+            "Vinit__V": Vinit,
+            "Vfinal__V": Vfinal,
+            "ScanRate__V_s": ScanRate,
+            "AcqInterval__s": SampleRate,
+            "ETA__s": eta,
         }
 
         # common
-        self.IO_IErange = self.ierangefinder(requested_range = IErange)
+        self.IO_IErange = self.ierangefinder(requested_range=IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
         activeDict = await self.technique_wrapper(
@@ -1227,15 +1213,14 @@ class gamry:
             sigfunc=sigfunc,
             sigfunc_params=sigfunc_params,
             samplerate=SampleRate,
-            eta=eta
+            eta=eta,
         )
-
-
 
         return activeDict
 
     async def technique_CA(
-        self, A: Action,
+        self,
+        A: Action,
     ):
         """CA definition"""
         Vval = A.action_params["Vval__V"]
@@ -1253,14 +1238,14 @@ class gamry:
 
         # setup partial header which will be completed in measure loop
         self.FIFO_gamryheader = {
-                "Vval__V":Vval,
-                "Tval__s":Tval,
-                "AcqInterval__s":SampleRate,
-                "ETA__s":eta,
+            "Vval__V": Vval,
+            "Tval__s": Tval,
+            "AcqInterval__s": SampleRate,
+            "ETA__s": eta,
         }
 
         # common
-        self.IO_IErange = self.ierangefinder(requested_range = IErange)
+        self.IO_IErange = self.ierangefinder(requested_range=IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
         activeDict = await self.technique_wrapper(
@@ -1269,12 +1254,13 @@ class gamry:
             sigfunc=sigfunc,
             sigfunc_params=sigfunc_params,
             samplerate=SampleRate,
-            eta=eta
+            eta=eta,
         )
         return activeDict
 
     async def technique_CP(
-        self, A: Action,
+        self,
+        A: Action,
     ):
         """CP definition"""
         Ival = A.action_params["Ival"]
@@ -1292,14 +1278,14 @@ class gamry:
 
         # setup partial header which will be completed in measure loop
         self.FIFO_gamryheader = {
-                "Ival":Ival,
-                "Tval__s":Tval,
-                "AcqInterval__s":SampleRate,
-                "ETA__s":eta,
+            "Ival": Ival,
+            "Tval__s": Tval,
+            "AcqInterval__s": SampleRate,
+            "ETA__s": eta,
         }
 
         # common
-        self.IO_IErange = self.ierangefinder(requested_range = IErange)
+        self.IO_IErange = self.ierangefinder(requested_range=IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
         activeDict = await self.technique_wrapper(
@@ -1308,7 +1294,7 @@ class gamry:
             sigfunc=sigfunc,
             sigfunc_params=sigfunc_params,
             samplerate=SampleRate,
-            eta=eta
+            eta=eta,
         )
         return activeDict
 
@@ -1367,23 +1353,23 @@ class gamry:
 
         # setup partial header which will be completed in measure loop
         self.FIFO_gamryheader = {
-                "Vinit__V":Vinit,
-                "Vapex1__V":Vapex1,
-                "Vapex2__V":Vapex2,
-                "Vfinal__V":Vfinal,
-                "ScanInit__V_s":ScanInit,
-                "ScanApex__V_s":ScanApex,
-                "ScanFinal__V_s":ScanFinal,
-                "holdtime0__s":HoldTime0,
-                "holdtime1__s":HoldTime1,
-                "holdtime2__s":HoldTime2,
-                "AcqInterval__s":SampleRate,
-                "cycles":Cycles,
-                "ETA__s":eta,
+            "Vinit__V": Vinit,
+            "Vapex1__V": Vapex1,
+            "Vapex2__V": Vapex2,
+            "Vfinal__V": Vfinal,
+            "ScanInit__V_s": ScanInit,
+            "ScanApex__V_s": ScanApex,
+            "ScanFinal__V_s": ScanFinal,
+            "holdtime0__s": HoldTime0,
+            "holdtime1__s": HoldTime1,
+            "holdtime2__s": HoldTime2,
+            "AcqInterval__s": SampleRate,
+            "cycles": Cycles,
+            "ETA__s": eta,
         }
 
         # common
-        self.IO_IErange = self.ierangefinder(requested_range = IErange)
+        self.IO_IErange = self.ierangefinder(requested_range=IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
         activeDict = await self.technique_wrapper(
@@ -1392,7 +1378,7 @@ class gamry:
             sigfunc=sigfunc,
             sigfunc_params=sigfunc_params,
             samplerate=SampleRate,
-            eta=eta
+            eta=eta,
         )
         return activeDict
 
@@ -1417,17 +1403,17 @@ class gamry:
 
         # setup partial header which will be completed in measure loop
         self.FIFO_gamryheader = {
-                "Vval__V":Vval,
-                "Tval__s":Tval,
-                "freq":Freq,
-                "rms":RMS,
-                "precision":Precision,
-                "AcqInterval__s":SampleRate,
-                "ETA__s":eta,
+            "Vval__V": Vval,
+            "Tval__s": Tval,
+            "freq": Freq,
+            "rms": RMS,
+            "precision": Precision,
+            "AcqInterval__s": SampleRate,
+            "ETA__s": eta,
         }
 
         # common
-        self.IO_IErange = self.ierangefinder(requested_range = IErange)
+        self.IO_IErange = self.ierangefinder(requested_range=IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
         activeDict = await self.technique_wrapper(
@@ -1437,7 +1423,7 @@ class gamry:
             sigfunc_params=sigfunc_params,
             samplerate=SampleRate,
             eta=eta,
-            setupargs=argv
+            setupargs=argv,
         )
         return activeDict
 
@@ -1460,13 +1446,13 @@ class gamry:
 
         # setup partial header which will be completed in measure loop
         self.FIFO_gamryheader = {
-            "Tval__s":Tval,
-            "AcqInterval__s":SampleRate,
-            "ETA__s":eta,
+            "Tval__s": Tval,
+            "AcqInterval__s": SampleRate,
+            "ETA__s": eta,
         }
 
         # common
-        self.IO_IErange = self.ierangefinder(requested_range = IErange)
+        self.IO_IErange = self.ierangefinder(requested_range=IErange)
         self.IO_TTLwait = TTLwait
         self.IO_TTLsend = TTLsend
 
@@ -1476,6 +1462,6 @@ class gamry:
             sigfunc=sigfunc,
             sigfunc_params=sigfunc_params,
             samplerate=SampleRate,
-            eta=eta
+            eta=eta,
         )
         return activeDict

@@ -627,9 +627,10 @@ def makeApp(confPrefix, servKey, helao_root):
         action_version: int = 1,
         req_vol: Optional[float] = None,
     ):
-        """Returns an empty vial position for given max volume.\n
-        For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.\n
-        It will select the first empty vial which has the smallest volume that still can hold req_vol"""
+        """Returns an empty vial position for given max volume.
+        For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.
+        It will select the first empty vial which has the smallest volume that still can hold req_vol
+        """
         active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(
             datadict=await app.driver.archive.tray_new_position(
@@ -853,8 +854,8 @@ def makeApp(confPrefix, servKey, helao_root):
         combine_liquids: bool = False,
         dilute_liquids: bool = True,
     ):
-        """Adds 'volume_ml' of 'source_liquid_in' to the sample 'custom'.\n
-        Args: \n
+        """Adds 'volume_ml' of 'source_liquid_in' to the sample 'custom'.
+        Args:
              custom: custom position where liquid will be added
              source_liquid_in: the liquid from which volume_ml will be added
                                to custom
@@ -939,7 +940,8 @@ def makeApp(confPrefix, servKey, helao_root):
         For manual entry leave DUID, AUID, action_time,
         and action_params empty and servkey on "data".
         If its the very first liquid (no source in database exists)
-        leave source and source_ml empty."""
+        leave source and source_ml empty.
+        """
         active = await app.base.setup_and_contain_action()
         samples = await app.driver.archive.create_samples(
             reference_samples_in=active.action.samples_in, action=active.action
