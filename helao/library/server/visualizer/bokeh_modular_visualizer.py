@@ -1,7 +1,5 @@
 __all__ = ["makeBokehApp"]
 
-from importlib import import_module
-
 
 import websockets
 import asyncio
@@ -152,9 +150,7 @@ class C_nidaqmxvis:
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
     def cleanup_session(self, session_context):
-        self.vis.print_message(
-            f"'{self.nidaqmx_key}' " "Bokeh session closed", info=True
-        )
+        self.vis.print_message(f"'{self.nidaqmx_key}' Bokeh session closed", info=True)
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
@@ -436,7 +432,7 @@ class C_potvis:
 
     def cleanup_session(self, session_context):
         self.vis.print_message(
-            f"'{self.potentiostat_key}' " "Bokeh session closed", info=True
+            f"'{self.potentiostat_key}' Bokeh session closed", info=True
         )
         self.IOloop_data_run = False
         self.IOtask.cancel()
@@ -664,7 +660,7 @@ def find_server_names(vis: Vis, fast_key: str) -> list:
     for server_name, server_config in vis.world_cfg["servers"].items():
         if server_config.get("fast", "") == fast_key:
             vis.print_message(
-                f"found server: '{fast_key}' " f"under '{server_name}'", info=True
+                f"found server: '{fast_key}' under '{server_name}'", info=True
             )
             server_names.append(server_name)
 

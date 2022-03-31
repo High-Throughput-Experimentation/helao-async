@@ -284,10 +284,10 @@ def makeApp(confPrefix, servKey, helao_root):
             SampleRate: Optional[int] = Query(1.0, ge=1),
             TTLwait: Optional[int] = -1,  # -1 disables, else select TTL channel
         ):
-            """Runs multi cell IV measurement.\n
-            Args: \n
-                 SampleRate: samples per second\n
-                 Tval: time of measurement in seconds\n
+            """Runs multi cell IV measurement.
+            Args:
+                 SampleRate: samples per second
+                 Tval: time of measurement in seconds
                  TTLwait: trigger channel, -1 disables, else select TTL channel"""
             A = await app.base.setup_action()
             A.action_abbr = "multiCV"

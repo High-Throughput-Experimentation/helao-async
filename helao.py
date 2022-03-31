@@ -181,7 +181,7 @@ class Pidd:
                     print_message(
                         {},
                         "launcher",
-                        f"waiting {twait}sec before " f"killing server {server}",
+                        f"waiting {twait}sec before killing server {server}",
                     )
                     time.sleep(twait)
                     print_message({}, "launcher", f"Killing {server}.")
@@ -313,7 +313,6 @@ def launcher(confArg, confDict, helao_root):
     # API server launch priority (matches folders in root helao-dev/)
     LAUNCH_ORDER = ["action", "orchestrator", "visualizer", "operator"]
 
-    
     pidd = Pidd(pidFile=f"pids_{confPrefix}.pck", pidPath=helaodirs.states_root)
     if not validateConfig(PIDD=pidd, confDict=confDict, helao_root=helao_root):
         print_message(
@@ -420,7 +419,7 @@ if __name__ == "__main__":
     helao_root = os.path.dirname(os.path.realpath(__file__))
     confArg = sys.argv[1]
     config = config_loader(confArg, helao_root)
-    
+
     # print("\x1b[2J") # clear screen
     cprint(
         figlet_format(f"HELAO\nV2.3\n{get_hlo_version()}", font="starwars"),
@@ -459,7 +458,7 @@ if __name__ == "__main__":
                         requests.post(f"http://{S.host}:{S.port}/shutdown")
                     except Exception as e:
                         print_message(
-                            {}, "launcher", f" ... got error: " f"\n{e}", error=True
+                            {}, "launcher", f" ... got error: {e}", error=True
                         )
 
         pidd.close()

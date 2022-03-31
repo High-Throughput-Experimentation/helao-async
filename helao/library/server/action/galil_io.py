@@ -158,16 +158,16 @@ async def galil_dyn_endpoints(app=None):
                 subthread: Optional[int] = Query(1, ge=0, le=8),
             ):
 
-                """Toggles output.\n
-                Args: \n
-                    trigger_item: di on which the toggle starts\n
-                    out_item: do_item for toggle output\n
-                    out_item_gamry: do which is connected to gamry aux input\n
-                    t_on: time (ms) out_item is on\n
-                    t_off: time (ms) out_item is off\n
-                    t_offset: offset time in ms after which toggle starts\n
-                    t_duration: time (ms) for total  toggle time (max is duration of trigger_item)\n
-                                negative value will run as long trigger_item is applied\n
+                """Toggles output.
+                Args:
+                    trigger_item: di on which the toggle starts
+                    out_item: do_item for toggle output
+                    out_item_gamry: do which is connected to gamry aux input
+                    t_on: time (ms) out_item is on
+                    t_off: time (ms) out_item is off
+                    t_offset: offset time in ms after which toggle starts
+                    t_duration: time (ms) for total  toggle time (max is duration of trigger_item)
+                                negative value will run as long trigger_item is applied
                     !!! toggle cycle is ON/OFF !!!"""
                 active = await app.base.setup_and_contain_action()
 
