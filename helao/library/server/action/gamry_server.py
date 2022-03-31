@@ -39,6 +39,7 @@ from helaocore.server.base import makeActionServ
 from helaocore.model.sample import LiquidSample, SampleUnion
 from helaocore.schema import Action
 from helao.library.driver.gamry_driver import gamry
+from helaocore.helper.config_loader import config_loader
 
 
 async def gamry_dyn_endpoints(app=None):
@@ -228,9 +229,9 @@ async def gamry_dyn_endpoints(app=None):
             return active_dict
 
 
-def makeApp(confPrefix, servKey):
+def makeApp(confPrefix, servKey, helao_root):
 
-    config = import_module(f"helao.config.{confPrefix}").config
+    config = config_loader(confPrefix, helao_root)
 
     app = makeActionServ(
         config=config,

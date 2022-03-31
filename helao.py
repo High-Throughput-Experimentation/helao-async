@@ -33,11 +33,6 @@ import psutil
 import time
 import requests
 import subprocess
-from importlib import import_module
-from importlib.util import spec_from_file_location
-from importlib.util import module_from_spec
-from importlib.machinery import SourceFileLoader
-
 
 from munch import munchify
 from termcolor import cprint
@@ -47,16 +42,17 @@ import colorama
 from helaocore.version import get_hlo_version
 from helaocore.helper.print_message import print_message
 from helaocore.helper.helao_dirs import helao_dirs
+from helaocore.helper.config_loader import config_loader
 
 import helao.test.unit_test_sample_models
-# from helao.test.unit_test_sample_models import sample_model_unit_test
 
+# from helao.test.unit_test_sample_models import sample_model_unit_test
 
 
 class Pidd:
     def __init__(self, pidFile, pidPath, retries=3):
         self.PROC_NAMES = ["python.exe", "python"]
-        self.pidFilePath =  os.path.join(pidPath, pidFile)
+        self.pidFilePath = os.path.join(pidPath, pidFile)
         self.RETRIES = retries
         self.reqKeys = ("host", "port", "group")
         self.codeKeys = ("fast", "bokeh")
@@ -64,17 +60,27 @@ class Pidd:
         try:
             self.load_global()
         except IOError:
-            print_message({}, "launcher", f"'{self.pidFilePath}' does not exist, writing empty global dict.", info = True)
+            print_message(
+                {},
+                "launcher",
+                f"'{self.pidFilePath}' does not exist, writing empty global dict.",
+                info=True,
+            )
             self.write_global()
         except Exception:
-            print_message({}, "launcher", f"Error loading '{self.pidFilePath}', writing empty global dict.", info = True)
+            print_message(
+                {},
+                "launcher",
+                f"Error loading '{self.pidFilePath}', writing empty global dict.",
+                info=True,
+            )
             self.write_global()
 
     def load_global(self):
         with open(self.pidFilePath, "rb") as f:
             self.d = pickle.load(f)
             # print_message({}, "launcher", f"Succesfully loaded '{self.pidFilePath}'.")
-        
+
     def write_global(self):
         with open(self.pidFilePath, "wb") as f:
             pickle.dump(self.d, f)
@@ -126,7 +132,11 @@ class Pidd:
         else:
             active = self.list_active()
             if k not in [key for key, _, _, _ in active]:
-                print_message({}, "launcher", f"Server '{k}' is not running, removing from global dict.")
+                print_message(
+                    {},
+                    "launcher",
+                    f"Server '{k}' is not running, removing from global dict.",
+                )
                 del self.d[k]
                 return True
             else:
@@ -137,16 +147,23 @@ class Pidd:
                         p.terminate()
                         time.sleep(0.5)
                         if not psutil.pid_exists(p.pid):
-                            print_message({}, "launcher", f"Successfully terminated server '{k}'.")
+                            print_message(
+                                {}, "launcher", f"Successfully terminated server '{k}'."
+                            )
                             return True
                     if psutil.pid_exists(p.pid):
-                        print_message({}, "launcher", 
-                            f"Failed to terminate server '{k}' after {self.RETRIES} retries.", error = True
+                        print_message(
+                            {},
+                            "launcher",
+                            f"Failed to terminate server '{k}' after {self.RETRIES} retries.",
+                            error=True,
                         )
                         return False
                 except Exception as e:
-                    print_message({}, "launcher", f"Error terminating server '{k}'", error = True)
-                    print_message({}, "launcher", e,error = True)
+                    print_message(
+                        {}, "launcher", f"Error terminating server '{k}'", error=True
+                    )
+                    print_message({}, "launcher", e, error=True)
                     return False
 
     def close(self):
@@ -161,12 +178,13 @@ class Pidd:
                 G = pidd.servers[group]
                 for server in G:
                     twait = 0.5
-                    print_message({}, "launcher",
-                                  f"waiting {twait}sec before "
-                                  f"killing server {server}")
+                    print_message(
+                        {},
+                        "launcher",
+                        f"waiting {twait}sec before " f"killing server {server}",
+                    )
                     time.sleep(twait)
-                    print_message({}, "launcher",
-                                  f"Killing {server}.")
+                    print_message({}, "launcher", f"Killing {server}.")
                     if server in activeserver:
                         self.kill_server(server)
 
@@ -176,11 +194,15 @@ class Pidd:
             self.kill_server(k)
         active = self.list_active()
         if active:
-            print_message({}, "launcher", "Following actions failed to terminate:", error = True)
+            print_message(
+                {}, "launcher", "Following actions failed to terminate:", error=True
+            )
             for x in active:
                 print_message({}, "launcher", x)
         else:
-            print_message({}, "launcher", f"All actions terminated. Removing '{self.pidFilePath}'")
+            print_message(
+                {}, "launcher", f"All actions terminated. Removing '{self.pidFilePath}'"
+            )
             os.remove(self.pidFilePath)
 
 
@@ -196,25 +218,43 @@ def validateConfig(PIDD, confDict, helao_root):
         hasKeys = [k in serverDict for k in PIDD.reqKeys]
         hasCode = [k for k in serverDict if k in PIDD.codeKeys]
         if not all(hasKeys):
-            print_message({}, "launcher", 
-                f"{server} config is missing {[k for k,b in zip(PIDD.reqKeys, hasKeys) if b]}."
+            print_message(
+                {},
+                "launcher",
+                f"{server} config is missing {[k for k,b in zip(PIDD.reqKeys, hasKeys) if b]}.",
             )
             return False
         if not isinstance(serverDict["host"], str):
-            print_message({}, "launcher", f"{server} server 'host' is not a string", error = True)
+            print_message(
+                {}, "launcher", f"{server} server 'host' is not a string", error=True
+            )
             return False
         if not isinstance(serverDict["port"], int):
-            print_message({}, "launcher", f"{server} server 'port' is not an integer", error = True)
+            print_message(
+                {}, "launcher", f"{server} server 'port' is not an integer", error=True
+            )
             return False
         if not isinstance(serverDict["group"], str):
-            print_message({}, "launcher", f"{server} server 'group' is not a string", error = True)
+            print_message(
+                {}, "launcher", f"{server} server 'group' is not a string", error=True
+            )
             return False
         if hasCode:
             if len(hasCode) != 1:
-                print_message({}, "launcher", f"{server} cannot have more than one code key {PIDD.codeKeys}", error = True)
+                print_message(
+                    {},
+                    "launcher",
+                    f"{server} cannot have more than one code key {PIDD.codeKeys}",
+                    error=True,
+                )
                 return False
             if not isinstance(serverDict[hasCode[0]], str):
-                print_message({}, "launcher", f"{server} server '{hasCode[0]}' is not a string", error = True)
+                print_message(
+                    {},
+                    "launcher",
+                    f"{server} server '{hasCode[0]}' is not a string",
+                    error=True,
+                )
                 return False
             launchPath = os.path.join(
                 "helao",
@@ -224,9 +264,11 @@ def validateConfig(PIDD, confDict, helao_root):
                 serverDict[hasCode[0]] + ".py",
             )
             if not os.path.exists(os.path.join(helao_root, launchPath)):
-                print_message({}, "launcher", 
-                    f"{server} server code helao/library/server/{serverDict['group']}/{serverDict[hasCode[0]]+'.py'} does not exist.", 
-                    error = True
+                print_message(
+                    {},
+                    "launcher",
+                    f"{server} server code helao/library/server/{serverDict['group']}/{serverDict[hasCode[0]]+'.py'} does not exist.",
+                    error=True,
                 )
                 return False
     serverAddrs = [f"{d['host']}:{d['port']}" for d in confDict["servers"].values()]
@@ -237,7 +279,7 @@ def validateConfig(PIDD, confDict, helao_root):
 
 
 def wait_key():
-    """ Wait for a key press on the console and return it. """
+    """Wait for a key press on the console and return it."""
     result = None
     if os.name == "nt":
         import msvcrt
@@ -263,16 +305,20 @@ def wait_key():
     return result
 
 
-def launcher(confPrefix, confDict, helao_root):
-    #get the BaseModel which contains all the dirs for helao
+def launcher(confArg, confDict, helao_root):
+    confPrefix = os.path.basename(confArg).replace(".py", "")
+    # get the BaseModel which contains all the dirs for helao
     helaodirs = helao_dirs(confDict)
 
     # API server launch priority (matches folders in root helao-dev/)
     LAUNCH_ORDER = ["action", "orchestrator", "visualizer", "operator"]
 
+    
     pidd = Pidd(pidFile=f"pids_{confPrefix}.pck", pidPath=helaodirs.states_root)
     if not validateConfig(PIDD=pidd, confDict=confDict, helao_root=helao_root):
-        print_message({}, "launcher", f"Configuration for '{confPrefix}' is invalid.", error = True)
+        print_message(
+            {}, "launcher", f"Configuration for '{confPrefix}' is invalid.", error=True
+        )
         raise Exception(f"Configuration for '{confPrefix}' is invalid.")
     else:
         print_message({}, "launcher", f"Configuration for '{confPrefix}' is valid.")
@@ -304,48 +350,60 @@ def launcher(confPrefix, confDict, helao_root):
                 servHP = (servHost, servPort)
                 # if 'py' key is None, assume remotely started or monitored by a separate action
                 if servPy is None:
-                    print_message({}, "launcher", 
+                    print_message(
+                        {},
+                        "launcher",
                         f"{server} does not specify one of ({pidd.codeKeys}) so action not be managed.",
-                        info = True
+                        info=True,
                     )
                 elif servKHP in activeKHP:
-                    print_message({}, "launcher", 
+                    print_message(
+                        {},
+                        "launcher",
                         f"{server} already running with pid [{active[activeKHP.index(servKHP)][3]}]",
-                        info = True
+                        info=True,
                     )
                 elif servHP in activeHP:
                     raise (
                         f"Cannot start {server}, {servHost}:{servPort} is already in use."
                     )
                 else:
-                    print_message({}, "launcher", 
-                        f"Launching {server} at {servHost}:{servPort} using helao/library/server/{group}/{servPy}.py"
+                    print_message(
+                        {},
+                        "launcher",
+                        f"Launching {server} at {servHost}:{servPort} using helao/library/server/{group}/{servPy}.py",
                     )
                     if codeKey == "fast":
                         if group == "orchestrator":
                             pidd.orchServs.append(server)
-                        cmd = ["python", "fast_launcher.py", confPrefix, server]
+                        cmd = ["python", "fast_launcher.py", confArg, server]
                         p = subprocess.Popen(cmd, cwd=helao_root)
                         ppid = p.pid
                     elif codeKey == "bokeh":
-                        cmd = ["python", "bokeh_launcher.py", confPrefix, server]
+                        cmd = ["python", "bokeh_launcher.py", confArg, server]
                         p = subprocess.Popen(cmd, cwd=helao_root)
                         try:
                             time.sleep(3)
                             ppid = pidd.find_bokeh(servHost, servPort)
                         except:
-                            print_message({}, "launcher", 
+                            print_message(
+                                {},
+                                "launcher",
                                 f"Could not find running bokeh server at {servHost}:{servPort}",
-                                error = True
+                                error=True,
                             )
-                            print_message({}, "launcher", 
+                            print_message(
+                                {},
+                                "launcher",
                                 "Unable to manage bokeh action. See bokeh output for correct PID.",
-                                error = True
+                                error=True,
                             )
                             ppid = p.pid
                     else:
-                        print_message({}, "launcher", 
-                            f"No launch method available for code type '{codeKey}', cannot launch {group}/{servPy}.py"
+                        print_message(
+                            {},
+                            "launcher",
+                            f"No launch method available for code type '{codeKey}', cannot launch {group}/{servPy}.py",
                         )
                         continue
                     pidd.store_pid(server, servHost, servPort, ppid)
@@ -358,30 +416,24 @@ def launcher(confPrefix, confDict, helao_root):
 if __name__ == "__main__":
     if not helao.test.unit_test_sample_models.sample_model_unit_test():
         quit()
-    colorama.init(strip=not sys.stdout.isatty()) # strip colors if stdout is redirected 
+    colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
     helao_root = os.path.dirname(os.path.realpath(__file__))
-    confPrefix = sys.argv[1]
-    if confPrefix.endswith(".py") and os.path.exists(confPrefix):
-        print_message({}, "launcher", f"Loading config from {confPrefix}", info=True)
-        conf_spec = spec_from_file_location("config", confPrefix)
-        conf_mod = module_from_spec(conf_spec)
-        conf_spec.loader.exec_module(conf_mod)
-        config = conf_mod.config
-        confPrefix = os.path.basename(confPrefix).replace(".py","")
-    elif confPrefix.endswith(".py") and not os.path.exists(confPrefix):
-        print_message({}, "launcher", f"Config not found at {confPrefix}", error=True)
-        raise FileNotFoundError("Launcher argument ends with .py, expected path not found.")
-    else:
-        print_message({}, "launcher", f"Loading config from helao/config/{confPrefix}.py", info=True)
-        #config = import_module(f"helao.config.{confPrefix}").config
-        config = SourceFileLoader("config", os.path.join(helao_root, "helao","config",f"{confPrefix}.py")).load_module().config
-
+    confArg = sys.argv[1]
+    config = config_loader(confArg, helao_root)
+    
     # print("\x1b[2J") # clear screen
-    cprint(figlet_format(f"HELAO\nV2.3\n{get_hlo_version()}", font="starwars"),"yellow", "on_red", attrs=["bold"])
-    pidd = launcher(confPrefix=confPrefix, confDict=config, helao_root=helao_root)
+    cprint(
+        figlet_format(f"HELAO\nV2.3\n{get_hlo_version()}", font="starwars"),
+        "yellow",
+        "on_red",
+        attrs=["bold"],
+    )
+    pidd = launcher(confArg=confArg, confDict=config, helao_root=helao_root)
     result = None
     while result not in [b"\x18", b"\x04"]:
-        print_message({}, "launcher", "CTRL-x to terminate action group. CTRL-d to disconnect.")
+        print_message(
+            {}, "launcher", "CTRL-x to terminate action group. CTRL-d to disconnect."
+        )
         result = wait_key()
     if result == b"\x18":
         for server in pidd.orchServs:
@@ -390,7 +442,7 @@ if __name__ == "__main__":
                 S = pidd.servers["orchestrator"][server]
                 requests.post(f"http://{S.host}:{S.port}/shutdown")
             except Exception as e:
-                print_message({}, "launcher", " ... got error: ", e, error = True)
+                print_message({}, "launcher", " ... got error: ", e, error=True)
         # in case a /shutdown is added to other FastAPI servers (not the shutdown without '/')
         # KILL_ORDER = ["visualizer", "action", "server"] # orch are killed above
         # no /shutdown in visualizers
@@ -406,14 +458,16 @@ if __name__ == "__main__":
                         # will produce a 404 if not found
                         requests.post(f"http://{S.host}:{S.port}/shutdown")
                     except Exception as e:
-                        print_message({}, "launcher", 
-                                      f" ... got error: "
-                                      f"\n{e}", error = True)
+                        print_message(
+                            {}, "launcher", f" ... got error: " f"\n{e}", error=True
+                        )
 
         pidd.close()
     else:
-        print_message({}, "launcher", 
-            f"Disconnecting action monitor. Launch 'python helao.py {confPrefix}' to reconnect."
+        print_message(
+            {},
+            "launcher",
+            f"Disconnecting action monitor. Launch 'python helao.py {confArg}' to reconnect.",
         )
 
 # main()

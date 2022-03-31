@@ -44,9 +44,10 @@ from fastapi import Body
 
 from helaocore.server.orch import makeOrchServ
 from helaocore.schema import Action
+from helaocore.helper.config_loader import config_loader
 
-def makeApp(confPrefix, servKey):
-    config = import_module(f"helao.config.{confPrefix}").config
+def makeApp(confPrefix, servKey, helao_root):
+    config = config_loader(confPrefix, helao_root)
 
     app = makeOrchServ(
         config,

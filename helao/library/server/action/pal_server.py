@@ -24,11 +24,12 @@ from helao.library.driver.archive_driver import ScanDirection, ScanOperator
 from helaocore.model.sample import SampleType, LiquidSample, SampleUnion, NoneSample
 from helaocore.helper.make_str_enum import make_str_enum
 from helaocore.schema import Action
+from helaocore.helper.config_loader import config_loader
 
 
-def makeApp(confPrefix, servKey):
+def makeApp(confPrefix, servKey, helao_root):
 
-    config = import_module(f"helao.config.{confPrefix}").config
+    config = config_loader(confPrefix, helao_root)
 
     app = makeActionServ(
         config,

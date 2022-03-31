@@ -1,5 +1,5 @@
 hostip = "127.0.0.1"
-config = dict()
+config = {}
 
 # action library provides generator functions which produce actions
 config["experiment_libraries"] = []
@@ -36,6 +36,7 @@ config["servers"] = dict(
             aws_profile="default",
             aws_bucket="helao.data.testing",
             api_host="caltech-api.modelyst.com",
+            testing=False
         ),
     ),
 )

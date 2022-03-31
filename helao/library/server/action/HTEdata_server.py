@@ -7,11 +7,12 @@ from fastapi import Body
 from importlib import import_module
 from helaocore.server.base import makeActionServ
 from helaocore.schema import Action
+from helaocore.helper.config_loader import config_loader
 
 
-def makeApp(confPrefix, servKey):
+def makeApp(confPrefix, servKey, helao_root):
 
-    config = import_module(f"helao.config.{confPrefix}").config
+    config = config_loader(confPrefix, helao_root)
     C = config["servers"]
     S = C[servKey]
 
