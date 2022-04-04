@@ -1111,6 +1111,7 @@ class Galil:
         self,
         plate_id: int = None,
         sample_no: int = None,
+        **kwargs,
     ) -> dict:
         return {
             "platexy": await self.unified_db.get_samples_xy(
