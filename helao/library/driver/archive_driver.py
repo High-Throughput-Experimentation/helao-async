@@ -175,11 +175,13 @@ class Archive:
 
         pattern = re.compile("([a-zA-Z]+)([0-9]+)")
         if self.position_config is not None:
+            self.base.print_message("Loading positions defined in config.", info=True)
             for key, val in self.position_config.items():
                 key = key.lower()
                 test = pattern.match(key)
                 if test is None:
                     if key == "custom":
+                        self.base.print_message("Custom position defined in config.", info=True)
                         for custom_name, custom_type in val.items():
                             positions.customs_dict.update(
                                 {
