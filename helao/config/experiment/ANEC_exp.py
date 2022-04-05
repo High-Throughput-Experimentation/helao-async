@@ -19,6 +19,7 @@ __all__ = [
     "ANEC_slave_aliquot",
     "ANEC_slave_alloff",
     "ANEC_slave_CV",
+    "ANEC_slave_photo_CA",
 ]
 
 ###
@@ -269,6 +270,15 @@ def ANEC_slave_GC_preparation(
     """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": 60})
+    apm.add(NI_server, "pump", {"pump": "Direction", "on": 0})
+    apm.add(ORCH_server, "wait", {"waittime": 30})
+    apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": 60})
+    apm.add(NI_server, "pump", {"pump": "Direction", "on": 0})
+    apm.add(ORCH_server, "wait", {"waittime": 30})
+    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 0})
     apm.add(
         PAL_server,
         "PAL_ANEC_GC",
@@ -469,6 +479,54 @@ def ANEC_slave_CA(
 
     return apm.action_list
 
+def ANEC_slave_photo_CA(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    WE_potential__V: Optional[float] = 0.0,
+    WE_versus: Optional[str] = "ref",
+    CA_duration_sec: Optional[float] = 0.1,
+    SampleRate: Optional[float] = 0.01,
+    IErange: Optional[str] = "auto",
+    ref_offset__V: Optional[float] = 0.0,
+    ref_type: Optional[str] = "leakless",
+    pH: Optional[float] = 6.8,
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    if apm.pars.WE_versus == "ref":
+        potential_vsRef = apm.pars.WE_potential__V - 1.0 * apm.pars.ref_offset__V
+    elif apm.pars.WE_versus == "rhe":
+        potential_vsRef = apm.pars.WE_potential__V - 1.0 * apm.pars.ref_offset__V - 0.059 * apm.pars.pH - REF_TABLE[ref_type]
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {"custom": "cell1_we"},
+        to_global_params=["_fast_samples_in"],
+    )
+    apm.add(NI_server, "led", {"led":"led", "on": 1})
+    apm.add(
+        PSTAT_server,
+        "run_CA",
+        {
+            "Vval__V": potential_vsRef,
+            "Tval__s": apm.pars.CA_duration_sec,
+            "AcqInterval__s": apm.pars.SampleRate,
+            "TTLwait": -1,  # -1 disables, else select TTL 0-3
+            "TTLsend": -1,  # -1 disables, else select TTL 0-3
+            "IErange": apm.pars.IErange,
+        },
+        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+    apm.add(NI_server, "led", {"led":"led", "on": 0})
+    # apm.add(ORCH_server, "wait", {"waittime": 10})
+
+    return apm.action_list
 
 def ANEC_slave_CV(
     experiment: Experiment,
