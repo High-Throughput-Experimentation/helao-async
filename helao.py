@@ -430,11 +430,32 @@ if __name__ == "__main__":
     pidd = launcher(confArg=confArg, confDict=config, helao_root=helao_root)
     result = None
     while result not in [b"\x18", b"\x04"]:
-        print_message(
-            {}, "launcher", "CTRL-x to terminate action group. CTRL-d to disconnect."
-        )
+        if result == b"\x12":
+            print_message({}, "launcher", f"Detected CTRL-r, restarting orch only.")
+            for server in pidd.orchServs:
+                try:
+                    print_message({}, "launcher", f"Unsubscribing {server} websockets.")
+                    S = pidd.servers["orchestrator"][server]
+                    requests.post(f"http://{S.host}:{S.port}/shutdown")
+                    pidd.kill_server(server)
+                    cmd = ["python", "fast_launcher.py", confArg, server]
+                    p = subprocess.Popen(cmd, cwd=helao_root)
+                    ppid = p.pid
+                    pidd.store_pid(server, S.host, S.port, ppid)
+                except Exception as e:
+                    print_message({}, "launcher", " ... got error: ", e, error=True)
+            result = None
+        else:
+            print_message(
+                {},
+                "launcher",
+                "CTRL-x to terminate orchestration group. CTRL-r to restart orch. CTRL-d to disconnect.",
+            )
         result = wait_key()
     if result == b"\x18":
+        print_message(
+            {}, "launcher", f"Detected CTRL-x, terminating orchestration group."
+        )
         for server in pidd.orchServs:
             try:
                 print_message({}, "launcher", f"Unsubscribing {server} websockets.")
@@ -460,7 +481,6 @@ if __name__ == "__main__":
                         print_message(
                             {}, "launcher", f" ... got error: {e}", error=True
                         )
-
         pidd.close()
     else:
         print_message(
