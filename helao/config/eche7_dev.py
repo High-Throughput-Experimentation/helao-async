@@ -8,7 +8,10 @@ config = dict()
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
 config["experiment_libraries"] = ["SDC_exp", "samples_exp"]
+# config["experiment_params"] = {"ph": 7.0,
+#                                "wavelength_nm": 385}
 config["sequence_libraries"] = ["SDC_seq"]
+# config["sequence_params"] = {"wavelength_intensity_mw385": 2.0}
 config["technique_name"] = "sdc"
 config["root"] = r"C:\INST_dev2"
 
