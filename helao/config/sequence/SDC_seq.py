@@ -3,12 +3,12 @@ Sequence library for SDC
 """
 
 __all__ = [
-    "SDC_4CA_toggle_1CV_toggle",
+    "SDC_4CA_led_1CV_led",
     "SDC_CV_CA_CV",
     "SDC_CV",
-    "SDC_CV_toggle",
+    "SDC_CV_led",
     "SDC_CA",
-    "SDC_CA_toggle",
+    "SDC_CA_led",
 ]
 
 
@@ -18,7 +18,7 @@ from helaocore.schema import ExperimentPlanMaker
 SEQUENCES = __all__
 
 
-def SDC_4CA_toggle_1CV_toggle(
+def SDC_4CA_led_1CV_led(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -45,18 +45,19 @@ def SDC_4CA_toggle_1CV_toggle(
     samplerate_sec: float = 0.05,
     CA1_doric_led: str = "doric_led1",
     CA1_wavelength_nm: float = 385,
+    wavelength_intensity_mwled1: float = 1.715,
     CA2_doric_led: str = "doric_led2",
     CA2_wavelength_nm: float = 455,
+    wavelength_intensity_mwled2: float = 1.478,
     CA3_doric_led: str = "doric_led3",
     CA3_wavelength_nm: float = 515,
+    wavelength_intensity_mwled3: float = 0.585,
     CA4_doric_led: str = "doric_led4",
     CA4_wavelength_nm: float = 590,
+    wavelength_intensity_mwled4: float = 0.366,
     CV_doric_led: str = "doric_led1",
     CV_wavelength_nm: float = 385,
-    wavelength_intensity_mw385: float = 1.715,
-    wavelength_intensity_mw455: float = 1.478,
-    wavelength_intensity_mw515: float = 0.585,
-    wavelength_intensity_mw590: float = 0.366,
+    wavelength_intensity_date: str = "n/a",
     t_onCA: float = 500,
     t_offCA: float = 500,
     t_onCV: float = 2000,
@@ -82,7 +83,7 @@ def SDC_4CA_toggle_1CV_toggle(
         )
         # CA1
         pl.add_experiment(
-            "SDC_slave_CA_toggle",
+            "SDC_slave_CA_led",
             {
                 "CA_potential_vsRHE": CA1_potential_vsRHE,
                 "ph": ph,
@@ -92,14 +93,15 @@ def SDC_4CA_toggle_1CV_toggle(
                 "IErange": IErange,
                 "led": CA1_doric_led,
                 "wavelength_nm": CA1_wavelength_nm,
-                "wavelength_intensity_mw": wavelength_intensity_mw385,
+                "wavelength_intensity_mw": wavelength_intensity_mwled1,
+                "wavelength_intensity_date": wavelength_intensity_date,
                 "t_on": t_onCA,
                 "t_off": t_offCA,
             },
         )
         # CA2
         pl.add_experiment(
-            "SDC_slave_CA_toggle",
+            "SDC_slave_CA_led",
             {
                 "CA_potential_vsRHE": CA2_potential_vsRHE,
                 "ph": ph,
@@ -109,14 +111,15 @@ def SDC_4CA_toggle_1CV_toggle(
                 "IErange": IErange,
                 "led": CA2_doric_led,
                 "wavelength_nm": CA2_wavelength_nm,
-                "wavelength_intensity_mw": wavelength_intensity_mw455,
+                "wavelength_intensity_mw": wavelength_intensity_mwled2,
+                "wavelength_intensity_date": wavelength_intensity_date,
                 "t_on": t_onCA,
                 "t_off": t_offCA,
             },
         )
         # CA3
         pl.add_experiment(
-            "SDC_slave_CA_toggle",
+            "SDC_slave_CA_led",
             {
                 "CA_potential_vsRHE": CA3_potential_vsRHE,
                 "ph": ph,
@@ -126,14 +129,15 @@ def SDC_4CA_toggle_1CV_toggle(
                 "IErange": IErange,
                 "led": CA3_doric_led,
                 "wavelength_nm": CA3_wavelength_nm,
-                "wavelength_intensity_mw": wavelength_intensity_mw515,
-                "t_on": t_onCA,
+                "wavelength_intensity_mw": wavelength_intensity_mwled3,
+                "wavelength_intensity_date": wavelength_intensity_date,
+               "t_on": t_onCA,
                 "t_off": t_offCA,
             },
         )
         # CA4
         pl.add_experiment(
-            "SDC_slave_CA_toggle",
+            "SDC_slave_CA_led",
             {
                 "CA_potential_vsRHE": CA4_potential_vsRHE,
                 "ph": ph,
@@ -143,7 +147,8 @@ def SDC_4CA_toggle_1CV_toggle(
                 "IErange": IErange,
                 "led": CA4_doric_led,
                 "wavelength_nm": CA4_wavelength_nm,
-                "wavelength_intensity_mw": wavelength_intensity_mw590,
+                "wavelength_intensity_mw": wavelength_intensity_mwled4,
+                "wavelength_intensity_date": wavelength_intensity_date,
                 "t_on": t_onCA,
                 "t_off": t_offCA,
             },
@@ -151,7 +156,7 @@ def SDC_4CA_toggle_1CV_toggle(
 
         # CV1
         pl.add_experiment(
-            "SDC_slave_CV_toggle",
+            "SDC_slave_CV_led",
             {
                 "Vinit_vsRHE": CV_Vinit_vsRHE,
                 "Vapex1_vsRHE": CV_Vapex1_vsRHE,
@@ -165,7 +170,8 @@ def SDC_4CA_toggle_1CV_toggle(
                 "ref_vs_nhe": ref_vs_nhe,
                 "led": CV_doric_led,
                 "wavelength_nm": CV_wavelength_nm,
-                "wavelength_intensity_mw": wavelength_intensity_mw385,
+                "wavelength_intensity_mw": wavelength_intensity_mwled1,
+                "wavelength_intensity_date": wavelength_intensity_date,
                 "t_on": t_onCV,
                 "t_off": t_offCV,
             },
@@ -381,7 +387,7 @@ def SDC_CA(
 
     return pl.experiment_plan_list  # returns complete experiment list
 
-def SDC_CA_toggle(
+def SDC_CA_led(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -395,10 +401,11 @@ def SDC_CA_toggle(
     samplerate_sec: float = 0.05,
     doric_led: str = "doric_led1",
     CA1_wavelength_nm: float = 385,
-    wavelength_intensity_mw385: float = 1.715,
-    wavelength_intensity_mw455: float = 1.478,
-    wavelength_intensity_mw515: float = 0.585,
-    wavelength_intensity_mw590: float = 0.366,
+    wavelength_intensity_mwled1: float = 1.715,
+    wavelength_intensity_mwled2: float = 1.478,
+    wavelength_intensity_mwled3: float = 0.585,
+    wavelength_intensity_mwled4: float = 0.366,
+    wavelength_intensity_date: str = "n/a",
     t_onCA: float = 500,
     t_offCA: float = 500,
 
@@ -423,7 +430,7 @@ def SDC_CA_toggle(
         )
         # CA1
         pl.add_experiment(
-            "SDC_slave_CA_toggle",
+            "SDC_slave_CA_led",
             {
                 "CA_potential_vsRHE": CA1_potential_vsRHE,
                 "ph": ph,
@@ -433,7 +440,8 @@ def SDC_CA_toggle(
                 "IErange": IErange,
                 "led": doric_led,
                 "wavelength_nm": CA1_wavelength_nm,
-                "wavelength_intensity_mw": wavelength_intensity_mw385,
+                "wavelength_intensity_mw": wavelength_intensity_mwled1,
+                "wavelength_intensity_date": wavelength_intensity_date,
                 "t_on": t_onCA,
                 "t_off": t_offCA,
             },
@@ -443,7 +451,7 @@ def SDC_CA_toggle(
 
     return pl.experiment_plan_list  # returns complete experiment list
 
-def SDC_CV_toggle(
+def SDC_CV_led(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -462,10 +470,11 @@ def SDC_CV_toggle(
     samplerate_sec: float = 0.05,
     doric_led: str = "doric_led1",
     CV_wavelength_nm: float = 385,
-    wavelength_intensity_mw385: float = 1.715,
-    wavelength_intensity_mw455: float = 1.478,
-    wavelength_intensity_mw515: float = 0.585,
-    wavelength_intensity_mw590: float = 0.366,
+    wavelength_intensity_mwled1: float = 1.715,
+    wavelength_intensity_mwled2: float = 1.478,
+    wavelength_intensity_mwled3: float = 0.585,
+    wavelength_intensity_mwled4: float = 0.366,
+    wavelength_intensity_date: str = "n/a",
     t_onCV: float = 2000,
     t_offCV: float = 1000,
 ):
@@ -490,7 +499,7 @@ def SDC_CV_toggle(
         
         # CV1
         pl.add_experiment(
-            "SDC_slave_CV_toggle",
+            "SDC_slave_CV_led",
             {
                 "Vinit_vsRHE": CV_Vinit_vsRHE,
                 "Vapex1_vsRHE": CV_Vapex1_vsRHE,
@@ -504,7 +513,8 @@ def SDC_CV_toggle(
                 "ref_vs_nhe": ref_vs_nhe,
                 "led": doric_led,
                 "wavelength_nm": CV_wavelength_nm,
-                "wavelength_intensity_mw": wavelength_intensity_mw385,
+                "wavelength_intensity_mw": wavelength_intensity_mwled1,
+                "wavelength_intensity_date": wavelength_intensity_date,
                 "t_on": t_onCV,
                 "t_off": t_offCV,
             },
