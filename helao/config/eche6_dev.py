@@ -8,20 +8,13 @@ config = dict()
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
 config["experiment_libraries"] = ["SDC_exp", "samples_exp"]
-#config["experiment_params"] = {"wavelength_intensity_mw": 2,
-                               #"wavelength_intensity_mwled2": 2,
-                              # "wavelength_intensity_mwled3": 4,
-                               #"wavelength_intensity_mwled4": 5,
-                             #  "wavelength_intensity_date": "12/23/2020"
-                             # 1.725 1.478 .585 .366
- #                            }
 config["sequence_libraries"] = ["SDC_seq"]
-config["sequence_params"] = {"wavelength_intensity_mwled1": 1.725,
-                               "wavelength_intensity_mwled2": 1.478,
-                               "wavelength_intensity_mwled3": 0.585,
-                               "wavelength_intensity_mwled4": 0.366,
+config["sequence_params"] = {"wavelength_intensity_mwled1": 2.77,
+                               "wavelength_intensity_mwled2": 2.31,
+                               "wavelength_intensity_mwled3": 0.961,
+                               "wavelength_intensity_mwled4": 1.0,
                                "wavelength_intensity_date": "12/23/2020"
-                             # 1.725 1.478 .585 .366
+                             
                              }
 config["technique_name"] = "sdc"
 config["root"] = r"C:\INST_dev2"
@@ -63,10 +56,10 @@ config["servers"] = dict(
                        [0,0,0,1]
                        ],
             count_to_mm=dict(
-                A=1.0/6396.11,
-                B=1.0/6400.24,
+                A=1.0/6391.80,
+                B=1.0/6401.37,
             ),
-            galil_ip_str="192.168.200.235",
+            galil_ip_str="192.168.200.220",
             def_speed_count_sec=10000,
             max_speed_count_sec=25000,
             ipstr="192.168.200.23",
@@ -75,7 +68,7 @@ config["servers"] = dict(
                 y="A",
                 ),
             axis_zero=dict(
-                A=127.8, #z
+                A=127.7, #z
                 B=76.7, #y
                 ),
             timeout = 10*60, # timeout for axis stop in sec
@@ -97,7 +90,7 @@ config["servers"] = dict(
         group="action",
         fast="galil_io",
         params=dict(
-            galil_ip_str="192.168.200.235",
+            galil_ip_str="192.168.200.220",
             dev_ai = {
                 },
             dev_ao = {
@@ -107,13 +100,13 @@ config["servers"] = dict(
                 },
             dev_do = {
                 "gamry_aux":1,
-                "led":8,
+                "led":2,
                 "pump_ref_flush":3,
                 "doric_led1":4,
-                "pump_supply":2,
+               # "unknown2":5,
                 "doric_led2":5,
-                "doric_led3":6,
-                "doric_led4":7,
+                "doric_led3":7,
+                "doric_led4":8,
                 },
         )
     ),
@@ -139,7 +132,7 @@ config["servers"] = dict(
         group="visualizer",
         bokeh="bokeh_modular_visualizer",
         params = dict(
-            doc_name = "ECHE4 Visualizer",
+            doc_name = "ECHE6 Visualizer",
         )
     ),
 )
