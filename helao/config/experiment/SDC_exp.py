@@ -9,9 +9,9 @@ __all__ = [
     "SDC_slave_add_liquid",
     "SDC_slave_startup",
     "SDC_slave_shutdown",
-    "SDC_slave_CA_toggle",
+    "SDC_slave_CA_led",
     "SDC_slave_CA",
-    "SDC_slave_CV_toggle",
+    "SDC_slave_CV_led",
     "SDC_slave_CV",
 ]
 
@@ -210,7 +210,7 @@ def SDC_slave_shutdown(experiment: Experiment):
     return apm.action_list  # returns complete action list to orch
 
 
-def SDC_slave_CA_toggle(
+def SDC_slave_CA_led(
     experiment: Experiment,
     experiment_version: int = 1,
     CA_potential_vsRHE: Optional[float] = 0.0,
@@ -222,6 +222,7 @@ def SDC_slave_CA_toggle(
     led: Optional[str] = "doric_led1",
     wavelength_nm: Optional[float] = 0.0,
     wavelength_intensity_mw: Optional[float] = 0.0,
+    wavelength_intensity_date: Optional[str] = "n/a",
     t_on: Optional[float] = 1000,
     t_off: Optional[float] = 1000,
     t_offset: Optional[int] = 0,
@@ -348,7 +349,7 @@ def SDC_slave_CA(
     return apm.action_list  # returns complete action list to orch
 
 
-def SDC_slave_CV_toggle(
+def SDC_slave_CV_led(
     experiment: Experiment,
     experiment_version: int = 1,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
@@ -366,6 +367,7 @@ def SDC_slave_CV_toggle(
     led: Optional[str] = "doric_led1",
     wavelength_nm: Optional[float] = 0.0,
     wavelength_intensity_mw: Optional[float] = 0.0,
+    wavelength_intensity_date: Optional[str] = "n/a",
     t_on: Optional[float] = 1000,
     t_off: Optional[float] = 1000,
     t_offset: Optional[int] = 0,
