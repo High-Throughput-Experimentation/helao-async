@@ -8,10 +8,15 @@ config = dict()
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
 config["experiment_libraries"] = ["SDC_exp", "samples_exp"]
-# config["experiment_params"] = {"ph": 7.0,
-#                                "wavelength_nm": 385}
+#config["experiment_params"] = { }
 config["sequence_libraries"] = ["SDC_seq"]
-# config["sequence_params"] = {"wavelength_intensity_mw385": 2.0}
+config["sequence_params"] = {"wavelength_intensity_mwled1": 1.04,
+                               "wavelength_intensity_mwled2": 0.86,
+                               "wavelength_intensity_mwled3": 0.344,
+                               "wavelength_intensity_mwled4": 0.267,
+                               "wavelength_intensity_date": "3/13/2019"
+                             
+                             }
 config["technique_name"] = "sdc"
 config["root"] = r"C:\INST_dev2"
 
@@ -131,4 +136,28 @@ config["servers"] = dict(
             doc_name = "ECHE7 Visualizer",
         )
     ),
+ #
+    # #########################################################################
+    # DB package server
+    # #########################################################################
+    DB=dict(
+        host=hostip,
+        port=8010,
+        group="action",
+        fast="dbpack_server",
+        params=dict(
+            aws_config_path="/mnt/k/users/hte/.credentials/aws_config.ini",
+            aws_profile="default",
+            aws_bucket="helao.data.testing",
+            api_host="caltech-api.modelyst.com",
+            testing=False
+        ),
+    ),
+
+
+
+
+
+
+
 )
