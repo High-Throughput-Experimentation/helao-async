@@ -23,6 +23,7 @@ from helaocore.schema import Action, Experiment, ActionPlanMaker
 from helaocore.model.action_start_condition import ActionStartCondition
 from helaocore.model.sample import SolidSample, LiquidSample
 from helaocore.model.machine import MachineModel
+from helaocore.model.process_contrib import ProcessContrib
 
 from helao.library.driver.galil_motion_driver import MoveModes, TransformationModes
 from helao.library.driver.pal_driver import Spacingmethod, PALtools
@@ -66,6 +67,7 @@ def SDC_slave_add_liquid(
     experiment_version: int = 1,
     solid_custom_position: Optional[str] = "cell1_we",
     reservoir_liquid_sample_no: Optional[int] = 1,
+    reservoir_bubbler_gas: Optional[str] = "O2",
     liquid_volume_ml: Optional[float] = 1.0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -83,6 +85,8 @@ def SDC_slave_add_liquid(
                     }
                 ).dict(),
                 "volume_ml": apm.pars.liquid_volume_ml,
+                "reservoir_bubbler_gas" : apm.pars.reservoir_bubbler_gas,
+                
                 "combine_liquids": True,
                 "dilute_liquids": True,
             },
@@ -132,6 +136,7 @@ def SDC_slave_startup(
     solid_plate_id: Optional[int] = 4534,
     solid_sample_no: Optional[int] = 1,
     reservoir_liquid_sample_no: Optional[int] = 1,
+    reservoir_bubbler_gas: Optional[str] = "N2",
     liquid_volume_ml: Optional[float] = 1.0,
 ):
     """Slave experiment
@@ -158,6 +163,7 @@ def SDC_slave_startup(
             experiment=experiment,
             solid_custom_position=apm.pars.solid_custom_position,
             reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
+            reservoir_bubbler_gas=apm.pars.reservoir_bubbler_gas,
             liquid_volume_ml=apm.pars.liquid_volume_ml,
         )
     )
@@ -266,7 +272,15 @@ def SDC_slave_CA_led(
                 "subthread": 1,
             },
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+        },
+        process_finish = True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+
     )
 
     # apply potential
@@ -288,7 +302,15 @@ def SDC_slave_CA_led(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+        },
+        process_finish = True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+
     )
 
     return apm.action_list  # returns complete action list to orch
@@ -343,7 +365,14 @@ def SDC_slave_CA(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+        },
+        process_finish = True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
 
     return apm.action_list  # returns complete action list to orch
@@ -411,7 +440,15 @@ def SDC_slave_CV_led(
                 "subthread": 1,
             },
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+        },
+        process_finish = True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+
     )
 
     # apply potential
@@ -441,7 +478,14 @@ def SDC_slave_CV_led(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+        },
+        process_finish = True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
 
     return apm.action_list  # returns complete action list to orch
@@ -510,7 +554,14 @@ def SDC_slave_CV(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+        },
+        process_finish = True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
 
     return apm.action_list  # returns complete action list to orch
