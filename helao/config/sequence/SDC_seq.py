@@ -23,6 +23,7 @@ def SDC_4CA_led_1CV_led(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_liquid_sample_no: int = 1,
+    reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
     ref_vs_nhe: float = 0.21,
     CA1_potential_vsRHE: float = 1.23,
@@ -78,7 +79,8 @@ def SDC_4CA_led_1CV_led(
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "liquid_volume_ml": liquid_volume_ml,
+                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
+               "liquid_volume_ml": liquid_volume_ml,
             },
         )
         # CA1
@@ -187,6 +189,7 @@ def SDC_CV_CA_CV(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_liquid_sample_no: int = 1,
+    reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
     ref_vs_nhe: float = 0.21,
     CV1_Vinit_vsRHE: float = 1.23,
@@ -224,6 +227,7 @@ def SDC_CV_CA_CV(
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
@@ -284,6 +288,7 @@ def SDC_CV(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_liquid_sample_no: int = 1,
+    reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
     ref_vs_nhe: float = 0.21,
     CV1_Vinit_vsRHE: float = .7,
@@ -312,6 +317,7 @@ def SDC_CV(
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
@@ -342,6 +348,7 @@ def SDC_CA(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_liquid_sample_no: int = 1,
+    reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
     ref_vs_nhe: float = 0.21,
     CA1_potential_vsRHE: float = 1.23,
@@ -365,6 +372,7 @@ def SDC_CA(
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
@@ -392,6 +400,7 @@ def SDC_CA_led(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_liquid_sample_no: int = 1,
+    reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
     ref_vs_nhe: float = 0.21,
     CA1_potential_vsRHE: float = 1.23,
@@ -425,6 +434,7 @@ def SDC_CA_led(
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
@@ -456,6 +466,7 @@ def SDC_CV_led(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_liquid_sample_no: int = 1,
+    reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
     ref_vs_nhe: float = 0.21,
     CV_Vinit_vsRHE: float = 1.23,
@@ -493,6 +504,7 @@ def SDC_CV_led(
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
