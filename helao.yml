@@ -23,6 +23,7 @@ dependencies:
   - cycler
   - fastapi
   - freetype
+  - git
   - graphene
   - graphql-core
   - graphql-relay
