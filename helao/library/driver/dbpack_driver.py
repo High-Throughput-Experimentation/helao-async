@@ -362,11 +362,12 @@ class ExpYml(HelaoYml):
                 "experiment_uuid",
             )
         }
+        new_uuid = gen_uuid()
         base_process.update(
             {
                 "process_timestamp": actions[0].time,
                 "process_group_index": group_idx,
-                "process_uuid": gen_uuid(),
+                "process_uuid": new_uuid,
                 "process_name": actions[-1].name,
                 "action_list": [
                     ShortActionModel(**act.dict)
