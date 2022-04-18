@@ -330,6 +330,7 @@ class ExpYml(HelaoYml):
     def update_group_progress(self):
         for group_idx, group_acts in self.grouped_actions.items():
             # init new groups
+            self.progress.read()
             if group_idx not in self.progress.keys():
                 self.progress[group_idx] = {
                     "ready": False,  # ready to start transfer from FINISHED to SYNCED
@@ -341,12 +342,19 @@ class ExpYml(HelaoYml):
                     "api": False,
                     "s3": False,
                 }
+                self.progress.write()
             if self.progress[group_idx]["done"]:
                 continue
-            if all([self.progress[act.pkey]["ready"] for act in group_acts]):
+            self.progress.read()
+            if all(
+                [
+                    self.progress[act.pkey]["ready"] or self.progress[act.pkey]["done"]
+                    for act in group_acts
+                ]
+            ):
                 self.progress[group_idx]["ready"] = True
                 self.progress.write()
-                if self.progress[group_idx]["meta"] is None:
+                if self.progress[group_idx].get("meta", None) is None:
                     self.create_process(group_idx)
 
     def create_process(self, group_idx: int):
@@ -603,9 +611,7 @@ class DBPack:
 
         for pkey in progress.keys():
             if progress[pkey]["done"]:
-                self.base.print_message(
-                    f"Target {pkey} is already done.", info=True
-                )
+                self.base.print_message(f"Target {pkey} is already done.", info=True)
                 continue
             if (
                 len(progress[pkey]["pending"]) == 0
@@ -693,7 +699,9 @@ class YmlOps:
                         self.dbp.base.print_message(
                             f"[{i+1}/{retry_num}] {api_str} {p_uuid} returned status: {resp.status}"
                         )
-                        self.dbp.base.print_message(f"[{i+1}/{retry_num}] {api_str} {p_uuid} response: {await resp.json()}")
+                        self.dbp.base.print_message(
+                            f"[{i+1}/{retry_num}] {api_str} {p_uuid} response: {await resp.json()}"
+                        )
                     await asyncio.sleep(1)
 
         if pdict["api"]:
@@ -734,7 +742,9 @@ class YmlOps:
                             self.dbp.base.print_message(
                                 f"failed API push for failed {self.yml.target.__str__()} :: {progress_key} :: {p_uuid}"
                             )
-                            self.dbp.base.print_message(f"response: {await resp.json()}")
+                            self.dbp.base.print_message(
+                                f"response: {await resp.json()}"
+                            )
             if isinstance(progress_key, str):
                 self.dbp.update_log(self.yml.target.__str__(), {"api": False})
             return ErrorCodes.http
