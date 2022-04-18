@@ -229,6 +229,7 @@ def SDC_slave_CA_led(
     wavelength_nm: Optional[float] = 0.0,
     wavelength_intensity_mw: Optional[float] = 0.0,
     wavelength_intensity_date: Optional[str] = "n/a",
+    led_side_illumination: Optional[str] = "front",
     t_on: Optional[float] = 1000,
     t_off: Optional[float] = 1000,
     t_offset: Optional[int] = 0,
@@ -272,14 +273,14 @@ def SDC_slave_CA_led(
                 "subthread": 1,
             },
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }#,
-#        process_finish = True,
-#        process_contrib=[
-#            ProcessContrib.action_params,
-#            ProcessContrib.files,
-#            ProcessContrib.samples_in,
-#            ProcessContrib.samples_out,
-#        ],
+            "process_finish": True,
+            "process_contrib": [
+                ProcessContrib.action_params,
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        },
 
     )
 
@@ -302,14 +303,14 @@ def SDC_slave_CA_led(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }#,
-#        process_finish = True,
-#        process_contrib=[
- #           ProcessContrib.action_params,
-#            ProcessContrib.files,
-#            ProcessContrib.samples_in,
-#            ProcessContrib.samples_out,
-#        ],
+            "process_finish": True,
+            "process_contrib": [
+                ProcessContrib.action_params,
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        },
 
     )
 
@@ -365,14 +366,14 @@ def SDC_slave_CA(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }#,
-#        process_finish = True,
-#        process_contrib=[
-#            ProcessContrib.action_params,
-#            ProcessContrib.files,
-#            ProcessContrib.samples_in,
-#           ProcessContrib.samples_out,
-#        ],
+            "process_finish": True,
+            "process_contrib": [
+                ProcessContrib.action_params,
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        },
     )
 
     return apm.action_list  # returns complete action list to orch
@@ -397,6 +398,7 @@ def SDC_slave_CV_led(
     wavelength_nm: Optional[float] = 0.0,
     wavelength_intensity_mw: Optional[float] = 0.0,
     wavelength_intensity_date: Optional[str] = "n/a",
+    led_side_illumination: Optional[str] = "front",
     t_on: Optional[float] = 1000,
     t_off: Optional[float] = 1000,
     t_offset: Optional[int] = 0,
@@ -447,7 +449,7 @@ def SDC_slave_CV_led(
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
-        }#,
+        },
     )
 
     # apply potential
@@ -477,14 +479,14 @@ def SDC_slave_CV_led(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }#,
-#        process_finish = True,
-#        process_contrib=[
-#            ProcessContrib.action_params,
-#            ProcessContrib.files,
-#           ProcessContrib.samples_in,
-#            ProcessContrib.samples_out,
- #       ],
+            "process_finish": True,
+            "process_contrib": [
+                ProcessContrib.action_params,
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        },
     )
 
     return apm.action_list  # returns complete action list to orch
@@ -553,14 +555,14 @@ def SDC_slave_CV(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }#,
-#        process_finish = True,
-#        process_contrib=[
- #           ProcessContrib.action_params,
-#            ProcessContrib.files,
-#            ProcessContrib.samples_in,
-#           ProcessContrib.samples_out,
-#        ],
+            "process_finish": True,
+            "process_contrib": [
+                ProcessContrib.action_params,
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        },
     )
 
     return apm.action_list  # returns complete action list to orch
