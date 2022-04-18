@@ -440,15 +440,14 @@ def SDC_slave_CV_led(
                 "subthread": 1,
             },
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "process_finish": True,
+            "process_contrib": [
+                ProcessContrib.action_params,
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
         }#,
-#        process_finish = True,
-#        process_contrib=[
-#            ProcessContrib.action_params,
-#            ProcessContrib.files,
-#            ProcessContrib.samples_in,
- #           ProcessContrib.samples_out,
-#        ],
-
     )
 
     # apply potential
