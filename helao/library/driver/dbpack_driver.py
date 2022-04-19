@@ -5,6 +5,7 @@ import io
 import codecs
 import json
 import asyncio
+from time import sleep
 from ruamel.yaml import YAML
 from pathlib import Path
 from glob import glob
@@ -158,13 +159,12 @@ class HelaoYml:
             if self.type == "experiment":
                 group_keys = sorted(
                     [k for k in self.progress.keys() if isinstance(k, int)]
-                )    
-                process_list = [
-                    self.progress[k]["meta"]["process_uuid"] for k in group_keys
-                ]
-                meta_json["process_list"] = process_list
-                if any([p is None for p in process_list]):
+                )
+                process_metas = [self.progress[k]["meta"] for k in group_keys]
+                if any([p is None for p in process_metas]):
                     return None
+                process_list = [pm["process_uuid"] for pm in process_metas]
+                meta_json["process_list"] = process_list
             self.progress[self.pkey].update({"ready": True, "meta": meta_json})
             self.progress.write()
 
@@ -842,7 +842,14 @@ class YmlOps:
             for file_path in self.yml.data_files:
                 file_path.finished.parent.mkdir(parents=True, exist_ok=True)
                 self.dbp.base.print_message(f"moving {file_path.__str__()} to FINISHED")
-                file_path.replace(file_path.finished)
+                move_success = False
+                while move_success == False:
+                    try:
+                        file_path.replace(file_path.finished)
+                        move_success = True
+                    except PermissionError:
+                        self.dbp.base.print_message(f"{file_path} is in use, retrying.")
+                        sleep(1)
             self.yml.target.finished.parent.mkdir(parents=True, exist_ok=True)
             self.dbp.base.print_message(
                 f"moving {self.yml.target.__str__()} to FINISHED"
@@ -863,7 +870,14 @@ class YmlOps:
             for file_path in self.yml.data_files:
                 file_path.synced.parent.mkdir(parents=True, exist_ok=True)
                 self.dbp.base.print_message(f"moving {file_path.__str__()} to SYNCED")
-                file_path.replace(file_path.synced)
+                move_success = False
+                while move_success == False:
+                    try:
+                        file_path.replace(file_path.synced)
+                        move_success = True
+                    except PermissionError:
+                        self.dbp.base.print_message(f"{file_path} is in use, retrying.")
+                        sleep(1)
             self.yml.target.synced.parent.mkdir(parents=True, exist_ok=True)
             self.dbp.base.print_message(f"moving {self.yml.target.__str__()} to SYNCED")
             new_target = self.yml.target.replace(self.yml.target.synced)
