@@ -158,11 +158,13 @@ class HelaoYml:
             if self.type == "experiment":
                 group_keys = sorted(
                     [k for k in self.progress.keys() if isinstance(k, int)]
-                )
+                )    
                 process_list = [
                     self.progress[k]["meta"]["process_uuid"] for k in group_keys
                 ]
                 meta_json["process_list"] = process_list
+                if any([p is None for p in process_list]):
+                    return None
             self.progress[self.pkey].update({"ready": True, "meta": meta_json})
             self.progress.write()
 
