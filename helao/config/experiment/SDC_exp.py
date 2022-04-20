@@ -273,7 +273,7 @@ def SDC_slave_CA_led(
                 "subthread": 1,
             },
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "process_finish": True,
+            "process_finish": False,
             "process_contrib": [
                 ProcessContrib.action_params,
                 ProcessContrib.files,
@@ -442,7 +442,7 @@ def SDC_slave_CV_led(
                 "subthread": 1,
             },
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "process_finish": True,
+            "process_finish": False,
             "process_contrib": [
                 ProcessContrib.action_params,
                 ProcessContrib.files,
