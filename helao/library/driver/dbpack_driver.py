@@ -629,8 +629,14 @@ class DBPack:
         if yml_type == YmlType.experiment:
             for pkey in [gkey for gkey in progress.keys() if isinstance(gkey, int)]:
                 if progress[pkey]["done"]:
-                    self.base.print_message(f"Target {pkey} is already done.", info=True)
                     continue
+                if progress[pkey]["ready"]:
+                    if progress[pkey]["pending"] or not progress[pkey]["s3"]:
+                        self.base.print_message(
+                            f"Target {pkey} has pending S3 push/uploads.", info=True
+                        )
+                        await ops.to_s3(pkey)
+                        progress.read()
                 if (
                     len(progress[pkey]["pending"]) == 0
                     and progress[pkey]["s3"]
