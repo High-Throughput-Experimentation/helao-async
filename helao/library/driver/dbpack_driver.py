@@ -626,6 +626,22 @@ class DBPack:
                 await ops.to_api(pkey)
                 progress.read()
 
+        if yml_type == YmlType.experiment:
+            for pkey in [gkey for gkey in progress.keys() if isinstance(gkey, int)]:
+                if progress[pkey]["done"]:
+                    self.base.print_message(f"Target {pkey} is already done.", info=True)
+                    continue
+                if (
+                    len(progress[pkey]["pending"]) == 0
+                    and progress[pkey]["s3"]
+                    and not progress[pkey]["api"]
+                ):
+                    self.base.print_message(
+                        f"Target {pkey} has pending API push.", info=True
+                    )
+                    await ops.to_api(pkey)
+                    progress.read()
+
         for pkey in progress.keys():
             if progress[pkey]["done"]:
                 continue
