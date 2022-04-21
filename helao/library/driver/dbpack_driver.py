@@ -365,13 +365,13 @@ class ExpYml(HelaoYml):
         base_process = {
             k: self.dict[k]
             for k in (
-                "access",
                 "orchestrator",
                 "technique_name",
                 "sequence_uuid",
                 "experiment_uuid",
             )
         }
+        base_process.update({"access": self.dict.get("access", "hte")})
         new_uuid = gen_uuid()
         base_process.update(
             {
