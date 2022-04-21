@@ -989,4 +989,12 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
+    @app.post(f"/get_loaded_positions", tags=["private_archive"])
+    def get_positions(
+        action: Optional[Action] = Body({}, embed=True),
+        action_version: int = 1,
+    ):
+        """Returns position dict."""
+        return app.base.driver.archive.positions
+
     return app
