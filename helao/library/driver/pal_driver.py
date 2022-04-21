@@ -2747,7 +2747,7 @@ class PAL:
 
         sampletype = A.action_params.get("sampletype", GCsampletype.none)
 
-        method = f"injection_tray_GC_{str(sampletype.name)}_{start}"
+        method = f"injection_tray_GC_{str(sampletype)}_{start}"
 
         palcam = PalCam(
             samples_in=A.samples_in,

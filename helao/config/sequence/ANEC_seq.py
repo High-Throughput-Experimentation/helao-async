@@ -1,6 +1,6 @@
 """Sequence library for ANEC"""
 
-__all__ = ["ANEC_repeat_CA", "ANEC_repeat_CV", "ANEC_CA_pretreat", "ANEC_photo_CA", "ANEC_gasonly_CA"]
+__all__ = ["ANEC_daily_ready", "ANEC_repeat_CA", "ANEC_repeat_CV", "ANEC_CA_pretreat", "ANEC_photo_CA", "ANEC_gasonly_CA"]
 
 
 from typing import Optional
@@ -8,6 +8,89 @@ from helaocore.schema import ExperimentPlanMaker
 
 
 SEQUENCES = __all__
+
+def ANEC_daily_ready(
+    sequence_version: int = 1,
+    num_repeats: int = 1,
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
+    reservoir_liquid_sample_no: int = 1,
+    volume_ul_cell_liquid: float = 1000,
+    WE_potential__V: float = 0.0,
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 6.8,
+    CA_duration_sec: float = 0.1,
+    SampleRate: float = 0.01,
+    IErange: str = "auto",
+    ref_offset__V: float = 0.0,
+):
+    """Repeat CA and aliquot sampling at the cell1_we position.
+
+    Flush and fill cell, run CA, and drain.
+
+    (1) Fill cell with liquid for 90 seconds
+    (2) Equilibrate for 15 seconds
+    (3) run CA
+    (4) Drain cell and purge with CO2 for 60 seconds
+
+    Args:
+        exp (Experiment): Active experiment object supplied by Orchestrator
+        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
+        volume_ul_GC: GC injection volume
+
+
+
+    """
+
+    epm = ExperimentPlanMaker()
+    
+    #clean the cell & purge with CO2
+    epm.add_experiment("ANEC_slave_normal_state", {})
+    epm.add_experiment("ANEC_slave_cleanup", {"reservoir_liquid_sample_no": 1})
+    epm.add_experiment("ANEC_slave_cleanup", {"reservoir_liquid_sample_no": 1})
+    # housekeeping
+    epm.add_experiment("ANEC_slave_unload_cell", {})
+
+    #epm.add_experiment("ANEC_slave_normal_state", {})
+
+    epm.add_experiment(
+        "ANEC_slave_load_solid",
+        {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no},
+    )
+
+    for _ in range(num_repeats):
+
+        epm.add_experiment(
+            "ANEC_slave_flush_fill_cell",
+            {
+                "liquid_flush_time": 90,
+                "co2_purge_time": 15,
+                "equilibration_time": 1.0,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "volume_ul_cell_liquid": volume_ul_cell_liquid,
+            },
+        )
+
+        epm.add_experiment(
+            "ANEC_slave_CA",
+            {
+                "WE_potential__V": WE_potential__V,
+                "WE_versus": WE_versus,
+                "ref_type": ref_type,
+                "pH": pH,
+                "ref_offset__V": ref_offset__V,
+                "CA_duration_sec": CA_duration_sec,
+                "SampleRate": SampleRate,
+                "IErange": IErange,
+            },
+        )
+
+
+        epm.add_experiment("ANEC_slave_drain_cell", {"drain_time": 50.0})
+
+    return epm.experiment_plan_list
+
 
 def ANEC_CA_pretreat(
     sequence_version: int = 1,
@@ -48,7 +131,7 @@ def ANEC_CA_pretreat(
     # housekeeping
     epm.add_experiment("ANEC_slave_unload_cell", {})
 
-    epm.add_experiment("ANEC_slave_normal_state", {})
+    #epm.add_experiment("ANEC_slave_normal_state", {})
 
     epm.add_experiment(
         "ANEC_slave_load_solid",
@@ -136,7 +219,7 @@ def ANEC_repeat_CA(
     # housekeeping
     epm.add_experiment("ANEC_slave_unload_cell", {})
 
-    epm.add_experiment("ANEC_slave_normal_state", {})
+    #epm.add_experiment("ANEC_slave_normal_state", {})
 
     epm.add_experiment(
         "ANEC_slave_load_solid",
@@ -230,7 +313,7 @@ def ANEC_gasonly_CA(
     # housekeeping
     epm.add_experiment("ANEC_slave_unload_cell", {})
 
-    epm.add_experiment("ANEC_slave_normal_state", {})
+    #epm.add_experiment("ANEC_slave_normal_state", {})
 
     epm.add_experiment(
         "ANEC_slave_load_solid",
@@ -324,7 +407,7 @@ def ANEC_photo_CA(
     # housekeeping
     epm.add_experiment("ANEC_slave_unload_cell", {})
 
-    epm.add_experiment("ANEC_slave_normal_state", {})
+    #epm.add_experiment("ANEC_slave_normal_state", {})
 
     epm.add_experiment(
         "ANEC_slave_load_solid",
@@ -419,7 +502,7 @@ def ANEC_repeat_CV(
     # housekeeping
     epm.add_experiment("ANEC_slave_unload_cell", {})
 
-    epm.add_experiment("ANEC_slave_normal_state", {})
+    #epm.add_experiment("ANEC_slave_normal_state", {})
 
     epm.add_experiment(
         "ANEC_slave_load_solid",

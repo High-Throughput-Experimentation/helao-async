@@ -212,9 +212,9 @@ def makeApp(confPrefix, servKey, helao_root):
         async def PAL_injection_tray_GC(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
-            startGC: Optional[bool] = None,
-            sampletype: Optional[GCsampletype] = None,
-            tool: Optional[PALtools] = None,
+            startGC: Optional[bool] = True,
+            sampletype: Optional[GCsampletype] = "liquid",
+            tool: Optional[PALtools] = PALtools.LS1,
             source_tray: Optional[int] = 1,
             source_slot: Optional[int] = 1,
             source_vial: Optional[int] = 1,

@@ -20,6 +20,7 @@ __all__ = [
     "ANEC_slave_alloff",
     "ANEC_slave_CV",
     "ANEC_slave_photo_CA",
+    "ANEC_slave_GCLiquid_analysis",
 ]
 
 ###
@@ -589,4 +590,55 @@ def ANEC_slave_CV(
 
     # apm.add(ORCH_server, "wait", {"waittime": 10})
 
+    return apm.action_list
+
+def ANEC_slave_GCLiquid_analysis(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    #startGC: Optional[bool] = None,
+    #sampletype: Optional[str] = None,
+    tool: Optional[str] = "LS 1",
+    source_tray: Optional[int] = 2,
+    source_slot: Optional[int] = 1,
+    source_vial: Optional[int] = 1,
+    dest: Optional[str] = "Injector 1",
+    volume_ul: Optional[int] = 2,
+    wash1: Optional[bool] = True,
+    wash2: Optional[bool] = True,
+    wash3: Optional[bool] = True,
+    wash4: Optional[bool] = False,
+):
+    """Sample headspace in cell1_we and inject into GC
+
+    Args:
+        exp (Experiment): Active experiment object supplied by Orchestrator
+        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
+        volume_ul_GC: GC injection volume
+
+    """
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(
+        PAL_server,
+        "PAL_injection_tray_GC",
+        {
+            "tool": apm.pars.tool,
+            "source_tray": apm.pars.source_tray,
+            "source_slot": apm.pars.source_slot,
+            "source_vial": apm.pars.source_vial,
+            "dest": apm.pars.dest,
+            "volume_ul": apm.pars.volume_ul,
+            "wash1": apm.pars.wash1,
+            "wash2": apm.pars.wash2,
+            "wash3": apm.pars.wash3,
+            "wash4": apm.pars.wash4,
+        },
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
     return apm.action_list
