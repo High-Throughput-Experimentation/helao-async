@@ -995,6 +995,6 @@ def makeApp(confPrefix, servKey, helao_root):
         action_version: int = 1,
     ):
         """Returns position dict."""
-        return app.base.driver.archive.positions
+        return app.driver.archive.positions
 
     return app
