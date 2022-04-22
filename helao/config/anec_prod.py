@@ -1,5 +1,5 @@
 hostip = "127.0.0.1"
-config = dict()
+config = {}
 
 # action library provides generator functions which produce actions
 config["experiment_libraries"] = ["ANEC_exp"]

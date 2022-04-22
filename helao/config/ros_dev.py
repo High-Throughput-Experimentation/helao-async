@@ -3,7 +3,7 @@ __all__ = ["config"]
 
 hostip = "131.215.44.107"
 # hostip = "127.0.0.1"
-config = dict()
+config = {}
 
 # action library provides generator functions which produce action
 # lists from input decision_id grouping

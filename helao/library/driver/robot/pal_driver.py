@@ -1922,7 +1922,7 @@ class PAL:
 
     async def _init_PAL_IOloop(self, A: Action, palcam: PalCam) -> dict:
         """initializes the main PAL IO loop after an action was submitted"""
-        activeDict = dict()
+        activeDict = {}
         if (
             self.sshhost is not None
             and not self.IO_do_meas

@@ -313,7 +313,7 @@ class Galil:
             self.digital_cycle_mainthread = None
             self.digital_cycle_subthread = None
 
-        return dict()
+        return {}
 
     def shutdown(self):
         # this gets called when the server is shut down or reloaded to ensure a clean
