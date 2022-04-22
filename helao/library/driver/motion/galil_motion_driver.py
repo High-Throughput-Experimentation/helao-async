@@ -10,7 +10,6 @@ __all__ = ["Galil", "MoveModes", "TransformationModes"]
 import numpy as np
 import time
 import asyncio
-from enum import Enum
 from functools import partial
 import json
 import os
@@ -28,7 +27,8 @@ from helaocore.model.active import ActiveParams
 from helaocore.model.file import FileConnParams
 from helaocore.model.sample import SolidSample
 
-from ...layout.aligner import Aligner
+from helao.library.layout.aligner import Aligner
+from helao.library.driver.motion.enum import MoveModes, TransformationModes
 
 # install galil driver first
 # (helao) c:\Program Files (x86)\Galil\gclib\source\wrappers\python>python setup.py install
@@ -1098,18 +1098,6 @@ class Galil:
                 [SolidSample(plate_id=plate_id, sample_no=sample_no)]
             )
         }
-
-
-class MoveModes(str, Enum):
-    homing = "homing"
-    relative = "relative"
-    absolute = "absolute"
-
-
-class TransformationModes(str, Enum):
-    motorxy = "motorxy"
-    platexy = "platexy"
-    instrxy = "instrxy"
 
 
 class TransformXY:
