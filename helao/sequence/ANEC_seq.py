@@ -1,6 +1,6 @@
 """Sequence library for ANEC"""
 
-__all__ = ["ANEC_daily_ready", "ANEC_repeat_CA", "ANEC_repeat_CV", "ANEC_CA_pretreat", "ANEC_photo_CA", "ANEC_gasonly_CA"]
+__all__ = ["ANEC_daily_ready", "ANEC_repeat_CA", "ANEC_repeat_CV", "ANEC_CA_pretreat", "ANEC_photo_CA", "ANEC_gasonly_CA", "GC_Archiveliquid_analysis", "HPLC_Archiveliquid_analysis"]
 
 
 from typing import Optional
@@ -540,5 +540,63 @@ def ANEC_repeat_CV(
         )
 
         epm.add_experiment("ANEC_slave_drain_cell", {"drain_time": 50.0})
+
+    return epm.experiment_plan_list
+
+def GC_Archiveliquid_analysis(
+    experiment_version: int = 1,
+    source_tray: int = 2,
+    source_slot: int = 1,
+    source_vial_from: int = 1,
+    source_vial_to: int = 1,
+    dest: str = "Injector 1",
+    volume_ul: int = 2,
+):
+    """
+    Analyze archived liquid product by GC
+    """
+
+    epm = ExperimentPlanMaker()
+
+    for source_vial in range(source_vial_from, source_vial_to+1):
+        epm.add_experiment(
+            "ANEC_slave_GCLiquid_analysis",
+            {
+                "source_tray": source_tray,
+                "source_slot": source_slot,
+                "source_vial": source_vial,
+                "dest": dest,
+                "volume_ul": volume_ul,
+            },
+        )
+
+    return epm.experiment_plan_list
+
+def HPLC_Archiveliquid_analysis(
+    experiment_version: int = 1,
+    source_tray: int = 2,
+    source_slot: int = 1,
+    source_vial_from: int = 1,
+    source_vial_to: int = 1,
+    dest: str = "LCInjector1",
+    volume_ul: int = 25,
+):
+    """
+    Analyze archived liquid product by GC
+    """
+
+    epm = ExperimentPlanMaker()
+
+    for source_vial in range(source_vial_from, source_vial_to+1):
+        epm.add_experiment(
+            "ANEC_slave_HPLCLiquid_analysis",
+            {
+                "source_tray": source_tray,
+                "source_slot": source_slot,
+                "source_vial": source_vial,
+                "dest": dest,
+                "volume_ul": volume_ul,
+            },
+        )
 
     return epm.experiment_plan_list
