@@ -28,11 +28,17 @@ from helaocore.model.file import FileConnParams
 from helaocore.model.active import ActiveParams
 from helaocore.model.data import DataModel
 from helao.library.driver.data.archive_driver import Archive
-from helao.library.driver.robot.enum import PALtools, CAMS, Spacingmethod, _positiontype, _cam, GCsampletype
+from helao.library.driver.robot.enum import (
+    PALtools,
+    CAMS,
+    Spacingmethod,
+    _positiontype,
+    _cam,
+    GCsampletype,
+)
 
 import nidaqmx
 from nidaqmx.constants import LineGrouping
-
 
 
 class _palcmd(BaseModel):
