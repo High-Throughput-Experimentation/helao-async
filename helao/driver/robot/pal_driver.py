@@ -27,8 +27,8 @@ from helaocore.model.sample import (
 from helaocore.model.file import FileConnParams
 from helaocore.model.active import ActiveParams
 from helaocore.model.data import DataModel
-from helao.library.driver.data.archive_driver import Archive
-from helao.library.driver.robot.enum import (
+from helao.driver.data.archive_driver import Archive
+from helao.driver.robot.enum import (
     PALtools,
     CAMS,
     Spacingmethod,

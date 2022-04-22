@@ -28,7 +28,7 @@ from helaocore.model.active import ActiveParams
 from helaocore.model.hlostatus import HloStatus
 from helaocore.data.sample import UnifiedSampleDataAPI
 
-from helao.library.driver.pstat.enum import (
+from helao.driver.pstat.enum import (
     Gamry_modes,
     Gamry_IErange_IFC1010,
     Gamry_IErange_REF600,

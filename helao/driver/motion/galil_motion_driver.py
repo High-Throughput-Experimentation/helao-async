@@ -27,8 +27,8 @@ from helaocore.model.active import ActiveParams
 from helaocore.model.file import FileConnParams
 from helaocore.model.sample import SolidSample
 
-from helao.library.layout.aligner import Aligner
-from helao.library.driver.motion.enum import MoveModes, TransformationModes
+from helao.layout.aligner import Aligner
+from helao.driver.motion.enum import MoveModes, TransformationModes
 
 # install galil driver first
 # (helao) c:\Program Files (x86)\Galil\gclib\source\wrappers\python>python setup.py install

@@ -23,7 +23,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if S["mode"] == "legacy":
         # print("Legacy data managament mode")
-        from helao.library.driver.data.HTEdata_legacy import HTEdata
+        from helao.driver.data.HTEdata_legacy import HTEdata
     # elif S['mode'] == "modelyst":
     #     pass
     # print("Modelyst data managament mode")

@@ -38,7 +38,7 @@ from socket import gethostname
 from helaocore.server.base import makeActionServ
 from helaocore.model.sample import LiquidSample, SampleUnion
 from helaocore.schema import Action
-from helao.library.driver.pstat.gamry_driver import gamry
+from helao.driver.pstat.gamry_driver import gamry
 from helaocore.helper.config_loader import config_loader
 
 

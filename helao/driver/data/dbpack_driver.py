@@ -25,7 +25,7 @@ from helaocore.model.experiment import ExperimentModel
 from helaocore.model.experiment_sequence import ExperimentSequenceModel
 from helaocore.helper.gen_uuid import gen_uuid
 from helaocore.helper.read_hlo import read_hlo
-from helao.library.driver.data.enum import YmlType
+from helao.driver.data.enum import YmlType
 
 
 modmap = {

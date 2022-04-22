@@ -21,7 +21,7 @@ from socket import gethostname
 
 
 from helaocore.server.base import makeActionServ
-from helao.library.driver.io.nidaqmx_driver import cNIMAX
+from helao.driver.io.nidaqmx_driver import cNIMAX
 from helaocore.model.sample import LiquidSample, SampleUnion
 from helaocore.helper.make_str_enum import make_str_enum
 from helaocore.schema import Action

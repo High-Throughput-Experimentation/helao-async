@@ -18,7 +18,7 @@ from helaocore.server.base import Base
 from helaocore.error import ErrorCodes
 from helaocore.helper.make_str_enum import make_str_enum
 
-from helao.library.driver.io.enum import TriggerType
+from helao.driver.io.enum import TriggerType
 
 driver_path = os.path.dirname(__file__)
 
