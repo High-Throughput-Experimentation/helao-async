@@ -23,7 +23,7 @@ config["sequence_params"] = {"wavelength_intensity_mwled1": 1.725,
                                "wavelength_intensity_date": "12/23/2020"
                              # 1.725 1.478 .585 .366
                              }
-config["technique_name"] = "sdc"
+config["technique_name"] = "eche"
 config["root"] = r"C:\INST_dev2"
 
 
