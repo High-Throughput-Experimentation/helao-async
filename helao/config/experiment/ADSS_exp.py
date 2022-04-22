@@ -51,7 +51,7 @@ z_engage = 2.5
 # moves it up to put pressure on seal
 z_seal = 4.5
 
-# cannot save data without prc
+# cannot save data without exp
 debug_save_act = True
 debug_save_data = True
 

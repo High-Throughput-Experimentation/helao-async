@@ -853,7 +853,7 @@ class PAL:
                         self.base.print_message(f"PAL data: {tmpdata}")
 
                 # (9) add samples_in/out to active.action
-                # add sample in and out to prc
+                # add sample in and out to exp
 
                 await self.active.append_sample(
                     samples=self.IO_palcam.samples_in, IO="in"
@@ -1475,7 +1475,7 @@ class PAL:
                 ]
 
                 # only now add the sample which was found in the position
-                # to the sample_in list for the prc/prg
+                # to the sample_in list for the exp/prg
                 sample_in.inheritance = SampleInheritance.allow_both
                 sample_in.status = [SampleStatus.incorporated]
 
@@ -2336,7 +2336,7 @@ class PAL:
                         self.IO_trigger_task.cancel()
                         self.IO_trigger_task = None
 
-                # update samples_in/out in prc
+                # update samples_in/out in exp
                 # and other cleanup
                 await self._PAL_IOloop_meas_end_helper()
 
@@ -2365,7 +2365,7 @@ class PAL:
 
     async def _PAL_IOloop_meas_end_helper(self) -> None:
         """resets all IO variables
-        and updates prc samples in and out"""
+        and updates exp samples in and out"""
 
         if self.PAL_pid is not None:
             self.base.print_message("waiting for PAL pid to finish")

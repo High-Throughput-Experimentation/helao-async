@@ -369,6 +369,7 @@ class ExpYml(HelaoYml):
                 "technique_name",
                 "sequence_uuid",
                 "experiment_uuid",
+                "experiment_params",
             )
         }
         base_process.update({"access": self.dict.get("access", "hte")})
