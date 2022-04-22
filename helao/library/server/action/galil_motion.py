@@ -18,7 +18,7 @@ from fastapi import Body
 import numpy as np
 
 
-from helao.library.driver.galil_motion_driver import (
+from helao.library.driver.motion.galil_motion_driver import (
     MoveModes,
     TransformationModes,
     Galil,

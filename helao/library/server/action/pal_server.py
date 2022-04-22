@@ -9,7 +9,7 @@ from fastapi import Body, Query
 from typing import Optional, List, Tuple
 
 from helaocore.server.base import makeActionServ
-from helao.library.driver.pal_driver import (
+from helao.library.driver.robot.pal_driver import (
     PAL,
     Spacingmethod,
     PALtools,
@@ -19,7 +19,7 @@ from helao.library.driver.pal_driver import (
     SampleInheritance,
     SampleStatus,
 )
-from helao.library.driver.archive_driver import ScanDirection, ScanOperator
+from helao.library.driver.data.archive_driver import ScanDirection, ScanOperator
 
 from helaocore.model.sample import SampleType, LiquidSample, SampleUnion, NoneSample
 from helaocore.helper.make_str_enum import make_str_enum

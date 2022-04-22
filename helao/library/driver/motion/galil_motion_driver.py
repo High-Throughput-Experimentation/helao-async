@@ -28,7 +28,7 @@ from helaocore.model.active import ActiveParams
 from helaocore.model.file import FileConnParams
 from helaocore.model.sample import SolidSample
 
-from ..layout.aligner import Aligner
+from ...layout.aligner import Aligner
 
 # install galil driver first
 # (helao) c:\Program Files (x86)\Galil\gclib\source\wrappers\python>python setup.py install
