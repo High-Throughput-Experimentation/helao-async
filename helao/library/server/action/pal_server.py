@@ -989,12 +989,32 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/get_loaded_positions", tags=["private_archive"])
-    def get_positions(
+    @app.post(f"/{servKey}/get_loaded_positions", tags=["private_archive"])
+    async def get_positions(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
     ):
-        """Returns position dict."""
-        return app.driver.archive.positions
+        """Returns position dict under action_params['_positions']."""
+        active = await app.base.setup_and_contain_action()
+        positions = app.driver.archive.positions
+        tray_positions = {
+            (traynum, slotnum, vialidx + 1): sample.global_label
+            for traynum, slotdict in positions.trays_dict.items()
+            for slotnum, vialtray in slotdict.items()
+            for vialidx, (vialbool, sample) in enumerate(
+                zip(vialtray.vials, vialtray.samples)
+            ) if vialbool
+        }
+        custom_positions = {
+            customkey: custom.sample.global_label
+            for customkey, custom in positions.customs_dict.items()
+        }
+        active.action.action_params.update({
+            "_positions": positions.as_dict(),
+            "_tray_pos": tray_positions,
+            "_custom_pos": custom_positions,
+        })
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
     return app
