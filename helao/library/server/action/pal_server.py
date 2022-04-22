@@ -453,7 +453,7 @@ def makeApp(confPrefix, servKey, helao_root):
     #         tool: Optional[PALtools] = None,
     #         source: Optional[dev_customitems] = None,
     #         dest: Optional[dev_customitems] = None,
-    #         volume_ul: Optional[int] = 200, # this value is only for prc, a fixed value is used
+    #         volume_ul: Optional[int] = 200, # this value is only for exp, a fixed value is used
     #         wash1: Optional[bool] = False,
     #         wash2: Optional[bool] = False,
     #         wash3: Optional[bool] = False,
@@ -473,7 +473,7 @@ def makeApp(confPrefix, servKey, helao_root):
             tool: Optional[PALtools] = None,
             volume_ul: Optional[
                 int
-            ] = 200,  # this value is only for prc, a fixed value is used
+            ] = 200,  # this value is only for exp, a fixed value is used
             wash1: Optional[bool] = True,
             wash2: Optional[bool] = True,
             wash3: Optional[bool] = True,

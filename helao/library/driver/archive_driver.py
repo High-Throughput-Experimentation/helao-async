@@ -1265,7 +1265,7 @@ class Archive:
                 custom_sample = custom_samples_in[0]
 
         self.base.print_message(
-            f"sample in custom position '{custom}' is {custom_sample.prc_dict()}"
+            f"sample in custom position '{custom}' is {custom_sample.exp_dict()}"
         )
 
         # (4) create a new ref sample first for the amount we
