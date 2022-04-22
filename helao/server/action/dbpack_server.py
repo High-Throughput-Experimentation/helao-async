@@ -8,7 +8,7 @@ Finished actions which do not contribute process information are pushed to
 __all__ = ["makeApp"]
 
 from helaocore.server.base import makeActionServ
-from helao.library.driver.data.dbpack_driver import DBPack
+from helao.driver.data.dbpack_driver import DBPack
 from helaocore.helper.config_loader import config_loader
 
 

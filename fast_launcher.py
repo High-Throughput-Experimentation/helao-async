@@ -21,7 +21,7 @@ if __name__ == "__main__":
     C = config["servers"]
     S = C[servKey]
 
-    makeApp = import_module(f"helao.library.server.{S['group']}.{S['fast']}").makeApp
+    makeApp = import_module(f"helao.server.{S['group']}.{S['fast']}").makeApp
     app = makeApp(confArg, servKey, helao_root)
     root = config.get("root", None)
     if root is not None:
