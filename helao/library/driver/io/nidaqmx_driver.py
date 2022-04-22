@@ -93,7 +93,7 @@ class cNIMAX:
 
         self.FIFO_epoch = None
         # self.FIFO_header = ''
-        self.FIFO_NImaxheader = dict()
+        self.FIFO_NImaxheader = {}
         self.FIFO_name = ""
         self.FIFO_dir = ""
         self.FIFO_cell_keys = [
@@ -239,7 +239,7 @@ class cNIMAX:
                 # update timeoffset
                 self.IVtimeoffset += number_of_samples / self.samplingrate
 
-                data_dict = dict()
+                data_dict = {}
                 for i, FIFO_cell_key in enumerate(self.FIFO_cell_keys):
                     data_dict[self.file_conn_keys[i]] = {
                         f"{self.FIFO_column_headings[0]}": time,
@@ -419,7 +419,7 @@ class cNIMAX:
         }
 
     async def run_cell_IV(self, A: Action):
-        activeDict = dict()
+        activeDict = {}
 
         samplerate = A.action_params["SampleRate"]
         duration = A.action_params["Tval"]
@@ -449,8 +449,8 @@ class cNIMAX:
                 self.FIFO_epoch = None
                 # create active and write streaming file header
 
-                self.FIFO_NImaxheader = dict()
-                file_sample_label = dict()
+                self.FIFO_NImaxheader = {}
+                file_sample_label = {}
                 file_sample_list = []
 
                 for sample in self.samples_in:

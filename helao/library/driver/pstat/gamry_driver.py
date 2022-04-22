@@ -909,7 +909,7 @@ class gamry:
     async def technique_wrapper(
         self, act, measmode, sigfunc, sigfunc_params, samplerate, eta=0.0, setupargs=[]
     ):
-        activeDict = dict()
+        activeDict = {}
         act.action_etc = eta
         act.error_code = ErrorCodes.none
         samples_in = await self.unified_db.get_samples(act.samples_in)

@@ -46,7 +46,7 @@ def makeApp(confPrefix, servKey, helao_root):
     if "positions" in app.server_params:
         dev_custom = app.server_params["positions"].get("custom", dict())
     else:
-        dev_custom = dict()
+        dev_custom = {}
     dev_customitems = make_str_enum(
         "dev_custom", {key: key for key in dev_custom.keys()}
     )

@@ -170,8 +170,8 @@ class Archive:
 
     def action_startup_config(self):
         positions = Positions()
-        # custom_positions = dict()
-        # trays_dict = dict()
+        # custom_positions = {}
+        # trays_dict = {}
 
         pattern = re.compile("([a-zA-Z]+)([0-9]+)")
         if self.position_config is not None:
@@ -212,7 +212,7 @@ class Archive:
 
                                 if slot_no is not None:
                                     if tmpi not in positions.trays_dict:
-                                        positions.trays_dict[tmpi] = dict()
+                                        positions.trays_dict[tmpi] = {}
 
                                     if slot_item is not None:
                                         self.base.print_message(f"got {slot_item}")
@@ -357,14 +357,14 @@ class Archive:
     ) -> Tuple[bool, List[SampleUnion], List[SampleUnion], dict]:
         samples = []
         unloaded = False
-        tray_dict = dict()
+        tray_dict = {}
 
         if tray in self.positions.trays_dict:
             if self.positions.trays_dict[tray] is not None:
                 if slot in self.positions.trays_dict[tray]:
                     if self.positions.trays_dict[tray][slot] is not None:
                         unloaded = True
-                        tray_dict[tray] = dict()
+                        tray_dict[tray] = {}
                         tray_dict[tray].update(
                             {slot: self.positions.trays_dict[tray][slot].as_dict()}
                         )
@@ -391,7 +391,7 @@ class Archive:
     async def tray_unloadall(
         self, *args, **kwargs
     ) -> Tuple[bool, List[SampleUnion], List[SampleUnion], dict]:
-        tray_dict = dict()
+        tray_dict = {}
         samples = []
         for tray_key, tray_item in self.positions.trays_dict.items():
             if tray_item is not None:
@@ -399,7 +399,7 @@ class Archive:
                     if slot_item is not None:
                         # first get content as dict
                         if tray_key not in tray_dict:
-                            tray_dict[tray_key] = dict()
+                            tray_dict[tray_key] = {}
                         tray_dict[tray_key].update(
                             {
                                 slot_key: self.positions.trays_dict[tray_key][
@@ -827,7 +827,7 @@ class Archive:
         samples_in = []
         samples_out = []
 
-        customs_dict = dict()
+        customs_dict = {}
         for custom in self.positions.customs_dict:
             (
                 unloaded,
@@ -871,7 +871,7 @@ class Archive:
     ) -> Tuple[bool, List[SampleUnion], List[SampleUnion], dict]:
         samples = []
         unloaded = False
-        customs_dict = dict()
+        customs_dict = {}
         if custom in self.positions.customs_dict:
             customs_dict.update({custom: self.positions.customs_dict[custom].as_dict()})
             samples.append(self.positions.customs_dict[custom].unload())
@@ -1009,7 +1009,7 @@ class Archive:
 
         sample = NoneSample()
         loaded = False
-        customs_dict = dict()
+        customs_dict = {}
 
         if load_sample_in is None:
             return False, NoneSample(), dict()
