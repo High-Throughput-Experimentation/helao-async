@@ -25,8 +25,8 @@ from helaocore.model.sample import SolidSample, LiquidSample
 from helaocore.model.machine import MachineModel
 from helaocore.model.process_contrib import ProcessContrib
 
-from helao.library.driver.galil_motion_driver import MoveModes, TransformationModes
-from helao.library.driver.pal_driver import Spacingmethod, PALtools
+from helao.library.driver.motion.galil_motion_driver import MoveModes, TransformationModes
+from helao.library.driver.robot.pal_driver import Spacingmethod, PALtools
 
 
 EXPERIMENTS = __all__

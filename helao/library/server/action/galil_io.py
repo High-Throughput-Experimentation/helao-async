@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import Body, Query
 from importlib import import_module
 from helaocore.server.base import makeActionServ
-from helao.library.driver.galil_io_driver import Galil, TriggerType
+from helao.library.driver.io.galil_io_driver import Galil, TriggerType
 from helaocore.schema import Action
 from helaocore.error import ErrorCodes
 from helaocore.helper.config_loader import config_loader

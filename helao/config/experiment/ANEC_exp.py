@@ -28,7 +28,7 @@ from socket import gethostname
 from typing import Optional
 
 from helaocore.schema import Experiment, ActionPlanMaker
-from helao.library.driver.pal_driver import PALtools
+from helao.library.driver.robot.pal_driver import PALtools
 from helaocore.model.sample import SolidSample, LiquidSample
 from helaocore.model.machine import MachineModel
 from helaocore.model.action_start_condition import ActionStartCondition

@@ -31,7 +31,7 @@ from helaocore.data.legacy import HTELegacyAPI
 from helaocore.model.data import DataModel
 from helaocore.error import ErrorCodes
 
-from ..driver.galil_motion_driver import MoveModes, TransformationModes
+from ..driver.motion.galil_motion_driver import MoveModes, TransformationModes
 
 
 class Aligner:
