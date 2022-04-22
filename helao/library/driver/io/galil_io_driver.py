@@ -12,19 +12,13 @@ __all__ = [
 
 
 import os
-import numpy as np
-import time
 import pathlib
-import asyncio
-from enum import Enum
-from typing import List
 
 from helaocore.server.base import Base
 from helaocore.error import ErrorCodes
-from helaocore.schema import Action
-from helaocore.error import ErrorCodes
 from helaocore.helper.make_str_enum import make_str_enum
 
+from helao.library.driver.io.enum import TriggerType
 
 driver_path = os.path.dirname(__file__)
 
@@ -38,11 +32,6 @@ import gclib
 class cmd_exception(ValueError):
     def __init__(self, arg):
         self.args = arg
-
-
-class TriggerType(str, Enum):
-    risingedge = "risingedge"
-    fallingedge = "fallingedge"
 
 
 class Galil:

@@ -12,7 +12,6 @@ from glob import glob
 from datetime import datetime
 from typing import Union, Optional
 from collections import UserDict, defaultdict
-from enum import Enum
 
 import pyaml
 import botocore
@@ -26,6 +25,7 @@ from helaocore.model.experiment import ExperimentModel
 from helaocore.model.experiment_sequence import ExperimentSequenceModel
 from helaocore.helper.gen_uuid import gen_uuid
 from helaocore.helper.read_hlo import read_hlo
+from helao.library.driver.data.enum import YmlType
 
 
 modmap = {
@@ -40,12 +40,6 @@ plural = {
     "sequence": "sequences",
     "process": "processes",
 }
-
-
-class YmlType(str, Enum):
-    action = "action"
-    experiment = "experiment"
-    sequence = "sequence"
 
 
 def dict2json(input_dict: dict):
