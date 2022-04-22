@@ -386,7 +386,7 @@ class ExpYml(HelaoYml):
             }
         )
         fill_process = {
-            "action_params": self.dict['experiment_params'],
+            "action_params": self.dict["experiment_params"],
             "samples_in": [],
             "samples_out": [],
             "files": [],
