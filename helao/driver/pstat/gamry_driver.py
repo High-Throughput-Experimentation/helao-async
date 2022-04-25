@@ -288,7 +288,7 @@ class gamry:
             # this will lock up the potentiostat server
             # happens when a not activated Gamry is connected and turned on
             # TODO: find a way to avoid it
-            self.base.print_message(f"fatal error initializing Gamry: {e}", error=True)
+            self.base.print_message(f"fatal error initializing Gamry: {repr(e)}", error=True)
         self.ready = True
 
     async def open_connection(self):
@@ -309,7 +309,7 @@ class gamry:
 
         except Exception as e:
             # self.pstat = None
-            self.base.print_message(f"Gamry error init: {e}", error=True)
+            self.base.print_message(f"Gamry error init: {repr(e)}", error=True)
             return ErrorCodes.critical
 
     def close_connection(self):

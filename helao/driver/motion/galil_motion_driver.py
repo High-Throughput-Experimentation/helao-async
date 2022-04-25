@@ -161,7 +161,7 @@ class Galil:
             self.base.print_message(
                 f"severe Galil error ... "
                 f"please power cycle Galil and try again: "
-                f"{e}",
+                f"{repr(e)}",
                 error=True,
             )
             self.galil_enabled = False
@@ -623,7 +623,7 @@ class Galil:
                 self._speed = speed
             except Exception as e:
                 self.base.print_message(
-                    f"motor numerical error for axis '{ax}': {e}", error=True
+                    f"motor numerical error for axis '{ax}': {repr(e)}", error=True
                 )
                 # something went wrong in the numerical part so we give that as feedback
                 ret_moved_axis.append(None)
@@ -681,7 +681,7 @@ class Galil:
 
                 # continue
             except Exception as e:
-                self.base.print_message(f"motor error: '{e}'", error=True)
+                self.base.print_message(f"motor error: '{repr(e)}'", error=True)
                 ret_moved_axis.append(None)
                 ret_speed.append(None)
                 ret_accepted_rel_dist.append(None)
@@ -1013,7 +1013,7 @@ class Galil:
             self.g.GClose()
         except Exception as e:
             self.base.print_message(
-                f"could not close galil connection: {e}", error=True
+                f"could not close galil connection: {repr(e)}", error=True
             )
         if self.aligner_enabled and self.aligner:
             self.aligner.IOtask.cancel()
@@ -1052,7 +1052,7 @@ class Galil:
 
                 except Exception as e:
                     self.base.print_message(
-                        f"error loading matrix for '{file}': {e}", error=True
+                        f"error loading matrix for '{file}': {repr(e)}", error=True
                     )
                     return None
         else:
@@ -1353,7 +1353,7 @@ class TransformXY:
             try:
                 self.Minv = self.M.I
             except Exception as e:
-                self.base.print_message(f"System Matrix singular {e}", error=True)
+                self.base.print_message(f"System Matrix singular {repr(e)}", error=True)
                 # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
                 self.Minv = np.matrix(
                     [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, -1]]
@@ -1362,7 +1362,7 @@ class TransformXY:
             try:
                 self.Minstrinv = self.Minstr.I
             except Exception as e:
-                self.base.print_message(f"Instrument Matrix singular {e}", error=True)
+                self.base.print_message(f"Instrument Matrix singular {repr(e)}", error=True)
                 # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
                 self.Minstrinv = np.matrix(
                     [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, -1]]
@@ -1409,6 +1409,6 @@ class TransformXY:
 
             return self.Mplatexy
         except Exception as e:
-            self.base.print_message(f"Instrument Matrix singular {e}", error=True)
+            self.base.print_message(f"Instrument Matrix singular {repr(e)}", error=True)
             # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
             self.Minv = np.matrix([[0, 0, 0], [0, 0, 0], [0, 0, -1]])

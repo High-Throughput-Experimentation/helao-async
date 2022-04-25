@@ -243,7 +243,7 @@ class Archive:
                     return Positions(**data)
                 except Exception as e:
                     self.base.print_message(
-                        f"error loading {self.archivepck}: {e}", error=True
+                        f"error loading {self.archivepck}: {repr(e)}", error=True
                     )
                     return Positions()
         #         data = pickle.load(f)

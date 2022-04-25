@@ -102,7 +102,7 @@ def sample_model_unit_test():
             print(passed_msg)
         except Exception as e:
             print(fail_msg, "cannot convert list of model dicts to model list")
-            print(e)
+            print(repr(e))
             return False
         
         
@@ -216,7 +216,7 @@ def sample_model_unit_test():
             print(passed_msg)
         except Exception as e:
             print(fail_msg, "cannot convert list of model dicts to model list")
-            print(e)
+            print(repr(e))
             return False
 
         try:
@@ -321,5 +321,5 @@ def sample_model_unit_test():
         return success
 
     except Exception as e:
-        print(e)
+        print(repr(e))
         return False

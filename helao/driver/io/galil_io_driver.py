@@ -77,7 +77,7 @@ class Galil:
         except Exception as e:
             self.base.print_message(
                 f"severe Galil error ... please power cycle Galil "
-                f"and try again {e}",
+                f"and try again {repr(e)}",
                 error=True,
             )
             self.galil_enabled = False
@@ -324,6 +324,6 @@ class Galil:
             self.g.GClose()
         except Exception as e:
             self.base.print_message(
-                f"could not close galil connection: {e}", error=True
+                f"could not close galil connection: {repr(e)}", error=True
             )
         return {"shutdown"}

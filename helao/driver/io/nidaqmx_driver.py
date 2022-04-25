@@ -70,7 +70,7 @@ class cNIMAX:
                 "NEGATE3", -1.0, 0.0, UnitsPreScaled.AMPS, "AMPS"
             )
         except Exception as e:
-            self.base.print_message("NImax error", error=True)
+            self.base.print_message(f"NImax error: {repr(e)}", error=True)
             raise e
         self.time_stamp = time.time()
 
@@ -254,7 +254,7 @@ class cNIMAX:
                     )
 
             except Exception as e:
-                self.base.print_message(f"canceling NImax IV stream: {e}", error=True)
+                self.base.print_message(f"canceling NImax IV stream: {repr(e)}", error=True)
 
         elif self.base.actionserver.estop and self.IO_do_meas:
             _ = self.task_cellcurrent.read(

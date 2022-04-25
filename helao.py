@@ -163,7 +163,7 @@ class Pidd:
                     print_message(
                         {}, "launcher", f"Error terminating server '{k}'", error=True
                     )
-                    print_message({}, "launcher", e, error=True)
+                    print_message({}, "launcher", repr(e), error=True)
                     return False
 
     def close(self):
@@ -442,7 +442,7 @@ if __name__ == "__main__":
                     ppid = p.pid
                     pidd.store_pid(server, S.host, S.port, ppid)
                 except Exception as e:
-                    print_message({}, "launcher", " ... got error: ", e, error=True)
+                    print_message({}, "launcher", " ... got error: ", repr(e), error=True)
             result = None
         else:
             print_message(
@@ -461,7 +461,7 @@ if __name__ == "__main__":
                 S = pidd.servers["orchestrator"][server]
                 requests.post(f"http://{S.host}:{S.port}/shutdown")
             except Exception as e:
-                print_message({}, "launcher", " ... got error: ", e, error=True)
+                print_message({}, "launcher", " ... got error: ", repr(e), error=True)
         # in case a /shutdown is added to other FastAPI servers (not the shutdown without '/')
         # KILL_ORDER = ["visualizer", "action", "server"] # orch are killed above
         # no /shutdown in visualizers
@@ -478,7 +478,7 @@ if __name__ == "__main__":
                         requests.post(f"http://{S.host}:{S.port}/shutdown")
                     except Exception as e:
                         print_message(
-                            {}, "launcher", f" ... got error: {e}", error=True
+                            {}, "launcher", f" ... got error: {repr(e)}", error=True
                         )
         pidd.close()
     else:

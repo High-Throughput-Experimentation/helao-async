@@ -354,7 +354,7 @@ class PAL:
 
         except Exception as e:
             self.base.print_message(
-                f"_poll_trigger_task excited with error: {e}", error=True
+                f"_poll_trigger_task excited with error: {repr(e)}", error=True
             )
 
     async def _sendcommand_main(self, palcam: PalCam) -> ErrorCodes:
@@ -1634,7 +1634,7 @@ class PAL:
             val = await asyncio.wait_for(self.IO_trigger_startq.get(), self.timeout)
         except Exception as e:
             self.base.print_message(
-                f"PAL start trigger timeout with error: {e}", error=True
+                f"PAL start trigger timeout with error: {repr(e)}", error=True
             )
             # also need to set IO_continue and IO_error
             # so active can return
@@ -1652,7 +1652,7 @@ class PAL:
             val = await asyncio.wait_for(self.IO_trigger_continueq.get(), self.timeout)
         except Exception as e:
             self.base.print_message(
-                f"PAL continue trigger timeout with error: {e}", error=True
+                f"PAL continue trigger timeout with error: {repr(e)}", error=True
             )
             return ErrorCodes.done_timeout
 
@@ -1666,7 +1666,7 @@ class PAL:
             val = await asyncio.wait_for(self.IO_trigger_doneq.get(), self.timeout)
         except Exception as e:
             self.base.print_message(
-                f"PAL done trigger timeout with error: {e}", error=True
+                f"PAL done trigger timeout with error: {repr(e)}", error=True
             )
             return ErrorCodes.done_timeout
 
@@ -1716,7 +1716,7 @@ class PAL:
                 self.base.print_message(
                     "CMD error. Could not send commands.", error=True
                 )
-                self.base.print_message(e, error=True)
+                self.base.print_message(repr(e), error=True)
                 error = ErrorCodes.cmd_error
         elif self.sshhost is not None:
             ssh_connected = False
@@ -1733,7 +1733,7 @@ class PAL:
                 except Exception as e:
                     ssh_connected = False
                     self.base.print_message(
-                        f"SSH connection error. Retrying in 1 seconds.\n{e}",
+                        f"SSH connection error. Retrying in 1 seconds.\n{repr(e)}",
                         error=True,
                     )
                     await asyncio.sleep(1)
@@ -1791,9 +1791,8 @@ class PAL:
 
             except Exception as e:
                 self.base.print_message(
-                    f"SSH connection error 1. Could not send commands.\n{e}", error=True
+                    f"SSH connection error 1. Could not send commands.\n{repr(e)}", error=True
                 )
-                self.base.print_message(e, error=True)
 
                 error = ErrorCodes.ssh_error
 
@@ -1809,7 +1808,7 @@ class PAL:
 
             except Exception as e:
                 self.base.print_message(
-                    f"SSH connection error 2. Could not send commands.\n{e}", error=True
+                    f"SSH connection error 2. Could not send commands.\n{repr(e)}", error=True
                 )
                 error = ErrorCodes.ssh_error
 
@@ -2895,7 +2894,7 @@ class PAL:
             except Exception as e:
                 ssh_connected = False
                 self.base.print_message(
-                    f"SSH connection error. Retrying in 1 seconds.\n{e}", error=True
+                    f"SSH connection error. Retrying in 1 seconds.\n{repr(e)}", error=True
                 )
                 await asyncio.sleep(1)
 
@@ -2910,7 +2909,7 @@ class PAL:
 
         except Exception as e:
             self.base.print_message(
-                f"SSH connection error 1. Could not send commands.\n{e}", error=True
+                f"SSH connection error 1. Could not send commands.\n{repr(e)}", error=True
             )
             self.base.print_message(e, error=True)
 
