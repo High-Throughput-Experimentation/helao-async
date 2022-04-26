@@ -388,6 +388,7 @@ class PAL:
             if not self.IO_signalq.empty():
                 self.IO_measuring = await self.IO_signalq.get()
             if not self.IO_measuring:
+                self.base.print_message("IO_measuring is true, breaking microcam loop.")
                 break
 
             self.base.print_message(f"waiting now '{microcam.method}'")
@@ -396,6 +397,7 @@ class PAL:
                 if not self.IO_signalq.empty():
                     self.IO_measuring = await self.IO_signalq.get()
                 if not self.IO_measuring:
+                    self.base.print_message("IO_measuring is true, breaking palaction loop.")
                     break
 
                 # (0) split action
@@ -1639,9 +1641,9 @@ class PAL:
             # also need to set IO_continue and IO_error
             # so active can return
             # else it will return after real first continue trigger
-            self.IO_error = ErrorCodes.done_timeout
+            self.IO_error = ErrorCodes.start_timeout
             self.IO_continue = True
-            return ErrorCodes.done_timeout
+            return ErrorCodes.start_timeout
 
         palaction.start_time = val
         self.base.print_message(
@@ -1654,7 +1656,7 @@ class PAL:
             self.base.print_message(
                 f"PAL continue trigger timeout with error: {repr(e)}", error=True
             )
-            return ErrorCodes.done_timeout
+            return ErrorCodes.continue_timeout
 
         self.IO_continue = True
         palaction.continue_time = val
@@ -2522,7 +2524,7 @@ class PAL:
     #     )
 
     async def method_injection_tray_GC(self, A: Action) -> dict:
-        start = A.action_params.get("startGC", None)
+        start = A.action_params.get("startGC", "start")
 
         if start == True:
             start = "start"
