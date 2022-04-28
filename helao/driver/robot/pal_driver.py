@@ -350,7 +350,7 @@ class PAL:
                     if (new_done ^ prev_done) and not new_done:
                         prev_done = deepcopy(new_done)
 
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.01)
 
         except Exception as e:
             self.base.print_message(
