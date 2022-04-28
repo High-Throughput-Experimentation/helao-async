@@ -34,7 +34,6 @@ import time
 import requests
 import subprocess
 
-from munch import munchify
 from termcolor import cprint
 from pyfiglet import figlet_format
 import colorama
@@ -174,7 +173,7 @@ class Pidd:
         KILL_ORDER = ["operator", "visualizer", "action", "orchestrator"]
         for group in KILL_ORDER:
             print_message({}, "launcher", f"Killing {group} group.")
-            if group in pidd.servers:
+            if group in pidd.servers.keys():
                 G = pidd.servers[group]
                 for server in G:
                     twait = 0.5
@@ -328,13 +327,13 @@ def launcher(confArg, confDict, helao_root):
         k: {sk: sv for sk, sv in confDict["servers"].items() if sv["group"] == k}
         for k in LAUNCH_ORDER
     }
-    pidd.servers = munchify(allGroup)
+    pidd.servers = allGroup
     pidd.orchServs = []
     for group in LAUNCH_ORDER:
         print_message({}, "launcher", f"Launching {group} group.")
-        if group in pidd.servers:
+        if group in pidd.servers.keys():
             G = pidd.servers[group]
-            for server in G:
+            for server in G.keys():
                 S = G[server]
                 codeKey = [k for k in S if k in pidd.codeKeys]
                 if codeKey:
@@ -342,8 +341,8 @@ def launcher(confArg, confDict, helao_root):
                     servPy = S[codeKey]
                 else:
                     servPy = None
-                servHost = S.host
-                servPort = S.port
+                servHost = S["host"]
+                servPort = S["port"]
                 servKHP = (server, servHost, servPort)
                 servHP = (servHost, servPort)
                 # if 'py' key is None, assume remotely started or monitored by a separate action
@@ -468,9 +467,9 @@ if __name__ == "__main__":
         KILL_ORDER = ["action"]  # orch are killed above
         for group in KILL_ORDER:
             print_message({}, "launcher", f"Shutting down {group} group.")
-            if group in pidd.servers:
+            if group in pidd.servers.keys():
                 G = pidd.servers[group]
-                for server in G:
+                for server in G.keys():
                     try:
                         print_message({}, "launcher", f"Shutting down {server}.")
                         S = G[server]
