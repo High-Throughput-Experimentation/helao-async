@@ -13,6 +13,10 @@ __all__ = [
     "SDC_slave_CA",
     "SDC_slave_CV_led",
     "SDC_slave_CV",
+    "SDC_slave_background",
+    "SDC_slave_CP_led",
+    "SDC_slave_CP",
+    
 ]
 
 
@@ -566,3 +570,252 @@ def SDC_slave_CV(
     )
 
     return apm.action_list  # returns complete action list to orch
+
+
+def SDC_slave_CP(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    CP_current: Optional[float] = 0.0,
+    ph: float = 9.53,
+    ref_vs_nhe: float = 0.21,
+    samplerate_sec: Optional[float] = 0.1,
+    CP_duration_sec: Optional[float] = 60,
+    IErange: Optional[str] = "auto",
+    comment: Optional[str] = "",
+):
+    """last functionality test: -"""
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    # get sample for gamry
+    apm.add_action(
+        {
+            "action_server": PAL_server,
+            "action_name": "archive_custom_query_sample",
+            "action_params": {
+                "custom": "cell1_we",
+            },
+            "to_global_params": [
+                "_fast_samples_in"
+            ],  # save new liquid_sample_no of eche cell to globals
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        }
+    )
+
+#    # apply potential
+ #   potential = (
+#        apm.pars.CA_potential_vsRHE - 1.0 * apm.pars.ref_vs_nhe - 0.059 * apm.pars.ph
+#    )
+#    print(f"ADSS_slave_CA potential: {potential}")
+    apm.add_action(
+        {
+            "action_server": PSTAT_server,
+            "action_name": "run_CP",
+            "action_params": {
+                "Ival": CP_current,
+                "Tval__s": apm.pars.CP_duration_sec,
+                "AcqInterval__s": apm.pars.samplerate_sec,
+                "TTLwait": -1,  # -1 disables, else select TTL 0-3
+                "TTLsend": -1,  # -1 disables, else select TTL 0-3
+                "IErange": apm.pars.IErange,
+            },
+            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "process_finish": True,
+            "process_contrib": [
+                ProcessContrib.action_params,
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        },
+    )
+
+    return apm.action_list  # returns complete action list to orch
+
+def SDC_slave_CP_led(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    CP_current: Optional[float] = 0.0,
+    ph: float = 9.53,
+    ref_vs_nhe: float = 0.21,
+    samplerate_sec: Optional[float] = 0.1,
+    CP_duration_sec: Optional[float] = 60,
+    IErange: Optional[str] = "auto",
+    led: Optional[str] = "doric_led1",
+    wavelength_nm: Optional[float] = 0.0,
+    wavelength_intensity_mw: Optional[float] = 0.0,
+    wavelength_intensity_date: Optional[str] = "n/a",
+    led_side_illumination: Optional[str] = "front",
+    t_on: Optional[float] = 1000,
+    t_off: Optional[float] = 1000,
+    t_offset: Optional[int] = 0,
+    t_duration: Optional[int] = -1,
+    comment: Optional[str] = "",
+):
+    """last functionality test: -"""
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    # get sample for gamry
+    apm.add_action(
+        {
+            "action_server": PAL_server,
+            "action_name": "archive_custom_query_sample",
+            "action_params": {
+                "custom": "cell1_we",
+            },
+            "to_global_params": [
+                "_fast_samples_in"
+            ],  # save new liquid_sample_no of eche cell to globals
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        }
+    )
+
+    # setup toggle on galil_io
+    apm.add_action(
+        {
+            "action_server": IO_server,
+            "action_name": "set_digital_cycle",
+            "action_params": {
+                "trigger_item": "gamry_ttl0",
+                "triggertype": toggle_triggertype,
+                "out_item": apm.pars.led,
+                "out_item_gamry": "gamry_aux",
+                "t_on": apm.pars.t_on,
+                "t_off": apm.pars.t_off,
+                "t_offset": apm.pars.t_offset,
+                "t_duration": apm.pars.t_duration,
+                "mainthread": 0,
+                "subthread": 1,
+            },
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "process_finish": False,
+            "process_contrib": [
+                ProcessContrib.action_params,
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        },
+
+    )
+
+    apm.add_action(
+        {
+            "action_server": PSTAT_server,
+            "action_name": "run_CP",
+            "action_params": {
+                "Ival": CP_current,
+                "Tval__s": apm.pars.CP_duration_sec,
+                "AcqInterval__s": apm.pars.samplerate_sec,
+                "TTLwait": -1,  # -1 disables, else select TTL 0-3
+                "TTLsend": 0,  # -1 disables, else select TTL 0-3
+                "IErange": apm.pars.IErange,
+            },
+            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "process_finish": True,
+            "process_contrib": [
+                ProcessContrib.action_params,
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        },
+
+    )
+
+    return apm.action_list  # returns complete action list to orch
+
+def SDC_slave_background(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    CP_current: [float] = 0.0,
+    ph: float = 9.53,
+    ref_vs_nhe: float = 0.21,
+    samplerate_sec: Optional[float] = 0.1,
+    background_duration_sec: Optional[float] = 60,
+    IErange: Optional[str] = "auto",
+    t_on: Optional[float] = 1000,
+    t_off: [float] = 0,
+    t_offset: [int] = 0,
+    t_duration: Optional[int] = -1,
+    comment: Optional[str] = "",
+):
+    """last functionality test: -"""
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    # get sample for gamry
+    apm.add_action(
+        {
+            "action_server": PAL_server,
+            "action_name": "archive_custom_query_sample",
+            "action_params": {
+                "custom": "cell1_we",
+            },
+            "to_global_params": [
+                "_fast_samples_in"
+            ],  # save new liquid_sample_no of eche cell to globals
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        }
+    )
+
+    # setup toggle on galil_io
+    apm.add_action(
+        {
+            "action_server": IO_server,
+            "action_name": "set_digital_cycle",
+            "action_params": {
+                "trigger_item": "gamry_ttl0",
+                "triggertype": toggle_triggertype,
+#                "out_item": apm.pars.led,
+                "out_item_gamry": "gamry_aux",
+                "t_on": apm.pars.t_on,
+                "t_off": apm.pars.t_off,
+                "t_offset": apm.pars.t_offset,
+                "t_duration": apm.pars.t_duration,
+                "mainthread": 0,
+                "subthread": 1,
+            },
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "process_finish": False,
+            "process_contrib": [
+                ProcessContrib.action_params,
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        },
+
+    )
+
+    apm.add_action(
+        {
+            "action_server": PSTAT_server,
+            "action_name": "run_CP",
+            "action_params": {
+                "Ival": CP_current,
+                "Tval__s": apm.pars.background_duration_sec,
+                "AcqInterval__s": apm.pars.samplerate_sec,
+                "TTLwait": -1,  # -1 disables, else select TTL 0-3
+                "TTLsend": 0,  # -1 disables, else select TTL 0-3
+                "IErange": apm.pars.IErange,
+            },
+            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "process_finish": True,
+            "process_contrib": [
+                ProcessContrib.action_params,
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        },
+
+    )
+
+    return apm.action_list  # returns complete action list to orch
+
+
