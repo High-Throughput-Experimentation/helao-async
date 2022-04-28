@@ -434,12 +434,12 @@ if __name__ == "__main__":
                 try:
                     print_message({}, "launcher", f"Unsubscribing {server} websockets.")
                     S = pidd.servers["orchestrator"][server]
-                    requests.post(f"http://{S.host}:{S.port}/shutdown")
+                    requests.post(f"http://{S['host']}:{S['port']}/shutdown")
                     pidd.kill_server(server)
                     cmd = ["python", "fast_launcher.py", confArg, server]
                     p = subprocess.Popen(cmd, cwd=helao_root)
                     ppid = p.pid
-                    pidd.store_pid(server, S.host, S.port, ppid)
+                    pidd.store_pid(server, S['host'], S['port'], ppid)
                 except Exception as e:
                     print_message({}, "launcher", " ... got error: ", repr(e), error=True)
             result = None
@@ -458,7 +458,7 @@ if __name__ == "__main__":
             try:
                 print_message({}, "launcher", f"Unsubscribing {server} websockets.")
                 S = pidd.servers["orchestrator"][server]
-                requests.post(f"http://{S.host}:{S.port}/shutdown")
+                requests.post(f"http://{S['host']}:{S['port']}/shutdown")
             except Exception as e:
                 print_message({}, "launcher", " ... got error: ", repr(e), error=True)
         # in case a /shutdown is added to other FastAPI servers (not the shutdown without '/')
@@ -474,7 +474,7 @@ if __name__ == "__main__":
                         print_message({}, "launcher", f"Shutting down {server}.")
                         S = G[server]
                         # will produce a 404 if not found
-                        requests.post(f"http://{S.host}:{S.port}/shutdown")
+                        requests.post(f"http://{S['host']}:{S['port']}/shutdown")
                     except Exception as e:
                         print_message(
                             {}, "launcher", f" ... got error: {repr(e)}", error=True
