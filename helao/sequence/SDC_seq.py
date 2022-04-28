@@ -9,6 +9,10 @@ __all__ = [
     "SDC_CV_led",
     "SDC_CA",
     "SDC_CA_led",
+    "SDC_background",
+    "SDC_CP",
+    "SDC_CP_led",
+
 ]
 
 
@@ -539,6 +543,195 @@ def SDC_CV_led(
                 "led_side_illumination": led_side_illumination,
                 "t_on": t_onCV,
                 "t_off": t_offCV,
+            },
+        )
+
+        pl.add_experiment("SDC_slave_shutdown", {})
+
+    return pl.experiment_plan_list  # returns complete experiment list
+
+
+def SDC_background(
+    sequence_version: int = 1,
+    plate_id: int = 1,
+    plate_sample_no_list: list = [2],
+    reservoir_liquid_sample_no: int = 1,
+#    reservoir_bubbler_gas: str = "O2",
+#    ph: float = 9.53,
+    ref_vs_nhe: float = 0.21,
+    CP1_current: float = 0,
+    background_duration_sec: float = 15,
+    IErange: str = "auto",
+    liquid_volume_ml: float = 1.0,
+    samplerate_sec: float = 0.05,
+    # led_side_illumination: str = "front",
+    # doric_led: str = "doric_led1",
+    # CA1_wavelength_nm: float = 385,
+    # wavelength_intensity_mwled1: float = 1.715,
+    # wavelength_intensity_mwled2: float = 1.478,
+    # wavelength_intensity_mwled3: float = 0.585,
+    # wavelength_intensity_mwled4: float = 0.366,
+    # wavelength_intensity_date: str = "n/a",
+    t_onCA: float = 1000,
+    t_offCA: float = 0,
+
+):
+
+    pl = ExperimentPlanMaker()
+
+    # (1) house keeping
+    pl.add_experiment("SDC_slave_unloadall_customs", {})
+
+    for plate_sample in plate_sample_no_list:
+
+        pl.add_experiment(
+            "SDC_slave_startup",
+            {
+                "solid_custom_position": "cell1_we",
+                "solid_plate_id": plate_id,
+                "solid_sample_no": plate_sample,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+#                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
+                "liquid_volume_ml": liquid_volume_ml,
+            },
+        )
+        # CP1
+        pl.add_experiment(
+            "SDC_slave_background",
+            {
+                "CP_current": CP1_current,
+#                "ph": ph,
+                "ref_vs_nhe": ref_vs_nhe,
+                "samplerate_sec": samplerate_sec,
+                "background_duration_sec": background_duration_sec,
+                "IErange": IErange,
+#                "led": doric_led,
+#                "wavelength_nm": CA1_wavelength_nm,
+#                "wavelength_intensity_mw": wavelength_intensity_mwled1,
+#                "wavelength_intensity_date": wavelength_intensity_date,
+ #               "led_side_illumination": led_side_illumination,
+                "t_on": t_onCA,
+                "t_off": t_offCA,
+            },
+        )
+
+        pl.add_experiment("SDC_slave_shutdown", {})
+
+    return pl.experiment_plan_list  # returns complete experiment list
+
+def SDC_CP(
+    sequence_version: int = 1,
+    plate_id: int = 1,
+    plate_sample_no_list: list = [2],
+    reservoir_liquid_sample_no: int = 1,
+    reservoir_bubbler_gas: str = "O2",
+    ph: float = 9.53,
+    ref_vs_nhe: float = 0.21,
+    CP1_current: float = .000001,
+    CP1_duration_sec: float = 4,
+    IErange: str = "auto",
+    liquid_volume_ml: float = 1.0,
+    samplerate_sec: float = 0.05,
+):
+
+    pl = ExperimentPlanMaker()
+
+    # (1) house keeping
+    pl.add_experiment("SDC_slave_unloadall_customs", {})
+
+    for plate_sample in plate_sample_no_list:
+
+        pl.add_experiment(
+            "SDC_slave_startup",
+            {
+                "solid_custom_position": "cell1_we",
+                "solid_plate_id": plate_id,
+                "solid_sample_no": plate_sample,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
+                "liquid_volume_ml": liquid_volume_ml,
+            },
+        )
+
+        # CP1
+        pl.add_experiment(
+            "SDC_slave_CA",
+            {
+                "CP_current" : CP1_current,
+                "ph": ph,
+                "ref_vs_nhe": ref_vs_nhe,
+                "samplerate_sec": samplerate_sec,
+                "CP_duration_sec": CP1_duration_sec,
+                "IErange": IErange,
+            },
+        )
+
+
+        pl.add_experiment("SDC_slave_shutdown", {})
+
+    return pl.experiment_plan_list  # returns complete experiment list
+
+def SDC_CP_led(
+    sequence_version: int = 1,
+    plate_id: int = 1,
+    plate_sample_no_list: list = [2],
+    reservoir_liquid_sample_no: int = 1,
+    reservoir_bubbler_gas: str = "O2",
+    ph: float = 9.53,
+    ref_vs_nhe: float = 0.21,
+    CP1_current: float = .000001,
+    CP1_duration_sec: float = 15,
+    IErange: str = "auto",
+    liquid_volume_ml: float = 1.0,
+    samplerate_sec: float = 0.05,
+    led_side_illumination: str = "front",
+    doric_led: str = "doric_led1",
+    CP1_wavelength_nm: float = 385,
+    wavelength_intensity_mwled1: float = 1.715,
+    wavelength_intensity_mwled2: float = 1.478,
+    wavelength_intensity_mwled3: float = 0.585,
+    wavelength_intensity_mwled4: float = 0.366,
+    wavelength_intensity_date: str = "n/a",
+    t_onCP: float = 500,
+    t_offCP: float = 500,
+
+):
+
+    pl = ExperimentPlanMaker()
+
+    # (1) house keeping
+    pl.add_experiment("SDC_slave_unloadall_customs", {})
+
+    for plate_sample in plate_sample_no_list:
+
+        pl.add_experiment(
+            "SDC_slave_startup",
+            {
+                "solid_custom_position": "cell1_we",
+                "solid_plate_id": plate_id,
+                "solid_sample_no": plate_sample,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
+                "liquid_volume_ml": liquid_volume_ml,
+            },
+        )
+        # CP1
+        pl.add_experiment(
+            "SDC_slave_CP_led",
+            {
+                "CP_current": CP1_current,
+                "ph": ph,
+                "ref_vs_nhe": ref_vs_nhe,
+                "samplerate_sec": samplerate_sec,
+                "CP_duration_sec": CP1_duration_sec,
+                "IErange": IErange,
+                "led": doric_led,
+                "wavelength_nm": CP1_wavelength_nm,
+                "wavelength_intensity_mw": wavelength_intensity_mwled1,
+                "wavelength_intensity_date": wavelength_intensity_date,
+                "led_side_illumination": led_side_illumination,
+                "t_on": t_onCP,
+                "t_off": t_offCP,
             },
         )
 
