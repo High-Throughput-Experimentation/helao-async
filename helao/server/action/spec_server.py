@@ -36,8 +36,24 @@ def makeApp(confPrefix, servKey, helao_root):
     ):
         """Measure single spectrum."""
         active = await app.base.setup_and_contain_action(action_abbr="OPT")
-        spectrum = app.driver.measure_spec(active.action.action_params["int_time"])
-        finished_action = await active.finish()
+        pars = {k:v for k,v in active.action.action_params.items() if k!='action_version'}
+        spectrum = app.driver.measure_spec(**pars)
+        _ = await active.finish()
+        return spectrum
+
+    @app.post(f"/{servKey}/measure_adv")
+    async def measure_spec_adv(
+        action: Optional[Action] = Body({}, embed=True),
+        action_version: int = 1,
+        int_time: Optional[int] = 35,
+        n_avg: Optional[int] = 1,
+        fft: Optional[int] = 0,
+    ):
+        """Measure single spectrum."""
+        active = await app.base.setup_and_contain_action(action_abbr="OPT")
+        pars = {k:v for k,v in active.action.action_params.items() if k!='action_version'}
+        spectrum = app.driver.measure_spec_adv(**pars)
+        _ = await active.finish()
         return spectrum
 
     @app.post("/shutdown")
