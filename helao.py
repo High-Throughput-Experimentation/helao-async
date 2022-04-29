@@ -427,28 +427,70 @@ if __name__ == "__main__":
     )
     pidd = launcher(confArg=confArg, confDict=config, helao_root=helao_root)
     result = None
+
+    def hotkey_msg():
+        print_message(
+            {},
+            "launcher",
+            "CTRL-x to terminate orchestration group. CTRL-r for restart options. CTRL-d to disconnect.",
+        )
+
+    def stop_server(groupname, servername):
+        print_message({}, "launcher", f"Unsubscribing {servername} websockets.")
+        S = pidd.servers[groupname][servername]
+        requests.post(f"http://{S['host']}:{S['port']}/shutdown")
+        return S
+
     while result not in [b"\x18", b"\x04"]:
         if result == b"\x12":
-            print_message({}, "launcher", f"Detected CTRL-r, restarting orch only.")
-            for server in pidd.orchServs:
-                try:
-                    print_message({}, "launcher", f"Unsubscribing {server} websockets.")
-                    S = pidd.servers["orchestrator"][server]
-                    requests.post(f"http://{S['host']}:{S['port']}/shutdown")
-                    pidd.kill_server(server)
-                    cmd = ["python", "fast_launcher.py", confArg, server]
-                    p = subprocess.Popen(cmd, cwd=helao_root)
-                    ppid = p.pid
-                    pidd.store_pid(server, S['host'], S['port'], ppid)
-                except Exception as e:
-                    print_message({}, "launcher", " ... got error: ", repr(e), error=True)
+            print_message({}, "launcher", f"Detected CTRL-r, checking restart options.")
+            slist = [(gk, sk) for gk, gd in pidd.servers.items() for sk in gd.keys()]
+            opts = range(len(slist))
+            while True:
+                print("Currently running server type/name:")
+                for i, (gk, sk) in enumerate(slist):
+                    print(f"{i}: {gk}/{sk}")
+                if len(slist) > 1:
+                    optionstr = f"{min(opts)}-{max(opts)}"
+                else:
+                    optionstr = "0"
+                sind = input(
+                    f"Enter server num to restart or blank to cancel [{optionstr}]: "
+                )
+                if sind in [str(o) for o in opts]:
+                    sg, sn = slist[int(sind)]
+                    print_message(
+                        {}, "launcher", f"Got option {sind}. Restarting {sg}/{sn}."
+                    )
+                    try:
+                        S = stop_server(sg, sn)
+                        pidd.kill_server(sn)
+                        cmd = ["python", "fast_launcher.py", confArg, sn]
+                        p = subprocess.Popen(cmd, cwd=helao_root)
+                        ppid = p.pid
+                        pidd.store_pid(sn, S["host"], S["port"], ppid)
+                        if sg == "action":
+                            for orchserv in pidd.orchServs:
+                                OS = pidd.servers["orchestrator"][orchserv]
+                                print_message(
+                                    {}, "launcher", f"Reregistering {sn} on {orchserv}."
+                                )
+                                requests.post(
+                                    f"http://{OS['host']}:{OS['port']}/attach_client",
+                                    data={"client_servkey": sn},
+                                )
+                    except Exception as e:
+                        print_message(
+                            {}, "launcher", " ... got error: ", repr(e), error=True
+                        )
+                    break
+                elif sind == "":
+                    print_message({}, "launcher", f"Cancelling restart.")
+                    break
+                else:
+                    print_message({}, "launcher", f"'{sind}' is not a valid option.")
             result = None
-        else:
-            print_message(
-                {},
-                "launcher",
-                "CTRL-x to terminate orchestration group. CTRL-r to restart orch. CTRL-d to disconnect.",
-            )
+        hotkey_msg()
         result = wait_key()
     if result == b"\x18":
         print_message(
@@ -456,9 +498,7 @@ if __name__ == "__main__":
         )
         for server in pidd.orchServs:
             try:
-                print_message({}, "launcher", f"Unsubscribing {server} websockets.")
-                S = pidd.servers["orchestrator"][server]
-                requests.post(f"http://{S['host']}:{S['port']}/shutdown")
+                stop_server("orchestrator", server)
             except Exception as e:
                 print_message({}, "launcher", " ... got error: ", repr(e), error=True)
         # in case a /shutdown is added to other FastAPI servers (not the shutdown without '/')
