@@ -29,6 +29,7 @@ def SDC_4CA_led_1CV_led(
     reservoir_liquid_sample_no: int = 1,
     reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
+    droplet_size_cm2: float = .071,  #3mm diameter droplet
     ref_vs_nhe: float = 0.21,
     CA1_potential_vsRHE: float = 1.23,
     CA1_duration_sec: float = 15,
@@ -66,8 +67,10 @@ def SDC_4CA_led_1CV_led(
     wavelength_intensity_date: str = "n/a",
     t_onCA: float = 500,
     t_offCA: float = 500,
+    t_offsetCA: float = 0,
     t_onCV: float = 2000,
     t_offCV: float = 1000,
+    t_offsetCV: float = 0,
 ):
 
     pl = ExperimentPlanMaker()
@@ -94,6 +97,10 @@ def SDC_4CA_led_1CV_led(
             {
                 "CA_potential_vsRHE": CA1_potential_vsRHE,
                 "ph": ph,
+                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_bubbler_gas": reservoir_bubbler_gas,
+                "droplet_size_cm2": droplet_size_cm2,
+                "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": samplerate_sec,
                 "CA_duration_sec": CA1_duration_sec,
@@ -105,6 +112,7 @@ def SDC_4CA_led_1CV_led(
                 "led_side_illumination": led_side_illumination,
                 "t_on": t_onCA,
                 "t_off": t_offCA,
+                "t_offset": t_offsetCA,
             },
         )
         # CA2
@@ -113,6 +121,10 @@ def SDC_4CA_led_1CV_led(
             {
                 "CA_potential_vsRHE": CA2_potential_vsRHE,
                 "ph": ph,
+                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_bubbler_gas": reservoir_bubbler_gas,
+                "droplet_size_cm2": droplet_size_cm2,
+                "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": samplerate_sec,
                 "CA_duration_sec": CA2_duration_sec,
@@ -124,6 +136,7 @@ def SDC_4CA_led_1CV_led(
                 "led_side_illumination": led_side_illumination,
                 "t_on": t_onCA,
                 "t_off": t_offCA,
+                "t_offset": t_offsetCA,
             },
         )
         # CA3
@@ -132,6 +145,10 @@ def SDC_4CA_led_1CV_led(
             {
                 "CA_potential_vsRHE": CA3_potential_vsRHE,
                 "ph": ph,
+                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_bubbler_gas": reservoir_bubbler_gas,
+                "droplet_size_cm2": droplet_size_cm2,
+                "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": samplerate_sec,
                 "CA_duration_sec": CA3_duration_sec,
@@ -141,8 +158,9 @@ def SDC_4CA_led_1CV_led(
                 "wavelength_intensity_mw": wavelength_intensity_mwled3,
                 "wavelength_intensity_date": wavelength_intensity_date,
                 "led_side_illumination": led_side_illumination,
-               "t_on": t_onCA,
+                "t_on": t_onCA,
                 "t_off": t_offCA,
+                "t_offset": t_offsetCA,
             },
         )
         # CA4
@@ -151,6 +169,10 @@ def SDC_4CA_led_1CV_led(
             {
                 "CA_potential_vsRHE": CA4_potential_vsRHE,
                 "ph": ph,
+                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_bubbler_gas": reservoir_bubbler_gas,
+                "droplet_size_cm2": droplet_size_cm2,
+                "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": samplerate_sec,
                 "CA_duration_sec": CA4_duration_sec,
@@ -162,6 +184,7 @@ def SDC_4CA_led_1CV_led(
                 "led_side_illumination": led_side_illumination,
                 "t_on": t_onCA,
                 "t_off": t_offCA,
+                "t_offset": t_offsetCA,
             },
         )
 
@@ -178,6 +201,10 @@ def SDC_4CA_led_1CV_led(
                 "cycles": CV_cycles,
                 "IErange": IErange,
                 "ph": ph,
+                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_bubbler_gas": reservoir_bubbler_gas,
+                "droplet_size_cm2": droplet_size_cm2,
+                "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "led": CV_doric_led,
                 "wavelength_nm": CV_wavelength_nm,
@@ -186,6 +213,7 @@ def SDC_4CA_led_1CV_led(
                 "led_side_illumination": led_side_illumination,
                 "t_on": t_onCV,
                 "t_off": t_offCV,
+                "t_offset": t_offsetCV,
             },
         )
 
@@ -201,6 +229,7 @@ def SDC_CV_CA_CV(
     reservoir_liquid_sample_no: int = 1,
     reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
+    droplet_size_cm2: float = .071,  #3mm diameter droplet    reference_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
     CV1_Vinit_vsRHE: float = 1.23,
     CV1_Vapex1_vsRHE: float = 0.73,
@@ -255,6 +284,10 @@ def SDC_CV_CA_CV(
                 "cycles": CV1_cycles,
                 "IErange": IErange,
                 "ph": ph,
+                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_bubbler_gas": reservoir_bubbler_gas,
+                "droplet_size_cm2": droplet_size_cm2,
+                "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
             },
         )
@@ -265,6 +298,10 @@ def SDC_CV_CA_CV(
             {
                 "CA_potential_vsRHE": CA2_potential_vsRHE,
                 "ph": ph,
+                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_bubbler_gas": reservoir_bubbler_gas,
+                "droplet_size_cm2": droplet_size_cm2,
+                "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": samplerate_sec,
                 "CA_duration_sec": CA2_duration_sec,
@@ -285,6 +322,10 @@ def SDC_CV_CA_CV(
                 "cycles": CV3_cycles,
                 "IErange": IErange,
                 "ph": ph,
+                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_bubbler_gas": reservoir_bubbler_gas,
+                "droplet_size_cm2": droplet_size_cm2,
+                "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
             },
         )
@@ -300,6 +341,7 @@ def SDC_CV(
     reservoir_liquid_sample_no: int = 1,
     reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
+    droplet_size_cm2: float = .071,  #3mm diameter droplet
     ref_vs_nhe: float = 0.21,
     CV1_Vinit_vsRHE: float = .7,
     CV1_Vapex1_vsRHE: float = 1,
@@ -345,6 +387,10 @@ def SDC_CV(
                 "cycles": CV1_cycles,
                 "IErange": IErange,
                 "ph": ph,
+                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_bubbler_gas": reservoir_bubbler_gas,
+                "droplet_size_cm2": droplet_size_cm2,
+                "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
             },
         )
@@ -360,6 +406,7 @@ def SDC_CA(
     reservoir_liquid_sample_no: int = 1,
     reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
+    droplet_size_cm2: float = .071,  #3mm diameter droplet
     ref_vs_nhe: float = 0.21,
     CA1_potential_vsRHE: float = 1.23,
     CA1_duration_sec: float = 4,
@@ -393,6 +440,10 @@ def SDC_CA(
             {
                 "CA_potential_vsRHE": CA1_potential_vsRHE,
                 "ph": ph,
+                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_bubbler_gas": reservoir_bubbler_gas,
+                "droplet_size_cm2": droplet_size_cm2,
+                "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": samplerate_sec,
                 "CA_duration_sec": CA1_duration_sec,
@@ -412,6 +463,7 @@ def SDC_CA_led(
     reservoir_liquid_sample_no: int = 1,
     reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
+    droplet_size_cm2: float = .071,  #3mm diameter droplet
     ref_vs_nhe: float = 0.21,
     CA1_potential_vsRHE: float = 1.23,
     CA1_duration_sec: float = 15,
@@ -428,7 +480,7 @@ def SDC_CA_led(
     wavelength_intensity_date: str = "n/a",
     t_onCA: float = 500,
     t_offCA: float = 500,
-
+    t_offsetCA: float = 0,
 ):
 
     pl = ExperimentPlanMaker()
@@ -455,6 +507,10 @@ def SDC_CA_led(
             {
                 "CA_potential_vsRHE": CA1_potential_vsRHE,
                 "ph": ph,
+                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_bubbler_gas": reservoir_bubbler_gas,
+                "droplet_size_cm2": droplet_size_cm2,
+                "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": samplerate_sec,
                 "CA_duration_sec": CA1_duration_sec,
@@ -466,6 +522,7 @@ def SDC_CA_led(
                 "led_side_illumination": led_side_illumination,
                 "t_on": t_onCA,
                 "t_off": t_offCA,
+                "t_offset": t_offsetCA,
             },
         )
 
@@ -480,6 +537,7 @@ def SDC_CV_led(
     reservoir_liquid_sample_no: int = 1,
     reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
+    droplet_size_cm2: float = .071,  #3mm diameter droplet
     ref_vs_nhe: float = 0.21,
     CV_Vinit_vsRHE: float = 1.23,
     CV_Vapex1_vsRHE: float = 0.73,
@@ -501,6 +559,7 @@ def SDC_CV_led(
     wavelength_intensity_date: str = "n/a",
     t_onCV: float = 2000,
     t_offCV: float = 1000,
+    t_offsetCV: float = 0,
 ):
 
     pl = ExperimentPlanMaker()
@@ -535,6 +594,10 @@ def SDC_CV_led(
                 "cycles": CV_cycles,
                 "IErange": IErange,
                 "ph": ph,
+                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_bubbler_gas": reservoir_bubbler_gas,
+                "droplet_size_cm2": droplet_size_cm2,
+                "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "led": doric_led,
                 "wavelength_nm": CV_wavelength_nm,
@@ -543,6 +606,7 @@ def SDC_CV_led(
                 "led_side_illumination": led_side_illumination,
                 "t_on": t_onCV,
                 "t_off": t_offCV,
+                "t_offset": t_offsetCV,
             },
         )
 
@@ -572,8 +636,9 @@ def SDC_background(
     # wavelength_intensity_mwled3: float = 0.585,
     # wavelength_intensity_mwled4: float = 0.366,
     # wavelength_intensity_date: str = "n/a",
-    t_onCA: float = 1000,
-    t_offCA: float = 0,
+    t_on: float = 1000,
+    t_off: float = 0,
+    t_offset: float = 50,
 
 ):
 
@@ -601,6 +666,10 @@ def SDC_background(
             {
                 "CP_current": CP1_current,
 #                "ph": ph,
+#                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+#                "reservoir_bubbler_gas": reservoir_bubbler_gas,
+#                "droplet_size_cm2": droplet_size_cm2,
+#                "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": samplerate_sec,
                 "background_duration_sec": background_duration_sec,
@@ -610,8 +679,9 @@ def SDC_background(
 #                "wavelength_intensity_mw": wavelength_intensity_mwled1,
 #                "wavelength_intensity_date": wavelength_intensity_date,
  #               "led_side_illumination": led_side_illumination,
-                "t_on": t_onCA,
-                "t_off": t_offCA,
+                "t_on": t_on,
+                "t_off": t_off,
+                "t_offset": t_offset,
             },
         )
 
@@ -626,6 +696,8 @@ def SDC_CP(
     reservoir_liquid_sample_no: int = 1,
     reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
+    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    reference_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
     CP1_current: float = .000001,
     CP1_duration_sec: float = 4,
@@ -659,6 +731,10 @@ def SDC_CP(
             {
                 "CP_current" : CP1_current,
                 "ph": ph,
+                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_bubbler_gas": reservoir_bubbler_gas,
+                "droplet_size_cm2": droplet_size_cm2,
+                "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": samplerate_sec,
                 "CP_duration_sec": CP1_duration_sec,
@@ -678,6 +754,8 @@ def SDC_CP_led(
     reservoir_liquid_sample_no: int = 1,
     reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
+    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    reference_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
     CP1_current: float = .000001,
     CP1_duration_sec: float = 15,
@@ -694,6 +772,7 @@ def SDC_CP_led(
     wavelength_intensity_date: str = "n/a",
     t_onCP: float = 500,
     t_offCP: float = 500,
+    t_offsetCP: float = 0,
 
 ):
 
@@ -721,6 +800,10 @@ def SDC_CP_led(
             {
                 "CP_current": CP1_current,
                 "ph": ph,
+                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_bubbler_gas": reservoir_bubbler_gas,
+                "droplet_size_cm2": droplet_size_cm2,
+                "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": samplerate_sec,
                 "CP_duration_sec": CP1_duration_sec,
@@ -732,6 +815,7 @@ def SDC_CP_led(
                 "led_side_illumination": led_side_illumination,
                 "t_on": t_onCP,
                 "t_off": t_offCP,
+                "t_offset": t_offsetCP,
             },
         )
 
