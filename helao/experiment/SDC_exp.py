@@ -225,6 +225,10 @@ def SDC_slave_CA_led(
     experiment_version: int = 1,
     CA_potential_vsRHE: Optional[float] = 0.0,
     ph: float = 9.53,
+    reservoir_electrolyte: int = 1, #currently liquid sample database number
+    reservoir_bubbler_gas: str = "O2",
+    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    reference_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
     samplerate_sec: Optional[float] = 0.1,
     CA_duration_sec: Optional[float] = 60,
@@ -326,6 +330,10 @@ def SDC_slave_CA(
     experiment_version: int = 1,
     CA_potential_vsRHE: Optional[float] = 0.0,
     ph: float = 9.53,
+    reservoir_electrolyte: int = 1, #currently liquid sample database number
+    reservoir_bubbler_gas: str = "O2",
+    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    reference_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
     samplerate_sec: Optional[float] = 0.1,
     CA_duration_sec: Optional[float] = 60,
@@ -397,6 +405,10 @@ def SDC_slave_CV_led(
     cycles: Optional[int] = 1,
     IErange: Optional[str] = "auto",
     ph: float = 0,
+    reservoir_electrolyte: int = 1, #currently liquid sample database number
+    reservoir_bubbler_gas: str = "O2",
+    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    reference_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
     led: Optional[str] = "doric_led1",
     wavelength_nm: Optional[float] = 0.0,
@@ -510,6 +522,10 @@ def SDC_slave_CV(
     cycles: Optional[int] = 1,
     IErange: Optional[str] = "auto",
     ph: float = 0,
+    reservoir_electrolyte: int = 1, #currently liquid sample database number
+    reservoir_bubbler_gas: str = "O2",
+    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    reference_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
     comment: Optional[str] = "",
 ):
@@ -577,6 +593,10 @@ def SDC_slave_CP(
     experiment_version: int = 1,
     CP_current: Optional[float] = 0.0,
     ph: float = 9.53,
+    reservoir_electrolyte: int = 1, #currently liquid sample database number
+    reservoir_bubbler_gas: str = "O2",
+    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    reference_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
     samplerate_sec: Optional[float] = 0.1,
     CP_duration_sec: Optional[float] = 60,
@@ -638,6 +658,10 @@ def SDC_slave_CP_led(
     experiment_version: int = 1,
     CP_current: Optional[float] = 0.0,
     ph: float = 9.53,
+    reservoir_electrolyte: int = 1, #currently liquid sample database number
+    reservoir_bubbler_gas: str = "O2",
+    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    reference_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
     samplerate_sec: Optional[float] = 0.1,
     CP_duration_sec: Optional[float] = 60,
@@ -733,6 +757,10 @@ def SDC_slave_background(
     experiment_version: int = 1,
     CP_current: [float] = 0.0,
     ph: float = 9.53,
+    reservoir_electrolyte: int = 1, #currently liquid sample database number
+    reservoir_bubbler_gas: str = "O2",
+    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    reference_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
     samplerate_sec: Optional[float] = 0.1,
     background_duration_sec: Optional[float] = 60,
