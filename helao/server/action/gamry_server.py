@@ -60,12 +60,13 @@ async def gamry_dyn_endpoints(app=None):
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
             fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
-            Vinit: Optional[float] = 0.0,  # Initial value in volts or amps.
-            Vfinal: Optional[float] = 1.0,  # Final value in volts or amps.
-            ScanRate: Optional[
+            Vinit__V: Optional[float] = 0.0,  # Initial value in volts or amps.
+            Vfinal__V: Optional[float] = 1.0,  # Final value in volts or amps.
+            ScanRate__V_s: Optional[
                 float
             ] = 1.0,  # Scan rate in volts/second or amps/second.
-            SampleRate: Optional[
+#            SampleRate: Optional[
+            AcqInterval__s: Optional[
                 float
             ] = 0.01,  # Time between data acquisition samples in seconds.
             TTLwait: Optional[int] = Query(
@@ -90,9 +91,10 @@ async def gamry_dyn_endpoints(app=None):
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
             fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
-            Vval: Optional[float] = 0.0,
-            Tval: Optional[float] = 10.0,
-            SampleRate: Optional[
+            Vval__V: Optional[float] = 0.0,
+            Tval__s: Optional[float] = 10.0,
+#            SampleRate: Optional[
+            AcqInterval__s: Optional[
                 float
             ] = 0.01,  # Time between data acquisition samples in seconds.
             TTLwait: Optional[int] = Query(
@@ -119,8 +121,9 @@ async def gamry_dyn_endpoints(app=None):
             action_version: int = 1,
             fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
             Ival: Optional[float] = 0.0,
-            Tval: Optional[float] = 10.0,
-            SampleRate: Optional[
+            Tval__s: Optional[float] = 10.0,
+#            SampleRate: Optional[
+            AcqInterval__s: Optional[
                 float
             ] = 1.0,  # Time between data acquisition samples in seconds.
             TTLwait: Optional[int] = Query(
@@ -145,14 +148,14 @@ async def gamry_dyn_endpoints(app=None):
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
             fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
-            Vinit: Optional[float] = 0.0,  # Initial value in volts or amps.
-            Vapex1: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
-            Vapex2: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
-            Vfinal: Optional[float] = 0.0,  # Final value in volts or amps.
-            ScanRate: Optional[
+            Vinit__V: Optional[float] = 0.0,  # Initial value in volts or amps.
+            Vapex1__V: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
+            Vapex2__V: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
+            Vfinal__V: Optional[float] = 0.0,  # Final value in volts or amps.
+            ScanRate__V_s: Optional[
                 float
             ] = 1.0,  # scan rate in volts/second or amps/second.
-            SampleRate: Optional[float] = 0.01,  # Time between data acquisition steps.
+            AcqInterval__s: Optional[float] = 0.01,  # Time between data acquisition steps.
             Cycles: Optional[int] = 1,
             TTLwait: Optional[int] = Query(
                 -1, ge=-1, le=3
@@ -177,14 +180,14 @@ async def gamry_dyn_endpoints(app=None):
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
             fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
-            Vval: Optional[float] = 0.0,
-            Tval: Optional[float] = 10.0,
+            Vval__V: Optional[float] = 0.0,
+            Tval__s: Optional[float] = 10.0,
             Freq: Optional[float] = 1000.0,
             RMS: Optional[float] = 0.02,
             Precision: Optional[
                 float
             ] = 0.001,  # The precision is used in a Correlation Coefficient (residual power) based test to determine whether or not to measure another cycle.
-            SampleRate: Optional[float] = 0.01,
+            AcqInterval__s: Optional[float] = 0.01,
             TTLwait: Optional[int] = Query(
                 -1, ge=-1, le=3
             ),  # -1 disables, else select TTL 0-3
@@ -208,8 +211,8 @@ async def gamry_dyn_endpoints(app=None):
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
             fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
-            Tval: Optional[float] = 10.0,
-            SampleRate: Optional[float] = 0.01,
+            Tval__s: Optional[float] = 10.0,
+            AcqInterval__s: Optional[float] = 0.01,
             TTLwait: Optional[int] = Query(
                 -1, ge=-1, le=3
             ),  # -1 disables, else select TTL 0-3
