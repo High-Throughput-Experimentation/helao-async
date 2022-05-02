@@ -464,12 +464,18 @@ if __name__ == "__main__":
                     )
                     try:
                         S = stop_server(sg, sn)
+                        print_message(
+                            {}, "launcher", f"{sn} successful shutdown() event."
+                        )
                         pidd.kill_server(sn)
+                        print_message(
+                            {}, "launcher", f"Successfully closed {sn} process."
+                        )
                         cmd = ["python", "fast_launcher.py", confArg, sn]
                         p = subprocess.Popen(cmd, cwd=helao_root)
                         ppid = p.pid
                         pidd.store_pid(sn, S["host"], S["port"], ppid)
-                        if sg == "action":
+                        if sg == 'action':
                             for orchserv in pidd.orchServs:
                                 OS = pidd.servers["orchestrator"][orchserv]
                                 print_message(
