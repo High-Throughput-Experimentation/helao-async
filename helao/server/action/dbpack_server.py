@@ -40,13 +40,4 @@ def makeApp(confPrefix, servKey, helao_root):
         pending_dict = app.driver.list_pending()
         return pending_dict
         
-    @app.post("/shutdown")
-    def post_shutdown():
-        pass
-
-    @app.on_event("shutdown")
-    def shutdown_event():
-        # this code doesn't run
-        pass
-
     return app
