@@ -305,7 +305,7 @@ class cNIMAX:
 
                         # wait for first callback interrupt
                         while not self.IO_measuring:
-                            await asyncio.sleep(0.01)
+                            await asyncio.sleep(0.1)
                         self.base.print_message("got IO_measuring", info=True)
 
                         # get timecode and correct for offset from first interrupt
@@ -318,7 +318,7 @@ class cNIMAX:
                         ) and self.IO_do_meas:
                             if not self.IO_signalq.empty():
                                 self.IO_do_meas = await self.IO_signalq.get()
-                            await asyncio.sleep(0.01)
+                            await asyncio.sleep(0.1)
 
                         self.base.print_message(
                             f"NImax IV finished with IO_do_meas {self.IO_do_meas}",

@@ -350,7 +350,7 @@ class PAL:
                     if (new_done ^ prev_done) and not new_done:
                         prev_done = deepcopy(new_done)
 
-                    await asyncio.sleep(0.01)
+                    await asyncio.sleep(0.1)
 
         except Exception as e:
             self.base.print_message(
@@ -1962,7 +1962,7 @@ class PAL:
                 # wait for first continue trigger
                 self.base.print_message("waiting for first continue", info=True)
                 while not self.IO_continue:
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(0.1)
                 self.base.print_message("got first continue", info=True)
                 A.error_code = self.IO_error
             else:
@@ -1993,7 +1993,7 @@ class PAL:
         and works on the current content of self.IO_palcam."""
         self.IOloop_run = True
         while self.IOloop_run:
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.1)
             self.IO_do_meas = await self.IO_signalq.get()
             if self.IO_do_meas:
                 self.IO_measuring = True
@@ -2103,7 +2103,7 @@ class PAL:
                     )
                     if diff_time > 0:
                         for ii in range(round(diff_time)):
-                            await asyncio.sleep(1)
+                            await asyncio.sleep(0.1)
                             if not self.IO_signalq.empty():
                                 self.IO_measuring = await self.IO_signalq.get()
                                 if not self.IO_measuring:
