@@ -509,9 +509,6 @@ class DBPack:
     def list_pending(self):
         return self.log_dict
 
-    def shutdown(self):
-        self.base.print_message("shutting down db package server")
-
     async def finish_exps(self, seq_yml: SeqYml):
         seq_yml.get_experiments()
         for exp in seq_yml.current_experiments:
