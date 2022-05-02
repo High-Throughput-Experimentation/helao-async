@@ -106,32 +106,33 @@ config["servers"] = dict(
     #         dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
     #     ),
     # ),
-    # IO=dict(
-    #     host=hostip,
-    #     port=8005,
-    #     group="action",
-    #     fast="galil_io",
-    #     params=dict(
-    #         galil_ip_str="192.168.200.235",
-    #         dev_ai = {
-    #             },
-    #         dev_ao = {
-    #             },
-    #         dev_di = {
-    #             "gamry_ttl0":1,
-    #             },
-    #         dev_do = {
-    #             "gamry_aux":1,
-    #             "led":8,
-    #             "pump_ref_flush":3,
-    #             "doric_led1":4,
-    #             "pump_supply":2,
-    #             "doric_led2":5,
-    #             "doric_led3":6,
-    #             "doric_led4":7,
-    #             },
-    #     )
-    # ),
+    IO=dict(
+        host=hostip,
+        port=8005,
+        group="action",
+        fast="galil_io",
+        params=dict(
+            galil_ip_str="192.168.200.235",
+            dev_ai = {
+                },
+            dev_ao = {
+                },
+            dev_di = {
+                "gamry_ttl0":1,
+                },
+            dev_do = {
+                "gamry_aux":1,
+                # "led":8,
+                "spec_trig":8,
+                "pump_ref_flush":3,
+                "doric_led1":4,
+                "pump_supply":2,
+                "doric_led2":5,
+                "doric_led3":6,
+                "doric_led4":7,
+                },
+        )
+    ),
     # PAL=dict(
     #     host=hostip,
     #     port=8007,
