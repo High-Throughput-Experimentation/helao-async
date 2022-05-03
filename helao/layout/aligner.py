@@ -4,6 +4,7 @@ import json
 import os
 from socket import gethostname
 from functools import partial
+import traceback
 
 import numpy as np
 
@@ -871,7 +872,8 @@ class Aligner:
             try:
                 new_matrix = np.matrix(json.loads(filecontent))
             except Exception as e:
-                self.vis.print_message(f"error loading matrix {repr(e)}", error=True)
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                self.vis.print_message(f"error loading matrix {repr(e), tb,}", error=True)
                 new_matrix = self.motor.dflt_matrix
 
             self.vis.print_message(f"loaded matrix \n'{new_matrix}'")
@@ -1351,11 +1353,12 @@ class Aligner:
         try:
             M = np.dot(A, B.I)
         except Exception as e:
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             # should not happen when all xyplate coordinates are unique
             # (previous function removes all duplicate xyplate points)
             # but can still produce a not valid Matrix
             # as xymotor plates might not be unique/faulty
-            self.vis.print_message(f"Matrix singular {repr(e)}", error=True)
+            self.vis.print_message(f"Matrix singular {repr(e), tb,}", error=True)
             M = TransferMatrix
         return M
 
@@ -1506,7 +1509,8 @@ class Aligner:
 
                 self.motorpos_q.task_done()
             except Exception as e:
-                self.vis.print_message(f"aligner IOloop error: {repr(e)}", error=True)
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                self.vis.print_message(f"aligner IOloop error: {repr(e), tb,}", error=True)
 
     def IOloop_helper(self):
         self.motor_readxmotor_text.value = (str)(self.g_motor_position[0])

@@ -4,6 +4,7 @@ import asyncio
 import os
 import paramiko
 import time
+import traceback
 from copy import deepcopy
 from typing import List, Optional, Union, Tuple
 from pydantic import BaseModel, Field
@@ -353,8 +354,9 @@ class PAL:
                     await asyncio.sleep(0.1)
 
         except Exception as e:
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             self.base.print_message(
-                f"_poll_trigger_task excited with error: {repr(e)}", error=True
+                f"_poll_trigger_task excited with error: {repr(e), tb,}", error=True
             )
 
     async def _sendcommand_main(self, palcam: PalCam) -> ErrorCodes:
@@ -1635,8 +1637,9 @@ class PAL:
         try:
             val = await asyncio.wait_for(self.IO_trigger_startq.get(), self.timeout)
         except Exception as e:
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             self.base.print_message(
-                f"PAL start trigger timeout with error: {repr(e)}", error=True
+                f"PAL start trigger timeout with error: {repr(e), tb,}", error=True
             )
             # also need to set IO_continue and IO_error
             # so active can return
@@ -1653,8 +1656,9 @@ class PAL:
         try:
             val = await asyncio.wait_for(self.IO_trigger_continueq.get(), self.timeout)
         except Exception as e:
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             self.base.print_message(
-                f"PAL continue trigger timeout with error: {repr(e)}", error=True
+                f"PAL continue trigger timeout with error: {repr(e), tb,}", error=True
             )
             return ErrorCodes.continue_timeout
 
@@ -1667,8 +1671,9 @@ class PAL:
         try:
             val = await asyncio.wait_for(self.IO_trigger_doneq.get(), self.timeout)
         except Exception as e:
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             self.base.print_message(
-                f"PAL done trigger timeout with error: {repr(e)}", error=True
+                f"PAL done trigger timeout with error: {repr(e), tb,}", error=True
             )
             return ErrorCodes.done_timeout
 
@@ -1715,10 +1720,11 @@ class PAL:
                 self.PAL_pid = subprocess.Popen(cmd_to_execute, shell=True)
                 self.base.print_message(f"PAL command send: {self.PAL_pid}")
             except Exception as e:
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                 self.base.print_message(
                     "CMD error. Could not send commands.", error=True
                 )
-                self.base.print_message(repr(e), error=True)
+                self.base.print_message(repr(e), tb, error=True)
                 error = ErrorCodes.cmd_error
         elif self.sshhost is not None:
             ssh_connected = False
@@ -1733,9 +1739,10 @@ class PAL:
                     )
                     ssh_connected = True
                 except Exception as e:
+                    tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                     ssh_connected = False
                     self.base.print_message(
-                        f"SSH connection error. Retrying in 1 seconds.\n{repr(e)}",
+                        f"SSH connection error. Retrying in 1 seconds.\n{repr(e), tb,}",
                         error=True,
                     )
                     await asyncio.sleep(1)
@@ -1792,8 +1799,9 @@ class PAL:
                 self.base.print_message(f"PAL command: '{cmd_to_execute}'", info=True)
 
             except Exception as e:
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                 self.base.print_message(
-                    f"SSH connection error 1. Could not send commands.\n{repr(e)}", error=True
+                    f"SSH connection error 1. Could not send commands.\n{repr(e), tb,}", error=True
                 )
 
                 error = ErrorCodes.ssh_error
@@ -1809,8 +1817,9 @@ class PAL:
                     mysshclient.close()
 
             except Exception as e:
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                 self.base.print_message(
-                    f"SSH connection error 2. Could not send commands.\n{repr(e)}", error=True
+                    f"SSH connection error 2. Could not send commands.\n{repr(e), tb,}", error=True
                 )
                 error = ErrorCodes.ssh_error
 
@@ -2894,9 +2903,10 @@ class PAL:
                 )
                 ssh_connected = True
             except Exception as e:
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                 ssh_connected = False
                 self.base.print_message(
-                    f"SSH connection error. Retrying in 1 seconds.\n{repr(e)}", error=True
+                    f"SSH connection error. Retrying in 1 seconds.\n{repr(e), tb,}", error=True
                 )
                 await asyncio.sleep(1)
 
@@ -2910,8 +2920,9 @@ class PAL:
             mysshclient.close()
 
         except Exception as e:
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             self.base.print_message(
-                f"SSH connection error 1. Could not send commands.\n{repr(e)}", error=True
+                f"SSH connection error 1. Could not send commands.\n{repr(e), tb,}", error=True
             )
             self.base.print_message(e, error=True)
 

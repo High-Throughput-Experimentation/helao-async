@@ -13,6 +13,7 @@ __all__ = [
 
 import os
 import pathlib
+import traceback
 
 from helaocore.server.base import Base
 from helaocore.error import ErrorCodes
@@ -75,9 +76,10 @@ class Galil:
                 self.base.print_message("no Galil IP configured", error=True)
                 self.galil_enabled = False
         except Exception as e:
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             self.base.print_message(
                 f"severe Galil error ... please power cycle Galil "
-                f"and try again {repr(e)}",
+                f"and try again {repr(e), tb,}",
                 error=True,
             )
             self.galil_enabled = False
@@ -323,7 +325,8 @@ class Galil:
         try:
             self.g.GClose()
         except Exception as e:
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             self.base.print_message(
-                f"could not close galil connection: {repr(e)}", error=True
+                f"could not close galil connection: {repr(e), tb,}", error=True
             )
         return {"shutdown"}

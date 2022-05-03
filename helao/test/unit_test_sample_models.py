@@ -4,6 +4,7 @@ __all__ = ["sample_model_unit_test"]
 import colorama
 from colorama import Fore, Style
 import sys
+import traceback
 
 
 from helaocore.model.sample import (
@@ -101,8 +102,9 @@ def sample_model_unit_test():
             test_sample_list = SampleList(samples=[test_liquid,test_gas,test_solid,test_assembly,test_assembly2])
             print(passed_msg)
         except Exception as e:
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             print(fail_msg, "cannot convert list of model dicts to model list")
-            print(repr(e))
+            print(repr(e), tb,)
             return False
         
         
@@ -215,8 +217,9 @@ def sample_model_unit_test():
             test_sample_list = SampleList(samples=[test_liquid.dict(),test_gas.dict(),test_solid.dict(),test_assembly.dict(), test_assembly2.dict()])
             print(passed_msg)
         except Exception as e:
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             print(fail_msg, "cannot convert list of model dicts to model list")
-            print(repr(e))
+            print(repr(e), tb,)
             return False
 
         try:
@@ -321,5 +324,6 @@ def sample_model_unit_test():
         return success
 
     except Exception as e:
-        print(repr(e))
+        tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+        print(repr(e), tb,)
         return False

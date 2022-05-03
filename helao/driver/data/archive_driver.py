@@ -7,6 +7,7 @@ import os
 from datetime import datetime
 from copy import deepcopy
 from typing import List, Tuple
+import traceback
 
 from socket import gethostname
 import re
@@ -242,8 +243,9 @@ class Archive:
                     data = json.loads(f.readline())
                     return Positions(**data)
                 except Exception as e:
+                    tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                     self.base.print_message(
-                        f"error loading {self.archivepck}: {repr(e)}", error=True
+                        f"error loading {self.archivepck}: {repr(e), tb,}", error=True
                     )
                     return Positions()
         #         data = pickle.load(f)

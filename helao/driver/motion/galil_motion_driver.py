@@ -15,6 +15,8 @@ import json
 import os
 from socket import gethostname
 from copy import deepcopy
+import traceback
+
 
 from bokeh.server.server import Server
 
@@ -158,10 +160,11 @@ class Galil:
                 self.base.print_message("no Galil IP configured", error=True)
                 self.galil_enabled = False
         except Exception as e:
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             self.base.print_message(
                 f"severe Galil error ... "
                 f"please power cycle Galil and try again: "
-                f"{repr(e)}",
+                f"{repr(e), tb,}",
                 error=True,
             )
             self.galil_enabled = False
@@ -622,8 +625,9 @@ class Galil:
                     speed = self.motor_max_speed_count_sec
                 self._speed = speed
             except Exception as e:
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                 self.base.print_message(
-                    f"motor numerical error for axis '{ax}': {repr(e)}", error=True
+                    f"motor numerical error for axis '{ax}': {repr(e), tb,}", error=True
                 )
                 # something went wrong in the numerical part so we give that as feedback
                 ret_moved_axis.append(None)
@@ -681,7 +685,8 @@ class Galil:
 
                 # continue
             except Exception as e:
-                self.base.print_message(f"motor error: '{repr(e)}'", error=True)
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                self.base.print_message(f"motor error: '{repr(e), tb,}'", error=True)
                 ret_moved_axis.append(None)
                 ret_speed.append(None)
                 ret_accepted_rel_dist.append(None)
@@ -758,6 +763,7 @@ class Galil:
         try:
             self.g.GClose()  # don't forget to close connections!
         except gclib.GclibError as e:
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             return {"connection": {"Unexpected GclibError:", e}}
         return {"connection": "motor_offline"}
 
@@ -1012,8 +1018,9 @@ class Galil:
             # self.motor_off_shutdown(axis = self.get_all_axis())
             self.g.GClose()
         except Exception as e:
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             self.base.print_message(
-                f"could not close galil connection: {repr(e)}", error=True
+                f"could not close galil connection: {repr(e), tb,}", error=True
             )
         if self.aligner_enabled and self.aligner:
             self.aligner.IOtask.cancel()
@@ -1051,8 +1058,9 @@ class Galil:
                         return new_matrix
 
                 except Exception as e:
+                    tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                     self.base.print_message(
-                        f"error loading matrix for '{file}': {repr(e)}", error=True
+                        f"error loading matrix for '{file}': {repr(e), tb,}", error=True
                     )
                     return None
         else:
@@ -1353,7 +1361,8 @@ class TransformXY:
             try:
                 self.Minv = self.M.I
             except Exception as e:
-                self.base.print_message(f"System Matrix singular {repr(e)}", error=True)
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                self.base.print_message(f"System Matrix singular {repr(e), tb,}", error=True)
                 # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
                 self.Minv = np.matrix(
                     [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, -1]]
@@ -1362,7 +1371,8 @@ class TransformXY:
             try:
                 self.Minstrinv = self.Minstr.I
             except Exception as e:
-                self.base.print_message(f"Instrument Matrix singular {repr(e)}", error=True)
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                self.base.print_message(f"Instrument Matrix singular {repr(e), tb,}", error=True)
                 # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
                 self.Minstrinv = np.matrix(
                     [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, -1]]
@@ -1409,6 +1419,7 @@ class TransformXY:
 
             return self.Mplatexy
         except Exception as e:
-            self.base.print_message(f"Instrument Matrix singular {repr(e)}", error=True)
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            self.base.print_message(f"Instrument Matrix singular {repr(e), tb,}", error=True)
             # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
             self.Minv = np.matrix([[0, 0, 0], [0, 0, 0], [0, 0, -1]])
