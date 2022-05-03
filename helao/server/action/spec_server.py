@@ -38,8 +38,8 @@ def makeApp(confPrefix, servKey, helao_root):
         active = await app.base.setup_and_contain_action(action_abbr="OPT")
         pars = {k:v for k,v in active.action.action_params.items() if k!='action_version'}
         spectrum = app.driver.measure_spec(**pars)
-        _ = await active.finish()
-        return spectrum
+        finished_act = await active.finish()
+        return finished_act.as_dict()
 
     @app.post(f"/{servKey}/measure_adv")
     async def measure_spec_adv(
@@ -53,7 +53,7 @@ def makeApp(confPrefix, servKey, helao_root):
         active = await app.base.setup_and_contain_action(action_abbr="OPT")
         pars = {k:v for k,v in active.action.action_params.items() if k!='action_version'}
         spectrum = app.driver.measure_spec_adv(**pars)
-        _ = await active.finish()
-        return spectrum
+        finished_act = await active.finish()
+        return finished_act.as_dict()
 
     return app
