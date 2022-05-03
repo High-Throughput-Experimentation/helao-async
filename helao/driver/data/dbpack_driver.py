@@ -679,7 +679,11 @@ class DBPack:
         return return_dict
     
     def shutdown(self):
-        pass
+        self.base.print_message("Checking for queued DB tasks.")
+        while not self.task_queue.empty():
+            asyncio.sleep(0.2)
+        self.base.print_message("All DB tasks complete. Shutting down.")
+        
 
 
 class YmlOps:
