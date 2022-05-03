@@ -479,7 +479,18 @@ class DBPack:
                 info=True,
             )
             self.testing_uuid_dict = None
-
+        self.loop = asyncio.get_event_loop()
+        self.task_queue = asyncio.Queue()
+        self.loop.create_task(self.yml_task())
+        self.current_task = None
+        
+    async def yml_task(self):
+        while True:
+            yml_target = await self.task_queue.get()
+            self.current_task = await self.finish_yml(yml_target)
+            self.current_task = None
+            self.task_queue.task_done()
+        
     def read_log(self):
         yaml = YAML(typ="safe")
         self.log_dict = yaml.load(self.log_path)
@@ -539,6 +550,10 @@ class DBPack:
             )
         return self.log_dict
 
+    async def add_yml_task(self, yml_path: str):
+        await self.task_queue.put(yml_path)
+        self.base.print_message(f"Added {yml_path} to tasks.")
+
     async def finish_yml(self, yml_path: Union[str, HelaoPath]):
         """Primary function for processing ymls.
 
@@ -546,8 +561,13 @@ class DBPack:
         yml_path[str]: local path to yml file
 
         """
-        hpth = HelaoPath(yml_path) if isinstance(yml_path, str) else yml_path
-        self.base.print_message(f"Processing yml {hpth.__str__()}", info=True)
+        if isinstance(yml_path, str):
+            yml_path_str = yml_path
+            hpth = HelaoPath(yml_path)
+        else:
+            yml_path_str = yml_path.__str__()
+            hpth = yml_path
+        self.base.print_message(f"Processing yml {yml_path_str}", info=True)
         if not hpth.exists():
             return f"{hpth} does not exist."
         yml_type = HelaoYml(hpth).type
@@ -655,7 +675,11 @@ class DBPack:
             for k, d in progress.items()
             if k in finished
         }
+
         return return_dict
+    
+    def shutdown(self):
+        pass
 
 
 class YmlOps:

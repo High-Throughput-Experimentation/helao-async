@@ -27,8 +27,8 @@ def makeApp(confPrefix, servKey, helao_root):
 
     @app.post(f"/finish_yml")
     async def finish_yml(yml_path: str):
-        progress = await app.driver.finish_yml(yml_path)
-        return progress
+        await app.driver.add_yml_task(yml_path)
+        return yml_path
 
     @app.post(f"/finish_pending")
     async def finish_pending():
