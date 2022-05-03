@@ -6,7 +6,7 @@ config = {}
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
-config["experiment_libraries"] = []
+config["experiment_libraries"] = ["spec_exp"]
 # config["experiment_libraries"] = ["SDC_exp", "samples_exp"]
 # config["experiment_params"] = {"wavelength_intensity_mw": 2,
 # "wavelength_intensity_mwled2": 2,
@@ -158,4 +158,20 @@ config["servers"] = dict(
     #         doc_name = "ECHE4 Visualizer",
     #     )
     # ),
+    # #########################################################################
+    # DB package server
+    # #########################################################################
+    DB=dict(
+        host=hostip,
+        port=8010,
+        group="action",
+        fast="dbpack_server",
+        params=dict(
+            aws_config_path="k:/users/hte/.credentials/aws_config.ini",
+            aws_profile="default",
+            aws_bucket="helao.data.testing",
+            api_host="caltech-api.modelyst.com",
+            testing=False
+        ),
+    ),
 )
