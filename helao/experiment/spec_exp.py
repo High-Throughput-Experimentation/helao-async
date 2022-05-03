@@ -31,7 +31,9 @@ SPEC_server = MachineModel(server_name="SPEC", machine_name=ORCH_HOST).json_dict
 def SPEC_test_wait(
     experiment: Experiment,
     experiment_version: int = 1,
-    wait_time: Optional[int] = 80,
+    wait_time1: Optional[int] = 5,
+    wait_time2: Optional[int] = 10,
+    wait_time3: Optional[int] = 15,
 ):
     """ORCH wait debugging
 
@@ -42,8 +44,10 @@ def SPEC_test_wait(
     """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.wait_time})
-    apm.add(SPEC_server, "measure", {"int_time": 50})
-    apm.add(SPEC_server, "measure", {"int_time": 50})
-    apm.add(SPEC_server, "measure", {"int_time": 50})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.wait_time1})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.wait_time2})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.wait_time3})
+    apm.add(SPEC_server, "measure_spec", {"int_time": 50})
+    apm.add(SPEC_server, "measure_spec", {"int_time": 50})
+    apm.add(SPEC_server, "measure_spec", {"int_time": 50})
     return apm.action_list
