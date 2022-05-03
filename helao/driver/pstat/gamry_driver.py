@@ -16,6 +16,7 @@ import comtypes.client as client
 import asyncio
 import time
 import psutil
+import traceback
 import numpy as np
 
 from helaocore.schema import Action
@@ -285,10 +286,11 @@ class gamry:
                 )
 
         except Exception as e:
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             # this will lock up the potentiostat server
             # happens when a not activated Gamry is connected and turned on
             # TODO: find a way to avoid it
-            self.base.print_message(f"fatal error initializing Gamry: {repr(e)}", error=True)
+            self.base.print_message(f"fatal error initializing Gamry: {repr(e), tb,}", error=True)
         self.ready = True
 
     async def open_connection(self):
@@ -308,8 +310,9 @@ class gamry:
                 return ErrorCodes.not_initialized
 
         except Exception as e:
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             # self.pstat = None
-            self.base.print_message(f"Gamry error init: {repr(e)}", error=True)
+            self.base.print_message(f"Gamry error init: {repr(e), tb,}", error=True)
             return ErrorCodes.critical
 
     def close_connection(self):
@@ -555,6 +558,7 @@ class gamry:
                         else:
                             self.dtaq.Init(self.pstat, *argv)
                     except Exception as e:
+                        tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                         self.base.print_message(
                             f"Gamry Error during setup: {gamry_error_decoder(e)}",
                             error=True,
@@ -574,6 +578,7 @@ class gamry:
                     )
 
             except comtypes.COMError as e:
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                 self.base.print_message(
                     f"Gamry error during measurement setup: {e}", error=True
                 )
@@ -614,6 +619,7 @@ class gamry:
                 self.pstat.SetSignal(self.IO_sigramp)
                 self.base.print_message("signal ramp set")
             except Exception as e:
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                 self.base.print_message("gamry error in signal")
                 self.base.print_message(gamry_error_decoder(e))
                 self.pstat.SetCell(self.GamryCOM.CellOff)
@@ -701,6 +707,7 @@ class gamry:
                 self.base.print_message("running dtaq")
                 self.IO_measuring = True
             except Exception as e:
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                 self.base.print_message("gamry error run")
                 self.base.print_message(gamry_error_decoder(e))
                 self.close_pstat_connection()
@@ -965,6 +972,7 @@ class gamry:
                     self.IO_sigramp.Init(*sigfunc_params)
                     act.error_code = ErrorCodes.none
                 except Exception as e:
+                    tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                     act.error_code = gamry_error_decoder(e)
                     self.base.print_message(
                         f"IO_sigramp.Init error: {act.error_code}", error=True

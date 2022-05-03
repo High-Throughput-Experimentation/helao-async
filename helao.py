@@ -33,6 +33,7 @@ import psutil
 import time
 import requests
 import subprocess
+import traceback
 
 from termcolor import cprint
 from pyfiglet import figlet_format
@@ -159,10 +160,11 @@ class Pidd:
                         )
                         return False
                 except Exception as e:
+                    tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                     print_message(
                         {}, "launcher", f"Error terminating server '{k}'", error=True
                     )
-                    print_message({}, "launcher", repr(e), error=True)
+                    print_message({}, "launcher", repr(e), tb, error=True)
                     return False
 
     def close(self):
@@ -486,8 +488,9 @@ if __name__ == "__main__":
                                     data={"client_servkey": sn},
                                 )
                     except Exception as e:
+                        tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                         print_message(
-                            {}, "launcher", " ... got error: ", repr(e), error=True
+                            {}, "launcher", " ... got error: ", repr(e), tb, error=True
                         )
                     break
                 elif sind == "":
@@ -506,7 +509,8 @@ if __name__ == "__main__":
             try:
                 stop_server("orchestrator", server)
             except Exception as e:
-                print_message({}, "launcher", " ... got error: ", repr(e), error=True)
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                print_message({}, "launcher", " ... got error: ", repr(e), tb, error=True)
         # in case a /shutdown is added to other FastAPI servers (not the shutdown without '/')
         # KILL_ORDER = ["visualizer", "action", "server"] # orch are killed above
         # no /shutdown in visualizers
@@ -522,8 +526,9 @@ if __name__ == "__main__":
                         # will produce a 404 if not found
                         requests.post(f"http://{S['host']}:{S['port']}/shutdown")
                     except Exception as e:
+                        tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                         print_message(
-                            {}, "launcher", f" ... got error: {repr(e)}", error=True
+                            {}, "launcher", f" ... got error: {repr(e), tb,}", error=True
                         )
         pidd.close()
     else:

@@ -2,6 +2,7 @@ __all__ = ["cNIMAX"]
 
 import time
 import asyncio
+import traceback
 
 import nidaqmx
 from nidaqmx.constants import LineGrouping
@@ -70,7 +71,8 @@ class cNIMAX:
                 "NEGATE3", -1.0, 0.0, UnitsPreScaled.AMPS, "AMPS"
             )
         except Exception as e:
-            self.base.print_message(f"NImax error: {repr(e)}", error=True)
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            self.base.print_message(f"NImax error: {repr(e), tb,}", error=True)
             raise e
         self.time_stamp = time.time()
 
@@ -254,7 +256,8 @@ class cNIMAX:
                     )
 
             except Exception as e:
-                self.base.print_message(f"canceling NImax IV stream: {repr(e)}", error=True)
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                self.base.print_message(f"canceling NImax IV stream: {repr(e), tb,}", error=True)
 
         elif self.base.actionserver.estop and self.IO_do_meas:
             _ = self.task_cellcurrent.read(

@@ -12,6 +12,7 @@ from glob import glob
 from datetime import datetime
 from typing import Union, Optional
 from collections import UserDict, defaultdict
+import traceback
 
 import pyaml
 import botocore
@@ -97,6 +98,7 @@ class HelaoPath(type(Path())):
                 check_dir.rmdir()
                 return "success"
             except PermissionError as e:
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                 return e
 
 
@@ -805,6 +807,7 @@ class YmlOps:
                 self.dbp.base.print_message(f"Successfully uploaded {target}")
                 return True
             except botocore.exceptions.ClientError as e:
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                 self.dbp.base.print_message(e)
                 self.dbp.base.print_message(
                     f"Retry S3 upload [{i}/{retry_num}]: {self.dbp.bucket}, {target}"
