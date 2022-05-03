@@ -28,20 +28,22 @@ def makeApp(confPrefix, servKey, helao_root):
         driver_class=SM303,
     )
 
-    @app.post(f"/{servKey}/measure")
+    @app.post(f"/{servKey}/measure_spec")
     async def measure_spec(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
         int_time: Optional[int] = 35,
     ):
         """Measure single spectrum."""
+        app.base.print_message("!!! Starting measure_spec action.")
         active = await app.base.setup_and_contain_action(action_abbr="OPT")
+        app.base.print_message("!!! Measure_spec action is active.")
         pars = {k:v for k,v in active.action.action_params.items() if k!='action_version'}
         spectrum = app.driver.measure_spec(**pars)
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{servKey}/measure_adv")
+    @app.post(f"/{servKey}/measure_spec_adv")
     async def measure_spec_adv(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
