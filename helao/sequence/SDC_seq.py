@@ -401,7 +401,7 @@ def SDC_CA(
     ref_vs_nhe: float = 0.21,
     CA_potential_vsRHE: float = 1.23,
     CA_duration_sec: float = 4,
-    CAsamplerate_sec: float = 0.05,
+    CA_samplerate_sec: float = 0.05,
     IErange: str = "auto",
 ):
 
@@ -688,7 +688,7 @@ def SDC_CP(
 
         # CP1
         pl.add_experiment(
-            "SDC_slave_CA",
+            "SDC_slave_CP",
             {
                 "CP_current" : CP_current,
                 "ph": ph,
