@@ -642,23 +642,7 @@ class gamry:
                     self.base.print_message(f"Gamry DIbits: {bits}")
                     if self.IO_TTLwait & bits:
                         break
-                    # if self.IO_TTLwait == 0:
-                    #     #0001
-                    #     if (bits & 0x01):
-                    #         break
-                    # elif self.IO_TTLwait == 1:
-                    #     #0010
-                    #     if (bits & 0x02):
-                    #         break
-                    # elif self.IO_TTLwait == 2:
-                    #     #0100
-                    #     if (bits & 0x04):
-                    #         break
-                    # elif self.IO_TTLwait == 3:
-                    #     #1000
-                    #     if (bits & 0x08):
-                    #         break
-                    break  # for testing, we don't want to wait forever
+                    # break  # for testing, we don't want to wait forever
                     await asyncio.sleep(0.001)
 
             # second, send a trigger
