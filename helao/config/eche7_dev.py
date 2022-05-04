@@ -3,21 +3,23 @@ __all__ = ["config"]
 
 
 hostip = "127.0.0.1"
-config = {}
+config = dict()
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
 config["experiment_libraries"] = ["SDC_exp", "samples_exp"]
 #config["experiment_params"] = { }
 config["sequence_libraries"] = ["SDC_seq"]
-config["sequence_params"] = {"wavelength_intensity_mwled1": 1.04,
-                               "wavelength_intensity_mwled2": 0.86,
-                               "wavelength_intensity_mwled3": 0.344,
-                               "wavelength_intensity_mwled4": 0.267,
-                               "wavelength_intensity_date": "3/13/2019"
-                             
+config["sequence_params"] = {
+                               "led_wavelengths_nm": [0,385,450,515,595],
+                               "led_intensities_mw": [0,1.04,0.86,0.344,0.267],
+                               "led_typenamesdate": ["front", "doric_led1", "doric_led2","doric_led3","doric_led4","3/13/2019"]
+
+                                
+
+
                              }
-config["technique_name"] = "eche"
+config["technique_name"] = "sdc"
 config["root"] = r"C:\INST_dev2"
 
 
