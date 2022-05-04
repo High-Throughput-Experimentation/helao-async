@@ -12,7 +12,6 @@ driver code, and hard-coded to use 'galil' class (see "__main__").
 __all__ = ["makeApp"]
 
 
-from importlib import import_module
 from typing import Optional, List, Union
 from fastapi import Body
 import numpy as np
