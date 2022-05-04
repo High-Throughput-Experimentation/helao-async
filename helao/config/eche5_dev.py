@@ -9,14 +9,13 @@ config = {}
 # lists from input experiment_id grouping
 config["experiment_libraries"] = ["SDC_exp", "samples_exp"]
 config["sequence_libraries"] = ["SDC_seq"]
-config["sequence_params"] = {"wavelength_intensity_mwled1": 3.77,
-                               "wavelength_intensity_mwled2": 2.77,
-                               "wavelength_intensity_mwled3": 1.13,
-                               "wavelength_intensity_mwled4": 1.0,
-                               "wavelength_intensity_date": "6/24/2020"
+config["sequence_params"] = {
+                               "led_wavelengths_nm": [0,385,450,515,595],
+                               "led_intensities_mw": [0,3.77,2.77,1.13,1.0],
+                               "led_typenamesdate": ["front", "doric_led1", "doric_led2","doric_led3","doric_led4","6/24/2020"]
 #           backside 2.27, 1.91, .76, .667   6/29/2021
                                 }
-config["technique_name"] = "eche"
+config["technique_name"] = "sdc"
 config["root"] = r"C:\INST_dev2"
 
 
@@ -134,5 +133,21 @@ config["servers"] = dict(
         params = dict(
             doc_name = "ECHE5 Visualizer",
         )
+    ),
+    # #########################################################################
+    # DB package server
+    # #########################################################################
+    DB=dict(
+        host=hostip,
+        port=8010,
+        group="action",
+        fast="dbpack_server",
+        params=dict(
+            aws_config_path="k:/users/hte/.credentials/aws_config.ini",
+            aws_profile="default",
+            aws_bucket="helao.data.testing",
+            api_host="caltech-api.modelyst.com",
+            testing=False
+        ),
     ),
 )
