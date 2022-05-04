@@ -2190,9 +2190,10 @@ class PAL:
         # measurement
         # need to set the current meas to idle first
         if self.active:
-            _ = await self.active.finish()
-        self.active = None
-        self.action = None
+            last_active = self.active
+            self.active = None
+            self.action = None
+            _ = await last_active.finish()
 
 
     async def method_arbitrary(self, A: Action) -> dict:
