@@ -8,22 +8,19 @@ config = {}
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
 config["experiment_libraries"] = ["SDC_exp", "samples_exp"]
-#config["experiment_params"] = {"wavelength_intensity_mw": 2,
-                               #"wavelength_intensity_mwled2": 2,
-                              # "wavelength_intensity_mwled3": 4,
-                               #"wavelength_intensity_mwled4": 5,
-                             #  "wavelength_intensity_date": "12/23/2020"
-                             # 1.725 1.478 .585 .366
+#config["experiment_params"] = {
+                               
  #                            }
 config["sequence_libraries"] = ["SDC_seq"]
-config["sequence_params"] = {"wavelength_intensity_mwled1": 1.725,
-                               "wavelength_intensity_mwled2": 1.478,
-                               "wavelength_intensity_mwled3": 0.585,
-                               "wavelength_intensity_mwled4": 0.366,
-                               "wavelength_intensity_date": "12/23/2020"
-                             # 1.725 1.478 .585 .366
+config["sequence_params"] = {
+                               "led_wavelengths_nm": [0,385,455,515,590],
+                               "led_intensities_mw": [0,1.725,1.478,0.585,0.366],
+                               "led_typenamesdate": ["front", "doric_led1", "doric_led2","doric_led3","doric_led4","12/23/2020"]
+
+                                
+# 1.725 1.478 .585 .366
                              }
-config["technique_name"] = "eche"
+config["technique_name"] = "sdc"
 config["root"] = r"C:\INST_dev2"
 
 
@@ -142,4 +139,24 @@ config["servers"] = dict(
             doc_name = "ECHE4 Visualizer",
         )
     ),
+    
+    #
+       # #########################################################################
+       # DB package server
+       # #########################################################################
+        DB=dict(
+            host=hostip,
+            port=8010,
+            group="action",
+            fast="dbpack_server",
+            params=dict(
+                aws_config_path="k:/users/hte/.credentials/aws_config.ini",
+                aws_profile="default",
+                aws_bucket="helao.data.testing",
+                api_host="caltech-api.modelyst.com",
+                testing=False
+            ),
+        ),
+
+    
 )

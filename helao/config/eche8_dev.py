@@ -9,12 +9,6 @@ config = {}
 # lists from input experiment_id grouping
 config["experiment_libraries"] = ["SDC_exp", "samples_exp"]
 config["sequence_libraries"] = ["SDC_seq"]
-config["sequence_params"] = {
-                               "led_wavelengths_nm": [0,385,455,515,590],
-                               "led_intensities_mw": [0,2.77,2.31,0.961,1.0],
-                               "led_typenamesdate": ["front", "doric_led1", "doric_led2","doric_led3","doric_led4","12/23/2020"]
-                             
-                             }
 config["technique_name"] = "sdc"
 config["root"] = r"C:\INST_dev2"
 
@@ -55,20 +49,20 @@ config["servers"] = dict(
                        [0,0,0,1]
                        ],
             count_to_mm=dict(
-                A=1.0/6391.80,
-                B=1.0/6401.37,
+                A=1.0/6399.69,
+                B=1.0/6402.54,
             ),
-            galil_ip_str="192.168.200.220",
+            galil_ip_str="192.168.200.234",
             def_speed_count_sec=10000,
             max_speed_count_sec=25000,
-            ipstr="192.168.200.23",
+            ipstr="192.168.200.234",
             axis_id=dict(
                 x="B",
                 y="A",
                 ),
             axis_zero=dict(
-                A=127.7, #z
-                B=76.7, #y
+                A=152.9, #znot    y
+                B=102.1, #ynot x
                 ),
             timeout = 10*60, # timeout for axis stop in sec
         )
@@ -89,7 +83,7 @@ config["servers"] = dict(
         group="action",
         fast="galil_io",
         params=dict(
-            galil_ip_str="192.168.200.220",
+            galil_ip_str="192.168.200.234",
             dev_ai = {
                 },
             dev_ao = {
@@ -101,11 +95,11 @@ config["servers"] = dict(
                 "gamry_aux":1,
                 "led":2,
                 "pump_ref_flush":3,
-                "doric_led1":4,
-               # "unknown2":5,
-                "doric_led2":5,
-                "doric_led3":7,
-                "doric_led4":8,
+               # "doric_led1":4,
+                "unknown2":5,
+               # "doric_led2":6,
+              #  "doric_led3":7,
+                #"doric_led4":8,
                 },
         )
     ),
@@ -131,10 +125,10 @@ config["servers"] = dict(
         group="visualizer",
         bokeh="bokeh_modular_visualizer",
         params = dict(
-            doc_name = "ECHE6 Visualizer",
+            doc_name = "ECHE8 Visualizer",
         )
     ),
- #
+    
     # #########################################################################
     # DB package server
     # #########################################################################
@@ -151,6 +145,6 @@ config["servers"] = dict(
             testing=False
         ),
     ),
-    
+
     
 )
