@@ -2176,6 +2176,16 @@ class PAL:
         self.IO_do_meas = False
         self.IO_action_run_counter = 0
 
+        if self.base.actionserver.estop:
+            self.base.print_message("PAL is in estop.")
+        else:
+            self.base.print_message("setting PAL to idle")
+
+        self.IO_measuring = False
+        self.base.print_message("PAL is done")
+
+        await asyncio.sleep(0.1)
+
         # need to check here again in case estop was triggered during
         # measurement
         # need to set the current meas to idle first
@@ -2184,13 +2194,6 @@ class PAL:
         self.active = None
         self.action = None
 
-        if self.base.actionserver.estop:
-            self.base.print_message("PAL is in estop.")
-        else:
-            self.base.print_message("setting PAL to idle")
-
-        self.IO_measuring = False
-        self.base.print_message("PAL is done")
 
     async def method_arbitrary(self, A: Action) -> dict:
         palcam = PalCam(**A.action_params)
