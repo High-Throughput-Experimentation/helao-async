@@ -16,7 +16,8 @@ __all__ = [
     "SDC_slave_background",
     "SDC_slave_CP_led",
     "SDC_slave_CP",
-    
+    "SDC_slave_movetosample",
+    "SDC_slave_move",
 ]
 
 
@@ -842,6 +843,83 @@ def SDC_slave_background(
             ],
         },
 
+    )
+
+    return apm.action_list  # returns complete action list to orch
+
+
+def SDC_slave_movetosample(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    solid_plate_id: Optional[int] = 4534,
+    solid_sample_no: Optional[int] = 1,
+):
+    """Slave experiment
+    last functionality test: -"""
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+
+    # get sample plate coordinates
+    apm.add_action(
+        {
+            "action_server": MOTOR_server,
+            "action_name": "solid_get_samples_xy",
+            "action_params": {
+                "plate_id": apm.pars.solid_plate_id,
+                "sample_no": apm.pars.solid_sample_no,
+            },
+            "to_global_params": [
+                "_platexy"
+            ],  # save new liquid_sample_no of eche cell to globals
+            "start_condition": ActionStartCondition.wait_for_all,
+        }
+    )
+
+    # move to position
+    apm.add_action(
+        {
+            "action_server": MOTOR_server,
+            "action_name": "move",
+            "action_params": {
+                # "d_mm": [apm.pars.x_mm, apm.pars.y_mm],
+                "axis": ["x", "y"],
+                "mode": MoveModes.absolute,
+                "transformation": TransformationModes.platexy,
+            },
+            "from_global_params": {"_platexy": "d_mm"},
+            "start_condition": ActionStartCondition.wait_for_all,
+        }
+    )
+
+    return apm.action_list  # returns complete action list to orch
+
+def SDC_slave_move(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    x_mm: float = 1.0,
+    y_mm: float = 1.0,
+):
+    """Slave experiment
+    last functionality test: -"""
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+
+    # move to position
+    apm.add_action(
+        {
+            "action_server": MOTOR_server,
+            "action_name": "move",
+            "action_params": {
+                "d_mm": [apm.pars.x_mm, apm.pars.y_mm],
+                "axis": ["x", "y"],
+                "mode": MoveModes.relative,
+                "transformation": TransformationModes.platexy,
+            },
+#            "from_global_params": {"_platexy": "d_mm"},
+            "start_condition": ActionStartCondition.wait_for_all,
+        }
     )
 
     return apm.action_list  # returns complete action list to orch
