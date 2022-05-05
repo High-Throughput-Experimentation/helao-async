@@ -52,6 +52,36 @@ def dict2json(input_dict: dict):
     bio.seek(0)
     return bio
 
+def wrap_sample_details(input_obj):
+    sample_root = ['hlo_version', 'global_label', 'sample_type', 'status', 'inheritance']
+    if isinstance(input_obj, dict) :
+        if 'sample_type' in input_obj.keys():
+            details_dict = {k: v for k,v in input_obj.items() if k not in sample_root}
+            root_dict = {k: v for k,v in input_obj.items() if k in sample_root}
+            root_dict['sample_details'] = wrap_sample_details(details_dict)
+        else:
+            root_dict = {}
+            for k,v in input_obj.items():
+                if isinstance(v, dict):
+                    root_dict[k] = wrap_sample_details(v)
+                elif isinstance(v, list):
+                    root_dict[k] = [wrap_sample_details(x) for x in v]
+                else:
+                    root_dict[k] = v
+        return root_dict
+    elif isinstance(input_obj, list):
+        root_list = []
+        if isinstance(input_obj, list):
+            for x in input_obj:
+                root_list.append(wrap_sample_details(x))
+        elif isinstance(input_obj, dict):
+            root_list.append(wrap_sample_details(input_obj))
+        else:
+            root_list.append(input_obj)
+        return root_list
+    else:
+        return input_obj
+
 
 class HelaoPath(type(Path())):
     """Helao data path helper attributes."""
@@ -148,6 +178,7 @@ class HelaoYml:
         self.progress_path = HelaoPath(os.path.join(*progress_parts))
         self.progress = Progress(self)
         meta_json = modmap[self.type](**self.dict).clean_dict()
+        meta_json = wrap_sample_details(meta_json)
         for file_dict in meta_json.get("files", []):
             if file_dict["file_name"].endswith(".hlo"):
                 file_dict["file_name"] = f"{file_dict['file_name']}.json"
@@ -407,6 +438,7 @@ class ExpYml(HelaoYml):
         fill_process["process_params"] = fill_process.pop("action_params")
         base_process.update(fill_process)
         meta_json = ProcessModel(**base_process).clean_dict()
+        meta_json = wrap_sample_details(meta_json)
         for file_dict in meta_json["files"]:
             if file_dict["file_name"].endswith(".hlo"):
                 file_dict["file_name"] = f"{file_dict['file_name']}.json"
