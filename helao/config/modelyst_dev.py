@@ -1,5 +1,6 @@
 hostip = "127.0.0.1"
 config = {}
+config['dummy'] = True
 
 # action library provides generator functions which produce actions
 config["experiment_libraries"] = []

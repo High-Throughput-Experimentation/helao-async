@@ -3,7 +3,8 @@ __all__ = ["config"]
 
 
 hostip = "127.0.0.1"
-config = dict()
+config = {}
+config['dummy'] = True
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
