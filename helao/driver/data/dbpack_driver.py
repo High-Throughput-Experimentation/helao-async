@@ -730,6 +730,7 @@ class YmlOps:
             f"attempting API push for {self.yml.target.__str__()} :: {progress_key} :: {p_uuid}"
         )
         try_create = True
+        last_response = {}
         async with aiohttp.ClientSession() as session:
             for i in range(retry_num):
                 if not pdict["api"]:
@@ -744,8 +745,9 @@ class YmlOps:
                         self.dbp.base.print_message(
                             f"[{i+1}/{retry_num}] {api_str} {p_uuid} returned status: {resp.status}"
                         )
+                        last_response = await resp.json()
                         self.dbp.base.print_message(
-                            f"[{i+1}/{retry_num}] {api_str} {p_uuid} response: {await resp.json()}"
+                            f"[{i+1}/{retry_num}] {api_str} {p_uuid} response: {last_response}"
                         )
                     await asyncio.sleep(1)
 
@@ -764,6 +766,7 @@ class YmlOps:
                 "endpoint": f"https://{self.dbp.api_host}/{plural[meta_type]}/",
                 "method": "POST" if try_create else "PATCH",
                 "status_code": resp.status,
+                "detail": last_response.get('detail', ''),
                 "data": req_model,
                 "s3_files": [
                     {
