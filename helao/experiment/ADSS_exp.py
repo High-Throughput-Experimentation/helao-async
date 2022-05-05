@@ -771,8 +771,8 @@ def ADSS_slave_tray_unload(
     exports.
 
     Parameters for ICPMS export are
-    survey_runs: rough sweep over the whole mass range
-    main_runs: sweep channel centered on element mass
+    survey_runs: rough sweep over the whole partial_molarity range
+    main_runs: sweep channel centered on element partial_molarity
     rack: position of the tray in the icpms instrument, usually 2.
     """
 

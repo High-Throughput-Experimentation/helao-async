@@ -1116,14 +1116,14 @@ class Archive:
             return error, []
 
         source_chemical = []
-        source_mass = []
+        source_partial_molarity = []
         source_supplier = []
         source_lotnumber = []
         for sample in samples_in:
             source_chemical = await self._add_listA_to_listB(
                 sample.chemical, source_chemical
             )
-            source_mass = await self._add_listA_to_listB(sample.mass, source_mass)
+            source_partial_molarity = await self._add_listA_to_listB(sample.partial_molarity, source_partial_molarity)
             source_supplier = await self._add_listA_to_listB(
                 sample.supplier, source_supplier
             )
@@ -1134,7 +1134,7 @@ class Archive:
         source = [sample.get_global_label() for sample in samples_in]
         self.base.print_message(f"source_global_label: '{source}'")
         self.base.print_message(f"source_chemical: {source_chemical}")
-        self.base.print_message(f"source_mass: {source_mass}")
+        self.base.print_message(f"source_partial_molarity: {source_partial_molarity}")
         self.base.print_message(f"source_supplier: {source_supplier}")
         self.base.print_message(f"source_lotnumber: {source_lotnumber}")
 
@@ -1145,7 +1145,7 @@ class Archive:
             "source": source,
             #     # action_timestamp=action.action_timestamp,
             "chemical": source_chemical,
-            "mass": source_mass,
+            "partial_molarity": source_partial_molarity,
             "supplier": source_supplier,
             "lot_number": source_lotnumber,
             "status": [SampleStatus.created],

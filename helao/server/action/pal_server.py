@@ -925,7 +925,7 @@ def makeApp(confPrefix, servKey, helao_root):
                         "volume_ml": 0.0,
                         "action_time": strftime("%Y%m%d.%H%M%S"),
                         "chemical": [],
-                        "mass": [],
+                        "partial_molarity": [],
                         "supplier": [],
                         "lot_number": [],
                     }
