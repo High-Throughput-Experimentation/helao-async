@@ -286,22 +286,15 @@ def wait_key():
 
         result = msvcrt.getch()
     else:
-        import termios
-
+        import sys, tty, termios
         fd = sys.stdin.fileno()
-
-        oldterm = termios.tcgetattr(fd)
-        newattr = termios.tcgetattr(fd)
-        newattr[3] = newattr[3] & ~termios.ICANON & ~termios.ECHO
-        termios.tcsetattr(fd, termios.TCSANOW, newattr)
-
+        old_settings = termios.tcgetattr(fd)
         try:
-            result = sys.stdin.read(1)
-        except IOError:
-            pass
+            tty.setraw(sys.stdin.fileno())
+            ch = sys.stdin.read(1)
         finally:
-            termios.tcsetattr(fd, termios.TCSAFLUSH, oldterm)
-
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        result = ch.encode()
     return result
 
 
