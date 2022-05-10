@@ -212,7 +212,7 @@ class Galil:
         )
         self.base.print_message(f"started bokeh server {self.bokehapp}", info=True)
         self.bokehapp.start()
-        self.bokehapp.io_loop.add_callback(self.bokehapp.show, f"/{servPy}")
+        # self.bokehapp.io_loop.add_callback(self.bokehapp.show, f"/{servPy}")
 
     def makeBokehApp(self, doc, motor):
         app = makeVisServ(
