@@ -5,6 +5,7 @@ server_key must be a FastAPI action server defined in config
 """
 
 __all__ = [
+    "ANEC_slave_startup",
     "ANEC_slave_drain_cell",
     "ANEC_slave_flush_fill_cell",
     "ANEC_slave_load_solid_only",
@@ -35,7 +36,7 @@ from helaocore.model.machine import MachineModel
 from helaocore.model.action_start_condition import ActionStartCondition
 from helaocore.model.process_contrib import ProcessContrib
 from helaocore.helper.ref_electrode import REF_TABLE
-
+from helao.driver.motion.galil_motion_driver import MoveModes, TransformationModes
 
 # list valid experiment functions
 EXPERIMENTS = __all__
@@ -54,6 +55,86 @@ z_home = 0.0
 z_engage = 2.5
 # moves it up to put pressure on seal
 z_seal = 4.5
+
+def ANEC_slave_startup(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    solid_plate_id: Optional[int] = 4534,
+    solid_sample_no: Optional[int] = 1,
+    z_move_mm: Optional[float] = 3.0
+):
+    """Slave experiment
+    last functionality test: -"""
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    # get sample plate coordinates
+    apm.add_action(
+        {
+            "action_server": MOTOR_server,
+            "action_name": "solid_get_samples_xy",
+            "action_params": {
+                "plate_id": apm.pars.solid_plate_id,
+                "sample_no": apm.pars.solid_sample_no,
+            },
+            "to_global_params": [
+                "_platexy"
+            ],  # save new liquid_sample_no of eche cell to globals
+            "start_condition": ActionStartCondition.wait_for_all,
+        }
+    )
+
+# =============================================================================
+#     # move to z-down position
+#     apm.add_action(
+#         {
+#             "action_server": MOTOR_server,
+#             "action_name": "move",
+#             "action_params": {
+#                 "d_mm": [-7],
+#                 "axis": ["z"],
+#                 "mode": MoveModes.relative,
+#                 "transformation": TransformationModes.platexy,
+#             },
+#             "start_condition": ActionStartCondition.wait_for_all,
+#         }
+#     )
+# =============================================================================
+    
+        # move to position
+    apm.add_action(
+        {
+            "action_server": MOTOR_server,
+            "action_name": "move",
+            "action_params": {
+                # "d_mm": [apm.pars.x_mm, apm.pars.y_mm],
+                "axis": ["x", "y"],
+                "mode": MoveModes.absolute,
+                "transformation": TransformationModes.motorxy,
+            },
+            "from_global_params": {"_platexy": "d_mm"},
+            "start_condition": ActionStartCondition.wait_for_all,
+        }
+    )
+    
+    
+        # move to z-up position
+    apm.add_action(
+        {
+            "action_server": MOTOR_server,
+            "action_name": "move",
+            "action_params": {
+                "d_mm": [apm.pars.z_move_mm],
+                "axis": ["z"],
+                "mode": MoveModes.relative,
+                "transformation": TransformationModes.motorxy,
+            },
+            "start_condition": ActionStartCondition.wait_for_all,
+        }
+    )
+    
+    return apm.action_list  # returns complete action list to orch
+    
 
 
 def ANEC_slave_load_solid(
@@ -144,7 +225,7 @@ def ANEC_slave_flush_fill_cell(
     liquid_flush_time: Optional[float] = 80,
     co2_purge_time: Optional[float] = 15,
     equilibration_time: Optional[float] = 1.0,
-    reservoir_liquid_sample_no: Optional[int] = 0,
+    reservoir_liquid_sample_no: Optional[int] = 1,
     volume_ul_cell_liquid: Optional[int] = 1000,
 ):
     """Add liquid volume to cell position.
@@ -608,6 +689,7 @@ def ANEC_slave_GCLiquid_analysis(
     wash2: Optional[bool] = True,
     wash3: Optional[bool] = True,
     wash4: Optional[bool] = False,
+    GC_analysis_time: Optional[float] = 520.0,
 ):
     """Sample headspace in cell1_we and inject into GC
 
@@ -642,6 +724,7 @@ def ANEC_slave_GCLiquid_analysis(
             ProcessContrib.samples_out,
         ],
     )
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.GC_analysis_time})
     return apm.action_list
 
 def ANEC_slave_HPLCLiquid_analysis(

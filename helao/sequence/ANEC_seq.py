@@ -1,6 +1,6 @@
 """Sequence library for ANEC"""
 
-__all__ = ["ANEC_daily_ready", "ANEC_repeat_CA", "ANEC_repeat_CV", "ANEC_CA_pretreat", "ANEC_photo_CA", "ANEC_gasonly_CA", "GC_Archiveliquid_analysis", "HPLC_Archiveliquid_analysis"]
+__all__ = ["ANEC_sample_ready", "ANEC_repeat_CA", "ANEC_repeat_CV", "ANEC_CA_pretreat", "ANEC_photo_CA", "ANEC_gasonly_CA", "GC_Archiveliquid_analysis", "HPLC_Archiveliquid_analysis"]
 
 
 from typing import Optional
@@ -9,11 +9,12 @@ from helaocore.schema import ExperimentPlanMaker
 
 SEQUENCES = __all__
 
-def ANEC_daily_ready(
+def ANEC_sample_ready(
     sequence_version: int = 1,
     num_repeats: int = 1,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
+    z_move_mm: float = 3.0,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: float = 1000,
     WE_potential__V: float = 0.0,
@@ -44,6 +45,12 @@ def ANEC_daily_ready(
     """
 
     epm = ExperimentPlanMaker()
+    
+    # move to solid sample
+    epm.add_experiment(
+        "ANEC_slave_startup",
+        {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no, "z_move_mm": z_move_mm},
+    )
     
     #clean the cell & purge with CO2
     epm.add_experiment("ANEC_slave_normal_state", {})
@@ -551,6 +558,7 @@ def GC_Archiveliquid_analysis(
     source_vial_to: int = 1,
     dest: str = "Injector 1",
     volume_ul: int = 2,
+    GC_analysis_time: float = 520.0
 ):
     """
     Analyze archived liquid product by GC
@@ -567,6 +575,7 @@ def GC_Archiveliquid_analysis(
                 "source_vial": source_vial,
                 "dest": dest,
                 "volume_ul": volume_ul,
+                "GC_analysis_time": GC_analysis_time
             },
         )
 
@@ -596,6 +605,10 @@ def HPLC_Archiveliquid_analysis(
                 "source_vial": source_vial,
                 "dest": dest,
                 "volume_ul": volume_ul,
+                "wash1": True,
+                "wash2": True,
+                "wash3": True,
+                "wash4": False,
             },
         )
 

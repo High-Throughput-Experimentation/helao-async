@@ -2184,7 +2184,7 @@ class PAL:
         self.IO_measuring = False
         self.base.print_message("PAL is done")
 
-        await asyncio.sleep(0.1)
+        #await asyncio.sleep(0.1)
 
         # need to check here again in case estop was triggered during
         # measurement
