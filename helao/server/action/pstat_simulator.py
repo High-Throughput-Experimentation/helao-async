@@ -31,11 +31,9 @@ class PstatSim:
         non_els = [
             "plate_id",
             "Sample",
-            "ana",
-            "idx",
-            "Eta.V_ave",
             "solution_ph",
-            "J_mAcm2",
+            "EtaV_CP3",
+            "EtaV_CP10",
         ]
         plateparams = (
             self.df[non_els]
@@ -44,17 +42,17 @@ class PstatSim:
             .reset_index()[["plate_id", "solution_ph"]]
         )
         self.platespaces = []
-        for plateid in set(self.df.plate_id):
+        for plate_id in set(self.df.plate_id):
             self.platespaces.append(
                 {
-                    "plate_id": plateid,
+                    "plate_id": plate_id,
                     "solution_ph": plateparams.query(
-                        f"plate_id=={plateid}"
+                        f"plate_id=={plate_id}"
                     ).solution_ph.to_list()[0],
                     "elements": [
                         k
                         for k, v in (
-                            self.df.query(f"plate_id=={plateid}")
+                            self.df.query(f"plate_id=={plate_id}")
                             .drop(non_els, axis=1)
                             .sum(axis=0)
                             > 0
@@ -63,6 +61,9 @@ class PstatSim:
                     ],
                 }
             )
+    
+    def shutdown(self):
+        pass
 
 
 def makeApp(confPrefix, servKey, helao_root):
@@ -78,17 +79,13 @@ def makeApp(confPrefix, servKey, helao_root):
         driver_class=PstatSim
     )
 
-    @app.post(f"/{servKey}/run_CP")
+    @app.post(f"/{servKey}/run_CP", tags=["public"])
     async def run_CP(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
-        fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
         Ival: Optional[float] = 0.0,
         Tval__s: Optional[float] = 10.0,
-#            SampleRate: Optional[
-        AcqInterval__s: Optional[
-            float
-        ] = 1.0,  # Time between data acquisition samples in seconds.
+        AcqInterval__s: Optional[float] = 1.0,  # Time between data acquisition samples in seconds.
     ):
         """Chronopotentiometry (Potential response on controlled current)
         use 4bit bitmask for triggers

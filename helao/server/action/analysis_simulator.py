@@ -30,11 +30,9 @@ class AnalysisSim:
         non_els = [
             "plate_id",
             "Sample",
-            "ana",
-            "idx",
-            "Eta.V_ave",
             "solution_ph",
-            "J_mAcm2",
+            "EtaV_CP3",
+            "EtaV_CP10",
         ]
         plateparams = (
             self.df[non_els]
@@ -43,17 +41,17 @@ class AnalysisSim:
             .reset_index()[["plate_id", "solution_ph"]]
         )
         self.platespaces = []
-        for plateid in set(self.df.plate_id):
+        for plate_id in set(self.df.plate_id):
             self.platespaces.append(
                 {
-                    "plate_id": plateid,
+                    "plate_id": plate_id,
                     "solution_ph": plateparams.query(
-                        f"plate_id=={plateid}"
+                        f"plate_id=={plate_id}"
                     ).solution_ph.to_list()[0],
                     "elements": [
                         k
                         for k, v in (
-                            self.df.query(f"plate_id=={plateid}")
+                            self.df.query(f"plate_id=={plate_id}")
                             .drop(non_els, axis=1)
                             .sum(axis=0)
                             > 0
@@ -62,6 +60,14 @@ class AnalysisSim:
                     ],
                 }
             )
+            
+    def calc_cpfom(self, plate_id:int, sample_no:int, ph:int, jmacm2:int, *args, **kwargs):
+        match = self.df.query(f"plate_id=={plate_id} & Sample=={sample_no} & solution_ph=={ph}")
+        eta = float(match[f"EtaV_CP{jmacm2}"].iloc[0])
+        return eta
+    
+    def shutdown(self):
+        pass
 
 
 def makeApp(confPrefix, servKey, helao_root):
@@ -77,14 +83,19 @@ def makeApp(confPrefix, servKey, helao_root):
         driver_class=AnalysisSim
     )
 
-    @app.post(f"/{servKey}/stop")
-    async def stop(
+    @app.post(f"/{servKey}/calc_cpfom", tags=["public"])
+    async def calc_cpfom(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
+        plate_id: int = 0,
+        sample_no: int = 0,
+        ph: int = 0,
+        jmacm2: int = 3
     ):
-        """Stops measurement in a controlled way."""
-        active = await app.base.setup_and_contain_action(action_abbr="stop")
-        await active.enqueue_data_dflt(datadict={"stop": await app.driver.stop()})
+        """Calculate Eta vs O2/H2O potential."""
+        active = await app.base.setup_and_contain_action()
+        eta = app.driver.calc_cpfom(**active.action.action_params)
+        active.action.action_params.update({f"_eta": eta})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
