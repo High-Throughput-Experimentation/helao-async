@@ -25,7 +25,7 @@ class ArchiveSim:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
-        self.loaded_plateid = None
+        self.loaded_plate_id = None
         self.loaded_ph = None
         self.loaded_els = []
         self.loaded_space = []
@@ -35,11 +35,9 @@ class ArchiveSim:
         non_els = [
             "plate_id",
             "Sample",
-            "ana",
-            "idx",
-            "Eta.V_ave",
             "solution_ph",
-            "J_mAcm2",
+            "EtaV_CP3",
+            "EtaV_CP10",
         ]
         plateparams = (
             self.df[non_els]
@@ -48,17 +46,17 @@ class ArchiveSim:
             .reset_index()[["plate_id", "solution_ph"]]
         )
         self.platespaces = []
-        for plateid in set(self.df.plate_id):
+        for plate_id in set(self.df.plate_id):
             self.platespaces.append(
                 {
-                    "plate_id": plateid,
+                    "plate_id": plate_id,
                     "solution_ph": plateparams.query(
-                        f"plate_id=={plateid}"
+                        f"plate_id=={plate_id}"
                     ).solution_ph.to_list()[0],
                     "elements": [
                         k
                         for k, v in (
-                            self.df.query(f"plate_id=={plateid}")
+                            self.df.query(f"plate_id=={plate_id}")
                             .drop(non_els, axis=1)
                             .sum(axis=0)
                             > 0
@@ -71,23 +69,23 @@ class ArchiveSim:
     def reset(self):
         self.measured_space = []
 
-    def load_plateid(self, plateid: int, *args, **kwargs):
-        if plateid == self.loaded_plateid:
-            self.base.print_message(f"plate {plateid} is already loaded")
+    def load_plate_id(self, plate_id: int, *args, **kwargs):
+        if plate_id == self.loaded_plate_id:
+            self.base.print_message(f"plate {plate_id} is already loaded")
             return False
-        if plateid in self.list_plates():
-            plated = [d for d in self.platespaces if d["plate_id"] == plateid][0]
-            self.loaded_plateid = plateid
+        if plate_id in self.list_plates():
+            plated = [d for d in self.platespaces if d["plate_id"] == plate_id][0]
+            self.loaded_plate_id = plate_id
             self.loaded_ph = plated["solution_ph"]
             self.loaded_els = plated["elements"]
-            self.loaded_df = self.df.query(f"plate_id=={plateid}")
+            self.loaded_df = self.df.query(f"plate_id=={plate_id}")
             self.loaded_space = self.loaded_df[self.loaded_els].to_numpy().tolist()
             self.reset()
             return {
-                "plateid": self.loaded_plateid,
+                "plate_id": self.loaded_plate_id,
                 "ph": self.loaded_ph,
                 "elements": self.loaded_els,
-                # "space": self.loaded_space,
+                "space": self.loaded_space,
             }
         else:
             return False
@@ -107,25 +105,31 @@ class ArchiveSim:
 
     def get_loaded_elements(self):
         return self.loaded_els
-        
+
     def get_loaded_space(self):
         return self.loaded_space
 
     def get_loaded_ph(self):
         return self.loaded_ph
 
-    def get_loaded_plateid(self):
-        return self.loaded_plateid
+    def get_loaded_plate_id(self):
+        return self.loaded_plate_id
 
     def acquire(self, element_fracs: list, *args, **kwargs):
         if element_fracs in self.loaded_space:
-            self.measured_space.append(element_fracs)
-            sample_no = self.loaded_df.iloc[
-                self.loaded_space.index(element_fracs)
-            ].Sample
+            match = self.loaded_df.iloc[self.loaded_space.index(element_fracs)]
+            sample_no = int(match.Sample)
+            eta3 = float(match.EtaV_CP3)
+            eta10 = float(match.EtaV_CP10)
+            acq_dict = {k: v for k,v in zip(self.loaded_els, element_fracs)}
+            acq_dict.update({"solution_ph": self.loaded_ph, "eta3": eta3, "eta10": eta10})
+            self.measured_space.append(acq_dict)
             return sample_no
         else:
             return False
+
+    def shutdown(self):
+        pass
 
 
 def makeApp(confPrefix, servKey, helao_root):
@@ -141,42 +145,90 @@ def makeApp(confPrefix, servKey, helao_root):
         driver_class=ArchiveSim,
     )
 
-    @app.post(f"/{servKey}/load_plateid")
-    async def load_plateid(
+    
+    # PRIVATE ENDPOINTS (not managed by Orch)
+
+    @app.post(f"/list_plates", tags=["private"])
+    def list_plates():
+        platelist = app.driver.list_plates()
+        return platelist
+
+    @app.post(f"/list_all_spaces", tags=["private"])
+    def list_all_spaces():
+        platespaces = app.driver.list_spaces()
+        return platespaces
+
+    @app.post(f"/get_measured", tags=["private"])
+    def get_measured():
+        measured = app.driver.get_acquired()
+        return measured
+
+    @app.post(f"/clear_measured", tags=["private"])
+    def get_measured():
+        result = app.driver.reset_acquired()
+        return result
+
+    @app.post(f"/get_loaded_space", tags=["private"])
+    async def get_loaded_space():
+        fullspace = app.driver.get_loaded_space()
+        return fullspace
+
+    @app.post(f"/get_loaded_plate_id", tags=["private"])
+    async def get_loaded_plate_id():
+        plate_id = app.driver.get_loaded_plate_id()
+        return plate_id
+
+    @app.post(f"/get_loaded_ph", tags=["private"])
+    async def get_loaded_ph():
+        ph = app.driver.get_loaded_ph()
+        return ph
+
+    @app.post(f"/get_loaded_elements", tags=["private"])
+    async def get_loaded_elements():
+        elements = app.driver.get_loaded_elements()
+        return elements
+
+
+    # BEGIN PUBLIC ENDPOINTS (Actions dispatched by Orch)
+
+    @app.post(f"/{servKey}/load_space", tags=["public"])
+    async def load_space(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
-        plateid: Optional[int] = None,
+        plate_id: int = 0,
     ):
         active = await app.base.setup_and_contain_action()
-        platedict = app.driver.load_plateid(**active.action.action_params)
+        platedict = app.driver.load_plate_id(plate_id=plate_id)
         for k, v in platedict.items():
             active.action.action_params.update({f"_{k}": v})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/list_plates")
-    async def list_plates(
+    @app.post(f"/{servKey}/query_plate", tags=["public"])
+    async def query_plate(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
-    ):
-        active = await app.base.setup_and_contain_action()
-        platelist = app.driver.list_plates()
-        active.action.action_params.update({f"_platelist": platelist})
-        finished_action = await active.finish()
-        return finished_action.as_dict()
-
-    @app.post(f"/{servKey}/list_spaces")
-    async def list_spaces(
-        action: Optional[Action] = Body({}, embed=True),
-        action_version: int = 1,
+        elements: Optional[List[str]] = [],
+        ph: Optional[int] = 13,
     ):
         active = await app.base.setup_and_contain_action()
         platespaces = app.driver.list_spaces()
-        active.action.action_params.update({f"_platespaces": platespaces})
+        if ph is not None:
+            platespaces = [
+                x
+                for x in platespaces
+                if x["solution_ph"] == ph and sorted(x["elements"]) == sorted(elements)
+            ][0]
+        active.action.action_params.update(
+            {
+                "_elements": platespaces["elements"],
+                "_plate_id": platespaces["plate_id"],
+            }
+        )
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/acquire")
+    @app.post(f"/{servKey}/acquire", tags=["public"])
     async def acquire(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -185,49 +237,6 @@ def makeApp(confPrefix, servKey, helao_root):
         active = await app.base.setup_and_contain_action()
         sample_no = app.driver.acquire(**active.action.action_params)
         active.action.action_params.update({f"_sampleno": sample_no})
-        finished_action = await active.finish()
-        return finished_action.as_dict()
-
-    @app.post(f"/{servKey}/get_loaded_space")
-    async def get_loaded_space(
-        action: Optional[Action] = Body({}, embed=True),
-        action_version: int = 1,
-    ):
-        active = await app.base.setup_and_contain_action()
-        fullspace = app.driver.get_loaded_space()
-        finished_action = await active.finish()
-        return finished_action.as_dict()
-
-    @app.post(f"/{servKey}/get_loaded_plateid")
-    async def get_loaded_plateid(
-        action: Optional[Action] = Body({}, embed=True),
-        action_version: int = 1,
-    ):
-        active = await app.base.setup_and_contain_action()
-        plateid = app.driver.get_loaded_plateid()
-        active.action.action_params.update({f"_plateid": plateid})
-        finished_action = await active.finish()
-        return finished_action.as_dict()
-
-    @app.post(f"/{servKey}/get_loaded_ph")
-    async def get_loaded_ph(
-        action: Optional[Action] = Body({}, embed=True),
-        action_version: int = 1,
-    ):
-        active = await app.base.setup_and_contain_action()
-        ph = app.driver.get_loaded_ph()
-        active.action.action_params.update({f"_ph": ph})
-        finished_action = await active.finish()
-        return finished_action.as_dict()
-
-    @app.post(f"/{servKey}/get_loaded_elements")
-    async def get_loaded_elements(
-        action: Optional[Action] = Body({}, embed=True),
-        action_version: int = 1,
-    ):
-        active = await app.base.setup_and_contain_action()
-        elements = app.driver.get_loaded_elements()
-        active.action.action_params.update({f"_elements": elements})
         finished_action = await active.finish()
         return finished_action.as_dict()
 

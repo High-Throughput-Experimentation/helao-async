@@ -47,6 +47,9 @@ class MotionSim:
 
     def move(self, d_mm: List[float], axis: List[str], speed: Optional[int] = None):
         pass
+    
+    def shutdown(self):
+        pass
 
 
 def makeApp(confPrefix, servKey, helao_root):
@@ -62,7 +65,7 @@ def makeApp(confPrefix, servKey, helao_root):
         driver_class=MotionSim
     )
 
-    @app.post(f"/{servKey}/solid_get_samples_xy")
+    @app.post(f"/{servKey}/solid_get_samples_xy", tags=["public"])
     async def solid_get_samples_xy(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -78,7 +81,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/move")
+    @app.post(f"/{servKey}/move", tags=["public"])
     async def move(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
