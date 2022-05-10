@@ -53,5 +53,5 @@ if __name__ == "__main__":
         info=True,
     )
     bokehapp.start()
-    bokehapp.io_loop.add_callback(bokehapp.show, f"/{servPy}")
+    # bokehapp.io_loop.add_callback(bokehapp.show, f"/{servPy}")
     bokehapp.io_loop.start()
