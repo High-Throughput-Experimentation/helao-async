@@ -52,16 +52,23 @@ def dict2json(input_dict: dict):
     bio.seek(0)
     return bio
 
+
 def wrap_sample_details(input_obj):
-    sample_root = ['hlo_version', 'global_label', 'sample_type', 'status', 'inheritance']
-    if isinstance(input_obj, dict) :
-        if 'sample_type' in input_obj.keys():
-            details_dict = {k: v for k,v in input_obj.items() if k not in sample_root}
-            root_dict = {k: v for k,v in input_obj.items() if k in sample_root}
-            root_dict['sample_details'] = wrap_sample_details(details_dict)
+    sample_root = [
+        "hlo_version",
+        "global_label",
+        "sample_type",
+        "status",
+        "inheritance",
+    ]
+    if isinstance(input_obj, dict):
+        if "sample_type" in input_obj.keys():
+            details_dict = {k: v for k, v in input_obj.items() if k not in sample_root}
+            root_dict = {k: v for k, v in input_obj.items() if k in sample_root}
+            root_dict["sample_details"] = wrap_sample_details(details_dict)
         else:
             root_dict = {}
-            for k,v in input_obj.items():
+            for k, v in input_obj.items():
                 if isinstance(v, dict):
                     root_dict[k] = wrap_sample_details(v)
                 elif isinstance(v, list):
@@ -128,7 +135,7 @@ class HelaoPath(type(Path())):
                 check_dir.rmdir()
                 return "success"
             except PermissionError as e:
-                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 return e
 
 
@@ -517,14 +524,14 @@ class DBPack:
         self.task_queue = asyncio.Queue()
         self.loop.create_task(self.yml_task())
         self.current_task = None
-        
+
     async def yml_task(self):
         while True:
             yml_target = await self.task_queue.get()
             self.current_task = await self.finish_yml(yml_target)
             self.current_task = None
             self.task_queue.task_done()
-        
+
     def read_log(self):
         yaml = YAML(typ="safe")
         self.log_dict = yaml.load(self.log_path)
@@ -711,13 +718,12 @@ class DBPack:
         }
 
         return return_dict
-    
+
     def shutdown(self):
         self.base.print_message("Checking for queued DB tasks.")
         while not self.task_queue.empty():
             asyncio.sleep(0.2)
         self.base.print_message("All DB tasks complete. Shutting down.")
-        
 
 
 class YmlOps:
@@ -798,7 +804,7 @@ class YmlOps:
                 "endpoint": f"https://{self.dbp.api_host}/{plural[meta_type]}/",
                 "method": "POST" if try_create else "PATCH",
                 "status_code": resp.status,
-                "detail": last_response.get('detail', ''),
+                "detail": last_response.get("detail", ""),
                 "data": req_model,
                 "s3_files": [
                     {
@@ -842,7 +848,7 @@ class YmlOps:
                 self.dbp.base.print_message(f"Successfully uploaded {target}")
                 return True
             except botocore.exceptions.ClientError as e:
-                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 self.dbp.base.print_message(e)
                 self.dbp.base.print_message(
                     f"Retry S3 upload [{i}/{retry_num}]: {self.dbp.bucket}, {target}"
