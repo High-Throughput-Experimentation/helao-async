@@ -29,6 +29,7 @@ from helaocore.model.action_start_condition import ActionStartCondition
 from helaocore.model.sample import SolidSample, LiquidSample
 from helaocore.model.machine import MachineModel
 from helaocore.model.process_contrib import ProcessContrib
+from helaocore.model.electrolyte import Electrolyte
 
 from helao.driver.motion.galil_motion_driver import MoveModes, TransformationModes
 from helao.driver.robot.pal_driver import Spacingmethod, PALtools
@@ -226,7 +227,8 @@ def SDC_slave_CA_led(
     experiment_version: int = 1,
     CA_potential_vsRHE: Optional[float] = 0.0,
     ph: float = 9.53,
-    reservoir_electrolyte: int = 1, #currently liquid sample database number
+    reservoir_electrolyte: Electrolyte = "SLF10",
+    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
     reservoir_bubbler_gas: str = "O2",
     droplet_size_cm2: float = .071,  #3mm diameter droplet
     reference_electrode_type: str = "NHE",
