@@ -42,22 +42,20 @@ class AnalysisSim:
         )
         self.platespaces = []
         for plate_id in set(self.df.plate_id):
+            platedf = self.df.query(f"plate_id=={plate_id}")
+            els = [
+                k
+                for k, v in (platedf.drop(non_els, axis=1).sum(axis=0) > 0).items()
+                if v > 0
+            ]
             self.platespaces.append(
                 {
                     "plate_id": plate_id,
                     "solution_ph": plateparams.query(
                         f"plate_id=={plate_id}"
                     ).solution_ph.to_list()[0],
-                    "elements": [
-                        k
-                        for k, v in (
-                            self.df.query(f"plate_id=={plate_id}")
-                            .drop(non_els, axis=1)
-                            .sum(axis=0)
-                            > 0
-                        ).items()
-                        if v > 0
-                    ],
+                    "elements": els,
+                    "element_fracs": platedf[els].to_numpy().tolist(),
                 }
             )
             
