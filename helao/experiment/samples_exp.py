@@ -37,6 +37,7 @@ def create_liquid_sample(
     ph: Optional[float] = 7.0,
     supplier: Optional[List[str]] = ["supplier1", "supplier2"],
     lot_number: Optional[List[str]] = ["lot1", "lot2"],
+    prep_date: Optional [str] = "2000-01-01",
     comment: Optional[str] = "comment",
 ):
     """creates a custom liquid sample
