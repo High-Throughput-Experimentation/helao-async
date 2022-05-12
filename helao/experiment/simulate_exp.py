@@ -19,7 +19,7 @@ Action library for simulator
 server_key must be a FastAPI action server defined in config
 """
 
-__all__ = ["ANEC_measure_CP"]
+__all__ = ["SIM_measure_CP"]
 
 from socket import gethostname
 from typing import Optional, List
@@ -40,7 +40,7 @@ PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).json_dict()
 
 
 # given solution pH, element space, and element fractions, measure CP at 3 and 10 mA/cm2
-def ANEC_measure_CP(
+def SIM_measure_CP(
     experiment: Experiment,
     experiment_version: int = 1,
     solution_ph: Optional[int] = 13,
@@ -57,41 +57,47 @@ def ANEC_measure_CP(
         to_global_params=["_plate_id"],
     )
     # load plate
-    apm.add(PAL_server, "load_space", {}, from_global_params={"_plate_id": "plate_id"})
+    apm.add(
+        PAL_server,
+        "load_space",
+        {},
+        from_global_params={"_plate_id": "plate_id"},
+        to_global_params=["_ph", "_elements"],
+    )
     # find sample matching element fracs
     apm.add(
         PAL_server,
         "acquire",
         {"element_fracs": apm.pars.element_fracs},
-        to_global_params=["_sampleno"],
+        to_global_params=["_acq_sample_no"],
     )
     # find plate x,y coordinates from sample_no
     apm.add(
         MOTOR_server,
         "solid_get_samples_xy",
         {},
-        from_global_params={"_plate_id": "plate_id", "_sampleno": "sample_no"},
+        from_global_params={"_plate_id": "plate_id", "_acq_sample_no": "sample_no"},
         to_global_params=["_platexy"],
     )
     # move stage motors to sample x,y
-    apm.add(MOTOR_server, "move", from_global_params={"_platexy": "d_mm"})
+    apm.add(MOTOR_server, "move", {}, from_global_params={"_platexy": "d_mm"})
     # measure CP at 3mA/cm2 for 15 seconds
     apm.add(PSTAT_server, "run_CP", {"Ival": 3e-5, "Tval__s": 15.0})
     # calculate CP fom
     apm.add(
         ANA_server,
-        "run_cpfom",
+        "calc_cpfom",
         {"ph": apm.pars.solution_ph, "jmacm2": 3},
-        from_global_params={"_plate_id": "plate_id", "_sampleno": "sample_no"},
+        from_global_params={"_plate_id": "plate_id", "_acq_sample_no": "sample_no"},
     )
     # measure CP at 10mA/cm2 for 15 seconds
     apm.add(PSTAT_server, "run_CP", {"Ival": 1e-4, "Tval__s": 15.0})
     # calculate CP fom
     apm.add(
         ANA_server,
-        "run_cpfom",
+        "calc_cpfom",
         {"ph": apm.pars.solution_ph, "jmacm2": 10},
-        from_global_params={"_plate_id": "plate_id", "_sampleno": "sample_no"},
+        from_global_params={"_plate_id": "plate_id", "_acq_sample_no": "sample_no"},
     )
 
     return apm.action_list
