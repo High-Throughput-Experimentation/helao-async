@@ -118,7 +118,7 @@ async def gamry_dyn_endpoints(app=None):
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
             fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
-            Ival: Optional[float] = 0.0,
+            Ival__A: Optional[float] = 0.0,
             Tval__s: Optional[float] = 10.0,
 #            SampleRate: Optional[
             AcqInterval__s: Optional[
