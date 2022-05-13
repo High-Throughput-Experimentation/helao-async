@@ -163,9 +163,14 @@ def makeApp(confPrefix, servKey, helao_root):
         return platespaces
 
     @app.post(f"/get_measured", tags=["private"])
-    def get_measured():
+    def get_measured(start_idx: Optional[int] = 0):
         measured = app.driver.get_acquired()
-        return measured
+        if start_idx is None or start_idx==0:
+            return measured
+        elif len(measured)>start_idx:
+            return measured[start_idx:]
+        else:
+            return []
 
     @app.post(f"/clear_measured", tags=["private"])
     def get_measured():
