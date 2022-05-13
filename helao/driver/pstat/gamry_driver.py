@@ -854,7 +854,6 @@ class gamry:
                 "could not detect IErange, using 'auto'", error=True
             )
             return self.gamry_range_enum.auto
-        requested_range = f"{requested_range.lower()}"
 
         self.base.print_message(f"got IErange request for {requested_range}", info=True)
 
@@ -863,6 +862,9 @@ class gamry:
         lookupvals = [e.value for e in self.gamry_range_enum]
 
         idx = None
+        if isinstance(requested_range, str):
+            requested_range = requested_range.lower()
+
         if requested_range in vals:
             idx = vals.index(requested_range)
 
@@ -872,8 +874,12 @@ class gamry:
         else:
             # auto should have been detected already above
             # try auto detect range based on value and unit pair
-            req_num, req_unit = mysplit(requested_range)
-            req_num = to_amps(number=req_num, unit=req_unit)
+
+            if isinstance(requested_range, float):
+                req_num = requested_range
+            else:
+                req_num, req_unit = mysplit(requested_range)
+                req_num = to_amps(number=req_num, unit=req_unit)
             if req_num is None:
                 return self.gamry_range_enum.auto
             for ret_idx, val in enumerate(vals):
