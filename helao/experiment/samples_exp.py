@@ -37,6 +37,8 @@ def create_liquid_sample(
     ph: Optional[float] = 7.0,
     supplier: Optional[List[str]] = ["supplier1", "supplier2"],
     lot_number: Optional[List[str]] = ["lot1", "lot2"],
+    electrolyte_name: Optional [str] = "name",
+    prep_date: Optional [str] = "2000-01-01",
     comment: Optional[str] = "comment",
 ):
     """creates a custom liquid sample
@@ -58,6 +60,8 @@ def create_liquid_sample(
                         "ph": apm.pars.ph,
                         "supplier": apm.pars.supplier,
                         "lot_number": apm.pars.lot_number,
+                        "electrolyte": apm.pars.electrolyte_name,
+                        "prep_date": apm.pars.prep_date,
                         "comment": apm.pars.comment,
                     }
                 )
@@ -77,6 +81,7 @@ def create_gas_sample(
     chemical: Optional[List[str]] = ["chemical1", "chemical2"],
     supplier: Optional[List[str]] = ["supplier1", "supplier2"],
     lot_number: Optional[List[str]] = ["lot1", "lot2"],
+    prep_date: Optional [str] = "2000-01-01",
     comment: Optional[str] = "comment",
 ):
     """creates a custom gas sample
@@ -97,6 +102,7 @@ def create_gas_sample(
                         "partial_molarity": apm.pars.partial_molarity,
                         "supplier": apm.pars.supplier,
                         "lot_number": apm.pars.lot_number,
+                        "prep_date": apm.pars.prep_date,
                         "comment": apm.pars.comment,
                     }
                 )

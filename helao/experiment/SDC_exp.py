@@ -29,6 +29,7 @@ from helaocore.model.action_start_condition import ActionStartCondition
 from helaocore.model.sample import SolidSample, LiquidSample
 from helaocore.model.machine import MachineModel
 from helaocore.model.process_contrib import ProcessContrib
+from helaocore.model.electrolyte import Electrolyte
 
 from helao.driver.motion.galil_motion_driver import MoveModes, TransformationModes
 from helao.driver.robot.pal_driver import Spacingmethod, PALtools
@@ -226,7 +227,8 @@ def SDC_slave_CA_led(
     experiment_version: int = 1,
     CA_potential_vsRHE: Optional[float] = 0.0,
     ph: float = 9.53,
-    reservoir_electrolyte: int = 1, #currently liquid sample database number
+    reservoir_electrolyte: Electrolyte = "SLF10",
+    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
     reservoir_bubbler_gas: str = "O2",
     droplet_size_cm2: float = .071,  #3mm diameter droplet
     reference_electrode_type: str = "NHE",
@@ -331,7 +333,8 @@ def SDC_slave_CA(
     experiment_version: int = 1,
     CA_potential_vsRHE: Optional[float] = 0.0,
     ph: float = 9.53,
-    reservoir_electrolyte: int = 1, #currently liquid sample database number
+    reservoir_electrolyte: Electrolyte = "SLF10",
+    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
     reservoir_bubbler_gas: str = "O2",
     droplet_size_cm2: float = .071,  #3mm diameter droplet
     reference_electrode_type: str = "NHE",
@@ -406,7 +409,8 @@ def SDC_slave_CV_led(
     cycles: Optional[int] = 1,
     IErange: Optional[str] = "auto",
     ph: float = 0,
-    reservoir_electrolyte: int = 1, #currently liquid sample database number
+    reservoir_electrolyte: Electrolyte = "SLF10",
+    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
     reservoir_bubbler_gas: str = "O2",
     droplet_size_cm2: float = .071,  #3mm diameter droplet
     reference_electrode_type: str = "NHE",
@@ -523,7 +527,8 @@ def SDC_slave_CV(
     cycles: Optional[int] = 1,
     IErange: Optional[str] = "auto",
     ph: float = 0,
-    reservoir_electrolyte: int = 1, #currently liquid sample database number
+    reservoir_electrolyte: Electrolyte = "SLF10",
+    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
     reservoir_bubbler_gas: str = "O2",
     droplet_size_cm2: float = .071,  #3mm diameter droplet
     reference_electrode_type: str = "NHE",
@@ -594,7 +599,8 @@ def SDC_slave_CP(
     experiment_version: int = 1,
     CP_current: Optional[float] = 0.0,
     ph: float = 9.53,
-    reservoir_electrolyte: int = 1, #currently liquid sample database number
+    reservoir_electrolyte: Electrolyte = "SLF10",
+    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
     reservoir_bubbler_gas: str = "O2",
     droplet_size_cm2: float = .071,  #3mm diameter droplet
     reference_electrode_type: str = "NHE",
@@ -633,7 +639,7 @@ def SDC_slave_CP(
             "action_server": PSTAT_server,
             "action_name": "run_CP",
             "action_params": {
-                "Ival": CP_current,
+                "Ival__A": CP_current,
                 "Tval__s": apm.pars.CP_duration_sec,
                 "AcqInterval__s": apm.pars.samplerate_sec,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
@@ -659,7 +665,8 @@ def SDC_slave_CP_led(
     experiment_version: int = 1,
     CP_current: Optional[float] = 0.0,
     ph: float = 9.53,
-    reservoir_electrolyte: int = 1, #currently liquid sample database number
+    reservoir_electrolyte: Electrolyte = "SLF10",
+    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
     reservoir_bubbler_gas: str = "O2",
     droplet_size_cm2: float = .071,  #3mm diameter droplet
     reference_electrode_type: str = "NHE",
@@ -731,7 +738,7 @@ def SDC_slave_CP_led(
             "action_server": PSTAT_server,
             "action_name": "run_CP",
             "action_params": {
-                "Ival": CP_current,
+                "Ival__A": CP_current,
                 "Tval__s": apm.pars.CP_duration_sec,
                 "AcqInterval__s": apm.pars.samplerate_sec,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
@@ -758,7 +765,8 @@ def SDC_slave_background(
     experiment_version: int = 1,
     CP_current: [float] = 0.0,
     ph: float = 9.53,
-    reservoir_electrolyte: int = 1, #currently liquid sample database number
+    reservoir_electrolyte: Electrolyte = "SLF10",
+    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
     reservoir_bubbler_gas: str = "O2",
     droplet_size_cm2: float = .071,  #3mm diameter droplet
     reference_electrode_type: str = "NHE",
@@ -825,7 +833,7 @@ def SDC_slave_background(
             "action_server": PSTAT_server,
             "action_name": "run_CP",
             "action_params": {
-                "Ival": CP_current,
+                "Ival__A": CP_current,
                 "Tval__s": apm.pars.background_duration_sec,
                 "AcqInterval__s": apm.pars.samplerate_sec,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
