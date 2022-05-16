@@ -6,6 +6,7 @@ server_key must be a FastAPI action server defined in config
 
 __all__ = [
     "ANEC_slave_startup",
+    "ANEC_slave_disengage",
     "ANEC_slave_drain_cell",
     "ANEC_slave_flush_fill_cell",
     "ANEC_slave_load_solid_only",
@@ -61,13 +62,28 @@ def ANEC_slave_startup(
     experiment_version: int = 1,
     solid_plate_id: Optional[int] = 4534,
     solid_sample_no: Optional[int] = 1,
-    z_move_mm: Optional[float] = 3.0
+    z_move_mm: Optional[float] = 3.5
 ):
     """Slave experiment
     last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
+    # move to z-down position
+    apm.add_action(
+        {
+            "action_server": MOTOR_server,
+            "action_name": "move",
+            "action_params": {
+                "d_mm": [0.1],
+                "axis": ["z"],
+                "mode": MoveModes.absolute,
+                "transformation": TransformationModes.motorxy,
+            },
+            "start_condition": ActionStartCondition.wait_for_all,
+        }
+    )
+    
     # get sample plate coordinates
     apm.add_action(
         {
@@ -84,22 +100,6 @@ def ANEC_slave_startup(
         }
     )
 
-# =============================================================================
-#     # move to z-down position
-#     apm.add_action(
-#         {
-#             "action_server": MOTOR_server,
-#             "action_name": "move",
-#             "action_params": {
-#                 "d_mm": [-7],
-#                 "axis": ["z"],
-#                 "mode": MoveModes.relative,
-#                 "transformation": TransformationModes.platexy,
-#             },
-#             "start_condition": ActionStartCondition.wait_for_all,
-#         }
-#     )
-# =============================================================================
     
         # move to position
     apm.add_action(
@@ -110,7 +110,7 @@ def ANEC_slave_startup(
                 # "d_mm": [apm.pars.x_mm, apm.pars.y_mm],
                 "axis": ["x", "y"],
                 "mode": MoveModes.absolute,
-                "transformation": TransformationModes.motorxy,
+                "transformation": TransformationModes.platexy,
             },
             "from_global_params": {"_platexy": "d_mm"},
             "start_condition": ActionStartCondition.wait_for_all,
@@ -126,7 +126,7 @@ def ANEC_slave_startup(
             "action_params": {
                 "d_mm": [apm.pars.z_move_mm],
                 "axis": ["z"],
-                "mode": MoveModes.relative,
+                "mode": MoveModes.absolute,
                 "transformation": TransformationModes.motorxy,
             },
             "start_condition": ActionStartCondition.wait_for_all,
@@ -135,6 +135,31 @@ def ANEC_slave_startup(
     
     return apm.action_list  # returns complete action list to orch
     
+def ANEC_slave_disengage(    
+    experiment: Experiment,
+    experiment_version: int = 1
+):
+    """Slave experiment
+    Disengages and seals electrochemical cell."""
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    # move to z-down position
+    apm.add_action(
+        {
+            "action_server": MOTOR_server,
+            "action_name": "move",
+            "action_params": {
+                "d_mm": [0.1],
+                "axis": ["z"],
+                "mode": MoveModes.absolute,
+                "transformation": TransformationModes.motorxy,
+            },
+            "start_condition": ActionStartCondition.wait_for_all,
+        }
+    )
+
+    return apm.action_list  # returns complete action list to orch
 
 
 def ANEC_slave_load_solid(
@@ -312,7 +337,7 @@ def ANEC_slave_drain_cell(
 def ANEC_slave_cleanup(
     experiment: Experiment,
     experiment_version: int = 1,
-    reservoir_liquid_sample_no: Optional[int] = 0,
+    reservoir_liquid_sample_no: Optional[int] = 1,
 ):
     """Flush and purge ANEC cell.
 
