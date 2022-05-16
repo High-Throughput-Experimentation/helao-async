@@ -26,16 +26,14 @@ class PstatSim:
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
         self.measure_status = None
-        self.df = pd.read_csv(self.config_dict['data_path'])
+        self.df = pd.read_csv(self.config_dict["data_path"])
         self.loaded_df = None
         non_els = [
             "plate_id",
             "Sample",
-            "ana",
-            "idx",
-            "Eta.V_ave",
             "solution_ph",
-            "J_mAcm2",
+            "EtaV_CP3",
+            "EtaV_CP10",
         ]
         plateparams = (
             self.df[non_els]
@@ -44,25 +42,26 @@ class PstatSim:
             .reset_index()[["plate_id", "solution_ph"]]
         )
         self.platespaces = []
-        for plateid in set(self.df.plate_id):
+        for plate_id in set(self.df.plate_id):
+            platedf = self.df.query(f"plate_id=={plate_id}")
+            els = [
+                k
+                for k, v in (platedf.drop(non_els, axis=1).sum(axis=0) > 0).items()
+                if v > 0
+            ]
             self.platespaces.append(
                 {
-                    "plate_id": plateid,
+                    "plate_id": plate_id,
                     "solution_ph": plateparams.query(
-                        f"plate_id=={plateid}"
+                        f"plate_id=={plate_id}"
                     ).solution_ph.to_list()[0],
-                    "elements": [
-                        k
-                        for k, v in (
-                            self.df.query(f"plate_id=={plateid}")
-                            .drop(non_els, axis=1)
-                            .sum(axis=0)
-                            > 0
-                        ).items()
-                        if v > 0
-                    ],
+                    "elements": els,
+                    "element_fracs": platedf[els].to_numpy().tolist(),
                 }
             )
+
+    def shutdown(self):
+        pass
 
 
 def makeApp(confPrefix, servKey, helao_root):
@@ -75,17 +74,15 @@ def makeApp(confPrefix, servKey, helao_root):
         server_title=servKey,
         description="PSTAT simulator",
         version=2.0,
-        driver_class=PstatSim
+        driver_class=PstatSim,
     )
 
-    @app.post(f"/{servKey}/run_CP")
+    @app.post(f"/{servKey}/run_CP", tags=["public"])
     async def run_CP(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
-        fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
         Ival: Optional[float] = 0.0,
         Tval__s: Optional[float] = 10.0,
-#            SampleRate: Optional[
         AcqInterval__s: Optional[
             float
         ] = 1.0,  # Time between data acquisition samples in seconds.

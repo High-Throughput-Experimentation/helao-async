@@ -19,6 +19,7 @@ __all__ = [
 
 
 from helaocore.schema import ExperimentPlanMaker
+from helaocore.model.electrolyte import Electrolyte
 
 
 SEQUENCES = __all__
@@ -27,6 +28,7 @@ def SDC_4CA_led_1CV_led(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
+    reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
     reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
@@ -90,7 +92,7 @@ def SDC_4CA_led_1CV_led(
             {
                 "CA_potential_vsRHE": CA1_potential_vsRHE,
                 "ph": ph,
-                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
                 "reservoir_bubbler_gas": reservoir_bubbler_gas,
                 "droplet_size_cm2": droplet_size_cm2,
                 "reference_electrode_type": "NHE",
@@ -114,7 +116,7 @@ def SDC_4CA_led_1CV_led(
             {
                 "CA_potential_vsRHE": CA2_potential_vsRHE,
                 "ph": ph,
-                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
                 "reservoir_bubbler_gas": reservoir_bubbler_gas,
                 "droplet_size_cm2": droplet_size_cm2,
                 "reference_electrode_type": "NHE",
@@ -138,7 +140,7 @@ def SDC_4CA_led_1CV_led(
             {
                 "CA_potential_vsRHE": CA3_potential_vsRHE,
                 "ph": ph,
-                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
                 "reservoir_bubbler_gas": reservoir_bubbler_gas,
                 "droplet_size_cm2": droplet_size_cm2,
                 "reference_electrode_type": "NHE",
@@ -162,7 +164,7 @@ def SDC_4CA_led_1CV_led(
             {
                 "CA_potential_vsRHE": CA4_potential_vsRHE,
                 "ph": ph,
-                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
                 "reservoir_bubbler_gas": reservoir_bubbler_gas,
                 "droplet_size_cm2": droplet_size_cm2,
                 "reference_electrode_type": "NHE",
@@ -194,7 +196,7 @@ def SDC_4CA_led_1CV_led(
                 "cycles": CV_cycles,
                 "IErange": IErange,
                 "ph": ph,
-                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
                 "reservoir_bubbler_gas": reservoir_bubbler_gas,
                 "droplet_size_cm2": droplet_size_cm2,
                 "reference_electrode_type": "NHE",
@@ -219,6 +221,7 @@ def SDC_CV_CA_CV(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
+    reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
     reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
@@ -277,7 +280,7 @@ def SDC_CV_CA_CV(
                 "cycles": CV1_cycles,
                 "IErange": IErange,
                 "ph": ph,
-                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
                 "reservoir_bubbler_gas": reservoir_bubbler_gas,
                 "droplet_size_cm2": droplet_size_cm2,
                 "reference_electrode_type": "NHE",
@@ -291,7 +294,7 @@ def SDC_CV_CA_CV(
             {
                 "CA_potential_vsRHE": CA2_potential_vsRHE,
                 "ph": ph,
-                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
                 "reservoir_bubbler_gas": reservoir_bubbler_gas,
                 "droplet_size_cm2": droplet_size_cm2,
                 "reference_electrode_type": "NHE",
@@ -315,7 +318,7 @@ def SDC_CV_CA_CV(
                 "cycles": CV3_cycles,
                 "IErange": IErange,
                 "ph": ph,
-                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
                 "reservoir_bubbler_gas": reservoir_bubbler_gas,
                 "droplet_size_cm2": droplet_size_cm2,
                 "reference_electrode_type": "NHE",
@@ -331,6 +334,7 @@ def SDC_CV(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
+    reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
     reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
@@ -379,7 +383,7 @@ def SDC_CV(
                 "cycles": CV1_cycles,
                 "IErange": IErange,
                 "ph": ph,
-                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
                 "reservoir_bubbler_gas": reservoir_bubbler_gas,
                 "droplet_size_cm2": droplet_size_cm2,
                 "reference_electrode_type": "NHE",
@@ -395,6 +399,7 @@ def SDC_CA(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
+    reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
     reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
@@ -432,7 +437,7 @@ def SDC_CA(
             {
                 "CA_potential_vsRHE": CA_potential_vsRHE,
                 "ph": ph,
-                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
                 "reservoir_bubbler_gas": reservoir_bubbler_gas,
                 "droplet_size_cm2": droplet_size_cm2,
                 "reference_electrode_type": "NHE",
@@ -452,6 +457,7 @@ def SDC_CA_led(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
+    reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
     reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
@@ -495,7 +501,7 @@ def SDC_CA_led(
             {
                 "CA_potential_vsRHE": CA_potential_vsRHE,
                 "ph": ph,
-                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
                 "reservoir_bubbler_gas": reservoir_bubbler_gas,
                 "droplet_size_cm2": droplet_size_cm2,
                 "reference_electrode_type": "NHE",
@@ -522,6 +528,7 @@ def SDC_CV_led(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
+    reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
     reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
@@ -577,7 +584,7 @@ def SDC_CV_led(
                 "cycles": CV_cycles,
                 "IErange": IErange,
                 "ph": ph,
-                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
                 "reservoir_bubbler_gas": reservoir_bubbler_gas,
                 "droplet_size_cm2": droplet_size_cm2,
                 "reference_electrode_type": "NHE",
@@ -602,6 +609,7 @@ def SDC_background(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
+    reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
     liquid_volume_ml: float = 1.0,
     ref_vs_nhe: float = 0.21,
@@ -656,6 +664,7 @@ def SDC_CP(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
+    reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
     reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
@@ -694,7 +703,7 @@ def SDC_CP(
             {
                 "CP_current" : CP_current,
                 "ph": ph,
-                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
                 "reservoir_bubbler_gas": reservoir_bubbler_gas,
                 "droplet_size_cm2": droplet_size_cm2,
                 "reference_electrode_type": "NHE",
@@ -714,6 +723,7 @@ def SDC_CP_led(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
+    reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
     reservoir_bubbler_gas: str = "O2",
     ph: float = 9.53,
@@ -759,7 +769,7 @@ def SDC_CP_led(
             {
                 "CP_current": CP_current,
                 "ph": ph,
-                "reservoir_electrolyte": reservoir_liquid_sample_no, #currently liquid sample database number
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
                 "reservoir_bubbler_gas": reservoir_bubbler_gas,
                 "droplet_size_cm2": droplet_size_cm2,
                 "reference_electrode_type": "NHE",

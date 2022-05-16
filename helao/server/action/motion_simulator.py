@@ -30,8 +30,7 @@ class MotionSim:
         pm_cols = ['Sample', 'x', 'y', 'dx', 'dy', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'code']
         self.pmdf = pd.read_csv(self.config_dict['platemap_path'], skiprows=2, header=None, names=pm_cols)
 
-    async def solid_get_samples_xy(self, plate_id: int, sample_no: int):
-        await asyncio.sleep(0.01)
+    def solid_get_samples_xy(self, plate_id: int, sample_no: int, *args, **kwargs):
         rowmatch = self.pmdf.query(f"Sample=={sample_no}")
         if len(rowmatch)==0:
             self.base.print_message(f"Could not locate sample_no: {sample_no} on plate_id: {plate_id}")
@@ -42,10 +41,13 @@ class MotionSim:
             else:
                 self.base.print_message(f"Found x,y")
             firstmatch = rowmatch.iloc[0]
-            retxy = [firstmatch.x, firstmatch.y]
+            retxy = [float(firstmatch.x), float(firstmatch.y)]
         return {"platexy": retxy}
 
     def move(self, d_mm: List[float], axis: List[str], speed: Optional[int] = None):
+        pass
+    
+    def shutdown(self):
         pass
 
 
@@ -62,7 +64,7 @@ def makeApp(confPrefix, servKey, helao_root):
         driver_class=MotionSim
     )
 
-    @app.post(f"/{servKey}/solid_get_samples_xy")
+    @app.post(f"/{servKey}/solid_get_samples_xy", tags=["public"])
     async def solid_get_samples_xy(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -70,15 +72,14 @@ def makeApp(confPrefix, servKey, helao_root):
         sample_no: Optional[int] = None,
     ):
         active = await app.base.setup_and_contain_action()
-        datadict = await app.driver.solid_get_samples_xy(
+        platexy = app.driver.solid_get_samples_xy(
             **active.action.action_params
         )
-        platexy = list(datadict.get("platexy", [(None, None)])[0])
         active.action.action_params.update({"_platexy": platexy})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/move")
+    @app.post(f"/{servKey}/move", tags=["public"])
     async def move(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,

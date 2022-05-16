@@ -3,7 +3,7 @@ config = {}
 config['dummy'] = True
 
 # action library provides generator functions which produce actions
-config["experiment_libraries"] = []
+config["experiment_libraries"] = ["simulate_exp"]
 config["sequence_libraries"] = []
 config["technique_name"] = "simulation"
 config["root"] = "/mnt/BIGSTOR/INST"  # software log and run files saved here
@@ -57,7 +57,7 @@ config["servers"] = dict(
             data_path="/mnt/k/users/guevarra/20191108_multipH_OER_full.csv"
         ),
     ),
-    ANALYSIS=dict(
+    ANA=dict(
         host=hostip,
         port=8009,
         group="action",
