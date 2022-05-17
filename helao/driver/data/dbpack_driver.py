@@ -145,9 +145,11 @@ class HelaoYml:
         self.parse_yml(path)
 
     def parse_yml(self, path):
+        # print(f"!!! parsing yml {path}")
         self.target = path if isinstance(path, HelaoPath) else HelaoPath(path)
         yaml = YAML(typ="safe")
         self.dict = yaml.load(self.target)
+        print(f"!!! successfully parsed yml {path}")
         self.type = self.dict["file_type"]
         self.uuid = self.dict[f"{self.type}_uuid"]
         # overwrite uuid when test dict is passed by dbp server
@@ -161,29 +163,43 @@ class HelaoYml:
         if inst_idx:
             inst_idx = inst_idx[0]
         else:
-            print("'INST' directory was not found in yml path. Cannot proceed.")
+            print("!!! 'INST' directory was not found in yml path. Cannot proceed.")
             return False
         self.status = self.target.parts[inst_idx + 1].replace("RUNS_", "")
         self.data_dir = self.target.parent
-        self.data_files = [
-            x
-            for x in self.data_dir.glob("*")
-            if x.suffix not in [".yml", ".progress"] and x.is_file()
-        ]
+        if self.type == "action":
+            self.data_files = [
+                x
+                for x in self.data_dir.glob("*")
+                if x.suffix not in [".yml", ".progress"] and x.is_file()
+            ]
+        else:
+            self.data_files = []
         self.parent_dir = self.data_dir.parent
         syncpath_offset = {"action": -6, "experiment": -6, "sequence": -5}
         if self.type == "action":
             exp_parts = list(self.target.parent.parent.parts)
-            exp_parts[-5] = "*"
-            exp_parts.append("*.yml")
-            all_exp_paths = glob(os.path.join(*exp_parts))
-            progress_parts = list(HelaoPath(all_exp_paths[0]).parts)
+            exp_parts[-5] = "RUNS_SYNCED"
+            exp_parts.append("*.progress")
+            existing_progress = glob(os.path.join(*exp_parts))
+            if existing_progress:
+                progress_parts = list(HelaoPath(existing_progress[0]).parts)
+            else:
+                all_exp_paths = []
+                for state in ("ACTIVE", "FINISHED"):
+                    temp_parts = list(self.target.parent.parent.parts)
+                    temp_parts[-5] = f"RUNS_{state}"
+                    temp_parts.append("*.yml")
+                    all_exp_paths += glob(os.path.join(*temp_parts))
+                progress_parts = list(HelaoPath(all_exp_paths[0]).parts)
         else:
             progress_parts = list(self.target.parts)
         progress_parts[syncpath_offset[self.type]] = "RUNS_SYNCED"
         progress_parts[-1] = progress_parts[-1].replace(".yml", ".progress")
         self.progress_path = HelaoPath(os.path.join(*progress_parts))
+        # print(f"!!! Loading progress from {self.progress_path}")
         self.progress = Progress(self)
+        print(f"!!! Successfully loaded progress from {self.progress_path}")
         meta_json = modmap[self.type](**self.dict).clean_dict()
         meta_json = wrap_sample_details(meta_json)
         for file_dict in meta_json.get("files", []):
@@ -236,6 +252,7 @@ class Progress(UserDict):
                 "pushed": {},
                 "api": False,
                 "s3": False,
+                "synced_children": [],
             }
             self.write()
         pending_files = [
@@ -257,63 +274,63 @@ class Progress(UserDict):
             pyaml.dump(self.data, safe=True, sort_dicts=False)
         )
 
-    def __setitem__(self, key, item):
-        self.data[key] = item
-        self.write()
+    # def __setitem__(self, key, item):
+    #     self.data[key] = item
+    #     self.write()
 
-    def __getitem__(self, key):
-        self.read()
-        return self.data[key]
+    # def __getitem__(self, key):
+    #     self.read()
+    #     return self.data[key]
 
-    def __repr__(self):
-        self.read()
-        return repr(self.data)
+    # def __repr__(self):
+    #     self.read()
+    #     return repr(self.data)
 
-    def __len__(self):
-        self.read()
-        return len(self.data)
+    # def __len__(self):
+    #     self.read()
+    #     return len(self.data)
 
-    def __delitem__(self, key):
-        del self.data[key]
-        self.write()
+    # def __delitem__(self, key):
+    #     del self.data[key]
+    #     self.write()
 
-    def has_key(self, k):
-        self.read()
-        return k in self.data
+    # def has_key(self, k):
+    #     self.read()
+    #     return k in self.data
 
-    def update(self, *args, **kwargs):
-        self.read()
-        self.data.update(*args, **kwargs)
-        self.write()
+    # def update(self, *args, **kwargs):
+    #     self.read()
+    #     self.data.update(*args, **kwargs)
+    #     self.write()
 
-    def keys(self):
-        self.read()
-        return self.data.keys()
+    # def keys(self):
+    #     self.read()
+    #     return self.data.keys()
 
-    def values(self):
-        self.read()
-        return self.data.values()
+    # def values(self):
+    #     self.read()
+    #     return self.data.values()
 
-    def items(self):
-        self.read()
-        return self.data.items()
+    # def items(self):
+    #     self.read()
+    #     return self.data.items()
 
-    def pop(self, *args):
-        self.read()
-        retval = self.data.pop(*args)
-        return retval
+    # def pop(self, *args):
+    #     self.read()
+    #     retval = self.data.pop(*args)
+    #     return retval
 
-    def __cmp__(self, dict_):
-        self.read()
-        return self.__cmp__(self.data, dict_)
+    # def __cmp__(self, dict_):
+    #     self.read()
+    #     return self.__cmp__(self.data, dict_)
 
-    def __contains__(self, item):
-        self.read()
-        return item in self.data
+    # def __contains__(self, item):
+    #     self.read()
+    #     return item in self.data
 
-    def __iter__(self):
-        self.read()
-        return iter(self.data)
+    # def __iter__(self):
+    #     self.read()
+    #     return iter(self.data)
 
 
 class ActYml(HelaoYml):
@@ -340,9 +357,13 @@ class ExpYml(HelaoYml):
     def get_actions(self):
         """Return a list of ActYml objects belonging to this experiment."""
         action_parts = list(self.data_dir.parts)
-        action_parts[-5] = "*"
-        action_parts.append(f"*{os.sep}*.yml")
-        all_action_paths = glob(os.path.join(*action_parts))
+        all_action_paths = []
+        all_action_paths += self.progress[self.pkey]["synced_children"]
+        for state in ("ACTIVE", "FINISHED"):
+            temp_parts = action_parts
+            temp_parts[-5] = f"RUNS_{state}"
+            temp_parts.append(f"*{os.sep}*.yml")
+            all_action_paths += glob(os.path.join(*temp_parts))
 
         self.current_actions = sorted(
             [ActYml(ap) for ap in all_action_paths], key=lambda x: x.time
@@ -392,6 +413,7 @@ class ExpYml(HelaoYml):
                 self.progress.write()
                 if self.progress[group_idx].get("meta", None) is None:
                     self.create_process(group_idx)
+                    self.progress.write()
 
     def create_process(self, group_idx: int):
         """Create process group from finished actions in progress['meta']."""
@@ -464,9 +486,13 @@ class SeqYml(HelaoYml):
     def get_experiments(self):
         """Return a list of ExpYml objects belonging to this experiment."""
         experiment_parts = list(self.data_dir.parts)
-        experiment_parts[-4] = "*"
-        experiment_parts.append(f"*{os.sep}*.yml")
-        all_experiment_paths = glob(os.path.join(*experiment_parts))
+        all_experiment_paths = []
+        all_experiment_paths += self.progress[self.pkey]["synced_children"]
+        for state in ("ACTIVE", "FINISHED"):
+            temp_parts = experiment_parts
+            temp_parts[-4] = f"RUNS_{state}"
+            temp_parts.append(f"*{os.sep}*.yml")
+            all_experiment_paths += glob(os.path.join(*temp_parts))
 
         self.current_experiments = sorted(
             [ExpYml(ep) for ep in all_experiment_paths], key=lambda x: x.time
@@ -521,15 +547,26 @@ class DBPack:
             )
             self.testing_uuid_dict = None
         self.loop = asyncio.get_event_loop()
-        self.task_queue = asyncio.Queue()
+        self.task_queue = asyncio.PriorityQueue()
         self.loop.create_task(self.yml_task())
         self.current_task = None
 
     async def yml_task(self):
         while True:
-            yml_target = await self.task_queue.get()
-            self.current_task = await self.finish_yml(yml_target)
-            self.current_task = None
+            _, yml_target = await self.task_queue.get()
+            if os.path.exists(yml_target):
+                try:
+                    await asyncio.sleep(1.0)  # delay to release base/orch file handles
+                    self.current_task = await self.finish_yml(yml_target)
+                    self.current_task = None
+                except Exception as e:
+                    tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                    self.print_message(
+                        f"Error during dbpack.finish_yml() {yml_target}. {repr(e), tb,}",
+                        error=True,
+                    )
+            else:
+                self.base.print_message(f"Path {yml_target} no longer exists, skipping.")
             self.task_queue.task_done()
 
     def read_log(self):
@@ -591,8 +628,8 @@ class DBPack:
             )
         return self.log_dict
 
-    async def add_yml_task(self, yml_path: str):
-        await self.task_queue.put(yml_path)
+    async def add_yml_task(self, yml_path: str, priority = 0):
+        await self.task_queue.put((priority, yml_path))
         self.base.print_message(f"Added {yml_path} to tasks.")
 
     async def finish_yml(self, yml_path: Union[str, HelaoPath]):
@@ -613,7 +650,9 @@ class DBPack:
             return f"{hpth} does not exist."
         yml_type = HelaoYml(hpth).type
         hyml = ymlmap[yml_type](hpth, uuid_test=self.testing_uuid_dict)
+        self.base.print_message(f"Loaded {yml_type} from {yml_path_str}", info=True)
         ops = YmlOps(self, hyml)
+        self.base.print_message(f"YmlOps initialized for {yml_path_str}", info=True)
 
         # if given a sequence or experiment, recurse through constituents
         if yml_type == YmlType.sequence:
@@ -663,6 +702,7 @@ class DBPack:
                     await ops.to_s3(pkey)
                     progress.read()
 
+        progress.read()
         for pkey in progress.keys():
             if progress[pkey]["done"]:
                 self.base.print_message(f"Target {pkey} is already done.", info=True)
@@ -678,6 +718,7 @@ class DBPack:
                 await ops.to_api(pkey)
                 progress.read()
 
+        progress.read()
         if yml_type == YmlType.experiment:
             for pkey in [gkey for gkey in progress.keys() if isinstance(gkey, int)]:
                 if progress[pkey]["done"]:
@@ -700,16 +741,21 @@ class DBPack:
                     await ops.to_api(pkey)
                     progress.read()
 
+        progress.read()
         for pkey in progress.keys():
             if progress[pkey]["done"]:
                 continue
             if progress[pkey]["api"]:
                 if isinstance(pkey, str):
-                    ops.to_synced()
+                    sync_path = ops.to_synced()
+                    progress[pkey]["synced_children"].append(sync_path)
+                    progress.write()
                 progress[pkey].update({"done": True, "ready": False})
                 progress.write()
                 finished.append(pkey)
                 progress.read()
+            elif isinstance(pkey, str):
+                await self.add_yml_task(progress[pkey]['path'], 0)
 
         return_dict = {
             k: {dk: dv for dk, dv in d.items() if dk != "meta"}
@@ -720,10 +766,11 @@ class DBPack:
         return return_dict
 
     def shutdown(self):
-        self.base.print_message("Checking for queued DB tasks.")
-        while not self.task_queue.empty():
-            asyncio.sleep(0.2)
-        self.base.print_message("All DB tasks complete. Shutting down.")
+        # self.base.print_message("Checking for queued DB tasks.")
+        # while not self.task_queue.empty():
+        #     sleep(0.2)
+        # self.base.print_message("All DB tasks complete. Shutting down.")
+        pass
 
 
 class YmlOps:
@@ -777,6 +824,7 @@ class YmlOps:
                     async with req_method(req_url, json=req_model) as resp:
                         if resp.status == 200:
                             pdict["api"] = True
+                            self.yml.progress[progress_key] = pdict
                             self.yml.progress.write()
                         elif resp.status == 400:
                             try_create = False
@@ -972,3 +1020,4 @@ class YmlOps:
                 self.dbp.base.print_message("Could not clean directory after moving.")
                 self.dbp.base.print_message(clean_success)
             self.yml.parse_yml(new_target)
+            return self.yml.target.__str__()
