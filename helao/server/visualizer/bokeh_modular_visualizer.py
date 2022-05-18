@@ -252,7 +252,7 @@ class C_nidaqmxvis:
                     f"failed to subscribe to "
                     f"{self.data_url}"
                     "trying again in 1sec",
-                    error=True,
+                    info=True,
                 )
                 await asyncio.sleep(1)
             if not self.IOloop_data_run:
@@ -528,7 +528,7 @@ class C_potvis:
                     f"failed to subscribe to "
                     f"{self.data_url}"
                     "trying again in 1sec",
-                    error=True,
+                    info=True,
                 )
                 await asyncio.sleep(1)
             if not self.IOloop_data_run:
