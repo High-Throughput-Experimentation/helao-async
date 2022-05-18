@@ -238,7 +238,7 @@ class ExpYml(HelaoYml):
         self.get_actions()
         if self.grouped_actions:
             self.max_group = max(self.grouped_actions.keys())
-            print_message({}, "DB", f"There are {self.max_group + 1} process groups.")
+            # print_message({}, "DB", f"There are {self.max_group + 1} process groups.")
         else:
             self.max_group = 0
 
@@ -255,11 +255,11 @@ class ExpYml(HelaoYml):
             temp_parts.append(f"*{os.sep}*.yml")
             all_action_paths += glob(os.path.join(*temp_parts))
 
-        print_message(
-            {},
-            "DB",
-            f"There are {len(all_action_paths)} action ymls associated with {self.target}",
-        )
+        # print_message(
+        #     {},
+        #     "DB",
+        #     f"There are {len(all_action_paths)} action ymls associated with {self.target}",
+        # )
         self.current_actions = sorted(
             [ActYml(ap) for ap in all_action_paths], key=lambda x: x.time
         )
