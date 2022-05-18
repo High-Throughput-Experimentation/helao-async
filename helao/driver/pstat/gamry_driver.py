@@ -878,7 +878,7 @@ class gamry:
             if isinstance(requested_range, float):
                 req_num = requested_range
             else:
-                req_num, req_unit = mysplit(requested_range)
+                req_num, req_unit = mysplit(requested_range.replace(" ", "").replace("_",""))
                 req_num = to_amps(number=req_num, unit=req_unit)
             if req_num is None:
                 return self.gamry_range_enum.auto
