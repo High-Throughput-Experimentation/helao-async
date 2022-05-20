@@ -8,15 +8,15 @@ config['dummy'] = True
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
-config["experiment_libraries"] = ["SDC_exp", "samples_exp"]
-config["sequence_libraries"] = ["SDC_seq"]
+config["experiment_libraries"] = ["ECHE_exp", "samples_exp"]
+config["sequence_libraries"] = ["ECHE_seq"]
 config["sequence_params"] = {
                                "led_wavelengths_nm": [0,385,455,515,590],
                                "led_intensities_mw": [0,2.77,2.31,0.961,1.0],
                                "led_typenamesdate": ["front", "doric_led1", "doric_led2","doric_led3","doric_led4","12/23/2020"]
                              
                              }
-config["technique_name"] = "sdc"
+config["technique_name"] = "eche"
 config["root"] = r"C:\INST_dev2"
 
 

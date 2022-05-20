@@ -1,19 +1,19 @@
 """
-Sequence library for SDC
+Sequence library for ECHE
 """
 
 __all__ = [
-    "SDC_4CA_led_1CV_led",
-    "SDC_CV_CA_CV",
-    "SDC_CV",
-    "SDC_CV_led",
-    "SDC_CA",
-    "SDC_CA_led",
-    "SDC_background",
-    "SDC_CP",
-    "SDC_CP_led",
-    "SDC_movetosample",
-    "SDC_move",
+    "ECHE_4CA_led_1CV_led",
+    "ECHE_CV_CA_CV",
+    "ECHE_CV",
+    "ECHE_CV_led",
+    "ECHE_CA",
+    "ECHE_CA_led",
+    "ECHE_background",
+    "ECHE_CP",
+    "ECHE_CP_led",
+    "ECHE_movetosample",
+    "ECHE_move",
 
 ]
 
@@ -24,7 +24,7 @@ from helaocore.model.electrolyte import Electrolyte
 
 SEQUENCES = __all__
 
-def SDC_4CA_led_1CV_led(
+def ECHE_4CA_led_1CV_led(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -71,12 +71,12 @@ def SDC_4CA_led_1CV_led(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("SDC_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_slave_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "SDC_slave_startup",
+            "ECHE_slave_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -88,7 +88,7 @@ def SDC_4CA_led_1CV_led(
         )
         # CA1
         pl.add_experiment(
-            "SDC_slave_CA_led",
+            "ECHE_slave_CA_led",
             {
                 "CA_potential_vsRHE": CA1_potential_vsRHE,
                 "ph": ph,
@@ -112,7 +112,7 @@ def SDC_4CA_led_1CV_led(
         )
         # CA2
         pl.add_experiment(
-            "SDC_slave_CA_led",
+            "ECHE_slave_CA_led",
             {
                 "CA_potential_vsRHE": CA2_potential_vsRHE,
                 "ph": ph,
@@ -136,7 +136,7 @@ def SDC_4CA_led_1CV_led(
         )
         # CA3
         pl.add_experiment(
-            "SDC_slave_CA_led",
+            "ECHE_slave_CA_led",
             {
                 "CA_potential_vsRHE": CA3_potential_vsRHE,
                 "ph": ph,
@@ -160,7 +160,7 @@ def SDC_4CA_led_1CV_led(
         )
         # CA4
         pl.add_experiment(
-            "SDC_slave_CA_led",
+            "ECHE_slave_CA_led",
             {
                 "CA_potential_vsRHE": CA4_potential_vsRHE,
                 "ph": ph,
@@ -185,7 +185,7 @@ def SDC_4CA_led_1CV_led(
 
         # CV1
         pl.add_experiment(
-            "SDC_slave_CV_led",
+            "ECHE_slave_CV_led",
             {
                 "Vinit_vsRHE": CV_Vinit_vsRHE,
                 "Vapex1_vsRHE": CV_Vapex1_vsRHE,
@@ -212,12 +212,12 @@ def SDC_4CA_led_1CV_led(
             },
         )
 
-        pl.add_experiment("SDC_slave_shutdown", {})
+        pl.add_experiment("ECHE_slave_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
 
-def SDC_CV_CA_CV(
+def ECHE_CV_CA_CV(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -251,12 +251,12 @@ def SDC_CV_CA_CV(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("SDC_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_slave_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "SDC_slave_startup",
+            "ECHE_slave_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -269,7 +269,7 @@ def SDC_CV_CA_CV(
 
         # CV1
         pl.add_experiment(
-            "SDC_slave_CV",
+            "ECHE_slave_CV",
             {
                 "Vinit_vsRHE": CV1_Vinit_vsRHE,
                 "Vapex1_vsRHE": CV1_Vapex1_vsRHE,
@@ -290,7 +290,7 @@ def SDC_CV_CA_CV(
 
         # CA2
         pl.add_experiment(
-            "SDC_slave_CA",
+            "ECHE_slave_CA",
             {
                 "CA_potential_vsRHE": CA2_potential_vsRHE,
                 "ph": ph,
@@ -307,7 +307,7 @@ def SDC_CV_CA_CV(
 
         # CV3
         pl.add_experiment(
-            "SDC_slave_CV",
+            "ECHE_slave_CV",
             {
                 "Vinit_vsRHE": CV3_Vinit_vsRHE,
                 "Vapex1_vsRHE": CV3_Vapex1_vsRHE,
@@ -326,11 +326,11 @@ def SDC_CV_CA_CV(
             },
         )
 
-        pl.add_experiment("SDC_slave_shutdown", {})
+        pl.add_experiment("ECHE_slave_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
-def SDC_CV(
+def ECHE_CV(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -354,12 +354,12 @@ def SDC_CV(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("SDC_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_slave_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "SDC_slave_startup",
+            "ECHE_slave_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -372,7 +372,7 @@ def SDC_CV(
 
         # CV1
         pl.add_experiment(
-            "SDC_slave_CV",
+            "ECHE_slave_CV",
             {
                 "Vinit_vsRHE": CV1_Vinit_vsRHE,
                 "Vapex1_vsRHE": CV1_Vapex1_vsRHE,
@@ -391,11 +391,11 @@ def SDC_CV(
             },
         )
 
-        pl.add_experiment("SDC_slave_shutdown", {})
+        pl.add_experiment("ECHE_slave_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
-def SDC_CA(
+def ECHE_CA(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -415,12 +415,12 @@ def SDC_CA(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("SDC_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_slave_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "SDC_slave_startup",
+            "ECHE_slave_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -433,7 +433,7 @@ def SDC_CA(
 
         # CA1
         pl.add_experiment(
-            "SDC_slave_CA",
+            "ECHE_slave_CA",
             {
                 "CA_potential_vsRHE": CA_potential_vsRHE,
                 "ph": ph,
@@ -449,11 +449,11 @@ def SDC_CA(
         )
 
 
-        pl.add_experiment("SDC_slave_shutdown", {})
+        pl.add_experiment("ECHE_slave_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
-def SDC_CA_led(
+def ECHE_CA_led(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -480,12 +480,12 @@ def SDC_CA_led(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("SDC_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_slave_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "SDC_slave_startup",
+            "ECHE_slave_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -497,7 +497,7 @@ def SDC_CA_led(
         )
         # CA1
         pl.add_experiment(
-            "SDC_slave_CA_led",
+            "ECHE_slave_CA_led",
             {
                 "CA_potential_vsRHE": CA_potential_vsRHE,
                 "ph": ph,
@@ -520,11 +520,11 @@ def SDC_CA_led(
             },
         )
 
-        pl.add_experiment("SDC_slave_shutdown", {})
+        pl.add_experiment("ECHE_slave_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
-def SDC_CV_led(
+def ECHE_CV_led(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -555,12 +555,12 @@ def SDC_CV_led(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("SDC_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_slave_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "SDC_slave_startup",
+            "ECHE_slave_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -573,7 +573,7 @@ def SDC_CV_led(
         
         # CV1
         pl.add_experiment(
-            "SDC_slave_CV_led",
+            "ECHE_slave_CV_led",
             {
                 "Vinit_vsRHE": CV_Vinit_vsRHE,
                 "Vapex1_vsRHE": CV_Vapex1_vsRHE,
@@ -600,12 +600,12 @@ def SDC_CV_led(
             },
         )
 
-        pl.add_experiment("SDC_slave_shutdown", {})
+        pl.add_experiment("ECHE_slave_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
 
-def SDC_background(
+def ECHE_background(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -626,12 +626,12 @@ def SDC_background(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("SDC_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_slave_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "SDC_slave_startup",
+            "ECHE_slave_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -643,7 +643,7 @@ def SDC_background(
         )
         # CP1
         pl.add_experiment(
-            "SDC_slave_background",
+            "ECHE_slave_background",
             {
                 "CP_current": CP_current,
                 "ref_vs_nhe": ref_vs_nhe,
@@ -656,11 +656,11 @@ def SDC_background(
             },
         )
 
-        pl.add_experiment("SDC_slave_shutdown", {})
+        pl.add_experiment("ECHE_slave_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
-def SDC_CP(
+def ECHE_CP(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -681,12 +681,12 @@ def SDC_CP(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("SDC_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_slave_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "SDC_slave_startup",
+            "ECHE_slave_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -699,7 +699,7 @@ def SDC_CP(
 
         # CP1
         pl.add_experiment(
-            "SDC_slave_CP",
+            "ECHE_slave_CP",
             {
                 "CP_current" : CP_current,
                 "ph": ph,
@@ -715,11 +715,11 @@ def SDC_CP(
         )
 
 
-        pl.add_experiment("SDC_slave_shutdown", {})
+        pl.add_experiment("ECHE_slave_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
-def SDC_CP_led(
+def ECHE_CP_led(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -748,12 +748,12 @@ def SDC_CP_led(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("SDC_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_slave_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "SDC_slave_startup",
+            "ECHE_slave_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -765,7 +765,7 @@ def SDC_CP_led(
         )
         # CP1
         pl.add_experiment(
-            "SDC_slave_CP_led",
+            "ECHE_slave_CP_led",
             {
                 "CP_current": CP_current,
                 "ph": ph,
@@ -788,11 +788,11 @@ def SDC_CP_led(
             },
         )
 
-        pl.add_experiment("SDC_slave_shutdown", {})
+        pl.add_experiment("ECHE_slave_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
-def SDC_movetosample(
+def ECHE_movetosample(
     sequence_version: int = 1,
     plate_id: int = 1,
     plate_sample_no: int = 1,
@@ -803,7 +803,7 @@ def SDC_movetosample(
 
 
     pl.add_experiment(
-        "SDC_slave_movetosample",
+        "ECHE_slave_movetosample",
         {
 #            "solid_custom_position": "cell1_we",
             "solid_plate_id": plate_id,
@@ -811,11 +811,11 @@ def SDC_movetosample(
         },
     )
 
-    pl.add_experiment("SDC_slave_shutdown", {})
+    pl.add_experiment("ECHE_slave_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
-def SDC_move(
+def ECHE_move(
     sequence_version: int = 1,
     move_x_mm: float = 1.0,
     move_y_mm: float = 1.0,
@@ -825,13 +825,13 @@ def SDC_move(
 
 
     pl.add_experiment(
-        "SDC_slave_move",
+        "ECHE_slave_move",
         {
             "x_mm": move_x_mm,
             "y_mm": move_y_mm,
         },
     )
 
-    pl.add_experiment("SDC_slave_shutdown", {})
+    pl.add_experiment("ECHE_slave_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
