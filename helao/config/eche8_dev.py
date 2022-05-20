@@ -8,9 +8,9 @@ config['dummy'] = True
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
-config["experiment_libraries"] = ["SDC_exp", "samples_exp"]
-config["sequence_libraries"] = ["SDC_seq"]
-config["technique_name"] = "sdc"
+config["experiment_libraries"] = ["ECHE_exp", "samples_exp"]
+config["sequence_libraries"] = ["ECHE_seq"]
+config["technique_name"] = "eche"
 config["root"] = r"C:\INST_dev2"
 
 

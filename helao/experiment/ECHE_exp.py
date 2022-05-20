@@ -1,23 +1,23 @@
 """
-Experiment library for SDC
+Experiment library for ECHE
 server_key must be a FastAPI action server defined in config
 """
 
 __all__ = [
-    "SDC_slave_unloadall_customs",
-    "SDC_slave_load_solid",
-    "SDC_slave_add_liquid",
-    "SDC_slave_startup",
-    "SDC_slave_shutdown",
-    "SDC_slave_CA_led",
-    "SDC_slave_CA",
-    "SDC_slave_CV_led",
-    "SDC_slave_CV",
-    "SDC_slave_background",
-    "SDC_slave_CP_led",
-    "SDC_slave_CP",
-    "SDC_slave_movetosample",
-    "SDC_slave_move",
+    "ECHE_slave_unloadall_customs",
+    "ECHE_slave_load_solid",
+    "ECHE_slave_add_liquid",
+    "ECHE_slave_startup",
+    "ECHE_slave_shutdown",
+    "ECHE_slave_CA_led",
+    "ECHE_slave_CA",
+    "ECHE_slave_CV_led",
+    "ECHE_slave_CV",
+    "ECHE_slave_background",
+    "ECHE_slave_CP_led",
+    "ECHE_slave_CP",
+    "ECHE_slave_movetosample",
+    "ECHE_slave_move",
 ]
 
 
@@ -49,7 +49,7 @@ PAL_server = MachineModel(server_name="PAL", machine_name=gethostname()).json_di
 toggle_triggertype = "fallingedge"
 
 
-def SDC_slave_unloadall_customs(experiment: Experiment):
+def ECHE_slave_unloadall_customs(experiment: Experiment):
     """last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -68,7 +68,7 @@ def SDC_slave_unloadall_customs(experiment: Experiment):
     return apm.action_list  # returns complete action list to orch
 
 
-def SDC_slave_add_liquid(
+def ECHE_slave_add_liquid(
     experiment: Experiment,
     experiment_version: int = 1,
     solid_custom_position: Optional[str] = "cell1_we",
@@ -103,7 +103,7 @@ def SDC_slave_add_liquid(
     return apm.action_list  # returns complete action list to orch
 
 
-def SDC_slave_load_solid(
+def ECHE_slave_load_solid(
     experiment: Experiment,
     experiment_version: int = 1,
     solid_custom_position: Optional[str] = "cell1_we",
@@ -135,7 +135,7 @@ def SDC_slave_load_solid(
     return apm.action_list  # returns complete action list to orch
 
 
-def SDC_slave_startup(
+def ECHE_slave_startup(
     experiment: Experiment,
     experiment_version: int = 1,
     solid_custom_position: Optional[str] = "cell1_we",
@@ -151,11 +151,11 @@ def SDC_slave_startup(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # unload all samples from custom positions
-    apm.add_action_list(SDC_slave_unloadall_customs(experiment=experiment))
+    apm.add_action_list(ECHE_slave_unloadall_customs(experiment=experiment))
 
     # load new requested solid samples
     apm.add_action_list(
-        SDC_slave_load_solid(
+        ECHE_slave_load_solid(
             experiment=experiment,
             solid_custom_position=apm.pars.solid_custom_position,
             solid_plate_id=apm.pars.solid_plate_id,
@@ -165,7 +165,7 @@ def SDC_slave_startup(
 
     # add liquid to solid
     apm.add_action_list(
-        SDC_slave_add_liquid(
+        ECHE_slave_add_liquid(
             experiment=experiment,
             solid_custom_position=apm.pars.solid_custom_position,
             reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
@@ -209,7 +209,7 @@ def SDC_slave_startup(
     return apm.action_list  # returns complete action list to orch
 
 
-def SDC_slave_shutdown(experiment: Experiment):
+def ECHE_slave_shutdown(experiment: Experiment):
     """Slave experiment
 
     last functionality test: -"""
@@ -217,12 +217,12 @@ def SDC_slave_shutdown(experiment: Experiment):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # unload all samples from custom positions
-    apm.add_action_list(SDC_slave_unloadall_customs(experiment=experiment))
+    apm.add_action_list(ECHE_slave_unloadall_customs(experiment=experiment))
 
     return apm.action_list  # returns complete action list to orch
 
 
-def SDC_slave_CA_led(
+def ECHE_slave_CA_led(
     experiment: Experiment,
     experiment_version: int = 1,
     CA_potential_vsRHE: Optional[float] = 0.0,
@@ -328,7 +328,7 @@ def SDC_slave_CA_led(
     return apm.action_list  # returns complete action list to orch
 
 
-def SDC_slave_CA(
+def ECHE_slave_CA(
     experiment: Experiment,
     experiment_version: int = 1,
     CA_potential_vsRHE: Optional[float] = 0.0,
@@ -395,7 +395,7 @@ def SDC_slave_CA(
     return apm.action_list  # returns complete action list to orch
 
 
-def SDC_slave_CV_led(
+def ECHE_slave_CV_led(
     experiment: Experiment,
     experiment_version: int = 1,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
@@ -513,7 +513,7 @@ def SDC_slave_CV_led(
     return apm.action_list  # returns complete action list to orch
 
 
-def SDC_slave_CV(
+def ECHE_slave_CV(
     experiment: Experiment,
     experiment_version: int = 1,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
@@ -594,7 +594,7 @@ def SDC_slave_CV(
     return apm.action_list  # returns complete action list to orch
 
 
-def SDC_slave_CP(
+def ECHE_slave_CP(
     experiment: Experiment,
     experiment_version: int = 1,
     CP_current: Optional[float] = 0.0,
@@ -660,7 +660,7 @@ def SDC_slave_CP(
 
     return apm.action_list  # returns complete action list to orch
 
-def SDC_slave_CP_led(
+def ECHE_slave_CP_led(
     experiment: Experiment,
     experiment_version: int = 1,
     CP_current: Optional[float] = 0.0,
@@ -760,7 +760,7 @@ def SDC_slave_CP_led(
 
     return apm.action_list  # returns complete action list to orch
 
-def SDC_slave_background(
+def ECHE_slave_background(
     experiment: Experiment,
     experiment_version: int = 1,
     CP_current: [float] = 0.0,
@@ -856,7 +856,7 @@ def SDC_slave_background(
     return apm.action_list  # returns complete action list to orch
 
 
-def SDC_slave_movetosample(
+def ECHE_slave_movetosample(
     experiment: Experiment,
     experiment_version: int = 1,
     solid_plate_id: Optional[int] = 4534,
@@ -902,7 +902,7 @@ def SDC_slave_movetosample(
 
     return apm.action_list  # returns complete action list to orch
 
-def SDC_slave_move(
+def ECHE_slave_move(
     experiment: Experiment,
     experiment_version: int = 1,
     x_mm: float = 1.0,

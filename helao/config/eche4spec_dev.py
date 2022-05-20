@@ -8,7 +8,7 @@ config['dummy'] = True
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
 config["experiment_libraries"] = ["spec_exp"]
-# config["experiment_libraries"] = ["SDC_exp", "samples_exp"]
+# config["experiment_libraries"] = ["ECHE_exp", "samples_exp"]
 # config["experiment_params"] = {"wavelength_intensity_mw": 2,
 # "wavelength_intensity_mwled2": 2,
 # "wavelength_intensity_mwled3": 4,
@@ -17,7 +17,7 @@ config["experiment_libraries"] = ["spec_exp"]
 # 1.725 1.478 .585 .366
 #                            }
 config["sequence_libraries"] = []
-# config["sequence_libraries"] = ["SDC_seq"]
+# config["sequence_libraries"] = ["ECHE_seq"]
 # config["sequence_params"] = {"wavelength_intensity_mwled1": 1.725,
 #                                "wavelength_intensity_mwled2": 1.478,
 #                                "wavelength_intensity_mwled3": 0.585,
