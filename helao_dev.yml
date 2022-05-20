@@ -1,0 +1,35 @@
+name: helao_dev
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - aiofiles
+  - aiohttp
+  - bokeh
+  - boto3
+  - botocore
+  - colorama
+  - comtypes
+  - databases
+  - fastapi
+  - ipykernel
+  - munch
+  - nidaqmx-python
+  - ntplib
+  - numpy
+  - pandas
+  - paramiko
+  - psutil
+  - pyaml
+  - pybase64
+  - pydantic
+  - pyfiglet
+  - python=3.8
+  - requests
+  - ruamel.yaml
+  - shortuuid
+  - sqlalchemy
+  - starlette
+  - termcolor
+  - uvicorn
+  - websockets
