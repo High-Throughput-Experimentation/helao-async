@@ -31,8 +31,8 @@ from helaocore.model.machine import MachineModel
 from helaocore.model.process_contrib import ProcessContrib
 from helaocore.model.electrolyte import Electrolyte
 
-from helao.driver.motion.galil_motion_driver import MoveModes, TransformationModes
-from helao.driver.robot.pal_driver import Spacingmethod, PALtools
+from helao.driver.motion.enum import MoveModes, TransformationModes
+from helao.driver.robot.enum import PALtools, Spacingmethod
 
 
 EXPERIMENTS = __all__
