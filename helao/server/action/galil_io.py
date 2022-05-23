@@ -148,11 +148,11 @@ async def galil_dyn_endpoints(app=None):
                 trigger_item: Optional[app.driver.dev_diitems] = "gamry_ttl0",
                 triggertype: Optional[TriggerType] = TriggerType.fallingedge,
                 out_item: Optional[app.driver.dev_doitems] = "led",
-                out_item_gamry: Optional[app.driver.dev_doitems] = "gamry_aux",
-                t_on: Optional[int] = 1000,
-                t_off: Optional[int] = 1000,
-                t_offset: Optional[int] = Query(0, ge=0),
-                t_duration: Optional[int] = Query(-1, ge=-1),
+                out_item_two: Optional[app.driver.dev_doitems] = "gamry_aux",
+                toggle_on_ms: Optional[int] = 1000,
+                toggle_off_ms: Optional[int] = 1000,
+                toggle_offset_ms: Optional[int] = Query(0, ge=0),
+                toggle_duration_ms: Optional[int] = Query(-1, ge=-1),
                 mainthread: Optional[int] = Query(0, ge=0, le=8),
                 subthread: Optional[int] = Query(1, ge=0, le=8),
             ):
@@ -161,11 +161,11 @@ async def galil_dyn_endpoints(app=None):
                 Args:
                     trigger_item: di on which the toggle starts
                     out_item: do_item for toggle output
-                    out_item_gamry: do which is connected to gamry aux input
-                    t_on: time (ms) out_item is on
-                    t_off: time (ms) out_item is off
-                    t_offset: offset time in ms after which toggle starts
-                    t_duration: time (ms) for total  toggle time (max is duration of trigger_item)
+                    out_item_two: do which is connected to gamry aux input
+                    toggle_on_ms: time (ms) out_item is on
+                    toggle_off_ms: time (ms) out_item is off
+                    toggle_offset_ms: offset time in ms after which toggle starts
+                    toggle_duration_ms: time (ms) for total  toggle time (max is duration of trigger_item)
                                 negative value will run as long trigger_item is applied
                     !!! toggle cycle is ON/OFF !!!"""
                 active = await app.base.setup_and_contain_action()
@@ -185,11 +185,73 @@ async def galil_dyn_endpoints(app=None):
                 ]
 
                 active.action.action_params["out_port_gamry"] = app.driver.dev_do[
-                    active.action.action_params["out_item_gamry"]
+                    active.action.action_params["out_item_two"]
                 ]
                 active.action.action_params[
                     "out_name_gamry"
-                ] = active.action.action_params["out_item_gamry"]
+                ] = active.action.action_params["out_item_two"]
+
+                datadict = await app.driver.set_digital_cycle(
+                    **active.action.action_params
+                )
+                active.action.error_code = datadict.get(
+                    "error_code", ErrorCodes.unspecified
+                )
+                await active.enqueue_data_dflt(datadict=datadict)
+                finished_action = await active.finish()
+                return finished_action.as_dict()
+
+        if app.driver.dev_di and app.driver.dev_do:
+
+            @app.post(f"/{servKey}/set_digital_cycle")
+            async def set_digital_cycle_two(
+                action: Optional[Action] = Body({}, embed=True),
+                action_version: int = 1,
+                trigger_item: Optional[app.driver.dev_diitems] = "gamry_ttl0",
+                triggertype: Optional[TriggerType] = TriggerType.fallingedge,
+                out_item: Optional[app.driver.dev_doitems] = "",
+                out_item_two: Optional[app.driver.dev_doitems] = "gamry_aux",
+                toggle_two_on_ms: Optional[int] = 1000,
+                toggle_two_off_ms: Optional[int] = 1000,
+                toggle_two_offset_ms: Optional[int] = Query(0, ge=0),
+                toggle_two_duration_ms: Optional[int] = Query(-1, ge=-1),
+                mainthread: Optional[int] = Query(0, ge=0, le=8),
+                subthread: Optional[int] = Query(1, ge=0, le=8),
+            ):
+
+                """Toggles output.
+                Args:
+                    trigger_item: di on which the toggle starts
+                    out_item: do_item for toggle output
+                    out_item_two: do which is connected to gamry aux input
+                    toggle_two_on_ms: time (ms) out_item is on
+                    toggle_two_off_ms: time (ms) out_item is off
+                    toggle_two_offset_ms: offset time in ms after which toggle starts
+                    toggle_two_duration_ms: time (ms) for total  toggle time (max is duration of trigger_item)
+                                negative value will run as long trigger_item is applied
+                    !!! toggle cycle is ON/OFF !!!"""
+                active = await app.base.setup_and_contain_action()
+
+                active.action.action_params["trigger_port"] = app.driver.dev_di[
+                    active.action.action_params["trigger_item"]
+                ]
+                active.action.action_params[
+                    "trigger_name"
+                ] = active.action.action_params["trigger_item"]
+
+                active.action.action_params["out_port"] = app.driver.dev_do[
+                    active.action.action_params["out_item"]
+                ]
+                active.action.action_params["out_name"] = active.action.action_params[
+                    "out_item"
+                ]
+
+                active.action.action_params["out_port_gamry"] = app.driver.dev_do[
+                    active.action.action_params["out_item_two"]
+                ]
+                active.action.action_params[
+                    "out_name_gamry"
+                ] = active.action.action_params["out_item_two"]
 
                 datadict = await app.driver.set_digital_cycle(
                     **active.action.action_params
