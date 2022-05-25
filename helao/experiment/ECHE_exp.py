@@ -18,6 +18,9 @@ __all__ = [
     "ECHE_slave_CP",
     "ECHE_slave_movetosample",
     "ECHE_slave_move",
+#    "ECHE_slave_CV_led_secondtrigger",
+#    "ECHE_slave_CV_noled_secondtrigger",
+
 ]
 
 
@@ -241,10 +244,10 @@ def ECHE_slave_CA_led(
     wavelength_intensity_mw: Optional[float] = 0.0,
     wavelength_intensity_date: Optional[str] = "n/a",
     led_side_illumination: Optional[str] = "front",
-    t_on: Optional[float] = 1000,
-    t_off: Optional[float] = 1000,
-    t_offset: Optional[int] = 0,
-    t_duration: Optional[int] = -1,
+    toggle_on_ms: Optional[float] = 1000,
+    toggle_off_ms: Optional[float] = 1000,
+    toggle_offset_ms: Optional[int] = 0,
+    toggle_duration_ms: Optional[int] = -1,
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -276,10 +279,10 @@ def ECHE_slave_CA_led(
                 "triggertype": toggle_triggertype,
                 "out_item": apm.pars.led,
                 "out_item_gamry": "gamry_aux",
-                "t_on": apm.pars.t_on,
-                "t_off": apm.pars.t_off,
-                "t_offset": apm.pars.t_offset,
-                "t_duration": apm.pars.t_duration,
+                "t_on": apm.pars.toggle_on_ms,
+                "t_off": apm.pars.toggle_off_ms,
+                "t_offset": apm.pars.toggle_offset_ms,
+                "t_duration": apm.pars.toggle_duration_ms,
                 "mainthread": 0,
                 "subthread": 1,
             },
@@ -420,10 +423,10 @@ def ECHE_slave_CV_led(
     wavelength_intensity_mw: Optional[float] = 0.0,
     wavelength_intensity_date: Optional[str] = "n/a",
     led_side_illumination: Optional[str] = "front",
-    t_on: Optional[float] = 1000,
-    t_off: Optional[float] = 1000,
-    t_offset: Optional[int] = 0,
-    t_duration: Optional[int] = -1,
+    toggle_on_ms: Optional[float] = 1000,
+    toggle_off_ms: Optional[float] = 1000,
+    toggle_offset_ms: Optional[int] = 0,
+    toggle_duration_ms: Optional[int] = -1,
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -455,10 +458,10 @@ def ECHE_slave_CV_led(
                 "triggertype": toggle_triggertype,
                 "out_item": apm.pars.led,
                 "out_item_gamry": "gamry_aux",
-                "t_on": apm.pars.t_on,
-                "t_off": apm.pars.t_off,
-                "t_offset": apm.pars.t_offset,
-                "t_duration": apm.pars.t_duration,
+                "t_on": apm.pars.toggle_on_ms,
+                "t_off": apm.pars.toggle_off_ms,
+                "t_offset": apm.pars.toggle_offset_ms,
+                "t_duration": apm.pars.toggle_duration_ms,
                 "mainthread": 0,
                 "subthread": 1,
             },
@@ -679,10 +682,10 @@ def ECHE_slave_CP_led(
     wavelength_intensity_mw: Optional[float] = 0.0,
     wavelength_intensity_date: Optional[str] = "n/a",
     led_side_illumination: Optional[str] = "front",
-    t_on: Optional[float] = 1000,
-    t_off: Optional[float] = 1000,
-    t_offset: Optional[int] = 0,
-    t_duration: Optional[int] = -1,
+    toggle_on_ms: Optional[float] = 1000,
+    toggle_off_ms: Optional[float] = 1000,
+    toggle_offset_ms: Optional[int] = 0,
+    toggle_duration_ms: Optional[int] = -1,
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -714,10 +717,10 @@ def ECHE_slave_CP_led(
                 "triggertype": toggle_triggertype,
                 "out_item": apm.pars.led,
                 "out_item_gamry": "gamry_aux",
-                "t_on": apm.pars.t_on,
-                "t_off": apm.pars.t_off,
-                "t_offset": apm.pars.t_offset,
-                "t_duration": apm.pars.t_duration,
+                "t_on": apm.pars.toggle_on_ms,
+                "t_off": apm.pars.toggle_off_ms,
+                "t_offset": apm.pars.toggle_offset_ms,
+                "t_duration": apm.pars.toggle_duration_ms,
                 "mainthread": 0,
                 "subthread": 1,
             },
@@ -774,10 +777,10 @@ def ECHE_slave_background(
     samplerate_sec: Optional[float] = 0.1,
     background_duration_sec: Optional[float] = 60,
     IErange: Optional[str] = "auto",
-    t_on: Optional[float] = 1000,
-    t_off: [float] = 0,
-    t_offset: [int] = 0,
-    t_duration: Optional[int] = -1,
+    toggle_on_ms: Optional[float] = 1000,
+    toggle_off_ms: Optional[float] = 0,
+    toggle_offset_ms: Optional[int] = 0,
+    toggle_duration_ms: Optional[int] = -1,
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -807,12 +810,12 @@ def ECHE_slave_background(
             "action_params": {
                 "trigger_item": "gamry_ttl0",
                 "triggertype": toggle_triggertype,
-#                "out_item": apm.pars.led,
+                "out_item": "gamry_aux",
                 "out_item_gamry": "gamry_aux",
-                "t_on": apm.pars.t_on,
-                "t_off": apm.pars.t_off,
-                "t_offset": apm.pars.t_offset,
-                "t_duration": apm.pars.t_duration,
+                "t_on": apm.pars.toggle_on_ms,
+                "t_off": apm.pars.toggle_off_ms,
+                "t_offset": apm.pars.toggle_offset_ms,
+                "t_duration": apm.pars.toggle_duration_ms,
                 "mainthread": 0,
                 "subthread": 1,
             },
@@ -933,3 +936,304 @@ def ECHE_slave_move(
     return apm.action_list  # returns complete action list to orch
 
 
+# def ECHE_slave_CV_led_secondtrigger(
+#     experiment: Experiment,
+#     experiment_version: int = 1,
+#     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
+#     Vapex1_vsRHE: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
+#     Vapex2_vsRHE: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
+#     Vfinal_vsRHE: Optional[float] = 0.0,  # Final value in volts or amps.
+#     scanrate_voltsec: Optional[
+#         float
+#     ] = 0.02,  # scan rate in volts/second or amps/second.
+#     samplerate_sec: Optional[float] = 0.1,
+#     cycles: Optional[int] = 1,
+#     IErange: Optional[str] = "auto",
+#     ph: float = 0,
+#     reservoir_electrolyte: Electrolyte = "SLF10",
+#     reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
+#     reservoir_bubbler_gas: str = "O2",
+#     droplet_size_cm2: float = .071,  #3mm diameter droplet
+#     reference_electrode_type: str = "NHE",
+#     ref_vs_nhe: float = 0.21,
+#     led: Optional[str] = "doric_led1",
+#     wavelength_nm: Optional[float] = 0.0,
+#     wavelength_intensity_mw: Optional[float] = 0.0,
+#     wavelength_intensity_date: Optional[str] = "n/a",
+#     led_side_illumination: Optional[str] = "front",
+#     toggle_on_ms: Optional[float] = 2000,
+#     toggle_off_ms: Optional[float] = 1000,
+#     toggle_offset_ms: Optional[int] = 0,
+#     toggle_duration_ms: Optional[int] = -1,
+#     comment: Optional[str] = "",
+#     toggle_two_on_ms: Optional[float] = 100,
+#     toggle_two_off_ms: Optional[float] = 100,
+#     toggle_two_offset_ms: Optional[int] = 0,
+#     toggle_two_duration_ms: Optional[int] = -1,
+
+
+# ):
+#     """last functionality test: -"""
+
+#     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+#     # get sample for gamry
+#     apm.add_action(
+#         {
+#             "action_server": PAL_server,
+#             "action_name": "archive_custom_query_sample",
+#             "action_params": {
+#                 "custom": "cell1_we",
+#             },
+#             "to_global_params": [
+#                 "_fast_samples_in"
+#             ],  # save new liquid_sample_no of eche cell to globals
+#             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#         }
+#     )
+
+#     # setup toggle on galil_io
+#     apm.add_action(
+#         {
+#             "action_server": IO_server,
+#             "action_name": "set_digital_cycle",
+#             "action_params": {
+#                 "trigger_item": "gamry_ttl0",
+#                 "triggertype": toggle_triggertype,
+#                 "out_item": apm.pars.led,
+#                 "out_item_gamry": "notused",
+#                 "t_on": apm.pars.toggle_on_ms,
+#                 "t_off": apm.pars.toggle_off_ms,
+#                 "t_offset": apm.pars.toggle_offset_ms,
+#                 "t_duration": apm.pars.toggle_duration_ms,
+#                 "mainthread": 0,
+#                 "subthread": 1,
+#             },
+#             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#             "process_finish": False,
+#             "process_contrib": [
+#                 ProcessContrib.action_params,
+#                 ProcessContrib.files,
+#                 ProcessContrib.samples_in,
+#                 ProcessContrib.samples_out,
+#             ],
+#         },
+#     )
+
+#     apm.add_action(
+#         {
+#             "action_server": IO_server,
+#             "action_name": "set_digital_cycle_two",
+#             "action_params": {
+#                 "trigger_item": "gamry_ttl0",
+#                 "triggertype": toggle_triggertype,
+#                 "out_item": "notused",
+#                 "out_item_gamry": "gamry_aux",
+#                 "t_on_two": apm.pars.toggle_two_on_ms,
+#                 "t_off_two": apm.pars.toggle_two_off_ms,
+#                 "t_offset_two": apm.pars.toggle_two_offset_ms,
+#                 "t_duration_two": apm.pars.toggle_two_duration_ms,
+#                 "mainthread": 2,
+#                 "subthread": 3,
+#             },
+#             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#             "process_finish": False,
+#             "process_contrib": [
+#                 ProcessContrib.action_params,
+#                 ProcessContrib.files,
+#                 ProcessContrib.samples_in,
+#                 ProcessContrib.samples_out,
+#             ],
+#         },
+#     )
+
+
+#     # apply potential
+#     apm.add_action(
+#         {
+#             "action_server": PSTAT_server,
+#             "action_name": "run_CV",
+#             "action_params": {
+#                 "Vinit__V": apm.pars.Vinit_vsRHE
+#                 - 1.0 * apm.pars.ref_vs_nhe
+#                 - 0.059 * apm.pars.ph,
+#                 "Vapex1__V": apm.pars.Vapex1_vsRHE
+#                 - 1.0 * apm.pars.ref_vs_nhe
+#                 - 0.059 * apm.pars.ph,
+#                 "Vapex2__V": apm.pars.Vapex2_vsRHE
+#                 - 1.0 * apm.pars.ref_vs_nhe
+#                 - 0.059 * apm.pars.ph,
+#                 "Vfinal__V": apm.pars.Vfinal_vsRHE
+#                 - 1.0 * apm.pars.ref_vs_nhe
+#                 - 0.059 * apm.pars.ph,
+#                 "ScanRate__V_s": apm.pars.scanrate_voltsec,
+#                 "AcqInterval__s": apm.pars.samplerate_sec,
+#                 "Cycles": apm.pars.cycles,
+#                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
+#                 "TTLsend": 0,  # -1 disables, else select TTL 0-3
+#                 "IErange": apm.pars.IErange,
+#             },
+#             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+#             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#             "process_finish": True,
+#             "process_contrib": [
+#                 ProcessContrib.action_params,
+#                 ProcessContrib.files,
+#                 ProcessContrib.samples_in,
+#                 ProcessContrib.samples_out,
+#             ],
+#         },
+#     )
+
+#     return apm.action_list  # returns complete action list to orch
+
+# def ECHE_slave_CV_noled_secondtrigger(
+#     experiment: Experiment,
+#     experiment_version: int = 1,
+#     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
+#     Vapex1_vsRHE: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
+#     Vapex2_vsRHE: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
+#     Vfinal_vsRHE: Optional[float] = 0.0,  # Final value in volts or amps.
+#     scanrate_voltsec: Optional[
+#         float
+#     ] = 0.02,  # scan rate in volts/second or amps/second.
+#     samplerate_sec: Optional[float] = 0.1,
+#     cycles: Optional[int] = 1,
+#     IErange: Optional[str] = "auto",
+#     ph: float = 0,
+#     reservoir_electrolyte: Electrolyte = "SLF10",
+#     reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
+#     reservoir_bubbler_gas: str = "O2",
+#     droplet_size_cm2: float = .071,  #3mm diameter droplet
+#     reference_electrode_type: str = "NHE",
+#     ref_vs_nhe: float = 0.21,
+#     led: Optional[str] = "doric_led1",
+#     wavelength_nm: Optional[float] = 0.0,
+#     wavelength_intensity_mw: Optional[float] = 0.0,
+#     wavelength_intensity_date: Optional[str] = "n/a",
+#     led_side_illumination: Optional[str] = "front",
+#     toggle_on_ms: Optional[float] = 2000,
+#     toggle_off_ms: Optional[float] = 1000,
+#     toggle_offset_ms: Optional[int] = 0,
+#     toggle_duration_ms: Optional[int] = -1,
+#     comment: Optional[str] = "",
+#     toggle_two_on_ms: Optional[float] = 100,
+#     toggle_two_off_ms: Optional[float] = 100,
+#     toggle_two_offset_ms: Optional[int] = 0,
+#     toggle_two_duration_ms: Optional[int] = -1,
+
+
+# ):
+#     """last functionality test: -"""
+
+#     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+#     # get sample for gamry
+#     apm.add_action(
+#         {
+#             "action_server": PAL_server,
+#             "action_name": "archive_custom_query_sample",
+#             "action_params": {
+#                 "custom": "cell1_we",
+#             },
+#             "to_global_params": [
+#                 "_fast_samples_in"
+#             ],  # save new liquid_sample_no of eche cell to globals
+#             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#         }
+#     )
+
+#     # setup toggle on galil_io
+#     # apm.add_action(
+#     #     {
+#     #         "action_server": IO_server,
+#     #         "action_name": "set_digital_cycle",
+#     #         "action_params": {
+#     #             "trigger_item": "gamry_ttl0",
+#     #             "triggertype": toggle_triggertype,
+#     #             "out_item": apm.pars.led,
+#     #             "out_item_gamry": "",
+#     #             "t_on": apm.pars.toggle_on_ms,
+#     #             "t_off": apm.pars.toggle_off_ms,
+#     #             "t_offset": apm.pars.toggle_offset_ms,
+#     #             "t_duration": apm.pars.toggle_duration_ms,
+#     #             "mainthread": 0,
+#     #             "subthread": 1,
+#     #         },
+#     #         "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#     #         "process_finish": False,
+#     #         "process_contrib": [
+#     #             ProcessContrib.action_params,
+#     #             ProcessContrib.files,
+#     #             ProcessContrib.samples_in,
+#     #             ProcessContrib.samples_out,
+#     #         ],
+#     #     },
+#     # )
+
+#     apm.add_action(
+#         {
+#             "action_server": IO_server,
+#             "action_name": "set_digital_cycle_two",
+#             "action_params": {
+#                 "trigger_item": "gamry_ttl0",
+#                 "triggertype": toggle_triggertype,
+#                 "out_item": "doric_led2",
+#                 "out_item_gamry": "gamry_aux",
+#                 "t_on_two": apm.pars.toggle_two_on_ms,
+#                 "t_off_two": apm.pars.toggle_two_off_ms,
+#                 "t_offset_two": apm.pars.toggle_two_offset_ms,
+#                 "t_duration_two": apm.pars.toggle_two_duration_ms,
+#                 "mainthread": 0,
+#                 "subthread": 1,
+#             },
+#             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#             "process_finish": False,
+#             "process_contrib": [
+#                 ProcessContrib.action_params,
+#                 ProcessContrib.files,
+#                 ProcessContrib.samples_in,
+#                 ProcessContrib.samples_out,
+#             ],
+#         },
+#     )
+
+
+#     # apply potential
+#     apm.add_action(
+#         {
+#             "action_server": PSTAT_server,
+#             "action_name": "run_CV",
+#             "action_params": {
+#                 "Vinit__V": apm.pars.Vinit_vsRHE
+#                 - 1.0 * apm.pars.ref_vs_nhe
+#                 - 0.059 * apm.pars.ph,
+#                 "Vapex1__V": apm.pars.Vapex1_vsRHE
+#                 - 1.0 * apm.pars.ref_vs_nhe
+#                 - 0.059 * apm.pars.ph,
+#                 "Vapex2__V": apm.pars.Vapex2_vsRHE
+#                 - 1.0 * apm.pars.ref_vs_nhe
+#                 - 0.059 * apm.pars.ph,
+#                 "Vfinal__V": apm.pars.Vfinal_vsRHE
+#                 - 1.0 * apm.pars.ref_vs_nhe
+#                 - 0.059 * apm.pars.ph,
+#                 "ScanRate__V_s": apm.pars.scanrate_voltsec,
+#                 "AcqInterval__s": apm.pars.samplerate_sec,
+#                 "Cycles": apm.pars.cycles,
+#                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
+#                 "TTLsend": 0,  # -1 disables, else select TTL 0-3
+#                 "IErange": apm.pars.IErange,
+#             },
+#             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+#             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#             "process_finish": True,
+#             "process_contrib": [
+#                 ProcessContrib.action_params,
+#                 ProcessContrib.files,
+#                 ProcessContrib.samples_in,
+#                 ProcessContrib.samples_out,
+#             ],
+#         },
+#     )
+
+#     return apm.action_list  # returns complete action list to orch
