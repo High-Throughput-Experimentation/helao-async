@@ -12,8 +12,10 @@ __all__ = [
     "ECHE_background",
     "ECHE_CP",
     "ECHE_CP_led",
+#    "ECHE_CV_led_secondtrigger",
     "ECHE_movetosample",
     "ECHE_move",
+
 
 ]
 
@@ -60,12 +62,14 @@ def ECHE_4CA_led_1CV_led(
     led_number_CA3: int = 3,
     led_number_CA4: int = 4,
     led_number_CV: int = 1,
-    t_onCA: float = 500,
-    t_offCA: float = 500,
-    t_offsetCA: float = 0,
-    t_onCV: float = 2000,
-    t_offCV: float = 1000,
-    t_offsetCV: float = 0,
+    toggle_onCA_ms: float = 500,
+    toggle_offCA_ms: float = 500,
+    toggle_offsetCA_ms: float = 0,
+    toggle_durationCA_ms: float = -1,
+    toggle_onCV_ms: float = 2000,
+    toggle_offCV_ms: float = 1000,
+    toggle_offsetCV_ms: float = 0,
+    toggle_durationCV_ms: float = -1,
 ):
 
     pl = ExperimentPlanMaker()
@@ -105,9 +109,10 @@ def ECHE_4CA_led_1CV_led(
                 "wavelength_intensity_mw": led_intensities_mw[led_number_CA1],
                 "wavelength_intensity_date": led_typenamesdate[5],
                 "led_side_illumination": led_typenamesdate[0],
-                "t_on": t_onCA,
-                "t_off": t_offCA,
-                "t_offset": t_offsetCA,
+                "toggle_on_ms": toggle_onCA_ms,
+                "toggle_off_ms": toggle_offCA_ms,
+                "toggle_offset_ms": toggle_offsetCA_ms,
+                "toggle_duration_ms": toggle_durationCA_ms,
             },
         )
         # CA2
@@ -129,9 +134,10 @@ def ECHE_4CA_led_1CV_led(
                 "wavelength_intensity_mw": led_intensities_mw[led_number_CA2],
                 "wavelength_intensity_date": led_typenamesdate[5],
                 "led_side_illumination": led_typenamesdate[0],
-                "t_on": t_onCA,
-                "t_off": t_offCA,
-                "t_offset": t_offsetCA,
+                "toggle_on_ms": toggle_onCA_ms,
+                "toggle_off_ms": toggle_offCA_ms,
+                "toggle_offset_ms": toggle_offsetCA_ms,
+                "toggle_duration_ms": toggle_durationCA_ms,
             },
         )
         # CA3
@@ -153,9 +159,10 @@ def ECHE_4CA_led_1CV_led(
                 "wavelength_intensity_mw": led_intensities_mw[led_number_CA3],
                 "wavelength_intensity_date": led_typenamesdate[5],
                 "led_side_illumination": led_typenamesdate[0],
-                "t_on": t_onCA,
-                "t_off": t_offCA,
-                "t_offset": t_offsetCA,
+                "toggle_on_ms": toggle_onCA_ms,
+                "toggle_off_ms": toggle_offCA_ms,
+                "toggle_offset_ms": toggle_offsetCA_ms,
+                "toggle_duration_ms": toggle_durationCA_ms,
             },
         )
         # CA4
@@ -177,9 +184,10 @@ def ECHE_4CA_led_1CV_led(
                 "wavelength_intensity_mw": led_intensities_mw[led_number_CA4],
                 "wavelength_intensity_date": led_typenamesdate[5],
                 "led_side_illumination": led_typenamesdate[0],
-                "t_on": t_onCA,
-                "t_off": t_offCA,
-                "t_offset": t_offsetCA,
+                "toggle_on_ms": toggle_onCA_ms,
+                "toggle_off_ms": toggle_offCA_ms,
+                "toggle_offset_ms": toggle_offsetCA_ms,
+                "toggle_duration_ms": toggle_durationCA_ms,
             },
         )
 
@@ -206,9 +214,10 @@ def ECHE_4CA_led_1CV_led(
                 "wavelength_intensity_mw": led_intensities_mw[led_number_CV],
                 "wavelength_intensity_date": led_typenamesdate[5],
                 "led_side_illumination": led_typenamesdate[0],
-                "t_on": t_onCV,
-                "t_off": t_offCV,
-                "t_offset": t_offsetCV,
+                "toggle_on_ms": toggle_onCV_ms,
+                "toggle_off_ms": toggle_offCV_ms,
+                "toggle_offset_ms": toggle_offsetCV_ms,
+                "toggle_duration_ms": toggle_durationCV_ms,
             },
         )
 
@@ -472,9 +481,10 @@ def ECHE_CA_led(
     led_wavelengths_nm: list = [0],
     led_intensities_mw: list = [0],
     led_number_CA: int = 1,
-    t_onCA: float = 500,
-    t_offCA: float = 500,
-    t_offsetCA: float = 0,
+    toggle_onCA_ms: float = 500,
+    toggle_offCA_ms: float = 500,
+    toggle_offsetCA_ms: float = 0,
+    toggle_durationCA_ms: float = -1,
 ):
 
     pl = ExperimentPlanMaker()
@@ -514,9 +524,10 @@ def ECHE_CA_led(
                 "wavelength_intensity_mw": led_intensities_mw[led_number_CA],
                 "wavelength_intensity_date": led_typenamesdate[5],
                 "led_side_illumination": led_typenamesdate[0],
-                "t_on": t_onCA,
-                "t_off": t_offCA,
-                "t_offset": t_offsetCA,
+                "toggle_on_ms": toggle_onCA_ms,
+                "toggle_off_ms": toggle_offCA_ms,
+                "toggle_offset_ms": toggle_offsetCA_ms,
+                "toggle_duration_ms": toggle_durationCA_ms,
             },
         )
 
@@ -547,9 +558,11 @@ def ECHE_CV_led(
     led_wavelengths_nm: list = [0],
     led_intensities_mw: list = [0],
     led_number_CV: int = 1,
-    t_onCV: float = 2000,
-    t_offCV: float = 1000,
-    t_offsetCV: float = 0,
+    toggle_onCV_ms: float = 2000,
+    toggle_offCV_ms: float = 1000,
+    toggle_offsetCV_ms: float = 0,
+    toggle_durationCV_ms: float = -1,
+    
 ):
 
     pl = ExperimentPlanMaker()
@@ -594,9 +607,10 @@ def ECHE_CV_led(
                 "wavelength_intensity_mw": led_intensities_mw[led_number_CV],
                 "wavelength_intensity_date": led_typenamesdate[5],
                 "led_side_illumination": led_typenamesdate[0],
-                "t_on": t_onCV,
-                "t_off": t_offCV,
-                "t_offset": t_offsetCV,
+                "toggle_on_ms": toggle_onCV_ms,
+                "toggle_off_ms": toggle_offCV_ms,
+                "toggle_offset_ms": toggle_offsetCV_ms,
+                "toggle_duration_ms": toggle_durationCV_ms,
             },
         )
 
@@ -617,9 +631,10 @@ def ECHE_background(
     background_duration_sec: float = 15,
     IErange: str = "auto",
     CP_samplerate_sec: float = 0.05,
-    t_on: float = 1000,
-    t_off: float = 0,
-    t_offset: float = 50,
+    toggle_on_ms: float = 1000,
+    toggle_off_ms: float = 0,
+    toggle_offset_ms: float = 0,
+    toggle_duration_ms: float = -1,
 
 ):
 
@@ -650,9 +665,10 @@ def ECHE_background(
                 "samplerate_sec": CP_samplerate_sec,
                 "background_duration_sec": background_duration_sec,
                 "IErange": IErange,
-                "t_on": t_on,
-                "t_off": t_off,
-                "t_offset": t_offset,
+                "toggle_on_ms": toggle_on_ms,
+                "toggle_off_ms": toggle_off_ms,
+                "toggle_offset_ms": toggle_offset_ms,
+                "toggle_duration_ms": toggle_duration_ms,
             },
         )
 
@@ -739,9 +755,10 @@ def ECHE_CP_led(
     led_typenamesdate: list = ["led"],
     led_wavelengths_nm: list = [0],
     led_intensities_mw: list = [0],
-    t_onCP: float = 500,
-    t_offCP: float = 500,
-    t_offsetCP: float = 0,
+    toggle_onCP_ms: float = 500,
+    toggle_offCP_ms: float = 500,
+    toggle_offsetCP_ms: float = 0,
+    toggle_durationCP_ms: float = -1,
 
 ):
 
@@ -782,9 +799,10 @@ def ECHE_CP_led(
                 "wavelength_intensity_mw": led_intensities_mw[led_number_CP],
                 "wavelength_intensity_date": led_typenamesdate[5],
                 "led_side_illumination": led_typenamesdate[0],
-                "t_on": t_onCP,
-                "t_off": t_offCP,
-                "t_offset": t_offsetCP,
+                "toggle_on_ms": toggle_onCP_ms,
+                "toggle_off_ms": toggle_offCP_ms,
+                "toggle_offset_ms": toggle_offsetCP_ms,
+                "toggle_duration_ms": toggle_durationCP_ms,
             },
         )
 
@@ -835,3 +853,99 @@ def ECHE_move(
     pl.add_experiment("ECHE_slave_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
+
+# def ECHE_CV_led_secondtrigger(
+#     sequence_version: int = 1,
+#     plate_id: int = 1,
+#     plate_sample_no_list: list = [2],
+#     reservoir_electrolyte: Electrolyte = "SLF10",
+#     reservoir_liquid_sample_no: int = 1,
+#     reservoir_bubbler_gas: str = "O2",
+#     ph: float = 9.53,
+#     droplet_size_cm2: float = .071,  #3mm diameter droplet
+#     liquid_volume_ml: float = 1.0,
+#     ref_vs_nhe: float = 0.21,
+#     CV_Vinit_vsRHE: float = 1.23,
+#     CV_Vapex1_vsRHE: float = 0.73,
+#     CV_Vapex2_vsRHE: float = 1.73,
+#     CV_Vfinal_vsRHE: float = 1.73,
+#     CV_scanrate_voltsec: float = 0.02,
+#     CV_samplerate_mV: float = 1,
+#     CV_cycles: int = 1,
+#     IErange: str = "auto",
+#     led_typenamesdate: list = ["led"],
+#     led_wavelengths_nm: list = [0],
+#     led_intensities_mw: list = [0],
+#     led_number_CV: int = 1,
+#     toggle_onCV_ms: float = 2000,
+#     toggle_offCV_ms: float = 1000,
+#     toggle_offsetCV_ms: float = 0,
+#     toggle_duration_ms: float = -1,
+#     toggle_two_onCV_ms: float = 100,
+#     toggle_two_offCV_ms: float = 500,
+#     toggle_two_offsetCV_ms: float = 0,
+#     toggle_two_duration_ms: float = -1,
+
+    
+# ):
+
+#     pl = ExperimentPlanMaker()
+
+#     # (1) house keeping
+#     pl.add_experiment("ECHE_slave_unloadall_customs", {})
+
+#     for plate_sample in plate_sample_no_list:
+
+#         pl.add_experiment(
+#             "ECHE_slave_startup",
+#             {
+#                 "solid_custom_position": "cell1_we",
+#                 "solid_plate_id": plate_id,
+#                 "solid_sample_no": plate_sample,
+#                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+#                 "reservoir_bubbler_gas":     reservoir_bubbler_gas,
+#                 "liquid_volume_ml": liquid_volume_ml,
+#             },
+#         )
+        
+#         # CV1
+#         pl.add_experiment(
+#             "ECHE_slave_CV_led_secondtrigger",
+#             {
+#                 "Vinit_vsRHE": CV_Vinit_vsRHE,
+#                 "Vapex1_vsRHE": CV_Vapex1_vsRHE,
+#                 "Vapex2_vsRHE": CV_Vapex2_vsRHE,
+#                 "Vfinal_vsRHE": CV_Vfinal_vsRHE,
+#                 "scanrate_voltsec": CV_scanrate_voltsec,
+#                 "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
+#                 "cycles": CV_cycles,
+#                 "IErange": IErange,
+#                 "ph": ph,
+#                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
+#                 "reservoir_bubbler_gas": reservoir_bubbler_gas,
+#                 "droplet_size_cm2": droplet_size_cm2,
+#                 "reference_electrode_type": "NHE",
+#                 "ref_vs_nhe": ref_vs_nhe,
+#                 "led": led_typenamesdate[led_number_CV],
+#                 "wavelength_nm": led_wavelengths_nm[led_number_CV],
+#                 "wavelength_intensity_mw": led_intensities_mw[led_number_CV],
+#                 "wavelength_intensity_date": led_typenamesdate[5],
+#                 "led_side_illumination": led_typenamesdate[0],
+#                 "toggle_on_ms": toggle_onCV_ms,
+#                 "toggle_off_ms": toggle_offCV_ms,
+#                 "toggle_offset_ms": toggle_offsetCV_ms,
+#                 "toggle_duration_ms": toggle_duration_ms,
+#                 "toggle_two_on_ms": toggle_two_onCV_ms,
+#                 "toggle_two_off_ms": toggle_two_offCV_ms,
+#                 "toggle_two_offset_ms": toggle_two_offsetCV_ms,
+#                 "toggle_two_duration_ms": toggle_two_duration_ms,
+
+
+
+#             },
+#         )
+
+#         pl.add_experiment("ECHE_slave_shutdown", {})
+
+#     return pl.experiment_plan_list  # returns complete experiment list
+
