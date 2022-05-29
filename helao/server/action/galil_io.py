@@ -153,8 +153,12 @@ async def galil_dyn_endpoints(app=None):
                 t_off: Optional[int] = 1000,
                 t_offset: Optional[int] = Query(0, ge=0),
                 t_duration: Optional[int] = Query(-1, ge=-1),
-                mainthread: Optional[int] = Query(0, ge=0, le=8),
-                subthread: Optional[int] = Query(1, ge=0, le=8),
+                t_on2: Optional[int] = 1000,
+                t_off2: Optional[int] = 1000,
+                t_offset2: Optional[int] = Query(0, ge=0),
+                t_duration2: Optional[int] = Query(-1, ge=-1),
+#                mainthread: Optional[int] = Query(0, ge=0, le=8),
+#               subthread: Optional[int] = Query(1, ge=0, le=8),
             ):
 
                 """Toggles output.
