@@ -294,6 +294,7 @@ class Galil:
                 t_time_on=t_on,
                 t_time_off=t_off,
                 t_offset=t_offset,
+                t_duration=t_duration,
                 f_maxcount=f_maxcount,
                 t_time_on2=t_on2,
                 t_time_off2=t_off2,
