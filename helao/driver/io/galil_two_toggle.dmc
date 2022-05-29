@@ -16,7 +16,7 @@
     XQ #toggle{subthread2}, {subthread2};      'execute thread 2
 	AI -{p_trigger};      'pause this thread until after input 1 is low
 
-    HX1;                 'halt all threads
+    HX1;HX2                 'halt threads 1&2
     CB {p_output};CB {p_output_gamry};    'clear output
 EN; 'end program
 
