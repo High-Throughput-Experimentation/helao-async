@@ -57,6 +57,7 @@ class Galil:
         self.digital_cycle_out_gamry = None
         self.digital_cycle_mainthread = None
         self.digital_cycle_subthread = None
+        self.digital_cycle_subthread2 = None
 
         # if this is the main instance let us make a galil connection
         self.g = gclib.py()
@@ -242,8 +243,12 @@ class Galil:
         t_off: int,
         t_offset: int,
         t_duration: int,
-        mainthread: int,
-        subthread: int,
+        t_on2: int,
+        t_off2: int,
+        t_offset2: int,
+        t_duration2: int,
+#        mainthread: int,
+#        subthread: int,
         *args,
         **kwargs,
     ):
@@ -255,13 +260,13 @@ class Galil:
             and self.dev_do[out_name] == out_port
             and out_name_gamry in self.dev_do
             and self.dev_do[out_name_gamry] == out_port_gamry
-            and mainthread != subthread
+#            and mainthread != subthread
         ):
 
             self.digital_cycle_out = out_port
             self.digital_cycle_out_gamry = out_port_gamry
-            self.digital_cycle_mainthread = mainthread
-            self.digital_cycle_subthread = subthread
+#            self.digital_cycle_mainthread = mainthread
+#           self.digital_cycle_subthread = subthread
 
             # di (AI n):
             # if n is positive, galil waits for input to go high (rising edge)
@@ -275,10 +280,12 @@ class Galil:
             print((t_on + t_off))
             print(t_duration / (t_on + t_off))
             f_maxcount = round(t_duration / (t_on + t_off))
+            f_maxcount2 = round(t_duration2 / (t_on2 + t_off2))
             self.base.print_message(f"toggle count: {f_maxcount}", info=True)
 
             DMC_prog = pathlib.Path(
-                os.path.join(driver_path, "galil_toggle.dmc")
+#                os.path.join(driver_path, "galil_toggle.dmc")
+                os.path.join(driver_path, "galil_two_toggle.dmc")
             ).read_text()
             DMC_prog = DMC_prog.format(
                 p_trigger=trigger_port,
@@ -288,11 +295,19 @@ class Galil:
                 t_time_off=t_off,
                 t_offset=t_offset,
                 f_maxcount=f_maxcount,
-                subthread=subthread,
-                mainthread=mainthread,
+                t_time_on2=t_on2,
+                t_time_off2=t_off2,
+                t_offset2=t_offset2,
+                t_duration2=t_duration2,
+                f_maxcount2=f_maxcount2,
+                subthread2=2,
+                subthread=1,
+                mainthread=0,
+#                subthread=subthread,
+#                mainthread=mainthread,
             )
             await self.upload_DMC(DMC_prog)
-            self.galilcmd(f"XQ #main{mainthread},{mainthread}")  # excecute main routine
+            self.galilcmd(f"XQ #main{0},{0}")  # excecute main routine
             # self.galilcmd("XQ #toggle, 1")  # excecute main routine
         else:
             self.base.print_message(
@@ -314,6 +329,7 @@ class Galil:
             self.digital_cycle_out_gamry = None
             self.digital_cycle_mainthread = None
             self.digital_cycle_subthread = None
+            self.digital_cycle_subthread2 = None
 
         return {}
 
