@@ -1,6 +1,6 @@
 __all__ = ["makeApp"]
 
-from typing import Optional
+from typing import Optional, Union, List
 from fastapi import Body, Query
 from helaocore.server.base import makeActionServ
 from helao.driver.io.galil_io_driver import Galil, TriggerType
@@ -138,7 +138,7 @@ async def galil_dyn_endpoints(app=None):
                 await active.enqueue_data_dflt(datadict=datadict)
                 finished_action = await active.finish()
                 return finished_action.as_dict()
-            
+
         if app.driver.dev_di and app.driver.dev_do:
 
             @app.post(f"/{servKey}/set_digital_cycle")
@@ -198,7 +198,24 @@ async def galil_dyn_endpoints(app=None):
                 await active.enqueue_data_dflt(datadict=datadict)
                 finished_action = await active.finish()
                 return finished_action.as_dict()
-            
+
+        if app.driver.dev_di and app.driver.dev_do:
+
+            @app.post(f"/{servKey}/stop_digital_cycle")
+            async def stop_digital_cycle(
+                action: Optional[Action] = Body({}, embed=True),
+                action_version: int = 1,
+            ):
+                active = await app.base.setup_and_contain_action()
+
+                datadict = await app.driver.stop_digital_cycle()
+                active.action.error_code = datadict.get(
+                    "error_code", ErrorCodes.unspecified
+                )
+                # await active.enqueue_data_dflt(datadict = datadict)
+                finished_action = await active.finish()
+                return finished_action.as_dict()
+
         if app.driver.dev_di and app.driver.dev_do:
 
             @app.post(f"/{servKey}/set_digital_cycle2")
@@ -249,9 +266,9 @@ async def galil_dyn_endpoints(app=None):
                 active.action.action_params["out_port2"] = app.driver.dev_do[
                     active.action.action_params["out_item2"]
                 ]
-                active.action.action_params[
-                    "out_name2"
-                ] = active.action.action_params["out_item2"]
+                active.action.action_params["out_name2"] = active.action.action_params[
+                    "out_item2"
+                ]
 
                 datadict = await app.driver.set_digital_cycle(
                     **active.action.action_params
@@ -265,14 +282,72 @@ async def galil_dyn_endpoints(app=None):
 
         if app.driver.dev_di and app.driver.dev_do:
 
-            @app.post(f"/{servKey}/stop_digital_cycle")
-            async def stop_digital_cycle(
+            @app.post(f"/{servKey}/stop_digital_cycle2")
+            async def stop_digital_cycle2(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 1,
             ):
                 active = await app.base.setup_and_contain_action()
 
-                datadict = await app.driver.stop_digital_cycle()
+                datadict = await app.driver.stop_digital_cycle2()
+                active.action.error_code = datadict.get(
+                    "error_code", ErrorCodes.unspecified
+                )
+                # await active.enqueue_data_dflt(datadict = datadict)
+                finished_action = await active.finish()
+                return finished_action.as_dict()
+
+        if app.driver.dev_di and app.driver.dev_do:
+
+            @app.post(f"/{servKey}/set_digital_cycles")
+            async def set_digital_cycles(
+                action: Optional[Action] = Body({}, embed=True),
+                action_version: int = 1,
+                trigger_name: Optional[app.driver.dev_diitems] = "gamry_ttl0",
+                triggertype: Optional[TriggerType] = TriggerType.fallingedge,
+                out_name: Optional[
+                    Union[app.driver.dev_doitems, List[app.driver.dev_doitems]]
+                ] = "led",
+                out_name_gamry: Optional[app.driver.dev_doitems] = "gamry_aux",
+                t_on: Optional[Union[int, List[int]]] = 1000,
+                t_off: Optional[Union[int, List[int]]] = 1000,
+                t_offset: Optional[Union[int, List[int]]] = Query(0, ge=0),
+                t_duration: Optional[Union[int, List[int]]] = Query(-1, ge=-1),
+            ):
+
+                """Toggles output.
+                Args:
+                    trigger_name: di on which the toggle starts
+                    out_name: do_item for toggle output
+                    out_name_gamry: do which is connected to gamry aux input
+                    t_on: time (ms) out_item is on
+                    t_off: time (ms) out_item is off
+                    t_offset: offset time in ms after which toggle starts
+                    t_duration: time (ms) for total  toggle time (max is duration of trigger_item)
+                                negative value will run as long trigger_item is applied
+                    !!! toggle cycle is ON/OFF !!!"""
+                active = await app.base.setup_and_contain_action()
+
+                datadict = await app.driver.set_digital_cycles(
+                    **active.action.action_params
+                )
+                active.action.error_code = datadict.get(
+                    "error_code", ErrorCodes.unspecified
+                )
+                await active.enqueue_data_dflt(datadict=datadict)
+                finished_action = await active.finish()
+                return finished_action.as_dict()
+
+        if app.driver.dev_di and app.driver.dev_do:
+
+            @app.post(f"/{servKey}/stop_digital_cycles")
+            async def stop_digital_cycles(
+                action: Optional[Action] = Body({}, embed=True),
+                action_version: int = 1,
+            ):
+                active = await app.base.setup_and_contain_action()
+
+                datadict = await app.driver.stop_digital_cycles()
                 active.action.error_code = datadict.get(
                     "error_code", ErrorCodes.unspecified
                 )
