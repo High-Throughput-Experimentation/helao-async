@@ -245,6 +245,7 @@ class Galil:
         **kwargs,
     ):
         err_code = ErrorCodes.none
+        valid_trig = False
         if trigger_name in self.dev_di:
             valid_trig = True
             trigger_port = self.dev_di[trigger_name]
