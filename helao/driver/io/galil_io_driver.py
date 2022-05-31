@@ -14,6 +14,7 @@ __all__ = [
 import os
 import pathlib
 import traceback
+from typing import Union, Optional, List
 
 from helaocore.server.base import Base
 from helaocore.error import ErrorCodes
@@ -77,7 +78,7 @@ class Galil:
                 self.base.print_message("no Galil IP configured", error=True)
                 self.galil_enabled = False
         except Exception as e:
-            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             self.base.print_message(
                 f"severe Galil error ... please power cycle Galil "
                 f"and try again {repr(e), tb,}",
@@ -230,6 +231,139 @@ class Galil:
         self.base.print_message(f"DMC prg:\n{DMC_prog}", info=True)
         self.galilprgdownload(DMC_prog + "\x00")
 
+    async def set_digital_cycles(
+        self,
+        trigger_name: str,
+        triggertype: TriggerType,
+        out_name: Union[str, List[str]],
+        t_on: Union[int, List[int]],
+        t_off: Union[int, List[int]],
+        t_offset: Union[int, List[int]],
+        t_duration: Union[int, List[int]],
+        out_name_gamry: Optional[str] = None,
+        *args,
+        **kwargs,
+    ):
+        err_code = ErrorCodes.none
+        if trigger_name in self.dev_di:
+            valid_trig = True
+            trigger_port = self.dev_di[trigger_name]
+            if triggertype == TriggerType.risingedge:
+                trigger_port = f"{abs(int(trigger_port))}"
+            elif triggertype == TriggerType.fallingedge:
+                trigger_port = f"-{abs(int(trigger_port))}"
+
+        if (
+            valid_trig
+            and out_name_gamry is not None
+            and isinstance(out_name, str)
+            and isinstance(t_on, int)
+            and isinstance(t_off, int)
+            and isinstance(t_offset, int)
+            and isinstance(t_duration, int)
+            and out_name in self.dev_do
+            and out_name_gamry in self.dev_do
+        ):
+            out_port = self.dev_do[out_name]
+            out_port_gamry = self.dev_do[out_name_gamry]
+            out_ports = [out_port, out_port_gamry]
+            t_on = [t_on] * 2
+            t_off = [t_off] * 2
+            t_offset = [t_offset] * 2
+            t_duration = [t_duration] * 2
+            self.digital_cycle_out = out_port
+            self.digital_cycle_out_gamry = out_port_gamry
+            self.digital_cycle_mainthread = 0
+            self.digital_cycle_subthread = 1
+
+            # di (AI n):
+            # if n is positive, galil waits for input to go high (rising edge)
+            # if n is negative, galil waits for input to go low (falling edge)
+
+        elif (
+            valid_trig
+            and out_name_gamry is None
+            and isinstance(out_name, list)
+            and isinstance(t_on, list)
+            and isinstance(t_off, list)
+            and isinstance(t_offset, list)
+            and isinstance(t_duration, list)
+            and trigger_name in self.dev_di
+            and all([x in self.dev_do for x in out_name])
+            and len(out_name)
+            == len(t_on)
+            == len(t_off)
+            == len(t_offset)
+            == len(t_duration)
+        ):
+            out_ports = [self.dev_do[x] for x in out_name]
+            self.digital_cycle_out = out_ports
+            self.digital_cycle_out_gamry = None
+            self.digital_cycle_mainthread = 0
+            self.digital_cycle_subthread = [i + 1 for i in range(len(out_ports))]
+
+        else:
+            self.base.print_message(
+                "set_digital_cycle parameters are not valid", error=True
+            )
+            return {"error_code": ErrorCodes.not_available}
+
+        mainprog = pathlib.path(
+            os.path.join(driver_path, "galil_toggle_main.dmc")
+        ).read_text()
+        subprog = pathlib.path(
+            os.path.join(driver_path, "galil_toggle_sub.dmc")
+        ).read_text()
+        mainlines = mainprog.split("\n")
+        subindex = [i for i, x in enumerate(mainlines) if x.strip().startswith("XQ")][0]
+        subline = mainlines.pop(subindex)
+        for i in range(len(trigger_port)):
+            mainlines.insert(subindex + i + 1, subline.format(subthread=i + 1))
+        clearbits = [i for i, x in enumerate(mainlines) if x.strip().startswith("CB")]
+        for i in clearbits:
+            mainlines[i] = "    " + "".join([f"CB {oc};" for oc in out_ports])
+        haltindex = [i for i, x in enumerate(mainlines) if x.strip().startswith("HX")][
+            0
+        ]
+        mainlines.pop(haltindex)
+        haltline = "    " + "".join([f"HX{i+1};" for i in range(len(out_ports))])
+        mainlines.insert(haltindex + 1, haltline)
+        prog_parts = ["\n".join(mainlines).format(p_trigger=trigger_port)] + [
+            subprog.format(
+                subthread=i + 1,
+                p_output=out_ports[i],
+                t_duration=t_duration[i],
+                t_offset=t_offset[i],
+                t_time_on=t_on[i],
+                t_time_off=t_off[i],
+            )
+            for i in range(len(out_ports))
+        ]
+        dmc_prog = "\n".join(prog_parts)
+        await self.upload_dmc(dmc_prog)
+        self.galilcmd(f"XQ #main,0")  # excecute main routine
+
+        return {"error_code": err_code}
+
+    async def stop_digital_cycles(self):
+        if self.digital_cycle_out is not None:
+            self.galilcmd(f"HX{self.digital_cycle_mainthread}")  # stops main routine
+            self.digital_cycle_mainthread = None
+            if isinstance(self.digital_cycle_out, int):
+                self.digital_cycle_out = [self.digital_cycle_out]
+            for i, dout in enumerate(self.digital_cycle_out):
+                self.galilcmd(f"HX{i+1}")  # stops main routine
+                cmd = f"CB {int(dout)}"
+                _ = self.galilcmd(cmd)
+            self.digital_cycle_out = None
+            self.digital_cycle_subthread = None
+        if self.digital_cycle_out_gamry is not None:
+            cmd = f"CB {int(self.digital_cycle_out_gamry)}"
+            _ = self.galilcmd(cmd)
+            self.digital_cycle_out_gamry = None
+
+        return {}
+
     async def set_digital_cycle(
         self,
         trigger_port: str,
@@ -290,7 +424,9 @@ class Galil:
                 mainthread=self.digital_cycle_subthread,
             )
             await self.upload_DMC(DMC_prog)
-            self.galilcmd(f"XQ #main{self.digital_cycle_subthread},{self.digital_cycle_subthread}")  # excecute main routine
+            self.galilcmd(
+                f"XQ #main{self.digital_cycle_subthread},{self.digital_cycle_subthread}"
+            )  # excecute main routine
         else:
             self.base.print_message(
                 "set_digital_cycle parameters are not valid", error=True
@@ -386,7 +522,9 @@ class Galil:
                 mainthread=self.digital_cycle_mainthread,
             )
             await self.upload_DMC(DMC_prog)
-            self.galilcmd(f"XQ #main{self.digital_cycle_mainthread},{self.digital_cycle_mainthread}")  # excecute main routine
+            self.galilcmd(
+                f"XQ #main{self.digital_cycle_mainthread},{self.digital_cycle_mainthread}"
+            )  # excecute main routine
         else:
             self.base.print_message(
                 "set_digital_cycle parameters are not valid", error=True
@@ -413,7 +551,6 @@ class Galil:
 
         return {}
 
-
     def shutdown(self):
         # this gets called when the server is shut down or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
@@ -422,7 +559,7 @@ class Galil:
         try:
             self.g.GClose()
         except Exception as e:
-            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             self.base.print_message(
                 f"could not close galil connection: {repr(e), tb,}", error=True
             )

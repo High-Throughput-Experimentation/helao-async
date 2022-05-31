@@ -1,0 +1,8 @@
+#main;
+    CB {p_output};
+    AI {p_trigger};
+    XQ #tgl{subthread},{subthread};
+    AI -{p_trigger};
+    HX;
+    CB {p_output};
+EN;
