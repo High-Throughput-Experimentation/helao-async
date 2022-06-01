@@ -309,17 +309,17 @@ class Galil:
             )
             return {"error_code": ErrorCodes.not_available}
 
-        mainprog = pathlib.path(
+        mainprog = pathlib.Path(
             os.path.join(driver_path, "galil_toggle_main.dmc")
         ).read_text()
-        subprog = pathlib.path(
+        subprog = pathlib.Path(
             os.path.join(driver_path, "galil_toggle_sub.dmc")
         ).read_text()
         mainlines = mainprog.split("\n")
         subindex = [i for i, x in enumerate(mainlines) if x.strip().startswith("XQ")][0]
         subline = mainlines.pop(subindex)
         for i in range(len(trigger_port)):
-            mainlines.insert(subindex + i + 1, subline.format(subthread=i + 1))
+            mainlines.insert(subindex + i , subline.format(subthread=i + 1))
         clearbits = [i for i, x in enumerate(mainlines) if x.strip().startswith("CB")]
         for i in clearbits:
             mainlines[i] = "    " + "".join([f"CB {oc};" for oc in out_ports])
@@ -328,7 +328,7 @@ class Galil:
         ]
         mainlines.pop(haltindex)
         haltline = "    " + "".join([f"HX{i+1};" for i in range(len(out_ports))])
-        mainlines.insert(haltindex + 1, haltline)
+        mainlines.insert(haltindex, haltline)
         prog_parts = ["\n".join(mainlines).format(p_trigger=trigger_port)] + [
             subprog.format(
                 subthread=i + 1,
@@ -341,7 +341,7 @@ class Galil:
             for i in range(len(out_ports))
         ]
         dmc_prog = "\n".join(prog_parts)
-        await self.upload_dmc(dmc_prog)
+        await self.upload_DMC(dmc_prog)
         self.galilcmd(f"XQ #main,0")  # excecute main routine
 
         return {"error_code": err_code}
