@@ -241,6 +241,7 @@ class Galil:
         t_offset: Union[int, List[int]],
         t_duration: Union[int, List[int]],
         out_name_gamry: Optional[str] = None,
+        req_out_name: Optional[str] = None,
         *args,
         **kwargs,
     ):
@@ -312,8 +313,14 @@ class Galil:
         mainprog = pathlib.Path(
             os.path.join(driver_path, "galil_toggle_main.dmc")
         ).read_text()
+        if req_out_name is not None:
+            req_port = self.dev_do[req_out_name]
+            subprog_dmc = "galil_toggle_sub_req.dmc"
+        else:
+            req_port = ""
+            subprog_dmc = "galil_toggle_sub.dmc"
         subprog = pathlib.Path(
-            os.path.join(driver_path, "galil_toggle_sub.dmc")
+            os.path.join(driver_path, subprog_dmc)
         ).read_text()
         mainlines = mainprog.split("\n")
         subindex = [i for i, x in enumerate(mainlines) if x.strip().startswith("XQ")][0]
@@ -337,6 +344,7 @@ class Galil:
                 t_offset=t_offset[i],
                 t_time_on=t_on[i],
                 t_time_off=t_off[i],
+                r_output=req_port,
             )
             for i in range(len(out_ports))
         ]

@@ -313,6 +313,9 @@ async def galil_dyn_endpoints(app=None):
                 t_off: Optional[Union[int, List[int]]] = 1000,
                 t_offset: Optional[Union[int, List[int]]] = 0,
                 t_duration: Optional[Union[int, List[int]]] = -1,
+                req_out_name: Optional[
+                    Union[app.driver.dev_doitems, List[app.driver.dev_doitems]]
+                ] = None,
             ):
 
                 """Toggles output.

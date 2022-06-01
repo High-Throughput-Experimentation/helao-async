@@ -1,0 +1,17 @@
+#tgl{subthread};
+    req = 0;
+    IF ({p_output}={r_output});
+        req = 1;
+    ENDIF;
+    cnt{subthread}=0;
+    AT 0;CB {p_output};
+	AT {t_offset};cnt{subthread}=cnt{subthread}+{t_offset};
+    #jt{subthread};
+    AT 0;OB {p_output},(@OUT[{r_output}])|(req);
+    AT {t_time_on};CB {p_output};cnt{subthread}=cnt{subthread}+{t_time_on};AT 0;
+    IF ({t_time_off}>0);
+        AT {t_time_off};cnt{subthread}=cnt{subthread}+{t_time_off};
+    ENDIF;
+    JP #jt{subthread},(cnt{subthread}<{t_duration})|({t_duration}<0);
+    CB {p_output};
+EN;
