@@ -270,7 +270,7 @@ async def galil_dyn_endpoints(app=None):
                     "out_item2"
                 ]
 
-                datadict = await app.driver.set_digital_cycle(
+                datadict = await app.driver.set_digital_cycle2(
                     **active.action.action_params
                 )
                 active.action.error_code = datadict.get(
@@ -311,8 +311,8 @@ async def galil_dyn_endpoints(app=None):
                 out_name_gamry: Optional[app.driver.dev_doitems] = "gamry_aux",
                 t_on: Optional[Union[int, List[int]]] = 1000,
                 t_off: Optional[Union[int, List[int]]] = 1000,
-                t_offset: Optional[Union[int, List[int]]] = Query(0, ge=0),
-                t_duration: Optional[Union[int, List[int]]] = Query(-1, ge=-1),
+                t_offset: Optional[Union[int, List[int]]] = 0,
+                t_duration: Optional[Union[int, List[int]]] = -1,
             ):
 
                 """Toggles output.
