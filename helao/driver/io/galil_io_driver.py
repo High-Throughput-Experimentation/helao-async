@@ -231,20 +231,48 @@ class Galil:
         self.base.print_message(f"DMC prg:\n{DMC_prog}", info=True)
         self.galilprgdownload(DMC_prog + "\x00")
 
-    async def set_digital_cycles(
+    async def set_digital_cycle(
         self,
         trigger_name: str,
         triggertype: TriggerType,
         out_name: Union[str, List[str]],
-        t_on: Union[int, List[int]],
-        t_off: Union[int, List[int]],
-        t_offset: Union[int, List[int]],
-        t_duration: Union[int, List[int]],
+        toggle_init_delay: Union[float, List[float]],  # seconds
+        toggle_duty: Union[float, List[float]],  # fraction
+        toggle_period: Union[float, List[float]],  # seconds
+        toggle_duration: Union[float, List[float]],  # seconds
         out_name_gamry: Optional[str] = None,
         req_out_name: Optional[str] = None,
         *args,
         **kwargs,
     ):
+        # rewrite params for consistency w/jcap eche runs
+        t_duration = (
+            [int(round(x * 1e3)) for x in toggle_duration]
+            if isinstance(toggle_duration, list)
+            else int(round(toggle_duration * 1e3))
+        )
+        t_on = (
+            [
+                int(round(x * y * 1e3))
+                for x, y in zip(toggle_period, toggle_duty)
+            ]
+            if isinstance(toggle_period, list)
+            else int(round(toggle_period * toggle_duty * 1e3))
+        )
+        t_off = (
+            [
+                int(round(x * (1 - y) * 1e3))
+                for x, y in zip(toggle_period, toggle_duty)
+            ]
+            if isinstance(toggle_period, list)
+            else int(round(toggle_period * (1 - toggle_duty) * 1e3))
+        )
+        t_offset = (
+            [int((x * 1e3)) for x in toggle_init_delay]
+            if isinstance(toggle_init_delay, list)
+            else int(round(toggle_init_delay * 1e3))
+        )
+
         err_code = ErrorCodes.none
         valid_trig = False
         if trigger_name in self.dev_di:
@@ -284,7 +312,6 @@ class Galil:
 
         elif (
             valid_trig
-            and out_name_gamry is None
             and isinstance(out_name, list)
             and isinstance(t_on, list)
             and isinstance(t_off, list)
@@ -319,14 +346,12 @@ class Galil:
         else:
             req_port = ""
             subprog_dmc = "galil_toggle_sub.dmc"
-        subprog = pathlib.Path(
-            os.path.join(driver_path, subprog_dmc)
-        ).read_text()
+        subprog = pathlib.Path(os.path.join(driver_path, subprog_dmc)).read_text()
         mainlines = mainprog.split("\n")
         subindex = [i for i, x in enumerate(mainlines) if x.strip().startswith("XQ")][0]
         subline = mainlines.pop(subindex)
         for i in range(len(trigger_port)):
-            mainlines.insert(subindex + i , subline.format(subthread=i + 1))
+            mainlines.insert(subindex + i, subline.format(subthread=i + 1))
         clearbits = [i for i, x in enumerate(mainlines) if x.strip().startswith("CB")]
         for i in clearbits:
             mainlines[i] = "    " + "".join([f"CB {oc};" for oc in out_ports])
@@ -354,7 +379,7 @@ class Galil:
 
         return {"error_code": err_code}
 
-    async def stop_digital_cycles(self):
+    async def stop_digital_cycle(self):
         if self.digital_cycle_out is not None:
             self.galilcmd(f"HX{self.digital_cycle_mainthread}")  # stops main routine
             self.digital_cycle_mainthread = None
@@ -370,193 +395,6 @@ class Galil:
             cmd = f"CB {int(self.digital_cycle_out_gamry)}"
             _ = self.galilcmd(cmd)
             self.digital_cycle_out_gamry = None
-
-        return {}
-
-    async def set_digital_cycle(
-        self,
-        trigger_port: str,
-        trigger_name: str,
-        triggertype: TriggerType,
-        out_port: str,
-        out_name: str,
-        out_port_gamry: str,
-        out_name_gamry: str,
-        t_on: int,
-        t_off: int,
-        t_offset: int,
-        t_duration: int,
-        *args,
-        **kwargs,
-    ):
-        err_code = ErrorCodes.none
-        if (
-            trigger_name in self.dev_di
-            and self.dev_di[trigger_name] == trigger_port
-            and out_name in self.dev_do
-            and self.dev_do[out_name] == out_port
-            and out_name_gamry in self.dev_do
-            and self.dev_do[out_name_gamry] == out_port_gamry
-        ):
-
-            self.digital_cycle_out = out_port
-            self.digital_cycle_out_gamry = out_port_gamry
-            self.digital_cycle_mainthread = 0
-            self.digital_cycle_subthread = 1
-
-            # di (AI n):
-            # if n is positive, galil waits for input to go high (rising edge)
-            # if n is negative, galil waits for input to go low (falling edge)
-            if triggertype == TriggerType.risingedge:
-                trigger_port = f"{abs(int(trigger_port))}"
-            elif triggertype == TriggerType.fallingedge:
-                trigger_port = f"-{abs(int(trigger_port))}"
-
-            print(t_duration)
-            print((t_on + t_off))
-            print(t_duration / (t_on + t_off))
-            f_maxcount = round(t_duration / (t_on + t_off))
-            self.base.print_message(f"toggle count: {f_maxcount}", info=True)
-
-            DMC_prog = pathlib.Path(
-                os.path.join(driver_path, "galil_toggle.dmc")
-            ).read_text()
-            DMC_prog = DMC_prog.format(
-                p_trigger=trigger_port,
-                p_output=out_port,
-                p_output_gamry=out_port_gamry,
-                t_time_on=t_on,
-                t_time_off=t_off,
-                t_offset=t_offset,
-                f_maxcount=f_maxcount,
-                subthread=self.digital_cycle_subthread,
-                mainthread=self.digital_cycle_subthread,
-            )
-            await self.upload_DMC(DMC_prog)
-            self.galilcmd(
-                f"XQ #main{self.digital_cycle_subthread},{self.digital_cycle_subthread}"
-            )  # excecute main routine
-        else:
-            self.base.print_message(
-                "set_digital_cycle parameters are not valid", error=True
-            )
-            err_code = ErrorCodes.not_available
-
-        return {"error_code": err_code}
-
-    async def stop_digital_cycle(self):
-        if self.digital_cycle_out:
-            self.galilcmd(f"HX{self.digital_cycle_mainthread}")  # stops main routine
-            self.galilcmd(f"HX{self.digital_cycle_subthread}")  # stops main routine
-            cmd = f"CB {int(self.digital_cycle_out)}"
-            _ = self.galilcmd(cmd)
-            cmd = f"CB {int(self.digital_cycle_out_gamry)}"
-            _ = self.galilcmd(cmd)
-            self.digital_cycle_out = None
-            self.digital_cycle_out_gamry = None
-            self.digital_cycle_mainthread = None
-            self.digital_cycle_subthread = None
-
-        return {}
-
-    async def set_digital_cycle2(
-        self,
-        trigger_port: str,
-        trigger_name: str,
-        triggertype: TriggerType,
-        out_port: str,
-        out_name: str,
-        out_port2: str,
-        out_name2: str,
-        t_on: int,
-        t_off: int,
-        t_offset: int,
-        t_duration: int,
-        t_on2: int,
-        t_off2: int,
-        t_offset2: int,
-        t_duration2: int,
-        *args,
-        **kwargs,
-    ):
-        err_code = ErrorCodes.none
-        if (
-            trigger_name in self.dev_di
-            and self.dev_di[trigger_name] == trigger_port
-            and out_name in self.dev_do
-            and self.dev_do[out_name] == out_port
-            and out_name2 in self.dev_do
-            and self.dev_do[out_name2] == out_port2
-        ):
-
-            self.digital_cycle_out = out_port
-            self.digital_cycle_out2 = out_port2
-            self.digital_cycle_mainthread = 0
-            self.digital_cycle_subthread = [1, 2]
-
-            # di (AI n):
-            # if n is positive, galil waits for input to go high (rising edge)
-            # if n is negative, galil waits for input to go low (falling edge)
-            if triggertype == TriggerType.risingedge:
-                trigger_port = f"{abs(int(trigger_port))}"
-            elif triggertype == TriggerType.fallingedge:
-                trigger_port = f"-{abs(int(trigger_port))}"
-
-            print(t_duration)
-            print((t_on + t_off))
-            print(t_duration / (t_on + t_off))
-            f_maxcount = round(t_duration / (t_on + t_off))
-            f_maxcount2 = round(t_duration2 / (t_on2 + t_off2))
-            self.base.print_message(f"toggle count: {f_maxcount}", info=True)
-
-            DMC_prog = pathlib.Path(
-                os.path.join(driver_path, "galil_two_toggle.dmc")
-            ).read_text()
-            DMC_prog = DMC_prog.format(
-                p_trigger=trigger_port,
-                p_output=out_port,
-                p_output2=out_port2,
-                t_time_on=t_on,
-                t_time_off=t_off,
-                t_offset=t_offset,
-                t_duration=t_duration,
-                f_maxcount=f_maxcount,
-                t_time_on2=t_on2,
-                t_time_off2=t_off2,
-                t_offset2=t_offset2,
-                t_duration2=t_duration2,
-                f_maxcount2=f_maxcount2,
-                subthread=self.digital_cycle_subthread[0],
-                subthread2=self.digital_cycle_subthread[1],
-                mainthread=self.digital_cycle_mainthread,
-            )
-            await self.upload_DMC(DMC_prog)
-            self.galilcmd(
-                f"XQ #main{self.digital_cycle_mainthread},{self.digital_cycle_mainthread}"
-            )  # excecute main routine
-        else:
-            self.base.print_message(
-                "set_digital_cycle parameters are not valid", error=True
-            )
-            err_code = ErrorCodes.not_available
-
-        return {"error_code": err_code}
-
-    async def stop_digital_cycle2(self):
-        if self.digital_cycle_out:
-            self.galilcmd(f"HX{self.digital_cycle_mainthread}")  # stops main routine
-            self.galilcmd(f"HX{self.digital_cycle_subthread[0]}")  # stops main routine
-            self.galilcmd(f"HX{self.digital_cycle_subthread[1]}")  # stops main routine
-            cmd = f"CB {int(self.digital_cycle_out)}"
-            _ = self.galilcmd(cmd)
-            self.digital_cycle_out = None
-            if self.digital_cycle_out2:
-                cmd = f"CB {int(self.digital_cycle_out2)}"
-                _ = self.galilcmd(cmd)
-                self.digital_cycle_out2 = None
-            self.digital_cycle_mainthread = None
-            self.digital_cycle_subthread = None
-            self.digital_cycle_subthread2 = None
 
         return {}
 

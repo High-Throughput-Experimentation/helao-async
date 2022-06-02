@@ -144,175 +144,17 @@ async def galil_dyn_endpoints(app=None):
             @app.post(f"/{servKey}/set_digital_cycle")
             async def set_digital_cycle(
                 action: Optional[Action] = Body({}, embed=True),
-                action_version: int = 1,
-                trigger_item: Optional[app.driver.dev_diitems] = "gamry_ttl0",
-                triggertype: Optional[TriggerType] = TriggerType.fallingedge,
-                out_item: Optional[app.driver.dev_doitems] = "led",
-                out_item_gamry: Optional[app.driver.dev_doitems] = "gamry_aux",
-                t_on: Optional[int] = 1000,
-                t_off: Optional[int] = 1000,
-                t_offset: Optional[int] = Query(0, ge=0),
-                t_duration: Optional[int] = Query(-1, ge=-1),
-            ):
-
-                """Toggles output.
-                Args:
-                    trigger_item: di on which the toggle starts
-                    out_item: do_item for toggle output
-                    out_item_gamry: do which is connected to gamry aux input
-                    t_on: time (ms) out_item is on
-                    t_off: time (ms) out_item is off
-                    t_offset: offset time in ms after which toggle starts
-                    t_duration: time (ms) for total  toggle time (max is duration of trigger_item)
-                                negative value will run as long trigger_item is applied
-                    !!! toggle cycle is ON/OFF !!!"""
-                active = await app.base.setup_and_contain_action()
-
-                active.action.action_params["trigger_port"] = app.driver.dev_di[
-                    active.action.action_params["trigger_item"]
-                ]
-                active.action.action_params[
-                    "trigger_name"
-                ] = active.action.action_params["trigger_item"]
-
-                active.action.action_params["out_port"] = app.driver.dev_do[
-                    active.action.action_params["out_item"]
-                ]
-                active.action.action_params["out_name"] = active.action.action_params[
-                    "out_item"
-                ]
-
-                active.action.action_params["out_port_gamry"] = app.driver.dev_do[
-                    active.action.action_params["out_item_gamry"]
-                ]
-                active.action.action_params[
-                    "out_name_gamry"
-                ] = active.action.action_params["out_item_gamry"]
-
-                datadict = await app.driver.set_digital_cycle(
-                    **active.action.action_params
-                )
-                active.action.error_code = datadict.get(
-                    "error_code", ErrorCodes.unspecified
-                )
-                await active.enqueue_data_dflt(datadict=datadict)
-                finished_action = await active.finish()
-                return finished_action.as_dict()
-
-        if app.driver.dev_di and app.driver.dev_do:
-
-            @app.post(f"/{servKey}/stop_digital_cycle")
-            async def stop_digital_cycle(
-                action: Optional[Action] = Body({}, embed=True),
-                action_version: int = 1,
-            ):
-                active = await app.base.setup_and_contain_action()
-
-                datadict = await app.driver.stop_digital_cycle()
-                active.action.error_code = datadict.get(
-                    "error_code", ErrorCodes.unspecified
-                )
-                # await active.enqueue_data_dflt(datadict = datadict)
-                finished_action = await active.finish()
-                return finished_action.as_dict()
-
-        if app.driver.dev_di and app.driver.dev_do:
-
-            @app.post(f"/{servKey}/set_digital_cycle2")
-            async def set_digital_cycle2(
-                action: Optional[Action] = Body({}, embed=True),
-                action_version: int = 1,
-                trigger_item: Optional[app.driver.dev_diitems] = "gamry_ttl0",
-                triggertype: Optional[TriggerType] = TriggerType.fallingedge,
-                out_item: Optional[app.driver.dev_doitems] = "led",
-                out_item2: Optional[app.driver.dev_doitems] = "gamry_aux",
-                t_on: Optional[int] = 1000,
-                t_off: Optional[int] = 1000,
-                t_offset: Optional[int] = Query(0, ge=0),
-                t_duration: Optional[int] = Query(-1, ge=-1),
-                t_on2: Optional[int] = 1000,
-                t_off2: Optional[int] = 1000,
-                t_offset2: Optional[int] = Query(0, ge=0),
-                t_duration2: Optional[int] = Query(-1, ge=-1),
-            ):
-
-                """Toggles output.
-                Args:
-                    trigger_item: di on which the toggle starts
-                    out_item: do_item for toggle output
-                    out_item2: do which is connected to gamry aux input
-                    t_on: time (ms) out_item is on
-                    t_off: time (ms) out_item is off
-                    t_offset: offset time in ms after which toggle starts
-                    t_duration: time (ms) for total  toggle time (max is duration of trigger_item)
-                                negative value will run as long trigger_item is applied
-                    !!! toggle cycle is ON/OFF !!!"""
-                active = await app.base.setup_and_contain_action()
-
-                active.action.action_params["trigger_port"] = app.driver.dev_di[
-                    active.action.action_params["trigger_item"]
-                ]
-                active.action.action_params[
-                    "trigger_name"
-                ] = active.action.action_params["trigger_item"]
-
-                active.action.action_params["out_port"] = app.driver.dev_do[
-                    active.action.action_params["out_item"]
-                ]
-                active.action.action_params["out_name"] = active.action.action_params[
-                    "out_item"
-                ]
-
-                active.action.action_params["out_port2"] = app.driver.dev_do[
-                    active.action.action_params["out_item2"]
-                ]
-                active.action.action_params["out_name2"] = active.action.action_params[
-                    "out_item2"
-                ]
-
-                datadict = await app.driver.set_digital_cycle2(
-                    **active.action.action_params
-                )
-                active.action.error_code = datadict.get(
-                    "error_code", ErrorCodes.unspecified
-                )
-                await active.enqueue_data_dflt(datadict=datadict)
-                finished_action = await active.finish()
-                return finished_action.as_dict()
-
-        if app.driver.dev_di and app.driver.dev_do:
-
-            @app.post(f"/{servKey}/stop_digital_cycle2")
-            async def stop_digital_cycle2(
-                action: Optional[Action] = Body({}, embed=True),
-                action_version: int = 1,
-            ):
-                active = await app.base.setup_and_contain_action()
-
-                datadict = await app.driver.stop_digital_cycle2()
-                active.action.error_code = datadict.get(
-                    "error_code", ErrorCodes.unspecified
-                )
-                # await active.enqueue_data_dflt(datadict = datadict)
-                finished_action = await active.finish()
-                return finished_action.as_dict()
-
-        if app.driver.dev_di and app.driver.dev_do:
-
-            @app.post(f"/{servKey}/set_digital_cycles")
-            async def set_digital_cycles(
-                action: Optional[Action] = Body({}, embed=True),
-                action_version: int = 1,
+                action_version: int = 2,
                 trigger_name: Optional[app.driver.dev_diitems] = "gamry_ttl0",
                 triggertype: Optional[TriggerType] = TriggerType.fallingedge,
                 out_name: Optional[
                     Union[app.driver.dev_doitems, List[app.driver.dev_doitems]]
                 ] = "led",
                 out_name_gamry: Optional[app.driver.dev_doitems] = "gamry_aux",
-                t_on: Optional[Union[int, List[int]]] = 1000,
-                t_off: Optional[Union[int, List[int]]] = 1000,
-                t_offset: Optional[Union[int, List[int]]] = 0,
-                t_duration: Optional[Union[int, List[int]]] = -1,
+                toggle_init_delay: Optional[Union[float, List[float]]] = 0,
+                toggle_duty: Optional[Union[float, List[float]]] = 0.5,
+                toggle_period: Optional[Union[float, List[float]]] = 2.0,
+                toggle_duration: Optional[Union[float, List[float]]] = -1,
                 req_out_name: Optional[
                     Union[app.driver.dev_doitems, List[app.driver.dev_doitems]]
                 ] = None,
@@ -323,10 +165,10 @@ async def galil_dyn_endpoints(app=None):
                     trigger_name: di on which the toggle starts
                     out_name: do_item for toggle output
                     out_name_gamry: do which is connected to gamry aux input
-                    t_on: time (ms) out_item is on
-                    t_off: time (ms) out_item is off
-                    t_offset: offset time in ms after which toggle starts
-                    t_duration: time (ms) for total  toggle time (max is duration of trigger_item)
+                    toggle_init_delay: offset time in seconds after which toggle starts
+                    toggle_duty: fraction duty cycle of toggle ON state
+                    toggle_period: period (seconds) of full toggle ON+OFF cycle
+                    toggle_duration: time (seconds) for total  toggle time (max is duration of trigger_item)
                                 negative value will run as long trigger_item is applied
                     !!! toggle cycle is ON/OFF !!!"""
                 active = await app.base.setup_and_contain_action()
@@ -343,10 +185,10 @@ async def galil_dyn_endpoints(app=None):
 
         if app.driver.dev_di and app.driver.dev_do:
 
-            @app.post(f"/{servKey}/stop_digital_cycles")
-            async def stop_digital_cycles(
+            @app.post(f"/{servKey}/stop_digital_cycle")
+            async def stop_digital_cycle(
                 action: Optional[Action] = Body({}, embed=True),
-                action_version: int = 1,
+                action_version: int = 2,
             ):
                 active = await app.base.setup_and_contain_action()
 

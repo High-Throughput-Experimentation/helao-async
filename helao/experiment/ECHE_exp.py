@@ -13,7 +13,6 @@ __all__ = [
     "ECHE_slave_CA",
     "ECHE_slave_CV_led",
     "ECHE_slave_CV",
-    "ECHE_slave_background",
     "ECHE_slave_CP_led",
     "ECHE_slave_CP",
     "ECHE_slave_movetosample",
@@ -21,7 +20,6 @@ __all__ = [
     "ECHE_slave_CV_led_secondtrigger",
     "ECHE_slave_CA_led_secondtrigger",
     "ECHE_slave_CP_led_secondtrigger",
-
 ]
 
 
@@ -74,10 +72,10 @@ def ECHE_slave_unloadall_customs(experiment: Experiment):
 
 def ECHE_slave_add_liquid(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     solid_custom_position: Optional[str] = "cell1_we",
     reservoir_liquid_sample_no: Optional[int] = 1,
-    reservoir_bubbler_gas: Optional[str] = "O2",
+    solution_bubble_gas: Optional[str] = "O2",
     liquid_volume_ml: Optional[float] = 1.0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -95,8 +93,7 @@ def ECHE_slave_add_liquid(
                     }
                 ).dict(),
                 "volume_ml": apm.pars.liquid_volume_ml,
-                "reservoir_bubbler_gas" : apm.pars.reservoir_bubbler_gas,
-                
+                "reservoir_bubbler_gas": apm.pars.solution_bubble_gas,
                 "combine_liquids": True,
                 "dilute_liquids": True,
             },
@@ -141,12 +138,12 @@ def ECHE_slave_load_solid(
 
 def ECHE_slave_startup(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     solid_custom_position: Optional[str] = "cell1_we",
     solid_plate_id: Optional[int] = 4534,
     solid_sample_no: Optional[int] = 1,
     reservoir_liquid_sample_no: Optional[int] = 1,
-    reservoir_bubbler_gas: Optional[str] = "N2",
+    solution_bubble_gas: Optional[str] = "N2",
     liquid_volume_ml: Optional[float] = 1.0,
 ):
     """Slave experiment
@@ -173,7 +170,7 @@ def ECHE_slave_startup(
             experiment=experiment,
             solid_custom_position=apm.pars.solid_custom_position,
             reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
-            reservoir_bubbler_gas=apm.pars.reservoir_bubbler_gas,
+            solution_bubble_gas=apm.pars.solution_bubble_gas,
             liquid_volume_ml=apm.pars.liquid_volume_ml,
         )
     )
@@ -228,32 +225,35 @@ def ECHE_slave_shutdown(experiment: Experiment):
 
 def ECHE_slave_CA_led(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     CA_potential_vsRHE: Optional[float] = 0.0,
-    ph: float = 9.53,
+    solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
-    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
-    reservoir_bubbler_gas: str = "O2",
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
-    reference_electrode_type: str = "NHE",
+    reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
+    solution_bubble_gas: str = "O2",
+    measurement_area: float = 0.071,  # 3mm diameter droplet
+    ref_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
     samplerate_sec: Optional[float] = 0.1,
     CA_duration_sec: Optional[float] = 60,
-    IErange: Optional[str] = "auto",
-    led: Optional[str] = "doric_led1",
-    wavelength_nm: Optional[float] = 0.0,
-    wavelength_intensity_mw: Optional[float] = 0.0,
-    wavelength_intensity_date: Optional[str] = "n/a",
-    led_side_illumination: Optional[str] = "front",
-    toggle_on_ms: Optional[float] = 1000,
-    toggle_off_ms: Optional[float] = 1000,
-    toggle_offset_ms: Optional[int] = 0,
-    toggle_duration_ms: Optional[int] = -1,
+    gamry_i_range: Optional[str] = "auto",
+    illumination_source: Optional[str] = "doric_led1",
+    illumination_wavelength: Optional[float] = 0.0,
+    illumination_intensity: Optional[float] = 0.0,
+    illumination_intensity_date: Optional[str] = "n/a",
+    illumination_side: Optional[str] = "front",
+    toggle_dark_time_init: Optional[float] = 0.0,
+    toggle_illum_duty: Optional[float] = 0.5,
+    toggle_illum_period: Optional[float] = 2.0,
+    toggle_illum_time: Optional[float] = -1,
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    if int(round(apm.pars.toggle_illum_time)) == -1:
+        apm.pars.toggle_illum_time = apm.pars.CA_duration_sec
 
     # get sample for gamry
     apm.add_action(
@@ -276,36 +276,28 @@ def ECHE_slave_CA_led(
             "action_server": IO_server,
             "action_name": "set_digital_cycle",
             "action_params": {
-                "trigger_item": "gamry_ttl0",
+                "trigger_name": "gamry_ttl0",
                 "triggertype": toggle_triggertype,
-                "out_item": apm.pars.led,
-                "out_item_gamry": "gamry_aux",
-                "t_on": apm.pars.toggle_on_ms,
-                "t_off": apm.pars.toggle_off_ms,
-                "t_offset": apm.pars.toggle_offset_ms,
-                "t_duration": apm.pars.toggle_duration_ms,
-                "t_on2": apm.pars.toggle_on_ms,
-                "t_off2": apm.pars.toggle_off_ms,
-                "t_offset2": apm.pars.toggle_offset_ms,
-                "t_duration2": apm.pars.toggle_duration_ms,
-#                "mainthread": 0,
-#                "subthread": 1,
+                "out_name": apm.pars.illumination_source,
+                "out_name_gamry": "gamry_aux",
+                "toggle_init_delay": apm.pars.toggle_dark_time_init,
+                "toggle_duty": apm.pars.toggle_illum_duty,
+                "toggle_period": apm.pars.toggle_illum_period,
+                "toggle_duration": apm.pars.toggle_illum_time,
             },
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "process_finish": False,
             "process_contrib": [
-                ProcessContrib.action_params,
                 ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
             ],
         },
-
     )
 
     # apply potential
     potential = (
-        apm.pars.CA_potential_vsRHE - 1.0 * apm.pars.ref_vs_nhe - 0.059 * apm.pars.ph
+        apm.pars.CA_potential_vsRHE
+        - 1.0 * apm.pars.ref_vs_nhe
+        - 0.059 * apm.pars.solution_ph
     )
     print(f"ADSS_slave_CA potential: {potential}")
     apm.add_action(
@@ -318,19 +310,17 @@ def ECHE_slave_CA_led(
                 "AcqInterval__s": apm.pars.samplerate_sec,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
                 "TTLsend": 0,  # -1 disables, else select TTL 0-3
-                "IErange": apm.pars.IErange,
+                "IErange": apm.pars.gamry_i_range,
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "process_finish": True,
             "process_contrib": [
-                ProcessContrib.action_params,
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
         },
-
     )
 
     return apm.action_list  # returns complete action list to orch
@@ -338,18 +328,18 @@ def ECHE_slave_CA_led(
 
 def ECHE_slave_CA(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     CA_potential_vsRHE: Optional[float] = 0.0,
-    ph: float = 9.53,
+    solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
-    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
-    reservoir_bubbler_gas: str = "O2",
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
-    reference_electrode_type: str = "NHE",
+    reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
+    solution_bubble_gas: str = "O2",
+    measurement_area: float = 0.071,  # 3mm diameter droplet
+    ref_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
     samplerate_sec: Optional[float] = 0.1,
     CA_duration_sec: Optional[float] = 60,
-    IErange: Optional[str] = "auto",
+    gamry_i_range: Optional[str] = "auto",
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -373,7 +363,9 @@ def ECHE_slave_CA(
 
     # apply potential
     potential = (
-        apm.pars.CA_potential_vsRHE - 1.0 * apm.pars.ref_vs_nhe - 0.059 * apm.pars.ph
+        apm.pars.CA_potential_vsRHE
+        - 1.0 * apm.pars.ref_vs_nhe
+        - 0.059 * apm.pars.solution_ph
     )
     print(f"ADSS_slave_CA potential: {potential}")
     apm.add_action(
@@ -386,13 +378,12 @@ def ECHE_slave_CA(
                 "AcqInterval__s": apm.pars.samplerate_sec,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
-                "IErange": apm.pars.IErange,
+                "IErange": apm.pars.gamry_i_range,
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "process_finish": True,
             "process_contrib": [
-                ProcessContrib.action_params,
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
@@ -405,7 +396,7 @@ def ECHE_slave_CA(
 
 def ECHE_slave_CV_led(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
@@ -415,28 +406,41 @@ def ECHE_slave_CV_led(
     ] = 0.02,  # scan rate in volts/second or amps/second.
     samplerate_sec: Optional[float] = 0.1,
     cycles: Optional[int] = 1,
-    IErange: Optional[str] = "auto",
-    ph: float = 0,
+    gamry_i_range: Optional[str] = "auto",
+    solution_ph: float = 0,
     reservoir_electrolyte: Electrolyte = "SLF10",
-    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
-    reservoir_bubbler_gas: str = "O2",
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
-    reference_electrode_type: str = "NHE",
+    reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
+    solution_bubble_gas: str = "O2",
+    measurement_area: float = 0.071,  # 3mm diameter droplet
+    ref_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
-    led: Optional[str] = "doric_led1",
-    wavelength_nm: Optional[float] = 0.0,
-    wavelength_intensity_mw: Optional[float] = 0.0,
-    wavelength_intensity_date: Optional[str] = "n/a",
-    led_side_illumination: Optional[str] = "front",
-    toggle_on_ms: Optional[float] = 1000,
-    toggle_off_ms: Optional[float] = 1000,
-    toggle_offset_ms: Optional[int] = 0,
-    toggle_duration_ms: Optional[int] = -1,
+    illumination_source: Optional[str] = "doric_led1",
+    illumination_wavelength: Optional[float] = 0.0,
+    illumination_intensity: Optional[float] = 0.0,
+    illumination_intensity_date: Optional[str] = "n/a",
+    illumination_side: Optional[str] = "front",
+    toggle_dark_time_init: Optional[float] = 0.0,
+    toggle_illum_duty: Optional[float] = 0.5,
+    toggle_illum_period: Optional[float] = 2.0,
+    toggle_illum_time: Optional[float] = -1,
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    CV_duration_sec = (
+        abs(apm.pars.Vfinal_vsRHE - apm.pars.Vapex2_vsRHE) / apm.pars.samplerate_sec
+    )
+    CV_duration_sec += (
+        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE) / apm.pars.samplerate_sec
+    )
+    CV_duration_sec += (
+        abs(apm.pars.Vapex1_vsRHE - apm.pars.Vinit_vsRHE) / apm.pars.samplerate_sec
+    )
+
+    if int(round(apm.pars.toggle_illum_time)) == -1:
+        apm.pars.toggle_illum_time = CV_duration_sec
 
     # get sample for gamry
     apm.add_action(
@@ -459,25 +463,18 @@ def ECHE_slave_CV_led(
             "action_server": IO_server,
             "action_name": "set_digital_cycle",
             "action_params": {
-                "trigger_item": "gamry_ttl0",
+                "trigger_name": "gamry_ttl0",
                 "triggertype": toggle_triggertype,
-                "out_item": apm.pars.led,
-                "out_item_gamry": "gamry_aux",
-                "t_on": apm.pars.toggle_on_ms,
-                "t_off": apm.pars.toggle_off_ms,
-                "t_offset": apm.pars.toggle_offset_ms,
-                "t_duration": apm.pars.toggle_duration_ms,
-                "t_on2": apm.pars.toggle_on_ms,
-                "t_off2": apm.pars.toggle_off_ms,
-                "t_offset2": apm.pars.toggle_offset_ms,
-                "t_duration2": apm.pars.toggle_duration_ms,
-#                "mainthread": 0,
-#                "subthread": 1,
+                "out_name": apm.pars.illumination_source,
+                "out_name_gamry": "gamry_aux",
+                "toggle_init_delay": apm.pars.toggle_dark_time_init,
+                "toggle_duty": apm.pars.toggle_illum_duty,
+                "toggle_period": apm.pars.toggle_illum_period,
+                "toggle_duration": apm.pars.toggle_illum_time,
             },
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "process_finish": False,
             "process_contrib": [
-                ProcessContrib.action_params,
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
@@ -493,28 +490,27 @@ def ECHE_slave_CV_led(
             "action_params": {
                 "Vinit__V": apm.pars.Vinit_vsRHE
                 - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.ph,
+                - 0.059 * apm.pars.solution_ph,
                 "Vapex1__V": apm.pars.Vapex1_vsRHE
                 - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.ph,
+                - 0.059 * apm.pars.solution_ph,
                 "Vapex2__V": apm.pars.Vapex2_vsRHE
                 - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.ph,
+                - 0.059 * apm.pars.solution_ph,
                 "Vfinal__V": apm.pars.Vfinal_vsRHE
                 - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.ph,
+                - 0.059 * apm.pars.solution_ph,
                 "ScanRate__V_s": apm.pars.scanrate_voltsec,
                 "AcqInterval__s": apm.pars.samplerate_sec,
                 "Cycles": apm.pars.cycles,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
                 "TTLsend": 0,  # -1 disables, else select TTL 0-3
-                "IErange": apm.pars.IErange,
+                "IErange": apm.pars.gamry_i_range,
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "process_finish": True,
             "process_contrib": [
-                ProcessContrib.action_params,
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
@@ -527,7 +523,7 @@ def ECHE_slave_CV_led(
 
 def ECHE_slave_CV(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
@@ -537,13 +533,13 @@ def ECHE_slave_CV(
     ] = 0.020,  # scan rate in volts/second or amps/second.
     samplerate_sec: Optional[float] = 0.1,
     cycles: Optional[int] = 1,
-    IErange: Optional[str] = "auto",
-    ph: float = 0,
+    gamry_i_range: Optional[str] = "auto",
+    solution_ph: float = 0,
     reservoir_electrolyte: Electrolyte = "SLF10",
-    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
-    reservoir_bubbler_gas: str = "O2",
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
-    reference_electrode_type: str = "NHE",
+    reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
+    solution_bubble_gas: str = "O2",
+    measurement_area: float = 0.071,  # 3mm diameter droplet
+    ref_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
     comment: Optional[str] = "",
 ):
@@ -574,28 +570,27 @@ def ECHE_slave_CV(
             "action_params": {
                 "Vinit__V": apm.pars.Vinit_vsRHE
                 - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.ph,
+                - 0.059 * apm.pars.solution_ph,
                 "Vapex1__V": apm.pars.Vapex1_vsRHE
                 - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.ph,
+                - 0.059 * apm.pars.solution_ph,
                 "Vapex2__V": apm.pars.Vapex2_vsRHE
                 - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.ph,
+                - 0.059 * apm.pars.solution_ph,
                 "Vfinal__V": apm.pars.Vfinal_vsRHE
                 - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.ph,
+                - 0.059 * apm.pars.solution_ph,
                 "ScanRate__V_s": apm.pars.scanrate_voltsec,
                 "AcqInterval__s": apm.pars.samplerate_sec,
                 "Cycles": apm.pars.cycles,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
-                "IErange": apm.pars.IErange,
+                "IErange": apm.pars.gamry_i_range,
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "process_finish": True,
             "process_contrib": [
-                ProcessContrib.action_params,
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
@@ -608,18 +603,18 @@ def ECHE_slave_CV(
 
 def ECHE_slave_CP(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     CP_current: Optional[float] = 0.0,
-    ph: float = 9.53,
+    solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
-    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
-    reservoir_bubbler_gas: str = "O2",
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
-    reference_electrode_type: str = "NHE",
+    reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
+    solution_bubble_gas: str = "O2",
+    measurement_area: float = 0.071,  # 3mm diameter droplet
+    ref_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
     samplerate_sec: Optional[float] = 0.1,
     CP_duration_sec: Optional[float] = 60,
-    IErange: Optional[str] = "auto",
+    gamry_i_range: Optional[str] = "auto",
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -641,11 +636,11 @@ def ECHE_slave_CP(
         }
     )
 
-#    # apply potential
- #   potential = (
-#        apm.pars.CA_potential_vsRHE - 1.0 * apm.pars.ref_vs_nhe - 0.059 * apm.pars.ph
-#    )
-#    print(f"ADSS_slave_CA potential: {potential}")
+    #    # apply potential
+    #   potential = (
+    #        apm.pars.CA_potential_vsRHE - 1.0 * apm.pars.ref_vs_nhe - 0.059 * apm.pars.solution_ph
+    #    )
+    #    print(f"ADSS_slave_CA potential: {potential}")
     apm.add_action(
         {
             "action_server": PSTAT_server,
@@ -656,13 +651,12 @@ def ECHE_slave_CP(
                 "AcqInterval__s": apm.pars.samplerate_sec,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
-                "IErange": apm.pars.IErange,
+                "IErange": apm.pars.gamry_i_range,
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "process_finish": True,
             "process_contrib": [
-                ProcessContrib.action_params,
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
@@ -672,34 +666,38 @@ def ECHE_slave_CP(
 
     return apm.action_list  # returns complete action list to orch
 
+
 def ECHE_slave_CP_led(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     CP_current: Optional[float] = 0.0,
-    ph: float = 9.53,
+    solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
-    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
-    reservoir_bubbler_gas: str = "O2",
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
-    reference_electrode_type: str = "NHE",
+    reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
+    solution_bubble_gas: str = "O2",
+    measurement_area: float = 0.071,  # 3mm diameter droplet
+    ref_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
     samplerate_sec: Optional[float] = 0.1,
     CP_duration_sec: Optional[float] = 60,
-    IErange: Optional[str] = "auto",
-    led: Optional[str] = "doric_led1",
-    wavelength_nm: Optional[float] = 0.0,
-    wavelength_intensity_mw: Optional[float] = 0.0,
-    wavelength_intensity_date: Optional[str] = "n/a",
-    led_side_illumination: Optional[str] = "front",
-    toggle_on_ms: Optional[float] = 1000,
-    toggle_off_ms: Optional[float] = 1000,
-    toggle_offset_ms: Optional[int] = 0,
-    toggle_duration_ms: Optional[int] = -1,
+    gamry_i_range: Optional[str] = "auto",
+    illumination_source: Optional[str] = "doric_led1",
+    illumination_wavelength: Optional[float] = 0.0,
+    illumination_intensity: Optional[float] = 0.0,
+    illumination_intensity_date: Optional[str] = "n/a",
+    illumination_side: Optional[str] = "front",
+    toggle_dark_time_init: Optional[float] = 0.0,
+    toggle_illum_duty: Optional[float] = 0.5,
+    toggle_illum_period: Optional[float] = 2.0,
+    toggle_illum_time: Optional[float] = -1,
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    if int(round(apm.pars.toggle_illum_time)) == -1:
+        apm.pars.toggle_illum_time = apm.pars.CP_duration_sec
 
     # get sample for gamry
     apm.add_action(
@@ -722,31 +720,23 @@ def ECHE_slave_CP_led(
             "action_server": IO_server,
             "action_name": "set_digital_cycle",
             "action_params": {
-                "trigger_item": "gamry_ttl0",
+                "trigger_name": "gamry_ttl0",
                 "triggertype": toggle_triggertype,
-                "out_item": apm.pars.led,
-                "out_item_gamry": "gamry_aux",
-                "t_on": apm.pars.toggle_on_ms,
-                "t_off": apm.pars.toggle_off_ms,
-                "t_offset": apm.pars.toggle_offset_ms,
-                "t_duration": apm.pars.toggle_duration_ms,
-                "t_on2": apm.pars.toggle_on_ms,
-                "t_off2": apm.pars.toggle_off_ms,
-                "t_offset2": apm.pars.toggle_offset_ms,
-                "t_duration2": apm.pars.toggle_duration_ms,
-#                "mainthread": 0,
-#                "subthread": 1,
+                "out_name": apm.pars.illumination_source,
+                "out_name_gamry": "gamry_aux",
+                "toggle_init_delay": apm.pars.toggle_dark_time_init,
+                "toggle_duty": apm.pars.toggle_illum_duty,
+                "toggle_period": apm.pars.toggle_illum_period,
+                "toggle_duration": apm.pars.toggle_illum_time,
             },
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "process_finish": False,
             "process_contrib": [
-                ProcessContrib.action_params,
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
         },
-
     )
 
     apm.add_action(
@@ -754,123 +744,22 @@ def ECHE_slave_CP_led(
             "action_server": PSTAT_server,
             "action_name": "run_CP",
             "action_params": {
-                "Ival__A": CP_current,
+                "Ival__A": apm.pars.CP_current,
                 "Tval__s": apm.pars.CP_duration_sec,
                 "AcqInterval__s": apm.pars.samplerate_sec,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
                 "TTLsend": 0,  # -1 disables, else select TTL 0-3
-                "IErange": apm.pars.IErange,
+                "IErange": apm.pars.gamry_i_range,
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "process_finish": True,
             "process_contrib": [
-                ProcessContrib.action_params,
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
         },
-
-    )
-
-    return apm.action_list  # returns complete action list to orch
-
-def ECHE_slave_background(
-    experiment: Experiment,
-    experiment_version: int = 1,
-    CP_current: [float] = 0.0,
-    ph: float = 9.53,
-    reservoir_electrolyte: Electrolyte = "SLF10",
-    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
-    reservoir_bubbler_gas: str = "O2",
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
-    reference_electrode_type: str = "NHE",
-    ref_vs_nhe: float = 0.21,
-    samplerate_sec: Optional[float] = 0.1,
-    background_duration_sec: Optional[float] = 60,
-    IErange: Optional[str] = "auto",
-    toggle_on_ms: Optional[float] = 1000,
-    toggle_off_ms: Optional[float] = 0,
-    toggle_offset_ms: Optional[int] = 0,
-    toggle_duration_ms: Optional[int] = -1,
-    comment: Optional[str] = "",
-):
-    """last functionality test: -"""
-
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    # get sample for gamry
-    apm.add_action(
-        {
-            "action_server": PAL_server,
-            "action_name": "archive_custom_query_sample",
-            "action_params": {
-                "custom": "cell1_we",
-            },
-            "to_global_params": [
-                "_fast_samples_in"
-            ],  # save new liquid_sample_no of eche cell to globals
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
-    )
-
-    # setup toggle on galil_io
-    apm.add_action(
-        {
-            "action_server": IO_server,
-            "action_name": "set_digital_cycle",
-            "action_params": {
-                "trigger_item": "gamry_ttl0",
-                "triggertype": toggle_triggertype,
-                "out_item": "gamry_aux",
-                "out_item_gamry": "gamry_aux",
-                "t_on": apm.pars.toggle_on_ms,
-                "t_off": apm.pars.toggle_off_ms,
-                "t_offset": apm.pars.toggle_offset_ms,
-                "t_duration": apm.pars.toggle_duration_ms,
-                "t_on2": apm.pars.toggle_on_ms,
-                "t_off2": apm.pars.toggle_off_ms,
-                "t_offset2": apm.pars.toggle_offset_ms,
-                "t_duration2": apm.pars.toggle_duration_ms,
-#                "mainthread": 0,
-#                "subthread": 1,
-            },
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "process_finish": False,
-            "process_contrib": [
-                ProcessContrib.action_params,
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
-        },
-
-    )
-
-    apm.add_action(
-        {
-            "action_server": PSTAT_server,
-            "action_name": "run_CP",
-            "action_params": {
-                "Ival__A": CP_current,
-                "Tval__s": apm.pars.background_duration_sec,
-                "AcqInterval__s": apm.pars.samplerate_sec,
-                "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                "TTLsend": 0,  # -1 disables, else select TTL 0-3
-                "IErange": apm.pars.IErange,
-            },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "process_finish": True,
-            "process_contrib": [
-                ProcessContrib.action_params,
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
-        },
-
     )
 
     return apm.action_list  # returns complete action list to orch
@@ -886,7 +775,6 @@ def ECHE_slave_movetosample(
     last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
 
     # get sample plate coordinates
     apm.add_action(
@@ -922,6 +810,7 @@ def ECHE_slave_movetosample(
 
     return apm.action_list  # returns complete action list to orch
 
+
 def ECHE_slave_move(
     experiment: Experiment,
     experiment_version: int = 1,
@@ -932,7 +821,6 @@ def ECHE_slave_move(
     last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
 
     # move to position
     apm.add_action(
@@ -945,16 +833,17 @@ def ECHE_slave_move(
                 "mode": MoveModes.relative,
                 "transformation": TransformationModes.platexy,
             },
-#            "from_global_params": {"_platexy": "d_mm"},
+            #            "from_global_params": {"_platexy": "d_mm"},
             "start_condition": ActionStartCondition.wait_for_all,
         }
     )
 
     return apm.action_list  # returns complete action list to orch
 
+
 def ECHE_slave_CV_led_secondtrigger(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
@@ -964,153 +853,48 @@ def ECHE_slave_CV_led_secondtrigger(
     ] = 0.02,  # scan rate in volts/second or amps/second.
     samplerate_sec: Optional[float] = 0.1,
     cycles: Optional[int] = 1,
-    IErange: Optional[str] = "auto",
-    ph: float = 0,
+    gamry_i_range: Optional[str] = "auto",
+    solution_ph: float = 0,
     reservoir_electrolyte: Electrolyte = "SLF10",
-    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
-    reservoir_bubbler_gas: str = "O2",
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
-    reference_electrode_type: str = "NHE",
+    reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
+    solution_bubble_gas: str = "O2",
+    measurement_area: float = 0.071,  # 3mm diameter droplet
+    ref_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
-    led: Optional[str] = "doric_led1",
-    wavelength_nm: Optional[float] = 0.0,
-    wavelength_intensity_mw: Optional[float] = 0.0,
-    wavelength_intensity_date: Optional[str] = "n/a",
-    led_side_illumination: Optional[str] = "front",
-    toggle_on_ms: Optional[float] = 1000,
-    toggle_off_ms: Optional[float] = 1000,
-    toggle_offset_ms: Optional[int] = 0,
-    toggle_duration_ms: Optional[int] = -1,
-    toggle_two_on_ms: Optional[float] = 100,
-    toggle_two_off_ms: Optional[float] = 100,
-    toggle_two_offset_ms: Optional[int] = 0,
-    toggle_two_duration_ms: Optional[int] = -1,
+    illumination_source: Optional[str] = "doric_led1",
+    illumination_wavelength: Optional[float] = 0.0,
+    illumination_intensity: Optional[float] = 0.0,
+    illumination_intensity_date: Optional[str] = "n/a",
+    illumination_side: Optional[str] = "front",
+    toggle_dark_time_init: Optional[float] = 0.0,
+    toggle_illum_duty: Optional[float] = 0.5,
+    toggle_illum_period: Optional[float] = 2.0,
+    toggle_illum_time: Optional[float] = -1,
+    toggle2_source: Optional[str] = "spec_trig",
+    toggle2_init_delay: Optional[float] = 0.0,
+    toggle2_duty: Optional[float] = 0.5,
+    toggle2_period: Optional[float] = 2.0,
+    toggle2_time: Optional[float] = -1,
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    # get sample for gamry
-    apm.add_action(
-        {
-            "action_server": PAL_server,
-            "action_name": "archive_custom_query_sample",
-            "action_params": {
-                "custom": "cell1_we",
-            },
-            "to_global_params": [
-                "_fast_samples_in"
-            ],  # save new liquid_sample_no of eche cell to globals
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+    CV_duration_sec = (
+        abs(apm.pars.Vfinal_vsRHE - apm.pars.Vapex2_vsRHE) / apm.pars.samplerate_sec
+    )
+    CV_duration_sec += (
+        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE) / apm.pars.samplerate_sec
+    )
+    CV_duration_sec += (
+        abs(apm.pars.Vapex1_vsRHE - apm.pars.Vinit_vsRHE) / apm.pars.samplerate_sec
     )
 
-    #setup toggle on galil_io
-    apm.add_action(
-        {
-            "action_server": IO_server,
-            "action_name": "set_digital_cycle",
-            "action_params": {
-                "trigger_item": "gamry_ttl0",
-                "triggertype": toggle_triggertype,
-                "out_item": apm.pars.led,
-                "out_item_gamry": "gamry_aux",
-                "t_on": apm.pars.toggle_on_ms,
-                "t_off": apm.pars.toggle_off_ms,
-                "t_offset": apm.pars.toggle_offset_ms,
-                "t_duration": apm.pars.toggle_duration_ms,
-                "t_on2": apm.pars.toggle_two_on_ms,
-                "t_off2": apm.pars.toggle_two_off_ms,
-                "t_offset2": apm.pars.toggle_two_offset_ms,
-                "t_duration2": apm.pars.toggle_two_duration_ms,
-                # "mainthread": 0,
-                # "subthread": 1,
-                # "subthread2": 2,
-            },
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "process_finish": False,
-            "process_contrib": [
-                ProcessContrib.action_params,
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
-        },
-    )
-
-
-    # apply potential
-    apm.add_action(
-        {
-            "action_server": PSTAT_server,
-            "action_name": "run_CV",
-            "action_params": {
-                "Vinit__V": apm.pars.Vinit_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.ph,
-                "Vapex1__V": apm.pars.Vapex1_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.ph,
-                "Vapex2__V": apm.pars.Vapex2_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.ph,
-                "Vfinal__V": apm.pars.Vfinal_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.ph,
-                "ScanRate__V_s": apm.pars.scanrate_voltsec,
-                "AcqInterval__s": apm.pars.samplerate_sec,
-                "Cycles": apm.pars.cycles,
-                "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                "TTLsend": 0,  # -1 disables, else select TTL 0-3
-                "IErange": apm.pars.IErange,
-            },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "process_finish": True,
-            "process_contrib": [
-                ProcessContrib.action_params,
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
-        },
-    )
-
-    return apm.action_list  # returns complete action list to orch
-
-def ECHE_slave_CA_led_secondtrigger(
-    experiment: Experiment,
-    experiment_version: int = 1,
-    CA_potential_vsRHE: Optional[float] = 0.0,
-    ph: float = 9.53,
-    reservoir_electrolyte: Electrolyte = "SLF10",
-    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
-    reservoir_bubbler_gas: str = "O2",
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
-    reference_electrode_type: str = "NHE",
-    ref_vs_nhe: float = 0.21,
-    samplerate_sec: Optional[float] = 0.1,
-    CA_duration_sec: Optional[float] = 60,
-    IErange: Optional[str] = "auto",
-    led: Optional[str] = "doric_led1",
-    wavelength_nm: Optional[float] = 0.0,
-    wavelength_intensity_mw: Optional[float] = 0.0,
-    wavelength_intensity_date: Optional[str] = "n/a",
-    led_side_illumination: Optional[str] = "front",
-    toggle_on_ms: Optional[float] = 1000,
-    toggle_off_ms: Optional[float] = 1000,
-    toggle_offset_ms: Optional[int] = 0,
-    toggle_duration_ms: Optional[int] = -1,
-    toggle_two_on_ms: Optional[float] = 100,
-    toggle_two_off_ms: Optional[float] = 100,
-    toggle_two_offset_ms: Optional[int] = 0,
-    toggle_two_duration_ms: Optional[int] = -1,
-    comment: Optional[str] = "",
-):
-    """last functionality test: -"""
-
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    if int(round(apm.pars.toggle_illum_time)) == -1:
+        apm.pars.toggle_illum_time = CV_duration_sec
+    if int(round(apm.pars.toggle2_time)) == -1:
+        apm.pars.toggle2_time = CV_duration_sec
 
     # get sample for gamry
     apm.add_action(
@@ -1133,36 +917,160 @@ def ECHE_slave_CA_led_secondtrigger(
             "action_server": IO_server,
             "action_name": "set_digital_cycle",
             "action_params": {
-                "trigger_item": "gamry_ttl0",
+                "trigger_name": "gamry_ttl0",
                 "triggertype": toggle_triggertype,
-                "out_item": apm.pars.led,
-                "out_item_gamry": "gamry_aux",
-                "t_on": apm.pars.toggle_on_ms,
-                "t_off": apm.pars.toggle_off_ms,
-                "t_offset": apm.pars.toggle_offset_ms,
-                "t_duration": apm.pars.toggle_duration_ms,
-                "t_on2": apm.pars.toggle_two_on_ms,
-                "t_off2": apm.pars.toggle_two_off_ms,
-                "t_offset2": apm.pars.toggle_two_offset_ms,
-                "t_duration2": apm.pars.toggle_two_duration_ms,
-#                "mainthread": 0,
-#                "subthread": 1,
+                "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
+                "out_name_gamry": None,
+                "toggle_init_delay": [
+                    apm.pars.toggle_dark_time_init,
+                    apm.pars.toggle2_init_delay,
+                ],
+                "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
+                "toggle_period": [
+                    apm.pars.toggle_illum_period,
+                    apm.pars.toggle2_period,
+                ],
+                "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
             },
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "process_finish": False,
             "process_contrib": [
-                ProcessContrib.action_params,
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
         },
+    )
 
+    # apply potential
+    apm.add_action(
+        {
+            "action_server": PSTAT_server,
+            "action_name": "run_CV",
+            "action_params": {
+                "Vinit__V": apm.pars.Vinit_vsRHE
+                - 1.0 * apm.pars.ref_vs_nhe
+                - 0.059 * apm.pars.solution_ph,
+                "Vapex1__V": apm.pars.Vapex1_vsRHE
+                - 1.0 * apm.pars.ref_vs_nhe
+                - 0.059 * apm.pars.solution_ph,
+                "Vapex2__V": apm.pars.Vapex2_vsRHE
+                - 1.0 * apm.pars.ref_vs_nhe
+                - 0.059 * apm.pars.solution_ph,
+                "Vfinal__V": apm.pars.Vfinal_vsRHE
+                - 1.0 * apm.pars.ref_vs_nhe
+                - 0.059 * apm.pars.solution_ph,
+                "ScanRate__V_s": apm.pars.scanrate_voltsec,
+                "AcqInterval__s": apm.pars.samplerate_sec,
+                "Cycles": apm.pars.cycles,
+                "TTLwait": -1,  # -1 disables, else select TTL 0-3
+                "TTLsend": 0,  # -1 disables, else select TTL 0-3
+                "IErange": apm.pars.gamry_i_range,
+            },
+            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "process_finish": True,
+            "process_contrib": [
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        },
+    )
+
+    return apm.action_list  # returns complete action list to orch
+
+
+def ECHE_slave_CA_led_secondtrigger(
+    experiment: Experiment,
+    experiment_version: int = 2,
+    CA_potential_vsRHE: Optional[float] = 0.0,
+    solution_ph: float = 9.53,
+    reservoir_electrolyte: Electrolyte = "SLF10",
+    reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
+    solution_bubble_gas: str = "O2",
+    measurement_area: float = 0.071,  # 3mm diameter droplet
+    ref_electrode_type: str = "NHE",
+    ref_vs_nhe: float = 0.21,
+    samplerate_sec: Optional[float] = 0.1,
+    CA_duration_sec: Optional[float] = 60,
+    gamry_i_range: Optional[str] = "auto",
+    illumination_source: Optional[str] = "doric_led1",
+    illumination_wavelength: Optional[float] = 0.0,
+    illumination_intensity: Optional[float] = 0.0,
+    illumination_intensity_date: Optional[str] = "n/a",
+    illumination_side: Optional[str] = "front",
+    toggle_dark_time_init: Optional[float] = 0.0,
+    toggle_illum_duty: Optional[float] = 0.5,
+    toggle_illum_period: Optional[float] = 2.0,
+    toggle_illum_time: Optional[float] = -1,
+    toggle2_source: Optional[str] = "spec_trig",
+    toggle2_init_delay: Optional[float] = 0.0,
+    toggle2_duty: Optional[float] = 0.5,
+    toggle2_period: Optional[float] = 2.0,
+    toggle2_time: Optional[float] = -1,
+    comment: Optional[str] = "",
+):
+    """last functionality test: -"""
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    if int(round(apm.pars.toggle_illum_time)) == -1:
+        apm.pars.toggle_illum_time = apm.pars.CA_duration_sec
+    if int(round(apm.pars.toggle2_time)) == -1:
+        apm.pars.toggle2_time = apm.pars.CA_duration_sec
+
+    # get sample for gamry
+    apm.add_action(
+        {
+            "action_server": PAL_server,
+            "action_name": "archive_custom_query_sample",
+            "action_params": {
+                "custom": "cell1_we",
+            },
+            "to_global_params": [
+                "_fast_samples_in"
+            ],  # save new liquid_sample_no of eche cell to globals
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        }
+    )
+
+    # setup toggle on galil_io
+    apm.add_action(
+        {
+            "action_server": IO_server,
+            "action_name": "set_digital_cycle",
+            "action_params": {
+                "trigger_name": "gamry_ttl0",
+                "triggertype": toggle_triggertype,
+                "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
+                "out_name_gamry": None,
+                "toggle_init_delay": [
+                    apm.pars.toggle_dark_time_init,
+                    apm.pars.toggle2_init_delay,
+                ],
+                "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
+                "toggle_period": [
+                    apm.pars.toggle_illum_period,
+                    apm.pars.toggle2_period,
+                ],
+                "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
+            },
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "process_finish": False,
+            "process_contrib": [
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        },
     )
 
     # apply potential
     potential = (
-        apm.pars.CA_potential_vsRHE - 1.0 * apm.pars.ref_vs_nhe - 0.059 * apm.pars.ph
+        apm.pars.CA_potential_vsRHE
+        - 1.0 * apm.pars.ref_vs_nhe
+        - 0.059 * apm.pars.solution_ph
     )
     print(f"ADSS_slave_CA potential: {potential}")
     apm.add_action(
@@ -1175,55 +1083,60 @@ def ECHE_slave_CA_led_secondtrigger(
                 "AcqInterval__s": apm.pars.samplerate_sec,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
                 "TTLsend": 0,  # -1 disables, else select TTL 0-3
-                "IErange": apm.pars.IErange,
+                "IErange": apm.pars.gamry_i_range,
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "process_finish": True,
             "process_contrib": [
-                ProcessContrib.action_params,
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
         },
-
     )
 
     return apm.action_list  # returns complete action list to orch
 
+
 def ECHE_slave_CP_led_secondtrigger(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     CP_current: Optional[float] = 0.0,
-    ph: float = 9.53,
+    solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
-    reservoir_liquid_sample_no: int = 1, #currently liquid sample database number
-    reservoir_bubbler_gas: str = "O2",
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
-    reference_electrode_type: str = "NHE",
+    reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
+    solution_bubble_gas: str = "O2",
+    measurement_area: float = 0.071,  # 3mm diameter droplet
+    ref_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
     samplerate_sec: Optional[float] = 0.1,
     CP_duration_sec: Optional[float] = 60,
-    IErange: Optional[str] = "auto",
-    led: Optional[str] = "doric_led1",
-    wavelength_nm: Optional[float] = 0.0,
-    wavelength_intensity_mw: Optional[float] = 0.0,
-    wavelength_intensity_date: Optional[str] = "n/a",
-    led_side_illumination: Optional[str] = "front",
-    toggle_on_ms: Optional[float] = 1000,
-    toggle_off_ms: Optional[float] = 1000,
-    toggle_offset_ms: Optional[int] = 0,
-    toggle_duration_ms: Optional[int] = -1,
-    toggle_two_on_ms: Optional[float] = 100,
-    toggle_two_off_ms: Optional[float] = 100,
-    toggle_two_offset_ms: Optional[int] = 0,
-    toggle_two_duration_ms: Optional[int] = -1,
+    gamry_i_range: Optional[str] = "auto",
+    illumination_source: Optional[str] = "doric_led1",
+    illumination_wavelength: Optional[float] = 0.0,
+    illumination_intensity: Optional[float] = 0.0,
+    illumination_intensity_date: Optional[str] = "n/a",
+    illumination_side: Optional[str] = "front",
+    toggle_dark_time_init: Optional[float] = 0.0,
+    toggle_illum_duty: Optional[float] = 0.5,
+    toggle_illum_period: Optional[float] = 2.0,
+    toggle_illum_time: Optional[float] = -1,
+    toggle2_source: Optional[str] = "spec_trig",
+    toggle2_init_delay: Optional[float] = 0.0,
+    toggle2_duty: Optional[float] = 0.5,
+    toggle2_period: Optional[float] = 2.0,
+    toggle2_time: Optional[float] = -1,
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    if int(round(apm.pars.toggle_illum_time)) == -1:
+        apm.pars.toggle_illum_time = apm.pars.CP_duration_sec
+    if int(round(apm.pars.toggle2_time)) == -1:
+        apm.pars.toggle2_time = apm.pars.CP_duration_sec
 
     # get sample for gamry
     apm.add_action(
@@ -1246,31 +1159,29 @@ def ECHE_slave_CP_led_secondtrigger(
             "action_server": IO_server,
             "action_name": "set_digital_cycle",
             "action_params": {
-                "trigger_item": "gamry_ttl0",
+                "trigger_name": "gamry_ttl0",
                 "triggertype": toggle_triggertype,
-                "out_item": apm.pars.led,
-                "out_item_gamry": "gamry_aux",
-                "t_on": apm.pars.toggle_on_ms,
-                "t_off": apm.pars.toggle_off_ms,
-                "t_offset": apm.pars.toggle_offset_ms,
-                "t_duration": apm.pars.toggle_duration_ms,
-                "t_on2": apm.pars.toggle_two_on_ms,
-                "t_off2": apm.pars.toggle_two_off_ms,
-                "t_offset2": apm.pars.toggle_two_offset_ms,
-                "t_duration2": apm.pars.toggle_two_duration_ms,
-#                "mainthread": 0,
-#                "subthread": 1,
+                "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
+                "out_name_gamry": None,
+                "toggle_init_delay": [
+                    apm.pars.toggle_dark_time_init,
+                    apm.pars.toggle2_init_delay,
+                ],
+                "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
+                "toggle_period": [
+                    apm.pars.toggle_illum_period,
+                    apm.pars.toggle2_period,
+                ],
+                "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
             },
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "process_finish": False,
             "process_contrib": [
-                ProcessContrib.action_params,
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
         },
-
     )
 
     apm.add_action(
@@ -1283,19 +1194,17 @@ def ECHE_slave_CP_led_secondtrigger(
                 "AcqInterval__s": apm.pars.samplerate_sec,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
                 "TTLsend": 0,  # -1 disables, else select TTL 0-3
-                "IErange": apm.pars.IErange,
+                "IErange": apm.pars.gamry_i_range,
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "process_finish": True,
             "process_contrib": [
-                ProcessContrib.action_params,
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
         },
-
     )
 
     return apm.action_list  # returns complete action list to orch
