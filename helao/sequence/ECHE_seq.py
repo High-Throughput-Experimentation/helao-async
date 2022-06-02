@@ -96,7 +96,7 @@ def ECHE_4CA_led_1CV_led(
     CV_scanrate_voltsec: float = 0.02,
     CV_samplerate_mV: float = 1,
     CV_cycles: int = 1,
-    IErange: str = "auto",
+    gamry_i_range: str = "auto",
     led_type: str = "front",
     led_date: str = "01/01/2000",
     led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
@@ -149,7 +149,7 @@ def ECHE_4CA_led_1CV_led(
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA1_duration_sec,
-                "IErange": IErange,
+                "gamry_i_range": gamry_i_range,
                 "illumination_source": led_name_CA1,
                 "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA1)],
                 "illumination_intensity": led_intensities_mw[
@@ -177,7 +177,7 @@ def ECHE_4CA_led_1CV_led(
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA2_duration_sec,
-                "IErange": IErange,
+                "gamry_i_range": gamry_i_range,
                 "illumination_source": led_name_CA2,
                 "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA2)],
                 "illumination_intensity": led_intensities_mw[
@@ -205,7 +205,7 @@ def ECHE_4CA_led_1CV_led(
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA3_duration_sec,
-                "IErange": IErange,
+                "gamry_i_range": gamry_i_range,
                 "illumination_source": led_name_CA3,
                 "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA3)],
                 "illumination_intensity": led_intensities_mw[
@@ -233,7 +233,7 @@ def ECHE_4CA_led_1CV_led(
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA4_duration_sec,
-                "IErange": IErange,
+                "gamry_i_range": gamry_i_range,
                 "illumination_source": led_name_CA4,
                 "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA4)],
                 "illumination_intensity": led_intensities_mw[
@@ -259,7 +259,7 @@ def ECHE_4CA_led_1CV_led(
                 "scanrate_voltsec": CV_scanrate_voltsec,
                 "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
                 "cycles": CV_cycles,
-                "IErange": IErange,
+                "gamry_i_range": gamry_i_range,
                 "solution_ph": solution_ph,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
@@ -314,7 +314,7 @@ def ECHE_CV_CA_CV(
     CV3_scanrate_voltsec: float = 0.02,
     CV3_samplerate_mV: float = 1,
     CV3_cycles: int = 1,
-    IErange: str = "auto",
+    gamry_i_range: str = "auto",
 ):
 
     pl = ExperimentPlanMaker()
@@ -348,7 +348,7 @@ def ECHE_CV_CA_CV(
                 "scanrate_voltsec": CV1_scanrate_voltsec,
                 "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
                 "cycles": CV1_cycles,
-                "IErange": IErange,
+                "gamry_i_range": gamry_i_range,
                 "solution_ph": solution_ph,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
@@ -373,7 +373,7 @@ def ECHE_CV_CA_CV(
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA2_duration_sec,
-                "IErange": IErange,
+                "gamry_i_range": gamry_i_range,
             },
         )
 
@@ -388,7 +388,7 @@ def ECHE_CV_CA_CV(
                 "scanrate_voltsec": CV3_scanrate_voltsec,
                 "samplerate_sec": CV3_samplerate_mV / (CV3_scanrate_voltsec * 1000),
                 "cycles": CV3_cycles,
-                "IErange": IErange,
+                "gamry_i_range": gamry_i_range,
                 "solution_ph": solution_ph,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
@@ -422,7 +422,7 @@ def ECHE_CV(
     CV1_scanrate_voltsec: float = 0.02,
     CV1_samplerate_mV: float = 1,
     CV1_cycles: int = 1,
-    IErange: str = "auto",
+    gamry_i_range: str = "auto",
 ):
 
     pl = ExperimentPlanMaker()
@@ -455,7 +455,7 @@ def ECHE_CV(
                 "scanrate_voltsec": CV1_scanrate_voltsec,
                 "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
                 "cycles": CV1_cycles,
-                "IErange": IErange,
+                "gamry_i_range": gamry_i_range,
                 "solution_ph": solution_ph,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
@@ -485,7 +485,7 @@ def ECHE_CA(
     CA_potential_vsRHE: float = 1.23,
     CA_duration_sec: float = 4,
     CA_samplerate_sec: float = 0.05,
-    IErange: str = "auto",
+    gamry_i_range: str = "auto",
 ):
 
     pl = ExperimentPlanMaker()
@@ -521,7 +521,7 @@ def ECHE_CA(
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA_duration_sec,
-                "IErange": IErange,
+                "gamry_i_range": gamry_i_range,
             },
         )
 
@@ -544,7 +544,7 @@ def ECHE_CA_led(
     CA_potential_vsRHE: float = 1.23,
     CA_duration_sec: float = 15,
     CA_samplerate_sec: float = 0.05,
-    IErange: str = "auto",
+    gamry_i_range: str = "auto",
     led_type: str = "front",
     led_date: str = "01/01/2000",
     led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
@@ -589,7 +589,7 @@ def ECHE_CA_led(
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA_duration_sec,
-                "IErange": IErange,
+                "gamry_i_range": gamry_i_range,
                 "illumination_source": led_name_CA,
                 "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA)],
                 "illumination_intensity": led_intensities_mw[
@@ -627,7 +627,7 @@ def ECHE_CV_led(
     CV_scanrate_voltsec: float = 0.02,
     CV_samplerate_mV: float = 1,
     CV_cycles: int = 1,
-    IErange: str = "auto",
+    gamry_i_range: str = "auto",
     led_type: str = "front",
     led_date: str = "01/01/2000",
     led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
@@ -670,7 +670,7 @@ def ECHE_CV_led(
                 "scanrate_voltsec": CV_scanrate_voltsec,
                 "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
                 "cycles": CV_cycles,
-                "IErange": IErange,
+                "gamry_i_range": gamry_i_range,
                 "solution_ph": solution_ph,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
@@ -711,7 +711,7 @@ def ECHE_CP(
     CP_current: float = 0.000001,
     CP_duration_sec: float = 4,
     CP_samplerate_sec: float = 0.05,
-    IErange: str = "auto",
+    gamry_i_range: str = "auto",
 ):
 
     pl = ExperimentPlanMaker()
@@ -747,7 +747,7 @@ def ECHE_CP(
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CP_samplerate_sec,
                 "CP_duration_sec": CP_duration_sec,
-                "IErange": IErange,
+                "gamry_i_range": gamry_i_range,
             },
         )
 
@@ -770,7 +770,7 @@ def ECHE_CP_led(
     CP_current: float = 0.000001,
     CP_duration_sec: float = 15,
     CP_samplerate_sec: float = 0.05,
-    IErange: str = "auto",
+    gamry_i_range: str = "auto",
     led_name_CP: str = "doric_led1",
     led_type: str = "front",
     led_date: str = "01/01/2000",
@@ -815,7 +815,7 @@ def ECHE_CP_led(
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CP_samplerate_sec,
                 "CP_duration_sec": CP_duration_sec,
-                "IErange": IErange,
+                "gamry_i_range": gamry_i_range,
                 "illumination_source": led_name_CP,
                 "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CP)],
                 "illumination_intensity": led_intensities_mw[
@@ -853,7 +853,7 @@ def ECHE_CV_led_spectrometer(
     CV_scanrate_voltsec: float = 0.02,
     CV_samplerate_mV: float = 1,
     CV_cycles: int = 1,
-    IErange: str = "auto",
+    gamry_i_range: str = "auto",
     led_type: str = "front",
     led_date: str = "01/01/2000",
     led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
@@ -900,7 +900,7 @@ def ECHE_CV_led_spectrometer(
                 "scanrate_voltsec": CV_scanrate_voltsec,
                 "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
                 "cycles": CV_cycles,
-                "IErange": IErange,
+                "gamry_i_range": gamry_i_range,
                 "solution_ph": solution_ph,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
@@ -945,7 +945,7 @@ def ECHE_CA_led_spectrometer(
     CA_potential_vsRHE: float = 1.23,
     CA_duration_sec: float = 15,
     CA_samplerate_sec: float = 0.05,
-    IErange: str = "auto",
+    gamry_i_range: str = "auto",
     led_type: str = "front",
     led_date: str = "01/01/2000",
     led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
@@ -994,7 +994,7 @@ def ECHE_CA_led_spectrometer(
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA_duration_sec,
-                "IErange": IErange,
+                "gamry_i_range": gamry_i_range,
                 "illumination_source": led_name_CA,
                 "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA)],
                 "illumination_intensity": led_intensities_mw[
@@ -1032,7 +1032,7 @@ def ECHE_CP_led_spectrometer(
     CP_current: float = 0.000001,
     CP_duration_sec: float = 15,
     CP_samplerate_sec: float = 0.05,
-    IErange: str = "auto",
+    gamry_i_range: str = "auto",
     led_name_CP: str = "doric_led1",
     led_type: str = "front",
     led_date: str = "01/01/2000",
@@ -1081,7 +1081,7 @@ def ECHE_CP_led_spectrometer(
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CP_samplerate_sec,
                 "CP_duration_sec": CP_duration_sec,
-                "IErange": IErange,
+                "gamry_i_range": gamry_i_range,
                 "illumination_source": led_name_CP,
                 "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CP)],
                 "illumination_intensity": led_intensities_mw[
