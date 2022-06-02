@@ -440,7 +440,7 @@ def ECHE_slave_CV_led(
     )
 
     if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = CV_duration_sec
+        apm.pars.toggle_illum_time = CV_duration_sec * apm.pars.cycles
 
     # get sample for gamry
     apm.add_action(
@@ -892,9 +892,9 @@ def ECHE_slave_CV_led_secondtrigger(
     )
 
     if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = CV_duration_sec
+        apm.pars.toggle_illum_time = CV_duration_sec * apm.pars.cycles
     if int(round(apm.pars.toggle2_time)) == -1:
-        apm.pars.toggle2_time = CV_duration_sec
+        apm.pars.toggle2_time = CV_duration_sec * apm.pars.cycles
 
     # get sample for gamry
     apm.add_action(
