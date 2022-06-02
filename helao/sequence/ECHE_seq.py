@@ -9,7 +9,6 @@ __all__ = [
     "ECHE_CV_led",
     "ECHE_CA",
     "ECHE_CA_led",
-    "ECHE_background",
     "ECHE_CP",
     "ECHE_CP_led",
     "ECHE_CV_led_spectrometer",
@@ -17,8 +16,6 @@ __all__ = [
     "ECHE_CP_led_spectrometer",
     "ECHE_movetosample",
     "ECHE_move",
-
-
 ]
 
 
@@ -28,15 +25,59 @@ from helaocore.model.electrolyte import Electrolyte
 
 SEQUENCES = __all__
 
-def ECHE_4CA_led_1CV_led(
+
+def ECHE_movetosample(
     sequence_version: int = 1,
+    plate_id: int = 1,
+    plate_sample_no: int = 1,
+):
+
+    pl = ExperimentPlanMaker()
+
+    pl.add_experiment(
+        "ECHE_slave_movetosample",
+        {
+            #            "solid_custom_position": "cell1_we",
+            "solid_plate_id": plate_id,
+            "solid_sample_no": plate_sample_no,
+        },
+    )
+
+    pl.add_experiment("ECHE_slave_shutdown", {})
+
+    return pl.experiment_plan_list  # returns complete experiment list
+
+
+def ECHE_move(
+    sequence_version: int = 1,
+    move_x_mm: float = 1.0,
+    move_y_mm: float = 1.0,
+):
+
+    pl = ExperimentPlanMaker()
+
+    pl.add_experiment(
+        "ECHE_slave_move",
+        {
+            "x_mm": move_x_mm,
+            "y_mm": move_y_mm,
+        },
+    )
+
+    pl.add_experiment("ECHE_slave_shutdown", {})
+
+    return pl.experiment_plan_list  # returns complete experiment list
+
+
+def ECHE_4CA_led_1CV_led(
+    sequence_version: int = 2,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
-    reservoir_bubbler_gas: str = "O2",
-    ph: float = 9.53,
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    solution_bubble_gas: str = "O2",
+    solution_ph: float = 9.53,
+    measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
     ref_vs_nhe: float = 0.21,
     CA1_potential_vsRHE: float = 1.23,
@@ -56,22 +97,24 @@ def ECHE_4CA_led_1CV_led(
     CV_samplerate_mV: float = 1,
     CV_cycles: int = 1,
     IErange: str = "auto",
-    led_typenamesdate: list = ["led"],
-    led_wavelengths_nm: list = [0],
-    led_intensities_mw: list = [0],
-    led_number_CA1: int = 1,
-    led_number_CA2: int = 2,
-    led_number_CA3: int = 3,
-    led_number_CA4: int = 4,
-    led_number_CV: int = 1,
-    toggle_onCA_ms: float = 500,
-    toggle_offCA_ms: float = 500,
-    toggle_offsetCA_ms: float = 0,
-    toggle_durationCA_ms: float = -1,
-    toggle_onCV_ms: float = 2000,
-    toggle_offCV_ms: float = 1000,
-    toggle_offsetCV_ms: float = 0,
-    toggle_durationCV_ms: float = -1,
+    led_type: str = "front",
+    led_date: str = "01/01/2000",
+    led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
+    led_wavelengths_nm: list = [385, 450, 515, 595],
+    led_intensities_mw: list = [-1, -1, -1, -1],
+    led_name_CA1: str = "doric_led1",
+    led_name_CA2: str = "doric_led2",
+    led_name_CA3: str = "doric_led3",
+    led_name_CA4: str = "doric_led4",
+    led_name_CV: str = "doric_led1",
+    toggleCA_illum_duty: float = 0.5,
+    toggleCA_illum_period: float = 1.0,
+    toggleCA_dark_time_init: float = 0,
+    toggleCA_illum_time: float = -1,
+    toggleCV_illum_duty: float = 0.667,
+    toggleCV_illum_period: float = 3.0,
+    toggleCV_dark_time_init: float = 0,
+    toggleCV_illum_time: float = -1,
 ):
 
     pl = ExperimentPlanMaker()
@@ -88,8 +131,8 @@ def ECHE_4CA_led_1CV_led(
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
-               "liquid_volume_ml": liquid_volume_ml,
+                "solution_bubble_gas": solution_bubble_gas,
+                "liquid_volume_ml": liquid_volume_ml,
             },
         )
         # CA1
@@ -97,24 +140,27 @@ def ECHE_4CA_led_1CV_led(
             "ECHE_slave_CA_led",
             {
                 "CA_potential_vsRHE": CA1_potential_vsRHE,
-                "ph": ph,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
-                "reservoir_bubbler_gas": reservoir_bubbler_gas,
-                "droplet_size_cm2": droplet_size_cm2,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA1_duration_sec,
                 "IErange": IErange,
-                "led": led_typenamesdate[led_number_CA1],
-                "wavelength_nm": led_wavelengths_nm[led_number_CA1],
-                "wavelength_intensity_mw": led_intensities_mw[led_number_CA1],
-                "wavelength_intensity_date": led_typenamesdate[5],
-                "led_side_illumination": led_typenamesdate[0],
-                "toggle_on_ms": toggle_onCA_ms,
-                "toggle_off_ms": toggle_offCA_ms,
-                "toggle_offset_ms": toggle_offsetCA_ms,
-                "toggle_duration_ms": toggle_durationCA_ms,
+                "illumination_source": led_name_CA1,
+                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA1)],
+                "illumination_intensity": led_intensities_mw[
+                    led_names.index(led_name_CA1)
+                ],
+                "illumination_intensity_date": led_date,
+                "led_side_illumination": led_type,
+                "toggle_illum_duty": toggleCA_illum_duty,
+                "toggle_illum_period": toggleCA_illum_period,
+                "toggle_illum_time": toggleCA_illum_time,
+                "toggle_dark_time_init": toggleCA_dark_time_init,
             },
         )
         # CA2
@@ -122,24 +168,27 @@ def ECHE_4CA_led_1CV_led(
             "ECHE_slave_CA_led",
             {
                 "CA_potential_vsRHE": CA2_potential_vsRHE,
-                "ph": ph,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
-                "reservoir_bubbler_gas": reservoir_bubbler_gas,
-                "droplet_size_cm2": droplet_size_cm2,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA2_duration_sec,
                 "IErange": IErange,
-                "led": led_typenamesdate[led_number_CA2],
-                "wavelength_nm": led_wavelengths_nm[led_number_CA2],
-                "wavelength_intensity_mw": led_intensities_mw[led_number_CA2],
-                "wavelength_intensity_date": led_typenamesdate[5],
-                "led_side_illumination": led_typenamesdate[0],
-                "toggle_on_ms": toggle_onCA_ms,
-                "toggle_off_ms": toggle_offCA_ms,
-                "toggle_offset_ms": toggle_offsetCA_ms,
-                "toggle_duration_ms": toggle_durationCA_ms,
+                "illumination_source": led_name_CA2,
+                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA2)],
+                "illumination_intensity": led_intensities_mw[
+                    led_names.index(led_name_CA2)
+                ],
+                "illumination_intensity_date": led_date,
+                "led_side_illumination": led_type,
+                "toggle_illum_duty": toggleCA_illum_duty,
+                "toggle_illum_period": toggleCA_illum_period,
+                "toggle_illum_time": toggleCA_illum_time,
+                "toggle_dark_time_init": toggleCA_dark_time_init,
             },
         )
         # CA3
@@ -147,24 +196,27 @@ def ECHE_4CA_led_1CV_led(
             "ECHE_slave_CA_led",
             {
                 "CA_potential_vsRHE": CA3_potential_vsRHE,
-                "ph": ph,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
-                "reservoir_bubbler_gas": reservoir_bubbler_gas,
-                "droplet_size_cm2": droplet_size_cm2,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA3_duration_sec,
                 "IErange": IErange,
-                "led": led_typenamesdate[led_number_CA3],
-                "wavelength_nm": led_wavelengths_nm[led_number_CA3],
-                "wavelength_intensity_mw": led_intensities_mw[led_number_CA3],
-                "wavelength_intensity_date": led_typenamesdate[5],
-                "led_side_illumination": led_typenamesdate[0],
-                "toggle_on_ms": toggle_onCA_ms,
-                "toggle_off_ms": toggle_offCA_ms,
-                "toggle_offset_ms": toggle_offsetCA_ms,
-                "toggle_duration_ms": toggle_durationCA_ms,
+                "illumination_source": led_name_CA3,
+                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA3)],
+                "illumination_intensity": led_intensities_mw[
+                    led_names.index(led_name_CA3)
+                ],
+                "illumination_intensity_date": led_date,
+                "led_side_illumination": led_type,
+                "toggle_illum_duty": toggleCA_illum_duty,
+                "toggle_illum_period": toggleCA_illum_period,
+                "toggle_illum_time": toggleCA_illum_time,
+                "toggle_dark_time_init": toggleCA_dark_time_init,
             },
         )
         # CA4
@@ -172,24 +224,27 @@ def ECHE_4CA_led_1CV_led(
             "ECHE_slave_CA_led",
             {
                 "CA_potential_vsRHE": CA4_potential_vsRHE,
-                "ph": ph,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
-                "reservoir_bubbler_gas": reservoir_bubbler_gas,
-                "droplet_size_cm2": droplet_size_cm2,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA4_duration_sec,
                 "IErange": IErange,
-                "led": led_typenamesdate[led_number_CA4],
-                "wavelength_nm": led_wavelengths_nm[led_number_CA4],
-                "wavelength_intensity_mw": led_intensities_mw[led_number_CA4],
-                "wavelength_intensity_date": led_typenamesdate[5],
-                "led_side_illumination": led_typenamesdate[0],
-                "toggle_on_ms": toggle_onCA_ms,
-                "toggle_off_ms": toggle_offCA_ms,
-                "toggle_offset_ms": toggle_offsetCA_ms,
-                "toggle_duration_ms": toggle_durationCA_ms,
+                "illumination_source": led_name_CA4,
+                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA4)],
+                "illumination_intensity": led_intensities_mw[
+                    led_names.index(led_name_CA4)
+                ],
+                "illumination_intensity_date": led_date,
+                "led_side_illumination": led_type,
+                "toggle_illum_duty": toggleCA_illum_duty,
+                "toggle_illum_period": toggleCA_illum_period,
+                "toggle_illum_time": toggleCA_illum_time,
+                "toggle_dark_time_init": toggleCA_dark_time_init,
             },
         )
 
@@ -205,21 +260,24 @@ def ECHE_4CA_led_1CV_led(
                 "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
                 "cycles": CV_cycles,
                 "IErange": IErange,
-                "ph": ph,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
-                "reservoir_bubbler_gas": reservoir_bubbler_gas,
-                "droplet_size_cm2": droplet_size_cm2,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
-                "led": led_typenamesdate[led_number_CV],
-                "wavelength_nm": led_wavelengths_nm[led_number_CV],
-                "wavelength_intensity_mw": led_intensities_mw[led_number_CV],
-                "wavelength_intensity_date": led_typenamesdate[5],
-                "led_side_illumination": led_typenamesdate[0],
-                "toggle_on_ms": toggle_onCV_ms,
-                "toggle_off_ms": toggle_offCV_ms,
-                "toggle_offset_ms": toggle_offsetCV_ms,
-                "toggle_duration_ms": toggle_durationCV_ms,
+                "illumination_source": led_name_CV,
+                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CV)],
+                "illumination_intensity": led_intensities_mw[
+                    led_names.index(led_name_CV)
+                ],
+                "illumination_intensity_date": led_date,
+                "led_side_illumination": led_type,
+                "toggle_illum_duty": toggleCV_illum_duty,
+                "toggle_illum_period": toggleCV_illum_period,
+                "toggle_illum_time": toggleCV_illum_time,
+                "toggle_dark_time_init": toggleCV_dark_time_init,
             },
         )
 
@@ -229,14 +287,14 @@ def ECHE_4CA_led_1CV_led(
 
 
 def ECHE_CV_CA_CV(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
-    reservoir_bubbler_gas: str = "O2",
-    ph: float = 9.53,
-    droplet_size_cm2: float = .071,  #3mm diameter droplet    reference_electrode_type: str = "NHE",
+    solution_bubble_gas: str = "O2",
+    solution_ph: float = 9.53,
+    measurement_area: float = 0.071,  # 3mm diameter droplet    reference_electrode_type: str = "NHE",
     liquid_volume_ml: float = 1.0,
     ref_vs_nhe: float = 0.21,
     CV1_Vinit_vsRHE: float = 1.23,
@@ -273,7 +331,8 @@ def ECHE_CV_CA_CV(
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
@@ -290,10 +349,11 @@ def ECHE_CV_CA_CV(
                 "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
                 "cycles": CV1_cycles,
                 "IErange": IErange,
-                "ph": ph,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
-                "reservoir_bubbler_gas": reservoir_bubbler_gas,
-                "droplet_size_cm2": droplet_size_cm2,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
             },
@@ -304,10 +364,11 @@ def ECHE_CV_CA_CV(
             "ECHE_slave_CA",
             {
                 "CA_potential_vsRHE": CA2_potential_vsRHE,
-                "ph": ph,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
-                "reservoir_bubbler_gas": reservoir_bubbler_gas,
-                "droplet_size_cm2": droplet_size_cm2,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CA_samplerate_sec,
@@ -328,10 +389,11 @@ def ECHE_CV_CA_CV(
                 "samplerate_sec": CV3_samplerate_mV / (CV3_scanrate_voltsec * 1000),
                 "cycles": CV3_cycles,
                 "IErange": IErange,
-                "ph": ph,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
-                "reservoir_bubbler_gas": reservoir_bubbler_gas,
-                "droplet_size_cm2": droplet_size_cm2,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
             },
@@ -341,18 +403,19 @@ def ECHE_CV_CA_CV(
 
     return pl.experiment_plan_list  # returns complete experiment list
 
+
 def ECHE_CV(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
-    reservoir_bubbler_gas: str = "O2",
-    ph: float = 9.53,
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    solution_bubble_gas: str = "O2",
+    solution_ph: float = 9.53,
+    measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
     ref_vs_nhe: float = 0.21,
-    CV1_Vinit_vsRHE: float = .7,
+    CV1_Vinit_vsRHE: float = 0.7,
     CV1_Vapex1_vsRHE: float = 1,
     CV1_Vapex2_vsRHE: float = 0,
     CV1_Vfinal_vsRHE: float = 0,
@@ -376,7 +439,7 @@ def ECHE_CV(
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
+                "solution_bubble_gas": solution_bubble_gas,
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
@@ -393,10 +456,11 @@ def ECHE_CV(
                 "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
                 "cycles": CV1_cycles,
                 "IErange": IErange,
-                "ph": ph,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
-                "reservoir_bubbler_gas": reservoir_bubbler_gas,
-                "droplet_size_cm2": droplet_size_cm2,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
             },
@@ -406,15 +470,16 @@ def ECHE_CV(
 
     return pl.experiment_plan_list  # returns complete experiment list
 
+
 def ECHE_CA(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
-    reservoir_bubbler_gas: str = "O2",
-    ph: float = 9.53,
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    solution_bubble_gas: str = "O2",
+    solution_ph: float = 9.53,
+    measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
     ref_vs_nhe: float = 0.21,
     CA_potential_vsRHE: float = 1.23,
@@ -437,7 +502,7 @@ def ECHE_CA(
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
+                "solution_bubble_gas": solution_bubble_gas,
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
@@ -447,10 +512,11 @@ def ECHE_CA(
             "ECHE_slave_CA",
             {
                 "CA_potential_vsRHE": CA_potential_vsRHE,
-                "ph": ph,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
-                "reservoir_bubbler_gas": reservoir_bubbler_gas,
-                "droplet_size_cm2": droplet_size_cm2,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CA_samplerate_sec,
@@ -459,34 +525,36 @@ def ECHE_CA(
             },
         )
 
-
         pl.add_experiment("ECHE_slave_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
+
 def ECHE_CA_led(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
-    reservoir_bubbler_gas: str = "O2",
-    ph: float = 9.53,
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    solution_bubble_gas: str = "O2",
+    solution_ph: float = 9.53,
+    measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
     ref_vs_nhe: float = 0.21,
     CA_potential_vsRHE: float = 1.23,
     CA_duration_sec: float = 15,
     CA_samplerate_sec: float = 0.05,
     IErange: str = "auto",
-    led_typenamesdate: list = ["led"],
-    led_wavelengths_nm: list = [0],
-    led_intensities_mw: list = [0],
-    led_number_CA: int = 1,
-    toggle_onCA_ms: float = 500,
-    toggle_offCA_ms: float = 500,
-    toggle_offsetCA_ms: float = 0,
-    toggle_durationCA_ms: float = -1,
+    led_type: str = "front",
+    led_date: str = "01/01/2000",
+    led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
+    led_wavelengths_nm: list = [385, 450, 515, 595],
+    led_intensities_mw: list = [-1, -1, -1, -1],
+    led_name_CA: str = "doric_led1",
+    toggleCA_illum_duty: float = 0.5,
+    toggleCA_illum_period: float = 1.0,
+    toggleCA_dark_time_init: float = 0,
+    toggleCA_illum_time: float = -1,
 ):
 
     pl = ExperimentPlanMaker()
@@ -503,7 +571,7 @@ def ECHE_CA_led(
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
+                "solution_bubble_gas": solution_bubble_gas,
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
@@ -512,24 +580,27 @@ def ECHE_CA_led(
             "ECHE_slave_CA_led",
             {
                 "CA_potential_vsRHE": CA_potential_vsRHE,
-                "ph": ph,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
-                "reservoir_bubbler_gas": reservoir_bubbler_gas,
-                "droplet_size_cm2": droplet_size_cm2,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA_duration_sec,
                 "IErange": IErange,
-                "led": led_typenamesdate[led_number_CA],
-                "wavelength_nm": led_wavelengths_nm[led_number_CA],
-                "wavelength_intensity_mw": led_intensities_mw[led_number_CA],
-                "wavelength_intensity_date": led_typenamesdate[5],
-                "led_side_illumination": led_typenamesdate[0],
-                "toggle_on_ms": toggle_onCA_ms,
-                "toggle_off_ms": toggle_offCA_ms,
-                "toggle_offset_ms": toggle_offsetCA_ms,
-                "toggle_duration_ms": toggle_durationCA_ms,
+                "illumination_source": led_name_CA,
+                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA)],
+                "illumination_intensity": led_intensities_mw[
+                    led_names.index(led_name_CA)
+                ],
+                "illumination_intensity_date": led_date,
+                "led_side_illumination": led_type,
+                "toggle_illum_duty": toggleCA_illum_duty,
+                "toggle_illum_period": toggleCA_illum_period,
+                "toggle_illum_time": toggleCA_illum_time,
+                "toggle_dark_time_init": toggleCA_dark_time_init,
             },
         )
 
@@ -537,15 +608,16 @@ def ECHE_CA_led(
 
     return pl.experiment_plan_list  # returns complete experiment list
 
+
 def ECHE_CV_led(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
-    reservoir_bubbler_gas: str = "O2",
-    ph: float = 9.53,
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    solution_bubble_gas: str = "O2",
+    solution_ph: float = 9.53,
+    measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
     ref_vs_nhe: float = 0.21,
     CV_Vinit_vsRHE: float = 1.23,
@@ -556,15 +628,16 @@ def ECHE_CV_led(
     CV_samplerate_mV: float = 1,
     CV_cycles: int = 1,
     IErange: str = "auto",
-    led_typenamesdate: list = ["led"],
-    led_wavelengths_nm: list = [0],
-    led_intensities_mw: list = [0],
-    led_number_CV: int = 1,
-    toggle_onCV_ms: float = 2000,
-    toggle_offCV_ms: float = 1000,
-    toggle_offsetCV_ms: float = 0,
-    toggle_durationCV_ms: float = -1,
-    
+    led_type: str = "front",
+    led_date: str = "01/01/2000",
+    led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
+    led_wavelengths_nm: list = [385, 450, 515, 595],
+    led_intensities_mw: list = [-1, -1, -1, -1],
+    led_name_CV: str = "doric_led1",
+    toggleCV_illum_duty: float = 0.667,
+    toggleCV_illum_period: float = 3.0,
+    toggleCV_dark_time_init: float = 0,
+    toggleCV_illum_time: float = -1,
 ):
 
     pl = ExperimentPlanMaker()
@@ -581,11 +654,11 @@ def ECHE_CV_led(
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
+                "solution_bubble_gas": solution_bubble_gas,
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
-        
+
         # CV1
         pl.add_experiment(
             "ECHE_slave_CV_led",
@@ -598,21 +671,24 @@ def ECHE_CV_led(
                 "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
                 "cycles": CV_cycles,
                 "IErange": IErange,
-                "ph": ph,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
-                "reservoir_bubbler_gas": reservoir_bubbler_gas,
-                "droplet_size_cm2": droplet_size_cm2,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
-                "led": led_typenamesdate[led_number_CV],
-                "wavelength_nm": led_wavelengths_nm[led_number_CV],
-                "wavelength_intensity_mw": led_intensities_mw[led_number_CV],
-                "wavelength_intensity_date": led_typenamesdate[5],
-                "led_side_illumination": led_typenamesdate[0],
-                "toggle_on_ms": toggle_onCV_ms,
-                "toggle_off_ms": toggle_offCV_ms,
-                "toggle_offset_ms": toggle_offsetCV_ms,
-                "toggle_duration_ms": toggle_durationCV_ms,
+                "illumination_source": led_name_CV,
+                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CV)],
+                "illumination_intensity": led_intensities_mw[
+                    led_names.index(led_name_CV)
+                ],
+                "illumination_intensity_date": led_date,
+                "led_side_illumination": led_type,
+                "toggle_illum_duty": toggleCV_illum_duty,
+                "toggle_illum_period": toggleCV_illum_period,
+                "toggle_illum_time": toggleCV_illum_time,
+                "toggle_dark_time_init": toggleCV_dark_time_init,
             },
         )
 
@@ -620,77 +696,19 @@ def ECHE_CV_led(
 
     return pl.experiment_plan_list  # returns complete experiment list
 
-
-def ECHE_background(
-    sequence_version: int = 1,
-    plate_id: int = 1,
-    plate_sample_no_list: list = [2],
-    reservoir_electrolyte: Electrolyte = "SLF10",
-    reservoir_liquid_sample_no: int = 1,
-    liquid_volume_ml: float = 1.0,
-    ref_vs_nhe: float = 0.21,
-    CP_current: float = 0,
-    background_duration_sec: float = 15,
-    IErange: str = "auto",
-    CP_samplerate_sec: float = 0.05,
-    toggle_on_ms: float = 1000,
-    toggle_off_ms: float = 0,
-    toggle_offset_ms: float = 0,
-    toggle_duration_ms: float = -1,
-
-):
-
-    pl = ExperimentPlanMaker()
-
-    # (1) house keeping
-    pl.add_experiment("ECHE_slave_unloadall_customs", {})
-
-    for plate_sample in plate_sample_no_list:
-
-        pl.add_experiment(
-            "ECHE_slave_startup",
-            {
-                "solid_custom_position": "cell1_we",
-                "solid_plate_id": plate_id,
-                "solid_sample_no": plate_sample,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-#                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
-                "liquid_volume_ml": liquid_volume_ml,
-            },
-        )
-        # CP1
-        pl.add_experiment(
-            "ECHE_slave_background",
-            {
-                "CP_current": CP_current,
-                "ref_vs_nhe": ref_vs_nhe,
-                "samplerate_sec": CP_samplerate_sec,
-                "background_duration_sec": background_duration_sec,
-                "IErange": IErange,
-                "toggle_on_ms": toggle_on_ms,
-                "toggle_off_ms": toggle_off_ms,
-                "toggle_offset_ms": toggle_offset_ms,
-                "toggle_duration_ms": toggle_duration_ms,
-            },
-        )
-
-        pl.add_experiment("ECHE_slave_shutdown", {})
-
-    return pl.experiment_plan_list  # returns complete experiment list
 
 def ECHE_CP(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
-    reservoir_bubbler_gas: str = "O2",
-    ph: float = 9.53,
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    solution_bubble_gas: str = "O2",
+    solution_ph: float = 9.53,
+    measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
-    reference_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
-    CP_current: float = .000001,
+    CP_current: float = 0.000001,
     CP_duration_sec: float = 4,
     CP_samplerate_sec: float = 0.05,
     IErange: str = "auto",
@@ -710,7 +728,7 @@ def ECHE_CP(
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
+                "solution_bubble_gas": solution_bubble_gas,
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
@@ -719,11 +737,12 @@ def ECHE_CP(
         pl.add_experiment(
             "ECHE_slave_CP",
             {
-                "CP_current" : CP_current,
-                "ph": ph,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
-                "reservoir_bubbler_gas": reservoir_bubbler_gas,
-                "droplet_size_cm2": droplet_size_cm2,
+                "CP_current": CP_current,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CP_samplerate_sec,
@@ -732,36 +751,36 @@ def ECHE_CP(
             },
         )
 
-
         pl.add_experiment("ECHE_slave_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
+
 def ECHE_CP_led(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
-    reservoir_bubbler_gas: str = "O2",
-    ph: float = 9.53,
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    solution_bubble_gas: str = "O2",
+    solution_ph: float = 9.53,
+    measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
-    reference_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
-    CP_current: float = .000001,
+    CP_current: float = 0.000001,
     CP_duration_sec: float = 15,
     CP_samplerate_sec: float = 0.05,
     IErange: str = "auto",
-    led_number_CP: int = 1,
-    led_typenamesdate: list = ["led"],
-    led_wavelengths_nm: list = [0],
-    led_intensities_mw: list = [0],
-    toggle_onCP_ms: float = 500,
-    toggle_offCP_ms: float = 500,
-    toggle_offsetCP_ms: float = 0,
-    toggle_durationCP_ms: float = -1,
-
+    led_name_CP: str = "doric_led1",
+    led_type: str = "front",
+    led_date: str = "01/01/2000",
+    led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
+    led_wavelengths_nm: list = [385, 450, 515, 595],
+    led_intensities_mw: list = [-1, -1, -1, -1],
+    toggleCP_illum_duty: float = 0.5,
+    toggleCP_illum_period: float = 1.0,
+    toggleCP_dark_time_init: float = 0.0,
+    toggleCP_illum_time: float = -1,
 ):
 
     pl = ExperimentPlanMaker()
@@ -778,7 +797,7 @@ def ECHE_CP_led(
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
+                "solution_bubble_gas": solution_bubble_gas,
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
@@ -787,24 +806,27 @@ def ECHE_CP_led(
             "ECHE_slave_CP_led",
             {
                 "CP_current": CP_current,
-                "ph": ph,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
-                "reservoir_bubbler_gas": reservoir_bubbler_gas,
-                "droplet_size_cm2": droplet_size_cm2,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CP_samplerate_sec,
                 "CP_duration_sec": CP_duration_sec,
                 "IErange": IErange,
-                "led": led_typenamesdate[led_number_CP],
-                "wavelength_nm": led_wavelengths_nm[led_number_CP],
-                "wavelength_intensity_mw": led_intensities_mw[led_number_CP],
-                "wavelength_intensity_date": led_typenamesdate[5],
-                "led_side_illumination": led_typenamesdate[0],
-                "toggle_on_ms": toggle_onCP_ms,
-                "toggle_off_ms": toggle_offCP_ms,
-                "toggle_offset_ms": toggle_offsetCP_ms,
-                "toggle_duration_ms": toggle_durationCP_ms,
+                "illumination_source": led_name_CP,
+                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CP)],
+                "illumination_intensity": led_intensities_mw[
+                    led_names.index(led_name_CP)
+                ],
+                "illumination_intensity_date": led_date,
+                "led_side_illumination": led_type,
+                "toggle_illum_duty": toggleCP_illum_duty,
+                "toggle_illum_period": toggleCP_illum_period,
+                "toggle_illum_time": toggleCP_illum_time,
+                "toggle_dark_time_init": toggleCP_dark_time_init,
             },
         )
 
@@ -812,59 +834,16 @@ def ECHE_CP_led(
 
     return pl.experiment_plan_list  # returns complete experiment list
 
-def ECHE_movetosample(
-    sequence_version: int = 1,
-    plate_id: int = 1,
-    plate_sample_no: int = 1,
-
-):
-
-    pl = ExperimentPlanMaker()
-
-
-    pl.add_experiment(
-        "ECHE_slave_movetosample",
-        {
-#            "solid_custom_position": "cell1_we",
-            "solid_plate_id": plate_id,
-            "solid_sample_no": plate_sample_no,
-        },
-    )
-
-    pl.add_experiment("ECHE_slave_shutdown", {})
-
-    return pl.experiment_plan_list  # returns complete experiment list
-
-def ECHE_move(
-    sequence_version: int = 1,
-    move_x_mm: float = 1.0,
-    move_y_mm: float = 1.0,
-):
-
-    pl = ExperimentPlanMaker()
-
-
-    pl.add_experiment(
-        "ECHE_slave_move",
-        {
-            "x_mm": move_x_mm,
-            "y_mm": move_y_mm,
-        },
-    )
-
-    pl.add_experiment("ECHE_slave_shutdown", {})
-
-    return pl.experiment_plan_list  # returns complete experiment list
 
 def ECHE_CV_led_spectrometer(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
-    reservoir_bubbler_gas: str = "O2",
-    ph: float = 9.53,
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    solution_bubble_gas: str = "O2",
+    solution_ph: float = 9.53,
+    measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
     ref_vs_nhe: float = 0.21,
     CV_Vinit_vsRHE: float = 1.23,
@@ -875,20 +854,20 @@ def ECHE_CV_led_spectrometer(
     CV_samplerate_mV: float = 1,
     CV_cycles: int = 1,
     IErange: str = "auto",
-    led_typenamesdate: list = ["led"],
-    led_wavelengths_nm: list = [0],
-    led_intensities_mw: list = [0],
-    led_number_CV: int = 1,
-    toggle_onCV_ms: float = 2000,
-    toggle_offCV_ms: float = 1000,
-    toggle_offsetCV_ms: float = 0,
-    toggle_duration_ms: float = -1,
-    toggle_two_on_ms: float = 100,
-    toggle_two_off_ms: float = 500,
-    toggle_two_offset_ms: float = 0,
-    toggle_two_duration_ms: float = -1,
-
-    
+    led_type: str = "front",
+    led_date: str = "01/01/2000",
+    led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
+    led_wavelengths_nm: list = [385, 450, 515, 595],
+    led_intensities_mw: list = [-1, -1, -1, -1],
+    led_name_CV: str = "doric_led1",
+    toggleCV_illum_duty: float = 0.667,
+    toggleCV_illum_period: float = 3.0,
+    toggleCV_dark_time_init: float = 0,
+    toggleCV_illum_time: float = -1,
+    toggleSpec_duty: float = 0.167,
+    toggleSpec_period: float = 0.6,
+    toggleSpec_init_delay: float = 0.0,
+    toggleSpec_time: float = -1,
 ):
 
     pl = ExperimentPlanMaker()
@@ -905,11 +884,11 @@ def ECHE_CV_led_spectrometer(
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
+                "solution_bubble_gas": solution_bubble_gas,
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
-        
+
         # CV1
         pl.add_experiment(
             "ECHE_slave_CV_led_secondtrigger",
@@ -922,28 +901,28 @@ def ECHE_CV_led_spectrometer(
                 "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
                 "cycles": CV_cycles,
                 "IErange": IErange,
-                "ph": ph,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
-                "reservoir_bubbler_gas": reservoir_bubbler_gas,
-                "droplet_size_cm2": droplet_size_cm2,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
-                "led": led_typenamesdate[led_number_CV],
-                "wavelength_nm": led_wavelengths_nm[led_number_CV],
-                "wavelength_intensity_mw": led_intensities_mw[led_number_CV],
-                "wavelength_intensity_date": led_typenamesdate[5],
-                "led_side_illumination": led_typenamesdate[0],
-                "toggle_on_ms": toggle_onCV_ms,
-                "toggle_off_ms": toggle_offCV_ms,
-                "toggle_offset_ms": toggle_offsetCV_ms,
-                "toggle_duration_ms": toggle_duration_ms,
-                "toggle_two_on_ms": toggle_two_on_ms,
-                "toggle_two_off_ms": toggle_two_off_ms,
-                "toggle_two_offset_ms": toggle_two_offset_ms,
-                "toggle_two_duration_ms": toggle_two_duration_ms,
-
-
-
+                "illumination_source": led_name_CV,
+                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CV)],
+                "illumination_intensity": led_intensities_mw[
+                    led_names.index(led_name_CV)
+                ],
+                "illumination_intensity_date": led_date,
+                "led_side_illumination": led_type,
+                "toggle_illum_duty": toggleCV_illum_duty,
+                "toggle_illum_period": toggleCV_illum_period,
+                "toggle_illum_time": toggleCV_illum_time,
+                "toggle_dark_time_init": toggleCV_dark_time_init,
+                "toggle2_duty": toggleSpec_duty,
+                "toggle2_period": toggleSpec_period,
+                "toggle2_init_delay": toggleSpec_init_delay,
+                "toggle2_time": toggleSpec_time,
             },
         )
 
@@ -951,33 +930,36 @@ def ECHE_CV_led_spectrometer(
 
     return pl.experiment_plan_list  # returns complete experiment list
 
+
 def ECHE_CA_led_spectrometer(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
-    reservoir_bubbler_gas: str = "O2",
-    ph: float = 9.53,
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    solution_bubble_gas: str = "O2",
+    solution_ph: float = 9.53,
+    measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
     ref_vs_nhe: float = 0.21,
     CA_potential_vsRHE: float = 1.23,
     CA_duration_sec: float = 15,
     CA_samplerate_sec: float = 0.05,
     IErange: str = "auto",
-    led_typenamesdate: list = ["led"],
-    led_wavelengths_nm: list = [0],
-    led_intensities_mw: list = [0],
-    led_number_CA: int = 1,
-    toggle_onCA_ms: float = 500,
-    toggle_offCA_ms: float = 500,
-    toggle_offsetCA_ms: float = 0,
-    toggle_durationCA_ms: float = -1,
-    toggle_two_on_ms: float = 100,
-    toggle_two_off_ms: float = 500,
-    toggle_two_offset_ms: float = 0,
-    toggle_two_duration_ms: float = -1,
+    led_type: str = "front",
+    led_date: str = "01/01/2000",
+    led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
+    led_wavelengths_nm: list = [385, 450, 515, 595],
+    led_intensities_mw: list = [-1, -1, -1, -1],
+    led_name_CA: str = "doric_led1",
+    toggleCA_illum_duty: float = 0.5,
+    toggleCA_illum_period: float = 1.0,
+    toggleCA_dark_time_init: float = 0,
+    toggleCA_illum_time: float = -1,
+    toggleSpec_duty: float = 0.167,
+    toggleSpec_period: float = 0.6,
+    toggleSpec_init_delay: float = 0.0,
+    toggleSpec_time: float = -1,
 ):
 
     pl = ExperimentPlanMaker()
@@ -994,7 +976,7 @@ def ECHE_CA_led_spectrometer(
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
+                "solution_bubble_gas": solution_bubble_gas,
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
@@ -1003,28 +985,31 @@ def ECHE_CA_led_spectrometer(
             "ECHE_slave_CA_led_secondtrigger",
             {
                 "CA_potential_vsRHE": CA_potential_vsRHE,
-                "ph": ph,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
-                "reservoir_bubbler_gas": reservoir_bubbler_gas,
-                "droplet_size_cm2": droplet_size_cm2,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA_duration_sec,
                 "IErange": IErange,
-                "led": led_typenamesdate[led_number_CA],
-                "wavelength_nm": led_wavelengths_nm[led_number_CA],
-                "wavelength_intensity_mw": led_intensities_mw[led_number_CA],
-                "wavelength_intensity_date": led_typenamesdate[5],
-                "led_side_illumination": led_typenamesdate[0],
-                "toggle_on_ms": toggle_onCA_ms,
-                "toggle_off_ms": toggle_offCA_ms,
-                "toggle_offset_ms": toggle_offsetCA_ms,
-                "toggle_duration_ms": toggle_durationCA_ms,
-                "toggle_two_on_ms": toggle_two_on_ms,
-                "toggle_two_off_ms": toggle_two_off_ms,
-                "toggle_two_offset_ms": toggle_two_offset_ms,
-                "toggle_two_duration_ms": toggle_two_duration_ms,
+                "illumination_source": led_name_CA,
+                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA)],
+                "illumination_intensity": led_intensities_mw[
+                    led_names.index(led_name_CA)
+                ],
+                "illumination_intensity_date": led_date,
+                "led_side_illumination": led_type,
+                "toggle_illum_duty": toggleCA_illum_duty,
+                "toggle_illum_period": toggleCA_illum_period,
+                "toggle_illum_time": toggleCA_illum_time,
+                "toggle_dark_time_init": toggleCA_dark_time_init,
+                "toggle2_duty": toggleSpec_duty,
+                "toggle2_period": toggleSpec_period,
+                "toggle2_init_delay": toggleSpec_init_delay,
+                "toggle2_time": toggleSpec_time,
             },
         )
 
@@ -1032,35 +1017,36 @@ def ECHE_CA_led_spectrometer(
 
     return pl.experiment_plan_list  # returns complete experiment list
 
+
 def ECHE_CP_led_spectrometer(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
-    reservoir_bubbler_gas: str = "O2",
-    ph: float = 9.53,
-    droplet_size_cm2: float = .071,  #3mm diameter droplet
+    solution_bubble_gas: str = "O2",
+    solution_ph: float = 9.53,
+    measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
-    reference_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
-    CP_current: float = .000001,
+    CP_current: float = 0.000001,
     CP_duration_sec: float = 15,
     CP_samplerate_sec: float = 0.05,
     IErange: str = "auto",
-    led_number_CP: int = 1,
-    led_typenamesdate: list = ["led"],
-    led_wavelengths_nm: list = [0],
-    led_intensities_mw: list = [0],
-    toggle_onCP_ms: float = 500,
-    toggle_offCP_ms: float = 500,
-    toggle_offsetCP_ms: float = 0,
-    toggle_durationCP_ms: float = -1,
-    toggle_two_on_ms: float = 100,
-    toggle_two_off_ms: float = 500,
-    toggle_two_offset_ms: float = 0,
-    toggle_two_duration_ms: float = -1,
-
+    led_name_CP: str = "doric_led1",
+    led_type: str = "front",
+    led_date: str = "01/01/2000",
+    led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
+    led_wavelengths_nm: list = [385, 450, 515, 595],
+    led_intensities_mw: list = [-1, -1, -1, -1],
+    toggleCP_illum_duty: float = 0.5,
+    toggleCP_illum_period: float = 1.0,
+    toggleCP_dark_time_init: float = 0.0,
+    toggleCP_illum_time: float = -1,
+    toggleSpec_duty: float = 0.167,
+    toggleSpec_period: float = 0.6,
+    toggleSpec_init_delay: float = 0.0,
+    toggleSpec_time: float = -1,
 ):
 
     pl = ExperimentPlanMaker()
@@ -1077,7 +1063,7 @@ def ECHE_CP_led_spectrometer(
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "reservoir_bubbler_gas":     reservoir_bubbler_gas,
+                "solution_bubble_gas": solution_bubble_gas,
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
@@ -1086,33 +1072,34 @@ def ECHE_CP_led_spectrometer(
             "ECHE_slave_CP_led_secondtrigger",
             {
                 "CP_current": CP_current,
-                "ph": ph,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no, #currently liquid sample database number
-                "reservoir_bubbler_gas": reservoir_bubbler_gas,
-                "droplet_size_cm2": droplet_size_cm2,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "samplerate_sec": CP_samplerate_sec,
                 "CP_duration_sec": CP_duration_sec,
                 "IErange": IErange,
-                "led": led_typenamesdate[led_number_CP],
-                "wavelength_nm": led_wavelengths_nm[led_number_CP],
-                "wavelength_intensity_mw": led_intensities_mw[led_number_CP],
-                "wavelength_intensity_date": led_typenamesdate[5],
-                "led_side_illumination": led_typenamesdate[0],
-                "toggle_on_ms": toggle_onCP_ms,
-                "toggle_off_ms": toggle_offCP_ms,
-                "toggle_offset_ms": toggle_offsetCP_ms,
-                "toggle_duration_ms": toggle_durationCP_ms,
-                "toggle_two_on_ms": toggle_two_on_ms,
-                "toggle_two_off_ms": toggle_two_off_ms,
-                "toggle_two_offset_ms": toggle_two_offset_ms,
-                "toggle_two_duration_ms": toggle_two_duration_ms,
+                "illumination_source": led_name_CP,
+                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CP)],
+                "illumination_intensity": led_intensities_mw[
+                    led_names.index(led_name_CP)
+                ],
+                "illumination_intensity_date": led_date,
+                "led_side_illumination": led_type,
+                "toggle_illum_duty": toggleCP_illum_duty,
+                "toggle_illum_period": toggleCP_illum_period,
+                "toggle_illum_time": toggleCP_illum_time,
+                "toggle_dark_time_init": toggleCP_dark_time_init,
+                "toggle2_duty": toggleSpec_duty,
+                "toggle2_period": toggleSpec_period,
+                "toggle2_init_delay": toggleSpec_init_delay,
+                "toggle2_time": toggleSpec_time,
             },
         )
 
         pl.add_experiment("ECHE_slave_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
-
-
