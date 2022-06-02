@@ -1,4 +1,7 @@
 #tgl{subthread};
+    IF ({t_duration}=0);
+        EN;
+    ENDIF;
     req = 0;
     IF ({p_output}={r_output});
         req = 1;
