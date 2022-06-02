@@ -173,7 +173,7 @@ async def galil_dyn_endpoints(app=None):
                     !!! toggle cycle is ON/OFF !!!"""
                 active = await app.base.setup_and_contain_action()
 
-                datadict = await app.driver.set_digital_cycles(
+                datadict = await app.driver.set_digital_cycle(
                     **active.action.action_params
                 )
                 active.action.error_code = datadict.get(
@@ -192,7 +192,7 @@ async def galil_dyn_endpoints(app=None):
             ):
                 active = await app.base.setup_and_contain_action()
 
-                datadict = await app.driver.stop_digital_cycles()
+                datadict = await app.driver.stop_digital_cycle()
                 active.action.error_code = datadict.get(
                     "error_code", ErrorCodes.unspecified
                 )
