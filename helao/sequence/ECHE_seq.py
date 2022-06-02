@@ -156,7 +156,7 @@ def ECHE_4CA_led_1CV_led(
                     led_names.index(led_name_CA1)
                 ],
                 "illumination_intensity_date": led_date,
-                "led_side_illumination": led_type,
+                "illumination_side": led_type,
                 "toggle_illum_duty": toggleCA_illum_duty,
                 "toggle_illum_period": toggleCA_illum_period,
                 "toggle_illum_time": toggleCA_illum_time,
@@ -184,7 +184,7 @@ def ECHE_4CA_led_1CV_led(
                     led_names.index(led_name_CA2)
                 ],
                 "illumination_intensity_date": led_date,
-                "led_side_illumination": led_type,
+                "illumination_side": led_type,
                 "toggle_illum_duty": toggleCA_illum_duty,
                 "toggle_illum_period": toggleCA_illum_period,
                 "toggle_illum_time": toggleCA_illum_time,
@@ -212,7 +212,7 @@ def ECHE_4CA_led_1CV_led(
                     led_names.index(led_name_CA3)
                 ],
                 "illumination_intensity_date": led_date,
-                "led_side_illumination": led_type,
+                "illumination_side": led_type,
                 "toggle_illum_duty": toggleCA_illum_duty,
                 "toggle_illum_period": toggleCA_illum_period,
                 "toggle_illum_time": toggleCA_illum_time,
@@ -240,7 +240,7 @@ def ECHE_4CA_led_1CV_led(
                     led_names.index(led_name_CA4)
                 ],
                 "illumination_intensity_date": led_date,
-                "led_side_illumination": led_type,
+                "illumination_side": led_type,
                 "toggle_illum_duty": toggleCA_illum_duty,
                 "toggle_illum_period": toggleCA_illum_period,
                 "toggle_illum_time": toggleCA_illum_time,
@@ -273,7 +273,7 @@ def ECHE_4CA_led_1CV_led(
                     led_names.index(led_name_CV)
                 ],
                 "illumination_intensity_date": led_date,
-                "led_side_illumination": led_type,
+                "illumination_side": led_type,
                 "toggle_illum_duty": toggleCV_illum_duty,
                 "toggle_illum_period": toggleCV_illum_period,
                 "toggle_illum_time": toggleCV_illum_time,
@@ -596,7 +596,7 @@ def ECHE_CA_led(
                     led_names.index(led_name_CA)
                 ],
                 "illumination_intensity_date": led_date,
-                "led_side_illumination": led_type,
+                "illumination_side": led_type,
                 "toggle_illum_duty": toggleCA_illum_duty,
                 "toggle_illum_period": toggleCA_illum_period,
                 "toggle_illum_time": toggleCA_illum_time,
@@ -684,7 +684,7 @@ def ECHE_CV_led(
                     led_names.index(led_name_CV)
                 ],
                 "illumination_intensity_date": led_date,
-                "led_side_illumination": led_type,
+                "illumination_side": led_type,
                 "toggle_illum_duty": toggleCV_illum_duty,
                 "toggle_illum_period": toggleCV_illum_period,
                 "toggle_illum_time": toggleCV_illum_time,
@@ -822,7 +822,7 @@ def ECHE_CP_led(
                     led_names.index(led_name_CP)
                 ],
                 "illumination_intensity_date": led_date,
-                "led_side_illumination": led_type,
+                "illumination_side": led_type,
                 "toggle_illum_duty": toggleCP_illum_duty,
                 "toggle_illum_period": toggleCP_illum_period,
                 "toggle_illum_time": toggleCP_illum_time,
@@ -914,7 +914,7 @@ def ECHE_CV_led_spectrometer(
                     led_names.index(led_name_CV)
                 ],
                 "illumination_intensity_date": led_date,
-                "led_side_illumination": led_type,
+                "illumination_side": led_type,
                 "toggle_illum_duty": toggleCV_illum_duty,
                 "toggle_illum_period": toggleCV_illum_period,
                 "toggle_illum_time": toggleCV_illum_time,
@@ -1001,7 +1001,7 @@ def ECHE_CA_led_spectrometer(
                     led_names.index(led_name_CA)
                 ],
                 "illumination_intensity_date": led_date,
-                "led_side_illumination": led_type,
+                "illumination_side": led_type,
                 "toggle_illum_duty": toggleCA_illum_duty,
                 "toggle_illum_period": toggleCA_illum_period,
                 "toggle_illum_time": toggleCA_illum_time,
@@ -1088,7 +1088,7 @@ def ECHE_CP_led_spectrometer(
                     led_names.index(led_name_CP)
                 ],
                 "illumination_intensity_date": led_date,
-                "led_side_illumination": led_type,
+                "illumination_side": led_type,
                 "toggle_illum_duty": toggleCP_illum_duty,
                 "toggle_illum_period": toggleCP_illum_period,
                 "toggle_illum_time": toggleCP_illum_time,
