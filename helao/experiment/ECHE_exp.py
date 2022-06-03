@@ -430,17 +430,20 @@ def ECHE_slave_CV_led(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     CV_duration_sec = (
+        abs(apm.pars.Vapex1_vsRHE - apm.pars.Vinit_vsRHE) / apm.pars.samplerate_sec
+    )
+    CV_duration_sec += (
         abs(apm.pars.Vfinal_vsRHE - apm.pars.Vapex2_vsRHE) / apm.pars.samplerate_sec
     )
     CV_duration_sec += (
-        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE) / apm.pars.samplerate_sec
+        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE) / apm.pars.samplerate_sec * apm.pars.cycles
     )
     CV_duration_sec += (
-        abs(apm.pars.Vapex1_vsRHE - apm.pars.Vinit_vsRHE) / apm.pars.samplerate_sec
+        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE) / apm.pars.samplerate_sec * 2.0 * (apm.pars.cycles - 1)
     )
 
     if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = CV_duration_sec * apm.pars.cycles
+        apm.pars.toggle_illum_time = CV_duration_sec 
 
     # get sample for gamry
     apm.add_action(
@@ -882,13 +885,16 @@ def ECHE_slave_CV_led_secondtrigger(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     CV_duration_sec = (
+        abs(apm.pars.Vapex1_vsRHE - apm.pars.Vinit_vsRHE) / apm.pars.samplerate_sec
+    )
+    CV_duration_sec += (
         abs(apm.pars.Vfinal_vsRHE - apm.pars.Vapex2_vsRHE) / apm.pars.samplerate_sec
     )
     CV_duration_sec += (
-        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE) / apm.pars.samplerate_sec
+        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE) / apm.pars.samplerate_sec * apm.pars.cycles
     )
     CV_duration_sec += (
-        abs(apm.pars.Vapex1_vsRHE - apm.pars.Vinit_vsRHE) / apm.pars.samplerate_sec
+        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE) / apm.pars.samplerate_sec * 2.0 * (apm.pars.cycles - 1)
     )
 
     if int(round(apm.pars.toggle_illum_time)) == -1:
