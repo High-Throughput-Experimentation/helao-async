@@ -10,7 +10,7 @@ config['dummy'] = True
 # lists from input decision_id grouping
 # config["action_libraries"] = ["lisa_eche_demo"]
 config["experiment_libraries"] = ["lisa_ANEC2"]
-config["technique_name"] = "rosdev"
+config["run_type"] = "rosdev"
 config["root"] = r"C:\INST_dev2\RUNS"
 
 

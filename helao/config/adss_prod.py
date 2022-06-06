@@ -9,7 +9,7 @@ config = {}
 # lists from input experiment_id grouping
 config["experiment_libraries"] = ["ADSS_exp", "samples_exp"]
 config["sequence_libraries"] = ["ADSS_seq"]
-config["technique_name"] = "adss"
+config["run_type"] = "adss"
 config["root"] = r"C:\INST"
 
 

@@ -10,7 +10,7 @@ config['dummy'] = True
 # lists from input experiment_id grouping
 config["experiment_libraries"] = ["ECHE_exp", "samples_exp"]
 config["sequence_libraries"] = ["ECHE_seq"]
-config["technique_name"] = "eche"
+config["run_type"] = "eche"
 config["root"] = r"C:\INST_dev2"
 
 
