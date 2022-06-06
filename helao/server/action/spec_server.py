@@ -7,13 +7,16 @@ are the preferred method for synchronizing spectral capture with illumination so
 
 __all__ = ["makeApp"]
 
-from typing import Optional
+from typing import Optional, List
 from fastapi import Body
 from helaocore.schema import Action
 from helaocore.server.base import makeActionServ
+from helaocore.model.sample import SampleUnion
+from helaocore.model.file import HloHeaderModel
 from helao.driver.spec.spectral_products import SM303
 from helaocore.helper.config_loader import config_loader
 
+from helao.driver.io.enum import TriggerType
 
 def makeApp(confPrefix, servKey, helao_root):
 
@@ -28,34 +31,55 @@ def makeApp(confPrefix, servKey, helao_root):
         driver_class=SM303,
     )
 
-    @app.post(f"/{servKey}/measure_spec")
-    async def measure_spec(
+    @app.post(f"/{servKey}/acquire_spec")
+    async def acquire_spec(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
+        fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
         int_time: Optional[int] = 35,
     ):
-        """Measure single spectrum."""
-        app.base.print_message("!!! Starting measure_spec action.")
-        active = await app.base.setup_and_contain_action(action_abbr="OPT")
-        app.base.print_message("!!! Measure_spec action is active.")
-        pars = {k:v for k,v in active.action.action_params.items() if k!='action_version'}
-        spectrum = app.driver.measure_spec(**pars)
+        """Acquire single spectrum."""
+        app.base.print_message("!!! Starting acquire_spec action.")
+        spec_header = {"wl": app.driver.pxwl}
+        active = await app.base.setup_and_contain_action(action_abbr="OPT", hloheader=HloHeaderModel(optional=spec_header))
+        app.base.print_message("!!! acquire_spec action is active.")
+        specdict = app.driver.acquire_spec_adv(**active.action.action_params)
+        await active.enqueue_data_dflt(datadict=specdict)
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{servKey}/measure_spec_adv")
-    async def measure_spec_adv(
+    @app.post(f"/{servKey}/acquire_spec_adv")
+    async def acquire_spec_adv(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
+        fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
         int_time: Optional[int] = 35,
         n_avg: Optional[int] = 1,
         fft: Optional[int] = 0,
     ):
-        """Measure single spectrum."""
-        active = await app.base.setup_and_contain_action(action_abbr="OPT")
-        pars = {k:v for k,v in active.action.action_params.items() if k!='action_version'}
-        spectrum = app.driver.measure_spec_adv(**pars)
+        """Acquire N spectra and average."""
+        spec_header = {"wl": app.driver.pxwl}
+        active = await app.base.setup_and_contain_action(action_abbr="OPT", hloheader=HloHeaderModel(optional=spec_header))
+        specdict = app.driver.acquire_spec_adv(**active.action.action_params)
+        await active.enqueue_data_dflt(datadict=specdict)
         finished_act = await active.finish()
         return finished_act.as_dict()
+
+    @app.post(f"/{servKey}/acquire_spec_extrig")
+    async def acquire_spec_extrig(
+        action: Optional[Action] = Body({}, embed=True),
+        action_version: int = 1,
+        fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
+        edge_mode: Optional[TriggerType] = TriggerType.risingedge,
+        int_time: Optional[int] = 35,
+        n_avg: Optional[int] = 1,
+        fft: Optional[int] = 0,
+        duration: Optional[float] = -1,
+    ):
+        """Acquire spectra based on external trigger."""
+        A = await app.base.setup_action()
+        A.action_abbr = "OPT"
+        active_dict = app.driver.acquire_spec_extrig(A)
+        return active_dict
 
     return app
