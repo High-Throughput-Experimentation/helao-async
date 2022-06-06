@@ -279,9 +279,11 @@ class Galil:
             valid_trig = True
             trigger_port = self.dev_di[trigger_name]
             if triggertype == TriggerType.risingedge:
-                trigger_port = trigger_port
+                trigger_port_on = trigger_port
+                trigger_port_off = -trigger_port
             elif triggertype == TriggerType.fallingedge:
-                trigger_port = -trigger_port
+                trigger_port_on = -trigger_port
+                trigger_port_off = trigger_port
 
         if (
             valid_trig
@@ -361,7 +363,7 @@ class Galil:
         mainlines.pop(haltindex)
         haltline = "    " + "".join([f"HX{i+1};" for i in range(len(out_ports))])
         mainlines.insert(haltindex, haltline)
-        prog_parts = ["\n".join(mainlines).format(p_trigger=trigger_port)] + [
+        prog_parts = ["\n".join(mainlines).format(p_trigger_on=trigger_port_on, p_trigger_off=trigger_port_off)] + [
             subprog.format(
                 subthread=i + 1,
                 p_output=out_ports[i],
