@@ -1,6 +1,6 @@
 from enum import Enum
 
 
-class TriggerType(str, Enum):
-    risingedge = "risingedge"
-    fallingedge = "fallingedge"
+class TriggerType(int, Enum):
+    fallingedge = 0
+    risingedge = 1
