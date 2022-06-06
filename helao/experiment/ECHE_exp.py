@@ -300,7 +300,7 @@ def ECHE_slave_CA_led(
         - 1.0 * apm.pars.ref_vs_nhe
         - 0.059 * apm.pars.solution_ph
     )
-    print(f"ADSS_slave_CA potential: {potential}")
+    print(f"ECHE_slave_CA potential: {potential}")
     apm.add_action(
         {
             "action_server": PSTAT_server,
@@ -315,6 +315,7 @@ def ECHE_slave_CA_led(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "technique": "CA",
             "process_finish": True,
             "process_contrib": [
                 ProcessContrib.files,
@@ -368,7 +369,7 @@ def ECHE_slave_CA(
         - 1.0 * apm.pars.ref_vs_nhe
         - 0.059 * apm.pars.solution_ph
     )
-    print(f"ADSS_slave_CA potential: {potential}")
+    print(f"ECHE_slave_CA potential: {potential}")
     apm.add_action(
         {
             "action_server": PSTAT_server,
@@ -383,6 +384,7 @@ def ECHE_slave_CA(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "technique": "CA",
             "process_finish": True,
             "process_contrib": [
                 ProcessContrib.files,
@@ -513,6 +515,7 @@ def ECHE_slave_CV_led(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "technique": "CV",
             "process_finish": True,
             "process_contrib": [
                 ProcessContrib.files,
@@ -593,6 +596,7 @@ def ECHE_slave_CV(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "technique": "CV",
             "process_finish": True,
             "process_contrib": [
                 ProcessContrib.files,
@@ -644,7 +648,7 @@ def ECHE_slave_CP(
     #   potential = (
     #        apm.pars.CA_potential_vsRHE - 1.0 * apm.pars.ref_vs_nhe - 0.059 * apm.pars.solution_ph
     #    )
-    #    print(f"ADSS_slave_CA potential: {potential}")
+    #    print(f"ECHE_slave_CA potential: {potential}")
     apm.add_action(
         {
             "action_server": PSTAT_server,
@@ -659,6 +663,7 @@ def ECHE_slave_CP(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "technique": "CP",
             "process_finish": True,
             "process_contrib": [
                 ProcessContrib.files,
@@ -757,6 +762,7 @@ def ECHE_slave_CP_led(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "technique": "CP",
             "process_finish": True,
             "process_contrib": [
                 ProcessContrib.files,
@@ -976,6 +982,7 @@ def ECHE_slave_CV_led_secondtrigger(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "technique": "CV",
             "process_finish": True,
             "process_contrib": [
                 ProcessContrib.files,
@@ -1079,7 +1086,7 @@ def ECHE_slave_CA_led_secondtrigger(
         - 1.0 * apm.pars.ref_vs_nhe
         - 0.059 * apm.pars.solution_ph
     )
-    print(f"ADSS_slave_CA potential: {potential}")
+    print(f"ECHE_slave_CA potential: {potential}")
     apm.add_action(
         {
             "action_server": PSTAT_server,
@@ -1094,6 +1101,7 @@ def ECHE_slave_CA_led_secondtrigger(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "technique": "CA",
             "process_finish": True,
             "process_contrib": [
                 ProcessContrib.files,
@@ -1205,6 +1213,7 @@ def ECHE_slave_CP_led_secondtrigger(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "technique": "CP",
             "process_finish": True,
             "process_contrib": [
                 ProcessContrib.files,
