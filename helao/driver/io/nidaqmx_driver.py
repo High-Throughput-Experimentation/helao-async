@@ -217,7 +217,7 @@ class cNIMAX:
                 self.IO_measuring = True
 
                 if self.FIFO_epoch is None:
-                    self.FIFO_epoch = self.active.set_realtime_nowait()
+                    self.FIFO_epoch = self.active.get_realtime_nowait()
                     # need to correct for the first datapoints
                     self.FIFO_epoch -= number_of_samples / self.samplingrate
                     if self.active:

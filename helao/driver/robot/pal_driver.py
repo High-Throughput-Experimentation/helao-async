@@ -318,7 +318,7 @@ class PAL:
                     new_done = data[2][0]
                     if (new_start ^ prev_start) and new_start:
                         self.IO_trigger_startq.put_nowait(
-                            self.active.set_realtime_nowait()
+                            self.active.get_realtime_nowait()
                         )
                         prev_start = deepcopy(new_start)
                         self.base.print_message(
@@ -329,7 +329,7 @@ class PAL:
 
                     if (new_continue ^ prev_continue) and new_continue:
                         self.IO_trigger_continueq.put_nowait(
-                            self.active.set_realtime_nowait()
+                            self.active.get_realtime_nowait()
                         )
                         prev_continue = deepcopy(new_continue)
                         self.base.print_message(
@@ -341,7 +341,7 @@ class PAL:
 
                     if (new_done ^ prev_done) and new_done:
                         self.IO_trigger_doneq.put_nowait(
-                            self.active.set_realtime_nowait()
+                            self.active.get_realtime_nowait()
                         )
                         prev_done = deepcopy(new_done)
                         self.base.print_message(
@@ -1716,7 +1716,7 @@ class PAL:
             self.base.print_message(f"PAL command: '{cmd_to_execute}'", info=True)
             try:
                 # result = os.system(cmd_to_execute)
-                palcam.joblist_time = self.active.set_realtime_nowait()
+                palcam.joblist_time = self.active.get_realtime_nowait()
                 self.PAL_pid = subprocess.Popen(cmd_to_execute, shell=True)
                 self.base.print_message(f"PAL command send: {self.PAL_pid}")
             except Exception as e:
@@ -1808,7 +1808,7 @@ class PAL:
 
             try:
                 if error is ErrorCodes.none:
-                    palcam.joblist_time = self.active.set_realtime_nowait()
+                    palcam.joblist_time = self.active.get_realtime_nowait()
                     (
                         mysshclient_stdin,
                         mysshclient_stdout,
@@ -2146,7 +2146,7 @@ class PAL:
         if self.active:
             self.active.finish_hlo_header(
                 file_conn_keys=self.active.action.file_conn_keys,
-                realtime=await self.active.set_realtime(),
+                realtime=await self.active.get_realtime(),
             )
 
         self.base.print_message(f"PAL_samples_in: {self.IO_palcam.samples_in}")
