@@ -1,8 +1,8 @@
 #main;
     CB {p_output};
-    AI {p_trigger};
+    AI {p_trigger_on};
     XQ #tgl{subthread},{subthread};
-    AI -{p_trigger};
+    AI {p_trigger_off};
     HX;
     CB {p_output};
 EN;
