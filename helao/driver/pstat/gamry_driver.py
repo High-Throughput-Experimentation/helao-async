@@ -697,7 +697,7 @@ class gamry:
                 self.close_pstat_connection()
                 return {"measure": "run_error"}
 
-            realtime = await self.active.set_realtime()
+            realtime = await self.active.get_realtime()
             if self.active:
                 self.active.finish_hlo_header(
                     realtime=realtime,
@@ -906,7 +906,6 @@ class gamry:
     async def technique_wrapper(
         self, act, measmode, sigfunc, sigfunc_params, samplerate, eta=0.0, setupargs=[]
     ):
-        activeDict = {}
         act.action_etc = eta
         act.error_code = ErrorCodes.none
         samples_in = await self.unified_db.get_samples(act.samples_in)
@@ -916,7 +915,6 @@ class gamry:
             )
             act.samples_in = []
             act.error_code = ErrorCodes.no_sample
-            activeDict = act.as_dict()
 
         if (
             self.pstat
@@ -929,25 +927,22 @@ class gamry:
             act.error_code = await self.open_connection()
 
         elif not self.pstat:
-            activeDict = act.as_dict()
             act.error_code = ErrorCodes.not_initialized
 
         elif not self.IO_do_meas:
-            activeDict = act.as_dict()
             act.error_code = ErrorCodes.in_progress
 
         elif self.base.actionserver.estop:
-            activeDict = act.as_dict()
             act.error_code = ErrorCodes.estop
 
         elif self.IO_measuring:
-            activeDict = act.as_dict()
             act.error_code = ErrorCodes.in_progress
 
         else:
             if act.error_code is ErrorCodes.none:
                 act.error_code = ErrorCodes.not_initialized
-            activeDict = act.as_dict()
+
+        activeDict = act.as_dict()
 
         if act.error_code is ErrorCodes.none:
             # set parameters for IOloop meas
@@ -970,7 +965,6 @@ class gamry:
 
                 self.samples_in = samples_in
                 self.action = act
-                self.action.samples_in = []
 
                 # write header lines with one function call
                 self.FIFO_gamryheader.update(
