@@ -5,7 +5,7 @@ config['dummy'] = True
 # action library provides generator functions which produce actions
 config["experiment_libraries"] = []
 config["sequence_libraries"] = []
-config["technique_name"] = "modelyst_test"
+config["run_type"] = "modelyst_test"
 config["root"] = "/mnt/BIGSTOR/INST"  ### software log and run files saved here
 
 
