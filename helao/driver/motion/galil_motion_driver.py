@@ -220,7 +220,7 @@ class Galil:
             server_key=self.base.server.server_name,
             doc=doc,
             server_title=self.base.server.server_name,
-            description=f"{self.base.technique_name} Aligner",
+            description=f"{self.base.run_type} Aligner",
             version=2.0,
             driver_class=None,
         )
