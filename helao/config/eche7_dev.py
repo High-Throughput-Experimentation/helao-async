@@ -17,7 +17,7 @@ config["sequence_params"] = {
     "led_type": "front",
     "led_date": "3/13/2019",
 }
-config["technique_name"] = "eche"
+config["run_type"] = "eche"
 config["root"] = r"C:\INST_dev2"
 
 

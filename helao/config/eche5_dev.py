@@ -17,7 +17,7 @@ config["sequence_params"] = {
     "led_date": "6/24/2020"
     #           backside 2.27, 1.91, .76, .667   6/29/2021
 }
-config["technique_name"] = "eche"
+config["run_type"] = "eche"
 config["root"] = r"C:\INST_dev2"
 
 

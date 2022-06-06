@@ -5,7 +5,7 @@ config['dummy'] = True
 # action library provides generator functions which produce actions
 config["experiment_libraries"] = ["ANEC_exp", "samples_exp"]
 config["sequence_libraries"] = ["ANEC_seq"]
-config["technique_name"] = "anec"
+config["run_type"] = "anec"
 config["root"] = r"C:\INST_dev2"
 
 
