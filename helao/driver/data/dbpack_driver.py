@@ -225,6 +225,8 @@ class ActYml(HelaoYml):
     def __init__(self, path: Union[HelaoPath, str], **kwargs):
         super().__init__(path, **kwargs)
         self.finisher = self.dict.get("process_finish", False)
+        self.type = self.dict.get("type", "MISSING")
+        self.technique = self.dict.get("technique", "MISSING")
         self.contribs = self.dict.get("process_contrib", False)
 
 
@@ -332,29 +334,33 @@ class ExpYml(HelaoYml):
     def create_process(self, group_idx: int):
         """Create process group from finished actions in progress['meta']."""
         actions = self.grouped_actions[group_idx]
-        base_process = {
+        base_process = {"access": self.dict.get("access", "hte")}
+        base_process.update({
             k: self.dict[k]
             for k in (
                 "orchestrator",
-                "technique_name",
                 "sequence_uuid",
                 "experiment_uuid",
             )
-        }
-        base_process.update({"access": self.dict.get("access", "hte")})
+        })
         new_uuid = gen_uuid()
         base_process.update(
             {
+                "type": actions[-1].type,
+                "technique": actions[-1].technique,
                 "process_timestamp": actions[0].time,
                 "process_group_index": group_idx,
                 "process_uuid": new_uuid,
-                "process_name": actions[-1].name,
                 "action_list": [
                     ShortActionModel(**act.dict)
                     for act in self.grouped_actions[group_idx]
                 ],
             }
         )
+        if base_process['type'] == "MISSING":
+            print_message({}, "DB", f"Process terminating action has no type. Using DB config.")
+        if base_process['technique'] == "MISSING":
+            print_message({}, "DB", f"Process terminating action has no process_name. Using action_name.")
         fill_process = {
             "action_params": self.dict["experiment_params"],
             "samples_in": [],
