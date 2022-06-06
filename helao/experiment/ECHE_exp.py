@@ -34,6 +34,7 @@ from helaocore.model.process_contrib import ProcessContrib
 from helaocore.model.electrolyte import Electrolyte
 
 from helao.driver.motion.enum import MoveModes, TransformationModes
+from helao.driver.io.enum import TriggerType
 from helao.driver.robot.enum import PALtools, Spacingmethod
 
 
@@ -48,7 +49,7 @@ IO_server = MachineModel(server_name="IO", machine_name=gethostname()).json_dict
 ORCH_server = MachineModel(server_name="ORCH", machine_name=gethostname()).json_dict()
 PAL_server = MachineModel(server_name="PAL", machine_name=gethostname()).json_dict()
 
-toggle_triggertype = "fallingedge"
+toggle_triggertype = TriggerType.fallingedge
 
 
 def ECHE_slave_unloadall_customs(experiment: Experiment):

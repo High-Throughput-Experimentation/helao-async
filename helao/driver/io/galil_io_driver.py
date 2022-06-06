@@ -279,9 +279,9 @@ class Galil:
             valid_trig = True
             trigger_port = self.dev_di[trigger_name]
             if triggertype == TriggerType.risingedge:
-                trigger_port = f"{abs(int(trigger_port))}"
+                trigger_port = trigger_port
             elif triggertype == TriggerType.fallingedge:
-                trigger_port = f"-{abs(int(trigger_port))}"
+                trigger_port = -trigger_port
 
         if (
             valid_trig
@@ -350,7 +350,7 @@ class Galil:
         mainlines = mainprog.split("\n")
         subindex = [i for i, x in enumerate(mainlines) if x.strip().startswith("XQ")][0]
         subline = mainlines.pop(subindex)
-        for i in range(len(trigger_port)):
+        for i in range(len(out_ports)):
             mainlines.insert(subindex + i, subline.format(subthread=i + 1))
         clearbits = [i for i, x in enumerate(mainlines) if x.strip().startswith("CB")]
         for i in clearbits:
