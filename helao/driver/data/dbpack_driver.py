@@ -23,7 +23,7 @@ from helaocore.server.base import Base
 from helaocore.model.process import ProcessModel
 from helaocore.model.action import ShortActionModel, ActionModel
 from helaocore.model.experiment import ExperimentModel
-from helaocore.model.experiment_sequence import ExperimentSequenceModel
+from helaocore.model.sequence import SequenceModel
 from helaocore.helper.gen_uuid import gen_uuid
 from helaocore.helper.read_hlo import read_hlo
 from helaocore.helper.print_message import print_message
@@ -33,7 +33,7 @@ from helao.driver.data.enum import YmlType
 modmap = {
     "action": ActionModel,
     "experiment": ExperimentModel,
-    "sequence": ExperimentSequenceModel,
+    "sequence": SequenceModel,
     "process": ProcessModel,
 }
 plural = {
@@ -151,15 +151,15 @@ class HelaoYml:
         yaml = YAML(typ="safe")
         self.dict = yaml.load(self.target)
         # print(f"!!! successfully parsed yml {path}")
-        self.type = self.dict["file_type"]
-        self.uuid = self.dict[f"{self.type}_uuid"]
+        self.file_type = self.dict["file_type"]
+        self.uuid = self.dict[f"{self.file_type}_uuid"]
         # overwrite uuid when test dict is passed by dbp server
         if self.uuid_test is not None:
             if self.target.__str__() not in self.uuid_test.keys():
                 self.uuid_test[self.target.__str__()] = gen_uuid()
             self.uuid = self.uuid_test[self.target.__str__()]
-        self.pkey = HelaoPath(self.dict[f"{self.type}_output_dir"]).stem
-        self.pkey = f"{self.type}--" + self.pkey
+        self.pkey = HelaoPath(self.dict[f"{self.file_type}_output_dir"]).stem
+        self.pkey = f"{self.file_type}--" + self.pkey
         inst_idx = [i for i, p in enumerate(self.target.parts) if "INST" in p]
         if inst_idx:
             inst_idx = inst_idx[0]
@@ -168,7 +168,7 @@ class HelaoYml:
             return False
         self.status = self.target.parts[inst_idx + 1].replace("RUNS_", "")
         self.data_dir = self.target.parent
-        if self.type == "action":
+        if self.file_type == "action":
             self.data_files = [
                 x
                 for x in self.data_dir.glob("*")
@@ -178,7 +178,7 @@ class HelaoYml:
             self.data_files = []
         self.parent_dir = self.data_dir.parent
         syncpath_offset = {"action": -6, "experiment": -6, "sequence": -5}
-        if self.type == "action":
+        if self.file_type == "action":
             exp_parts = list(self.target.parent.parent.parts)
             exp_parts[-5] = "RUNS_SYNCED"
             exp_parts.append("*.progress")
@@ -195,14 +195,14 @@ class HelaoYml:
                 progress_parts = list(HelaoPath(all_exp_paths[0]).parts)
         else:
             progress_parts = list(self.target.parts)
-        progress_parts[syncpath_offset[self.type]] = "RUNS_SYNCED"
+        progress_parts[syncpath_offset[self.file_type]] = "RUNS_SYNCED"
         progress_parts[-1] = progress_parts[-1].replace(".yml", ".progress")
         self.progress_path = HelaoPath(os.path.join(*progress_parts))
         # print(f"!!! Loading progress from {self.progress_path}")
         self.progress = Progress(self)
         # print(f"!!! Successfully loaded progress from {self.progress_path}")
-        if (self.status == "FINISHED") and (self.type != 'experiment'):
-            meta_json = modmap[self.type](**self.dict).clean_dict()
+        if (self.status == "FINISHED") and (self.file_type != 'experiment'):
+            meta_json = modmap[self.file_type](**self.dict).clean_dict()
             meta_json = wrap_sample_details(meta_json)
             for file_dict in meta_json.get("files", []):
                 if file_dict["file_name"].endswith(".hlo"):
@@ -213,19 +213,19 @@ class HelaoYml:
     @property
     def time(self):
         return datetime.strptime(
-            self.dict[f"{self.type}_timestamp"], "%Y-%m-%d %H:%M:%S.%f"
+            self.dict[f"{self.file_type}_timestamp"], "%Y-%m-%d %H:%M:%S.%f"
         )
 
     @property
     def name(self):
-        return self.dict[f"{self.type}_name"]
+        return self.dict[f"{self.file_type}_name"]
 
 
 class ActYml(HelaoYml):
     def __init__(self, path: Union[HelaoPath, str], **kwargs):
         super().__init__(path, **kwargs)
         self.finisher = self.dict.get("process_finish", False)
-        self.type = self.dict.get("type", "MISSING")
+        self.file_type = self.dict.get("type", "MISSING")
         self.technique = self.dict.get("technique", "MISSING")
         self.contribs = self.dict.get("process_contrib", False)
 
@@ -321,7 +321,7 @@ class ExpYml(HelaoYml):
         )
         process_metas = [self.progress[k]["meta"] for k in group_keys]
         if self.status == "FINISHED":
-            meta_json = modmap[self.type](**self.dict).clean_dict()
+            meta_json = modmap[self.file_type](**self.dict).clean_dict()
             meta_json = wrap_sample_details(meta_json)
             for file_dict in meta_json.get("files", []):
                 if file_dict["file_name"].endswith(".hlo"):
@@ -346,7 +346,7 @@ class ExpYml(HelaoYml):
         new_uuid = gen_uuid()
         base_process.update(
             {
-                "type": actions[-1].type,
+                "run_type": actions[-1].dict.get("run_type", "MISSING"),
                 "technique": actions[-1].technique,
                 "process_timestamp": actions[0].time,
                 "process_group_index": group_idx,
@@ -357,7 +357,7 @@ class ExpYml(HelaoYml):
                 ],
             }
         )
-        if base_process['type'] == "MISSING":
+        if base_process['run_type'] == "MISSING":
             print_message({}, "DB", f"Process terminating action has no type. Using DB config.")
         if base_process['technique'] == "MISSING":
             print_message({}, "DB", f"Process terminating action has no process_name. Using action_name.")
@@ -453,7 +453,7 @@ class Progress(UserDict):
                 "ready": False,  # ready to start transfer from FINISHED to SYNCED
                 "done": False,  # same as status=='SYNCED'
                 "meta": None,
-                "type": self.yml.type,
+                "type": self.yml.file_type,
                 "pending": [],
                 "pushed": {},
                 "api": False,
@@ -687,7 +687,7 @@ class DBPack:
             self.base.print_message(f"{hpth} does not exist.", info=True)
             return {}
         _hyml = HelaoYml(hpth)
-        yml_type = _hyml.type
+        yml_type = _hyml.file_type
         if "finished" not in _hyml.dict[f"{yml_type}_status"]:
             self.base.print_message(
                 f"{yml_type} {yml_path_str} is still in progress", info=True
@@ -958,7 +958,7 @@ class YmlOps:
         if isinstance(progress_key, int):  # process group
             meta_type = "process"
         else:
-            meta_type = self.yml.type.lower()
+            meta_type = self.yml.file_type.lower()
         meta_type = pdict["type"]
         p_uuid = pdict["meta"][
             f"{meta_type}_uuid" if isinstance(progress_key, str) else "process_uuid"
