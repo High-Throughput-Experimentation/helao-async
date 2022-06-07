@@ -100,7 +100,7 @@ class SM303:
 
     def set_extedge_mode(self, mode: TriggerType = TriggerType.risingedge):
         cedge_mode = ctypes.c_short(mode)
-        resp = self.spec.spExtEdgeMode(cedge_mode, self.dev_num)
+        resp = self.spec.spSetExtEdgeMode(cedge_mode, self.dev_num)
         if resp == 1:
             self.base.print_message(
                 f"Successfully set ext. trigger edge mode to {str(mode)}"
