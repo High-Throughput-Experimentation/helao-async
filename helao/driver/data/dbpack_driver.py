@@ -225,7 +225,7 @@ class ActYml(HelaoYml):
     def __init__(self, path: Union[HelaoPath, str], **kwargs):
         super().__init__(path, **kwargs)
         self.finisher = self.dict.get("process_finish", False)
-        self.file_type = self.dict.get("type", "MISSING")
+        self.run_type = self.dict.get("run_type", "MISSING")
         self.technique = self.dict.get("technique", "MISSING")
         self.contribs = self.dict.get("process_contrib", False)
 
