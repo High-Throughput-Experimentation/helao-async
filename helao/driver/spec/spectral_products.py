@@ -29,10 +29,10 @@ class SM303:
         self._data = (ctypes.c_long * 1056)()  # placeholder
         self.data = []  # result
         self.bad_px = (ctypes.c_short * 1056)()
-        self.wl_cal = self.config_dict["wl_cal"]
-        self.px_cal = self.config_dict["px_cal"]
-        assert len(self.wl_cal) == len(self.px_cal)
-        self.n_cal = len(self.wl_cal)
+        # self.wl_cal = self.config_dict["wl_cal"]
+        # self.px_cal = self.config_dict["px_cal"]
+        # assert len(self.wl_cal) == len(self.px_cal)
+        # self.n_cal = len(self.wl_cal)
         if os.path.exists(self.lib_path):
             self.spec = ctypes.CDLL(self.lib_path)
             self.setup_sm303()
@@ -55,33 +55,37 @@ class SM303:
         self.spec.spSetupGivenChannel(self.dev_num)
         self.spec.spInitGivenChannel(self.model, self.dev_num)
         self.spec.spSetTEC(ctypes.c_long(1), self.dev_num)
-        self.c_wl_cal = (ctypes.c_double * self.n_cal)()
-        self.c_px_cal = (ctypes.c_double * self.n_cal)()
-        self.c_fitcoeffs = (ctypes.c_double * self.n_cal)()
-        for i, (wl, px) in enumerate(zip(self.wl_cal, self.px_cal)):
-            self.c_wl_cal[i] = wl / 10
-            self.c_px_cal[i] = px
-        self.spec.spPolyFit(
-            ctypes.byref(self.c_px_cal),
-            ctypes.byref(self.c_wl_cal),
-            ctypes.c_short(self.n_cal),
-            ctypes.byref(self.c_fitcoeffs),
-            ctypes.c_short(3),  # polynomial order
-        )
-        self.c_wl = (ctypes.c_double * self.n_pixels)()
-        for i in range(self.n_pixels):
-            self.spec.spPolyCalc(
-                ctypes.byref(self.c_fitcoeffs),
-                ctypes.c_short(3),  # polynomial order
-                ctypes.c_double(i + 1),
-                ctypes.byref(self.c_wl, ctypes.sizeof(ctypes.c_double) * i),
-            )
-        self.pxwl = [self.c_wl[i] for i in range(self.n_pixels)]
-        self.base.print_message(
-            f"Calibrated wavelength range: {min(self.pxwl)}, {max(self.pxwl)} over {self.n_pixels} detector pixels."
-        )
+        # self.c_wl_cal = (ctypes.c_double * self.n_cal)()
+        # self.c_px_cal = (ctypes.c_double * self.n_cal)()
+        # self.c_fitcoeffs = (ctypes.c_double * self.n_cal)()
+        # for i, (wl, px) in enumerate(zip(self.wl_cal, self.px_cal)):
+        #     self.c_wl_cal[i] = wl / 10
+        #     self.c_px_cal[i] = px
+        # self.spec.spPolyFit(
+        #     ctypes.byref(self.c_px_cal),
+        #     ctypes.byref(self.c_wl_cal),
+        #     ctypes.c_short(self.n_cal),
+        #     ctypes.byref(self.c_fitcoeffs),
+        #     ctypes.c_short(3),  # polynomial order
+        # )
+        # self.c_wl = (ctypes.c_double * self.n_pixels)()
+        # for i in range(self.n_pixels):
+        #     self.spec.spPolyCalc(
+        #         ctypes.byref(self.c_fitcoeffs),
+        #         ctypes.c_short(3),  # polynomial order
+        #         ctypes.c_double(i + 1),
+        #         ctypes.byref(self.c_wl, ctypes.sizeof(ctypes.c_double) * i),
+        #     )
+        # self.pxwl = [self.c_wl[i] for i in range(self.n_pixels)]
+        # self.base.print_message(
+        #     f"Calibrated wavelength range: {min(self.pxwl)}, {max(self.pxwl)} over {self.n_pixels} detector pixels."
+        # )
         self.wl_saved = (ctypes.c_double * 1024)()
         self.spec.spGetWLTable(ctypes.byref(self.wl_saved), self.dev_num)
+        self.pxwl = list(self.wl_saved)
+        self.base.print_message(
+            f"Loaded wavelength range from EEPROM: {min(self.pxwl)}, {max(self.pxwl)} over {self.n_pixels} detector pixels."
+        )
 
     def set_trigger_mode(self, mode: SpecTrigType = SpecTrigType.off):
         resp = self.spec.spSetTrigEx(mode, self.dev_num)
@@ -265,6 +269,7 @@ class SM303:
             self.active = None
             self.polling_task = None
             self.polling = False
+        return {"error_code": ErrorCodes.none}
 
     def unset_external_trigger(self):
         self.spec.spSetTrgEx(ctypes.c_short(10), self.dev_num)  # 10=SP_TRIGGER_OFF
