@@ -88,7 +88,7 @@ class SM303:
         )
 
     def set_trigger_mode(self, mode: SpecTrigType = SpecTrigType.off):
-        resp = self.spec.spSetTrigEx(mode, self.dev_num)
+        resp = self.spec.spSetTrgEx(mode, self.dev_num)
         if resp == 1:
             self.base.print_message(f"Successfully set trigger mode to {str(mode)}")
             self.trigmode = mode
