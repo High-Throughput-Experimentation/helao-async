@@ -45,6 +45,10 @@ class SM303:
         self.polling_task = None
         self.polling = False
 
+        self.unified_db = UnifiedSampleDataAPI(self.base)
+        asyncio.gather(self.unified_db.init_db())
+        self.allow_no_sample = self.config_dict.get("allow_no_sample", False)
+
     def setup_sm303(self):
         self.model = ctypes.c_short(self.spec.spGetModel())
         self.spec.spTestAllChannels()
@@ -216,10 +220,15 @@ class SM303:
                         params["n_avg"], params["fft"], params["duration"]
                     )
                 )
-                activeDict = self.active.action.as_dict()
+                return self.active.action.as_dict()
             else:
-                activeDict = A.as_dict()
-        return activeDict
+                return A.as_dict()
+        else:
+            self.base.print_message(
+                "Could not set trigger, edge mode, or integration time.", error=True
+            )
+            A.error_code = ErrorCodes.critical
+            return A.as_dict()
 
     async def continuous_read(self, n_avg: int = 1, fft: int = 0, duration: float = -1):
         """Async polling task."""
