@@ -415,7 +415,7 @@ if __name__ == "__main__":
 
     # print("\x1b[2J") # clear screen
     cprint(
-        figlet_format(f"HELAO\nV2.3\n{get_hlo_version()}", font="starwars"),
+        figlet_format(f"HELAO\n{get_hlo_version()}", font="starwars"),
         "yellow",
         "on_red",
         attrs=["bold"],
