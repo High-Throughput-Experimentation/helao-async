@@ -348,6 +348,7 @@ class ExpYml(HelaoYml):
             {
                 "run_type": actions[-1].dict.get("run_type", "MISSING"),
                 "technique": actions[-1].technique,
+                "dummy": actions[-1].dict.get("dummy", False),
                 "process_timestamp": actions[0].time,
                 "process_group_index": group_idx,
                 "process_uuid": new_uuid,
