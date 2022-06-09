@@ -4,7 +4,6 @@ import os
 import time
 import ctypes
 import asyncio
-import concurrent
 import traceback
 
 from helaocore.schema import Action
@@ -376,7 +375,7 @@ class SM303:
             # VERY IMPORTANT! ctypes dll function calls release the GIL which interrupts
             # the synchronization of HELAO's async coroutines, so we wrap the dll call
             # with run_in_executor to force awaitable execution order in the while loop
-            await self.event_loop.run_in_executor(None, self.read_data)
+            await asyncio.wait_for(self.event_loop.run_in_executor(None, self.read_data), 0.1)
             # if first_print:
                 # self.base.print_message(f"spReadDataAdvEx was called")
             if self.data:
@@ -393,6 +392,7 @@ class SM303:
                         status=HloStatus.active,
                     )
                 )
+                self.data = []
             await asyncio.sleep(0.001)
             self.spec_time = time.time()
             # first_print = False
