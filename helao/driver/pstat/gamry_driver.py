@@ -94,7 +94,7 @@ class dummy_sink:
 
 # due to async status handling and delayed result paradigm, this gamry class requires an
 # action server to operate
-class gamry:
+class Gamry:
     def __init__(self, action_serv: Base):
 
         self.base = action_serv
@@ -127,7 +127,7 @@ class gamry:
         self.allow_no_sample = self.config_dict.get("allow_no_sample", False)
         self.Gamry_devid = self.config_dict.get("dev_id", 0)
 
-        asyncio.gather(self.init_Gamry(self.Gamry_devid))
+        self.init_Gamry(self.Gamry_devid)
 
         # for Dtaq
         self.dtaqsink = dummy_sink()
@@ -235,7 +235,7 @@ class gamry:
                 )
                 return False
 
-    async def init_Gamry(self, devid):
+    def init_Gamry(self, devid):
         """connect to a Gamry"""
         try:
             self.devices = client.CreateObject("GamryCOM.GamryDeviceList")
@@ -277,21 +277,19 @@ class gamry:
                 self.base.print_message(
                     f"Connected to Gamry on DevID {devid}!", info=True
                 )
-
+                self.ready = True
             else:
                 self.pstat = None
                 self.base.print_message(
                     f"No potentiostat is connected on DevID {devid}! Have you turned it on?",
                     error=True,
                 )
-
         except Exception as e:
             tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             # this will lock up the potentiostat server
             # happens when a not activated Gamry is connected and turned on
             # TODO: find a way to avoid it
             self.base.print_message(f"fatal error initializing Gamry: {repr(e), tb,}", error=True)
-        self.ready = True
 
     async def open_connection(self):
         """Open connection to Gamry"""
@@ -925,26 +923,6 @@ class gamry:
         ):
             # open connection, will be closed after measurement in IOloop
             act.error_code = await self.open_connection()
-
-        elif not self.pstat:
-            act.error_code = ErrorCodes.not_initialized
-
-        elif not self.IO_do_meas:
-            act.error_code = ErrorCodes.in_progress
-
-        elif self.base.actionserver.estop:
-            act.error_code = ErrorCodes.estop
-
-        elif self.IO_measuring:
-            act.error_code = ErrorCodes.in_progress
-
-        else:
-            if act.error_code is ErrorCodes.none:
-                act.error_code = ErrorCodes.not_initialized
-
-        activeDict = act.as_dict()
-
-        if act.error_code is ErrorCodes.none:
             # set parameters for IOloop meas
             self.IO_meas_mode = measmode
             act.error_code = await self.measurement_setup(
@@ -1019,17 +997,28 @@ class gamry:
                 # reset continue flag
                 self.IO_continue = False
 
-                if self.active:
-                    activeDict = self.active.action.as_dict()
-                else:
-                    activeDict = act.as_dict()
             else:
                 self.close_connection()
-                activeDict = act.as_dict()
+
+        elif not self.pstat:
+            act.error_code = ErrorCodes.not_initialized
+
+        elif not self.IO_do_meas:
+            act.error_code = ErrorCodes.in_progress
+
+        elif self.base.actionserver.estop:
+            act.error_code = ErrorCodes.estop
+
+        elif self.IO_measuring:
+            act.error_code = ErrorCodes.in_progress
 
         else:
-            # could not open connection
-            # open_connection already set the error_code
+            if act.error_code is ErrorCodes.none:
+                act.error_code = ErrorCodes.not_initialized
+
+        if self.active:
+            activeDict = self.active.action.as_dict()
+        else:
             activeDict = act.as_dict()
 
         return activeDict
