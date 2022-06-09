@@ -1,8 +1,11 @@
 __all__ = ["SM303"]
 
 import os
+import time
 import ctypes
 import asyncio
+import concurrent
+import traceback
 
 from helaocore.schema import Action
 from helaocore.error import ErrorCodes
@@ -39,53 +42,130 @@ class SM303:
         else:
             self.base.print_message("SMdbUSBm.dll not found.", error=True)
             self.spec = None
+        self.ready = False
+        self.action = None
         self.active = None
         self.trigmode = None
         self.edgemode = None
-        self.polling_task = None
-        self.polling = False
+        self.n_avg = 1
+        self.fft = 0
+        self.trigger_duration = 0
+        self.start_time = None
+        self.spec_time = None
+        self.IO_signalq = asyncio.Queue(1)
+        self.IO_do_meas = False  # signal flag for intent (start/stop)
+        self.IO_measuring = False  # status flag of measurement
+        self.event_loop = asyncio.get_event_loop()
+        self.event_loop.create_task(self.IOloop())
 
         self.unified_db = UnifiedSampleDataAPI(self.base)
         asyncio.gather(self.unified_db.init_db())
         self.allow_no_sample = self.config_dict.get("allow_no_sample", False)
 
+        # for saving data localy
+        self.FIFO_epoch = None
+        self.FIFO_header = dict()  # measuement specific, will be reset each measurement
+        self.FIFO_column_headings = []
+        self.FIFO_name = ""
+
+        # signals return to endpoint after active was created
+        self.IO_continue = False
+        self.IOloop_run = False
+
+    def set_IO_signalq_nowait(self, val: bool) -> None:
+        if self.IO_signalq.full():
+            _ = self.IO_signalq.get_nowait()
+        self.IO_signalq.put_nowait(val)
+
+    async def set_IO_signalq(self, val: bool) -> None:
+        if self.IO_signalq.full():
+            _ = await self.IO_signalq.get()
+        await self.IO_signalq.put(val)
+
+    async def IOloop(self):
+        """This is trigger-acquire-read loop which always runs."""
+        self.IOloop_run = True
+        try:
+            while self.IOloop_run:
+                self.IO_do_meas = await self.IO_signalq.get()
+                if self.IO_do_meas:
+                    # are we in estop?
+                    if not self.base.actionserver.estop:
+                        self.base.print_message("Spec got measurement request")
+                        await self.continuous_read()
+                        if self.base.actionserver.estop:
+                            self.IO_do_meas = False
+                            self.base.print_message(
+                                "Spec is in estop after measurement.", error=True
+                            )
+                        else:
+                            self.base.print_message("setting Spec to idle")
+                            # await self.stat.set_idle()
+                        self.base.print_message("Spec measurement is done")
+                    else:
+                        self.active.action.action_status.append(HloStatus.estopped)
+                        self.IO_do_meas = False
+                        self.base.print_message("Spec is in estop.", error=True)
+
+                # endpoint can return even we got errors
+                self.IO_continue = True
+
+                if self.active:
+                    self.base.print_message("Spec finishes active action")
+                    _ = await self.active.finish()
+                    self.active = None
+                    self.action = None
+                    self.samples_in = []
+
+        except asyncio.CancelledError:
+            # endpoint can return even we got errors
+            self.IO_continue = True
+            self.base.print_message("IOloop task was cancelled")
+
     def setup_sm303(self):
-        self.model = ctypes.c_short(self.spec.spGetModel())
-        self.spec.spTestAllChannels()
-        self.spec.spSetupGivenChannel(self.dev_num)
-        self.spec.spInitGivenChannel(self.model, self.dev_num)
-        self.spec.spSetTEC(ctypes.c_long(1), self.dev_num)
-        # self.c_wl_cal = (ctypes.c_double * self.n_cal)()
-        # self.c_px_cal = (ctypes.c_double * self.n_cal)()
-        # self.c_fitcoeffs = (ctypes.c_double * self.n_cal)()
-        # for i, (wl, px) in enumerate(zip(self.wl_cal, self.px_cal)):
-        #     self.c_wl_cal[i] = wl / 10
-        #     self.c_px_cal[i] = px
-        # self.spec.spPolyFit(
-        #     ctypes.byref(self.c_px_cal),
-        #     ctypes.byref(self.c_wl_cal),
-        #     ctypes.c_short(self.n_cal),
-        #     ctypes.byref(self.c_fitcoeffs),
-        #     ctypes.c_short(3),  # polynomial order
-        # )
-        # self.c_wl = (ctypes.c_double * self.n_pixels)()
-        # for i in range(self.n_pixels):
-        #     self.spec.spPolyCalc(
-        #         ctypes.byref(self.c_fitcoeffs),
-        #         ctypes.c_short(3),  # polynomial order
-        #         ctypes.c_double(i + 1),
-        #         ctypes.byref(self.c_wl, ctypes.sizeof(ctypes.c_double) * i),
-        #     )
-        # self.pxwl = [self.c_wl[i] for i in range(self.n_pixels)]
-        # self.base.print_message(
-        #     f"Calibrated wavelength range: {min(self.pxwl)}, {max(self.pxwl)} over {self.n_pixels} detector pixels."
-        # )
-        self.wl_saved = (ctypes.c_double * 1024)()
-        self.spec.spGetWLTable(ctypes.byref(self.wl_saved), self.dev_num)
-        self.pxwl = list(self.wl_saved)
-        self.base.print_message(
-            f"Loaded wavelength range from EEPROM: {min(self.pxwl)}, {max(self.pxwl)} over {self.n_pixels} detector pixels."
-        )
+        try:
+            self.model = ctypes.c_short(self.spec.spGetModel())
+            self.spec.spTestAllChannels()
+            self.spec.spSetupGivenChannel(self.dev_num)
+            self.spec.spInitGivenChannel(self.model, self.dev_num)
+            self.spec.spSetTEC(ctypes.c_long(1), self.dev_num)
+            # self.c_wl_cal = (ctypes.c_double * self.n_cal)()
+            # self.c_px_cal = (ctypes.c_double * self.n_cal)()
+            # self.c_fitcoeffs = (ctypes.c_double * self.n_cal)()
+            # for i, (wl, px) in enumerate(zip(self.wl_cal, self.px_cal)):
+            #     self.c_wl_cal[i] = wl / 10
+            #     self.c_px_cal[i] = px
+            # self.spec.spPolyFit(
+            #     ctypes.byref(self.c_px_cal),
+            #     ctypes.byref(self.c_wl_cal),
+            #     ctypes.c_short(self.n_cal),
+            #     ctypes.byref(self.c_fitcoeffs),
+            #     ctypes.c_short(3),  # polynomial order
+            # )
+            # self.c_wl = (ctypes.c_double * self.n_pixels)()
+            # for i in range(self.n_pixels):
+            #     self.spec.spPolyCalc(
+            #         ctypes.byref(self.c_fitcoeffs),
+            #         ctypes.c_short(3),  # polynomial order
+            #         ctypes.c_double(i + 1),
+            #         ctypes.byref(self.c_wl, ctypes.sizeof(ctypes.c_double) * i),
+            #     )
+            # self.pxwl = [self.c_wl[i] for i in range(self.n_pixels)]
+            # self.base.print_message(
+            #     f"Calibrated wavelength range: {min(self.pxwl)}, {max(self.pxwl)} over {self.n_pixels} detector pixels."
+            # )
+            self.wl_saved = (ctypes.c_double * 1024)()
+            self.spec.spGetWLTable(ctypes.byref(self.wl_saved), self.dev_num)
+            self.pxwl = list(self.wl_saved)
+            self.base.print_message(
+                f"Loaded wavelength range from EEPROM: {min(self.pxwl)}, {max(self.pxwl)} over {self.n_pixels} detector pixels."
+            )
+            self.ready = True
+        except Exception as e:
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            self.base.print_message(
+                f"fatal error initializing SM303: {repr(e), tb,}", error=True
+            )
 
     def set_trigger_mode(self, mode: SpecTrigType = SpecTrigType.off):
         resp = self.spec.spSetTrgEx(mode, self.dev_num)
@@ -147,7 +227,7 @@ class SM303:
             if result == 1:
                 self.data = [self._data[i] for i in range(1056)][10:1034]
                 retdict = {"epoch_ns": self.base.get_realtime_nowait()}
-                retdict.update({f'ch_{i:04}': x for i,x in enumerate(self.data)})
+                retdict.update({f"ch_{i:04}": x for i, x in enumerate(self.data)})
                 retdict["error_code"] = ErrorCodes.none
                 return retdict
             else:
@@ -176,13 +256,14 @@ class SM303:
         """
 
         params = A.action_params
-
+        self.n_avg = params["n_avg"]
+        self.fft = params["fft"]
+        self.trigger_duration = params["duration"]
         trigset = self.set_trigger_mode(SpecTrigType.external)
         edgeset = self.set_extedge_mode(params["edge_mode"])
         inttset = self.set_integration_time(params["int_time"])
-
+        # TODO: can perform more checks like gamry technique wrapper...
         if trigset and edgeset and inttset:
-            myloop = asyncio.get_event_loop()
             A.error_code = ErrorCodes.none
             # validate samples_in
             samples_in = await self.unified_db.get_samples(A.samples_in)
@@ -192,22 +273,19 @@ class SM303:
                 )
                 A.samples_in = []
                 A.error_code = ErrorCodes.no_sample
-
-            for sample in samples_in:
-                sample.status = [SampleStatus.preserved]
-                sample.inheritance = SampleInheritance.allow_both
-
-            # TODO: can perform more checks like gamry technique wrapper...
-
-            # setup active
-            if A.error_code is ErrorCodes.none:
+                activeDict = A.as_dict()
+            else:
+                self.samples_in = samples_in
+                self.action = A
+                # self.base.print_message("Writing initial spec_helao__file", info=True)
                 spec_header = {"wl": self.pxwl}
+                dflt_conn_key = self.base.dflt_file_conn_key()
                 self.active = await self.base.contain_action(
                     ActiveParams(
-                        action=A,
+                        action=self.action,
                         file_conn_params_dict={
-                            self.base.dflt_file_conn_key(): FileConnParams(
-                                file_conn_key=self.base.dflt_file_conn_key(),
+                            dflt_conn_key: FileConnParams(
+                                file_conn_key=dflt_conn_key,
                                 sample_global_labels=[
                                     sample.get_global_label() for sample in samples_in
                                 ],
@@ -217,59 +295,142 @@ class SM303:
                         },
                     )
                 )
-            if self.active is not None:
-                # start polling task
-                self.polling_task = myloop.create_task(
-                    self.continuous_read(
-                        params["n_avg"], params["fft"], params["duration"]
-                    )
+                for sample in samples_in:
+                    sample.status = [SampleStatus.preserved]
+                    sample.inheritance = SampleInheritance.allow_both
+
+                self.active.action.samples_in = []
+                # now add updated samples to sample_in again
+                await self.active.append_sample(
+                    samples=[sample_in for sample_in in self.samples_in], IO="in"
                 )
-                return self.active.action.as_dict()
-            else:
-                return A.as_dict()
+
+                self.start_time = time.time()
+                self.base.print_message(f"start_time: {self.start_time}")
+                self.spec_time = time.time()
+                self.base.print_message(f"spec_time: {self.spec_time}")
+                self.active.finish_hlo_header(
+                    realtime=self.base.get_realtime_nowait(),
+                    file_conn_keys=self.active.action.file_conn_keys,
+                )
+                # signal the IOloop to start the measrurement
+                await self.set_IO_signalq(True)
+
+                # need to wait now for the activation of the meas routine
+                # and that the active object is activated and sets action status
+                while not self.IO_continue:
+                    await asyncio.sleep(1)
+
+                # reset continue flag
+                self.IO_continue = False
+
+                activeDict = self.active.action.as_dict()
         else:
             self.base.print_message(
-                "Could not set trigger, edge mode, or integration time.", error=True
+                f"Could not trigger_mode ('SpecTrigType.external'), edge_mode ({params['edge_mode']}), int_time ({params['int_time']}), or trigger_duration ({params['duration']}).",
+                error=True,
             )
             A.error_code = ErrorCodes.critical
-            return A.as_dict()
+            activeDict = A.as_dict()
+        return activeDict
 
-    async def continuous_read(self, n_avg: int = 1, fft: int = 0, duration: float = -1):
-        """Async polling task."""
-        self.polling = True
-        start_time = self.base.get_realtime_nowait()
-        spec_time = self.base.get_realtime_nowait()
-        while self.polling and (spec_time - start_time)/1e9 < duration:
-            result = self.spec.spReadDataAdvEx(
-                ctypes.byref(self._data),
-                ctypes.c_short(n_avg),
-                ctypes.c_short(fft),
-                ctypes.c_short(0),
-                ctypes.byref(self.bad_px),
-                self.dev_num,
-            )
-            if result == 1:
+    def read_data(self):
+        result = self.spec.spReadDataAdvEx(
+            ctypes.byref(self._data),
+            ctypes.c_short(self.n_avg),
+            ctypes.c_short(self.fft),
+            ctypes.c_short(0),
+            ctypes.byref(self.bad_px),
+            self.dev_num,
+        )
+        if result == 1:
+            self.data = list(self._data)[10:1034]
+        else:
+            self.data = []
+
+    async def continuous_read(self, start_margin=3):
+        """Async polling task.
+        
+        'start_margin' is the number of seconds to extend the trigger acquisition window
+        to account for the time delay between SPEC and PSTAT actions
+        """
+        # first_print = True
+        await asyncio.sleep(0.001)
+
+        if self.spec is None:
+            self.IO_measuring = False
+            return {"measure": "not initialized"}
+
+        else:
+            # active object is set so we can set the continue flag
+            self.IO_continue = True
+
+        while self.IO_do_meas and (self.spec_time - self.start_time) < (
+            self.trigger_duration + start_margin
+        ):
+            # if first_print:
+            #     self.base.print_message(
+            #         f"entering polling loop for {self.trigger_duration:.1f} seconds"
+            #     )
+
+            # VERY IMPORTANT! ctypes dll function calls release the GIL which interrupts
+            # the synchronization of HELAO's async coroutines, so we wrap the dll call
+            # with run_in_executor to force awaitable execution order in the while loop
+            await self.event_loop.run_in_executor(None, self.read_data)
+            # if first_print:
+                # self.base.print_message(f"spReadDataAdvEx was called")
+            if self.data:
                 self.data = [self._data[i] for i in range(1056)][10:1034]
                 # enqueue data
-                spec_time = self.base.get_realtime_nowait()
-                datadict = {'epoch_ns': spec_time}
-                datadict.update({f'ch_{i:04}': x for i,x in enumerate(self.data)})
-                await self.active.enqueue_data(datamodel=DataModel(data=datadict, errors=[], status=HloStatus.active))
+                datadict = {"epoch_ns": self.spec_time}
+                datadict.update({f"ch_{i:04}": x for i, x in enumerate(self.data)})
+                # if first_print:
+                #     self.base.print_message("writing initial data")
+                await self.active.enqueue_data(
+                    datamodel=DataModel(
+                        data={self.active.action.file_conn_keys[0]: datadict},
+                        errors=[],
+                        status=HloStatus.active,
+                    )
+                )
             await asyncio.sleep(0.001)
-        await self.active.finish()
-        self.active = None
-        self.polling_task = None
-        self.polling = False
-    
-    async def stop_continuous_read(self):
-        """Stop async polling task."""
-        if self.polling_task is not None:
-            await self.polling_task.cancel()
-            await self.active.finish()
-            self.active = None
-            self.polling_task = None
-            self.polling = False
-        return {"error_code": ErrorCodes.none}
+            self.spec_time = time.time()
+            # first_print = False
+
+        self.base.print_message(f"polling loop duration complete, finishing")
+        self.trigger_duration = 0
+        self.close_spec_connection()
+        return {"measure": f"done_extrig"}
+
+    def close_spec_connection(self):
+        if self.IO_measuring:
+            self.IO_do_meas = False  # will stop meas loop
+            self.IO_measuring = False
+            self.unset_external_trigger()
+            self.base.print_message("signaling IOloop to stop")
+            self.set_IO_signalq_nowait(False)
+        else:
+            pass
+
+    async def stop(self):
+        """stops measurement, writes all data and returns from meas loop"""
+        if self.IO_measuring:
+            self.IO_do_meas = False  # will stop meas loop
+            await self.set_IO_signalq(False)
+
+    async def estop(self, switch: bool, *args, **kwargs):
+        """same as stop, set or clear estop flag with switch parameter"""
+        # should be the same as stop()
+        switch = bool(switch)
+        self.base.actionserver.estop = switch
+        if self.IO_measuring:
+            if switch:
+                self.IO_do_meas = False  # will stop meas loop
+                await self.set_IO_signalq(False)
+                if self.active:
+                    # add estop status to active.status
+                    await self.active.set_estop()
+        return switch
 
     def unset_external_trigger(self):
         self.spec.spSetTrgEx(ctypes.c_short(10), self.dev_num)  # 10=SP_TRIGGER_OFF
