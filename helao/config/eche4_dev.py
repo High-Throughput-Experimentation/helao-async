@@ -156,17 +156,17 @@ config["servers"] = dict(
     # #########################################################################
     # DB package server
     # #########################################################################
-    DB=dict(
-        host=hostip,
-        port=8010,
-        group="action",
-        fast="dbpack_server",
-        params=dict(
-            aws_config_path="k:/users/hte/.credentials/aws_config.ini",
-            aws_profile="default",
-            aws_bucket="helao.data.testing",
-            api_host="caltech-api.modelyst.com",
-            testing=False,
-        ),
-    ),
+    # DB=dict(
+    #     host=hostip,
+    #     port=8010,
+    #     group="action",
+    #     fast="dbpack_server",
+    #     params=dict(
+    #         aws_config_path="k:/users/hte/.credentials/aws_config.ini",
+    #         aws_profile="default",
+    #         aws_bucket="helao.data.testing",
+    #         api_host="caltech-api.modelyst.com",
+    #         testing=False,
+    #     ),
+    # ),
 )
