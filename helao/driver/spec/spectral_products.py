@@ -71,6 +71,60 @@ class SM303:
         self.IO_continue = False
         self.IOloop_run = False
 
+    def setup_sm303(self):
+        try:
+            self.spec.spCloseAllChannels()
+            # time.sleep(1)
+            model = self.spec.spGetModel()
+            # print(model)
+            self.model = ctypes.c_short(model)
+            # time.sleep(0.1)
+            self.spec.spTestAllChannels()
+            # time.sleep(0.1)
+            self.spec.spSetupGivenChannel(self.dev_num)
+            # time.sleep(0.1)
+            self.spec.spInitGivenChannel(self.model, self.dev_num)
+            # time.sleep(0.1)
+            self.spec.spSetTEC(ctypes.c_long(1), self.dev_num)
+            # time.sleep(0.1)
+            # self.c_wl_cal = (ctypes.c_double * self.n_cal)()
+            # self.c_px_cal = (ctypes.c_double * self.n_cal)()
+            # self.c_fitcoeffs = (ctypes.c_double * self.n_cal)()
+            # for i, (wl, px) in enumerate(zip(self.wl_cal, self.px_cal)):
+            #     self.c_wl_cal[i] = wl / 10
+            #     self.c_px_cal[i] = px
+            # self.spec.spPolyFit(
+            #     ctypes.byref(self.c_px_cal),
+            #     ctypes.byref(self.c_wl_cal),
+            #     ctypes.c_short(self.n_cal),
+            #     ctypes.byref(self.c_fitcoeffs),
+            #     ctypes.c_short(3),  # polynomial order
+            # )
+            # self.c_wl = (ctypes.c_double * self.n_pixels)()
+            # for i in range(self.n_pixels):
+            #     self.spec.spPolyCalc(
+            #         ctypes.byref(self.c_fitcoeffs),
+            #         ctypes.c_short(3),  # polynomial order
+            #         ctypes.c_double(i + 1),
+            #         ctypes.byref(self.c_wl, ctypes.sizeof(ctypes.c_double) * i),
+            #     )
+            # self.pxwl = [self.c_wl[i] for i in range(self.n_pixels)]
+            # self.base.print_message(
+            #     f"Calibrated wavelength range: {min(self.pxwl)}, {max(self.pxwl)} over {self.n_pixels} detector pixels."
+            # )
+            self.wl_saved = (ctypes.c_double * 1024)()
+            self.spec.spGetWLTable(ctypes.byref(self.wl_saved), self.dev_num)
+            self.pxwl = list(self.wl_saved)
+            self.base.print_message(
+                f"Loaded wavelength range from EEPROM: {min(self.pxwl)}, {max(self.pxwl)} over {self.n_pixels} detector pixels."
+            )
+            self.ready = True
+        except Exception as e:
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            self.base.print_message(
+                f"fatal error initializing SM303: {repr(e), tb,}", error=True
+            )
+
     def set_IO_signalq_nowait(self, val: bool) -> None:
         if self.IO_signalq.full():
             _ = self.IO_signalq.get_nowait()
@@ -121,50 +175,6 @@ class SM303:
             self.IO_continue = True
             self.base.print_message("IOloop task was cancelled")
 
-    def setup_sm303(self):
-        try:
-            self.model = ctypes.c_short(self.spec.spGetModel())
-            self.spec.spTestAllChannels()
-            self.spec.spSetupGivenChannel(self.dev_num)
-            self.spec.spInitGivenChannel(self.model, self.dev_num)
-            self.spec.spSetTEC(ctypes.c_long(1), self.dev_num)
-            # self.c_wl_cal = (ctypes.c_double * self.n_cal)()
-            # self.c_px_cal = (ctypes.c_double * self.n_cal)()
-            # self.c_fitcoeffs = (ctypes.c_double * self.n_cal)()
-            # for i, (wl, px) in enumerate(zip(self.wl_cal, self.px_cal)):
-            #     self.c_wl_cal[i] = wl / 10
-            #     self.c_px_cal[i] = px
-            # self.spec.spPolyFit(
-            #     ctypes.byref(self.c_px_cal),
-            #     ctypes.byref(self.c_wl_cal),
-            #     ctypes.c_short(self.n_cal),
-            #     ctypes.byref(self.c_fitcoeffs),
-            #     ctypes.c_short(3),  # polynomial order
-            # )
-            # self.c_wl = (ctypes.c_double * self.n_pixels)()
-            # for i in range(self.n_pixels):
-            #     self.spec.spPolyCalc(
-            #         ctypes.byref(self.c_fitcoeffs),
-            #         ctypes.c_short(3),  # polynomial order
-            #         ctypes.c_double(i + 1),
-            #         ctypes.byref(self.c_wl, ctypes.sizeof(ctypes.c_double) * i),
-            #     )
-            # self.pxwl = [self.c_wl[i] for i in range(self.n_pixels)]
-            # self.base.print_message(
-            #     f"Calibrated wavelength range: {min(self.pxwl)}, {max(self.pxwl)} over {self.n_pixels} detector pixels."
-            # )
-            self.wl_saved = (ctypes.c_double * 1024)()
-            self.spec.spGetWLTable(ctypes.byref(self.wl_saved), self.dev_num)
-            self.pxwl = list(self.wl_saved)
-            self.base.print_message(
-                f"Loaded wavelength range from EEPROM: {min(self.pxwl)}, {max(self.pxwl)} over {self.n_pixels} detector pixels."
-            )
-            self.ready = True
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            self.base.print_message(
-                f"fatal error initializing SM303: {repr(e), tb,}", error=True
-            )
 
     def set_trigger_mode(self, mode: SpecTrigType = SpecTrigType.off):
         resp = self.spec.spSetTrgEx(mode, self.dev_num)
