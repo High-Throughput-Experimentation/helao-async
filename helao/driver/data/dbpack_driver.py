@@ -228,6 +228,8 @@ class ActYml(HelaoYml):
         self.finisher = self.dict.get("process_finish", False)
         self.run_type = self.dict.get("run_type", "MISSING")
         self.technique = self.dict.get("technique", "MISSING")
+        if isinstance(self.technique, list):
+            self.technique = self.technique[self.dict.get("action_split", 0)]
         self.contribs = self.dict.get("process_contrib", False)
 
 
