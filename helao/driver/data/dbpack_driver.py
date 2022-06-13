@@ -27,6 +27,7 @@ from helaocore.model.sequence import SequenceModel
 from helaocore.helper.gen_uuid import gen_uuid
 from helaocore.helper.read_hlo import read_hlo
 from helaocore.helper.print_message import print_message
+from helaocore.helper.zip_dir import zip_dir
 from helao.driver.data.enum import YmlType
 
 
@@ -201,7 +202,7 @@ class HelaoYml:
         # print(f"!!! Loading progress from {self.progress_path}")
         self.progress = Progress(self)
         # print(f"!!! Successfully loaded progress from {self.progress_path}")
-        if (self.status == "FINISHED") and (self.file_type != 'experiment'):
+        if (self.status == "FINISHED") and (self.file_type != "experiment"):
             meta_json = modmap[self.file_type](**self.dict).clean_dict()
             meta_json = wrap_sample_details(meta_json)
             for file_dict in meta_json.get("files", []):
@@ -234,7 +235,7 @@ class ExpYml(HelaoYml):
     def __init__(self, path: Union[HelaoPath, str], **kwargs):
         super().__init__(path, **kwargs)
         self.parse_yml(path)
-        
+
     def parse_yml(self, path: Union[HelaoPath, str]):
         super().parse_yml(path)
         self.get_actions()
@@ -316,9 +317,7 @@ class ExpYml(HelaoYml):
                     f"Cannot create process {group_idx} with actions still pending.",
                 )
             # self.progress.read()
-        group_keys = sorted(
-            [k for k in self.progress.keys() if isinstance(k, int)]
-        )
+        group_keys = sorted([k for k in self.progress.keys() if isinstance(k, int)])
         process_metas = [self.progress[k]["meta"] for k in group_keys]
         if self.status == "FINISHED":
             meta_json = modmap[self.file_type](**self.dict).clean_dict()
@@ -335,14 +334,16 @@ class ExpYml(HelaoYml):
         """Create process group from finished actions in progress['meta']."""
         actions = self.grouped_actions[group_idx]
         base_process = {"access": self.dict.get("access", "hte")}
-        base_process.update({
-            k: self.dict[k]
-            for k in (
-                "orchestrator",
-                "sequence_uuid",
-                "experiment_uuid",
-            )
-        })
+        base_process.update(
+            {
+                k: self.dict[k]
+                for k in (
+                    "orchestrator",
+                    "sequence_uuid",
+                    "experiment_uuid",
+                )
+            }
+        )
         new_uuid = gen_uuid()
         base_process.update(
             {
@@ -358,10 +359,16 @@ class ExpYml(HelaoYml):
                 ],
             }
         )
-        if base_process['run_type'] == "MISSING":
-            print_message({}, "DB", f"Process terminating action has no type. Using DB config.")
-        if base_process['technique'] == "MISSING":
-            print_message({}, "DB", f"Process terminating action has no process_name. Using action_name.")
+        if base_process["run_type"] == "MISSING":
+            print_message(
+                {}, "DB", f"Process terminating action has no type. Using DB config."
+            )
+        if base_process["technique"] == "MISSING":
+            print_message(
+                {},
+                "DB",
+                f"Process terminating action has no process_name. Using action_name.",
+            )
         fill_process = {
             "action_params": self.dict["experiment_params"],
             "samples_in": [],
@@ -408,7 +415,7 @@ class SeqYml(HelaoYml):
     def __init__(self, path: Union[HelaoPath, str], **kwargs):
         super().__init__(path, **kwargs)
         self.parse_yml(path)
-        
+
     def parse_yml(self, path: Union[HelaoPath, str]):
         super().parse_yml(path)
         self.get_experiments()
@@ -1067,4 +1074,14 @@ class YmlOps:
                 self.dbp.base.print_message("Could not clean directory after moving.")
                 self.dbp.base.print_message(clean_success)
             self.yml.parse_yml(new_target)
-            return self.yml.target.__str__()
+            if self.yml.file_type != "sequence":
+                return self.yml.target.__str__()
+            else:
+                zip_target = new_target.parent.parent.joinpath(
+                    f"{new_target.parent.name}.zip"
+                )
+                self.dbp.base.print_message(
+                    f"Full sequence has synced, creating zip: {zip_target.__str__()}"
+                )
+                zip_dir(new_target.parent, zip_target)
+                return zip_target.__str__()
