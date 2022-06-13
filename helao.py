@@ -301,7 +301,7 @@ def wait_key():
 def launcher(confArg, confDict, helao_root):
     confPrefix = os.path.basename(confArg).replace(".py", "")
     # get the BaseModel which contains all the dirs for helao
-    helaodirs = helao_dirs(confDict)
+    helaodirs = helao_dirs(confDict, "launcher")
 
     # API server launch priority (matches folders in root helao-dev/)
     LAUNCH_ORDER = ["action", "orchestrator", "visualizer", "operator"]
