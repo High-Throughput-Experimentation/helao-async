@@ -48,7 +48,9 @@ class SM303:
         self.edgemode = None
         self.n_avg = 1
         self.fft = 0
+        self.int_time = 35
         self.trigger_duration = 0
+        self.start_margin = 2
         self.start_time = None
         self.spec_time = None
         self.IO_signalq = asyncio.Queue(1)
@@ -71,22 +73,72 @@ class SM303:
         self.IO_continue = False
         self.IOloop_run = False
 
+    def set_IO_signalq_nowait(self, val: bool) -> None:
+        if self.IO_signalq.full():
+            _ = self.IO_signalq.get_nowait()
+        self.IO_signalq.put_nowait(val)
+
+    async def set_IO_signalq(self, val: bool) -> None:
+        if self.IO_signalq.full():
+            _ = await self.IO_signalq.get()
+        await self.IO_signalq.put(val)
+
+    async def IOloop(self):
+        """This is trigger-acquire-read loop which always runs."""
+        self.IOloop_run = True
+        try:
+            while self.IOloop_run:
+                self.IO_do_meas = await self.IO_signalq.get()
+                if self.IO_do_meas:
+                    # are we in estop?
+                    if not self.base.actionserver.estop:
+                        self.base.print_message("Spec got measurement request")
+                        try:
+                            await asyncio.wait_for(self.continuous_read(), self.trigger_duration + self.start_margin)
+                        except asyncio.exceptions.TimeoutError:
+                            pass
+                        if self.base.actionserver.estop:
+                            self.IO_do_meas = False
+                            self.base.print_message(
+                                "Spec is in estop after measurement.", error=True
+                            )
+                        else:
+                            self.base.print_message("setting Spec to idle")
+                            # await self.stat.set_idle()
+                        self.base.print_message("Spec measurement is done")
+                    else:
+                        self.active.action.action_status.append(HloStatus.estopped)
+                        self.IO_do_meas = False
+                        self.base.print_message("Spec is in estop.", error=True)
+
+                # endpoint can return even we got errors
+                self.IO_continue = True
+
+                if self.active:
+                    self.base.print_message("Spec finishes active action")
+                    active_not_finished = True
+                    while active_not_finished:
+                        try:
+                            await asyncio.wait_for(self.active.finish(), 1)
+                            active_not_finished = False
+                        except asyncio.exceptions.TimeoutError:
+                            pass
+                    self.active = None
+                    self.action = None
+                    self.samples_in = []
+
+        except asyncio.CancelledError:
+            # endpoint can return even we got errors
+            self.IO_continue = True
+            self.base.print_message("IOloop task was cancelled")
+
     def setup_sm303(self):
         try:
-            self.spec.spCloseAllChannels()
-            # time.sleep(1)
-            model = self.spec.spGetModel()
-            # print(model)
-            self.model = ctypes.c_short(model)
-            # time.sleep(0.1)
+            self.model = ctypes.c_short(self.spec.spGetModel())
             self.spec.spTestAllChannels()
-            # time.sleep(0.1)
             self.spec.spSetupGivenChannel(self.dev_num)
-            # time.sleep(0.1)
             self.spec.spInitGivenChannel(self.model, self.dev_num)
-            # time.sleep(0.1)
             self.spec.spSetTEC(ctypes.c_long(1), self.dev_num)
-            # time.sleep(0.1)
             # self.c_wl_cal = (ctypes.c_double * self.n_cal)()
             # self.c_px_cal = (ctypes.c_double * self.n_cal)()
             # self.c_fitcoeffs = (ctypes.c_double * self.n_cal)()
@@ -125,57 +177,6 @@ class SM303:
                 f"fatal error initializing SM303: {repr(e), tb,}", error=True
             )
 
-    def set_IO_signalq_nowait(self, val: bool) -> None:
-        if self.IO_signalq.full():
-            _ = self.IO_signalq.get_nowait()
-        self.IO_signalq.put_nowait(val)
-
-    async def set_IO_signalq(self, val: bool) -> None:
-        if self.IO_signalq.full():
-            _ = await self.IO_signalq.get()
-        await self.IO_signalq.put(val)
-
-    async def IOloop(self):
-        """This is trigger-acquire-read loop which always runs."""
-        self.IOloop_run = True
-        try:
-            while self.IOloop_run:
-                self.IO_do_meas = await self.IO_signalq.get()
-                if self.IO_do_meas:
-                    # are we in estop?
-                    if not self.base.actionserver.estop:
-                        self.base.print_message("Spec got measurement request")
-                        await self.continuous_read()
-                        if self.base.actionserver.estop:
-                            self.IO_do_meas = False
-                            self.base.print_message(
-                                "Spec is in estop after measurement.", error=True
-                            )
-                        else:
-                            self.base.print_message("setting Spec to idle")
-                            # await self.stat.set_idle()
-                        self.base.print_message("Spec measurement is done")
-                    else:
-                        self.active.action.action_status.append(HloStatus.estopped)
-                        self.IO_do_meas = False
-                        self.base.print_message("Spec is in estop.", error=True)
-
-                # endpoint can return even we got errors
-                self.IO_continue = True
-
-                if self.active:
-                    self.base.print_message("Spec finishes active action")
-                    _ = await self.active.finish()
-                    self.active = None
-                    self.action = None
-                    self.samples_in = []
-
-        except asyncio.CancelledError:
-            # endpoint can return even we got errors
-            self.IO_continue = True
-            self.base.print_message("IOloop task was cancelled")
-
-
     def set_trigger_mode(self, mode: SpecTrigType = SpecTrigType.off):
         resp = self.spec.spSetTrgEx(mode, self.dev_num)
         if resp == 1:
@@ -203,6 +204,7 @@ class SM303:
 
     def set_integration_time(self, int_time: float = 7.0):
         # minimum int_time for SM303 is 7.0 msec
+        self.int_time = float(int_time)
         cint_time = ctypes.c_double(int_time)
         resp = self.spec.spSetDblIntEx(cint_time, self.dev_num)
         if resp == 1:
@@ -357,7 +359,7 @@ class SM303:
         else:
             self.data = []
 
-    async def continuous_read(self, start_margin=3):
+    async def continuous_read(self):
         """Async polling task.
         
         'start_margin' is the number of seconds to extend the trigger acquisition window
@@ -375,7 +377,7 @@ class SM303:
             self.IO_continue = True
 
         while self.IO_do_meas and (self.spec_time - self.start_time) < (
-            self.trigger_duration + start_margin
+            self.trigger_duration + self.start_margin
         ):
             # if first_print:
             #     self.base.print_message(
@@ -385,7 +387,10 @@ class SM303:
             # VERY IMPORTANT! ctypes dll function calls release the GIL which interrupts
             # the synchronization of HELAO's async coroutines, so we wrap the dll call
             # with run_in_executor to force awaitable execution order in the while loop
-            await asyncio.wait_for(self.event_loop.run_in_executor(None, self.read_data), 0.1)
+            try:
+                await self.event_loop.run_in_executor(None, self.read_data)
+            except asyncio.exceptions.TimeoutError:
+                self.data = []
             # if first_print:
                 # self.base.print_message(f"spReadDataAdvEx was called")
             if self.data:
@@ -447,7 +452,7 @@ class SM303:
 
     def shutdown(self):
         self.base.print_message("shutting down SM303")
-        self.unset_external_trigger()
-        self.spec.spSetTEC(ctypes.c_long(0), self.dev_num)
+        # self.unset_external_trigger()
+        # self.spec.spSetTEC(ctypes.c_long(0), self.dev_num)
         self.spec.spCloseGivenChannel(self.dev_num)
         return {"shutdown"}
