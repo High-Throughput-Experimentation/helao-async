@@ -178,7 +178,7 @@ class Pidd:
             if group in pidd.servers.keys():
                 G = pidd.servers[group]
                 for server in G:
-                    twait = 0.5
+                    twait = 0.1
                     print_message(
                         {},
                         "launcher",
