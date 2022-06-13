@@ -203,7 +203,6 @@ def ANEC_series_CA(
 
 def ANEC_photo_CA(
     sequence_version: int = 2,
-    num_repeats: int = 1,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1,
