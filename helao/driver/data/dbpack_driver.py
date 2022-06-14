@@ -704,9 +704,9 @@ class DBPack:
             )
             return {}
         hyml = ymlmap[yml_type](hpth, uuid_test=self.testing_uuid_dict)
-        # self.base.print_message(f"Loaded {yml_type} from {yml_path_str}", info=True)
+        self.base.print_message(f"Loaded {yml_type} from {yml_path_str}", info=True)
         ops = YmlOps(self, hyml)
-        # self.base.print_message(f"YmlOps initialized for {yml_path_str}", info=True)
+        self.base.print_message(f"YmlOps initialized for {yml_path_str}", info=True)
 
         # if given a sequence or experiment, recurse through constituents
         if yml_type == YmlType.sequence:
@@ -830,7 +830,7 @@ class DBPack:
 
 
 class YmlOps:
-    def __init__(self, dbp: DBPack, yml: Union[ActYml, ExpYml, SeqYml]):
+    def __init__(self, dbp: DBPack, yml: Union[SeqYml, ActYml, ExpYml]):
         self.dbp = dbp
         self.yml = yml
 
