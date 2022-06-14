@@ -27,6 +27,7 @@ class SM303:
         self.config_dict = action_serv.server_cfg["params"]
         self.lib_path = self.config_dict["lib_path"]
         self.n_pixels = self.config_dict["n_pixels"]
+        self.start_margin = self.config_dict["start_margin"]
         self.dev_num = ctypes.c_short(self.config_dict["dev_num"])
         self._data = (ctypes.c_long * 1056)()  # placeholder
         self.data = []  # result
@@ -51,7 +52,6 @@ class SM303:
         self.fft = 0
         self.int_time = 35
         self.trigger_duration = 0
-        self.start_margin = 2
         self.start_time = None
         self.spec_time = None
         self.IO_signalq = asyncio.Queue(1)
