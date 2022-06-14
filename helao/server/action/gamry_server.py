@@ -36,7 +36,7 @@ from fastapi import Body, Query
 from helaocore.server.base import makeActionServ
 from helaocore.model.sample import LiquidSample, SampleUnion
 from helaocore.schema import Action
-from helao.driver.pstat.gamry_driver import Gamry
+from helao.driver.pstat.gamry_driver import gamry
 from helaocore.helper.config_loader import config_loader
 
 
@@ -240,7 +240,7 @@ def makeApp(confPrefix, servKey, helao_root):
         server_title=servKey,
         description="Gamry instrument/action server",
         version=2.0,
-        driver_class=Gamry,
+        driver_class=gamry,
         dyn_endpoints=gamry_dyn_endpoints,
     )
 
