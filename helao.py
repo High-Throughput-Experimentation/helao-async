@@ -418,7 +418,7 @@ if __name__ == "__main__":
 
     # compress old logs:
     log_root = os.path.join(config['root'], "LOGS")
-    for server_name in ["_MASTER_", "bokeh_launcher", "fast_launcher"]
+    for server_name in ["_MASTER_", "bokeh_launcher", "fast_launcher"]:
         old_log_txts = glob(os.path.join(log_root, server_name, "*.txt"))
         for old_log in old_log_txts:
             with open(old_log) as f:
