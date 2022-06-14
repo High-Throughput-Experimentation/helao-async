@@ -34,6 +34,9 @@ import time
 import requests
 import subprocess
 import traceback
+import re
+import zipfile
+from glob import glob
 
 from termcolor import cprint
 from pyfiglet import figlet_format
@@ -412,6 +415,20 @@ if __name__ == "__main__":
     helao_root = os.path.dirname(os.path.realpath(__file__))
     confArg = sys.argv[1]
     config = config_loader(confArg, helao_root)
+
+    # compress old logs:
+    log_root = os.path.join(config['root'], "LOGS")
+    for server_name in ["_MASTER_", "bokeh_launcher", "fast_launcher"]
+        old_log_txts = glob(os.path.join(log_root, server_name, "*.txt"))
+        for old_log in old_log_txts:
+            with open(old_log) as f:
+                line0 = f.readline()
+            timestamp = re.findall('[0-9]{2}:[0-9]{2}:[0-9]{2}', line0)[0].replace(":","")
+            zipname = old_log.replace(".txt", f"{timestamp}.zip")
+            arcname = os.path.basename(old_log).replace(".txt", f"{timestamp}.txt")
+            with zipfile.ZipFile(zipname, "w") as zf:
+                zf.write(old_log, arcname)
+            os.remove(old_log)
 
     # print("\x1b[2J") # clear screen
     cprint(
