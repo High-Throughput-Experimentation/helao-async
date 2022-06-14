@@ -120,27 +120,6 @@ config["servers"] = dict(
         ),
     ),
     
-    SPEC=dict(
-        host=hostip,
-        port=8011,
-        group="action",
-        fast="spec_server",
-        params=dict(
-            dev_num=0,
-            lib_path=r"C:\Users\eche\Downloads\SM32ProForUSB_2.34.34\SM32ProForUSB_2.34.34\SDKs\DLL\x64\stdcall\SPdbUSBm.dll",
-            n_pixels=1024,
-            start_margin=5,
-            # wl_cal=[2537, 3132, 3650, 4047, 4358, 5461, 6965, 7635, 8115, 9123],
-            # px_cal=[173,  239,  299,  342,  376,  494,  652,  721,  769,  871],
-            ## px_cal=[269, 386, 488, 564, 624, 831, 1108, 1228, 1314, 1493],
-            # id_vendor = 0x0547,
-            # id_product = 0x0322,
-        ),
-    ),
-    
-    
-    
-    
     # #########################################################################
     # Visualizers (bokeh servers)
     # #########################################################################
@@ -153,21 +132,21 @@ config["servers"] = dict(
             doc_name="ECHE4 Visualizer",
         ),
     ),
-    #
-    # #########################################################################
+    
+    #########################################################################
     # DB package server
-    # #########################################################################
-    # DB=dict(
-    #     host=hostip,
-    #     port=8010,
-    #     group="action",
-    #     fast="dbpack_server",
-    #     params=dict(
-    #         aws_config_path="k:/users/hte/.credentials/aws_config.ini",
-    #         aws_profile="default",
-    #         aws_bucket="helao.data.testing",
-    #         api_host="caltech-api.modelyst.com",
-    #         testing=False,
-    #     ),
-    # ),
+    #########################################################################
+    DB=dict(
+        host=hostip,
+        port=8010,
+        group="action",
+        fast="dbpack_server",
+        params=dict(
+            aws_config_path="k:/users/hte/.credentials/aws_config.ini",
+            aws_profile="default",
+            aws_bucket="helao.data.testing",
+            api_host="caltech-api.modelyst.com",
+            testing=False,
+        ),
+    ),
 )
