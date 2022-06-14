@@ -387,7 +387,8 @@ class gamry:
                 # StabilityFast (0), StabilityNorm (1), StabilityMed (1), StabilitySlow (2)
                 # pstat.SetCASpeed(1)#GamryCOM.CASpeedNorm)
                 # CASpeedFast (0), CASpeedNorm (1), CASpeedMed (2), CASpeedSlow (3)
-                self.pstat.SetSenseSpeedMode(True)
+                if not self.FIFO_Gamryname.startswith('IFC1010'):
+                    self.pstat.SetSenseSpeedMode(True)
                 # pstat.SetConvention (PHE200_IConvention)
                 # anodic currents are positive
                 self.pstat.SetIConvention(self.GamryCOM.Anodic)
