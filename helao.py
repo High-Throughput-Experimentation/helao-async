@@ -426,7 +426,7 @@ if __name__ == "__main__":
             timestamp = re.findall('[0-9]{2}:[0-9]{2}:[0-9]{2}', line0)[0].replace(":","")
             zipname = old_log.replace(".txt", f"{timestamp}.zip")
             arcname = os.path.basename(old_log).replace(".txt", f"{timestamp}.txt")
-            with zipfile.ZipFile(zipname, "w") as zf:
+            with zipfile.ZipFile(zipname, "w", compression=zipfile.ZIP_DEFLATED) as zf:
                 zf.write(old_log, arcname)
             os.remove(old_log)
 
