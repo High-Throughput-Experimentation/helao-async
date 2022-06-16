@@ -418,19 +418,22 @@ class gamry:
                 # Sets the I/E Range of the potentiostat.
                 self.pstat.SetIERange(0.03)
                 # Enable or disable current measurement auto-ranging.
-                self.pstat.SetIERangeMode(True)
+                if not self.FIFO_Gamryname.startswith('IFC1010'):
+                    self.pstat.SetIERangeMode(True)
 
                 if self.IO_IErange == self.gamry_range_enum.auto:
                     self.base.print_message("auto I range selected")
                     self.pstat.SetIERange(0.03)
-                    self.pstat.SetIERangeMode(True)
+                    if not self.FIFO_Gamryname.startswith('IFC1010'):
+                        self.pstat.SetIERangeMode(True)
                 else:
                     self.base.print_message(f"{self.IO_IErange.value} I range selected")
                     self.base.print_message(
                         f"{IErangesdict[self.IO_IErange.name]} I range selected"
                     )
                     self.pstat.SetIERange(IErangesdict[self.IO_IErange.name])
-                    self.pstat.SetIERangeMode(False)
+                    if not self.FIFO_Gamryname.startswith('IFC1010'):
+                        self.pstat.SetIERangeMode(False)
                 # elif self.IO_IErange == self.gamry_range_enum.mode0:
                 #     self.pstat.SetIERangeMode(False)
                 #     self.pstat.SetIERange(0)
