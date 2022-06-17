@@ -396,7 +396,7 @@ def ANEC_slave_GC_preparation(
             "volume_ul_GC": apm.pars.volume_ul_GC,
         },
         process_finish=True,
-        technique= ["headspace_GC_back_analysis", "headspace_GC_front_analysis"],
+        technique_name= ["headspace_GC_back_analysis", "headspace_GC_front_analysis"],
         process_contrib=[
             ProcessContrib.action_params,
             ProcessContrib.files,
@@ -476,7 +476,7 @@ def ANEC_slave_load_solid_and_clean_cell(
             "volume_ul_GC": apm.pars.volume_ul_GC,
         },
         process_finish=True,
-        technique= ["headspace_GC_back_analysis", "headspace_GC_front_analysis"],
+        technique_name= ["headspace_GC_back_analysis", "headspace_GC_front_analysis"],
         process_contrib=[
             ProcessContrib.action_params,
             ProcessContrib.files,
@@ -529,7 +529,7 @@ def ANEC_slave_aliquot(
             "wash4": apm.pars.wash4,
         },
         process_finish=True,
-        technique= ["headspace_GC_back_analysis", "headspace_GC_front_analysis","liquid_product_archive"],
+        technique_name= ["headspace_GC_back_analysis", "headspace_GC_front_analysis","liquid_product_archive"],
         process_contrib=[
             ProcessContrib.action_params,
             ProcessContrib.files,
@@ -578,7 +578,7 @@ def ANEC_slave_CA(
         },
         from_global_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
-        technique= ["CA"],
+        technique_name= ["CA"],
         process_contrib=[
             ProcessContrib.action_params,
             ProcessContrib.files,
@@ -628,7 +628,7 @@ def ANEC_slave_photo_CA(
         },
         from_global_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
-        technique= ["CA"],
+        technique_name= ["CA"],
         process_contrib=[
             ProcessContrib.action_params,
             ProcessContrib.files,
@@ -692,7 +692,7 @@ def ANEC_slave_CV(
         },
         from_global_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
-        technique= ["CV"],
+        technique_name= ["CV"],
         process_contrib=[
             ProcessContrib.action_params,
             ProcessContrib.files,
@@ -748,7 +748,7 @@ def ANEC_slave_GCLiquid_analysis(
             "wash4": apm.pars.wash4,
         },
         process_finish=True,
-        technique= ["liquid_GC_front_analysis"],
+        technique_name= ["liquid_GC_front_analysis"],
         process_contrib=[
             ProcessContrib.action_params,
             ProcessContrib.files,
@@ -802,7 +802,7 @@ def ANEC_slave_HPLCLiquid_analysis(
             "wash4": apm.pars.wash4,
         },
         process_finish=True,
-        technique= ["liquid_HPLC_analysis"],
+        technique_name= ["liquid_HPLC_analysis"],
         process_contrib=[
             ProcessContrib.action_params,
             ProcessContrib.files,
