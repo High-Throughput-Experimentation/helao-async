@@ -227,9 +227,9 @@ class ActYml(HelaoYml):
         super().__init__(path, **kwargs)
         self.finisher = self.dict.get("process_finish", False)
         self.run_type = self.dict.get("run_type", "MISSING")
-        self.technique = self.dict.get("technique", "MISSING")
-        if isinstance(self.technique, list):
-            self.technique = self.technique[self.dict.get("action_split", 0)]
+        self.technique_name = self.dict.get("technique_name", "MISSING")
+        if isinstance(self.technique_name, list):
+            self.technique_name = self.technique_name[self.dict.get("action_split", 0)]
         self.contribs = self.dict.get("process_contrib", False)
 
 
@@ -350,7 +350,7 @@ class ExpYml(HelaoYml):
         base_process.update(
             {
                 "run_type": actions[-1].dict.get("run_type", "MISSING"),
-                "technique": actions[-1].technique,
+                "technique_name": actions[-1].technique_name,
                 "dummy": actions[-1].dict.get("dummy", False),
                 "process_timestamp": actions[0].time,
                 "process_group_index": group_idx,
@@ -365,7 +365,7 @@ class ExpYml(HelaoYml):
             print_message(
                 {}, "DB", f"Process terminating action has no type. Using DB config."
             )
-        if base_process["technique"] == "MISSING":
+        if base_process["technique_name"] == "MISSING":
             print_message(
                 {},
                 "DB",
