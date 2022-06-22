@@ -4,13 +4,14 @@ __all__ = ["config"]
 
 hostip = "127.0.0.1"
 config = {}
+config['dummy'] = False
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
 config["experiment_libraries"] = ["ADSS_exp", "samples_exp"]
 config["sequence_libraries"] = ["ADSS_seq"]
 config["run_type"] = "adss"
-config["root"] = r"C:\INST"
+config["root"] = r"C:\INST_hlo"
 
 
 # we define all the servers here so that the overview is a bit better

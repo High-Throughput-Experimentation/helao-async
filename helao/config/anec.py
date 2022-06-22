@@ -1,11 +1,12 @@
 hostip = "127.0.0.1"
 config = {}
+config["dummy"] = False
 
 # action library provides generator functions which produce actions
-config["experiment_libraries"] = ["ANEC_exp"]
+config["experiment_libraries"] = ["ANEC_exp", "samples_exp"]
 config["sequence_libraries"] = ["ANEC_seq"]
 config["run_type"] = "anec"
-config["root"] = r"C:\INST_prod"
+config["root"] = r"C:\INST_hlo"
 
 
 # we define all the servers here so that the overview is a bit better
@@ -18,6 +19,10 @@ config["servers"] = dict(
         port=8001,
         group="orchestrator",
         fast="async_orch2",
+        params=dict(
+            enable_op=True,
+            bokeh_port=5002,
+        ),
     ),
     ##########################################################################
     # Instrument Servers
@@ -28,20 +33,11 @@ config["servers"] = dict(
         group="action",
         fast="galil_motion",
         params=dict(
-            Transfermatrix=[
-                [1, 0, 0],
-                [0, 1, 0],
-                [0, 0, 1],
-            ],  # default Transfermatrix for plate calibration
-            # 4x6 plate, FIXME
-            # M_instr = [[1,0,0,-76.525],[0,1,0,-50.875],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
-            # 100mm wafer, FIXME
-            M_instr=[
-                [1, 0, 0, -76.525 + (3 * 25.4 - 50) - 0.5 + 0.75 + 1.5 + 0.25],
-                [0, 1, 0, -50.875 + 2.71 + 5 - 3 + 1],
-                [0, 0, 1, 0],
-                [0, 0, 0, 1],
-            ],  # instrument specific calibration
+            enable_aligner=True,
+            bokeh_port=5003,
+            # backup if f"{gethostname()}_instrument_calib.json" is not found
+            # instrument specific calibration
+            M_instr=[[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
             count_to_mm=dict(
                 A=1.0 / 16282.23,
                 B=1.0 / 6397.56,
@@ -69,7 +65,6 @@ config["servers"] = dict(
         port=8004,
         group="action",
         fast="gamry_server",
-        simulate=False,  # choose between simulator(default) or real device
         params=dict(
             dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
         ),
@@ -107,7 +102,7 @@ config["servers"] = dict(
         fast="pal_server",
         params=dict(
             host="localhost",
-            timeout=30 * 60,  # 30min timeout for waiting for TTL
+            timeout=5 * 60,  # 30min timeout for waiting for TTL
             dev_trigger="NImax",
             trigger={  # TTL handshake via NImax
                 "start": "cDAQ1Mod2/port0/line1",  # TTL1
@@ -115,6 +110,15 @@ config["servers"] = dict(
                 "done": "cDAQ1Mod2/port0/line3",  # TTL3
             },
             cam_file_path=r"C:\Users\anec\Desktop\psc_methods\active_methods\HELAO",
+            # cams={
+            #     "deepclean": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
+            #     # "injection_custom_HPLC":"HELAO_HPLC_LiquidInjection_Custom_to_HPLCInjector_220215.cam",
+            #     "injection_tray_HPLC": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
+            #     "injection_custom_GC_gas_wait": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
+            #     "injection_custom_GC_gas_start": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
+            #     "injection_tray_GC_liquid_start": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
+            #     "archive": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
+            # },
             cams={
                 "deepclean": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
                 # "injection_custom_HPLC":"HELAO_HPLC_LiquidInjection_Custom_to_HPLCInjector_220215.cam",
@@ -142,25 +146,29 @@ config["servers"] = dict(
     # #########################################################################
     # Visualizers (bokeh servers)
     # #########################################################################
-    VIS=dict(  # simple dumb modular visualizer
+    VIS=dict(
         host=hostip,
         port=5001,
         group="visualizer",
         bokeh="bokeh_modular_visualizer",
         params=dict(
             doc_name="ANEC Visualizer",
-            # ws_nidaqmx="NI",
-            ws_potentiostat="PSTAT",
         ),
     ),
-    OP=dict(
+    # #########################################################################
+    # DB package server
+    # #########################################################################
+    DB=dict(
         host=hostip,
-        port=5002,
-        group="operator",
-        bokeh="async_operator",
+        port=8010,
+        group="action",
+        fast="dbpack_server",
         params=dict(
-            doc_name="ANEC Operator",
-            orch="ORCH",
+            aws_config_path="k:/users/hte/.credentials/aws_config.ini",
+            aws_profile="default",
+            aws_bucket="helao.data",
+            api_host="caltech-api.modelyst.com",
+            testing=False,
         ),
     ),
 )

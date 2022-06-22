@@ -3,22 +3,22 @@ __all__ = ["config"]
 
 hostip = "127.0.0.1"
 config = {}
-config["dummy"] = True
+config["dummy"] = False
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
 config["experiment_libraries"] = ["ECHE_exp", "samples_exp"]
+# config["experiment_params"] = { }
 config["sequence_libraries"] = ["ECHE_seq"]
 config["sequence_params"] = {
     "led_wavelengths_nm": [385, 450, 515, 595],
-    "led_intensities_mw": [3.77, 2.77, 1.13, 1.0],
+    "led_intensities_mw": [1.04, 0.86, 0.344, 0.267],
     "led_names": ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
     "led_type": "front",
-    "led_date": "6/24/2020"
-    #           backside 2.27, 1.91, .76, .667   6/29/2021
+    "led_date": "3/13/2019",
 }
 config["run_type"] = "eche"
-config["root"] = r"C:\INST_dev2"
+config["root"] = r"C:\INST_hlo"
 
 
 # we define all the servers here so that the overview is a bit better
@@ -52,10 +52,10 @@ config["servers"] = dict(
             # instrument specific calibration
             M_instr=[[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
             count_to_mm=dict(
-                A=1.0 / 6395.30,
-                B=1.0 / 6400.56,
+                A=1.0 / 6396.87,
+                B=1.0 / 6390.30,
             ),
-            galil_ip_str="192.168.200.225",
+            galil_ip_str="192.168.200.236",
             def_speed_count_sec=10000,
             max_speed_count_sec=25000,
             ipstr="192.168.200.23",
@@ -64,8 +64,8 @@ config["servers"] = dict(
                 y="A",
             ),
             axis_zero=dict(
-                A=127.7,  # z
-                B=76.9,  # y
+                A=76.8,  # z
+                B=77.1,  # y
             ),
             timeout=10 * 60,  # timeout for axis stop in sec
         ),
@@ -76,7 +76,7 @@ config["servers"] = dict(
         group="action",
         fast="gamry_server",
         params=dict(
-            allow_no_sample=True,
+            # allow_no_sample = True,
             dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
         ),
     ),
@@ -86,7 +86,7 @@ config["servers"] = dict(
         group="action",
         fast="galil_io",
         params=dict(
-            galil_ip_str="192.168.200.225",
+            galil_ip_str="192.168.200.236",
             dev_ai={},
             dev_ao={},
             dev_di={
@@ -94,11 +94,12 @@ config["servers"] = dict(
             },
             dev_do={
                 "gamry_aux": 1,
+                "spec_trig": 1,
                 "led": 2,
                 "pump_ref_flush": 3,
                 "doric_led1": 4,
-                # "unknown2":5,
-                "doric_led2": 5,
+                "unknown2": 5,
+                "doric_led2": 6,
                 "doric_led3": 7,
                 "doric_led4": 8,
             },
@@ -126,9 +127,10 @@ config["servers"] = dict(
         group="visualizer",
         bokeh="bokeh_modular_visualizer",
         params=dict(
-            doc_name="ECHE5 Visualizer",
+            doc_name="ECHE7 Visualizer",
         ),
     ),
+    #
     # #########################################################################
     # DB package server
     # #########################################################################
@@ -140,7 +142,7 @@ config["servers"] = dict(
         params=dict(
             aws_config_path="k:/users/hte/.credentials/aws_config.ini",
             aws_profile="default",
-            aws_bucket="helao.data.testing",
+            aws_bucket="helao.data",
             api_host="caltech-api.modelyst.com",
             testing=False,
         ),
