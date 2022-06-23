@@ -617,7 +617,7 @@ class DBPack:
                     f"Path {yml_target} no longer exists, skipping."
                 )
             self.task_queue.task_done()
-    
+
     def cleanup_root(self):
         today = datetime.strptime(datetime.now().strftime("%Y%m%d"), "%Y%m%d")
         chkdirs = ["RUNS_ACTIVE", "RUNS_FINISHED"]
@@ -638,7 +638,7 @@ class DBPack:
                                 error=True,
                             )
                     weekdir = os.path.dirname(datedir)
-                    if len(glob(os.path.join(weekdir), "*")):
+                    if len(glob(os.path.join(weekdir, "*"))) == 0:
                         try:
                             os.rmdir(weekdir)
                         except Exception as e:
@@ -852,9 +852,7 @@ class DBPack:
 
         # zip sequence directory
         for target in synced_sequences:
-            zip_target = target.parent.parent.joinpath(
-                f"{target.parent.name}.zip"
-            )
+            zip_target = target.parent.parent.joinpath(f"{target.parent.name}.zip")
             self.base.print_message(
                 f"Full sequence has synced, creating zip: {zip_target.__str__()}"
             )
