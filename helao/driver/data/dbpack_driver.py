@@ -801,12 +801,15 @@ class DBPack:
                     hyml.progress.read()
 
         hyml.parse_yml(hyml.target)
+        synced_sequences = []
         for pkey in hyml.progress.keys():
             if hyml.progress[pkey]["done"]:
                 continue
             if hyml.progress[pkey]["api"]:
                 if isinstance(pkey, str):
                     sync_path = ops.to_synced()
+                    if pkey.startswith("sequence"):
+                        synced_sequences.append(sync_path)
                 hyml.progress[pkey].update({"done": True, "ready": False})
                 hyml.progress.write()
                 finished.append(pkey)
@@ -814,12 +817,21 @@ class DBPack:
             elif isinstance(pkey, str):
                 await self.add_yml_task(hyml.progress[pkey]["path"], 0)
 
+        # zip sequence directory
+        for target in synced_sequences:
+            zip_target = target.parent.parent.joinpath(
+                f"{target.parent.name}.zip"
+            )
+            self.base.print_message(
+                f"Full sequence has synced, creating zip: {zip_target.__str__()}"
+            )
+            zip_dir(target.parent, zip_target)
+
         return_dict = {
             k: {dk: dv for dk, dv in d.items() if dk != "meta"}
             for k, d in hyml.progress.items()
             if k in finished
         }
-
         return return_dict
 
     def shutdown(self):
@@ -1077,14 +1089,4 @@ class YmlOps:
                 self.dbp.base.print_message("Could not clean directory after moving.")
                 self.dbp.base.print_message(clean_success)
             self.yml.parse_yml(new_target)
-            if self.yml.file_type != "sequence":
-                return self.yml.target.__str__()
-            else:
-                zip_target = new_target.parent.parent.joinpath(
-                    f"{new_target.parent.name}.zip"
-                )
-                self.dbp.base.print_message(
-                    f"Full sequence has synced, creating zip: {zip_target.__str__()}"
-                )
-                zip_dir(new_target.parent, zip_target)
-                return zip_target.__str__()
+            return self.yml.target
