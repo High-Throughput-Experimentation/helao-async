@@ -594,6 +594,7 @@ class DBPack:
         self.task_queue = asyncio.PriorityQueue()
         self.loop.create_task(self.yml_task())
         self.current_task = None
+        self.cleanup_root()
 
     async def yml_task(self):
         while True:
@@ -616,6 +617,26 @@ class DBPack:
                     f"Path {yml_target} no longer exists, skipping."
                 )
             self.task_queue.task_done()
+    
+    def cleanup_root(self):
+        today = datetime.strptime(datetime.now().strftime("%Y%m%d"), "%Y%m%d")
+        chkdirs = ["RUNS_ACTIVE", "RUNS_FINISHED"]
+        for cd in chkdirs:
+            seq_dates = glob(os.path.join(self.world_config["root"], cd, "*", "*"))
+            for datedir in seq_dates:
+                if datetime.strptime(os.path.basename(datedir), "%Y%m%d") < today:
+                    seq_dirs = glob(os.path.join(datedir, "*"))
+                    if len(seq_dirs) == 0:
+                        try:
+                            os.rmdir(datedir)
+                        except Exception as e:
+                            tb = "".join(
+                                traceback.format_exception(type(e), e, e.__traceback__)
+                            )
+                            self.base.print_message(
+                                f"Directory {datedir} is empty, but could not removed. {repr(e), tb,}",
+                                error=True,
+                            )
 
     def read_log(self):
         yaml = YAML(typ="safe")
@@ -826,6 +847,7 @@ class DBPack:
                 f"Full sequence has synced, creating zip: {zip_target.__str__()}"
             )
             zip_dir(target.parent, zip_target)
+            self.cleanup_root()
 
         return_dict = {
             k: {dk: dv for dk, dv in d.items() if dk != "meta"}
