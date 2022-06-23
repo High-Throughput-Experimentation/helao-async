@@ -637,6 +637,18 @@ class DBPack:
                                 f"Directory {datedir} is empty, but could not removed. {repr(e), tb,}",
                                 error=True,
                             )
+                    weekdir = os.path.dirname(datedir)
+                    if len(glob(os.path.join(weekdir), "*")):
+                        try:
+                            os.rmdir(weekdir)
+                        except Exception as e:
+                            tb = "".join(
+                                traceback.format_exception(type(e), e, e.__traceback__)
+                            )
+                            self.base.print_message(
+                                f"Directory {weekdir} is empty, but could not removed. {repr(e), tb,}",
+                                error=True,
+                            )
 
     def read_log(self):
         yaml = YAML(typ="safe")
