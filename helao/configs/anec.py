@@ -1,6 +1,7 @@
 hostip = "127.0.0.1"
 config = {}
 config["dummy"] = False
+config['simulation'] = False
 
 # action library provides generator functions which produce actions
 config["experiment_libraries"] = ["ANEC_exp", "samples_exp"]
