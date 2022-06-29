@@ -103,6 +103,7 @@ config["servers"] = dict(
                 '7':'PXI-6289/ai22',
                 '8':'PXI-6289/ai23',
                 '9':'PXI-6289/ai0'
+              #  '9':'PXI-6289/ai1'  # after rewire for thermocouple connection
                 },
             dev_cellvoltage = {
                 '1':'PXI-6284/ai16',
@@ -114,6 +115,7 @@ config["servers"] = dict(
                 '7':'PXI-6284/ai22',
                 '8':'PXI-6284/ai23',
                 '9':'PXI-6284/ai0'
+              #  '9':'PXI-6284/ai1'  # after rewire for thermocouple connection
                 },
             # dev_activecell = {
             #     '1':'PXI-6289/port0/line23', #P0.23
@@ -233,5 +235,22 @@ config["servers"] = dict(
         bokeh="bokeh_modular_visualizer",
         params = dict(
         )
+    ),
+    #
+    # #########################################################################
+    # DB package server
+    # #########################################################################
+    DB=dict(
+        host=hostip,
+        port=8010,
+        group="action",
+        fast="dbpack_server",
+        params=dict(
+            aws_config_path="k:/users/hte/.credentials/aws_config.ini",
+            aws_profile="default",
+            aws_bucket="helao.data.testing",
+            api_host="caltech-api.modelyst.com",
+            testing=False,
+        ),
     ),
 )
