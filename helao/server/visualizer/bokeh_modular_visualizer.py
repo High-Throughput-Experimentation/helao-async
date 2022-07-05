@@ -4,13 +4,13 @@ __all__ = ["makeBokehApp"]
 import websockets
 import asyncio
 import json
+from datetime import datetime
 from functools import partial
 from socket import gethostname
 from uuid import UUID
 from copy import deepcopy
 
 from bokeh.models import (
-    ColumnDataSource,
     CheckboxButtonGroup,
     RadioButtonGroup,
     TextInput,
@@ -20,6 +20,8 @@ from bokeh.plotting import figure
 from bokeh.palettes import small_palettes
 from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
+from bokeh.models import ColumnDataSource
+from bokeh.models import DataTable, TableColumn
 
 
 from helaocore.model.data import DataPackageModel
@@ -27,12 +29,25 @@ from helaocore.model.hlostatus import HloStatus
 from helaocore.server.make_vis_serv import makeVisServ
 from helaocore.server.vis import Vis
 from helaocore.helper.config_loader import config_loader
+from helaocore.server.dispatcher import async_private_dispatcher
+from helaocore.error import ErrorCodes
 
 
 valid_data_status = (
     None,
     HloStatus.active,
 )
+
+
+
+def async_partial(f, *args):
+    async def f2(*args2):
+        result = f(*args, *args2)
+        if asyncio.iscoroutinefunction(f):
+            result = await result
+        return result
+
+    return f2
 
 
 class C_nidaqmxvis:
@@ -654,6 +669,208 @@ class C_potvis:
             self._add_plots()
 
 
+class C_palvis:
+    """PAL/archive visualizer module class"""
+
+    def __init__(self, visServ: Vis, pal_key: str):
+        self.vis = visServ
+        self.config_dict = self.vis.server_cfg["params"]
+        self.max_width = 1024
+        self.max_smps = 10
+
+        self.pal_key = pal_key
+        palserv_config = self.vis.world_cfg["servers"].get(self.pal_key, None)
+        if palserv_config is None:
+            return
+        palserv_host = palserv_config.get("host", None)
+        palserv_port = palserv_config.get("port", None)
+
+        self.data_url = (
+            f"ws://{palserv_config['host']}:{palserv_config['port']}/ws_data"
+        )
+        # self.stat_url = f"ws://{palserv_config["host"]}:{palserv_config["port"]}/ws_status"
+
+        self.IOloop_data_run = False
+        self.IOloop_stat_run = False
+
+        smptypes = ["solid", "liquid", "gas", "assembly"]
+
+        self.data_dict_keys = [
+            "global_label",
+            "sample_creation_timecode",
+            "comment",
+            "volume",
+            "ph",
+            "electrolyte",
+        ]
+        self.data_dict = {
+            smptype: {key: [] for key in self.data_dict_keys} for smptype in smptypes
+        }
+
+        self.datasource = {
+            smptype: ColumnDataSource(data=self.data_dict[smptype])
+            for smptype in smptypes
+        }
+
+        self.sample_tables = {
+            smptype: DataTable(
+                source=self.datasource[smptype],
+                columns=[TableColumn(field=k, title=k) for k in self.data_dict_keys],
+                width=self.max_width - 20,
+                height=200,
+                autosize_mode="fit_columns",
+            )
+            for smptype in smptypes
+        }
+
+        # create visual elements
+        self.layout = []
+
+        # input field widget
+        self.input_max_smps = TextInput(
+            value=f"{self.max_smps}",
+            title="num latest samples to return",
+            disabled=False,
+            width=150,
+            height=40,
+        )
+        # execute on input field change
+        self.input_max_smps.on_change(
+            "value",
+            partial(self.callback_input_max_smps, sender=self.input_max_smps),
+        )
+
+        # combine all sublayouts into a single one
+        self.layout = layout(
+            [
+                [
+                    Spacer(width=20),
+                    Div(
+                        text=f'<b>PAL Visualizer module for server <a href="http://{palserv_host}:{palserv_port}/docs#/" target="_blank">\'{self.pal_key}\'</a></b>',
+                        width=1004,
+                        height=15,
+                    ),
+                ],
+                [self.input_max_smps],
+                [
+                    Spacer(width=20),
+                    Div(
+                        text="<b>Newest liquid samples:</b>", width=200 + 50, height=15
+                    ),
+                ],
+                [self.sample_tables["liquid"]],
+                [
+                    Spacer(width=20),
+                    Div(
+                        text="<b>Newest assembly samples:</b>",
+                        width=200 + 50,
+                        height=15,
+                    ),
+                ],
+                [self.sample_tables["assembly"]],
+                [
+                    Spacer(width=20),
+                    Div(text="<b>Newest gas samples:</b>", width=200 + 50, height=15),
+                ],
+                [self.sample_tables["gas"]],
+                [
+                    Spacer(width=20),
+                    Div(text="<b>Newest solid samples:</b>", width=200 + 50, height=15),
+                ],
+                [self.sample_tables["solid"]],
+                Spacer(height=10),
+            ],
+            background="#C0C0C0",
+            width=1024,
+        )
+
+        self.reset_plot()
+
+        self.vis.doc.add_root(self.layout)
+        self.vis.doc.add_root(Spacer(height=10))
+        self.IOtask = asyncio.create_task(self.IOloop_data())
+        self.vis.doc.on_session_destroyed(self.cleanup_session)
+
+    def cleanup_session(self, session_context):
+        self.vis.print_message(f"'{self.pal_key}' Bokeh session closed", info=True)
+        self.IOloop_data_run = False
+        self.IOtask.cancel()
+    
+    def callback_input_max_smps(self, attr, old, new, sender):
+        """callback for input_max_smps"""
+
+        def to_int(val):
+            try:
+                return int(val)
+            except ValueError:
+                return None
+
+        newpts = to_int(new)
+
+        self.max_smps = newpts
+
+        self.vis.doc.add_next_tick_callback(
+            partial(self.update_input_value, sender, f"{self.max_smps}")
+        )
+        self.reset_plot()
+
+    def update_input_value(self, sender, value):
+        sender.value = value
+        
+    async def add_points(self):
+        # pull latest sample lists from PAL server and populate self.datasource.data
+        # keep global_label, sample_creation_timecode, comment, volume, ph, electrolyte
+        resp, err = await async_private_dispatcher(
+            self.vis.world_cfg, "PAL", "list_new_samples", {"num_smps": self.max_smps}, {}
+        )
+        if err == ErrorCodes.none:
+            for smptype in ["solid", "liquid", "gas", "assembly"]:
+                for k in self.data_dict_keys:
+                    self.data_dict[smptype][k] = [d.get(k, None) for d in resp[smptype]]
+                self.data_dict[smptype]["sample_creation_timecode"] = [
+                    datetime.fromtimestamp(v / 1e9).strftime("%Y-%m-%d %H:%M:%S")
+                    for v in self.data_dict[smptype]["sample_creation_timecode"]
+                ]
+                self.datasource[smptype].data = self.data_dict[smptype]
+
+    async def IOloop_data(self):  # non-blocking coroutine, updates data source
+        self.vis.print_message(f" ... PAL visualizer subscribing to: {self.data_url}")
+        retry_limit = 5
+        for _ in range(retry_limit):
+            try:
+                async with websockets.connect(self.data_url) as ws:
+                    self.IOloop_data_run = True
+                    while self.IOloop_data_run:
+                        try:
+                            datapackage = DataPackageModel(
+                                **json.loads(await ws.recv())
+                            )
+                            datastatus = datapackage.datamodel.status
+                            if datastatus in valid_data_status:
+                                self.vis.doc.add_next_tick_callback(
+                                    async_partial(self.add_points)
+                                )
+                        except Exception:
+                            self.IOloop_data_run = False
+                    await ws.close()
+                    self.IOloop_data_run = False
+            except Exception:
+                self.vis.print_message(
+                    f"failed to subscribe to "
+                    f"{self.data_url}"
+                    "trying again in 1sec",
+                    info=True,
+                )
+                await asyncio.sleep(1)
+            if not self.IOloop_data_run:
+                self.vis.print_message("IOloop closed", info=True)
+                break
+
+    def reset_plot(self):
+        # copy old data to "prev" plot
+        self.vis.doc.add_next_tick_callback(partial(self.add_points))
+
+
 def find_server_names(vis: Vis, fast_key: str) -> list:
     """finds server name for a given fast driver"""
     server_names = []
@@ -708,9 +925,13 @@ def makeBokehApp(doc, confPrefix, servKey, helao_root):
 
     # find all configured NI servers
     niservnames = find_server_names(vis=app.vis, fast_key="nidaqmx_server")
-
     NImaxvis = []
     for niservname in niservnames:
         NImaxvis.append(C_nidaqmxvis(visServ=app.vis, nidaqmx_key=niservname))
 
+    # find all configured PAL servers
+    palservnames = find_server_names(vis=app.vis, fast_key="pal_server")
+    palvis = []
+    for palservname in palservnames:
+        palvis.append(C_palvis(visServ=app.vis, pal_key=palservname))
     return doc
