@@ -39,7 +39,6 @@ valid_data_status = (
 )
 
 
-
 def async_partial(f, *args):
     async def f2(*args2):
         result = f(*args, *args2)
@@ -740,6 +739,16 @@ class C_palvis:
             partial(self.callback_input_max_smps, sender=self.input_max_smps),
         )
 
+        # selector for give_only inheritance
+        self.inheritance_selector_group = CheckboxButtonGroup(
+            labels=["give_only"], active=[], width=500
+        )
+        self.inheritance_selector_group.on_change(
+            "active",
+            partial(self.callback_inheritance, sender=self.inheritance_selector_group)
+        )
+        self.inheritance_select = self.inheritance_selector_group.active
+
         # combine all sublayouts into a single one
         self.layout = layout(
             [
@@ -751,7 +760,7 @@ class C_palvis:
                         height=15,
                     ),
                 ],
-                [self.input_max_smps],
+                [self.input_max_smps, self.inheritance_selector_group],
                 [
                     Spacer(width=20),
                     Div(
@@ -795,7 +804,7 @@ class C_palvis:
         self.vis.print_message(f"'{self.pal_key}' Bokeh session closed", info=True)
         self.IOloop_data_run = False
         self.IOtask.cancel()
-    
+
     def callback_input_max_smps(self, attr, old, new, sender):
         """callback for input_max_smps"""
 
@@ -806,9 +815,7 @@ class C_palvis:
                 return None
 
         newpts = to_int(new)
-
         self.max_smps = newpts
-
         self.vis.doc.add_next_tick_callback(
             partial(self.update_input_value, sender, f"{self.max_smps}")
         )
@@ -816,12 +823,29 @@ class C_palvis:
 
     def update_input_value(self, sender, value):
         sender.value = value
-        
+    
+    def update_inheritance_selector(self):
+        self.inheritance_select = self.inheritance_selector_group.active
+    
+    def callback_inheritance(self, attr, old, new, sender):
+        """callback for inheritance_select"""
+        self.vis.doc.add_next_tick_callback(
+            partial(self.update_inheritance_selector)
+        )
+        self.reset_plot()
+
     async def add_points(self):
         # pull latest sample lists from PAL server and populate self.datasource.data
         # keep global_label, sample_creation_timecode, comment, volume, ph, electrolyte
         resp, err = await async_private_dispatcher(
-            self.vis.world_cfg, "PAL", "list_new_samples", {"num_smps": self.max_smps}, {}
+            self.vis.world_cfg,
+            "PAL",
+            "list_new_samples",
+            {
+                "num_smps": self.max_smps,
+                "give_only": True if 0 in self.inheritance_select else False,
+            },
+            {},
         )
         if err == ErrorCodes.none:
             for smptype in ["solid", "liquid", "gas", "assembly"]:
