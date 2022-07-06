@@ -1003,27 +1003,43 @@ def makeApp(confPrefix, servKey, helao_root):
             for slotnum, vialtray in slotdict.items()
             for vialidx, (vialbool, sample) in enumerate(
                 zip(vialtray.vials, vialtray.samples)
-            ) if vialbool
+            )
+            if vialbool
         }
         custom_positions = {
             customkey: custom.sample.global_label
             for customkey, custom in positions.customs_dict.items()
         }
-        active.action.action_params.update({
-            "_positions": positions.as_dict(),
-            "_tray_pos": tray_positions,
-            "_custom_pos": custom_positions,
-        })
+        active.action.action_params.update(
+            {
+                "_positions": positions.as_dict(),
+                "_tray_pos": tray_positions,
+                "_custom_pos": custom_positions,
+            }
+        )
         finished_action = await active.finish()
         return finished_action.as_dict()
 
     @app.post(f"/list_new_samples", tags=["public_db"])
     async def list_new_samples(num_smps: int = 10, give_only: bool = False):
         """List num_smps newest global sample labels from each local DB table."""
-        solids = await app.driver.archive.unified_db.solidAPI.list_new_samples(limit=num_smps, give_only=give_only)
-        liquids = await app.driver.archive.unified_db.liquidAPI.list_new_samples(limit=num_smps, give_only=give_only)
-        gases = await app.driver.archive.unified_db.gasAPI.list_new_samples(limit=num_smps, give_only=give_only)
-        assemblies = await app.driver.archive.unified_db.assemblyAPI.list_new_samples(limit=num_smps, give_only=give_only)
-        return {"solid": solids, "liquid": liquids, "gas": gases, "assembly": assemblies}
+        solids = await app.driver.archive.unified_db.solidAPI.list_new_samples(
+            limit=num_smps, give_only=give_only
+        )
+        liquids = await app.driver.archive.unified_db.liquidAPI.list_new_samples(
+            limit=num_smps, give_only=give_only
+        )
+        gases = await app.driver.archive.unified_db.gasAPI.list_new_samples(
+            limit=num_smps, give_only=give_only
+        )
+        assemblies = await app.driver.archive.unified_db.assemblyAPI.list_new_samples(
+            limit=num_smps, give_only=give_only
+        )
+        return {
+            "solid": solids,
+            "liquid": liquids,
+            "gas": gases,
+            "assembly": assemblies,
+        }
 
     return app
