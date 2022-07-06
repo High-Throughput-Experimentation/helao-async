@@ -741,11 +741,14 @@ class C_palvis:
 
         # selector for give_only inheritance
         self.inheritance_selector_group = CheckboxButtonGroup(
-            labels=["give_only"], active=[], width=500
+            labels=["give_only"],
+            active=[],
+            width=150,
+            height=40,
         )
         self.inheritance_selector_group.on_change(
             "active",
-            partial(self.callback_inheritance, sender=self.inheritance_selector_group)
+            partial(self.callback_inheritance, sender=self.inheritance_selector_group),
         )
         self.inheritance_select = self.inheritance_selector_group.active
 
@@ -760,7 +763,7 @@ class C_palvis:
                         height=15,
                     ),
                 ],
-                [self.input_max_smps, self.inheritance_selector_group],
+                [self.input_max_smps, [Spacer(width=20), Div(text='filter by inheritance:'), self.inheritance_selector_group]],
                 [
                     Spacer(width=20),
                     Div(
@@ -823,15 +826,13 @@ class C_palvis:
 
     def update_input_value(self, sender, value):
         sender.value = value
-    
+
     def update_inheritance_selector(self):
         self.inheritance_select = self.inheritance_selector_group.active
-    
+
     def callback_inheritance(self, attr, old, new, sender):
         """callback for inheritance_select"""
-        self.vis.doc.add_next_tick_callback(
-            partial(self.update_inheritance_selector)
-        )
+        self.vis.doc.add_next_tick_callback(partial(self.update_inheritance_selector))
         self.reset_plot()
 
     async def add_points(self):
@@ -843,7 +844,7 @@ class C_palvis:
             "list_new_samples",
             {
                 "num_smps": self.max_smps,
-                "give_only": True if 0 in self.inheritance_select else False,
+                "give_only": "true" if 0 in self.inheritance_select else "false",
             },
             {},
         )
