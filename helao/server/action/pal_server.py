@@ -1018,12 +1018,12 @@ def makeApp(confPrefix, servKey, helao_root):
         return finished_action.as_dict()
 
     @app.post(f"/list_new_samples", tags=["public_db"])
-    async def list_new_samples(num_smps: int = 10):
+    async def list_new_samples(num_smps: int = 10, give_only: bool = False):
         """List num_smps newest global sample labels from each local DB table."""
-        solids = await app.driver.archive.unified_db.solidAPI.list_new_samples(limit=num_smps)
-        liquids = await app.driver.archive.unified_db.liquidAPI.list_new_samples(limit=num_smps)
-        gases = await app.driver.archive.unified_db.gasAPI.list_new_samples(limit=num_smps)
-        assemblies = await app.driver.archive.unified_db.assemblyAPI.list_new_samples(limit=num_smps)
+        solids = await app.driver.archive.unified_db.solidAPI.list_new_samples(limit=num_smps, give_only=give_only)
+        liquids = await app.driver.archive.unified_db.liquidAPI.list_new_samples(limit=num_smps, give_only=give_only)
+        gases = await app.driver.archive.unified_db.gasAPI.list_new_samples(limit=num_smps, give_only=give_only)
+        assemblies = await app.driver.archive.unified_db.assemblyAPI.list_new_samples(limit=num_smps, give_only=give_only)
         return {"solid": solids, "liquid": liquids, "gas": gases, "assembly": assemblies}
 
     return app
