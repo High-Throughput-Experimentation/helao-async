@@ -763,7 +763,7 @@ class C_palvis:
                         height=15,
                     ),
                 ],
-                [self.input_max_smps, [Spacer(width=20), Div(text='filter by inheritance:'), self.inheritance_selector_group]],
+                [self.input_max_smps, Spacer(width=50), [Div(text='filter by inheritance:'), self.inheritance_selector_group]],
                 [
                     Spacer(width=20),
                     Div(
