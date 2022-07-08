@@ -4,10 +4,9 @@ channels:
   - defaults
 dependencies:
   - pip:
-    - aioshutil>=1.1
+    - aioshutil=1.1
   - aiofiles=0.8
   - aiohttp=3.8
-  - aioshutil=1.1
   - bokeh=2.4
   - boto3=1.23
   - botocore=1.26
