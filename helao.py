@@ -270,7 +270,7 @@ def validateConfig(PIDD, confDict, helao_root):
                 print_message(
                     {},
                     "launcher",
-                    f"{server} server code helao/server/{serverDict['group']}/{serverDict[hasCode[0]]+'.py'} does not exist.",
+                    f"{server} server code helao/servers/{serverDict['group']}/{serverDict[hasCode[0]]+'.py'} does not exist.",
                     error=True,
                 )
                 return False
@@ -366,7 +366,7 @@ def launcher(confArg, confDict, helao_root):
                     print_message(
                         {},
                         "launcher",
-                        f"Launching {server} at {servHost}:{servPort} using helao/server/{group}/{servPy}.py",
+                        f"Launching {server} at {servHost}:{servPort} using helao/servers/{group}/{servPy}.py",
                     )
                     if codeKey == "fast":
                         if group == "orchestrator":
