@@ -8,8 +8,8 @@ from uvicorn.config import LOGGING_CONFIG
 import uvicorn
 import colorama
 
-from helaocore.helper.print_message import print_message
-from helaocore.helper.config_loader import config_loader
+from helao.helpers.print_message import print_message
+from helao.helpers.config_loader import config_loader
 
 
 if __name__ == "__main__":
