@@ -43,13 +43,13 @@ from pyfiglet import figlet_format
 import colorama
 
 from helaocore.version import get_hlo_version
-from helaocore.helper.print_message import print_message
-from helaocore.helper.helao_dirs import helao_dirs
-from helaocore.helper.config_loader import config_loader
+from helao.helpers.print_message import print_message
+from helao.helpers.helao_dirs import helao_dirs
+from helao.helpers.config_loader import config_loader
 
-import helao.test.unit_test_sample_models
+import helao.tests.unit_test_sample_models
 
-# from helao.test.unit_test_sample_models import sample_model_unit_test
+# from helao.tests.unit_test_sample_models import sample_model_unit_test
 
 
 class Pidd:
@@ -262,7 +262,7 @@ def validateConfig(PIDD, confDict, helao_root):
                 return False
             launchPath = os.path.join(
                 "helao",
-                "server",
+                "servers",
                 serverDict["group"],
                 serverDict[hasCode[0]] + ".py",
             )
@@ -409,7 +409,7 @@ def launcher(confArg, confDict, helao_root):
 
 # def main():
 if __name__ == "__main__":
-    if not helao.test.unit_test_sample_models.sample_model_unit_test():
+    if not helao.tests.unit_test_sample_models.sample_model_unit_test():
         quit()
     colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
     helao_root = os.path.dirname(os.path.realpath(__file__))
