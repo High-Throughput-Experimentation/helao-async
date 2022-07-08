@@ -1023,7 +1023,7 @@ def makeApp(confPrefix, servKey, helao_root):
     @app.post(f"/list_new_samples", tags=["public_db"])
     async def list_new_samples(num_smps: int = 10, give_only: str = "false"):
         """List num_smps newest global sample labels from each local DB table."""
-        give_bool = True if give_only=="true" else False
+        give_bool = True if give_only == "true" else False
         solids = await app.driver.archive.unified_db.solidAPI.list_new_samples(
             limit=num_smps, give_only=give_bool
         )
