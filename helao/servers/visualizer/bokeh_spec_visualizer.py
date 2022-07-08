@@ -24,7 +24,7 @@ from bokeh.layouts import layout, Spacer
 
 from helaocore.models.data import DataPackageModel
 from helaocore.models.hlostatus import HloStatus
-from helao.servers.make_vis_serv import makeVisServ
+from helao.helpers.make_vis_serv import makeVisServ
 from helao.servers.vis import Vis
 from helao.helpers.config_loader import config_loader
 

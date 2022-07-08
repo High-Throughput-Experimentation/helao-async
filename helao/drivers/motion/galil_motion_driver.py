@@ -23,7 +23,7 @@ from bokeh.server.server import Server
 from helao.servers.base import Base
 from helaocore.error import ErrorCodes
 from helao.helpers.premodels import Action
-from helao.servers.make_vis_serv import makeVisServ
+from helao.helpers.make_vis_serv import makeVisServ
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 from helao.helpers.active_params import ActiveParams
 from helaocore.models.file import FileConnParams

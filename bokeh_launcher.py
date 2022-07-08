@@ -24,7 +24,7 @@ if __name__ == "__main__":
     servPy = S["bokeh"]
 
     makeApp = import_module(
-        f"helao.server.{S['group']}.{S['bokeh']}"
+        f"helao.servers.{S['group']}.{S['bokeh']}"
     ).makeBokehApp
     root = config.get("root", None)
     if root is not None:

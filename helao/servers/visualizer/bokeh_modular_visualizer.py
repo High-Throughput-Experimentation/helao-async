@@ -26,10 +26,10 @@ from bokeh.models import DataTable, TableColumn
 
 from helaocore.models.data import DataPackageModel
 from helaocore.models.hlostatus import HloStatus
-from helao.servers.make_vis_serv import makeVisServ
+from helao.helpers.make_vis_serv import makeVisServ
 from helao.servers.vis import Vis
 from helao.helpers.config_loader import config_loader
-from helao.servers.dispatcher import async_private_dispatcher
+from helao.helpers.dispatcher import async_private_dispatcher
 from helaocore.error import ErrorCodes
 
 
