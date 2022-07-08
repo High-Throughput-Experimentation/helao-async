@@ -499,6 +499,8 @@ class Orch(Base):
             self.print_message(f"new active sequence is {self.active_sequence.sequence_name}")
             if self.world_cfg.get("dummy", "False"):
                 self.active_sequence.dummy = True
+            if self.world_cfg.get("simulation", "False"):
+                self.active_sequence.simulation = True
             self.active_sequence.init_seq(time_offset=self.ntp_offset)
 
             # todo: this is for later, for now the operator needs to unpack the sequence
@@ -550,6 +552,8 @@ class Orch(Base):
         self.print_message(f"new active experiment is {self.active_experiment.experiment_name}")
         if self.world_cfg.get("dummy", "False"):
             self.active_experiment.dummy = True
+        if self.world_cfg.get("simulation", "False"):
+            self.active_experiment.simulation = True
         self.active_experiment.run_type = self.run_type
         self.active_experiment.orchestrator = self.server
         self.active_experiment.init_exp(time_offset=self.ntp_offset)
