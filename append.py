@@ -9,7 +9,7 @@ __all__ = ["appender"]
 
 import os
 import sys
-from helaocore.helper.config_loader import config_loader
+from helao.helpers.config_loader import config_loader
 
 helao_root = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(helao_root, 'config'))
