@@ -78,7 +78,15 @@ class _BaseSampleAPI(object):
         self._con = None
         self._cur = None
         # convert these to json when saving them to the db
-        self._jsonkeys = ["chemical", "partial_molarity", "supplier", "lot_number", "source", "status", "action_uuid"]
+        self._jsonkeys = [
+            "chemical",
+            "partial_molarity",
+            "supplier",
+            "lot_number",
+            "source",
+            "status",
+            "action_uuid",
+        ]
         self.ready = False
 
     async def _open_db(self):
@@ -113,6 +121,29 @@ class _BaseSampleAPI(object):
             )
 
         return object_to_sample(sampledict)
+
+    
+    def _df_to_samples(self, df):
+        """converts db dataframe back to a sample basemodel
+        and performs a simply data integrity check"""
+
+        if df.size == 0:
+            return [NoneSample()]
+        else:
+            sample_list = []
+            for i in range(df.shape[0]):
+                sampledict = dict(df.iloc[i, :])
+
+                for key in self._jsonkeys:
+                    sampledict.update({key: json.loads(sampledict[key])})
+
+                if sampledict["idx"] != sampledict["sample_no"]:  # integrity check
+                    raise ValueError(
+                        f"sampledict['idx'] != sampledict['sample_no']: {sampledict['idx']} != {sampledict['sample_no']}"
+                    )
+                sample_list.append(object_to_sample(sampledict))
+
+        return sample_list
 
     def _create_init_db(self):
         self._cur.execute(
@@ -300,6 +331,44 @@ class _BaseSampleAPI(object):
                 else:
                     self._base.print_message("zero sample_no is not supported", info=True)
             self._close_db()
+        return ret_samples
+
+    async def list_new_samples(self, limit: int = 10, give_only: bool = False) -> List[SampleUnion]:
+        """this will only use the sample_no for local sample, or global_label for external samples
+        and fills in the rest from the db and returns the list again.
+        We expect to not have mixed sample types here.
+        """
+        while not self.ready:
+            self._base.print_message("db not ready", info=True)
+            await asyncio.sleep(0.1)
+        await asyncio.sleep(0.001)
+        ret_samples = []
+        inherit = 'WHERE inheritance = "give_only"' if give_only else ''
+        lock = asyncio.Lock()
+        async with lock:
+            await self._open_db()
+            self._base.print_message(f"getting {limit} samples of type {self._sample_type}")
+            await asyncio.sleep(0.001)
+            retdf = pd.read_sql_query(
+                f"""
+                SELECT 
+                    * 
+                FROM
+                    {self._sample_type}
+                {inherit}
+                ORDER BY
+                    sample_creation_timecode DESC
+                LIMIT
+                    {limit};
+                """,
+                con=self._con,
+            )
+            retsample_list = self._df_to_samples(retdf)
+            for retsample in retsample_list:
+                if retsample.sample_type is not None:
+                    ret_samples.append(retsample.clean_dict())
+            self._close_db()
+            # print('\n\n', ret_samples, '\n\n')
         return ret_samples
 
     def _update(self, sample_dfdict):
@@ -813,6 +882,19 @@ class UnifiedSampleDataAPI:
                 )
 
         return retval
+
+    async def list_new_samples(self, limit: int = 10) -> List[SampleUnion]:
+        """this will only use the sample_no for local sample, or global_label for external samples
+        and fills in the rest from the db and returns the list again.
+        We expect to not have mixed sample types here.
+        """
+        retdict = {
+            "liquid": await self.liquidAPI.list_new_samples(limit),
+            "solid": await self.solidAPI.list_new_samples(limit),
+            "gas": await self.gasAPI.list_new_samples(limit),
+            "assembly": await self.assemblyAPI.list_new_samples(limit),
+        }
+        return retdict
 
     async def update_samples(self, samples: List[SampleUnion] = []) -> None:
         for sample_ in samples:

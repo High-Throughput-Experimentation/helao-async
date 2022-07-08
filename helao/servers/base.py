@@ -779,6 +779,8 @@ class Base(object):
             self.action.action_server = self.base.server
             if self.base.world_cfg.get("dummy", "False"):
                 self.action.dummy = True
+            if self.base.world_cfg.get("simulation", "False"):
+                self.action.simulation = True
             self.action.init_act(time_offset=self.base.ntp_offset)
             self.add_new_listen_uuid(self.action.action_uuid)
 
