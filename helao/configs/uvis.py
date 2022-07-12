@@ -35,39 +35,41 @@ config["servers"] = dict(
     ##########################################################################
     SPEC_T=dict(
         host=hostip,
-        port=8002,
+        port=8004,
         group="action",
         fast="spec_server",
         params=dict(
             dev_num=0,
-            lib_path=r"C:\Spectral Products\SM32ProForUSB-T2\SDK Examples\DLL\x64\stdcall\SPdbUSBm.dll",
+            lib_path=r"C:\Spectral Products\SM32ProForUSB\SDK Examples\DLL\x64\stdcall\SPdbUSBm.dll",
             n_pixels=1024,
-            id_vendor = 0x0547,
-            id_product = 0x0322,
+            start_margin=5,
+            # id_vendor = 0x0547,
+            # id_product = 0x0322,
         ),
     ),
     SPEC_R=dict(
         host=hostip,
-        port=8003,
+        port=8008,
         group="action",
         fast="spec_server",
         params=dict(
             dev_num=1,
-            lib_path=r"C:\Spectral Products\SM32ProForUSB-T2\SDK Examples\DLL\x64\stdcall\SPdbUSBm.dll",
+            lib_path=r"C:\Spectral Products\SM32ProForUSB\SDK Examples\DLL\x64\stdcall\SPdbUSBm.dll",
             n_pixels=1024,
-            id_vendor = 0x0547,
-            id_product = 0x0322,
+            start_margin=5,
+            # id_vendor = 0x0547,
+            # id_product = 0x0322,
         ),
     ),
     MOTOR=dict(
         host=hostip,
-        port=8004,
+        port=8003,
         group="action",
         fast="galil_motion",
         # cmd_print=False,
         params=dict(
             enable_aligner=True,
-            bokeh_port=5004,
+            bokeh_port=5003,
             # backup if f"{gethostname()}_instrument_calib.json" is not found
             # instrument specific calibration
             M_instr=[[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
@@ -75,17 +77,17 @@ config["servers"] = dict(
                 A=1.0 / 6396.11,
                 B=1.0 / 6400.24,
             ),
-            galil_ip_str="192.168.200.232",
+            galil_ip_str="192.168.200.246",
             def_speed_count_sec=10000,
             max_speed_count_sec=25000,
             ipstr="192.168.200.23",
             axis_id=dict(
-                x="B",
-                y="A",
+                x="A",
+                y="B",
             ),
             axis_zero=dict(
-                A=127.8,  # z
-                B=76.7,  # y
+                A=127,  # X
+                B=72.5,  # Y
             ),
             timeout=10 * 60,  # timeout for axis stop in sec
         ),
@@ -96,21 +98,17 @@ config["servers"] = dict(
         group="action",
         fast="galil_io",
         params=dict(
-            galil_ip_str="192.168.200.232",
+            galil_ip_str="192.168.200.246",
             dev_ai={},
             dev_ao={},
             dev_di={
                 "gamry_ttl0": 1,
             },
             dev_do={
-                "gamry_aux": 1,
-                "led": 8,
-                "pump_ref_flush": 3,
-                "doric_led1": 4,
-                "pump_supply": 2,
-                "doric_led2": 5,
-                "doric_led3": 6,
-                "doric_led4": 7,
+                "gamry_aux": 4,
+                "doric_led1": 1,
+                "spec_trig": 2,
+                "spec_trig2": 3,
             },
         ),
     ),
@@ -130,15 +128,15 @@ config["servers"] = dict(
     # #########################################################################
     # Visualizers (bokeh servers)
     # #########################################################################
-    # VIS=dict(
-    #     host=hostip,
-    #     port=5001,
-    #     group="visualizer",
-    #     bokeh="bokeh_modular_visualizer",
-    #     params=dict(
-    #         doc_name="ECHE4 Visualizer",
-    #     ),
-    # ),
+    VIS=dict(
+        host=hostip,
+        port=5001,
+        group="visualizer",
+        bokeh="bokeh_modular_visualizer",
+        params=dict(
+            doc_name="UVIS Visualizer",
+        ),
+    ),
     #
     # #########################################################################
     # DB package server
