@@ -31,7 +31,7 @@ config["servers"] = dict(
         group="action",
         fast="archive_simulator",
         params=dict(
-            data_path="/autofs/sshfs_home/users/guevarra/20191108_multipH_OER_full.csv"
+            data_path="/mnt/STORAGE/helao_tmp/20191108_multipH_OER_full.csv"
         ),
     ),
     MOTOR=dict(
@@ -40,7 +40,7 @@ config["servers"] = dict(
         group="action",
         fast="motion_simulator",
         params=dict(
-            platemap_path="/autofs/sshfs_data/hte_jcap_app_proto/map/0069-04-0100-mp.txt",
+            platemap_path="/mnt/STORAGE/helao_tmp/0069-04-0100-mp.txt",
             count_to_mm=dict(
                 A=1.0/6396.87,
                 B=1.0/6390.30,
@@ -55,7 +55,7 @@ config["servers"] = dict(
         group="action",
         fast="pstat_simulator",
         params=dict(
-            data_path="/autofs/sshfs_home/users/guevarra/20191108_multipH_OER_full.csv"
+            data_path="/mnt/STORAGE/helao_tmp/20191108_multipH_OER_full.csv"
         ),
     ),
     ANA=dict(
@@ -64,7 +64,7 @@ config["servers"] = dict(
         group="action",
         fast="analysis_simulator",
         params=dict(
-            data_path="/autofs/sshfs_home/users/guevarra/20191108_multipH_OER_full.csv"
+            data_path="/mnt/STORAGE/helao_tmp/20191108_multipH_OER_full.csv"
         ),
     ),
     # DB=dict(
