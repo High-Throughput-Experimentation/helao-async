@@ -135,8 +135,8 @@ class SM303:
 
     def setup_sm303(self):
         try:
-            self.model = ctypes.c_short(self.spec.spGetModel())
             self.spec.spTestAllChannels()
+            self.model = ctypes.c_short(self.spec.spGetModel(self.dev_num))
             self.spec.spSetupGivenChannel(self.dev_num)
             self.spec.spInitGivenChannel(self.model, self.dev_num)
             self.spec.spSetTEC(ctypes.c_long(1), self.dev_num)
