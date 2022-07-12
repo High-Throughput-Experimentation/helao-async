@@ -11,7 +11,8 @@ __all__ = [
     "UVIS_slave_shutdown",
     "UVIS_slave_movetosample",
     "UVIS_slave_move",
-    "UVIS_slave_transmission",
+    "UVIS_slave_CV_led_secondtrigger",
+#    "UVIS_slave_transmission",
 ]
 
 
