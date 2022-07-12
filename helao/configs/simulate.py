@@ -7,7 +7,7 @@ config['simulation'] = True
 config["experiment_libraries"] = ["simulate_exp"]
 config["sequence_libraries"] = []
 config["run_type"] = "simulation"
-config["root"] = "/mnt/BIGSTOR/INST"  # software log and run files saved here
+config["root"] = "/mnt/STORAGE/INST_hlo"  # software log and run files saved here
 
 
 # we define all the servers here so that the overview is a bit better
@@ -31,7 +31,7 @@ config["servers"] = dict(
         group="action",
         fast="archive_simulator",
         params=dict(
-            data_path="/mnt/k/users/guevarra/20191108_multipH_OER_full.csv"
+            data_path="/autofs/sshfs_home/users/guevarra/20191108_multipH_OER_full.csv"
         ),
     ),
     MOTOR=dict(
@@ -40,7 +40,7 @@ config["servers"] = dict(
         group="action",
         fast="motion_simulator",
         params=dict(
-            platemap_path="/mnt/j/hte_jcap_app_proto/map/0069-04-0100-mp.txt",
+            platemap_path="/autofs/sshfs_data/hte_jcap_app_proto/map/0069-04-0100-mp.txt",
             count_to_mm=dict(
                 A=1.0/6396.87,
                 B=1.0/6390.30,
@@ -55,7 +55,7 @@ config["servers"] = dict(
         group="action",
         fast="pstat_simulator",
         params=dict(
-            data_path="/mnt/k/users/guevarra/20191108_multipH_OER_full.csv"
+            data_path="/autofs/sshfs_home/users/guevarra/20191108_multipH_OER_full.csv"
         ),
     ),
     ANA=dict(
@@ -64,7 +64,7 @@ config["servers"] = dict(
         group="action",
         fast="analysis_simulator",
         params=dict(
-            data_path="/mnt/k/users/guevarra/20191108_multipH_OER_full.csv"
+            data_path="/autofs/sshfs_home/users/guevarra/20191108_multipH_OER_full.csv"
         ),
     ),
     # DB=dict(
@@ -73,7 +73,7 @@ config["servers"] = dict(
     #     group="action",
     #     fast="dbpack_server",
     #     params=dict(
-    #         aws_config_path="/mnt/k/users/hte/.credentials/aws_config.ini",
+    #         aws_config_path="/autofs/sshfs_home/users/hte/.credentials/aws_config.ini",
     #         aws_profile="default",
     #         aws_bucket="helao.data.testing",
     #         api_host="caltech-api.modelyst.com",
