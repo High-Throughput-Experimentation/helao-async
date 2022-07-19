@@ -39,7 +39,7 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action):
                     print_message(
                         actd,
                         "orchestrator",
-                        f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={e}",
+                        f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}",
                         error=True,
                     )
             except Exception as e:
@@ -87,7 +87,7 @@ async def async_private_dispatcher(
                     print_message(
                         actd,
                         "orchestrator",
-                        f"{server}/{private_action} POST request returned status {resp.status}: '{response}', error={repr(e)}",
+                        f"{server}/{private_action} POST request returned status {resp.status}: '{response}', error={repr(error_code)}",
                         error=True,
                     )
             except Exception as e:
