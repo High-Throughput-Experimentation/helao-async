@@ -552,13 +552,9 @@ class Base(object):
                     self.actionserver.endpoints[status_msg.act.action_name] = EndpointModel(
                         endpoint_name=status_msg.act.action_name
                     )
-                    self.actionserver.endpoints[status_msg.act.action_name].active_dict.update(
-                        {status_msg.act.action_uuid: status_msg}
-                    )
-                else:
-                    self.actionserver.endpoints[status_msg.act.action_name].active_dict.update(
-                        {status_msg.act.action_uuid: status_msg}
-                    )
+                self.actionserver.endpoints[status_msg.act.action_name].active_dict.update(
+                    {status_msg.act.action_uuid: status_msg}
+                )
 
                 # sort the status (finished_dict is empty at this point)
                 self.actionserver.endpoints[status_msg.act.action_name].sort_status()
