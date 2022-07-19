@@ -1,11 +1,9 @@
 @echo off
 call conda activate base
-SETLOCAL
-set hdir = %~dp0
-cd %hdir%..\helao-core
+cd C:\INST_hlo\CODE\helao-core
 git reset --hard
 git pull
-cd %hdir%.
+cd C:\INST_hlo\CODE\helao-async
 git reset --hard
 git pull
 ENDLOCAL
