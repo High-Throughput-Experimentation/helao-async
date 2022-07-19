@@ -664,21 +664,22 @@ class Orch(Base):
             #     _ = await self.incoming_status.get()
             #     self.incoming_status.task_done()
             pre_endpoint_status = deepcopy(self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[A.action_name])
-            num_pre_acts = len(pre_endpoint_status.active_dict) + len(pre_endpoint_status.finished_dict[HloStatus.finished])
+            num_pre_acts = len(pre_endpoint_status.active_dict) + sum([len(d) for _, d in pre_endpoint_status.finished_dict.items()])
+            f"Present status has {num_pre_acts} dispatched '{A.action_name}' actions."
             # self.print_message(f"There are {num_current_actives} active '{A.action_name}' actions.")
             result_actiondict, error_code = await async_action_dispatcher(self.world_cfg, A)
             post_endpoint_status = deepcopy(self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[A.action_name])
-            num_post_acts = len(post_endpoint_status.active_dict) + len(post_endpoint_status.finished_dict[HloStatus.finished])
+            num_post_acts = len(post_endpoint_status.active_dict) + sum([len(d) for _, d in post_endpoint_status.finished_dict.items()])
             while num_post_acts == num_pre_acts:
                 self.print_message(
                     f"Waiting for dispatched {A.action_name} request to register in global status."
                 )
                 try:
-                    await asyncio.wait_for(self.wait_for_interrupt(), timeout=1)
+                    await asyncio.wait_for(self.wait_for_interrupt(), timeout=5)
                 except asyncio.TimeoutError:
                     self.print_message("No interrupt received, re-checking.")
                 post_endpoint_status = deepcopy(self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[A.action_name])
-                num_post_acts = len(post_endpoint_status.active_dict) + len(post_endpoint_status.finished_dict[HloStatus.finished])
+                num_post_acts = len(post_endpoint_status.active_dict) + sum([len(d) for _, d in post_endpoint_status.finished_dict.items()])
                 self.print_message(
                     f"Incoming status has {num_post_acts} dispatched '{A.action_name}' actions."
                 )
