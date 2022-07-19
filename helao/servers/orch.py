@@ -669,7 +669,7 @@ class Orch(Base):
             endpoint_uuids = [k.hex for k in endpoint_status.active_dict.keys()] + [k.hex for k in endpoint_status.finished_dict[HloStatus.finished].keys()]
             result_uuid = result_actiondict['action_uuid']
             self.print_message(f"Action {A.action_name} dispatched with uuid: {result_uuid}")
-            while result_actiondict['action_uuid'] not in endpoint_uuids:
+            while result_uuid not in endpoint_uuids:
                 self.print_message(
                     f"Waiting for dispatched {A.action_name} request to register in global status."
                 )
