@@ -666,12 +666,14 @@ class Orch(Base):
             # self.print_message(f"There are {num_current_actives} active '{A.action_name}' actions.")
             result_actiondict, error_code = await async_action_dispatcher(self.world_cfg, A)
             endpoint_status = deepcopy(self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[A.action_name])
-            endpoint_uuids = list(endpoint_status.active_dict.keys()) + [uk for d in endpoint_status.finished_dict.values() for uk in d.keys()]
+            endpoint_uuids = list(endpoint_status.active_dict.keys()) + list(endpoint_status.finished_dict[HloStatus.finished].keys())
             while result_actiondict['action_uuid'] not in endpoint_uuids:
                 self.print_message(
                     f"Waiting for dispatched {A.action_name} request to register in global status."
                 )
                 await self.wait_for_interrupt()
+                endpoint_status = deepcopy(self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[A.action_name])
+                endpoint_uuids = list(endpoint_status.active_dict.keys()) + list(endpoint_status.finished_dict[HloStatus.finished].keys())
             self.print_message(f"New status registered on {A.action_name}.")
             if error_code is not ErrorCodes.none:
                 return error_code
