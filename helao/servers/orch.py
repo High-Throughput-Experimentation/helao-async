@@ -666,8 +666,8 @@ class Orch(Base):
             # self.print_message(f"There are {num_current_actives} active '{A.action_name}' actions.")
             result_actiondict, error_code = await async_action_dispatcher(self.world_cfg, A)
             endpoint_status = deepcopy(self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[A.action_name])
-            endpoint_uuids = list(endpoint_status.active_dict.keys()) + list(endpoint_status.finished_dict[HloStatus.finished].keys())
-            result_uuid = UUID(result_actiondict['action_uuid'])
+            endpoint_uuids = [k.hex for k in endpoint_status.active_dict.keys()] + [k.hex for k in endpoint_status.finished_dict[HloStatus.finished].keys()]
+            result_uuid = result_actiondict['action_uuid']
             self.print_message(f"Action {A.action_name} dispatched with uuid: {result_uuid}")
             while result_actiondict['action_uuid'] not in endpoint_uuids:
                 self.print_message(
