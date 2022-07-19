@@ -1,8 +1,8 @@
 @echo off
 call conda activate base
-cd C:\INST_hlo\CODE\helao-core
+cd %~dp0..\helao-core
 git reset --hard
 git pull
-cd C:\INST_hlo\CODE\helao-async
+cd %~dp0
 git reset --hard
 git pull
