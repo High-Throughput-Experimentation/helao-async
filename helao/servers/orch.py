@@ -663,12 +663,12 @@ class Orch(Base):
             # while not self.incoming_status.empty():
             #     _ = await self.incoming_status.get()
             #     self.incoming_status.task_done()
-            endpoint_status = self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[A.action_name]
-            num_pre_acts = len(endpoint_status.active_dict) + len(endpoint_status.finished_dict[HloStatus.finished])
+            pre_endpoint_status = deepcopy(self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[A.action_name])
+            num_pre_acts = len(pre_endpoint_status.active_dict) + len(pre_endpoint_status.finished_dict[HloStatus.finished])
             # self.print_message(f"There are {num_current_actives} active '{A.action_name}' actions.")
             result_actiondict, error_code = await async_action_dispatcher(self.world_cfg, A)
-            endpoint_status = self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[A.action_name]
-            num_post_acts = len(endpoint_status.active_dict) + len(endpoint_status.finished_dict[HloStatus.finished])
+            post_endpoint_status = deepcopy(self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[A.action_name])
+            num_post_acts = len(post_endpoint_status.active_dict) + len(post_endpoint_status.finished_dict[HloStatus.finished])
             while num_post_acts == num_pre_acts:
                 self.print_message(
                     f"Waiting for dispatched {A.action_name} request to register in global status."
@@ -677,8 +677,8 @@ class Orch(Base):
                     await asyncio.wait_for(self.wait_for_interrupt(), timeout=1)
                 except asyncio.TimeoutError:
                     self.print_message("No interrupt received, re-checking.")
-                endpoint_status = self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[A.action_name]
-                num_post_acts = len(endpoint_status.active_dict) + len(endpoint_status.finished_dict[HloStatus.finished])
+                post_endpoint_status = deepcopy(self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[A.action_name])
+                num_post_acts = len(post_endpoint_status.active_dict) + len(post_endpoint_status.finished_dict[HloStatus.finished])
                 self.print_message(
                     f"Incoming status has {num_post_acts} dispatched '{A.action_name}' actions."
                 )
