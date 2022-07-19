@@ -5,7 +5,7 @@ set hdir = %~dp0
 cd %hdir%..\helao-core
 git fetch
 git switch %1
-cd %hdir%
+cd %hdir%.
 git fetch
 git switch %1
 ENDLOCAL
