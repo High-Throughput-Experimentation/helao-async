@@ -668,7 +668,7 @@ class Orch(Base):
             endpoint_status = deepcopy(self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[A.action_name])
             endpoint_uuids = [k.hex for k in endpoint_status.active_dict.keys()] + [k.hex for k in endpoint_status.finished_dict[HloStatus.finished].keys()]
             self.print_message(f"Current {A.action_name} received uuids: {endpoint_uuids}")
-            result_uuid = result_actiondict['action_uuid']
+            result_uuid = result_actiondict['action_uuid'].replace("-","")
             self.print_message(f"Action {A.action_name} dispatched with uuid: {result_uuid}")
             while result_uuid not in endpoint_uuids:
                 self.print_message(
