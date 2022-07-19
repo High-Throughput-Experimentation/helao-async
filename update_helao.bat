@@ -5,7 +5,7 @@ set hdir = %~dp0
 cd %hdir%..\helao-core
 git reset --hard
 git pull
-cd %hdir%
+cd %hdir%.
 git reset --hard
 git pull
 ENDLOCAL
