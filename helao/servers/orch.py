@@ -662,28 +662,25 @@ class Orch(Base):
             # while not self.incoming_status.empty():
             #     _ = await self.incoming_status.get()
             #     self.incoming_status.task_done()
-            num_current_actives = len(
-                self.orchstatusmodel.server_dict[A.action_server.as_key()]
-                .endpoints[A.action_name]
-                .active_dict
-            )
+            endpoint_status = self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[A.action_name]
+            num_pre_acts = len(endpoint_status.active_dict) + len(endpoint_status.finished_dict[HloStatus.finished])
             # self.print_message(f"There are {num_current_actives} active '{A.action_name}' actions.")
             result_actiondict, error_code = await async_action_dispatcher(self.world_cfg, A)
-            while True:
+            endpoint_status = self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[A.action_name]
+            num_post_acts = len(endpoint_status.active_dict) + len(endpoint_status.finished_dict[HloStatus.finished])
+            while num_post_acts == num_pre_acts:
                 self.print_message(
                     f"Waiting for dispatched {A.action_name} request to register in global status."
                 )
                 await self.wait_for_interrupt()
-                num_new_actives = len(
-                    self.incoming.server_dict[A.action_server.as_key()].endpoints[A.action_name].active_dict
-                )
+                endpoint_status = self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[A.action_name]
+                num_post_acts = len(endpoint_status.active_dict) + len(endpoint_status.finished_dict[HloStatus.finished])
                 self.print_message(
-                    f"Incoming status has {num_current_actives} active '{A.action_name}' actions."
+                    f"Incoming status has {num_post_acts} dispatched '{A.action_name}' actions."
                 )
-                if num_new_actives > num_current_actives:
+                if num_post_acts > num_pre_acts:
                     self.print_message(f"New status registered on {A.action_name}.")
                     break
-                num_current_actives = num_new_actives
             if error_code is not ErrorCodes.none:
                 return error_code
 
