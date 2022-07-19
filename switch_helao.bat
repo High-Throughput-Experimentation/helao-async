@@ -1,8 +1,11 @@
 @echo off
 call conda activate base
-cd %~dp0..\helao-core
+SETLOCAL
+set hdir = %~dp0
+cd %hdir%..\helao-core
 git fetch
 git switch %1
-cd %~dp0
+cd %hdir%
 git fetch
 git switch %1
+ENDLOCAL
