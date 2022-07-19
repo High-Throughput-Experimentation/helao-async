@@ -669,7 +669,7 @@ class Orch(Base):
             )
             # self.print_message(f"There are {num_current_actives} active '{A.action_name}' actions.")
             result_actiondict, error_code = await async_action_dispatcher(self.world_cfg, A)
-            while A.action_name == 'wait':
+            while True:
                 self.print_message(
                     f"Waiting for dispatched {A.action_name} request to register in global status."
                 )
