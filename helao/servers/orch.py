@@ -671,7 +671,7 @@ class Orch(Base):
                 self.print_message(
                     f"Waiting for dispatched {A.action_name} request to register in global status."
                 )
-                await asyncio.wait_for(self.wait_for_interrupt(), timeout=5)
+                await self.wait_for_interrupt()
             self.print_message(f"New status registered on {A.action_name}.")
             if error_code is not ErrorCodes.none:
                 return error_code
