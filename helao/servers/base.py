@@ -206,6 +206,7 @@ class Base(object):
         self.actives: Dict[UUID, object] = {}
         # basemodel to describe the full action server
         self.actionserver = ActionServerModel(action_server=self.server)
+        self.actionserver.init_endpoints()
 
         self.status_q = MultisubscriberQueue()
         self.data_q = MultisubscriberQueue()
