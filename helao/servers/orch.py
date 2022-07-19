@@ -326,6 +326,7 @@ class Orch(Base):
             self.start_operator()
         # basemodel which holds all information for orch
         self.orchstatusmodel = GlobalStatusModel(orchestrator=self.server)
+        self.orchstatusmodel._sort_status()
         # this queue is simply used for waiting for any interrupt
         # but it does not do anything with its content
         self.interrupt_q = asyncio.Queue()
