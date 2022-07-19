@@ -673,7 +673,10 @@ class Orch(Base):
                 self.print_message(
                     f"Waiting for dispatched {A.action_name} request to register in global status."
                 )
-                await self.wait_for_interrupt()
+                try:
+                    await asyncio.wait_for(self.wait_for_interrupt(), timeout=1)
+                except asyncio.TimeoutError:
+                    self.print_message("No interrupt received, re-checking.")
                 endpoint_status = self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[A.action_name]
                 num_post_acts = len(endpoint_status.active_dict) + len(endpoint_status.finished_dict[HloStatus.finished])
                 self.print_message(
