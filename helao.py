@@ -447,13 +447,13 @@ if __name__ == "__main__":
     confArg = sys.argv[1]
     config = config_loader(confArg, helao_root)
 
-    # print("\x1b[2J") # clear screen
+    print("\x1b[2J")  # clear screen
+    print("\n\n")
     cprint(
         figlet_format(f"HELAO\n{get_hlo_version().strip('Vv')}", font="nancyj-fancy"),
         "green",
         attrs=["bold"],
     )
-
     for x in python_paths:
         repo = os.path.basename(x)
         cprint(
@@ -467,6 +467,7 @@ if __name__ == "__main__":
         )
         cprint(git_stat, "cyan")
     time.sleep(3)
+    cprint("\n\nlaunching HELAO in 3 seconds...\n\n", "white", attrs=["bold"])
 
     # compress old logs:
     log_root = os.path.join(config["root"], "LOGS")
