@@ -429,7 +429,7 @@ if __name__ == "__main__":
         quit()
     else:
         python_paths = (
-            python_path.split(";") if os.platform == "win32" else python_path.split(":")
+            python_path.split(";") if sys.platform == "win32" else python_path.split(":")
         )
         python_paths = [os.path.abspath(x) for x in python_paths]
         branches = {
