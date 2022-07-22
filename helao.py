@@ -163,7 +163,9 @@ class Pidd:
                         )
                         return False
                 except Exception as e:
-                    tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                    tb = "".join(
+                        traceback.format_exception(type(e), e, e.__traceback__)
+                    )
                     print_message(
                         {}, "launcher", f"Error terminating server '{k}'", error=True
                     )
@@ -290,6 +292,7 @@ def wait_key():
         result = msvcrt.getch()
     else:
         import sys, tty, termios
+
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
         try:
@@ -412,31 +415,75 @@ if __name__ == "__main__":
     if not helao.tests.unit_test_sample_models.sample_model_unit_test():
         quit()
     colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
+    if os.environ.get("CONDA_DEFAULT_ENV") != "helao":
+        print_message(
+            {},
+            "launcher",
+            "",
+            "helao.py launcher was not called from a 'helao' conda environment.",
+            warn=True,
+        )
+    python_path = os.environ.get("PYTHONPATH")
+    if python_path is None:
+        print_message({}, "launcher", "", "PYTHONPATH environment var not defined.")
+        quit()
+    else:
+        python_paths = (
+            python_path.split(";") if os.platform == "win32" else python_path.split(":")
+        )
+        python_paths = [os.path.abspath(x) for x in python_paths]
+        branches = {
+            os.path.basename(x): subprocess.getoutput(
+                f'git --git-dir={os.path.join(x, ".git")} branch --show-current'
+            )
+            for x in python_paths
+        }
+    if not len(set(branches.values())) == 1:
+        print_message({}, "launcher", "", "Cannot start HELAO using mixed branches.")
+        for k, v in branches.items():
+            print_message({}, "launcher", "", f"local repo '{k}' on branch '{v}'")
+        quit()
     helao_root = os.path.dirname(os.path.realpath(__file__))
     confArg = sys.argv[1]
     config = config_loader(confArg, helao_root)
 
+    # print("\x1b[2J") # clear screen
+    cprint(
+        figlet_format(f"HELAO\n{get_hlo_version().strip('Vv')}", font="nancyj-fancy"),
+        "green",
+        attrs=["bold"],
+    )
+
+    for x in python_paths:
+        repo = os.path.basename(x)
+        cprint(
+            f"\nlocal repo '{repo}' on branch: '{branches[repo]}'",
+            "cyan",
+            attrs=["bold"],
+        )
+        cprint("lastest 'git show --stat'", "cyan", attrs=["bold"])
+        git_stat = subprocess.getoutput(
+            f'git --git-dir={os.path.join(x, ".git")} show --stat'
+        )
+        cprint(git_stat, "cyan")
+    time.sleep(3)
+
     # compress old logs:
-    log_root = os.path.join(config['root'], "LOGS")
+    log_root = os.path.join(config["root"], "LOGS")
     for server_name in ["_MASTER_", "bokeh_launcher", "fast_launcher"]:
         old_log_txts = glob(os.path.join(log_root, server_name, "*.txt"))
         for old_log in old_log_txts:
             with open(old_log) as f:
                 line0 = f.readline()
-            timestamp = re.findall('[0-9]{2}:[0-9]{2}:[0-9]{2}', line0)[0].replace(":","")
+            timestamp = re.findall("[0-9]{2}:[0-9]{2}:[0-9]{2}", line0)[0].replace(
+                ":", ""
+            )
             zipname = old_log.replace(".txt", f"{timestamp}.zip")
             arcname = os.path.basename(old_log).replace(".txt", f"{timestamp}.txt")
             with zipfile.ZipFile(zipname, "w", compression=zipfile.ZIP_DEFLATED) as zf:
                 zf.write(old_log, arcname)
             os.remove(old_log)
 
-    # print("\x1b[2J") # clear screen
-    cprint(
-        figlet_format(f"HELAO\n{get_hlo_version()}", font="starwars"),
-        "yellow",
-        "on_red",
-        attrs=["bold"],
-    )
     pidd = launcher(confArg=confArg, confDict=config, helao_root=helao_root)
     result = None
 
@@ -487,7 +534,7 @@ if __name__ == "__main__":
                         p = subprocess.Popen(cmd, cwd=helao_root)
                         ppid = p.pid
                         pidd.store_pid(sn, S["host"], S["port"], ppid)
-                        if sg == 'action':
+                        if sg == "action":
                             for orchserv in pidd.orchServs:
                                 OS = pidd.servers["orchestrator"][orchserv]
                                 print_message(
@@ -498,7 +545,9 @@ if __name__ == "__main__":
                                     data={"client_servkey": sn},
                                 )
                     except Exception as e:
-                        tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                        tb = "".join(
+                            traceback.format_exception(type(e), e, e.__traceback__)
+                        )
                         print_message(
                             {}, "launcher", " ... got error: ", repr(e), tb, error=True
                         )
@@ -519,8 +568,10 @@ if __name__ == "__main__":
             try:
                 stop_server("orchestrator", server)
             except Exception as e:
-                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-                print_message({}, "launcher", " ... got error: ", repr(e), tb, error=True)
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+                print_message(
+                    {}, "launcher", " ... got error: ", repr(e), tb, error=True
+                )
         # in case a /shutdown is added to other FastAPI servers (not the shutdown without '/')
         # KILL_ORDER = ["visualizer", "action", "server"] # orch are killed above
         # no /shutdown in visualizers
@@ -536,9 +587,14 @@ if __name__ == "__main__":
                         # will produce a 404 if not found
                         requests.post(f"http://{S['host']}:{S['port']}/shutdown")
                     except Exception as e:
-                        tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                        tb = "".join(
+                            traceback.format_exception(type(e), e, e.__traceback__)
+                        )
                         print_message(
-                            {}, "launcher", f" ... got error: {repr(e), tb,}", error=True
+                            {},
+                            "launcher",
+                            f" ... got error: {repr(e), tb,}",
+                            error=True,
                         )
         pidd.close()
     else:
