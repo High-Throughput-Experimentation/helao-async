@@ -457,11 +457,10 @@ if __name__ == "__main__":
     for x in python_paths:
         repo = os.path.basename(x)
         cprint(
-            f"\nlocal repo '{repo}' on branch: '{branches[repo]}'",
+            f"\n\nlocal repo '{repo}' on branch: '{branches[repo]}'",
             "cyan",
             attrs=["bold"],
         )
-        cprint("lastest 'git show --stat'", "cyan", attrs=["bold"])
         git_stat = subprocess.getoutput(
             f'git --git-dir={os.path.join(x, ".git")} show --stat'
         )
