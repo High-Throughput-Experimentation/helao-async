@@ -466,8 +466,8 @@ if __name__ == "__main__":
             f'git --git-dir={os.path.join(x, ".git")} show --stat'
         )
         cprint(git_stat, "cyan")
-    time.sleep(3)
     cprint("\n\nlaunching HELAO in 3 seconds...\n\n", "white", attrs=["bold"])
+    time.sleep(3)
 
     # compress old logs:
     log_root = os.path.join(config["root"], "LOGS")
