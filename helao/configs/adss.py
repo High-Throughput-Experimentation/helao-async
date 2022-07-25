@@ -4,7 +4,7 @@ __all__ = ["config"]
 
 hostip = "127.0.0.1"
 config = {}
-config['dummy'] = False
+config['dummy'] = True
 config['simulation'] = False
 
 # action library provides generator functions which produce actions
@@ -121,6 +121,10 @@ config["servers"] = dict(
                 'type-S':'PXI-6289/ai0',
                 'type-T':'PXI-6284/ai0'
                 },   
+            dev_heat = {
+                'heater1':'PXI-6284/port2/line1', #P2.1
+                'heater2':'PXI-6284/port2/line2'  #P2.2
+                },
             # dev_activecell = {
             #     '1':'PXI-6289/port0/line23', #P0.23
             #     '2':'PXI-6289/port0/line24', #P0.24
@@ -146,8 +150,9 @@ config["servers"] = dict(
                 '5':'PXI-6284/port1/line6', #P1.6
                 '6':'PXI-6284/port1/line7', #P1.7
                 '7':'PXI-6284/port2/line0', #P2.0
-                '8':'PXI-6284/port2/line1', #P2.1
-                '9':'PXI-6284/port2/line2'  #P2.2
+               # '8':'PXI-6284/port2/line1', #P2.1 repurposed for heaters
+               # '9':'PXI-6284/port2/line2'  #P2.2 repurposed for heaters
+               
                 },
             # dev_mastercell = {
             #     '1':'PXI-6284/port0/line23', #P0.23
@@ -244,17 +249,17 @@ config["servers"] = dict(
     # #########################################################################
     # DB package server
     # #########################################################################
-    DB=dict(
-        host=hostip,
-        port=8010,
-        group="action",
-        fast="dbpack_server",
-        params=dict(
-            aws_config_path="k:/users/hte/.credentials/aws_config.ini",
-            aws_profile="default",
-            aws_bucket="helao.data.testing",
-            api_host="caltech-api.modelyst.com",
-            testing=False,
-        ),
-    ),
+    # DB=dict(
+    #     host=hostip,
+    #     port=8010,
+    #     group="action",
+    #     fast="dbpack_server",
+    #     params=dict(
+    #         aws_config_path="k:/users/hte/.credentials/aws_config.ini",
+    #         aws_profile="default",
+    #         aws_bucket="helao.data.testing",
+    #         api_host="caltech-api.modelyst.com",
+    #         testing=False,
+    #     ),
+    # ),
 )
