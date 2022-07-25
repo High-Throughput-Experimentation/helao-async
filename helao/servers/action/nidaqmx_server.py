@@ -41,6 +41,12 @@ def makeApp(confPrefix, servKey, helao_root):
         version=2.0,
         driver_class=cNIMAX,
     )
+    dev_temperature = app.server_params.get("dev_temperature", dict())
+    dev_tempitems = make_str_enum("dev_temperature", {key: key for key in dev_temperature})
+
+    dev_heat = app.server_params.get("dev_heat", dict())
+    dev_heatitems = make_str_enum("dev_heat", {key: key for key in dev_heat})
+
 
     dev_pump = app.server_params.get("dev_pump", dict())
     dev_pumpitems = make_str_enum("dev_pump", {key: key for key in dev_pump})
@@ -293,6 +299,56 @@ def makeApp(confPrefix, servKey, helao_root):
             A.action_abbr = "multiCV"
             active_dict = await app.driver.run_cell_IV(A)
             return active_dict
+
+    if dev_temperature:
+
+        @app.post(f"/{servKey}/readtemp", tags=["public"])
+        async def readtemp(
+            action: Optional[Action] = Body({}, embed=True),
+            action_version: int = 1,
+            TC: Optional[str]= "type-S",  #some sort of selection
+            Tval: Optional[float] = 10.0,
+            SampleRate: Optional[int] = Query(1.0, ge=1),
+            TTLwait: Optional[int] = -1,  # -1 disables, else select TTL channel
+        ):
+            """Runs temp measurement.
+            Args:
+                 SampleRate: samples per second
+                 TC: which thermocouple to read
+                 Tval: time of measurement in seconds
+                 TTLwait: trigger channel, -1 disables, else select TTL channel"""
+            A = await app.base.setup_action()
+            A.action_abbr = "multiCV"  #need to replace with a temp measurement
+            active_dict = await app.driver.run_cell_IV(A)
+            return active_dict
+
+
+    if dev_heat:
+
+        @app.post(f"/{servKey}/heater", tags=["public"])
+        async def heater(
+            action: Optional[Action] = Body({}, embed=True),
+            action_version: int = 1,
+            heater: Optional[dev_heatitems] = None,
+            on: Optional[bool] = True,
+        ):
+            active = await app.base.setup_and_contain_action(action_abbr="heatf")
+            # some additional params in order to call the same driver functions
+            # for all DO actions
+            active.action.action_params["do_port"] = dev_heat[
+                active.action.action_params["heater"]
+            ]
+            active.action.action_params["do_name"] = active.action.action_params[
+                "heater"
+            ]
+            datadict = await app.driver.set_digital_out(**active.action.action_params)
+            active.action.error_code = datadict.get(
+                "error_code", ErrorCodes.unspecified
+            )
+            await active.enqueue_data_dflt(datadict=datadict)
+            finished_act = await active.finish()
+            return finished_act.as_dict()
+
 
     @app.post(f"/{servKey}/stop", tags=["public"])
     async def stop(
