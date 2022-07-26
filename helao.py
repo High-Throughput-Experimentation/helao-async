@@ -433,10 +433,9 @@ if __name__ == "__main__":
             if sys.platform == "win32"
             else python_path.split(":")
         )
+        python_paths = [os.path.abspath(x) for x in python_paths]
         python_paths = [
-            os.path.abspath(x)
-            for x in python_paths
-            if os.path.basename(x).startswith("helao-")
+            x for x in python_paths if os.path.basename(x).startswith("helao-")
         ]
         branches = {
             os.path.basename(x): subprocess.getoutput(
