@@ -229,7 +229,9 @@ class ActYml(HelaoYml):
         self.run_type = self.dict.get("run_type", "MISSING")
         self.technique_name = self.dict.get("technique_name", "MISSING")
         if isinstance(self.technique_name, list):
-            self.technique_name = self.technique_name[self.dict.get("action_split", 0)]
+            split_technique = self.technique_name[self.dict.get("action_split", 0)]
+            self.technique_name = split_technique
+            self.dict['technique_name'] = split_technique
         self.contribs = self.dict.get("process_contrib", False)
 
 
