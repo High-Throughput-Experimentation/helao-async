@@ -231,7 +231,7 @@ class ActYml(HelaoYml):
         if isinstance(self.technique_name, list):
             split_technique = self.technique_name[self.dict.get("action_split", 0)]
             self.technique_name = split_technique
-            self.dict['technique_name'] = split_technique
+            self.dict["technique_name"] = split_technique
         self.contribs = self.dict.get("process_contrib", False)
 
 
