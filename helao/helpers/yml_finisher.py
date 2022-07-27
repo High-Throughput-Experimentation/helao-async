@@ -109,7 +109,7 @@ async def move_dir(
             rm_files_done = [f for f in rm_files if not os.path.exists(f)]
             if len(rm_files_done) == len(rm_files):
                 _ = await asyncio.gather(
-                    aioshutil.rmtree(yml_dir), return_exceptions=True
+                    aiofiles.os.rmdir(yml_dir), return_exceptions=True
                 )
                 if not os.path.exists(yml_dir):
                     rm_success = True
@@ -118,6 +118,7 @@ async def move_dir(
                     )
                     yml_path = os.path.join(new_dir, f"{timestamp}.yml")
                     await yml_finisher(yml_path, base=base)
+            await asyncio.sleep(retry_delay)
             else:
                 print_msg(
                     f"Could not remove directory from ACTIVE, retrying after {retry_delay} seconds"
