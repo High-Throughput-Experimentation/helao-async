@@ -578,7 +578,7 @@ def ANEC_slave_CA(
         },
         from_global_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
-        technique_name= ["CA"],
+        technique_name= "CA",
         process_contrib=[
             ProcessContrib.action_params,
             ProcessContrib.files,
@@ -628,7 +628,7 @@ def ANEC_slave_photo_CA(
         },
         from_global_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
-        technique_name= ["CA"],
+        technique_name= "CA",
         process_contrib=[
             ProcessContrib.action_params,
             ProcessContrib.files,
