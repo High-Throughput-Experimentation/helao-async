@@ -81,27 +81,29 @@ async def move_dir(
     copy_retries = 0
     src_list = glob(os.path.join(yml_dir, "*"))
 
-    while not copy_success and copy_retries <= 60:
+    while (not copy_success) and copy_retries <= 60:
         dst_list = [p.replace("RUNS_ACTIVE", "RUNS_FINISHED") for p in src_list]
         _ = await asyncio.gather(
             *[aioshutil.copy(src, dst) for src, dst in zip(src_list, dst_list)],
             return_exceptions=True,
         )
         exists_list = [f for f in dst_list if os.path.exists(f)]
-        if len(exists_list) == len(dst_list):
+        if len(exists_list) == len(src_list):
             copy_success = True
         else:
             src_list = [f for f in src_list if f not in exists_list]
             print_msg(
-                f"Could not move {len(src_list)} files to FINISHED, retrying after {retry_delay} seconds"
+                f"Could not copy {len(src_list)} files to FINISHED, retrying after {retry_delay} seconds"
             )
+            print("\n".join(src_list))
             copy_retries += 1
-            await asyncio.sleep(retry_delay)
+        await asyncio.sleep(retry_delay)
+
     if copy_success:
         rm_success = False
         rm_retries = 0
-        while not rm_success and rm_retries <= 30:
-            rm_list = glob(os.path.join(yml_dir, "*"))
+        rm_list = glob(os.path.join(yml_dir, "*"))
+        while (not rm_success) and rm_retries <= 30:
             rm_files = [x for x in rm_list if os.path.isfile(x)]
             _ = await asyncio.gather(
                 *[aiofiles.os.remove(f) for f in rm_files], return_exceptions=True
@@ -119,8 +121,10 @@ async def move_dir(
                     yml_path = os.path.join(new_dir, f"{timestamp}.yml")
                     await yml_finisher(yml_path, base=base)
             else:
+                rm_list = [f for f in rm_list if f not in rm_files_done]
                 print_msg(
                     f"Could not remove directory from ACTIVE, retrying after {retry_delay} seconds"
                 )
+                print("\n".join(rm_list))
                 rm_retries += 1
             await asyncio.sleep(retry_delay)
