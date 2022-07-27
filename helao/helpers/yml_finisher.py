@@ -118,10 +118,9 @@ async def move_dir(
                     )
                     yml_path = os.path.join(new_dir, f"{timestamp}.yml")
                     await yml_finisher(yml_path, base=base)
-                await asyncio.sleep(retry_delay)  #syntax indent once.... should it be twice?
             else:
                 print_msg(
                     f"Could not remove directory from ACTIVE, retrying after {retry_delay} seconds"
                 )
                 rm_retries += 1
-                await asyncio.sleep(retry_delay)
+            await asyncio.sleep(retry_delay)
