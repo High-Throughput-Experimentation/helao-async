@@ -101,7 +101,7 @@ async def move_dir(
         rm_success = False
         rm_retries = 0
         while not rm_success and rm_retries <= 30:
-            rm_list = glob(os.path.join(yml_dir, "**"), recursive=True)
+            rm_list = glob(os.path.join(yml_dir, "*"))
             rm_files = [x for x in rm_list if os.path.isfile(x)]
             _ = await asyncio.gather(
                 *[aiofiles.os.remove(f) for f in rm_files], return_exceptions=True
