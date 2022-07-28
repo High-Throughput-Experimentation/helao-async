@@ -208,6 +208,11 @@ class HelaoYml:
             for file_dict in meta_json.get("files", []):
                 if file_dict["file_name"].endswith(".hlo"):
                     file_dict["file_name"] = f"{file_dict['file_name']}.json"
+            if "technique_name" in meta_json.keys():
+                tech_name = meta_json["technique_name"]
+                if isinstance(tech_name, list):
+                    split_technique = tech_name[meta_json.get("action_split", 0)]
+                    meta_json["technique_name"] = split_technique
             self.progress[self.pkey].update({"ready": True, "meta": meta_json})
             self.progress.write()
 
@@ -364,6 +369,10 @@ class ExpYml(HelaoYml):
                 ],
             }
         )
+        if isinstance(base_process["technique_name"], list):
+            base_process["technique_name"] = base_process["technique_name"][
+                actions[-1].dict.get("action_split", 0)
+            ]
         if base_process["run_type"] == "MISSING":
             print_message(
                 {}, "DB", f"Process terminating action has no type. Using DB config."
