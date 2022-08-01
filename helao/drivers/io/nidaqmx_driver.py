@@ -10,6 +10,9 @@ from nidaqmx.constants import Edge
 from nidaqmx.constants import AcquisitionType
 from nidaqmx.constants import TerminalConfiguration
 from nidaqmx.constants import VoltageUnits
+from nidaqmx.constants import TemperatureUnits
+from nidaqmx.constants import CJCSource
+from nidaqmx.constants import ThermocoupleType
 from nidaqmx.constants import CurrentShuntResistorLocation
 from nidaqmx.constants import UnitsPreScaled
 from nidaqmx.constants import TriggerType
@@ -49,6 +52,10 @@ class cNIMAX:
         self.dev_liquidvalveitems = make_str_enum(
             "dev_liquidvalve", {key: key for key in self.dev_liquidvalve}
         )
+        self.dev_heat = self.config_dict.get("dev_heat", dict())
+        self.dev_heatitems = make_str_enum(
+            "dev_heat", {key: key for key in self.dev_heat}
+        )
 
         self.dev_led = self.config_dict.get("dev_led", dict())
         self.dev_leditems = make_str_enum("dev_led", {key: key for key in self.dev_led})
@@ -75,7 +82,7 @@ class cNIMAX:
             self.base.print_message(f"NImax error: {repr(e), tb,}", error=True)
             raise e
         self.time_stamp = time.time()
-
+        
         # this defines the time axis, need to calculate our own
         self.samplingrate = 10  # samples per second
         # used to keep track of time during data readout
@@ -89,6 +96,8 @@ class cNIMAX:
         self.IO_signalq = asyncio.Queue(1)
         self.task_cellcurrent = None
         self.task_cellvoltage = None
+        self.task_tempS = None
+        self.task_tempT = None
         self.IO_do_meas = False  # signal flag for intent (start/stop)
         self.IO_measuring = False  # status flag of measurement
         self.activeCell = [False for _ in range(9)]
@@ -106,15 +115,18 @@ class cNIMAX:
             "cell5",
             "cell6",
             "cell7",
-            "cell8",
-            "cell9",
+    #        "cell8",   #removed from cell list due to use of NI lines
+    #        "cell9",   #can add back in if rewiring added to box for heaters
+
         ]
         self.file_conn_keys = []
         self.FIFO_column_headings = [
             "t_s",
             "Icell_A",
             "Ecell_V",
-        ]
+            "Ttemp_type-S_C",
+            "Ttemp_type-T_C",            
+     ]
 
         # keeps track of the multi cell IV measurements in the background
         myloop = asyncio.get_event_loop()
@@ -186,6 +198,54 @@ class cNIMAX:
             sample_mode=AcquisitionType.CONTINUOUS,
             samps_per_chan=self.buffersize,
         )
+        self.task_tempS = nidaqmx.Task()
+        self.temperature.ai_channels.add_ai_thrmcpl_chan(
+            physical_channel= 'type-S',
+#            physical_channel= 'PXI-6289/ai0'
+            name_to_assign_to_channel="Temp_typeS",
+            min_val=0,
+            max_val=150,
+            units=TemperatureUnits.DEG_C,
+            thermocouple_type=ThermocoupleType.S,
+            cjc_source=CJCSource.BUILT_IN,
+        )
+
+        self.task_tempS.ai_channels.all.ai_lowpass_enable = True
+        self.task_tempS.timing.cfg_samp_clk_timing(   #timing/triggering need
+                                                         
+            self.Tsamplingrate,
+            source="",
+            active_edge=Edge.RISING,
+            sample_mode=AcquisitionType.CONTINUOUS,
+            samps_per_chan=self.buffersize,
+        )
+        # # TODO can increase the callbackbuffersize if needed
+        # # self.task_cellcurrent.register_every_n_samples_acquired_into_buffer_event(10,self.streamCURRENT_callback)
+        # self.task_tempS.register_every_n_samples_acquired_into_buffer_event(
+        #     self.buffersizeread, self.streamT_callback
+        # )
+
+        self.task_tempT = nidaqmx.Task()
+        self.temperature.ai_channels.add_ai_thrmcpl_chan(
+            physical_channel= 'type-T',
+#            physical_channel= 'PXI-6284/ai0'
+            name_to_assign_to_channel="Temp_typeT",
+            min_val=0,
+            max_val=150,
+            units=TemperatureUnits.DEG_C,
+            thermocouple_type=ThermocoupleType.T,
+            cjc_source=CJCSource.BUILT_IN,
+        )
+
+        self.task_tempT.ai_channels.all.ai_lowpass_enable = True
+        self.task_tempT.timing.cfg_samp_clk_timing(   #timing need?
+ 
+            self.Tsamplingrate,
+            source="",
+            active_edge=Edge.RISING,
+            sample_mode=AcquisitionType.CONTINUOUS,
+            samps_per_chan=self.buffersize,
+        )
 
         # each card need its own physical trigger input
         if (
@@ -196,7 +256,14 @@ class cNIMAX:
             self.task_cellvoltage.triggers.start_trigger.trig_type = (
                 TriggerType.DIGITAL_EDGE
             )
+            self.task_tempT.triggers.start_trigger.trig_type = (
+                TriggerType.DIGITAL_EDGE
+            )
             self.task_cellvoltage.triggers.start_trigger.cfg_dig_edge_start_trig(
+                trigger_source=self.config_dict["dev_cellvoltage_trigger"],
+                trigger_edge=Edge.RISING,
+            )
+            self.task_tempT.triggers.start_trigger.cfg_dig_edge_start_trig(
                 trigger_source=self.config_dict["dev_cellvoltage_trigger"],
                 trigger_edge=Edge.RISING,
             )
@@ -204,11 +271,68 @@ class cNIMAX:
             self.task_cellcurrent.triggers.start_trigger.trig_type = (
                 TriggerType.DIGITAL_EDGE
             )
+            self.task_tempS.triggers.start_trigger.trig_type = (
+                TriggerType.DIGITAL_EDGE
+            )
             self.task_cellcurrent.triggers.start_trigger.cfg_dig_edge_start_trig(
                 trigger_source=self.config_dict["dev_cellcurrent_trigger"],
                 trigger_edge=Edge.RISING,
             )
+            self.task_tempS.triggers.start_trigger.cfg_dig_edge_start_trig(
+                trigger_source=self.config_dict["dev_cellcurrent_trigger"],
+                trigger_edge=Edge.RISING,
+            )
 
+    def create_Ttask(self):
+        """configures and starts a NImax task for nonexperiment temp measurements"""
+        self.task_tempinst_S = nidaqmx.Task()
+        self.temperature.ai_channels.add_ai_thrmcpl_chan(
+            physical_channel= 'type-S',
+#            physical_channel= 'PXI-6289/ai0'
+            name_to_assign_to_channel="Temp_typeS",
+            min_val=0,
+            max_val=150,
+            units=TemperatureUnits.DEG_C,
+            thermocouple_type=ThermocoupleType.S,
+            cjc_source=CJCSource.BUILT_IN,
+        )
+
+        self.task_tempinst_S.ai_channels.all.ai_lowpass_enable = True
+        self.task_tempinst_S.timing.cfg_samp_clk_timing(   #timing/triggering need
+                                                         
+            rate= 1,
+#           self.Tsamplingrate,
+            source="",
+            active_edge=Edge.RISING,
+            sample_mode=AcquisitionType.CONTINUOUS,
+            samps_per_chan=self.buffersize,
+        )
+        self.task_tempinst_T = nidaqmx.Task()
+        self.temperature.ai_channels.add_ai_thrmcpl_chan(
+            physical_channel= 'type-T',
+#            physical_channel= 'PXI-6284/ai0'
+            name_to_assign_to_channel="Temp_typeT",
+            min_val=0,
+            max_val=150,
+            units=TemperatureUnits.DEG_C,
+            thermocouple_type=ThermocoupleType.T,
+            cjc_source=CJCSource.BUILT_IN,
+        )
+
+        self.task_tempinst_T.ai_channels.all.ai_lowpass_enable = True
+        self.task_tempinst_T.timing.cfg_samp_clk_timing(   #timing need?
+ 
+            rate= 1,
+#           self.Tsamplingrate,
+            source="",
+            active_edge=Edge.RISING,
+            sample_mode=AcquisitionType.CONTINUOUS,
+            samps_per_chan=self.buffersize,
+        )
+
+        self.task_tempinst_S.start()
+        self.task_tempinst_T.start()
+ 
     def streamIV_callback(
         self, task_handle, every_n_samples_event_type, number_of_samples, callback_data
     ):
@@ -233,6 +357,13 @@ class cNIMAX:
                 dataV = self.task_cellvoltage.read(
                     number_of_samples_per_channel=number_of_samples
                 )
+                data_TS = self.task_tempS.read(
+                    number_of_samples_per_channel=number_of_samples
+                )
+                data_TT = self.task_tempT.read(
+                    number_of_samples_per_channel=number_of_samples
+                )
+
                 # this is also what NImax seems to do
                 time = [
                     self.IVtimeoffset + i / self.samplingrate
@@ -247,6 +378,8 @@ class cNIMAX:
                         f"{self.FIFO_column_headings[0]}": time,
                         f"{self.FIFO_column_headings[1]}": dataI[i],
                         f"{self.FIFO_column_headings[2]}": dataV[i],
+                        f"{self.FIFO_column_headings[3]}": dataTS,
+                        f"{self.FIFO_column_headings[4]}": dataTT,
                     }
 
                 # push data to datalogger queue
@@ -266,9 +399,17 @@ class cNIMAX:
             _ = self.task_cellvoltage.read(
                 number_of_samples_per_channel=number_of_samples
             )
+            _ = self.task_tempS.read(
+                number_of_samples_per_channel=number_of_samples
+            )
+            _ = self.task_tempT.read(
+                number_of_samples_per_channel=number_of_samples
+            )
             self.IO_measuring = False
             self.task_cellcurrent.close()
             self.task_cellvoltage.close()
+            self.task_tempS.close()
+            self.task_tempT.close()
 
         else:
             # NImax has data but measurement was already turned off
@@ -279,12 +420,20 @@ class cNIMAX:
             _ = self.task_cellvoltage.read(
                 number_of_samples_per_channel=number_of_samples
             )
+            _ = self.task_tempS.read(
+                number_of_samples_per_channel=number_of_samples
+            )
+            _ = self.task_tempT.read(
+                number_of_samples_per_channel=number_of_samples
+            )
             # task should be already off or should be closed soon
             self.base.print_message(
                 "meas was turned off but NImax IV task is still running ..."
             )
             # self.task_cellcurrent.close()
             # self.task_cellvoltage.close()
+            #self.task_tempS.close()
+            #self.task_tempT.close()
 
         return 0
 
@@ -305,6 +454,8 @@ class cNIMAX:
                         self.task_cellvoltage.start()
                         # then start master to trigger slave
                         self.task_cellcurrent.start()
+                        self.task_tempS.start()
+                        self.task_tempT.start()
 
                         # wait for first callback interrupt
                         while not self.IO_measuring:
@@ -333,6 +484,8 @@ class cNIMAX:
                         self.IO_measuring = False
                         self.task_cellcurrent.close()
                         self.task_cellvoltage.close()
+                        self.task_tempS.close()
+                        self.task_tempT.close()
                         _ = await self.active.finish()
                         self.active = None
                         self.action = None
@@ -364,6 +517,43 @@ class cNIMAX:
 
         except asyncio.CancelledError:
             self.base.print_message("IOloop task was cancelled")
+
+    async def Heatloop(self, samplerate, duration_h, reservoir1_min, reservoir1_max, reservoir2_min, reservoir2_max,):
+        activeDict = {}
+
+        # samplerate = A.action_params["SampleRate"]
+        # duration = A.action_params["duration"] * 60 * 60  #time in hours
+        # reservoir1_min = A.action_params["r1min"]
+        # reservoir1_max = A.action_params["r1max"]
+        # reservoir2_min = A.action_params["r2min"]
+        # reservoir2_max = A.action_params["r2max"]
+
+        """attempt maintain temperatures for the
+        temp task. """
+        duration = duration_h * 3600
+        self.Heatloopstarttime = (
+            time.time()        )
+        loopduration = time.time() - self.Heatloopstarttime
+        # start slave first
+        # then start master to trigger slave
+        self.create_Ttask()
+        self.task_tempinst_T.start()
+        self.task_tempinst_S.start()
+
+        self.Heatloop_run = True
+    
+        # while self.Heatloop_run and loopduration < self.duration:
+
+        #     if self.task_tempinst_S.read() < reservoir1_min:
+
+                
+        #     if self.task_tempinst_S.read() > reservoir1_max:
+
+        #     if self.task_tempinst_T.read() < reservoir2_min:
+
+        #     if self.task_tempinst_T.read() > reservoir2_max:
+                 
+
 
     async def set_digital_out(
         self, do_port=None, do_name: str = "", on: bool = False, *args, **kwargs
@@ -546,6 +736,35 @@ class cNIMAX:
             activeDict = A.as_dict()
 
         return activeDict
+
+    async def read_T(self):
+        activeDict = {}
+
+        temperature = {}
+#        thermocouple = A.action_params["TC"]
+
+    #    A.error_code = ErrorCodes.none
+
+#        data_TS = self.task_tempinst_S.read()
+#        data_TT = self.task_tempinst_T.read()
+    #
+    #    if thermocouple == "type-S":
+        temperature["type-S"] = self.task_tempinst_S.read()
+    #    if thermocouple == "type-T":
+        temperature["type-T"] = self.task_tempinst_T.read()        
+ 
+        # else:
+        #     A.error_code = ErrorCodes.in_progress
+        #     activeDict = A.as_dict()
+
+        # return activeDict
+        return temperature
+
+    async def stop_Ttask(self):
+        """stops instantaneous temp measurement"""
+        self.task_tempinst_S.close()
+        self.task_tempinst_T.close()
+        
 
     async def stop(self):
         """stops measurement, writes all data and returns from meas loop"""
