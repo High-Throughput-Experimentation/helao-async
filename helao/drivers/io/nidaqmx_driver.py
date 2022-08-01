@@ -318,7 +318,7 @@ class cNIMAX:
             units=TemperatureUnits.DEG_C,
             thermocouple_type=ThermocoupleType.T,
             cjc_source=CJCSource.SCANNABLE_CHANNEL,
-            cjc_channel = 'PXI-6289/ai0',
+            cjc_channel = 'PXI-6284/ai0',
         )
 
         self.task_tempinst_T.ai_channels.all.ai_lowpass_enable = True
