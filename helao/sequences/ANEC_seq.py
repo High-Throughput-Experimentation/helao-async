@@ -48,28 +48,28 @@ def ANEC_sample_ready(
     
     # move to solid sample
     epm.add_experiment(
-        "ANEC_slave_startup",
+        "ANEC_sub_startup",
         {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no, "z_move_mm": z_move_mm},
     )
     
     #clean the cell & purge with CO2
-    epm.add_experiment("ANEC_slave_normal_state", {})
-    epm.add_experiment("ANEC_slave_cleanup", {"reservoir_liquid_sample_no": 1})
-    epm.add_experiment("ANEC_slave_cleanup", {"reservoir_liquid_sample_no": 1})
+    epm.add_experiment("ANEC_sub_normal_state", {})
+    epm.add_experiment("ANEC_sub_cleanup", {"reservoir_liquid_sample_no": 1})
+    epm.add_experiment("ANEC_sub_cleanup", {"reservoir_liquid_sample_no": 1})
     # housekeeping
-    epm.add_experiment("ANEC_slave_unload_cell", {})
+    epm.add_experiment("ANEC_sub_unload_cell", {})
 
-    #epm.add_experiment("ANEC_slave_normal_state", {})
+    #epm.add_experiment("ANEC_sub_normal_state", {})
 
     epm.add_experiment(
-        "ANEC_slave_load_solid",
+        "ANEC_sub_load_solid",
         {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no},
     )
 
     for _ in range(num_repeats):
 
         epm.add_experiment(
-            "ANEC_slave_flush_fill_cell",
+            "ANEC_sub_flush_fill_cell",
             {
                 "liquid_flush_time": 90,
                 "co2_purge_time": 15,
@@ -80,7 +80,7 @@ def ANEC_sample_ready(
         )
 
         epm.add_experiment(
-            "ANEC_slave_CA",
+            "ANEC_sub_CA",
             {
                 "WE_potential__V": WE_potential__V,
                 "WE_versus": WE_versus,
@@ -94,7 +94,7 @@ def ANEC_sample_ready(
         )
 
 
-        epm.add_experiment("ANEC_slave_drain_cell", {"drain_time": 50.0})
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
 
     return epm.experiment_plan_list
 
@@ -144,12 +144,12 @@ def ANEC_series_CA(
     epm = ExperimentPlanMaker()
 
     # housekeeping
-    epm.add_experiment("ANEC_slave_unload_cell", {})
+    epm.add_experiment("ANEC_sub_unload_cell", {})
 
-    #epm.add_experiment("ANEC_slave_normal_state", {})
+    #epm.add_experiment("ANEC_sub_normal_state", {})
 
     epm.add_experiment(
-        "ANEC_slave_load_solid",
+        "ANEC_sub_load_solid",
         {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no},
     )
 
@@ -157,7 +157,7 @@ def ANEC_series_CA(
         print(f" ... cycle {cycle} potential:", potential, f" ... cycle {cycle} duration:", time)
 
         epm.add_experiment(
-            "ANEC_slave_flush_fill_cell",
+            "ANEC_sub_flush_fill_cell",
             {
                 "liquid_flush_time": 80,
                 "co2_purge_time": 15,
@@ -168,7 +168,7 @@ def ANEC_series_CA(
         )
 
         epm.add_experiment(
-            "ANEC_slave_CA",
+            "ANEC_sub_CA",
             {
                 "WE_potential__V": potential,
                 "WE_versus": WE_versus,
@@ -182,7 +182,7 @@ def ANEC_series_CA(
         )
 
         epm.add_experiment(
-            "ANEC_slave_aliquot",
+            "ANEC_sub_aliquot",
             {
                 "toolGC": toolGC,
                 "toolarchive": toolarchive,
@@ -195,9 +195,9 @@ def ANEC_series_CA(
             },
         )
 
-        epm.add_experiment("ANEC_slave_drain_cell", {"drain_time": 50.0})
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
 
-    epm.add_experiment("ANEC_slave_alloff", {})
+    epm.add_experiment("ANEC_sub_alloff", {})
     
     return epm.experiment_plan_list
 
@@ -247,12 +247,12 @@ def ANEC_photo_CA(
     epm = ExperimentPlanMaker()
 
     # housekeeping
-    epm.add_experiment("ANEC_slave_unload_cell", {})
+    epm.add_experiment("ANEC_sub_unload_cell", {})
 
-    #epm.add_experiment("ANEC_slave_normal_state", {})
+    #epm.add_experiment("ANEC_sub_normal_state", {})
 
     epm.add_experiment(
-        "ANEC_slave_load_solid",
+        "ANEC_sub_load_solid",
         {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no},
     )
 
@@ -260,7 +260,7 @@ def ANEC_photo_CA(
         print(f" ... cycle {cycle} potential:", potential, f" ... cycle {cycle} duration:", time)
 
         epm.add_experiment(
-            "ANEC_slave_flush_fill_cell",
+            "ANEC_sub_flush_fill_cell",
             {
                 "liquid_flush_time": 90,
                 "co2_purge_time": 15,
@@ -271,7 +271,7 @@ def ANEC_photo_CA(
         )
 
         epm.add_experiment(
-            "ANEC_slave_photo_CA",
+            "ANEC_sub_photo_CA",
             {
                 "WE_potential__V": potential,
                 "WE_versus": WE_versus,
@@ -285,7 +285,7 @@ def ANEC_photo_CA(
         )
 
         epm.add_experiment(
-            "ANEC_slave_aliquot",
+            "ANEC_sub_aliquot",
             {
                 "toolGC": toolGC,
                 "toolarchive": toolarchive,
@@ -298,9 +298,9 @@ def ANEC_photo_CA(
             },
         )
 
-        epm.add_experiment("ANEC_slave_drain_cell", {"drain_time": 50.0})
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
     if len(WE_potential__V)>1:
-        epm.add_experiment("ANEC_slave_alloff", {})
+        epm.add_experiment("ANEC_sub_alloff", {})
     return epm.experiment_plan_list
 
 def ANEC_cleanup_disengage(
@@ -313,10 +313,10 @@ def ANEC_cleanup_disengage(
     epm = ExperimentPlanMaker()
 
     # housekeeping
-    epm.add_experiment("ANEC_slave_cleanup", {})
-    epm.add_experiment("ANEC_slave_cleanup", {})
-    epm.add_experiment("ANEC_slave_alloff", {})
-    epm.add_experiment("ANEC_slave_disengage", {})
+    epm.add_experiment("ANEC_sub_cleanup", {})
+    epm.add_experiment("ANEC_sub_cleanup", {})
+    epm.add_experiment("ANEC_sub_alloff", {})
+    epm.add_experiment("ANEC_sub_disengage", {})
 
     return epm.experiment_plan_list
 
@@ -357,19 +357,19 @@ def ANEC_CA_pretreat(
     epm = ExperimentPlanMaker()
 
     # housekeeping
-    epm.add_experiment("ANEC_slave_unload_cell", {})
+    epm.add_experiment("ANEC_sub_unload_cell", {})
 
-    #epm.add_experiment("ANEC_slave_normal_state", {})
+    #epm.add_experiment("ANEC_sub_normal_state", {})
 
     epm.add_experiment(
-        "ANEC_slave_load_solid",
+        "ANEC_sub_load_solid",
         {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no},
     )
 
     for _ in range(num_repeats):
 
         epm.add_experiment(
-            "ANEC_slave_flush_fill_cell",
+            "ANEC_sub_flush_fill_cell",
             {
                 "liquid_flush_time": 90,
                 "co2_purge_time": 15,
@@ -380,7 +380,7 @@ def ANEC_CA_pretreat(
         )
 
         epm.add_experiment(
-            "ANEC_slave_CA",
+            "ANEC_sub_CA",
             {
                 "WE_potential__V": WE_potential__V,
                 "WE_versus": WE_versus,
@@ -394,7 +394,7 @@ def ANEC_CA_pretreat(
         )
 
 
-        epm.add_experiment("ANEC_slave_drain_cell", {"drain_time": 50.0})
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
 
     return epm.experiment_plan_list
 
@@ -445,19 +445,19 @@ def ANEC_repeat_CA(
     epm = ExperimentPlanMaker()
 
     # housekeeping
-    epm.add_experiment("ANEC_slave_unload_cell", {})
+    epm.add_experiment("ANEC_sub_unload_cell", {})
 
-    #epm.add_experiment("ANEC_slave_normal_state", {})
+    #epm.add_experiment("ANEC_sub_normal_state", {})
 
     epm.add_experiment(
-        "ANEC_slave_load_solid",
+        "ANEC_sub_load_solid",
         {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no},
     )
 
     for _ in range(num_repeats):
 
         epm.add_experiment(
-            "ANEC_slave_flush_fill_cell",
+            "ANEC_sub_flush_fill_cell",
             {
                 "liquid_flush_time": 80,
                 "co2_purge_time": 15,
@@ -468,7 +468,7 @@ def ANEC_repeat_CA(
         )
 
         epm.add_experiment(
-            "ANEC_slave_CA",
+            "ANEC_sub_CA",
             {
                 "WE_potential__V": WE_potential__V,
                 "WE_versus": WE_versus,
@@ -482,7 +482,7 @@ def ANEC_repeat_CA(
         )
 
         epm.add_experiment(
-            "ANEC_slave_aliquot",
+            "ANEC_sub_aliquot",
             {
                 "toolGC": toolGC,
                 "toolarchive": toolarchive,
@@ -495,7 +495,7 @@ def ANEC_repeat_CA(
             },
         )
 
-        epm.add_experiment("ANEC_slave_drain_cell", {"drain_time": 50.0})
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
 
     return epm.experiment_plan_list
 
@@ -539,19 +539,19 @@ def ANEC_gasonly_CA(
     epm = ExperimentPlanMaker()
 
     # housekeeping
-    epm.add_experiment("ANEC_slave_unload_cell", {})
+    epm.add_experiment("ANEC_sub_unload_cell", {})
 
-    #epm.add_experiment("ANEC_slave_normal_state", {})
+    #epm.add_experiment("ANEC_sub_normal_state", {})
 
     epm.add_experiment(
-        "ANEC_slave_load_solid",
+        "ANEC_sub_load_solid",
         {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no},
     )
 
     for _ in range(num_repeats):
 
         epm.add_experiment(
-            "ANEC_slave_flush_fill_cell",
+            "ANEC_sub_flush_fill_cell",
             {
                 "liquid_flush_time": 80,
                 "co2_purge_time": 15,
@@ -562,7 +562,7 @@ def ANEC_gasonly_CA(
         )
 
         epm.add_experiment(
-            "ANEC_slave_CA",
+            "ANEC_sub_CA",
             {
                 "WE_potential__V": WE_potential__V,
                 "WE_versus": WE_versus,
@@ -576,14 +576,14 @@ def ANEC_gasonly_CA(
         )
 
         epm.add_experiment(
-            "ANEC_slave_GC_preparation",
+            "ANEC_sub_GC_preparation",
             {
                 "toolGC": toolGC,
                 "volume_ul_GC": volume_ul_GC,
             },
         )
 
-        epm.add_experiment("ANEC_slave_drain_cell", {"drain_time": 50.0})
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
 
     return epm.experiment_plan_list
 
@@ -630,19 +630,19 @@ def ANEC_repeat_CV(
     epm = ExperimentPlanMaker()
 
     # housekeeping
-    epm.add_experiment("ANEC_slave_unload_cell", {})
+    epm.add_experiment("ANEC_sub_unload_cell", {})
 
-    #epm.add_experiment("ANEC_slave_normal_state", {})
+    #epm.add_experiment("ANEC_sub_normal_state", {})
 
     epm.add_experiment(
-        "ANEC_slave_load_solid",
+        "ANEC_sub_load_solid",
         {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no},
     )
 
     for _ in range(num_repeats):
 
         epm.add_experiment(
-            "ANEC_slave_flush_fill_cell",
+            "ANEC_sub_flush_fill_cell",
             {
                 "liquid_flush_time": 80,
                 "co2_purge_time": 15,
@@ -653,7 +653,7 @@ def ANEC_repeat_CV(
         )
 
         epm.add_experiment(
-            "ANEC_slave_CV",
+            "ANEC_sub_CV",
             {
                 "WE_versus": WE_versus,
                 "ref_type": ref_type,
@@ -669,7 +669,7 @@ def ANEC_repeat_CV(
             },
         )
 
-        epm.add_experiment("ANEC_slave_drain_cell", {"drain_time": 50.0})
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
 
     return epm.experiment_plan_list
 
@@ -691,7 +691,7 @@ def GC_Archiveliquid_analysis(
 
     for source_vial in range(source_vial_from, source_vial_to+1):
         epm.add_experiment(
-            "ANEC_slave_GCLiquid_analysis",
+            "ANEC_sub_GCLiquid_analysis",
             {
                 "source_tray": source_tray,
                 "source_slot": source_slot,
@@ -721,7 +721,7 @@ def HPLC_Archiveliquid_analysis(
 
     for source_vial in range(source_vial_from, source_vial_to+1):
         epm.add_experiment(
-            "ANEC_slave_HPLCLiquid_analysis",
+            "ANEC_sub_HPLCLiquid_analysis",
             {
                 "source_tray": source_tray,
                 "source_slot": source_slot,
