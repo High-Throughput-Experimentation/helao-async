@@ -295,7 +295,7 @@ class cNIMAX:
             units=TemperatureUnits.DEG_C,
             thermocouple_type=ThermocoupleType.S,
             cjc_source=CJCSource.SCANNABLE_CHANNEL,
-            cjc_channel= 'PXI-6284/ai0',
+            cjc_channel= 'CJCtemp',
         )
 
         self.task_tempinst_S.ai_channels.all.ai_lowpass_enable = True
@@ -318,7 +318,7 @@ class cNIMAX:
             units=TemperatureUnits.DEG_C,
             thermocouple_type=ThermocoupleType.T,
             cjc_source=CJCSource.SCANNABLE_CHANNEL,
-            cjc_channel = 'PXI-6284/ai0',
+            cjc_channel = 'CJCtemp',
         )
 
         self.task_tempinst_T.ai_channels.all.ai_lowpass_enable = True
@@ -334,7 +334,7 @@ class cNIMAX:
         self.task_tempCJC = nidaqmx.Task()
         self.task_tempCJC.ai_channels.add_ai_temp_built_in_sensor_chan(
             physical_channel= 'PXI-6284/ai0',
-            #name_to_assign_to_channel="Temp_typeT",
+            name_to_assign_to_channel="CJCtemp",
             units=TemperatureUnits.DEG_C,
         )
         self.task_tempCJC.ai_channels.all.ai_lowpass_enable = True
