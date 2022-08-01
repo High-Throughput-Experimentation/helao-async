@@ -319,7 +319,7 @@ def makeApp(confPrefix, servKey, helao_root):
                  TTLwait: trigger channel, -1 disables, else select TTL channel"""
             # A = await app.base.setup_action()
             # A.action_abbr = "getTemp"
-            
+            app.driver.create_Ttask()
             return app.driver.read_T()
 
 
