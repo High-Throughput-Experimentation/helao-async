@@ -305,8 +305,8 @@ def makeApp(confPrefix, servKey, helao_root):
 
         @app.post(f"/readtemp", tags=["public"])
         async def readtemp(
-            # action: Optional[Action] = Body({}, embed=True),
-            # action_version: int = 1,
+             action: Optional[Action] = Body({}, embed=True),
+             action_version: int = 1,
 #            TC: Optional[str]= "type-S",  #some sort of selection
 #            Tval: Optional[float] = 10.0,
 #            SampleRate: Optional[int] = Query(1.0, ge=1),
