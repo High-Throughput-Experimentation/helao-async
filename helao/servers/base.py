@@ -1151,7 +1151,7 @@ class Base(object):
 
                                 self.file_conn_dict[file_conn_key].params.json_data_keys = jsonkeys
 
-                            self.base.print_message("creating output file for {file_conn_key}")
+                            self.base.print_message(f"creating output file for {file_conn_key}")
                             # create the file for this data stream
                             await self.log_data_set_output_file(file_conn_key=file_conn_key)
 
