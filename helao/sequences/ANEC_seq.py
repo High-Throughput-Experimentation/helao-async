@@ -299,8 +299,8 @@ def ANEC_photo_CA(
         )
 
         epm.add_experiment("ANEC_slave_drain_cell", {"drain_time": 50.0})
-    
-    epm.add_experiment("ANEC_slave_alloff", {})
+    if len(WE_potential__V)>1:
+        epm.add_experiment("ANEC_slave_alloff", {})
     return epm.experiment_plan_list
 
 def ANEC_cleanup_disengage(

@@ -1,5 +1,5 @@
 @echo off
-call conda activate base
+call conda activate helao
 cd C:\INST_hlo\CODE\helao-core
 git fetch
 git reset --hard
