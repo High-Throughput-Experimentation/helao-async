@@ -303,7 +303,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if dev_temperature:
 
-        @app.post(f"/{servKey}/readtemp", tags=["public"])
+        @app.post(f"/readtemp", tags=["public"])
         async def readtemp(
             # action: Optional[Action] = Body({}, embed=True),
             # action_version: int = 1,
@@ -318,9 +318,9 @@ def makeApp(confPrefix, servKey, helao_root):
                  Tval: time of measurement in seconds
                  TTLwait: trigger channel, -1 disables, else select TTL channel"""
             # A = await app.base.setup_action()
-            # A.action_abbr = "getTemp"  
-            active_dict = app.driver.read_T()
-            return active_dict
+            # A.action_abbr = "getTemp"
+            
+            return app.driver.read_T()
 
 
     if dev_heat:
