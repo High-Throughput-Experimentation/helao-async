@@ -286,7 +286,7 @@ class cNIMAX:
     def create_Ttask(self):
         """configures and starts a NImax task for nonexperiment temp measurements"""
         self.task_tempinst_S = nidaqmx.Task()
-        self.temperature.ai_channels.add_ai_thrmcpl_chan(
+        self.task_tempinst_S.ai_channels.add_ai_thrmcpl_chan(
             physical_channel= 'type-S',
 #            physical_channel= 'PXI-6289/ai0'
             name_to_assign_to_channel="Temp_typeS",
@@ -308,7 +308,7 @@ class cNIMAX:
             samps_per_chan=self.buffersize,
         )
         self.task_tempinst_T = nidaqmx.Task()
-        self.temperature.ai_channels.add_ai_thrmcpl_chan(
+        self.task_tempinst_T.ai_channels.add_ai_thrmcpl_chan(
             physical_channel= 'type-T',
 #            physical_channel= 'PXI-6284/ai0'
             name_to_assign_to_channel="Temp_typeT",
