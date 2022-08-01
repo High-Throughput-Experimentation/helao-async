@@ -738,7 +738,7 @@ class cNIMAX:
         return activeDict
 
     async def read_T(self):
-        activeDict = {}
+        #activeDict = {}
 
         temperature = {}
 #        thermocouple = A.action_params["TC"]
@@ -755,9 +755,9 @@ class cNIMAX:
  
         # else:
         #     A.error_code = ErrorCodes.in_progress
-        #     activeDict = A.as_dict()
+      #  activeDict = temperature.as_dict()
 
-        # return activeDict
+      #  return activeDict
         return temperature
 
     async def stop_Ttask(self):
