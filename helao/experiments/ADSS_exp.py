@@ -19,6 +19,9 @@ __all__ = [
     "ADSS_slave_fillfixed",
     "ADSS_slave_fill",
     "ADSS_slave_tray_unload",
+    "ADSS_slave_CA_noaliquots", #only one with process contrib
+    "ADSS_slave_CV_noaliquots", #only one with process contrib
+    
 ]
 
 
@@ -29,6 +32,8 @@ from helao.helpers.premodels import Action, Experiment, ActionPlanMaker
 from helaocore.models.action_start_condition import ActionStartCondition
 from helaocore.models.sample import SolidSample, LiquidSample
 from helaocore.models.machine import MachineModel
+from helaocore.models.process_contrib import ProcessContrib
+from helaocore.models.electrolyte import Electrolyte
 
 from helao.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
 from helao.drivers.robot.pal_driver import Spacingmethod, PALtools
@@ -753,6 +758,196 @@ def ADSS_slave_CA(
     )
 
     return sq.action_list  # returns complete action list to orch
+
+
+
+def ADSS_slave_CA_noaliquots(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    CA_potential: Optional[float] = 0.0,
+    ph: float = 9.53,
+    ref_vs_nhe: float = 0.21,
+    samplerate_sec: Optional[float] = .05,
+    OCV_duration_sec: Optional[float] = 60,
+    CA_duration_sec: Optional[float] = 1320,
+    aliquot_times_sec: Optional[List[float]] = [60, 600, 1140],
+):
+    """last functionality test: 11/29/2021"""
+
+    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
+
+    # get sample for gamry
+    sq.add_action(
+        {
+            "action_server": PAL_server,
+            "action_name": "archive_custom_query_sample",
+            "action_params": {
+                "custom": "cell1_we",
+            },
+            "to_global_params": [
+                "_fast_samples_in"
+            ],  # save new liquid_sample_no of eche cell to globals
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        }
+    )
+
+    # OCV
+    sq.add_action(
+        {
+            "action_server": PSTAT_server,
+            "action_name": "run_OCV",
+            "action_params": {
+                "Tval": sq.pars.OCV_duration_sec,
+                "SampleRate": sq.pars.samplerate_sec,
+                "TTLwait": -1,  # -1 disables, else select TTL 0-3
+                "TTLsend": -1,  # -1 disables, else select TTL 0-3
+                "IErange": "auto",
+            },
+            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "process_finish": True,
+            "process_contrib": [
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+
+        }
+    )
+
+
+    sq.add_action(
+        {
+            "action_server": PAL_server,
+            "action_name": "archive_custom_query_sample",
+            "action_params": {
+                "custom": "cell1_we",
+            },
+            "to_global_params": [
+                "_fast_samples_in"
+            ],  # save new liquid_sample_no of eche cell to globals
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        }
+    )
+
+    # apply potential
+    potential = sq.pars.CA_potential - 1.0 * sq.pars.ref_vs_nhe - 0.059 * sq.pars.ph
+    print(f"ADSS_slave_CA potential: {potential}")
+    sq.add_action(
+        {
+            "action_server": PSTAT_server,
+            "action_name": "run_CA",
+            "action_params": {
+                "Vval": potential,
+                "Tval": sq.pars.CA_duration_sec,
+                "SampleRate": sq.pars.samplerate_sec,
+                "TTLwait": -1,  # -1 disables, else select TTL 0-3
+                "TTLsend": -1,  # -1 disables, else select TTL 0-3
+                "IErange": "auto",
+            },
+            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "technique_name": "CA",
+            "process_finish": True,
+            "process_contrib": [
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        }
+    )
+
+    return sq.action_list  # returns complete action list to orch
+
+def ADSS_slave_CV_noaliquots(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
+    Vapex1_vsRHE: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
+    Vapex2_vsRHE: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
+    Vfinal_vsRHE: Optional[float] = 0.0,  # Final value in volts or amps.
+    scanrate_voltsec: Optional[float] = 0.02,  # scan rate in volts/second or amps/second.
+    samplerate_sec: Optional[float] = 0.1,
+    cycles: Optional[int] = 1,
+    gamry_i_range: Optional[str] = "auto",
+    ph: float = 9.53,
+    ref_vs_nhe: float = 0.21,
+    aliquot_times_sec: Optional[List[float]] = [60, 600, 1140],
+):
+
+    
+    apm = ActionPlanMaker()  # exposes function parameters via sq.pars
+
+    CV_duration_sec = (
+        abs(apm.pars.Vapex1_vsRHE - apm.pars.Vinit_vsRHE) / apm.pars.scanrate_voltsec
+    )
+    CV_duration_sec += (
+        abs(apm.pars.Vfinal_vsRHE - apm.pars.Vapex2_vsRHE) / apm.pars.scanrate_voltsec
+    )
+    CV_duration_sec += (
+        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE) / apm.pars.scanrate_voltsec * apm.pars.cycles
+    )
+    CV_duration_sec += (
+        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE) / apm.pars.scanrate_voltsec * 2.0 * (apm.pars.cycles - 1)
+    )
+
+    # get sample for gamry
+    apm.add_action(
+        {
+            "action_server": PAL_server,
+            "action_name": "archive_custom_query_sample",
+            "action_params": {
+                "custom": "cell1_we",
+            },
+            "to_global_params": [
+                "_fast_samples_in"
+            ],  # save new liquid_sample_no of eche cell to globals
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        }
+    )
+
+    # apply potential
+
+
+
+    apm.add_action(
+        {
+            "action_server": PSTAT_server,
+            "action_name": "run_CV",
+            "action_params": {
+                "Vinit__V": apm.pars.Vinit_vsRHE
+                - 1.0 * apm.pars.ref_vs_nhe
+                - 0.059 * apm.pars.ph,
+                "Vapex1__V": apm.pars.Vapex1_vsRHE
+                - 1.0 * apm.pars.ref_vs_nhe
+                - 0.059 * apm.pars.ph,
+                "Vapex2__V": apm.pars.Vapex2_vsRHE
+                - 1.0 * apm.pars.ref_vs_nhe
+                - 0.059 * apm.pars.ph,
+                "Vfinal__V": apm.pars.Vfinal_vsRHE
+                - 1.0 * apm.pars.ref_vs_nhe
+                - 0.059 * apm.pars.ph,
+                "ScanRate__V_s": apm.pars.scanrate_voltsec,
+                "AcqInterval__s": apm.pars.samplerate_sec,
+                "Cycles": apm.pars.cycles,
+                "TTLwait": -1,  # -1 disables, else select TTL 0-3
+                "TTLsend": 0,  # -1 disables, else select TTL 0-3
+                "IErange": apm.pars.gamry_i_range,
+            },
+            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "technique_name": "CV",
+            "process_finish": True,
+            "process_contrib": [
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        }
+    )
+
+    return apm.action_list  # returns complete action list to orch
+
 
 
 def ADSS_slave_tray_unload(
