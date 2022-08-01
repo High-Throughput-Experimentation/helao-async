@@ -118,8 +118,8 @@ config["servers"] = dict(
                 '9':'PXI-6284/ai1'  # after rewire for thermocouple connection
                 },
             dev_temperature ={
-                'type-S':'PXI-6289/ai0',
-                'type-T':'PXI-6284/ai0'
+                'type-S':'PXI-6289/ai2',
+                'type-T':'PXI-6289/ai3'
                 },   
             dev_heat = {
                 'heater1':'PXI-6284/port2/line1', #P2.1
