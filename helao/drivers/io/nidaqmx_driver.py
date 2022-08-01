@@ -323,7 +323,15 @@ class cNIMAX:
 
         self.task_tempinst_T.ai_channels.all.ai_lowpass_enable = True
         self.task_tempinst_T.timing.cfg_samp_clk_timing(   #timing need?
- 
+
+        self.task_tempCJC = nidaqmx.Task()
+        self.task_tempCJC.ai_channels.add_ai_temp_built_in_sensor_chan(
+            physical_channel= 'PXI-6284/ai0',
+            #name_to_assign_to_channel="Temp_typeT",
+            units=TemperatureUnits.DEG_C,
+        )
+        self.task_tempCJC.ai_channels.all.ai_lowpass_enable = True
+        self.task_tempCJC.timing.cfg_samp_clk_timing(   #timing need?
             rate= 1,
 #           self.Tsamplingrate,
             source="",
@@ -334,6 +342,7 @@ class cNIMAX:
 
         self.task_tempinst_S.start()
         self.task_tempinst_T.start()
+        self.task_tempCJC.start()
  
     def streamIV_callback(
         self, task_handle, every_n_samples_event_type, number_of_samples, callback_data
