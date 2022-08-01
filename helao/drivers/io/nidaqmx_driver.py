@@ -324,6 +324,13 @@ class cNIMAX:
         self.task_tempinst_T.ai_channels.all.ai_lowpass_enable = True
         self.task_tempinst_T.timing.cfg_samp_clk_timing(   #timing need?
 
+            rate= 1,
+#           self.Tsamplingrate,
+            source="",
+            active_edge=Edge.RISING,
+            sample_mode=AcquisitionType.CONTINUOUS,
+            samps_per_chan=self.buffersize,
+        )
         self.task_tempCJC = nidaqmx.Task()
         self.task_tempCJC.ai_channels.add_ai_temp_built_in_sensor_chan(
             physical_channel= 'PXI-6284/ai0',
