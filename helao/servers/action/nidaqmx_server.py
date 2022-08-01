@@ -12,6 +12,7 @@ __all__ = ["makeApp"]
 # - test what happens if NImax broswer has nothing configured and only lists the device
 # - create tasks for action library
 # - handshake as stream with interrupt
+import time
 
 from importlib import import_module
 
@@ -304,22 +305,21 @@ def makeApp(confPrefix, servKey, helao_root):
 
         @app.post(f"/{servKey}/readtemp", tags=["public"])
         async def readtemp(
-            action: Optional[Action] = Body({}, embed=True),
-            action_version: int = 1,
-            TC: Optional[str]= "type-S",  #some sort of selection
-            Tval: Optional[float] = 10.0,
-            SampleRate: Optional[int] = Query(1.0, ge=1),
-            TTLwait: Optional[int] = -1,  # -1 disables, else select TTL channel
+            # action: Optional[Action] = Body({}, embed=True),
+            # action_version: int = 1,
+#            TC: Optional[str]= "type-S",  #some sort of selection
+#            Tval: Optional[float] = 10.0,
+#            SampleRate: Optional[int] = Query(1.0, ge=1),
+#            TTLwait: Optional[int] = -1,  # -1 disables, else select TTL channel
         ):
             """Runs temp measurement.
             Args:
-                 SampleRate: samples per second
                  TC: which thermocouple to read
                  Tval: time of measurement in seconds
                  TTLwait: trigger channel, -1 disables, else select TTL channel"""
-            A = await app.base.setup_action()
-            A.action_abbr = "multiCV"  #need to replace with a temp measurement
-            active_dict = await app.driver.run_cell_IV(A)
+            # A = await app.base.setup_action()
+            # A.action_abbr = "getTemp"  
+            active_dict = app.driver.read_T()
             return active_dict
 
 
@@ -332,7 +332,7 @@ def makeApp(confPrefix, servKey, helao_root):
             heater: Optional[dev_heatitems] = None,
             on: Optional[bool] = True,
         ):
-            active = await app.base.setup_and_contain_action(action_abbr="heatf")
+            active = await app.base.setup_and_contain_action(action_abbr="heat")
             # some additional params in order to call the same driver functions
             # for all DO actions
             active.action.action_params["do_port"] = dev_heat[
@@ -348,6 +348,45 @@ def makeApp(confPrefix, servKey, helao_root):
             await active.enqueue_data_dflt(datadict=datadict)
             finished_act = await active.finish()
             return finished_act.as_dict()
+
+
+#if dev_maintainT:
+
+    @app.post(f"/{servKey}/heatloop", tags=["public"])
+    async def heatloop(
+        # action: Optional[Action] = Body({}, embed=True),
+        # action_version: int = 1,
+
+        duration_hrs: float = 2,
+        reservoir1_min_C: float = 74.5,
+        reservoir1_max_C: float = 75.5,
+        reservoir2_min_C: float = 84.5,
+        reservoir2_max_C: float = 85.5,
+    ):
+        # A = await app.base.setup_action()
+
+        await app.driver.create_Ttask()
+        starttime=time.time()
+        duration = duration_hrs * 60 * 60
+        heatloop_run = True
+        while heatloop_run and ( time.time() - starttime < duration):
+            #temp_dict = await app.driver.read_T(A)
+            temp_dict = readtemp()
+            if temp_dict["type-S"] < reservoir1_min_C:
+                heater(heater="heater1", on = True)
+            if temp_dict["type-S"] > reservoir1_max_C:
+                heater(heater="heater1", on = False)
+            if temp_dict["type-T"] < reservoir2_min_C:
+                heater(heater="heater2", on = True)
+            if temp_dict["type-T"] > reservoir2_max_C:
+                heater(heater="heater2", on = False)
+            #need way to monitor and break loop
+            #ie, heatloop_run = False
+
+        await app.driver.stop_Ttask()
+        heater(heater="heater1", on = False)
+        heater(heater="heater2", on = False)
+
 
 
     @app.post(f"/{servKey}/stop", tags=["public"])
