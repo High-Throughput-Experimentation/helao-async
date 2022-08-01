@@ -294,7 +294,7 @@ class cNIMAX:
             max_val=150,
             units=TemperatureUnits.DEG_C,
             thermocouple_type=ThermocoupleType.S,
-            cjc_source=CJCSource.CHANNEL,
+            cjc_source=CJCSource.SCANNABLE_CHANNEL,
             cjc_channel= 'PXI-6289/ai0',
         )
 
@@ -317,7 +317,7 @@ class cNIMAX:
             max_val=150,
             units=TemperatureUnits.DEG_C,
             thermocouple_type=ThermocoupleType.T,
-            cjc_source=CJCSource.CHANNEL,
+            cjc_source=CJCSource.SCANNABLE_CHANNEL,
             cjc_channel = 'PXI-6289/ai0',
         )
 
