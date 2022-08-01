@@ -4,14 +4,14 @@ server_key must be a FastAPI action server defined in config
 """
 
 __all__ = [
-    "UVIS_slave_unloadall_customs",
-    "UVIS_slave_load_solid",
-    "UVIS_slave_startup",
-    "UVIS_slave_shutdown",
-    "UVIS_slave_movetosample",
-    "UVIS_slave_move",
-    "UVIS_slave_spectrometer_T",
-    "UVIS_slave_spectrometer_R",
+    "UVIS_sub_unloadall_customs",
+    "UVIS_sub_load_solid",
+    "UVIS_sub_startup",
+    "UVIS_sub_shutdown",
+    "UVIS_sub_movetosample",
+    "UVIS_sub_move",
+    "UVIS_sub_spectrometer_T",
+    "UVIS_sub_spectrometer_R",
 ]
 
 
@@ -49,7 +49,7 @@ PAL_server = MachineModel(server_name="PAL", machine_name=gethostname()).json_di
 toggle_triggertype = TriggerType.fallingedge
 
 
-def UVIS_slave_unloadall_customs(experiment: Experiment):
+def UVIS_sub_unloadall_customs(experiment: Experiment):
     """last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -68,7 +68,7 @@ def UVIS_slave_unloadall_customs(experiment: Experiment):
     return apm.action_list  # returns complete action list to orch
 
 
-def UVIS_slave_load_solid(
+def UVIS_sub_load_solid(
     experiment: Experiment,
     experiment_version: int = 1,
     solid_custom_position: Optional[str] = "cell1_we",
@@ -100,24 +100,24 @@ def UVIS_slave_load_solid(
     return apm.action_list  # returns complete action list to orch
 
 
-def UVIS_slave_startup(
+def UVIS_sub_startup(
     experiment: Experiment,
     experiment_version: int = 2,
     solid_custom_position: Optional[str] = "cell1_we",
     solid_plate_id: Optional[int] = 4534,
     solid_sample_no: Optional[int] = 1,
 ):
-    """Slave experiment
+    """Sub experiment
     last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # unload all samples from custom positions
-    apm.add_action_list(UVIS_slave_unloadall_customs(experiment=experiment))
+    apm.add_action_list(UVIS_sub_unloadall_customs(experiment=experiment))
 
     # load new requested solid samples
     apm.add_action_list(
-        UVIS_slave_load_solid(
+        UVIS_sub_load_solid(
             experiment=experiment,
             solid_custom_position=apm.pars.solid_custom_position,
             solid_plate_id=apm.pars.solid_plate_id,
@@ -160,26 +160,26 @@ def UVIS_slave_startup(
     return apm.action_list  # returns complete action list to orch
 
 
-def UVIS_slave_shutdown(experiment: Experiment):
-    """Slave experiment
+def UVIS_sub_shutdown(experiment: Experiment):
+    """Sub experiment
 
     last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # unload all samples from custom positions
-    apm.add_action_list(UVIS_slave_unloadall_customs(experiment=experiment))
+    apm.add_action_list(UVIS_sub_unloadall_customs(experiment=experiment))
 
     return apm.action_list  # returns complete action list to orch
 
 
-def UVIS_slave_movetosample(
+def UVIS_sub_movetosample(
     experiment: Experiment,
     experiment_version: int = 1,
     solid_plate_id: Optional[int] = 4534,
     solid_sample_no: Optional[int] = 1,
 ):
-    """Slave experiment
+    """Sub experiment
     last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -219,13 +219,13 @@ def UVIS_slave_movetosample(
     return apm.action_list  # returns complete action list to orch
 
 
-def UVIS_slave_move(
+def UVIS_sub_move(
     experiment: Experiment,
     experiment_version: int = 1,
     x_mm: float = 1.0,
     y_mm: float = 1.0,
 ):
-    """Slave experiment
+    """Sub experiment
     last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -249,7 +249,7 @@ def UVIS_slave_move(
     return apm.action_list  # returns complete action list to orch
 
 
-def UVIS_slave_spectrometer_T(
+def UVIS_sub_spectrometer_T(
     experiment: Experiment,
     experiment_version: int = 1,
     toggle_illum_time: Optional[float] = -1,
@@ -300,7 +300,7 @@ def UVIS_slave_spectrometer_T(
     return apm.action_list  # returns complete action list to orch
 
 
-def UVIS_slave_spectrometer_R(
+def UVIS_sub_spectrometer_R(
     experiment: Experiment,
     experiment_version: int = 1,
     toggle_illum_time: Optional[float] = -1,

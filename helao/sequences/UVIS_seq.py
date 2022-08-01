@@ -25,7 +25,7 @@ def UVIS_movetosample(
     pl = ExperimentPlanMaker()
 
     pl.add_experiment(
-        "UVIS_slave_movetosample",
+        "UVIS_sub_movetosample",
         {
             #            "solid_custom_position": "cell1_we",
             "solid_plate_id": plate_id,
@@ -33,7 +33,7 @@ def UVIS_movetosample(
         },
     )
 
-    pl.add_experiment("UVIS_slave_shutdown", {})
+    pl.add_experiment("UVIS_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -47,14 +47,14 @@ def UVIS_move(
     pl = ExperimentPlanMaker()
 
     pl.add_experiment(
-        "UVIS_slave_move",
+        "UVIS_sub_move",
         {
             "x_mm": move_x_mm,
             "y_mm": move_y_mm,
         },
     )
 
-    pl.add_experiment("UVIS_slave_shutdown", {})
+    pl.add_experiment("UVIS_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -70,12 +70,12 @@ def UVIS_spectrometer(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("UVIS_slave_unloadall_customs", {})
+    pl.add_experiment("UVIS_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "UVIS_slave_startup",
+            "UVIS_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -84,7 +84,7 @@ def UVIS_spectrometer(
         )
         # 
         pl.add_experiment(
-            "UVIS_slave_spectrometer_T",
+            "UVIS_sub_spectrometer_T",
             {
                 "toggle_illum_time": toggle_illum_time,
                 "spec_n_avg": Spec_n_avg,
@@ -92,7 +92,7 @@ def UVIS_spectrometer(
             },
         )
         pl.add_experiment(
-            "UVIS_slave_spectrometer_R",
+            "UVIS_sub_spectrometer_R",
             {
                 "toggle_illum_time": toggle_illum_time,
                 "spec_n_avg": Spec_n_avg,
@@ -100,7 +100,7 @@ def UVIS_spectrometer(
             },
         )
 
-        pl.add_experiment("UVIS_slave_shutdown", {})
+        pl.add_experiment("UVIS_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 

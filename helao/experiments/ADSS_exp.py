@@ -6,21 +6,21 @@ server_key must be a FastAPI action server defined in config
 __all__ = [
     "debug",
     # "ADSS_duaribilty_CAv1",
-    "ADSS_slave_startup",
-    "ADSS_slave_shutdown",
-    "ADSS_slave_engage",
-    "ADSS_slave_disengage",
-    "ADSS_slave_drain",
-    "ADSS_slave_clean_PALtool",
-    "ADSS_slave_CA",
-    "ADSS_slave_unloadall_customs",
-    "ADSS_slave_load_solid",
-    "ADSS_slave_load_liquid",
-    "ADSS_slave_fillfixed",
-    "ADSS_slave_fill",
-    "ADSS_slave_tray_unload",
-    "ADSS_slave_CA_noaliquots", #only one with process contrib
-    "ADSS_slave_CV_noaliquots", #only one with process contrib
+    "ADSS_sub_startup",
+    "ADSS_sub_shutdown",
+    "ADSS_sub_engage",
+    "ADSS_sub_disengage",
+    "ADSS_sub_drain",
+    "ADSS_sub_clean_PALtool",
+    "ADSS_sub_CA",
+    "ADSS_sub_unloadall_customs",
+    "ADSS_sub_load_solid",
+    "ADSS_sub_load_liquid",
+    "ADSS_sub_fillfixed",
+    "ADSS_sub_fill",
+    "ADSS_sub_tray_unload",
+    "ADSS_sub_CA_noaliquots", #only one with process contrib
+    "ADSS_sub_CV_noaliquots", #only one with process contrib
     
 ]
 
@@ -140,7 +140,7 @@ def debug(
     return sq.action_list  # returns complete action list to orch
 
 
-def ADSS_slave_unloadall_customs(experiment: Experiment):
+def ADSS_sub_unloadall_customs(experiment: Experiment):
     """last functionality test: 11/29/2021"""
 
     sq = ActionPlanMaker()  # exposes function parameters via sq.pars
@@ -157,7 +157,7 @@ def ADSS_slave_unloadall_customs(experiment: Experiment):
     return sq.action_list  # returns complete action list to orch
 
 
-def ADSS_slave_load_solid(
+def ADSS_sub_load_solid(
     experiment: Experiment,
     experiment_version: int = 1,
     solid_custom_position: Optional[str] = "cell1_we",
@@ -187,7 +187,7 @@ def ADSS_slave_load_solid(
     return sq.action_list  # returns complete action list to orch
 
 
-def ADSS_slave_load_liquid(
+def ADSS_sub_load_liquid(
     experiment: Experiment,
     experiment_version: int = 1,
     liquid_custom_position: Optional[str] = "elec_res1",
@@ -215,7 +215,7 @@ def ADSS_slave_load_liquid(
     return sq.action_list  # returns complete action list to orch
 
 
-def ADSS_slave_startup(
+def ADSS_sub_startup(
     experiment: Experiment,
     experiment_version: int = 1,
     solid_custom_position: Optional[str] = "cell1_we",
@@ -226,7 +226,7 @@ def ADSS_slave_startup(
     liquid_custom_position: Optional[str] = "elec_res1",
     liquid_sample_no: Optional[int] = 1,
 ):
-    """Slave experiment
+    """Sub experiment
     (1) Unload all custom position samples
     (2) Load solid sample to cell
     (3) Load liquid sample to reservoir
@@ -238,11 +238,11 @@ def ADSS_slave_startup(
     sq = ActionPlanMaker()  # exposes function parameters via sq.pars
 
     # unload all samples from custom positions
-    sq.add_action_list(ADSS_slave_unloadall_customs(experiment=experiment))
+    sq.add_action_list(ADSS_sub_unloadall_customs(experiment=experiment))
 
     # load new requested samples
     sq.add_action_list(
-        ADSS_slave_load_solid(
+        ADSS_sub_load_solid(
             experiment=experiment,
             solid_custom_position=sq.pars.solid_custom_position,
             solid_plate_id=sq.pars.solid_plate_id,
@@ -251,7 +251,7 @@ def ADSS_slave_startup(
     )
 
     sq.add_action_list(
-        ADSS_slave_load_liquid(
+        ADSS_sub_load_liquid(
             experiment=experiment,
             liquid_custom_position=sq.pars.liquid_custom_position,
             liquid_sample_no=sq.pars.liquid_sample_no,
@@ -285,7 +285,7 @@ def ADSS_slave_startup(
     )
 
     # move z to home
-    sq.add_action_list(ADSS_slave_disengage(experiment))
+    sq.add_action_list(ADSS_sub_disengage(experiment))
 
     # move to position
     sq.add_action(
@@ -305,13 +305,13 @@ def ADSS_slave_startup(
     )
 
     # seal cell
-    sq.add_action_list(ADSS_slave_engage(experiment))
+    sq.add_action_list(ADSS_sub_engage(experiment))
 
     return sq.action_list  # returns complete action list to orch
 
 
-def ADSS_slave_shutdown(experiment: Experiment):
-    """Slave experiment
+def ADSS_sub_shutdown(experiment: Experiment):
+    """Sub experiment
     (1) Deep clean PAL tool
     (2) pump liquid out off cell
     (3) Drain cell
@@ -323,7 +323,7 @@ def ADSS_slave_shutdown(experiment: Experiment):
 
     # deep clean
     sq.add_action_list(
-        ADSS_slave_clean_PALtool(
+        ADSS_sub_clean_PALtool(
             experiment, clean_tool=PALtools.LS3, clean_volume_ul=500
         )
     )
@@ -366,7 +366,7 @@ def ADSS_slave_shutdown(experiment: Experiment):
     )
 
     # drain, TODO
-    # sq.add_action_list(ADSS_slave_drain(experiment))
+    # sq.add_action_list(ADSS_sub_drain(experiment))
 
     # turn pump off
     sq.add_action(
@@ -396,13 +396,13 @@ def ADSS_slave_shutdown(experiment: Experiment):
 
     # move z to home
     # cannot do this without proper drain for now
-    # sq.add_action_list(ADSS_slave_disengage(experiment))
+    # sq.add_action_list(ADSS_sub_disengage(experiment))
 
     return sq.action_list  # returns complete action list to orch
 
 
-def ADSS_slave_drain(experiment: Experiment):
-    """DUMMY Slave experiment
+def ADSS_sub_drain(experiment: Experiment):
+    """DUMMY Sub experiment
     Drains electrochemical cell.
 
     last functionality test: 11/29/2021"""
@@ -412,8 +412,8 @@ def ADSS_slave_drain(experiment: Experiment):
     return sq.action_list  # returns complete action list to orch
 
 
-def ADSS_slave_engage(experiment: Experiment):
-    """Slave experiment
+def ADSS_sub_engage(experiment: Experiment):
+    """Sub experiment
     Engages and seals electrochemical cell.
 
     last functionality test: 11/29/2021"""
@@ -457,8 +457,8 @@ def ADSS_slave_engage(experiment: Experiment):
     return sq.action_list  # returns complete action list to orch
 
 
-def ADSS_slave_disengage(experiment: Experiment):
-    """Slave experiment
+def ADSS_sub_disengage(experiment: Experiment):
+    """Sub experiment
     Disengages and seals electrochemical cell.
 
     last functionality test: 11/29/2021"""
@@ -484,13 +484,13 @@ def ADSS_slave_disengage(experiment: Experiment):
     return sq.action_list  # returns complete action list to orch
 
 
-def ADSS_slave_clean_PALtool(
+def ADSS_sub_clean_PALtool(
     experiment: Experiment,
     experiment_version: int = 1,
     clean_tool: Optional[str] = PALtools.LS3,
     clean_volume_ul: Optional[int] = 500,
 ):
-    """Slave experiment
+    """Sub experiment
     Performs deep clean of selected PAL tool.
 
     last functionality test: 11/29/2021"""
@@ -513,7 +513,7 @@ def ADSS_slave_clean_PALtool(
     return sq.action_list  # returns complete action list to orch
 
 
-def ADSS_slave_fillfixed(
+def ADSS_sub_fillfixed(
     experiment: Experiment,
     experiment_version: int = 1,
     fill_vol_ul: Optional[int] = 10000,
@@ -581,7 +581,7 @@ def ADSS_slave_fillfixed(
     return sq.action_list  # returns complete action list to orch
 
 
-def ADSS_slave_fill(
+def ADSS_sub_fill(
     experiment: Experiment,
     experiment_version: int = 1,
     fill_vol_ul: Optional[int] = 1000,
@@ -610,7 +610,7 @@ def ADSS_slave_fill(
     return sq.action_list  # returns complete action list to orch
 
 
-def ADSS_slave_CA(
+def ADSS_sub_CA(
     experiment: Experiment,
     experiment_version: int = 1,
     CA_potential: Optional[float] = 0.0,
@@ -695,7 +695,7 @@ def ADSS_slave_CA(
 
     # apply potential
     potential = sq.pars.CA_potential - 1.0 * sq.pars.ref_vs_nhe - 0.059 * sq.pars.ph
-    print(f"ADSS_slave_CA potential: {potential}")
+    print(f"ADSS_sub_CA potential: {potential}")
     sq.add_action(
         {
             "action_server": PSTAT_server,
@@ -761,7 +761,7 @@ def ADSS_slave_CA(
 
 
 
-def ADSS_slave_CA_noaliquots(
+def ADSS_sub_CA_noaliquots(
     experiment: Experiment,
     experiment_version: int = 1,
     CA_potential: Optional[float] = 0.0,
@@ -832,7 +832,7 @@ def ADSS_slave_CA_noaliquots(
 
     # apply potential
     potential = sq.pars.CA_potential - 1.0 * sq.pars.ref_vs_nhe - 0.059 * sq.pars.ph
-    print(f"ADSS_slave_CA potential: {potential}")
+    print(f"ADSS_sub_CA potential: {potential}")
     sq.add_action(
         {
             "action_server": PSTAT_server,
@@ -859,7 +859,7 @@ def ADSS_slave_CA_noaliquots(
 
     return sq.action_list  # returns complete action list to orch
 
-def ADSS_slave_CV_noaliquots(
+def ADSS_sub_CV_noaliquots(
     experiment: Experiment,
     experiment_version: int = 1,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
@@ -950,7 +950,7 @@ def ADSS_slave_CV_noaliquots(
 
 
 
-def ADSS_slave_tray_unload(
+def ADSS_sub_tray_unload(
     experiment: Experiment,
     experiment_version: int = 1,
     tray: Optional[int] = 2,

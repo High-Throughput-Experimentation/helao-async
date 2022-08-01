@@ -5,25 +5,25 @@ server_key must be a FastAPI action server defined in config
 """
 
 __all__ = [
-    "ANEC_slave_startup",
-    "ANEC_slave_disengage",
-    "ANEC_slave_drain_cell",
-    "ANEC_slave_flush_fill_cell",
-    "ANEC_slave_load_solid_only",
-    "ANEC_slave_load_solid",
-    "ANEC_slave_load_solid_and_clean_cell",
-    "ANEC_slave_unload_cell",
-    "ANEC_slave_unload_liquid",
-    "ANEC_slave_normal_state",
-    "ANEC_slave_GC_preparation",
-    "ANEC_slave_cleanup",
-    "ANEC_slave_CA",
-    "ANEC_slave_aliquot",
-    "ANEC_slave_alloff",
-    "ANEC_slave_CV",
-    "ANEC_slave_photo_CA",
-    "ANEC_slave_GCLiquid_analysis",
-    "ANEC_slave_HPLCLiquid_analysis"
+    "ANEC_sub_startup",
+    "ANEC_sub_disengage",
+    "ANEC_sub_drain_cell",
+    "ANEC_sub_flush_fill_cell",
+    "ANEC_sub_load_solid_only",
+    "ANEC_sub_load_solid",
+    "ANEC_sub_load_solid_and_clean_cell",
+    "ANEC_sub_unload_cell",
+    "ANEC_sub_unload_liquid",
+    "ANEC_sub_normal_state",
+    "ANEC_sub_GC_preparation",
+    "ANEC_sub_cleanup",
+    "ANEC_sub_CA",
+    "ANEC_sub_aliquot",
+    "ANEC_sub_alloff",
+    "ANEC_sub_CV",
+    "ANEC_sub_photo_CA",
+    "ANEC_sub_GCLiquid_analysis",
+    "ANEC_sub_HPLCLiquid_analysis"
 ]
 
 ###
@@ -57,14 +57,14 @@ z_engage = 2.5
 # moves it up to put pressure on seal
 z_seal = 4.5
 
-def ANEC_slave_startup(
+def ANEC_sub_startup(
     experiment: Experiment,
     experiment_version: int = 1,
     solid_plate_id: Optional[int] = 4534,
     solid_sample_no: Optional[int] = 1,
     z_move_mm: Optional[float] = 3.5
 ):
-    """Slave experiment
+    """Sub experiment
     last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -135,11 +135,11 @@ def ANEC_slave_startup(
     
     return apm.action_list  # returns complete action list to orch
     
-def ANEC_slave_disengage(    
+def ANEC_sub_disengage(    
     experiment: Experiment,
     experiment_version: int = 1
 ):
-    """Slave experiment
+    """Sub experiment
     Disengages and seals electrochemical cell."""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -162,7 +162,7 @@ def ANEC_slave_disengage(
     return apm.action_list  # returns complete action list to orch
 
 
-def ANEC_slave_load_solid(
+def ANEC_sub_load_solid(
     experiment: Experiment,
     experiment_version: int = 1,
     solid_plate_id: Optional[int] = 4534,
@@ -188,7 +188,7 @@ def ANEC_slave_load_solid(
     return apm.action_list
 
 
-def ANEC_slave_alloff(
+def ANEC_sub_alloff(
     experiment: Experiment,
     experiment_version: int = 2,
 ):
@@ -211,7 +211,7 @@ def ANEC_slave_alloff(
     return apm.action_list
 
 
-def ANEC_slave_normal_state(
+def ANEC_sub_normal_state(
     experiment: Experiment,
     experiment_version: int = 2,
 ):
@@ -244,7 +244,7 @@ def ANEC_slave_normal_state(
     return apm.action_list
 
 
-def ANEC_slave_flush_fill_cell(
+def ANEC_sub_flush_fill_cell(
     experiment: Experiment,
     experiment_version: int = 1,
     liquid_flush_time: Optional[float] = 80,
@@ -295,7 +295,7 @@ def ANEC_slave_flush_fill_cell(
     return apm.action_list
 
 
-def ANEC_slave_unload_cell(experiment: Experiment, experiment_version: int = 1):
+def ANEC_sub_unload_cell(experiment: Experiment, experiment_version: int = 1):
     """Unload Sample at 'cell1_we' position."""
 
     apm = ActionPlanMaker()
@@ -303,7 +303,7 @@ def ANEC_slave_unload_cell(experiment: Experiment, experiment_version: int = 1):
     return apm.action_list
 
 
-def ANEC_slave_unload_liquid(experiment: Experiment, experiment_version: int = 1,):
+def ANEC_sub_unload_liquid(experiment: Experiment, experiment_version: int = 1,):
     """Unload liquid sample at 'cell1_we' position and reload solid sample."""
 
     apm = ActionPlanMaker()
@@ -319,7 +319,7 @@ def ANEC_slave_unload_liquid(experiment: Experiment, experiment_version: int = 1
     return apm.action_list
 
 
-def ANEC_slave_drain_cell(
+def ANEC_sub_drain_cell(
     experiment: Experiment,
     experiment_version: int = 2,
     drain_time: Optional[float] = 50.0,
@@ -327,14 +327,14 @@ def ANEC_slave_drain_cell(
     """Drain liquid from cell and unload liquid sample."""
 
     apm = ActionPlanMaker()
-    apm.add_action_list(ANEC_slave_normal_state(experiment))
-    apm.add_action_list(ANEC_slave_unload_liquid(experiment))
+    apm.add_action_list(ANEC_sub_normal_state(experiment))
+    apm.add_action_list(ANEC_sub_unload_liquid(experiment))
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.drain_time})
 
     return apm.action_list
 
 
-def ANEC_slave_cleanup(
+def ANEC_sub_cleanup(
     experiment: Experiment,
     experiment_version: int = 1,
     reservoir_liquid_sample_no: Optional[int] = 1,
@@ -353,16 +353,16 @@ def ANEC_slave_cleanup(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add_action_list(
-        ANEC_slave_flush_fill_cell(
+        ANEC_sub_flush_fill_cell(
             experiment=experiment,
             reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
         )
     )
-    apm.add_action_list(ANEC_slave_drain_cell(experiment))
+    apm.add_action_list(ANEC_sub_drain_cell(experiment))
     return apm.action_list
 
 
-def ANEC_slave_GC_preparation(
+def ANEC_sub_GC_preparation(
     experiment: Experiment,
     experiment_version: int = 1,
     toolGC: Optional[str] = "HS 2",
@@ -407,7 +407,7 @@ def ANEC_slave_GC_preparation(
     return apm.action_list
 
 
-def ANEC_slave_load_solid_only(
+def ANEC_sub_load_solid_only(
     experiment: Experiment,
     experiment_version: int = 1,
     solid_plate_id: Optional[int] = 1,
@@ -416,7 +416,7 @@ def ANEC_slave_load_solid_only(
     """Load solid and clean cell."""
 
     apm = ActionPlanMaker()
-    apm.add_action_list(ANEC_slave_unload_cell(experiment))
+    apm.add_action_list(ANEC_sub_unload_cell(experiment))
     apm.add(
         PAL_server,
         "archive_custom_load",
@@ -432,7 +432,7 @@ def ANEC_slave_load_solid_only(
     return apm.action_list
 
 
-def ANEC_slave_load_solid_and_clean_cell(
+def ANEC_sub_load_solid_and_clean_cell(
     experiment: Experiment,
     experiment_version: int = 1,
     solid_plate_id: Optional[int] = 1,
@@ -445,7 +445,7 @@ def ANEC_slave_load_solid_and_clean_cell(
     """Load solid and clean cell."""
 
     apm = ActionPlanMaker()
-    apm.add_action_list(ANEC_slave_unload_cell(experiment))
+    apm.add_action_list(ANEC_sub_unload_cell(experiment))
     apm.add(
         PAL_server,
         "archive_custom_load",
@@ -458,9 +458,9 @@ def ANEC_slave_load_solid_and_clean_cell(
             ).dict(),
         },
     )
-    apm.add_action_list(ANEC_slave_drain_cell(experiment))
+    apm.add_action_list(ANEC_sub_drain_cell(experiment))
     apm.add_action_list(
-        ANEC_slave_flush_fill_cell(
+        ANEC_sub_flush_fill_cell(
             experiment=experiment,
             reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
         )
@@ -485,11 +485,11 @@ def ANEC_slave_load_solid_and_clean_cell(
         ],
     )
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
-    apm.add_action_list(ANEC_slave_drain_cell(experiment))
+    apm.add_action_list(ANEC_sub_drain_cell(experiment))
     return apm.action_list
 
 
-def ANEC_slave_aliquot(
+def ANEC_sub_aliquot(
     experiment: Experiment,
     experiment_version: int = 1,
     toolGC: Optional[str] = "HS 2",
@@ -542,7 +542,7 @@ def ANEC_slave_aliquot(
     return apm.action_list
 
 
-def ANEC_slave_CA(
+def ANEC_sub_CA(
     experiment: Experiment,
     experiment_version: int = 1,
     WE_potential__V: Optional[float] = 0.0,
@@ -591,7 +591,7 @@ def ANEC_slave_CA(
 
     return apm.action_list
 
-def ANEC_slave_photo_CA(
+def ANEC_sub_photo_CA(
     experiment: Experiment,
     experiment_version: int = 1,
     WE_potential__V: Optional[float] = 0.0,
@@ -641,7 +641,7 @@ def ANEC_slave_photo_CA(
 
     return apm.action_list
 
-def ANEC_slave_CV(
+def ANEC_sub_CV(
     experiment: Experiment,
     experiment_version: int = 1,
     WE_versus: Optional[str] = "ref",
@@ -705,7 +705,7 @@ def ANEC_slave_CV(
 
     return apm.action_list
 
-def ANEC_slave_GCLiquid_analysis(
+def ANEC_sub_GCLiquid_analysis(
     experiment: Experiment,
     experiment_version: int = 1,
     #startGC: Optional[bool] = None,
@@ -759,7 +759,7 @@ def ANEC_slave_GCLiquid_analysis(
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.GC_analysis_time})
     return apm.action_list
 
-def ANEC_slave_HPLCLiquid_analysis(
+def ANEC_sub_HPLCLiquid_analysis(
     experiment: Experiment,
     experiment_version: int = 1,
     #startGC: Optional[bool] = None,

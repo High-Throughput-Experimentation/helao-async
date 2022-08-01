@@ -35,7 +35,7 @@ def ECHE_movetosample(
     pl = ExperimentPlanMaker()
 
     pl.add_experiment(
-        "ECHE_slave_movetosample",
+        "ECHE_sub_movetosample",
         {
             #            "solid_custom_position": "cell1_we",
             "solid_plate_id": plate_id,
@@ -43,7 +43,7 @@ def ECHE_movetosample(
         },
     )
 
-    pl.add_experiment("ECHE_slave_shutdown", {})
+    pl.add_experiment("ECHE_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -57,14 +57,14 @@ def ECHE_move(
     pl = ExperimentPlanMaker()
 
     pl.add_experiment(
-        "ECHE_slave_move",
+        "ECHE_sub_move",
         {
             "x_mm": move_x_mm,
             "y_mm": move_y_mm,
         },
     )
 
-    pl.add_experiment("ECHE_slave_shutdown", {})
+    pl.add_experiment("ECHE_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -120,12 +120,12 @@ def ECHE_4CA_led_1CV_led(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("ECHE_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "ECHE_slave_startup",
+            "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -137,7 +137,7 @@ def ECHE_4CA_led_1CV_led(
         )
         # CA1
         pl.add_experiment(
-            "ECHE_slave_CA_led",
+            "ECHE_sub_CA_led",
             {
                 "CA_potential_vsRHE": CA1_potential_vsRHE,
                 "solution_ph": solution_ph,
@@ -165,7 +165,7 @@ def ECHE_4CA_led_1CV_led(
         )
         # CA2
         pl.add_experiment(
-            "ECHE_slave_CA_led",
+            "ECHE_sub_CA_led",
             {
                 "CA_potential_vsRHE": CA2_potential_vsRHE,
                 "solution_ph": solution_ph,
@@ -193,7 +193,7 @@ def ECHE_4CA_led_1CV_led(
         )
         # CA3
         pl.add_experiment(
-            "ECHE_slave_CA_led",
+            "ECHE_sub_CA_led",
             {
                 "CA_potential_vsRHE": CA3_potential_vsRHE,
                 "solution_ph": solution_ph,
@@ -221,7 +221,7 @@ def ECHE_4CA_led_1CV_led(
         )
         # CA4
         pl.add_experiment(
-            "ECHE_slave_CA_led",
+            "ECHE_sub_CA_led",
             {
                 "CA_potential_vsRHE": CA4_potential_vsRHE,
                 "solution_ph": solution_ph,
@@ -250,7 +250,7 @@ def ECHE_4CA_led_1CV_led(
 
         # CV1
         pl.add_experiment(
-            "ECHE_slave_CV_led",
+            "ECHE_sub_CV_led",
             {
                 "Vinit_vsRHE": CV_Vinit_vsRHE,
                 "Vapex1_vsRHE": CV_Vapex1_vsRHE,
@@ -281,7 +281,7 @@ def ECHE_4CA_led_1CV_led(
             },
         )
 
-        pl.add_experiment("ECHE_slave_shutdown", {})
+        pl.add_experiment("ECHE_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -320,12 +320,12 @@ def ECHE_CV_CA_CV(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("ECHE_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "ECHE_slave_startup",
+            "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -339,7 +339,7 @@ def ECHE_CV_CA_CV(
 
         # CV1
         pl.add_experiment(
-            "ECHE_slave_CV",
+            "ECHE_sub_CV",
             {
                 "Vinit_vsRHE": CV1_Vinit_vsRHE,
                 "Vapex1_vsRHE": CV1_Vapex1_vsRHE,
@@ -361,7 +361,7 @@ def ECHE_CV_CA_CV(
 
         # CA2
         pl.add_experiment(
-            "ECHE_slave_CA",
+            "ECHE_sub_CA",
             {
                 "CA_potential_vsRHE": CA2_potential_vsRHE,
                 "solution_ph": solution_ph,
@@ -379,7 +379,7 @@ def ECHE_CV_CA_CV(
 
         # CV3
         pl.add_experiment(
-            "ECHE_slave_CV",
+            "ECHE_sub_CV",
             {
                 "Vinit_vsRHE": CV3_Vinit_vsRHE,
                 "Vapex1_vsRHE": CV3_Vapex1_vsRHE,
@@ -399,7 +399,7 @@ def ECHE_CV_CA_CV(
             },
         )
 
-        pl.add_experiment("ECHE_slave_shutdown", {})
+        pl.add_experiment("ECHE_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -428,12 +428,12 @@ def ECHE_CV(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("ECHE_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "ECHE_slave_startup",
+            "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -446,7 +446,7 @@ def ECHE_CV(
 
         # CV1
         pl.add_experiment(
-            "ECHE_slave_CV",
+            "ECHE_sub_CV",
             {
                 "Vinit_vsRHE": CV1_Vinit_vsRHE,
                 "Vapex1_vsRHE": CV1_Vapex1_vsRHE,
@@ -466,7 +466,7 @@ def ECHE_CV(
             },
         )
 
-        pl.add_experiment("ECHE_slave_shutdown", {})
+        pl.add_experiment("ECHE_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -491,12 +491,12 @@ def ECHE_CA(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("ECHE_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "ECHE_slave_startup",
+            "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -509,7 +509,7 @@ def ECHE_CA(
 
         # CA1
         pl.add_experiment(
-            "ECHE_slave_CA",
+            "ECHE_sub_CA",
             {
                 "CA_potential_vsRHE": CA_potential_vsRHE,
                 "solution_ph": solution_ph,
@@ -525,7 +525,7 @@ def ECHE_CA(
             },
         )
 
-        pl.add_experiment("ECHE_slave_shutdown", {})
+        pl.add_experiment("ECHE_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -560,12 +560,12 @@ def ECHE_CA_led(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("ECHE_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "ECHE_slave_startup",
+            "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -577,7 +577,7 @@ def ECHE_CA_led(
         )
         # CA1
         pl.add_experiment(
-            "ECHE_slave_CA_led",
+            "ECHE_sub_CA_led",
             {
                 "CA_potential_vsRHE": CA_potential_vsRHE,
                 "solution_ph": solution_ph,
@@ -604,7 +604,7 @@ def ECHE_CA_led(
             },
         )
 
-        pl.add_experiment("ECHE_slave_shutdown", {})
+        pl.add_experiment("ECHE_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -643,12 +643,12 @@ def ECHE_CV_led(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("ECHE_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "ECHE_slave_startup",
+            "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -661,7 +661,7 @@ def ECHE_CV_led(
 
         # CV1
         pl.add_experiment(
-            "ECHE_slave_CV_led",
+            "ECHE_sub_CV_led",
             {
                 "Vinit_vsRHE": CV_Vinit_vsRHE,
                 "Vapex1_vsRHE": CV_Vapex1_vsRHE,
@@ -692,7 +692,7 @@ def ECHE_CV_led(
             },
         )
 
-        pl.add_experiment("ECHE_slave_shutdown", {})
+        pl.add_experiment("ECHE_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -717,12 +717,12 @@ def ECHE_CP(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("ECHE_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "ECHE_slave_startup",
+            "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -735,7 +735,7 @@ def ECHE_CP(
 
         # CP1
         pl.add_experiment(
-            "ECHE_slave_CP",
+            "ECHE_sub_CP",
             {
                 "CP_current": CP_current,
                 "solution_ph": solution_ph,
@@ -751,7 +751,7 @@ def ECHE_CP(
             },
         )
 
-        pl.add_experiment("ECHE_slave_shutdown", {})
+        pl.add_experiment("ECHE_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -786,12 +786,12 @@ def ECHE_CP_led(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("ECHE_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "ECHE_slave_startup",
+            "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -803,7 +803,7 @@ def ECHE_CP_led(
         )
         # CP1
         pl.add_experiment(
-            "ECHE_slave_CP_led",
+            "ECHE_sub_CP_led",
             {
                 "CP_current": CP_current,
                 "solution_ph": solution_ph,
@@ -830,7 +830,7 @@ def ECHE_CP_led(
             },
         )
 
-        pl.add_experiment("ECHE_slave_shutdown", {})
+        pl.add_experiment("ECHE_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -873,12 +873,12 @@ def ECHE_CV_led_spectrometer(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("ECHE_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "ECHE_slave_startup",
+            "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -891,7 +891,7 @@ def ECHE_CV_led_spectrometer(
 
         # CV1
         pl.add_experiment(
-            "ECHE_slave_CV_led_secondtrigger",
+            "ECHE_sub_CV_led_secondtrigger",
             {
                 "Vinit_vsRHE": CV_Vinit_vsRHE,
                 "Vapex1_vsRHE": CV_Vapex1_vsRHE,
@@ -926,7 +926,7 @@ def ECHE_CV_led_spectrometer(
             },
         )
 
-        pl.add_experiment("ECHE_slave_shutdown", {})
+        pl.add_experiment("ECHE_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -965,12 +965,12 @@ def ECHE_CA_led_spectrometer(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("ECHE_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "ECHE_slave_startup",
+            "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -982,7 +982,7 @@ def ECHE_CA_led_spectrometer(
         )
         # CA1
         pl.add_experiment(
-            "ECHE_slave_CA_led_secondtrigger",
+            "ECHE_sub_CA_led_secondtrigger",
             {
                 "CA_potential_vsRHE": CA_potential_vsRHE,
                 "solution_ph": solution_ph,
@@ -1013,7 +1013,7 @@ def ECHE_CA_led_spectrometer(
             },
         )
 
-        pl.add_experiment("ECHE_slave_shutdown", {})
+        pl.add_experiment("ECHE_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -1052,12 +1052,12 @@ def ECHE_CP_led_spectrometer(
     pl = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("ECHE_slave_unloadall_customs", {})
+    pl.add_experiment("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
         pl.add_experiment(
-            "ECHE_slave_startup",
+            "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -1069,7 +1069,7 @@ def ECHE_CP_led_spectrometer(
         )
         # CP1
         pl.add_experiment(
-            "ECHE_slave_CP_led_secondtrigger",
+            "ECHE_sub_CP_led_secondtrigger",
             {
                 "CP_current": CP_current,
                 "solution_ph": solution_ph,
@@ -1100,6 +1100,6 @@ def ECHE_CP_led_spectrometer(
             },
         )
 
-        pl.add_experiment("ECHE_slave_shutdown", {})
+        pl.add_experiment("ECHE_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
