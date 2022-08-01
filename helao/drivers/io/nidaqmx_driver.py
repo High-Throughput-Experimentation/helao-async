@@ -294,7 +294,8 @@ class cNIMAX:
             max_val=150,
             units=TemperatureUnits.DEG_C,
             thermocouple_type=ThermocoupleType.S,
-            cjc_source=CJCSource.BUILT_IN,
+            cjc_source=10200,
+#            cjc_source=CJCSource.BUILT_IN,
         )
 
         self.task_tempinst_S.ai_channels.all.ai_lowpass_enable = True
@@ -316,7 +317,8 @@ class cNIMAX:
             max_val=150,
             units=TemperatureUnits.DEG_C,
             thermocouple_type=ThermocoupleType.T,
-            cjc_source=CJCSource.BUILT_IN,
+            cjc_source=10200,
+#            cjc_source=CJCSource.BUILT_IN,
         )
 
         self.task_tempinst_T.ai_channels.all.ai_lowpass_enable = True
