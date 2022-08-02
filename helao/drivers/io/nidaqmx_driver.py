@@ -298,8 +298,9 @@ class cNIMAX:
             max_val=150,
             units=TemperatureUnits.DEG_C,
             thermocouple_type=ThermocoupleType.S,
-            cjc_source=CJCSource.CONSTANT_USER_VALUE,
-            cjc_val = 27,
+            cjc_source=CJCSource.BUILT_IN,
+#            cjc_source=CJCSource.CONSTANT_USER_VALUE,
+#            cjc_val = 27,
             # cjc_source=CJCSource.SCANNABLE_CHANNEL,
             # cjc_channel= 'CJCtemp',
         )
@@ -317,7 +318,7 @@ class cNIMAX:
         self.task_tempinst_T = nidaqmx.Task()
         self.task_tempinst_T.ai_channels.add_ai_thrmcpl_chan(
            # physical_channel= 'type-T',
-            physical_channel= 'PXI-6284/ai2',
+            physical_channel= 'PXI-6284/ai0',   #temporary  cjc source ai channel instead of 2
             name_to_assign_to_channel="Temp_typeT",
             min_val=0,
             max_val=150,
