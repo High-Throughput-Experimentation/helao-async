@@ -359,7 +359,7 @@ def makeApp(confPrefix, servKey, helao_root):
         reservoir2_max_C: float = 85.5,
     ):
         # A = await app.base.setup_action()
-
+    temp_dict = {}
         app.driver.create_Ttask()
         starttime=time.time()
         duration = duration_hrs * 60 * 60
@@ -367,13 +367,15 @@ def makeApp(confPrefix, servKey, helao_root):
         while heatloop_run and ( time.time() - starttime < duration):
             #temp_dict = await app.driver.read_T(A)
             temp_dict = readtemp()
-            if temp_dict["type-S"] < reservoir1_min_C:
+            for k,v in temp_dict.items():
+                temp_dict[k] = float(v)
+            if temp_dict['type-S'] < reservoir1_min_C:
                 heater(heater="heater1", on = True)
-            if temp_dict["type-S"] > reservoir1_max_C:
+            if temp_dict['type-S'] > reservoir1_max_C:
                 heater(heater="heater1", on = False)
-            if temp_dict["type-T"] < reservoir2_min_C:
+            if temp_dict['type-T'] < reservoir2_min_C:
                 heater(heater="heater2", on = True)
-            if temp_dict["type-T"] > reservoir2_max_C:
+            if temp_dict['type-T'] > reservoir2_max_C:
                 heater(heater="heater2", on = False)
             #need way to monitor and break loop
             #ie, heatloop_run = False
