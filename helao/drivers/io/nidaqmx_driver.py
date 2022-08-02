@@ -98,9 +98,6 @@ class cNIMAX:
         self.task_cellvoltage = None
         self.task_tempS = None
         self.task_tempT = None
-        self.task_tempinst_S = None
-        self.task_tempinst_T = None
-        self.task_tempCJC = None
         self.IO_do_meas = False  # signal flag for intent (start/stop)
         self.IO_measuring = False  # status flag of measurement
         self.activeCell = [False for _ in range(9)]
@@ -136,6 +133,40 @@ class cNIMAX:
         # add meas IOloop
         myloop.create_task(self.IOloop())
         self.IOloop_run = False
+
+    def tempchannels(temptask):
+        temptask.ai_channels.add_ai_thrmcpl_chan(
+            physical_channel= 'PXI-6289/ai2',
+            name_to_assign_to_channel="typeS",
+            min_val=0,
+            max_val=150,
+            units=TemperatureUnits.DEG_C,
+            thermocouple_type=ThermocoupleType.S,
+            cjc_source=CJCSource.SCANNABLE_CHANNEL,
+            cjc_channel= 'CJCtemp',
+        )
+        temptask.ai_channels.add_ai_thrmcpl_chan(
+            physical_channel= 'PXI-6289/ai3',
+            name_to_assign_to_channel="typeT",
+            min_val=0,
+            max_val=150,
+            units=TemperatureUnits.DEG_C,
+            thermocouple_type=ThermocoupleType.S,
+            cjc_source=CJCSource.SCANNABLE_CHANNEL,
+            cjc_channel= 'CJCtemp',
+        )
+        temptask.ai_channels.add_ai_temp_built_in_sensor_chan(
+            physical_channel= 'PXI-6284/ai0',
+            name_to_assign_to_channel="CJCtemp",
+            units=TemperatureUnits.DEG_C,
+        )
+        temptask.timing.cfg_samp_clk_timing(   #timing need?
+            rate= 1,
+            sample_mode=AcquisitionType.CONTINUOUS,
+            samps_per_chan=1000,
+        )
+
+
 
     def set_IO_signalq_nowait(self, val: bool) -> None:
         if self.IO_signalq.full():
@@ -288,71 +319,74 @@ class cNIMAX:
 
     def create_Ttask(self):
         """configures and starts a NImax task for nonexperiment temp measurements"""
-        self.task_tempinst_S = nidaqmx.Task()
-        self.task_tempinst_S.ai_channels.add_ai_thrmcpl_chan(
-#           physical_channel= 'type-S',
-            physical_channel= 'PXI-6289/ai2',
-            name_to_assign_to_channel="Temp_typeS",
-            min_val=0,
-            max_val=150,
-            units=TemperatureUnits.DEG_C,
-            thermocouple_type=ThermocoupleType.S,
-            cjc_source=CJCSource.SCANNABLE_CHANNEL,
-            cjc_channel= 'CJCtemp',
-        )
+#         self.task_tempinst_S = nidaqmx.Task()
+        temperatures= nidaqmx.Task()
+        tempchannels(temperatures)
+#         self.task_tempinst_S.ai_channels.add_ai_thrmcpl_chan(
+# #           physical_channel= 'type-S',
+#             physical_channel= 'PXI-6289/ai2',
+#             name_to_assign_to_channel="Temp_typeS",
+#             min_val=0,
+#             max_val=150,
+#             units=TemperatureUnits.DEG_C,
+#             thermocouple_type=ThermocoupleType.S,
+#             cjc_source=CJCSource.SCANNABLE_CHANNEL,
+#             cjc_channel= 'CJCtemp',
+#         )
 
-        self.task_tempinst_S.ai_channels.all.ai_lowpass_enable = True
-        self.task_tempinst_S.timing.cfg_samp_clk_timing(   #timing/triggering need
+#         self.task_tempinst_S.ai_channels.all.ai_lowpass_enable = True
+#         self.task_tempinst_S.timing.cfg_samp_clk_timing(   #timing/triggering need
                                                          
-            rate= 1,
-#           self.Tsamplingrate,
-            source="",
-            active_edge=Edge.RISING,
-            sample_mode=AcquisitionType.CONTINUOUS,
-            samps_per_chan=self.buffersize,
-        )
-        self.task_tempinst_T = nidaqmx.Task()
-        self.task_tempinst_T.ai_channels.add_ai_thrmcpl_chan(
-           # physical_channel= 'type-T',
-            physical_channel= 'PXI-6289/ai3',
-            name_to_assign_to_channel="Temp_typeT",
-            min_val=0,
-            max_val=150,
-            units=TemperatureUnits.DEG_C,
-            thermocouple_type=ThermocoupleType.T,
-            cjc_source=CJCSource.SCANNABLE_CHANNEL,
-            cjc_channel = 'CJCtemp',
-        )
+#             rate= 1,
+# #           self.Tsamplingrate,
+#             source="",
+#             active_edge=Edge.RISING,
+#             sample_mode=AcquisitionType.CONTINUOUS,
+#             samps_per_chan=self.buffersize,
+#         )
+#         self.task_tempinst_T = nidaqmx.Task()
+#         self.task_tempinst_T.ai_channels.add_ai_thrmcpl_chan(
+#            # physical_channel= 'type-T',
+#             physical_channel= 'PXI-6289/ai3',
+#             name_to_assign_to_channel="Temp_typeT",
+#             min_val=0,
+#             max_val=150,
+#             units=TemperatureUnits.DEG_C,
+#             thermocouple_type=ThermocoupleType.T,
+#             cjc_source=CJCSource.SCANNABLE_CHANNEL,
+#             cjc_channel = 'CJCtemp',
+#         )
 
-        self.task_tempinst_T.ai_channels.all.ai_lowpass_enable = True
-        self.task_tempinst_T.timing.cfg_samp_clk_timing(   #timing need?
+#         self.task_tempinst_T.ai_channels.all.ai_lowpass_enable = True
+#         self.task_tempinst_T.timing.cfg_samp_clk_timing(   #timing need?
 
-            rate= 1,
-#           self.Tsamplingrate,
-            source="",
-            active_edge=Edge.RISING,
-            sample_mode=AcquisitionType.CONTINUOUS,
-            samps_per_chan=self.buffersize,
-        )
-        self.task_tempCJC = nidaqmx.Task()
-        self.task_tempCJC.ai_channels.add_ai_temp_built_in_sensor_chan(
-            physical_channel= 'PXI-6284/ai0',
-            name_to_assign_to_channel="CJCtemp",
-            units=TemperatureUnits.DEG_C,
-        )
-        self.task_tempCJC.ai_channels.all.ai_lowpass_enable = True
-        self.task_tempCJC.timing.cfg_samp_clk_timing(   #timing need?
-            rate= 1,
-#           self.Tsamplingrate,
-            source="",
-            active_edge=Edge.RISING,
-            sample_mode=AcquisitionType.CONTINUOUS,
-            samps_per_chan=self.buffersize,
-        )
+#             rate= 1,
+# #           self.Tsamplingrate,
+#             source="",
+#             active_edge=Edge.RISING,
+#             sample_mode=AcquisitionType.CONTINUOUS,
+#             samps_per_chan=self.buffersize,
+#         )
+#         self.task_tempCJC = nidaqmx.Task()
+#         self.task_tempCJC.ai_channels.add_ai_temp_built_in_sensor_chan(
+#             physical_channel= 'PXI-6284/ai0',
+#             name_to_assign_to_channel="CJCtemp",
+#             units=TemperatureUnits.DEG_C,
+#         )
+#         self.task_tempCJC.ai_channels.all.ai_lowpass_enable = True
+#         self.task_tempCJC.timing.cfg_samp_clk_timing(   #timing need?
+#             rate= 1,
+# #           self.Tsamplingrate,
+#             source="",
+#             active_edge=Edge.RISING,
+#             sample_mode=AcquisitionType.CONTINUOUS,
+#             samps_per_chan=self.buffersize,
+#         )
 
-        self.task_tempinst_S.start()
-        self.task_tempinst_T.start()
-        self.task_tempCJC.start()
+#         self.task_tempinst_S.start()
+#         self.task_tempinst_T.start()
+#         self.task_tempCJC.start()
+        temperatures.start()
  
     def streamIV_callback(
         self, task_handle, every_n_samples_event_type, number_of_samples, callback_data
@@ -761,7 +795,7 @@ class cNIMAX:
     async def read_T(self):
         #activeDict = {}
 
-        temperature = {}
+        rtemp = {}
 #        thermocouple = A.action_params["TC"]
 
     #    A.error_code = ErrorCodes.none
@@ -770,16 +804,18 @@ class cNIMAX:
 #        data_TT = self.task_tempinst_T.read()
     #
     #    if thermocouple == "type-S":
-        temperature["type-S"] = self.task_tempinst_S.read()
+#        rtemp["type-S"] = self.task_tempinst_S.read()
+        rtemp = temperatures.read()
+        print(rtemp)
     #    if thermocouple == "type-T":
-        temperature["type-T"] = self.task_tempinst_T.read()        
+    #    rtemp["type-T"] = self.task_tempinst_T.read()        
  
         # else:
         #     A.error_code = ErrorCodes.in_progress
       #  activeDict = temperature.as_dict()
 
       #  return activeDict
-        return temperature
+        return rtemp
 
     async def stop_Ttask(self):
         """stops instantaneous temp measurement"""
