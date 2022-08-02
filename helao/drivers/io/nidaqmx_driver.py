@@ -134,7 +134,7 @@ class cNIMAX:
         myloop.create_task(self.IOloop())
         self.IOloop_run = False
 
-    def tempchannels(temptask):
+    async def tempchannels(temptask):
         temptask.ai_channels.add_ai_thrmcpl_chan(
             physical_channel= 'PXI-6289/ai2',
             name_to_assign_to_channel="typeS",
