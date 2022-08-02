@@ -388,9 +388,9 @@ def makeApp(confPrefix, servKey, helao_root):
         heater(heater="heater1", on = False)
         heater(heater="heater2", on = False)
 
-        @app.post(f"/stoptemp", tags=["public"])
-        async def stop_temp():
-            app.driver.stop_Ttask()
+    @app.post(f"/stoptemp", tags=["public"])
+    async def stop_temp():
+        await app.driver.stop_Ttask()
 
 
     @app.post(f"/{servKey}/stop", tags=["public"])
