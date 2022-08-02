@@ -307,21 +307,14 @@ def makeApp(confPrefix, servKey, helao_root):
         async def readtemp(
              action: Optional[Action] = Body({}, embed=True),
              action_version: int = 1,
-#            TC: Optional[str]= "type-S",  #some sort of selection
-#            Tval: Optional[float] = 10.0,
-#            SampleRate: Optional[int] = Query(1.0, ge=1),
-#            TTLwait: Optional[int] = -1,  # -1 disables, else select TTL channel
         ):
-            """Runs temp measurement.
-            Args:
-                 TC: which thermocouple to read
-                 Tval: time of measurement in seconds
-                 TTLwait: trigger channel, -1 disables, else select TTL channel"""
+            """Runs temp measurement.  T and S thermocouples"""
             # A = await app.base.setup_action()
             # A.action_abbr = "getTemp"
             tempread = {}
             app.driver.create_Ttask()
             tempread= await app.driver.read_T()
+            app.driver.stop_Ttask()
             return tempread
 
     if dev_heat:
@@ -384,13 +377,13 @@ def makeApp(confPrefix, servKey, helao_root):
             #need way to monitor and break loop
             #ie, heatloop_run = False
 
-        await app.driver.stop_Ttask()
+        app.driver.stop_Ttask()
         heater(heater="heater1", on = False)
         heater(heater="heater2", on = False)
 
     @app.post(f"/stoptemp", tags=["public"])
     async def stop_temp():
-        await app.driver.stop_Ttask()
+        app.driver.stop_Ttask()
 
 
     @app.post(f"/{servKey}/stop", tags=["public"])
