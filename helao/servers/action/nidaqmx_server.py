@@ -320,7 +320,7 @@ def makeApp(confPrefix, servKey, helao_root):
             # A = await app.base.setup_action()
             # A.action_abbr = "getTemp"
             tempread = {}
-            await app.driver.create_Ttask()
+            app.driver.create_Ttask()
             tempread= await app.driver.read_T()
             return tempread
 
