@@ -314,6 +314,7 @@ def makeApp(confPrefix, servKey, helao_root):
             tempread = {}
             app.driver.create_Ttask()
             tempread= await app.driver.read_T()
+            print(tempread)
             app.driver.stop_Ttask()
             return tempread
 

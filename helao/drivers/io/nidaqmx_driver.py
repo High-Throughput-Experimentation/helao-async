@@ -778,7 +778,7 @@ class cNIMAX:
         print(rtemp)
     #    if thermocouple == "type-T":
         rtemp["type-T"] = self.task_tempinst_T.read()        
- 
+        print(rtemp)
         # else:
         #     A.error_code = ErrorCodes.in_progress
 
