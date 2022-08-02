@@ -134,38 +134,6 @@ class cNIMAX:
         myloop.create_task(self.IOloop())
         self.IOloop_run = False
 
-    async def tempchannels(temptask):
-        temptask.ai_channels.add_ai_thrmcpl_chan(
-            physical_channel= 'PXI-6289/ai2',
-            name_to_assign_to_channel="typeS",
-            min_val=0,
-            max_val=150,
-            units=TemperatureUnits.DEG_C,
-            thermocouple_type=ThermocoupleType.S,
-            cjc_source=CJCSource.SCANNABLE_CHANNEL,
-            cjc_channel= 'CJCtemp',
-        )
-        temptask.ai_channels.add_ai_thrmcpl_chan(
-            physical_channel= 'PXI-6289/ai3',
-            name_to_assign_to_channel="typeT",
-            min_val=0,
-            max_val=150,
-            units=TemperatureUnits.DEG_C,
-            thermocouple_type=ThermocoupleType.S,
-            cjc_source=CJCSource.SCANNABLE_CHANNEL,
-            cjc_channel= 'CJCtemp',
-        )
-        temptask.ai_channels.add_ai_temp_built_in_sensor_chan(
-            physical_channel= 'PXI-6284/ai0',
-            name_to_assign_to_channel="CJCtemp",
-            units=TemperatureUnits.DEG_C,
-        )
-        temptask.timing.cfg_samp_clk_timing(   #timing need?
-            rate= 1,
-            sample_mode=AcquisitionType.CONTINUOUS,
-            samps_per_chan=1000,
-        )
-
 
 
     def set_IO_signalq_nowait(self, val: bool) -> None:
@@ -869,3 +837,35 @@ class cNIMAX:
             retries += 1
         # stop IOloop
         self.IOloop_run = False
+
+def tempchannels(temptask):
+    temptask.ai_channels.add_ai_thrmcpl_chan(
+        physical_channel= 'PXI-6289/ai2',
+        name_to_assign_to_channel="typeS",
+        min_val=0,
+        max_val=150,
+        units=TemperatureUnits.DEG_C,
+        thermocouple_type=ThermocoupleType.S,
+        cjc_source=CJCSource.SCANNABLE_CHANNEL,
+        cjc_channel= 'CJCtemp',
+    )
+    temptask.ai_channels.add_ai_thrmcpl_chan(
+        physical_channel= 'PXI-6289/ai3',
+        name_to_assign_to_channel="typeT",
+        min_val=0,
+        max_val=150,
+        units=TemperatureUnits.DEG_C,
+        thermocouple_type=ThermocoupleType.S,
+        cjc_source=CJCSource.SCANNABLE_CHANNEL,
+        cjc_channel= 'CJCtemp',
+    )
+    temptask.ai_channels.add_ai_temp_built_in_sensor_chan(
+        physical_channel= 'PXI-6284/ai0',
+        name_to_assign_to_channel="CJCtemp",
+        units=TemperatureUnits.DEG_C,
+    )
+    temptask.timing.cfg_samp_clk_timing(   #timing need?
+        rate= 1,
+        sample_mode=AcquisitionType.CONTINUOUS,
+        samps_per_chan=1000,
+    )
