@@ -219,11 +219,11 @@ def UVIS_sub_movetosample(
     return apm.action_list  # returns complete action list to orch
 
 
-def UVIS_sub_move(
+def UVIS_sub_relmove(
     experiment: Experiment,
     experiment_version: int = 1,
-    x_mm: float = 1.0,
-    y_mm: float = 1.0,
+    offset_x_mm: float = 1.0,
+    offset_y_mm: float = 1.0,
 ):
     """Sub experiment
     last functionality test: -"""
@@ -236,7 +236,7 @@ def UVIS_sub_move(
             "action_server": MOTOR_server,
             "action_name": "move",
             "action_params": {
-                "d_mm": [apm.pars.x_mm, apm.pars.y_mm],
+                "d_mm": [apm.pars.offset_x_mm, apm.pars.offset_y_mm],
                 "axis": ["x", "y"],
                 "mode": MoveModes.relative,
                 "transformation": TransformationModes.platexy,
