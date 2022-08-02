@@ -292,7 +292,7 @@ class cNIMAX:
 #        tempchannels(temperatures)
         self.task_tempinst_S.ai_channels.add_ai_thrmcpl_chan(
 #           physical_channel= 'type-S',
-            physical_channel= 'PXI-6289/ai2',
+            physical_channel= 'PXI-6289/ai2', 
             name_to_assign_to_channel="Temp_typeS",
             min_val=0,
             max_val=150,
@@ -317,7 +317,7 @@ class cNIMAX:
         self.task_tempinst_T = nidaqmx.Task()
         self.task_tempinst_T.ai_channels.add_ai_thrmcpl_chan(
            # physical_channel= 'type-T',
-            physical_channel= 'PXI-6289/ai3',
+            physical_channel= 'PXI-6284/ai2',
             name_to_assign_to_channel="Temp_typeT",
             min_val=0,
             max_val=150,
