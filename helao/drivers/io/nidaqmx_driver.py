@@ -785,7 +785,7 @@ class cNIMAX:
       #  return activeDict
         return rtemp
 
-    async def stop_Ttask(self):
+    def stop_Ttask(self):
         """stops instantaneous temp measurement"""
         self.task_tempinst_S.close()
         self.task_tempinst_T.close()
