@@ -3,7 +3,7 @@ __all__ = ["config"]
 
 hostip = "127.0.0.1"
 config = {}
-config["dummy"] = False
+config["dummy"] = True
 config['simulation'] = False
 
 # action library provides generator functions which produce actions
@@ -120,7 +120,7 @@ config["servers"] = dict(
             },
         ),
     ),
-    SPEC=dict(
+    SPEC_T=dict(
         host=hostip,
         port=8011,
         group="action",

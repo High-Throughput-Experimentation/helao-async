@@ -15,24 +15,24 @@ __all__ = [
 ]
 
 
-from typing import Optional, List, Union
+from typing import Optional #, List, Union
 from socket import gethostname
 
-from helao.helpers.premodels import Action, Experiment, ActionPlanMaker
 from helaocore.models.action_start_condition import ActionStartCondition
-from helaocore.models.sample import SolidSample, LiquidSample
+from helaocore.models.sample import SolidSample #, LiquidSample
 from helaocore.models.machine import MachineModel
 from helaocore.models.process_contrib import ProcessContrib
-from helaocore.models.electrolyte import Electrolyte
+# from helaocore.models.electrolyte import Electrolyte
 
+from helao.helpers.premodels import Experiment, ActionPlanMaker #, Action
 from helao.drivers.motion.enum import MoveModes, TransformationModes
 from helao.drivers.io.enum import TriggerType
-from helao.drivers.robot.enum import PALtools, Spacingmethod
+# from helao.drivers.robot.enum import PALtools, Spacingmethod
 
 
 EXPERIMENTS = __all__
 
-PSTAT_server = MachineModel(server_name="PSTAT", machine_name=gethostname()).json_dict()
+# PSTAT_server = MachineModel(server_name="PSTAT", machine_name=gethostname()).json_dict()
 
 MOTOR_server = MachineModel(server_name="MOTOR", machine_name=gethostname()).json_dict()
 IO_server = MachineModel(server_name="IO", machine_name=gethostname()).json_dict()
@@ -288,7 +288,7 @@ def UVIS_sub_spectrometer_T(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "process_finish": False,
+            "process_finish": True,
             "process_contrib": [
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
@@ -339,7 +339,7 @@ def UVIS_sub_spectrometer_R(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "process_finish": False,
+            "process_finish": True,
             "process_contrib": [
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
