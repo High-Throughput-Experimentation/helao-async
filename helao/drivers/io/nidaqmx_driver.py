@@ -837,3 +837,9 @@ class cNIMAX:
             retries += 1
         # stop IOloop
         self.IOloop_run = False
+
+    def tasklist(self):
+        system = nidaqmx.system.System.local()
+        task_names = system.tasks.task_names
+        print(task_names)
+        return task_names

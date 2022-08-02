@@ -380,13 +380,18 @@ def makeApp(confPrefix, servKey, helao_root):
             #need way to monitor and break loop
             #ie, heatloop_run = False
 
-        app.driver.stop_Ttask()
+        await stop_temp()
         heater(heater="heater1", on = False)
         heater(heater="heater2", on = False)
 
     @app.post(f"/stoptemp", tags=["public"])
     async def stop_temp():
         app.driver.stop_Ttask()
+
+    @app.post(f"/listtasks", tags=["public"])
+    async def list_tasks():
+        list = app.driver.tasklist()
+        return list
 
 
     @app.post(f"/{servKey}/stop", tags=["public"])
