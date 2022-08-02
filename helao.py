@@ -491,7 +491,7 @@ if __name__ == "__main__":
         print_message(
             {},
             "launcher",
-            "CTRL-x to terminate orchestration group. CTRL-r for restart options. CTRL-d to disconnect.\n",
+            "CTRL-x to terminate orchestration group. CTRL-r for restart options. CTRL-d to disconnect.",
         )
 
     def stop_server(groupname, servername):
@@ -605,5 +605,5 @@ if __name__ == "__main__":
                 "launcher",
                 f"Disconnecting action monitor. Launch 'python helao.py {confArg}' to reconnect.",
             )
-    x = threading.Thread(target=thread_waitforkey)
+    x = threading.Thread(target=thread_waitforkey, daemon=True)
     x.start()
