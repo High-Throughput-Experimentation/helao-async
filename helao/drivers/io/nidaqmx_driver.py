@@ -98,6 +98,9 @@ class cNIMAX:
         self.task_cellvoltage = None
         self.task_tempS = None
         self.task_tempT = None
+        self.task_tempinst_S = None
+        self.task_tempinst_T = None
+        self.task_tempCJC = None
         self.IO_do_meas = False  # signal flag for intent (start/stop)
         self.IO_measuring = False  # status flag of measurement
         self.activeCell = [False for _ in range(9)]
