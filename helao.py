@@ -405,6 +405,7 @@ def launcher(confArg, confDict, helao_root):
                         )
                         continue
                     pidd.store_pid(server, servHost, servPort, ppid)
+                    time.sleep(0.5)
         if group != LAUNCH_ORDER[-1]:
             time.sleep(3)
     return pidd
