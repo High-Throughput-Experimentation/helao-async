@@ -493,7 +493,6 @@ if __name__ == "__main__":
             "launcher",
             "CTRL-x to terminate orchestration group. CTRL-r for restart options. CTRL-d to disconnect.\n",
         )
-        time.sleep(0.5)
 
     def stop_server(groupname, servername):
         print_message({}, "launcher", f"Unsubscribing {servername} websockets.")
@@ -501,8 +500,8 @@ if __name__ == "__main__":
         requests.post(f"http://{S['host']}:{S['port']}/shutdown")
         return S
 
-    while result not in [b"\x18", b"\x04"]:
-        if result == b"\x12":
+    while result not in ["\x18", "\x04"]:
+        if result == "\x12":
             print_message({}, "launcher", f"Detected CTRL-r, checking restart options.")
             slist = [(gk, sk) for gk, gd in pidd.servers.items() for sk in gd.keys()]
             opts = range(len(slist))
@@ -561,7 +560,7 @@ if __name__ == "__main__":
             result = None
         hotkey_msg()
         result = wait_key()
-    if result == b"\x18":
+    if result == "\x18":
         print_message(
             {}, "launcher", f"Detected CTRL-x, terminating orchestration group."
         )
