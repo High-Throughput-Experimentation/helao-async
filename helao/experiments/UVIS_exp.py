@@ -288,6 +288,7 @@ def UVIS_sub_spectrometer_T(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "technique_name": "T_UVVIS",
             "process_finish": True,
             "process_contrib": [
                 ProcessContrib.files,
@@ -339,6 +340,7 @@ def UVIS_sub_spectrometer_R(
             },
             "from_global_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "technique_name": "R_UVVIS",
             "process_finish": True,
             "process_contrib": [
                 ProcessContrib.files,
