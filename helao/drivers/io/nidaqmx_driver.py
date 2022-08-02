@@ -792,7 +792,7 @@ class cNIMAX:
     async def stop_Ttask(self):
         """stops instantaneous temp measurement"""
         self.task_tempinst_S.close()
-     #   self.task_tempinst_T.close()
+        self.task_tempinst_T.close()
         
 
     async def stop(self):
