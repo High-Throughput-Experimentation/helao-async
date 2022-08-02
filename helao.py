@@ -605,5 +605,5 @@ if __name__ == "__main__":
                 "launcher",
                 f"Disconnecting action monitor. Launch 'python helao.py {confArg}' to reconnect.",
             )
-    x = threading.Thread(target=thread_waitforkey, daemon=True)
+    x = threading.Thread(target=thread_waitforkey)
     x.start()
