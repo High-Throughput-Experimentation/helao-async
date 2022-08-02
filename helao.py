@@ -35,6 +35,7 @@ import requests
 import subprocess
 import traceback
 import re
+import threading
 import zipfile
 from glob import glob
 
@@ -485,7 +486,6 @@ if __name__ == "__main__":
             os.remove(old_log)
 
     pidd = launcher(confArg=confArg, confDict=config, helao_root=helao_root)
-    result = None
 
     def hotkey_msg():
         print_message(
@@ -500,108 +500,110 @@ if __name__ == "__main__":
         requests.post(f"http://{S['host']}:{S['port']}/shutdown")
         return S
 
-    while result not in ["\x18", "\x04"]:
-        if result == "\x12":
-            print_message({}, "launcher", f"Detected CTRL-r, checking restart options.")
-            slist = [(gk, sk) for gk, gd in pidd.servers.items() for sk in gd.keys()]
-            opts = range(len(slist))
-            while True:
-                print("Currently running server type/name:")
-                for i, (gk, sk) in enumerate(slist):
-                    print(f"{i}: {gk}/{sk}")
-                if len(slist) > 1:
-                    optionstr = f"{min(opts)}-{max(opts)}"
-                else:
-                    optionstr = "0"
-                sind = input(
-                    f"Enter server num to restart or blank to cancel [{optionstr}]: "
-                )
-                if sind in [str(o) for o in opts]:
-                    sg, sn = slist[int(sind)]
-                    print_message(
-                        {}, "launcher", f"Got option {sind}. Restarting {sg}/{sn}."
+    def thread_waitforkey():
+        result = None
+        while result not in ["\x18", "\x04"]:
+            if result == "\x12":
+                print_message({}, "launcher", f"Detected CTRL-r, checking restart options.")
+                slist = [(gk, sk) for gk, gd in pidd.servers.items() for sk in gd.keys()]
+                opts = range(len(slist))
+                while True:
+                    print("Currently running server type/name:")
+                    for i, (gk, sk) in enumerate(slist):
+                        print(f"{i}: {gk}/{sk}")
+                    if len(slist) > 1:
+                        optionstr = f"{min(opts)}-{max(opts)}"
+                    else:
+                        optionstr = "0"
+                    sind = input(
+                        f"Enter server num to restart or blank to cancel [{optionstr}]: "
                     )
-                    try:
-                        S = stop_server(sg, sn)
+                    if sind in [str(o) for o in opts]:
+                        sg, sn = slist[int(sind)]
                         print_message(
-                            {}, "launcher", f"{sn} successful shutdown() event."
+                            {}, "launcher", f"Got option {sind}. Restarting {sg}/{sn}."
                         )
-                        pidd.kill_server(sn)
-                        print_message(
-                            {}, "launcher", f"Successfully closed {sn} process."
-                        )
-                        cmd = ["python", "fast_launcher.py", confArg, sn]
-                        p = subprocess.Popen(cmd, cwd=helao_root)
-                        ppid = p.pid
-                        pidd.store_pid(sn, S["host"], S["port"], ppid)
-                        if sg == "action":
-                            for orchserv in pidd.orchServs:
-                                OS = pidd.servers["orchestrator"][orchserv]
-                                print_message(
-                                    {}, "launcher", f"Reregistering {sn} on {orchserv}."
-                                )
-                                requests.post(
-                                    f"http://{OS['host']}:{OS['port']}/attach_client",
-                                    data={"client_servkey": sn},
-                                )
-                    except Exception as e:
-                        tb = "".join(
-                            traceback.format_exception(type(e), e, e.__traceback__)
-                        )
-                        print_message(
-                            {}, "launcher", " ... got error: ", repr(e), tb, error=True
-                        )
-                    break
-                elif sind == "":
-                    print_message({}, "launcher", f"Cancelling restart.")
-                    break
-                else:
-                    print_message({}, "launcher", f"'{sind}' is not a valid option.")
-            result = None
-        hotkey_msg()
-        result = wait_key()
-    if result == "\x18":
-        print_message(
-            {}, "launcher", f"Detected CTRL-x, terminating orchestration group."
-        )
-        for server in pidd.orchServs:
-            try:
-                stop_server("orchestrator", server)
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                print_message(
-                    {}, "launcher", " ... got error: ", repr(e), tb, error=True
-                )
-        # in case a /shutdown is added to other FastAPI servers (not the shutdown without '/')
-        # KILL_ORDER = ["visualizer", "action", "server"] # orch are killed above
-        # no /shutdown in visualizers
-        KILL_ORDER = ["action"]  # orch are killed above
-        for group in KILL_ORDER:
-            print_message({}, "launcher", f"Shutting down {group} group.")
-            if group in pidd.servers.keys():
-                G = pidd.servers[group]
-                for server in G.keys():
-                    try:
-                        print_message({}, "launcher", f"Shutting down {server}.")
-                        S = G[server]
-                        # will produce a 404 if not found
-                        requests.post(f"http://{S['host']}:{S['port']}/shutdown")
-                    except Exception as e:
-                        tb = "".join(
-                            traceback.format_exception(type(e), e, e.__traceback__)
-                        )
-                        print_message(
-                            {},
-                            "launcher",
-                            f" ... got error: {repr(e), tb,}",
-                            error=True,
-                        )
-        pidd.close()
-    else:
-        print_message(
-            {},
-            "launcher",
-            f"Disconnecting action monitor. Launch 'python helao.py {confArg}' to reconnect.",
-        )
-
-# main()
+                        try:
+                            S = stop_server(sg, sn)
+                            print_message(
+                                {}, "launcher", f"{sn} successful shutdown() event."
+                            )
+                            pidd.kill_server(sn)
+                            print_message(
+                                {}, "launcher", f"Successfully closed {sn} process."
+                            )
+                            cmd = ["python", "fast_launcher.py", confArg, sn]
+                            p = subprocess.Popen(cmd, cwd=helao_root)
+                            ppid = p.pid
+                            pidd.store_pid(sn, S["host"], S["port"], ppid)
+                            if sg == "action":
+                                for orchserv in pidd.orchServs:
+                                    OS = pidd.servers["orchestrator"][orchserv]
+                                    print_message(
+                                        {}, "launcher", f"Reregistering {sn} on {orchserv}."
+                                    )
+                                    requests.post(
+                                        f"http://{OS['host']}:{OS['port']}/attach_client",
+                                        data={"client_servkey": sn},
+                                    )
+                        except Exception as e:
+                            tb = "".join(
+                                traceback.format_exception(type(e), e, e.__traceback__)
+                            )
+                            print_message(
+                                {}, "launcher", " ... got error: ", repr(e), tb, error=True
+                            )
+                        break
+                    elif sind == "":
+                        print_message({}, "launcher", f"Cancelling restart.")
+                        break
+                    else:
+                        print_message({}, "launcher", f"'{sind}' is not a valid option.")
+                result = None
+            hotkey_msg()
+            result = wait_key()
+        if result == "\x18":
+            print_message(
+                {}, "launcher", f"Detected CTRL-x, terminating orchestration group."
+            )
+            for server in pidd.orchServs:
+                try:
+                    stop_server("orchestrator", server)
+                except Exception as e:
+                    tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+                    print_message(
+                        {}, "launcher", " ... got error: ", repr(e), tb, error=True
+                    )
+            # in case a /shutdown is added to other FastAPI servers (not the shutdown without '/')
+            # KILL_ORDER = ["visualizer", "action", "server"] # orch are killed above
+            # no /shutdown in visualizers
+            KILL_ORDER = ["action"]  # orch are killed above
+            for group in KILL_ORDER:
+                print_message({}, "launcher", f"Shutting down {group} group.")
+                if group in pidd.servers.keys():
+                    G = pidd.servers[group]
+                    for server in G.keys():
+                        try:
+                            print_message({}, "launcher", f"Shutting down {server}.")
+                            S = G[server]
+                            # will produce a 404 if not found
+                            requests.post(f"http://{S['host']}:{S['port']}/shutdown")
+                        except Exception as e:
+                            tb = "".join(
+                                traceback.format_exception(type(e), e, e.__traceback__)
+                            )
+                            print_message(
+                                {},
+                                "launcher",
+                                f" ... got error: {repr(e), tb,}",
+                                error=True,
+                            )
+            pidd.close()
+        else:
+            print_message(
+                {},
+                "launcher",
+                f"Disconnecting action monitor. Launch 'python helao.py {confArg}' to reconnect.",
+            )
+    x = threading.Thread(target=thread_waitforkey)
+    x.start()
