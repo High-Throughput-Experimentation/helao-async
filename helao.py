@@ -38,6 +38,7 @@ import re
 import zipfile
 from glob import glob
 
+import click
 from termcolor import cprint
 from pyfiglet import figlet_format
 import colorama
@@ -285,52 +286,16 @@ def validateConfig(PIDD, confDict, helao_root):
 
 def wait_key():
     """Wait for a key press on the console and return it."""
-    result = None
-    if os.name == "nt":
-        import msvcrt
-
-        result = msvcrt.getch()
-    else:
-        import sys, tty, termios, fcntl
-
-        fd = sys.stdin.fileno()
-        # save old state
-        flags_save = fcntl.fcntl(fd, fcntl.F_GETFL)
-        attrs_save = termios.tcgetattr(fd)
-        # make raw - the way to do this comes from the termios(3) man page.
-        attrs = list(attrs_save) # copy the stored version to update
-        # iflag
-        attrs[0] &= ~(termios.IGNBRK | termios.BRKINT | termios.PARMRK
-                    | termios.ISTRIP | termios.INLCR | termios. IGNCR
-                    | termios.ICRNL | termios.IXON )
-        # oflag
-        attrs[1] &= ~termios.OPOST
-        # cflag
-        attrs[2] &= ~(termios.CSIZE | termios. PARENB)
-        attrs[2] |= termios.CS8
-        # lflag
-        attrs[3] &= ~(termios.ECHONL | termios.ECHO | termios.ICANON
-                    | termios.ISIG | termios.IEXTEN)
-        termios.tcsetattr(fd, termios.TCSANOW, attrs)
-        # turn off non-blocking
-        fcntl.fcntl(fd, fcntl.F_SETFL, flags_save & ~os.O_NONBLOCK)
-        # read a single keystroke
-        ret = []
-        try:
-            ret.append(sys.stdin.read(1)) # returns a single character
-            fcntl.fcntl(fd, fcntl.F_SETFL, flags_save | os.O_NONBLOCK)
-            c = sys.stdin.read(1) # returns a single character
-            while len(c) > 0:
-                ret.append(c)
-                c = sys.stdin.read(1)
-        except KeyboardInterrupt:
-            ret.append('x03')
-        finally:
-            # restore old state
-            termios.tcsetattr(fd, termios.TCSAFLUSH, attrs_save)
-            fcntl.fcntl(fd, fcntl.F_SETFL, flags_save)
-            result = c.encode()
-    return result
+    try:
+        keypress = click.getchar()
+    except KeyboardInterrupt:
+        keypress =  "\x03"
+    except EOFError:
+        if os.name == "nt":
+            keypress = "\x1a"
+        else:
+            keypress = "\x04"
+    return keypress
 
 
 def launcher(confArg, confDict, helao_root):
