@@ -291,16 +291,45 @@ def wait_key():
 
         result = msvcrt.getch()
     else:
-        import sys, tty, termios
+        import sys, tty, termios, fcntl
 
         fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
+        # save old state
+        flags_save = fcntl.fcntl(fd, fcntl.F_GETFL)
+        attrs_save = termios.tcgetattr(fd)
+        # make raw - the way to do this comes from the termios(3) man page.
+        attrs = list(attrs_save) # copy the stored version to update
+        # iflag
+        attrs[0] &= ~(termios.IGNBRK | termios.BRKINT | termios.PARMRK
+                    | termios.ISTRIP | termios.INLCR | termios. IGNCR
+                    | termios.ICRNL | termios.IXON )
+        # oflag
+        attrs[1] &= ~termios.OPOST
+        # cflag
+        attrs[2] &= ~(termios.CSIZE | termios. PARENB)
+        attrs[2] |= termios.CS8
+        # lflag
+        attrs[3] &= ~(termios.ECHONL | termios.ECHO | termios.ICANON
+                    | termios.ISIG | termios.IEXTEN)
+        termios.tcsetattr(fd, termios.TCSANOW, attrs)
+        # turn off non-blocking
+        fcntl.fcntl(fd, fcntl.F_SETFL, flags_save & ~os.O_NONBLOCK)
+        # read a single keystroke
+        ret = []
         try:
-            tty.setraw(sys.stdin.fileno())
-            ch = sys.stdin.read(1)
+            ret.append(sys.stdin.read(1)) # returns a single character
+            fcntl.fcntl(fd, fcntl.F_SETFL, flags_save | os.O_NONBLOCK)
+            c = sys.stdin.read(1) # returns a single character
+            while len(c) > 0:
+                ret.append(c)
+                c = sys.stdin.read(1)
+        except KeyboardInterrupt:
+            ret.append('x03')
         finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-        result = ch.encode()
+            # restore old state
+            termios.tcsetattr(fd, termios.TCSAFLUSH, attrs_save)
+            fcntl.fcntl(fd, fcntl.F_SETFL, flags_save)
+            result = c.encode()
     return result
 
 
@@ -497,8 +526,9 @@ if __name__ == "__main__":
         print_message(
             {},
             "launcher",
-            "CTRL-x to terminate orchestration group. CTRL-r for restart options. CTRL-d to disconnect.",
+            "CTRL-x to terminate orchestration group. CTRL-r for restart options. CTRL-d to disconnect.\n",
         )
+        time.sleep(0.5)
 
     def stop_server(groupname, servername):
         print_message({}, "launcher", f"Unsubscribing {servername} websockets.")
