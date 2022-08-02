@@ -57,7 +57,7 @@ def print_message(server_cfg, server_name, *args, **kwargs):
                 cprint(figlet_format("ERROR", font="starwars"), "yellow", "on_red", attrs=["bold"])
 
             for arg in args:
-                print(f"\n{precolor}{msg_part1}{Style.RESET_ALL} {style}{arg}{Style.RESET_ALL}")
+                print(f"\n{precolor}{msg_part1}{Style.RESET_ALL} {style}{arg}{Style.RESET_ALL}\r")
 
     output_path = kwargs.get("log_dir", None)
     if output_path is not None:
