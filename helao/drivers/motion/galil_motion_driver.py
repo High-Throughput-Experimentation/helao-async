@@ -107,7 +107,7 @@ class Galil:
 
         # need to check if config settings exist
         # else need to create empty ones
-        self.axis_id = self.config_dict.get("axis_id", dict())
+        self.axis_id = self.config_dict.get("axis_id",{})
 
         # Mplatexy is identity matrix by default
         self.transform = TransformXY(self.base, self.M_instr, self.axis_id)

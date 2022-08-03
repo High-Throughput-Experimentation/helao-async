@@ -1258,7 +1258,7 @@ class Operator:
         self.orch = orch
         self.dataAPI = HTELegacyAPI(self.vis)
 
-        self.config_dict = self.vis.server_cfg.get("params", dict())
+        self.config_dict = self.vis.server_cfg.get("params",{})
         self.pal_name = None
         self.update_q = asyncio.Queue()
         # find pal server if configured in world config
@@ -1272,7 +1272,7 @@ class Operator:
         if self.pal_name is not None:
             pal_server_params = self.vis.world_cfg["servers"][self.pal_name]["params"]
             if "positions" in pal_server_params:
-                dev_custom = pal_server_params["positions"].get("custom", dict())
+                dev_custom = pal_server_params["positions"].get("custom",{})
             else:
                 dev_custom = {}
             self.dev_customitems = [key for key in dev_custom.keys()]
