@@ -331,7 +331,7 @@ class Archive:
         error = ErrorCodes.not_available
 
         if load_sample_in is None:
-            return False, NoneSample(), dict()
+            return False, NoneSample(),{}
 
         # check if sample actually exists
         load_samples_in = await self.unified_db.get_samples(
@@ -1018,7 +1018,7 @@ class Archive:
         customs_dict = {}
 
         if load_sample_in is None:
-            return False, NoneSample(), dict()
+            return False, NoneSample(),{}
 
         # check if sample actually exists
         load_samples_in = await self.unified_db.get_samples(
@@ -1027,7 +1027,7 @@ class Archive:
 
         if not load_samples_in:
             print_message({}, "archive", "Sample does not exist in DB.", error=True)
-            return False, NoneSample(), dict()
+            return False, NoneSample(),{}
 
         if custom in self.positions.customs_dict:
             loaded, sample = self.positions.customs_dict[custom].load(

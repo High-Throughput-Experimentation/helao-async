@@ -40,11 +40,11 @@ def makeApp(confPrefix, servKey, helao_root):
         driver_class=PAL,
     )
 
-    _cams = app.server_params.get("cams", dict())
+    _cams = app.server_params.get("cams",{})
     # _camsitems = make_str_enum("cams",{key:key for key in _cams.keys()})
 
     if "positions" in app.server_params:
-        dev_custom = app.server_params["positions"].get("custom", dict())
+        dev_custom = app.server_params["positions"].get("custom",{})
     else:
         dev_custom = {}
     dev_customitems = make_str_enum(

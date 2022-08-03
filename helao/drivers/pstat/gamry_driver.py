@@ -151,7 +151,7 @@ class gamry:
         # for saving data localy
         self.FIFO_epoch = None
         self.FIFO_gamryheader = (
-            dict()
+           {}
         )  # measuement specific, will be reset each measurement
         self.FIFO_column_headings = []
         self.FIFO_Gamryname = ""
