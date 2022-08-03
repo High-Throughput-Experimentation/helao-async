@@ -42,8 +42,8 @@ def makeApp(confPrefix, servKey, helao_root):
         version=2.0,
         driver_class=cNIMAX,
     )
-    dev_monitor = app.server_params.get("dev_temperature", dict())
-    dev_tempitems = make_str_enum("dev_temperature", {key: key for key in dev_temperature})
+    dev_monitor = app.server_params.get("dev_monitor", dict())
+    dev_tempitems = make_str_enum("dev_monitor", {key: key for key in dev_monitor})
 
     dev_heat = app.server_params.get("dev_heat", dict())
     dev_heatitems = make_str_enum("dev_heat", {key: key for key in dev_heat})
