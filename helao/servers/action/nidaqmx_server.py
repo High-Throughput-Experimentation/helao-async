@@ -301,7 +301,7 @@ def makeApp(confPrefix, servKey, helao_root):
             active_dict = await app.driver.run_cell_IV(A)
             return active_dict
 
-    if dev_temperature:
+    if dev_monitor:
 
         @app.post(f"/readtemp", tags=["public"])
         async def readtemp(
