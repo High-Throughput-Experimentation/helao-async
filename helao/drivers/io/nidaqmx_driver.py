@@ -212,22 +212,6 @@ class cNIMAX:
 #            cjc_source=CJCSource.BUILT_IN,
         )
 
-#        self.task_6289cellcurrenttemp.ai_channels.all.ai_lowpass_enable = True
-#        self.task_6289cellcurrenttemp.timing.cfg_samp_clk_timing(   #timing/triggering need
-                                                         
-        #     self.Tsamplingrate,
-        #     source="",
-        #     active_edge=Edge.RISING,
-        #     sample_mode=AcquisitionType.CONTINUOUS,
-        #     samps_per_chan=self.buffersize,
-        # )
-        # # TODO can increase the callbackbuffersize if needed
-        # # self.task_6289cellcurrenttemp.register_every_n_samples_acquired_into_buffer_event(10,self.streamCURRENT_callback)
-        # self.task_6289cellcurrenttemp.register_every_n_samples_acquired_into_buffer_event(
-        #     self.buffersizeread, self.streamT_callback
-        # )
-
-#        self.task_6284cellvoltagetemp = nidaqmx.Task()
         self.task_6284cellvoltagetemp.ai_channels.add_ai_thrmcpl_chan(
  #           physical_channel= 'type-T',
             physical_channel= 'PXI-6284/ai0',
@@ -239,15 +223,6 @@ class cNIMAX:
 #            cjc_source=CJCSource.BUILT_IN,
         )
 
-        # self.task_6284cellvoltagetemp.ai_channels.all.ai_lowpass_enable = True
-        # self.task_6284cellvoltagetemp.timing.cfg_samp_clk_timing(   #timing need?
- 
-        #     self.Tsamplingrate,
-        #     source="",
-        #     active_edge=Edge.RISING,
-        #     sample_mode=AcquisitionType.CONTINUOUS,
-        #     samps_per_chan=self.buffersize,
-        # )
 
         # each card need its own physical trigger input
         if (
@@ -258,32 +233,18 @@ class cNIMAX:
             self.task_6284cellvoltagetemp.triggers.start_trigger.trig_type = (
                 TriggerType.DIGITAL_EDGE
             )
-            # self.task_6284cellvoltagetemp.triggers.start_trigger.trig_type = (   #was originally tempT
-            #     TriggerType.DIGITAL_EDGE
-            # )
             self.task_6284cellvoltagetemp.triggers.start_trigger.cfg_dig_edge_start_trig(
                 trigger_source=self.config_dict["dev_cellvoltage_trigger"],
                 trigger_edge=Edge.RISING,
             )
-            # self.task_6284cellvoltagetemp.triggers.start_trigger.cfg_dig_edge_start_trig(
-            #     trigger_source=self.config_dict["dev_cellvoltage_trigger"],
-            #     trigger_edge=Edge.RISING,
-            # )
 
             self.task_6289cellcurrenttemp.triggers.start_trigger.trig_type = (
                 TriggerType.DIGITAL_EDGE
             )
-            # self.task_6289cellcurrenttemp.triggers.start_trigger.trig_type = (
-            #     TriggerType.DIGITAL_EDGE
-            # )   #was originally task_tempS
             self.task_6289cellcurrenttemp.triggers.start_trigger.cfg_dig_edge_start_trig(
                 trigger_source=self.config_dict["dev_cellcurrent_trigger"],
                 trigger_edge=Edge.RISING,
             )
-            # self.task_6289cellcurrenttemp.triggers.start_trigger.cfg_dig_edge_start_trig(
-            #     trigger_source=self.config_dict["dev_cellcurrent_trigger"],
-            #     trigger_edge=Edge.RISING,
-            # )
 
     def create_Ttask(self):
         """configures and starts a NImax task for nonexperiment temp measurements"""
@@ -381,12 +342,6 @@ class cNIMAX:
                 dataV = self.task_6284cellvoltagetemp.read(
                     number_of_samples_per_channel=number_of_samples
                 )
-                # data_TS = self.task_6289cellcurrenttemp.read(    #temp channels now read as last of I and V
-                #     number_of_samples_per_channel=number_of_samples
-                # )
-                # data_TT = self.task_6284cellvoltagetemp.read(
-                #     number_of_samples_per_channel=number_of_samples
-                # )
 
                 # this is also what NImax seems to do
                 time = [
@@ -397,7 +352,7 @@ class cNIMAX:
                 self.IVtimeoffset += number_of_samples / self.samplingrate
 
                 data_dict = {}
-                #need to get dataTS and dataTT channel date out first is 8 when 7 cells (due to wiring) would be 10 if 9
+                #T and S temp data out first is 8 when 7 cells (due to wiring) would be 10 if 9
                 for i, FIFO_cell_key in enumerate(self.FIFO_cell_keys):
                     data_dict[self.file_conn_keys[i]] = {
                         f"{self.FIFO_column_headings[0]}": time,
@@ -424,17 +379,9 @@ class cNIMAX:
             _ = self.task_6284cellvoltagetemp.read(
                 number_of_samples_per_channel=number_of_samples
             )
-            # _ = self.task_6289cellcurrenttemp.read(
-            #     number_of_samples_per_channel=number_of_samples
-            # )
-            # _ = self.task_6284cellvoltagetemp.read(
-            #     number_of_samples_per_channel=number_of_samples
-            # )
             self.IO_measuring = False
             self.task_6289cellcurrenttemp.close()
             self.task_6284cellvoltagetemp.close()
-            # self.task_6289cellcurrenttemp.close()
-            # self.task_6284cellvoltagetemp.close()
 
         else:
             # NImax has data but measurement was already turned off
@@ -445,18 +392,10 @@ class cNIMAX:
             _ = self.task_6284cellvoltagetemp.read(
                 number_of_samples_per_channel=number_of_samples
             )
-            # _ = self.task_6289cellcurrenttemp.read(
-            #     number_of_samples_per_channel=number_of_samples
-            # )
-            # _ = self.task_6284cellvoltagetemp.read(
-            #     number_of_samples_per_channel=number_of_samples
-            # )
             # task should be already off or should be closed soon
             self.base.print_message(
                 "meas was turned off but NImax IV task is still running ..."
             )
-            # self.task_6289cellcurrenttemp.close()
-            # self.task_6284cellvoltagetemp.close()
             #self.task_6289cellcurrenttemp.close()
             #self.task_6284cellvoltagetemp.close()
 
@@ -479,8 +418,6 @@ class cNIMAX:
                         self.task_6284cellvoltagetemp.start()
                         # then start master to trigger slave
                         self.task_6289cellcurrenttemp.start()
-                        # self.task_6289cellcurrenttemp.start()
-                        # self.task_6284cellvoltagetemp.start()
 
                         # wait for first callback interrupt
                         while not self.IO_measuring:
@@ -509,8 +446,6 @@ class cNIMAX:
                         self.IO_measuring = False
                         self.task_6289cellcurrenttemp.close()
                         self.task_6284cellvoltagetemp.close()
-                        # self.task_6289cellcurrenttemp.close()
-                        # self.task_6284cellvoltagetemp.close()
                         _ = await self.active.finish()
                         self.active = None
                         self.action = None
@@ -766,23 +701,10 @@ class cNIMAX:
         #activeDict = {}
 
         rtemp = {}
-#        thermocouple = A.action_params["TC"]
-
-    #    A.error_code = ErrorCodes.none
-
-#        data_TS = self.task_tempinst_S.read()
-#        data_TT = self.task_tempinst_T.read()
-    #
-    #    if thermocouple == "type-S":
         rtemp["type-S"] = self.task_tempinst_S.read()
-        print(rtemp)
-    #    if thermocouple == "type-T":
+ #       print(rtemp)
         rtemp["type-T"] = self.task_tempinst_T.read()        
         print(rtemp)
-        # else:
-        #     A.error_code = ErrorCodes.in_progress
-
-      #  return activeDict
         return rtemp
 
     def stop_Ttask(self):

@@ -365,10 +365,13 @@ def makeApp(confPrefix, servKey, helao_root):
         duration = duration_hrs * 60 * 60
         heatloop_run = True
         while heatloop_run and ( time.time() - starttime < duration):
-            #temp_dict = await app.driver.read_T(A)
+            #need to insert pause. also verify if values are actually being evaluated
+            time.sleep(1)
             temp_dict = await readtemp()
             for k,v in temp_dict.items():
                 temp_dict[k] = float(v)
+            print(type(temp_dict['type-S']))
+            print(type(temp_dict['type-T']))
             if temp_dict['type-S'] < reservoir1_min_C:
                 heater(heater="heater1", on = True)
             if temp_dict['type-S'] > reservoir1_max_C:
