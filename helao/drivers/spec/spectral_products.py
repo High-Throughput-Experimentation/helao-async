@@ -66,7 +66,7 @@ class SM303:
 
         # for saving data localy
         self.FIFO_epoch = None
-        self.FIFO_header = dict()  # measuement specific, will be reset each measurement
+        self.FIFO_header ={}  # measuement specific, will be reset each measurement
         self.FIFO_column_headings = []
         self.FIFO_name = ""
 

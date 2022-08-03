@@ -38,26 +38,26 @@ class cNIMAX:
         self.unified_db = UnifiedSampleDataAPI(self.base)
         asyncio.gather(self.unified_db.init_db())
 
-        self.dev_pump = self.config_dict.get("dev_pump", dict())
+        self.dev_pump = self.config_dict.get("dev_pump",{})
         self.dev_pumpitems = make_str_enum(
             "dev_pump", {key: key for key in self.dev_pump}
         )
 
-        self.dev_gasvalve = self.config_dict.get("dev_gasvalve", dict())
+        self.dev_gasvalve = self.config_dict.get("dev_gasvalve",{})
         self.dev_gasvalveitems = make_str_enum(
             "dev_gasvalve", {key: key for key in self.dev_gasvalve}
         )
 
-        self.dev_liquidvalve = self.config_dict.get("dev_liquidvalve", dict())
+        self.dev_liquidvalve = self.config_dict.get("dev_liquidvalve",{})
         self.dev_liquidvalveitems = make_str_enum(
             "dev_liquidvalve", {key: key for key in self.dev_liquidvalve}
         )
-        self.dev_heat = self.config_dict.get("dev_heat", dict())
+        self.dev_heat = self.config_dict.get("dev_heat",{})
         self.dev_heatitems = make_str_enum(
             "dev_heat", {key: key for key in self.dev_heat}
         )
 
-        self.dev_led = self.config_dict.get("dev_led", dict())
+        self.dev_led = self.config_dict.get("dev_led",{})
         self.dev_leditems = make_str_enum("dev_led", {key: key for key in self.dev_led})
 
         self.allow_no_sample = self.config_dict.get("allow_no_sample", False)
