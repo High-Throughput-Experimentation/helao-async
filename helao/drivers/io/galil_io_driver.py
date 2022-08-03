@@ -42,16 +42,16 @@ class Galil:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
 
-        self.dev_ai = self.config_dict.get("dev_ai", dict())
+        self.dev_ai = self.config_dict.get("dev_ai",{})
         self.dev_aiitems = make_str_enum("dev_ai", {key: key for key in self.dev_ai})
 
-        self.dev_ao = self.config_dict.get("dev_ao", dict())
+        self.dev_ao = self.config_dict.get("dev_ao",{})
         self.dev_aoitems = make_str_enum("dev_ao", {key: key for key in self.dev_ao})
 
-        self.dev_di = self.config_dict.get("dev_di", dict())
+        self.dev_di = self.config_dict.get("dev_di",{})
         self.dev_diitems = make_str_enum("dev_di", {key: key for key in self.dev_di})
 
-        self.dev_do = self.config_dict.get("dev_do", dict())
+        self.dev_do = self.config_dict.get("dev_do",{})
         self.dev_doitems = make_str_enum("dev_do", {key: key for key in self.dev_do})
 
         self.digital_cycle_out = None

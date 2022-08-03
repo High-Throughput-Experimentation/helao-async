@@ -34,7 +34,7 @@ async def galil_dyn_endpoints(app=None):
 
     if app.driver.galil_enabled is True:
 
-        dev_axis = app.server_params.get("axis_id", dict())
+        dev_axis = app.server_params.get("axis_id",{})
         dev_axisitems = make_str_enum("axis_id", {key: key for key in dev_axis})
 
         if dev_axis:
