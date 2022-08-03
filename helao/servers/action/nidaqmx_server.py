@@ -312,10 +312,10 @@ def makeApp(confPrefix, servKey, helao_root):
             # A = await app.base.setup_action()
             # A.action_abbr = "getTemp"
             tempread = {}
-            app.driver.create_Ttask()
+            #app.driver.create_Ttask()  #start task separately
             tempread= await app.driver.read_T()
             print(tempread)
-            app.driver.stop_Ttask()
+            #app.driver.stop_Ttask()   #stop task separately
             return tempread
 
     if dev_heat:
@@ -373,23 +373,32 @@ def makeApp(confPrefix, servKey, helao_root):
             print(type(temp_dict['type-S']))
             print(type(temp_dict['type-T']))
             if temp_dict['type-S'] < reservoir1_min_C:
+                print("heat1on")
                 heater(heater="heater1", on = True)
             if temp_dict['type-S'] > reservoir1_max_C:
+                print("heat1off")
                 heater(heater="heater1", on = False)
             if temp_dict['type-T'] < reservoir2_min_C:
+                print("heat2on")
                 heater(heater="heater2", on = True)
             if temp_dict['type-T'] > reservoir2_max_C:
+                print("heat2off")
                 heater(heater="heater2", on = False)
             #need way to monitor and break loop
             #ie, heatloop_run = False
 
-        await stop_temp()
+#        await stop_temp()
         heater(heater="heater1", on = False)
         heater(heater="heater2", on = False)
 
     @app.post(f"/stoptemp", tags=["public"])
     async def stop_temp():
         app.driver.stop_Ttask()
+
+    @app.post(f"/starttemp", tags=["public"])
+    async def start_temp():
+        app.driver.start_Ttask()
+
 
     @app.post(f"/listtasks", tags=["public"])
     async def list_tasks():
