@@ -95,6 +95,15 @@ def makeActionServ(
         """
         await app.base.ws_data(websocket)
 
+    @app.websocket("/ws_live")
+    async def websocket_live(websocket: WebSocket):
+        """Broadcast live buffer dicts.
+
+        Args:
+        websocket: a fastapi.WebSocket object
+        """
+        await app.base.ws_live(websocket)
+
     @app.post("/get_status", tags=["private"])
     def status_wrapper():
         return app.base.actionserver
@@ -244,6 +253,7 @@ class Base(object):
         self.status_logger = self.aloop.create_task(self.log_status_task())
         self.sync_ntp_task_run = False
         self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
+        self.bufferer = self.aloop.create_task(self.live_buffer_task())
 
     def print_message(self, *args, **kwargs):
         print_message(
