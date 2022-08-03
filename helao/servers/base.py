@@ -210,6 +210,8 @@ class Base(object):
 
         self.status_q = MultisubscriberQueue()
         self.data_q = MultisubscriberQueue()
+        self.live_q = MultisubscriberQueue()
+        self.live_buffer = {}
         self.status_clients = set()
         self.ntp_server = "time.nist.gov"
         self.ntp_response = None
@@ -537,13 +539,40 @@ class Base(object):
                 error=True,
             )
 
+    async def ws_live(self, websocket: WebSocket):
+        """Subscribe to data queue and send messages to websocket client."""
+        self.print_message("got new live_buffer subscriber")
+        await websocket.accept()
+        try:
+            async for live_msg in self.live_q.subscribe():
+                await websocket.send_text(json.dumps(live_msg))
+        # except WebSocketDisconnect:
+        except Exception as e:
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            self.print_message(
+                f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
+                error=True,
+            )
+
+    async def live_buffer_task(self):
+        """Self-subscribe to live_q, update live_buffer dict."""
+        self.print_message(f"{self.server.server_name} live buffer task created.")
+        async for live_msg in self.live_q.subscribe():
+            self.live_buffer.update(live_msg)
+
+    async def put_lbuf(self, live_dict):
+        """Convert dict values to tuples of (val, timestamp), enqueue to live_q."""
+        new_dict = {k: (v, time.time()) for k,v in live_dict}
+        await self.live_q.queue(new_dict)
+
+    def get_lbuf(self, live_key):
+        return self.live_buffer[live_key]
+
     async def log_status_task(self, retry_limit: int = 5):
-        """Self-subscribe to status queue,
-        log status changes, POST to clients."""
+        """Self-subscribe to status queue, log status changes, POST to clients."""
         self.print_message(f"{self.server.server_name} status log task created.")
 
         try:
-            self.print_message("log_status_task started.")
             # get the new "StatusModel" from the queue
             async for status_msg in self.status_q.subscribe():
                 # add it to the correct "EndpointModel"
