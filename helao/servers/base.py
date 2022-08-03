@@ -624,7 +624,7 @@ class Base(object):
             real_time = epoch_ns + offset_ns
         return real_time
 
-    async def sync_ntp_task(self, resync_time: int = 600):
+    async def sync_ntp_task(self, resync_time: int = 1800):
         "Regularly sync with NTP server."
         self.sync_ntp_task_run = True
         try:
@@ -645,7 +645,7 @@ class Base(object):
                         self.ntp_offset = 0.0
                     if time() - self.ntp_last_sync > resync_time:
                         self.print_message(
-                            f"last time check was more then {resync_time} ago, syncing time again."
+                            f"last time check was more then {resync_time/60.0:.1f} minutes ago, syncing time again."
                         )
                         await self.get_ntp_time()
                     else:

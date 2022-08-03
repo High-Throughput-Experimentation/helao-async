@@ -35,29 +35,27 @@ from bokeh.plotting import figure, Figure
 from bokeh.events import ButtonClick, DoubleTap
 from bokeh.models.widgets import FileInput, Toggle
 
+from helaocore.models.action_start_condition import ActionStartCondition
+from helaocore.models.sequence import SequenceModel
+from helaocore.models.experiment import ExperimentTemplate
+from helaocore.models.hlostatus import HloStatus
+from helaocore.models.server import ActionServerModel, GlobalStatusModel
+from helaocore.models.orchstatus import OrchStatus
+from helaocore.error import ErrorCodes
 
-from helao.servers.base import Base
 from helao.helpers.server_api import HelaoFastAPI
-from helao.servers.vis import Vis
 from helao.helpers.make_vis_serv import makeVisServ
 from helao.helpers.import_experiments import import_experiments
 from helao.helpers.import_sequences import import_sequences
 from helao.helpers.dispatcher import async_private_dispatcher, async_action_dispatcher
-
-from helaocore.models.action_start_condition import ActionStartCondition
 from helao.helpers.to_json import to_json
 from helao.helpers.unpack_samples import unpack_samples_helper
 from helao.helpers.yml_finisher import move_dir
 from helao.helpers.premodels import Sequence, Experiment, Action
-
-from helaocore.models.sequence import SequenceModel
-from helaocore.models.experiment import ExperimentTemplate
-
-from helaocore.models.hlostatus import HloStatus
-from helaocore.models.server import ActionServerModel, GlobalStatusModel
-from helaocore.models.orchstatus import OrchStatus
+from helao.servers.base import Base
+from helao.servers.vis import Vis
 from helao.helpers.legacy_api import HTELegacyAPI
-from helaocore.error import ErrorCodes
+from helao.helpers.gen_uuid import gen_uuid
 
 
 # ANSI color codes converted to the Windows versions
@@ -190,8 +188,8 @@ def makeOrchServ(config, server_key, server_title, description, version, driver_
     async def append_sequence(
         sequence: Optional[Sequence] = Body({}, embed=True),
     ):
-        await app.orch.add_sequence(sequence=sequence)
-        return {}
+        seq_uuid = await app.orch.add_sequence(sequence=sequence)
+        return {"sequence_uuid": seq_uuid}
 
     @app.post(f"/{server_key}/wait")
     async def wait(action: Optional[Action] = Body({}, embed=True), waittime: Optional[float] = 10.0):
@@ -572,6 +570,8 @@ class Orch(Base):
 
         self.print_message("setting action order")
         for i, act in enumerate(unpacked_acts):
+            # init uuid now for tracking later
+            act.action_uuid = gen_uuid()
             act.action_order = int(i)
             # actual order should be the same at the beginning
             # will be incremented as necessary
@@ -996,10 +996,10 @@ class Orch(Base):
         self,
         sequence: Sequence,
     ):
-        # for D_dict in sequence.experiment_plan_list:
-        #     D = Experiment(D_dict)
-        #     seq.experiment_plan_list.append(D)
+        # init uuid now for tracking later
+        sequence.sequence_uuid = gen_uuid()
         self.sequence_dq.append(sequence)
+        return sequence.sequence_uuid
 
     async def add_experiment(
         self,
@@ -1015,6 +1015,9 @@ class Orch(Base):
         Ddict = experimenttemplate.dict()
         Ddict.update(seq.dict())
         D = Experiment(**Ddict)
+
+        # init uuid now for tracking later
+        D.experiment_uuid = gen_uuid()
 
         # reminder: experiment_dict values take precedence over keyword args
         if D.orchestrator.server_name is None or D.orchestrator.machine_name is None:
@@ -1131,6 +1134,7 @@ class Orch(Base):
 
         new_action_order = last_action_order + 1
         new_action = sup_action
+        new_action.action_uuid = gen_uuid()
         new_action.action_order = new_action_order
         self.action_dq.append(new_action)
 

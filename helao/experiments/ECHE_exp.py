@@ -4,22 +4,22 @@ server_key must be a FastAPI action server defined in config
 """
 
 __all__ = [
-    "ECHE_slave_unloadall_customs",
-    "ECHE_slave_load_solid",
-    "ECHE_slave_add_liquid",
-    "ECHE_slave_startup",
-    "ECHE_slave_shutdown",
-    "ECHE_slave_CA_led",
-    "ECHE_slave_CA",
-    "ECHE_slave_CV_led",
-    "ECHE_slave_CV",
-    "ECHE_slave_CP_led",
-    "ECHE_slave_CP",
-    "ECHE_slave_movetosample",
-    "ECHE_slave_move",
-    "ECHE_slave_CV_led_secondtrigger",
-    "ECHE_slave_CA_led_secondtrigger",
-    "ECHE_slave_CP_led_secondtrigger",
+    "ECHE_sub_unloadall_customs",
+    "ECHE_sub_load_solid",
+    "ECHE_sub_add_liquid",
+    "ECHE_sub_startup",
+    "ECHE_sub_shutdown",
+    "ECHE_sub_CA_led",
+    "ECHE_sub_CA",
+    "ECHE_sub_CV_led",
+    "ECHE_sub_CV",
+    "ECHE_sub_CP_led",
+    "ECHE_sub_CP",
+    "ECHE_sub_movetosample",
+    "ECHE_sub_move",
+    "ECHE_sub_CV_led_secondtrigger",
+    "ECHE_sub_CA_led_secondtrigger",
+    "ECHE_sub_CP_led_secondtrigger",
 ]
 
 
@@ -52,7 +52,7 @@ PAL_server = MachineModel(server_name="PAL", machine_name=gethostname()).json_di
 toggle_triggertype = TriggerType.fallingedge
 
 
-def ECHE_slave_unloadall_customs(experiment: Experiment):
+def ECHE_sub_unloadall_customs(experiment: Experiment):
     """last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -71,7 +71,7 @@ def ECHE_slave_unloadall_customs(experiment: Experiment):
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_slave_add_liquid(
+def ECHE_sub_add_liquid(
     experiment: Experiment,
     experiment_version: int = 2,
     solid_custom_position: Optional[str] = "cell1_we",
@@ -105,7 +105,7 @@ def ECHE_slave_add_liquid(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_slave_load_solid(
+def ECHE_sub_load_solid(
     experiment: Experiment,
     experiment_version: int = 1,
     solid_custom_position: Optional[str] = "cell1_we",
@@ -137,7 +137,7 @@ def ECHE_slave_load_solid(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_slave_startup(
+def ECHE_sub_startup(
     experiment: Experiment,
     experiment_version: int = 2,
     solid_custom_position: Optional[str] = "cell1_we",
@@ -147,17 +147,17 @@ def ECHE_slave_startup(
     solution_bubble_gas: Optional[str] = "N2",
     liquid_volume_ml: Optional[float] = 1.0,
 ):
-    """Slave experiment
+    """Sub experiment
     last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # unload all samples from custom positions
-    apm.add_action_list(ECHE_slave_unloadall_customs(experiment=experiment))
+    apm.add_action_list(ECHE_sub_unloadall_customs(experiment=experiment))
 
     # load new requested solid samples
     apm.add_action_list(
-        ECHE_slave_load_solid(
+        ECHE_sub_load_solid(
             experiment=experiment,
             solid_custom_position=apm.pars.solid_custom_position,
             solid_plate_id=apm.pars.solid_plate_id,
@@ -167,7 +167,7 @@ def ECHE_slave_startup(
 
     # add liquid to solid
     apm.add_action_list(
-        ECHE_slave_add_liquid(
+        ECHE_sub_add_liquid(
             experiment=experiment,
             solid_custom_position=apm.pars.solid_custom_position,
             reservoir_liquid_sample_no=apm.pars.reservoir_liquid_sample_no,
@@ -211,20 +211,20 @@ def ECHE_slave_startup(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_slave_shutdown(experiment: Experiment):
-    """Slave experiment
+def ECHE_sub_shutdown(experiment: Experiment):
+    """Sub experiment
 
     last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # unload all samples from custom positions
-    apm.add_action_list(ECHE_slave_unloadall_customs(experiment=experiment))
+    apm.add_action_list(ECHE_sub_unloadall_customs(experiment=experiment))
 
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_slave_CA_led(
+def ECHE_sub_CA_led(
     experiment: Experiment,
     experiment_version: int = 2,
     CA_potential_vsRHE: Optional[float] = 0.0,
@@ -300,7 +300,7 @@ def ECHE_slave_CA_led(
         - 1.0 * apm.pars.ref_vs_nhe
         - 0.059 * apm.pars.solution_ph
     )
-    print(f"ECHE_slave_CA potential: {potential}")
+    print(f"ECHE_sub_CA potential: {potential}")
     apm.add_action(
         {
             "action_server": PSTAT_server,
@@ -328,7 +328,7 @@ def ECHE_slave_CA_led(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_slave_CA(
+def ECHE_sub_CA(
     experiment: Experiment,
     experiment_version: int = 2,
     CA_potential_vsRHE: Optional[float] = 0.0,
@@ -369,7 +369,7 @@ def ECHE_slave_CA(
         - 1.0 * apm.pars.ref_vs_nhe
         - 0.059 * apm.pars.solution_ph
     )
-    print(f"ECHE_slave_CA potential: {potential}")
+    print(f"ECHE_sub_CA potential: {potential}")
     apm.add_action(
         {
             "action_server": PSTAT_server,
@@ -397,7 +397,7 @@ def ECHE_slave_CA(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_slave_CV_led(
+def ECHE_sub_CV_led(
     experiment: Experiment,
     experiment_version: int = 2,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
@@ -528,7 +528,7 @@ def ECHE_slave_CV_led(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_slave_CV(
+def ECHE_sub_CV(
     experiment: Experiment,
     experiment_version: int = 2,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
@@ -609,7 +609,7 @@ def ECHE_slave_CV(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_slave_CP(
+def ECHE_sub_CP(
     experiment: Experiment,
     experiment_version: int = 2,
     CP_current: Optional[float] = 0.0,
@@ -648,7 +648,7 @@ def ECHE_slave_CP(
     #   potential = (
     #        apm.pars.CA_potential_vsRHE - 1.0 * apm.pars.ref_vs_nhe - 0.059 * apm.pars.solution_ph
     #    )
-    #    print(f"ECHE_slave_CA potential: {potential}")
+    #    print(f"ECHE_sub_CA potential: {potential}")
     apm.add_action(
         {
             "action_server": PSTAT_server,
@@ -676,7 +676,7 @@ def ECHE_slave_CP(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_slave_CP_led(
+def ECHE_sub_CP_led(
     experiment: Experiment,
     experiment_version: int = 2,
     CP_current: Optional[float] = 0.0,
@@ -775,13 +775,13 @@ def ECHE_slave_CP_led(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_slave_movetosample(
+def ECHE_sub_movetosample(
     experiment: Experiment,
     experiment_version: int = 1,
     solid_plate_id: Optional[int] = 4534,
     solid_sample_no: Optional[int] = 1,
 ):
-    """Slave experiment
+    """Sub experiment
     last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -821,13 +821,13 @@ def ECHE_slave_movetosample(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_slave_move(
+def ECHE_sub_move(
     experiment: Experiment,
     experiment_version: int = 1,
     x_mm: float = 1.0,
     y_mm: float = 1.0,
 ):
-    """Slave experiment
+    """Sub experiment
     last functionality test: -"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -851,7 +851,7 @@ def ECHE_slave_move(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_slave_CV_led_secondtrigger(
+def ECHE_sub_CV_led_secondtrigger(
     experiment: Experiment,
     experiment_version: int = 2,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
@@ -995,7 +995,7 @@ def ECHE_slave_CV_led_secondtrigger(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_slave_CA_led_secondtrigger(
+def ECHE_sub_CA_led_secondtrigger(
     experiment: Experiment,
     experiment_version: int = 2,
     CA_potential_vsRHE: Optional[float] = 0.0,
@@ -1086,7 +1086,7 @@ def ECHE_slave_CA_led_secondtrigger(
         - 1.0 * apm.pars.ref_vs_nhe
         - 0.059 * apm.pars.solution_ph
     )
-    print(f"ECHE_slave_CA potential: {potential}")
+    print(f"ECHE_sub_CA potential: {potential}")
     apm.add_action(
         {
             "action_server": PSTAT_server,
@@ -1114,7 +1114,7 @@ def ECHE_slave_CA_led_secondtrigger(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_slave_CP_led_secondtrigger(
+def ECHE_sub_CP_led_secondtrigger(
     experiment: Experiment,
     experiment_version: int = 2,
     CP_current: Optional[float] = 0.0,

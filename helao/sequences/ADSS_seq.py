@@ -44,11 +44,11 @@ def ADSS_minimum_CV(
 
     pl = ExperimentPlanMaker()
 
-    pl.add_experiment("ADSS_slave_unloadall_customs",{})
+    pl.add_experiment("ADSS_sub_unloadall_customs",{})
 
 
     pl.add_experiment(
-        "ADSS_slave_load_solid",
+        "ADSS_sub_load_solid",
         {
             "solid_custom_position": solid_custom_position,
             "solid_plate_id": solid_plate_id,
@@ -56,7 +56,7 @@ def ADSS_minimum_CV(
         },
     )
     pl.add_experiment(
-        "ADSS_slave_load_liquid",
+        "ADSS_sub_load_liquid",
         {
             "liquid_custom_position": liquid_custom_position,
             "liquid_sample_no": liquid_sample_no,
@@ -65,7 +65,7 @@ def ADSS_minimum_CV(
 
 
     pl.add_experiment(
-        "ADSS_slave_CV_noaliquots",
+        "ADSS_sub_CV_noaliquots",
         {
             "Vinit_vsRHE": CV1_Vinit_vsRHE,
             "Vapex1_vsRHE": CV1_Vapex1_vsRHE,
@@ -81,8 +81,8 @@ def ADSS_minimum_CV(
         },
     )
 
-#    pl.add_experiment("ADSS_slave_shutdown", {})
- #   pl.add_experiment("ADSS_slave_wait", {})
+#    pl.add_experiment("ADSS_sub_shutdown", {})
+    pl.add_experiment("ADSS_sub_wait", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -115,7 +115,7 @@ def ADSS_minimum_CA(
     pl = ExperimentPlanMaker()
 
     # pl.add_experiment(
-    #     "ADSS_slave_startup",
+    #     "ADSS_sub_startup",
     #     {
     #         "solid_custom_position": solid_custom_position,
     #         "solid_plate_id": solid_plate_id,
@@ -124,11 +124,11 @@ def ADSS_minimum_CA(
     #         "liquid_sample_no": liquid_sample_no,
     #     },
     # )
-    pl.add_experiment("ADSS_slave_unloadall_customs",{})
+    pl.add_experiment("ADSS_sub_unloadall_customs",{})
 
 
     pl.add_experiment(
-        "ADSS_slave_load_solid",
+        "ADSS_sub_load_solid",
         {
             "solid_custom_position": solid_custom_position,
             "solid_plate_id": solid_plate_id,
@@ -136,7 +136,7 @@ def ADSS_minimum_CA(
         },
     )
     pl.add_experiment(
-        "ADSS_slave_load_liquid",
+        "ADSS_sub_load_liquid",
         {
             "liquid_custom_position": liquid_custom_position,
             "liquid_sample_no": liquid_sample_no,
@@ -145,7 +145,7 @@ def ADSS_minimum_CA(
 
 
     pl.add_experiment(
-        "ADSS_slave_CA_noaliquots",
+        "ADSS_sub_CA_noaliquots",
         {
             "CA_potential": CA_potential_vsRHE,
             "ph": ph,
@@ -157,7 +157,8 @@ def ADSS_minimum_CA(
         },
     )
 
-#    pl.add_experiment("ADSS_slave_shutdown", {})
+#    pl.add_experiment("ADSS_sub_shutdown", {})
+    pl.add_experiment("ADSS_sub_wait", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -188,7 +189,7 @@ def ADSS_duaribilty_CAv1(
     pl = ExperimentPlanMaker()
 
     pl.add_experiment(
-        "ADSS_slave_startup",
+        "ADSS_sub_startup",
         {
             "x_mm": x_mm,
             "y_mm": y_mm,
@@ -204,15 +205,15 @@ def ADSS_duaribilty_CAv1(
         print(f" ... cycle {cycle} potential:", potential)
         if cycle == 0:
             pl.add_experiment(
-                "ADSS_slave_fillfixed",
+                "ADSS_sub_fillfixed",
                 {"fill_vol_ul": 10000, "filltime_sec": filltime_sec},
             )
 
         else:
-            pl.add_experiment("ADSS_slave_fill", {"fill_vol_ul": 1000})
+            pl.add_experiment("ADSS_sub_fill", {"fill_vol_ul": 1000})
 
         pl.add_experiment(
-            "ADSS_slave_CA",
+            "ADSS_sub_CA",
             {
                 "CA_potential": potential,
                 "ph": ph,
@@ -224,7 +225,7 @@ def ADSS_duaribilty_CAv1(
             },
         )
 
-    pl.add_experiment("ADSS_slave_shutdown", {})
+    pl.add_experiment("ADSS_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -251,7 +252,7 @@ def ADSS_tray_unload(
     pl = ExperimentPlanMaker()
 
     pl.add_experiment(
-        "ADSS_slave_tray_unload",
+        "ADSS_sub_tray_unload",
         {
             "tray": tray,
             "slot": slot,

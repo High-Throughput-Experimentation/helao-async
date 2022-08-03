@@ -3,14 +3,14 @@ __all__ = ["config"]
 
 hostip = "127.0.0.1"
 config = {}
-config["dummy"] = False
+config["dummy"] = True
 config['simulation'] = False
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
-config["experiment_libraries"] = ["ECHE_exp", "samples_exp", "spec_exp"]
+config["experiment_libraries"] = ["ECHE_exp", "samples_exp", "UVIS_exp"]
 # config["experiment_params"] = {}
-config["sequence_libraries"] = ["ECHE_seq"]
+config["sequence_libraries"] = ["ECHE_seq", "UVIS_seq"]
 config["sequence_params"] = {
     "led_wavelengths_nm": [385, 455, 515, 590],
     "led_intensities_mw": [1.725, 1.478, 0.585, 0.366],
@@ -120,7 +120,7 @@ config["servers"] = dict(
             },
         ),
     ),
-    SPEC=dict(
+    SPEC_T=dict(
         host=hostip,
         port=8011,
         group="action",
