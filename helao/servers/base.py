@@ -573,7 +573,7 @@ class Base(object):
     async def put_lbuf(self, live_dict):
         """Convert dict values to tuples of (val, timestamp), enqueue to live_q."""
         new_dict = {k: (v, time.time()) for k,v in live_dict}
-        await self.live_q.queue(new_dict)
+        await self.live_q.put(new_dict)
 
     def get_lbuf(self, live_key):
         return self.live_buffer[live_key]
