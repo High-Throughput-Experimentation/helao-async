@@ -119,7 +119,7 @@ config["servers"] = dict(
                 },
             dev_monitor ={
                 'type-S':'PXI-6289/ai2',
-                'type-T':'PXI-6284/ai2'
+                'type-T':'PXI-6289/ai3'
                 },   
             dev_heat = {
                 'heater1':'PXI-6284/port2/line1', #P2.1
