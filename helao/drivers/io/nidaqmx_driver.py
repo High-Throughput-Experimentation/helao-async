@@ -358,7 +358,7 @@ class cNIMAX:
             mvalues = self.task_monitors.read()
             for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
                 datastore = {myname : mvalues[i]}
-                put_lbuf(datastore)
+                await self.base.put_lbuf(datastore)
             time.sleep(1)    
 
     def streamIV_callback(
@@ -386,7 +386,7 @@ class cNIMAX:
                     number_of_samples_per_channel=number_of_samples
                 )
                 for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
-                    mdata[i], _ = get_lbuf(myname)    
+                    mdata[i], _ = self.base.get_lbuf(myname)    
 
                 # this is also what NImax seems to do
                 time = [
@@ -544,7 +544,7 @@ class cNIMAX:
         while (time.time() - heatloopstarttime < duration) and self.Heatloop_run:
             readtempdict = {}
             for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
-                mdata[i], _ = get_lbuf(myname) 
+                mdata[i], _ = self.base.get_lbuf(myname) 
                 readtempdict[myname] = mdata[i]
             temp_typeS = float(readtempdict["type-S"])
             temp_typeT = float(readtempdict["type-T"])
@@ -748,7 +748,7 @@ class cNIMAX:
         #activeDict = {}
         rtemp = {}
         for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
-            mdata[i], _ = get_lbuf(myname) 
+            mdata[i], _ = self.base.get_lbuf(myname) 
             rtemp[myname] = mdata[i]
 
 #        rtemp["type-S"] = self.task_tempinst_S.read()
