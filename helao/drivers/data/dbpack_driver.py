@@ -388,6 +388,7 @@ class ExpYml(HelaoYml):
             "samples_in": [],
             "samples_out": [],
             "files": [],
+            "run_use": "data",
         }
         for act in actions:
             for ppkey, ppval in fill_process.items():
