@@ -6,19 +6,25 @@ config = {}
 config["dummy"] = True
 config['simulation'] = False
 
-# action library provides generator functions which produce actions
-# lists from input experiment_id grouping
-config["experiment_libraries"] = ["ECHE_exp", "samples_exp", "UVIS_exp"]
-# config["experiment_params"] = {}
-config["sequence_libraries"] = ["ECHE_seq", "UVIS_seq"]
+config["experiment_libraries"] = ["samples_exp", "UVIS_exp"]
+config["sequence_libraries"] = ["UVIS_seq"]
 config["sequence_params"] = {
-    "led_wavelengths_nm": [385, 455, 515, 590],
-    "led_intensities_mw": [1.725, 1.478, 0.585, 0.366],
-    "led_names": ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
+    "led_wavelengths_nm": [-1],
+    "led_intensities_mw": [-1],
+    "led_names": ["doric_wled"],
     "led_type": "front",
-    "led_date": "12/23/2020"
-    # 1.725 1.478 .585 .366
+    "led_date": "n/a"
 }
+# config["experiment_libraries"] = ["ECHE_exp", "samples_exp"]
+# config["experiment_params"] = {}
+# config["sequence_libraries"] = ["ECHE_seq"]
+# config["sequence_params"] = {
+#     "led_wavelengths_nm": [385, 455, 515, 590],
+#     "led_intensities_mw": [1.725, 1.478, 0.585, 0.366],
+#     "led_names": ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
+#     "led_type": "front",
+#     "led_date": "12/23/2020"
+# }
 config["run_type"] = "eche"
 config["root"] = r"C:\INST_hlo"
 
@@ -99,8 +105,9 @@ config["servers"] = dict(
                 "spec_trig": 1,
                 "led": 8,
                 "pump_ref_flush": 3,
-                "doric_led1": 4,
                 "pump_supply": 2,
+                "doric_led1": 4,
+                "doric_wled": 5,
                 "doric_led2": 5,
                 "doric_led3": 6,
                 "doric_led4": 7,
