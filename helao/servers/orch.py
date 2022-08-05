@@ -201,6 +201,14 @@ def makeOrchServ(config, server_key, server_title, description, version, driver_
             await asyncio.sleep(0.01)
         return partial_action
 
+    @app.post(f"/{server_key}/interrupt")
+    async def interrupt(action: Optional[Action] = Body({}, embed=True)):
+        """Stop dispatch loop for planned manual intervention."""
+        active = await app.orch.setup_and_contain_action()
+        await app.orch.stop()
+        finished_action = active.finish()
+        return finished_action.as_dict()
+
     # @app.post("/append_experiment")
     # async def append_experiment(
     #     orchestrator: str = None,
