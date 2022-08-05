@@ -219,9 +219,9 @@ class SM303:
         )
         return False
 
-    def acquire_spec_adv(self, int_time: float, **kwargs):
+    def acquire_spec_adv(self, int_time_ms: float, **kwargs):
         trigset = self.set_trigger_mode(SpecTrigType.off)
-        inttset = self.set_integration_time(int_time)
+        inttset = self.set_integration_time(int_time_ms)
         if trigset and inttset:
             if "n_avg" in kwargs or "fft" in kwargs:
                 _n_avg = kwargs.get("n_avg", 1)
