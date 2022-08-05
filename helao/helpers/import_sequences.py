@@ -50,9 +50,15 @@ def import_sequences(
 
     # now add all user_seq
     if user_sequence_path is not None:
-        files = [os.path.splitext(file)[0] for file in os.listdir(user_sequence_path) if file.endswith(".py")]
-        for file in files:
-            get_seqs(seq_path=user_sequence_path, seq_file=file)
+        userfiles = [os.path.splitext(userfile)[0] for userfile in os.listdir(user_sequence_path) if userfile.endswith(".py")]
+        for userfile in userfiles:
+            get_seqs(seq_path=user_sequence_path, seq_userfile=userfile)
+            print_message(
+                world_config_dict,
+                server_name,
+                f"Pausing for 3 seconds to notify: custom sequences were imported from {os.path.join(user_sequence_path, userfile)}",
+            )
+            time.sleep(3)
 
     print_message(
         world_config_dict,
