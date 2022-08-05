@@ -1,8 +1,8 @@
 __all__ = ["import_experiments"]
 
 import os
+import time
 from importlib.machinery import SourceFileLoader
-
 from helao.helpers.print_message import print_message
 
 
@@ -55,11 +55,17 @@ def import_experiments(
 
     # now add all user_exp
     if user_experiment_path is not None:
-        files = [
-            os.path.splitext(file)[0] for file in os.listdir(user_experiment_path) if file.endswith(".py")
+        userfiles = [
+            os.path.splitext(userfile)[0] for userfile in os.listdir(user_experiment_path) if userfile.endswith(".py")
         ]
-        for file in files:
-            get_exps(exp_path=user_experiment_path, exp_file=file)
+        for userfile in userfiles:
+            get_exps(exp_path=user_experiment_path, exp_userfile=userfile)
+            print_message(
+                world_config_dict,
+                server_name,
+                f"Pausing for 3 seconds to notify: custom experiments were imported from {os.path.join(user_experiment_path, userfile)}",
+            )
+            time.sleep(3)
 
     print_message(
         world_config_dict,
