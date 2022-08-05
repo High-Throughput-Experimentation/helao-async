@@ -34,7 +34,7 @@ async def galil_dyn_endpoints(app=None):
 
     if app.driver.galil_enabled is True:
 
-        dev_axis = app.server_params.get("axis_id",{})
+        dev_axis = app.server_params.get("axis_id", {})
         dev_axisitems = make_str_enum("axis_id", {key: key for key in dev_axis})
 
         if dev_axis:
@@ -341,6 +341,62 @@ async def galil_dyn_endpoints(app=None):
             platexy = list(datadict.get("platexy", [(None, None)])[0])
             active.action.action_params.update({"_platexy": platexy})
             await active.enqueue_data_dflt(datadict=datadict)
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+        @app.post(f"/{servKey}/solid_get_builtin_specref")
+        async def solid_get_builtin_specref(
+            action: Optional[Action] = Body({}, embed=True),
+            action_version: int = 1,
+            specref_code: Optional[int] = 4,
+        ):
+            active = await app.base.setup_and_contain_action()
+
+            refno = 0
+            refxy = app.base.world_cfg["builtin_ref_motorxy"]
+            active.action.action_params.update({"_refno": refno, "_refxy": refxy})
+            await active.enqueue_data_dflt(datadict={"_refno": refno, "_refxy": refxy})
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+        @app.post(f"/{servKey}/solid_get_nearest_specref")
+        async def solid_get_nearest_specref(
+            action: Optional[Action] = Body({}, embed=True),
+            action_version: int = 1,
+            plate_id: Optional[int] = None,
+            sample_no: Optional[int] = None,
+            specref_code: Optional[int] = 4,
+        ):
+            active = await app.base.setup_and_contain_action()
+            datadict = await app.driver.solid_get_platemap(
+                active.action.action_params["plate_id"]
+            )
+            pmdlist = datadict["platemap"][0]
+            pmkeys = ["sample_no", "x", "y"]
+
+            smpd = [
+                d
+                for d in pmdlist
+                if d["sample_no"] == active.action.action_params["sample_no"]
+            ][0]
+            refarr = np.array(
+                [
+                    [
+                        d[k]
+                        for k in pmkeys
+                        if d["code"] == active.action.action_params["specref_code"]
+                    ]
+                    for d in pmdlist
+                ]
+            )
+            refnos, refxys = refarr[0, :], refarr[1:, :]
+            nearest = np.argmin(
+                ((refxys - np.array([smpd["x"], smpd["y"]])) ** 2).sum(axis=1)
+            )
+            refno = refnos[nearest]
+            refxy = list(refxys[nearest])
+            active.action.action_params.update({"_refno": refno, "_refxy": refxy})
+            await active.enqueue_data_dflt(datadict={"_refno": refno, "_refxy": refxy})
             finished_action = await active.finish()
             return finished_action.as_dict()
 
