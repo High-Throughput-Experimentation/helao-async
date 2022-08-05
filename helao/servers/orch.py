@@ -710,21 +710,37 @@ class Orch(Base):
                 return result_action.error_code
 
             if result_action.to_global_params:
-                self.print_message(
-                    f"copying global vars {', '.join(result_action.to_global_params)} back to experiment"
-                )
+                if isinstance(result_action.to_global_params, list):
+                    self.print_message(
+                        f"copying global vars {', '.join(result_action.to_global_params)} back to experiment"
+                    )
+                    for k in result_action.to_global_params:
+                        if k in result_action.action_params:
+                            if (
+                                result_action.action_params[k] is None
+                                and k in self.active_experiment.global_params
+                            ):
+                                self.print_message(f"clearing {k} in global vars")
+                                self.active_experiment.global_params.pop(k)
+                            else:
+                                self.print_message(f"updating {k} in global vars")
+                                self.active_experiment.global_params.update({k: result_action.action_params[k]})
+                elif isinstance(result_action.to_global_params, dict):
+                    self.print_message(
+                        f"copying global vars {', '.join(result_action.to_global_params.keys())} back to experiment"
+                    )
+                    for k1,k2 in result_action.to_global_params.items():
+                        if k1 in result_action.action_params:
+                            if (
+                                result_action.action_params[k1] is None
+                                and k2 in self.active_experiment.global_params
+                            ):
+                                self.print_message(f"clearing {k2} in global vars")
+                                self.active_experiment.global_params.pop(k2)
+                            else:
+                                self.print_message(f"updating {k2} in global vars")
+                                self.active_experiment.global_params.update({k2: result_action.action_params[k1]})
 
-                for k in result_action.to_global_params:
-                    if k in result_action.action_params:
-                        if (
-                            result_action.action_params[k] is None
-                            and k in self.active_experiment.global_params
-                        ):
-                            self.print_message(f"clearing {k} in global vars")
-                            self.active_experiment.global_params.pop(k)
-                        else:
-                            self.print_message(f"updating {k} in global vars")
-                            self.active_experiment.global_params.update({k: result_action.action_params[k]})
                 self.print_message("done copying global vars back to experiment")
 
         return ErrorCodes.none
