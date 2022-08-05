@@ -1088,7 +1088,7 @@ class Galil:
     def reset_plate_transfermatrix(self):
         self.update_plate_transfermatrix(newtransfermatrix=self.dflt_matrix)
 
-    async def solid_get_platemap(self, plate_id: int = None) -> dict:
+    async def solid_get_platemap(self, plate_id: int = None, **kwargs) -> dict:
         return {
             "platemap": await self.unified_db.get_platemap(
                 [SolidSample(plate_id=plate_id)]
