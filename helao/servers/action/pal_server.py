@@ -727,6 +727,30 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
+    @app.post(f"/{servKey}/archive_custom_load_solid", tags=["public_archive"])
+    async def archive_custom_load_solid(
+        action: Optional[Action] = Body({}, embed=True),
+        action_version: int = 1,
+        custom: Optional[dev_customitems] = None,
+        sample_no: Optional[int] = 1,
+        plate_id: Optional[int] = 1,
+    ):
+
+        active = await app.base.setup_and_contain_action(
+            action_abbr="load_sample",
+        )
+        active.action.action_params["load_sample_in"] = SolidSample(**active.action.action_params)
+        loaded, loaded_sample, customs_dict = await app.driver.archive.custom_load(
+            **active.action.action_params
+        )
+        if loaded:
+            await active.append_sample(samples=[loaded_sample], IO="in")
+        await active.enqueue_data_dflt(
+            datadict={"loaded": loaded, "customs_dict": customs_dict}
+        )
+        finished_act = await active.finish()
+        return finished_act.as_dict()
+
     @app.post(f"/{servKey}/archive_custom_load", tags=["public_archive"])
     async def archive_custom_load(
         action: Optional[Action] = Body({}, embed=True),
