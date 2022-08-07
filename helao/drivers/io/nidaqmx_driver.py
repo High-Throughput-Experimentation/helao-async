@@ -341,8 +341,8 @@ class cNIMAX:
                 max_val=150,
                 units=TemperatureUnits.DEG_C,
                 thermocouple_type=TCtype,
-                # cjc_source=CJCSource.CONSTANT_USER_VALUE,
-                # cjc_val = 27,
+                cjc_source=CJCSource.CONSTANT_USER_VALUE,
+                cjc_val = 27,
                 # cjc_source=CJCSource.SCANNABLE_CHANNEL,
                 # cjc_channel= 'CJCtemp',
             )
