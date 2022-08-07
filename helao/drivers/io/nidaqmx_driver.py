@@ -359,6 +359,7 @@ class cNIMAX:
             print(mvalues)
  #           for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
             for i, myname in enumerate(self.config_dict["dev_monitor"]):
+                print(myname)
                 datastore = {myname : mvalues[i]}
                 print(datastore)    
                 await self.base.put_lbuf(datastore)
