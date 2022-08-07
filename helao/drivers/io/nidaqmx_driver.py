@@ -357,8 +357,8 @@ class cNIMAX:
         while self.monitorloop_run:
             mvalues = self.task_monitors.read()
             print(mvalues)
- #           for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
-            for i, myname in enumerate(self.config_dict["dev_monitor"]):
+            for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
+#            for i, myname in enumerate(self.config_dict["dev_monitor"]):
                 print(myname)
                 datastore = {myname : mvalues[i]}
                 print(datastore)    
@@ -755,8 +755,8 @@ class cNIMAX:
         #activeDict = {}
         rtemp = {}
         mdata = {}
-#        for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
-        for i, myname in enumerate(self.config_dict["dev_monitor"]):
+        for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
+#        for i, myname in enumerate(self.config_dict["dev_monitor"]):
             print(myname)
             mdata[i], _ = self.base.get_lbuf(myname) 
             print(mdata[i]) 
