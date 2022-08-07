@@ -339,7 +339,7 @@ class cNIMAX:
                 name_to_assign_to_channel="TC_" + myname,
                 min_val=0,
                 max_val=150,
-                units=10143 #TemperatureUnits.DEG_C,
+                units=10143, #TemperatureUnits.DEG_C,
                 thermocouple_type=TCtype,
                 # cjc_source=CJCSource.CONSTANT_USER_VALUE,
                 # cjc_val = 27,
