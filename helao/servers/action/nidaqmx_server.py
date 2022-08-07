@@ -347,6 +347,15 @@ def makeApp(confPrefix, servKey, helao_root):
 
 #if dev_maintainT:
 
+    @app.post(f"/{servKey}/monloop", tags=["public"])
+    async def monloop(
+       
+    ):
+        # A = await app.base.setup_action()
+        A = await app.driver.monitorloop(
+        )
+
+
     @app.post(f"/{servKey}/heatloop", tags=["public"])
     async def heatloop(
         # action: Optional[Action] = Body({}, embed=True),
