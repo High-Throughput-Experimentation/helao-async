@@ -831,14 +831,13 @@ def ADSS_sub_preCV(
         }
     )
     # apply potential
-    potential = sq.pars.CA_potential - 1.0 * sq.pars.ref_vs_nhe - 0.059 * sq.pars.ph
-    print(f"ADSS_sub_CA potential: {potential}")
+    print(f"ADSS_sub_CA potential: {sq.pars.CA_potential}")
     sq.add_action(
         {
             "action_server": PSTAT_server,
             "action_name": "run_CA",
             "action_params": {
-                "Vval": potential,
+                "Vval": sq.pars.CA_potential,
                 "Tval": sq.pars.CA_duration_sec,
                 "SampleRate": sq.pars.samplerate_sec,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
