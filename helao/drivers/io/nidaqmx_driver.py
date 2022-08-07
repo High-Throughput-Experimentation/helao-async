@@ -325,15 +325,15 @@ class cNIMAX:
         for myname, mydev in self.config_dict["dev_monitor"].items():
             #can add if filter for different types of monitors (other than Temp)
             print(myname)
+            print('typek')
+            TCtype=10073#ThermocoupleType.K,
             if myname == "type-S":
                 print('types')
                 TCtype=10085#ThermocoupleType.S,
             if myname == "type-T":
                 print('typet')
                 TCtype=10086#ThermocoupleType.T,
-            else:
-                print('typek')
-                TCtype=10073#ThermocoupleType.K,
+#            else:
             self.task_monitors.ai_channels.add_ai_thrmcpl_chan(
                 mydev,
                 name_to_assign_to_channel="TC_" + myname,
