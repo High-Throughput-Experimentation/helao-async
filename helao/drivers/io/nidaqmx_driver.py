@@ -356,7 +356,8 @@ class cNIMAX:
         self.task_monitors.start()
         while self.monitorloop_run:
             mvalues = self.task_monitors.read()
-            for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
+ #           for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
+            for i, myname in enumerate(self.config_dict["dev_monitor"]):
                 datastore = {myname : mvalues[i]}
                 await self.base.put_lbuf(datastore)
             time.sleep(1)    
