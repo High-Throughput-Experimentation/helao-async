@@ -326,13 +326,13 @@ class cNIMAX:
             #can add if filter for different types of monitors (other than Temp)
             print(myname)
             print('typek')
-            TCtype=ThermocoupleType.K,
-            if myname == "type-S":
+            TCtype=ThermocoupleType.K
+            if myname == 'type-S':
                 print('types')
-                TCtype=ThermocoupleType.S,
-            if myname == "type-T":
+                TCtype=ThermocoupleType.S
+            if myname == 'type-T':
                 print('typet')
-                TCtype=ThermocoupleType.T,
+                TCtype=ThermocoupleType.T
 #            else:
             self.task_monitors.ai_channels.add_ai_thrmcpl_chan(
                 mydev,
