@@ -15,7 +15,7 @@ __all__ = [
     "ADSS_sub_CA",  #latest
     "ADSS_sub_CV",  #latest
     "ADSS_sub_OCV",   #at beginning of all sequences
-    "ADSS_sub_preCV"  #separate CA before every CV
+    "ADSS_sub_preCV",  #separate CA before every CV
     "ADSS_sub_unloadall_customs",
     "ADSS_sub_load_solid",
     "ADSS_sub_load_liquid",
@@ -762,7 +762,6 @@ def ADSS_sub_OCV(
     experiment: Experiment,
     experiment_version: int = 1,
 ):
-    """last functionality test: 11/29/2021"""
 
     sq = ActionPlanMaker()  # exposes function parameters via sq.pars
 
