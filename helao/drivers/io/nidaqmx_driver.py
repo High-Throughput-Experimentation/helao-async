@@ -360,8 +360,8 @@ class cNIMAX:
  #           for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
             for i, myname in enumerate(self.config_dict["dev_monitor"]):
                 datastore = {myname : mvalues[i]}
-            print(datastore)    
-            await self.base.put_lbuf(datastore)
+                print(datastore)    
+                await self.base.put_lbuf(datastore)
             time.sleep(1)    
 
     def streamIV_callback(
