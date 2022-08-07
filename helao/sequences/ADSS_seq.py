@@ -41,7 +41,7 @@ def ADSS_CV(
 
     pl = ExperimentPlanMaker()
 
-    pl.add_experiment("ADSS_sub_unloadall_customs",dict())
+    pl.add_experiment("ADSS_sub_unloadall_customs",{})
     pl.add_experiment(
         "ADSS_sub_load_solid",
         {
