@@ -751,7 +751,7 @@ class cNIMAX:
         #activeDict = {}
         rtemp = {}
         mdata = {}
-        for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
+        for i, myname, port in enumerate(self.config_dict["dev_monitor"].items()):
             print(myname)
             mdata[i], _ = self.base.get_lbuf(myname) 
             print(mdata[i]) 
