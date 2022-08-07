@@ -324,11 +324,15 @@ class cNIMAX:
         self.task_monitors = nidaqmx.Task()
         for myname, mydev in self.config_dict["dev_monitor"].items():
             #can add if filter for different types of monitors (other than Temp)
+            print(myname)
             if myname == "type-S":
+                print('types')
                 TCtype=ThermocoupleType.S,
             if myname == "type-T":
+                print('typet')
                 TCtype=ThermocoupleType.T,
             else:
+                print('typek')
                 TCtype=ThermocoupleType.K,
             self.task_monitors.ai_channels.add_ai_thrmcpl_chan(
                 mydev,
@@ -352,7 +356,7 @@ class cNIMAX:
         )
 #        self.task_monitors.start()
     async def monitorloop(self):
-        self.create_monitortask()
+        monitors=self.create_monitortask()
         self.task_monitors.start()
         while self.monitorloop_run:
             mvalues = self.task_monitors.read()
