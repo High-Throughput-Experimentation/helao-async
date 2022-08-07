@@ -154,7 +154,9 @@ def ADSS_sub_unloadall_customs(experiment: Experiment):
         {
             "action_server": PAL_server,
             "action_name": "archive_custom_unloadall",
-            "action_params": {},
+            "action_params": {
+                "destroy_liquid": False,
+            },
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         }
     )
