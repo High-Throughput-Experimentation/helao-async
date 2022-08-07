@@ -540,12 +540,14 @@ class cNIMAX:
         loopduration = time.time() - heatloopstarttime
 
         self.Heatloop_run = True
-        mdata = []
+        mdata = {}
                                 
         while (time.time() - heatloopstarttime < duration) and self.Heatloop_run:
             readtempdict = {}
             for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
-                mdata[i], _ = self.base.get_lbuf(myname) 
+                print("myname" + myname)
+                mdata[i], _ = self.base.get_lbuf(myname)
+                print(mdata[i]) 
                 readtempdict[myname] = mdata[i]
             temp_typeS = float(readtempdict["type-S"])
             temp_typeT = float(readtempdict["type-T"])
@@ -748,9 +750,11 @@ class cNIMAX:
     async def read_T(self):
         #activeDict = {}
         rtemp = {}
-        mdata = []
+        mdata = {}
         for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
+            print("myname" + myname)
             mdata[i], _ = self.base.get_lbuf(myname) 
+            print(mdata[i]) 
             rtemp[myname] = mdata[i]
 
 #        rtemp["type-S"] = self.task_tempinst_S.read()
