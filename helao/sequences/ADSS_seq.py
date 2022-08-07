@@ -2,8 +2,8 @@
 Sequence library for ADSS
 """
 
-__all__ = ["ADSS_CV"    #don't forget to always include preCV's
-    "ADSS_CA"           #and OCVs as first experiment of sequences
+__all__ = ["ADSS_CV",    #don't forget to always include preCV's
+    "ADSS_CA",           #and OCVs as first experiment of sequences
     "ADSS_duaribilty_CAv1",
     "ADSS_tray_unload",
     "ADSS_minimum_CA",
