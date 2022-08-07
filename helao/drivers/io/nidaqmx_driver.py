@@ -752,7 +752,7 @@ class cNIMAX:
         rtemp = {}
         mdata = {}
         for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
-            print("myname" + myname)
+            print(myname)
             mdata[i], _ = self.base.get_lbuf(myname) 
             print(mdata[i]) 
             rtemp[myname] = mdata[i]
