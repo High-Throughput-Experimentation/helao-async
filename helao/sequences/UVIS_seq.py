@@ -2,10 +2,7 @@
 Sequence library for ECHE
 """
 
-__all__ = [
-    "UVIS_TR",
-    "UVIS_T"
-]
+__all__ = ["UVIS_T"]
 
 
 from helao.helpers.premodels import ExperimentPlanMaker
@@ -38,12 +35,12 @@ def UVIS_T(
             "reference_mode": reference_mode,
             "solid_custom_position": custom_position,
             "solid_plate_id": plate_id,
-            "solid_sample_no": plate_sample_no_list[0]
-        }
+            "solid_sample_no": plate_sample_no_list[0],
+        },
     )
     # dark ref
     epm.add_experiment(
-        "UVIS_sub_measure",  
+        "UVIS_sub_measure",
         {
             "spec_type": "T",
             "spec_int_time": spec_integration_time_ms,
@@ -59,7 +56,7 @@ def UVIS_T(
     )
     # light ref
     epm.add_experiment(
-        "UVIS_sub_measure",  
+        "UVIS_sub_measure",
         {
             "spec_type": "T",
             "spec_int_time": spec_integration_time_ms,
@@ -86,7 +83,7 @@ def UVIS_T(
         )
         # perform transmission spec
         epm.add_experiment(
-            "UVIS_sub_measure",  
+            "UVIS_sub_measure",
             {
                 "spec_type": "T",
                 "spec_int_time": spec_integration_time_ms,
@@ -108,12 +105,12 @@ def UVIS_T(
             "reference_mode": reference_mode,
             "solid_custom_position": custom_position,
             "solid_plate_id": plate_id,
-            "solid_sample_no": plate_sample_no_list[-1]
-        }
+            "solid_sample_no": plate_sample_no_list[-1],
+        },
     )
     # dark ref
     epm.add_experiment(
-        "UVIS_sub_measure",  
+        "UVIS_sub_measure",
         {
             "spec_type": "T",
             "spec_int_time": spec_integration_time_ms,
@@ -129,7 +126,7 @@ def UVIS_T(
     )
     # light ref
     epm.add_experiment(
-        "UVIS_sub_measure",  
+        "UVIS_sub_measure",
         {
             "spec_type": "T",
             "spec_int_time": spec_integration_time_ms,
@@ -146,4 +143,3 @@ def UVIS_T(
     epm.add_experiment("UVIS_sub_shutdown", {})
 
     return epm.experiment_plan_list  # returns complete experiment list
-
