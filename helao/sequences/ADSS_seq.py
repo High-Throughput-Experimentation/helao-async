@@ -143,7 +143,7 @@ def ADSS_CA(
     pl.add_experiment(
         "ADSS_sub_OCV",
         {
-        },
+        }
     )
 
     pl.add_experiment(
