@@ -156,6 +156,7 @@ def ADSS_CA(
             "CA_duration_sec": CA_duration_sec,
         },
     )
+    return pl.experiment_plan_list  # returns complete experiment list
 
 
 def ADSS_minimum_CV(
