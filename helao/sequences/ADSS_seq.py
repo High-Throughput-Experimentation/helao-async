@@ -93,8 +93,8 @@ def ADSS_CA(
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
-    x_mm: float = 0.0,
-    y_mm: float = 0.0,
+ #   x_mm: float = 0.0,
+ #   y_mm: float = 0.0,
     liquid_custom_position: str = "elec_res1",
     liquid_sample_no: int = 1,
     CA_potential_vsRHE: float = 1.0,
@@ -299,6 +299,7 @@ def ADSS_minimum_CA(
             "aliquot_times_sec": aliquot_times_sec,
         },
     )
+    return pl.experiment_plan_list  # returns complete experiment list
 
 
 

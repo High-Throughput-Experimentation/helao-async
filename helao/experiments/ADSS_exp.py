@@ -759,8 +759,8 @@ def ADSS_sub_CV(
     return apm.action_list  # returns complete action list to orch
 
 def ADSS_sub_OCV(
-    experiment: Experiment,
-    experiment_version: int = 1,
+#    experiment: Experiment,
+#    experiment_version: int = 1,
 ):
 
     sq = ActionPlanMaker()  # exposes function parameters via sq.pars
@@ -787,7 +787,7 @@ def ADSS_sub_OCV(
             "action_name": "run_OCV",
             "action_params": {
                 "Tval": 1,
-                "SampleRate": sq.pars.samplerate_sec,
+                "SampleRate": 0.05,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
