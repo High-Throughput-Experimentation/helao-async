@@ -20,6 +20,7 @@ def UVIS_T(
     spec_n_avg: int = 1,
     spec_int_time_ms: int = 35,
     duration_sec: float = -1,
+    specref_code: int = 1,
     led_type: str = "front",
     led_date: str = "n/a",
     led_names: list = ["doric_wled"],
@@ -35,6 +36,7 @@ def UVIS_T(
             "solid_custom_position": custom_position,
             "solid_plate_id": plate_id,
             "solid_sample_no": plate_sample_no_list[0],
+            "specref_code": specref_code,
         },
     )
     # dark ref
@@ -49,6 +51,7 @@ def UVIS_T(
             "illumination_wavelength": led_wavelengths_nm[0],
             "illumination_intensity": led_intensities_mw[0],
             "illumination_intensity_date": led_date,
+            "illumination_side": led_type,
             "technique_name": "T_UVVIS",
             "run_use": "ref_dark",
         },
@@ -65,6 +68,7 @@ def UVIS_T(
             "illumination_wavelength": led_wavelengths_nm[0],
             "illumination_intensity": led_intensities_mw[0],
             "illumination_intensity_date": led_date,
+            "illumination_side": led_type,
             "technique_name": "T_UVVIS",
             "run_use": "ref_light",
         },
@@ -92,6 +96,7 @@ def UVIS_T(
                 "illumination_wavelength": led_wavelengths_nm[0],
                 "illumination_intensity": led_intensities_mw[0],
                 "illumination_intensity_date": led_date,
+            "illumination_side": led_type,
                 "technique_name": "T_UVVIS",
                 "run_use": "data",
             },
@@ -105,6 +110,7 @@ def UVIS_T(
             "solid_custom_position": custom_position,
             "solid_plate_id": plate_id,
             "solid_sample_no": plate_sample_no_list[-1],
+            "specref_code": specref_code,
         },
     )
     # dark ref
@@ -119,6 +125,7 @@ def UVIS_T(
             "illumination_wavelength": led_wavelengths_nm[0],
             "illumination_intensity": led_intensities_mw[0],
             "illumination_intensity_date": led_date,
+            "illumination_side": led_type,
             "technique_name": "T_UVVIS",
             "run_use": "ref_dark",
         },
@@ -135,6 +142,7 @@ def UVIS_T(
             "illumination_wavelength": led_wavelengths_nm[0],
             "illumination_intensity": led_intensities_mw[0],
             "illumination_intensity_date": led_date,
+            "illumination_side": led_type,
             "technique_name": "T_UVVIS",
             "run_use": "ref_light",
         },
