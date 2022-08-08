@@ -19,6 +19,7 @@ from helao.helpers.config_loader import config_loader
 
 from helao.drivers.io.enum import TriggerType
 
+
 def makeApp(confPrefix, servKey, helao_root):
 
     config = config_loader(confPrefix, helao_root)
@@ -38,19 +39,23 @@ def makeApp(confPrefix, servKey, helao_root):
         action_version: int = 1,
         fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
         int_time_ms: Optional[int] = 35,
-        duration_sec: Optional[float] = -1, # measurements longer than HTTP timeout should use acquire_spec_extrig
+        duration_sec: Optional[
+            float
+        ] = -1,  # measurements longer than HTTP timeout should use acquire_spec_extrig
     ):
         """Acquire one or more spectrum if duration is positive."""
         # app.base.print_message("!!! Starting acquire_spec action.")
         spec_header = {"wl": app.driver.pxwl}
-        active = await app.base.setup_and_contain_action(action_abbr="OPT", hloheader=HloHeaderModel(optional=spec_header))
+        active = await app.base.setup_and_contain_action(
+            action_abbr="OPT", hloheader=HloHeaderModel(optional=spec_header)
+        )
         # app.base.print_message("!!! acquire_spec action is active.")
         starttime = time.time()
         # acquire at least 1 spectrum
         specdict = app.driver.acquire_spec_adv(**active.action.action_params)
         await active.enqueue_data_dflt(datadict=specdict)
         # duration loop
-        while time.time() - starttime < apm.pars.duration_sec:
+        while time.time() - starttime < duration_sec:
             specdict = app.driver.acquire_spec_adv(**active.action.action_params)
             await active.enqueue_data_dflt(datadict=specdict)
         finished_act = await active.finish()
@@ -62,19 +67,23 @@ def makeApp(confPrefix, servKey, helao_root):
         action_version: int = 1,
         fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
         int_time_ms: Optional[int] = 35,
-        duration_sec: Optional[float] = -1, # measurements longer than HTTP timeout should use acquire_spec_extrig
+        duration_sec: Optional[
+            float
+        ] = -1,  # measurements longer than HTTP timeout should use acquire_spec_extrig
         n_avg: Optional[int] = 1,
         fft: Optional[int] = 0,
     ):
         """Acquire N spectra and average."""
         spec_header = {"wl": app.driver.pxwl}
-        active = await app.base.setup_and_contain_action(action_abbr="OPT", hloheader=HloHeaderModel(optional=spec_header))
+        active = await app.base.setup_and_contain_action(
+            action_abbr="OPT", hloheader=HloHeaderModel(optional=spec_header)
+        )
         starttime = time.time()
         # acquire at least 1 spectrum
         specdict = app.driver.acquire_spec_adv(**active.action.action_params)
         await active.enqueue_data_dflt(datadict=specdict)
         # duration loop
-        while time.time() - starttime < apm.pars.duration_sec:
+        while time.time() - starttime < duration_sec:
             specdict = app.driver.acquire_spec_adv(**active.action.action_params)
             await active.enqueue_data_dflt(datadict=specdict)
         finished_act = await active.finish()
