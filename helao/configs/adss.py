@@ -117,7 +117,7 @@ config["servers"] = dict(
                 #'9':'PXI-6284/ai0'
                 '9':'PXI-6284/ai1'  # after rewire for thermocouple connection
                 },
-            dev_temperature ={
+            dev_monitor ={
                 'type-S':'PXI-6289/ai2',
                 'type-T':'PXI-6289/ai3'
                 },   

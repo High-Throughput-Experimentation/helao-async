@@ -42,8 +42,8 @@ def makeApp(confPrefix, servKey, helao_root):
         version=2.0,
         driver_class=cNIMAX,
     )
-    dev_temperature = app.server_params.get("dev_temperature",{})
-    dev_tempitems = make_str_enum("dev_temperature", {key: key for key in dev_temperature})
+    dev_monitor = app.server_params.get("dev_monitor",{})
+    dev_monitoritems = make_str_enum("dev_monitor", {key: key for key in dev_monitor})
 
     dev_heat = app.server_params.get("dev_heat",{})
     dev_heatitems = make_str_enum("dev_heat", {key: key for key in dev_heat})
@@ -301,21 +301,21 @@ def makeApp(confPrefix, servKey, helao_root):
             active_dict = await app.driver.run_cell_IV(A)
             return active_dict
 
-    if dev_temperature:
+    if dev_monitor:
 
         @app.post(f"/readtemp", tags=["public"])
         async def readtemp(
-             action: Optional[Action] = Body({}, embed=True),
-             action_version: int = 1,
+#             action: Optional[Action] = Body({}, embed=True),
+#             action_version: int = 1,
         ):
             """Runs temp measurement.  T and S thermocouples"""
             # A = await app.base.setup_action()
             # A.action_abbr = "getTemp"
             tempread = {}
-            app.driver.create_Ttask()
+            #app.driver.create_Ttask()  #start task separately
             tempread= await app.driver.read_T()
             print(tempread)
-            app.driver.stop_Ttask()
+            #app.driver.stop_Ttask()   #stop task separately
             return tempread
 
     if dev_heat:
@@ -347,6 +347,15 @@ def makeApp(confPrefix, servKey, helao_root):
 
 #if dev_maintainT:
 
+    @app.post(f"/{servKey}/monloop", tags=["public"])
+    async def monloop(
+       
+    ):
+        # A = await app.base.setup_action()
+        A = await app.driver.monitorloop(
+        )
+
+
     @app.post(f"/{servKey}/heatloop", tags=["public"])
     async def heatloop(
         # action: Optional[Action] = Body({}, embed=True),
@@ -359,37 +368,53 @@ def makeApp(confPrefix, servKey, helao_root):
         reservoir2_max_C: float = 85.5,
     ):
         # A = await app.base.setup_action()
-        temp_dict = {}
-        #app.driver.create_Ttask()
-        starttime=time.time()
-        duration = duration_hrs * 60 * 60
-        heatloop_run = True
-        while heatloop_run and ( time.time() - starttime < duration):
-            #need to insert pause. also verify if values are actually being evaluated
-            time.sleep(1)
-            temp_dict = await readtemp()
-            for k,v in temp_dict.items():
-                temp_dict[k] = float(v)
-            print(type(temp_dict['type-S']))
-            print(type(temp_dict['type-T']))
-            if temp_dict['type-S'] < reservoir1_min_C:
-                heater(heater="heater1", on = True)
-            if temp_dict['type-S'] > reservoir1_max_C:
-                heater(heater="heater1", on = False)
-            if temp_dict['type-T'] < reservoir2_min_C:
-                heater(heater="heater2", on = True)
-            if temp_dict['type-T'] > reservoir2_max_C:
-                heater(heater="heater2", on = False)
+        A = await app.driver.Heatloop(
+            duration_h = duration_hrs,
+            reservoir1_min = reservoir1_min_C,
+            reservoir1_max = reservoir1_max_C,
+            reservoir2_min = reservoir2_min_C,
+            reservoir2_max = reservoir2_max_C,
+        )
+#        temp_dict = {}
+#        #app.driver.create_Ttask()
+#        starttime=time.time()
+#        duration = duration_hrs * 60 * 60
+#        heatloop_run = True
+#        while heatloop_run and ( time.time() - starttime < duration):
+#            #need to insert pause. also verify if values are actually being evaluated
+#            time.sleep(1)
+#            temp_dict = await readtemp()
+#            for k,v in temp_dict.items():
+#                temp_dict[k] = float(v)
+#            print(type(temp_dict['type-S']))
+#            print(type(temp_dict['type-T']))
+#            if temp_dict['type-S'] < reservoir1_min_C:
+#                print("heat1on")
+#                heater(heater="heater1", on = True)
+#            if temp_dict['type-S'] > reservoir1_max_C:
+#                print("heat1off")
+#                heater(heater="heater1", on = False)
+#            if temp_dict['type-T'] < reservoir2_min_C:
+#                print("heat2on")
+#                heater(heater="heater2", on = True)
+#            if temp_dict['type-T'] > reservoir2_max_C:
+#                print("heat2off")
+#                heater(heater="heater2", on = False)
             #need way to monitor and break loop
             #ie, heatloop_run = False
 
-        await stop_temp()
-        heater(heater="heater1", on = False)
-        heater(heater="heater2", on = False)
+#        await stop_temp()
+#        heater(heater="heater1", on = False)
+#        heater(heater="heater2", on = False)
 
     @app.post(f"/stoptemp", tags=["public"])
     async def stop_temp():
         app.driver.stop_Ttask()
+
+    @app.post(f"/starttemp", tags=["public"])
+    async def start_temp():
+        app.driver.create_Ttask()
+
 
     @app.post(f"/listtasks", tags=["public"])
     async def list_tasks():
