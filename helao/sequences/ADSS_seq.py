@@ -22,8 +22,8 @@ def ADSS_CV(
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
-    x_mm: float = 0.0,
-    y_mm: float = 0.0,
+#    x_mm: float = 0.0,
+#    y_mm: float = 0.0,
     liquid_custom_position: str = "elec_res1",
     liquid_sample_no: int = 1,
     CV1_Vinit_vsRHE: float = 0.7,
@@ -102,8 +102,6 @@ def ADSS_CA(
     ph: float = 9.53,
     ref_vs_nhe: float = 0.21,
     CA_duration_sec: float = 1320,
-    aliquot_times_sec: List[float] = [60, 600, 1140],
-    OCV_duration_sec: float = 60,
     samplerate_sec: float = 0.05,
 ):
 
