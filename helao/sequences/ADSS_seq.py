@@ -85,7 +85,6 @@ def ADSS_CV(
     )
 
 #    pl.add_experiment("ADSS_sub_shutdown", {})
-    pl.add_experiment("ADSS_sub_wait", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -228,7 +227,6 @@ def ADSS_minimum_CV(
     )
 
 #    pl.add_experiment("ADSS_sub_shutdown", {})
-    pl.add_experiment("ADSS_sub_wait", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
