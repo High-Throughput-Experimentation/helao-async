@@ -759,8 +759,8 @@ def ADSS_sub_CV(
     return apm.action_list  # returns complete action list to orch
 
 def ADSS_sub_OCV(
-#    experiment: Experiment,
-#    experiment_version: int = 1,
+    experiment: Experiment,
+    experiment_version: int = 1,
 ):
 
     sq = ActionPlanMaker()  # exposes function parameters via sq.pars
