@@ -6,7 +6,6 @@ __all__ = ["UVIS_T"]
 
 
 from helao.helpers.premodels import ExperimentPlanMaker
-from helaocore.models.electrolyte import Electrolyte
 
 
 SEQUENCES = __all__
@@ -43,9 +42,9 @@ def UVIS_T(
         "UVIS_sub_measure",
         {
             "spec_type": "T",
-            "spec_int_time": spec_integration_time_ms,
+            "spec_int_time": spec_int_time_ms,
             "spec_n_avg": spec_n_avg,
-            "duration_sec": toggle_illum_time_sec,
+            "duration_sec": duration_sec,
             "toggle_source": led_names[0],
             "illumination_wavelength": led_wavelengths_nm[0],
             "illumination_intensity": led_intensities_mw[0],
@@ -59,9 +58,9 @@ def UVIS_T(
         "UVIS_sub_measure",
         {
             "spec_type": "T",
-            "spec_int_time": spec_integration_time_ms,
+            "spec_int_time": spec_int_time_ms,
             "spec_n_avg": spec_n_avg,
-            "duration_sec": toggle_illum_time_sec,
+            "duration_sec": duration_sec,
             "toggle_source": led_names[0],
             "illumination_wavelength": led_wavelengths_nm[0],
             "illumination_intensity": led_intensities_mw[0],
@@ -86,9 +85,9 @@ def UVIS_T(
             "UVIS_sub_measure",
             {
                 "spec_type": "T",
-                "spec_int_time": spec_integration_time_ms,
+                "spec_int_time": spec_int_time_ms,
                 "spec_n_avg": spec_n_avg,
-                "duration_sec": toggle_illum_time_sec,
+                "duration_sec": duration_sec,
                 "toggle_source": led_names[0],
                 "illumination_wavelength": led_wavelengths_nm[0],
                 "illumination_intensity": led_intensities_mw[0],
@@ -113,9 +112,9 @@ def UVIS_T(
         "UVIS_sub_measure",
         {
             "spec_type": "T",
-            "spec_int_time": spec_integration_time_ms,
+            "spec_int_time": spec_int_time_ms,
             "spec_n_avg": spec_n_avg,
-            "duration_sec": toggle_illum_time_sec,
+            "duration_sec": duration_sec,
             "toggle_source": led_names[0],
             "illumination_wavelength": led_wavelengths_nm[0],
             "illumination_intensity": led_intensities_mw[0],
@@ -129,9 +128,9 @@ def UVIS_T(
         "UVIS_sub_measure",
         {
             "spec_type": "T",
-            "spec_int_time": spec_integration_time_ms,
+            "spec_int_time": spec_int_time_ms,
             "spec_n_avg": spec_n_avg,
-            "duration_sec": toggle_illum_time_sec,
+            "duration_sec": duration_sec,
             "toggle_source": led_names[0],
             "illumination_wavelength": led_wavelengths_nm[0],
             "illumination_intensity": led_intensities_mw[0],
