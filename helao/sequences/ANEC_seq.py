@@ -202,7 +202,7 @@ def ANEC_series_CA(
     return epm.experiment_plan_list
 
 def ANEC_photo_CA(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1,
@@ -215,7 +215,11 @@ def ANEC_photo_CA(
     SampleRate: float = 0.01,
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
-    LED_source_nm: int = 450,
+    led_wavelengths_nm: float = 450.0,
+    led_type: str = "front",
+    led_date: str = "01/01/2000",
+    led_intensities_mw: float = 9.0,
+    led_name_CA: str = "Thorlab_led",
     toolGC: str = "HS 2",
     toolarchive: str = "LS 3",
     volume_ul_GC: int = 300,
@@ -281,6 +285,11 @@ def ANEC_photo_CA(
                 "CA_duration_sec": time,
                 "SampleRate": SampleRate,
                 "IErange": IErange,
+                "illumination_source": led_name_CA,
+                "illumination_wavelength": led_wavelengths_nm,
+                "illumination_intensity": led_intensities_mw,
+                "illumination_intensity_date": led_date,
+                "illumination_side": led_type,
             },
         )
 
