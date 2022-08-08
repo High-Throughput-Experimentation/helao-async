@@ -652,7 +652,7 @@ def ADSS_sub_CA(
             "action_name": "run_CA",
             "action_params": {
                 "Vval": potential,
-                "Tval": sq.pars.CA_duration_sec,
+                "Tval__s": sq.pars.CA_duration_sec,
                 "SampleRate": sq.pars.samplerate_sec,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
@@ -786,7 +786,7 @@ def ADSS_sub_OCV(
             "action_server": PSTAT_server,
             "action_name": "run_OCV",
             "action_params": {
-                "Tval": 1,
+                "Tval__s": 1,
                 "SampleRate": 0.05,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
@@ -838,7 +838,7 @@ def ADSS_sub_preCV(
             "action_name": "run_CA",
             "action_params": {
                 "Vval": sq.pars.CA_potential,
-                "Tval": sq.pars.CA_duration_sec,
+                "Tval__s": sq.pars.CA_duration_sec,
                 "SampleRate": sq.pars.samplerate_sec,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
