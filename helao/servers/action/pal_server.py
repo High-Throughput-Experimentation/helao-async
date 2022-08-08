@@ -21,7 +21,13 @@ from helao.drivers.robot.pal_driver import (
 )
 from helao.drivers.data.archive_driver import ScanDirection, ScanOperator
 
-from helaocore.models.sample import SampleType, LiquidSample, SampleUnion, NoneSample
+from helaocore.models.sample import (
+    SampleType,
+    LiquidSample,
+    SampleUnion,
+    NoneSample,
+    SolidSample,
+)
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
@@ -40,11 +46,11 @@ def makeApp(confPrefix, servKey, helao_root):
         driver_class=PAL,
     )
 
-    _cams = app.server_params.get("cams",{})
+    _cams = app.server_params.get("cams", {})
     # _camsitems = make_str_enum("cams",{key:key for key in _cams.keys()})
 
     if "positions" in app.server_params:
-        dev_custom = app.server_params["positions"].get("custom",{})
+        dev_custom = app.server_params["positions"].get("custom", {})
     else:
         dev_custom = {}
     dev_customitems = make_str_enum(
@@ -739,7 +745,9 @@ def makeApp(confPrefix, servKey, helao_root):
         active = await app.base.setup_and_contain_action(
             action_abbr="load_sample",
         )
-        active.action.action_params["load_sample_in"] = SolidSample(**active.action.action_params)
+        active.action.action_params["load_sample_in"] = SolidSample(
+            **active.action.action_params
+        )
         loaded, loaded_sample, customs_dict = await app.driver.archive.custom_load(
             **active.action.action_params
         )
