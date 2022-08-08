@@ -390,7 +390,7 @@ async def galil_dyn_endpoints(app=None):
             print(refarr[:2])
             refnos, refxys = refarr[:, 0], refarr[:, 1:]
             nearest = np.argmin(
-                ((refxys - np.array([smpd["x"], smpd["y"]])).reshape(1, 2) ** 2).sum(
+                ((refxys - np.array([smpd["x"], smpd["y"]]).reshape(1, 2)) ** 2).sum(
                     axis=1
                 )
             )
