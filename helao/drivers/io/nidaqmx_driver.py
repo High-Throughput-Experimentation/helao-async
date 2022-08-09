@@ -557,17 +557,13 @@ class cNIMAX:
             for myheat, myport in self.dev_heat.items():
                 if myheat == "heater1":
                     if temp_typeS < reservoir1_min:
-                        print('heater1 with Stemplower than min')
                         await self.set_digital_out(do_port=myport, do_name=myheat, on=True)
                     if temp_typeS > reservoir1_max:
-                        print('heater1 with Stemphigher than max')
                         await self.set_digital_out(do_port=myport, do_name=myheat, on=False)
                 if myheat == 'heater2':
                     if temp_typeT < reservoir2_min:
-                        print('heater2 with Ttemplower than min')
                         await self.set_digital_out(do_port=myport, do_name=myheat, on=True)
                     if temp_typeT > reservoir2_max:
-                        print('heater2 with Ttemphigher than max')
                         await self.set_digital_out(do_port=myport, do_name=myheat, on=False)
             time.sleep(1)
         return self.Heatloop_run
