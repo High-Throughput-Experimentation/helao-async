@@ -362,7 +362,8 @@ class cNIMAX:
                 datastore = {myname : mvalues[i]}
 #                print(datastore)    
                 await self.base.put_lbuf(datastore)
-            time.sleep(1)    
+            time.sleep(1)
+            self.monitorloop_run = False   #so it only runs once    
 
     def streamIV_callback(
         self, task_handle, every_n_samples_event_type, number_of_samples, callback_data
@@ -758,7 +759,7 @@ class cNIMAX:
             rtemp[myname] = mdata[i]
 
 #        rtemp["type-S"] = self.task_tempinst_S.read()
- #       print(rtemp)
+        print(rtemp)
 #        rtemp["type-T"] = self.task_tempinst_T.read()        
 #        print(rtemp)
         return rtemp

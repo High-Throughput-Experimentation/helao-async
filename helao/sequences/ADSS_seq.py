@@ -21,8 +21,8 @@ def ADSS_CV(
     sequence_version: int = 1,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
-    plate_sample_no_list: list = [1],   #list instead of map select
-    #solid_sample_no: int = 1,
+#    plate_sample_no_list: list = [1],   #list instead of map select
+    solid_sample_no: int = 1,
 #    x_mm: float = 0.0,
 #    y_mm: float = 0.0,
     liquid_custom_position: str = "elec_res1",
@@ -44,51 +44,51 @@ def ADSS_CV(
 
     pl.add_experiment("ADSS_sub_unloadall_customs",{})
 
-    for solid_sample_no in plate_sample_no_list:
+#    for solid_sample_no in plate_sample_no_list:   #have to indent add expts if used
 
-        pl.add_experiment(
-            "ADSS_sub_load_solid",
-            {
-                "solid_custom_position": solid_custom_position,
-                "solid_plate_id": solid_plate_id,
-                "solid_sample_no": solid_sample_no,
-            },
-        )
-        pl.add_experiment(
-            "ADSS_sub_load_liquid",
-            {
-                "liquid_custom_position": liquid_custom_position,
-                "liquid_sample_no": liquid_sample_no,
-            },
-        )
-        pl.add_experiment(
-            "ADSS_sub_preCV",
-            {
-                "CA_potential": CV1_Vinit_vsRHE
-                    - 1.0 * ref_vs_nhe
-                    - 0.059 * ph,
-                "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
-                "CA_duration_sec": preCV_duration,
-            },
-        )
+    pl.add_experiment(
+        "ADSS_sub_load_solid",
+        {
+            "solid_custom_position": solid_custom_position,
+            "solid_plate_id": solid_plate_id,
+            "solid_sample_no": solid_sample_no,
+        },
+    )
+    pl.add_experiment(
+        "ADSS_sub_load_liquid",
+        {
+            "liquid_custom_position": liquid_custom_position,
+            "liquid_sample_no": liquid_sample_no,
+        },
+    )
+    pl.add_experiment(
+        "ADSS_sub_preCV",
+        {
+            "CA_potential": CV1_Vinit_vsRHE
+                - 1.0 * ref_vs_nhe
+                - 0.059 * ph,
+            "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
+            "CA_duration_sec": preCV_duration,
+        },
+    )
 
-        pl.add_experiment(
-            "ADSS_sub_CV",
-            {
-                "Vinit_vsRHE": CV1_Vinit_vsRHE,
-                "Vapex1_vsRHE": CV1_Vapex1_vsRHE,
-                "Vapex2_vsRHE": CV1_Vapex2_vsRHE,
-                "Vfinal_vsRHE": CV1_Vfinal_vsRHE,
-                "scanrate_voltsec": CV1_scanrate_voltsec,
-                "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
-                "cycles": CV1_cycles,
-                "gamry_i_range": gamry_i_range,
-                "ph": ph,
-                "ref_vs_nhe": ref_vs_nhe,
-            },
-        )
+    pl.add_experiment(
+        "ADSS_sub_CV",
+        {
+            "Vinit_vsRHE": CV1_Vinit_vsRHE,
+            "Vapex1_vsRHE": CV1_Vapex1_vsRHE,
+            "Vapex2_vsRHE": CV1_Vapex2_vsRHE,
+            "Vfinal_vsRHE": CV1_Vfinal_vsRHE,
+            "scanrate_voltsec": CV1_scanrate_voltsec,
+            "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
+            "cycles": CV1_cycles,
+            "gamry_i_range": gamry_i_range,
+            "ph": ph,
+            "ref_vs_nhe": ref_vs_nhe,
+        },
+    )
 
-    #    pl.add_experiment("ADSS_sub_shutdown", {})
+#    pl.add_experiment("ADSS_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
 
@@ -96,8 +96,8 @@ def ADSS_CA(
     sequence_version: int = 1,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
-    plate_sample_no_list: list = [1], #list instead of map select
-#    solid_sample_no: int = 1,
+#    plate_sample_no_list: list = [1], #list instead of map select
+    solid_sample_no: int = 1,
  #   x_mm: float = 0.0,
  #   y_mm: float = 0.0,
     liquid_custom_position: str = "elec_res1",
@@ -128,41 +128,41 @@ def ADSS_CA(
     # )
     pl.add_experiment("ADSS_sub_unloadall_customs",{})
 
-    for solid_sample_no in plate_sample_no_list:
+#    for solid_sample_no in plate_sample_no_list:   #have to indent add expts if used
 
-        pl.add_experiment(
-            "ADSS_sub_load_solid",
-            {
-                "solid_custom_position": solid_custom_position,
-                "solid_plate_id": solid_plate_id,
-                "solid_sample_no": solid_sample_no,
-            },
-        )
-        pl.add_experiment(
-            "ADSS_sub_load_liquid",
-            {
-                "liquid_custom_position": liquid_custom_position,
-                "liquid_sample_no": liquid_sample_no,
-            },
-        )
+    pl.add_experiment(
+        "ADSS_sub_load_solid",
+        {
+            "solid_custom_position": solid_custom_position,
+            "solid_plate_id": solid_plate_id,
+            "solid_sample_no": solid_sample_no,
+        },
+    )
+    pl.add_experiment(
+        "ADSS_sub_load_liquid",
+        {
+            "liquid_custom_position": liquid_custom_position,
+            "liquid_sample_no": liquid_sample_no,
+        },
+    )
 
-        pl.add_experiment(
-            "ADSS_sub_OCV",
-            {
-            }
-        )
+    pl.add_experiment(
+        "ADSS_sub_OCV",
+        {
+        }
+    )
 
-        pl.add_experiment(
-            "ADSS_sub_CA",
-            {
-                "CA_potential": CA_potential_vsRHE,
-                "ph": ph,
-                "ref_vs_nhe": ref_vs_nhe,
-                "samplerate_sec": samplerate_sec,
-                "CA_duration_sec": CA_duration_sec,
-            },
-        )
-    #    pl.add_experiment("ADSS_sub_shutdown", {})
+    pl.add_experiment(
+        "ADSS_sub_CA",
+        {
+            "CA_potential": CA_potential_vsRHE,
+            "ph": ph,
+            "ref_vs_nhe": ref_vs_nhe,
+            "samplerate_sec": samplerate_sec,
+            "CA_duration_sec": CA_duration_sec,
+        },
+    )
+#    pl.add_experiment("ADSS_sub_shutdown", {})
     return pl.experiment_plan_list  # returns complete experiment list
 
 
