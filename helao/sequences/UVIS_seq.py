@@ -44,7 +44,7 @@ def UVIS_T(
         "UVIS_sub_measure",
         {
             "spec_type": "T",
-            "spec_int_time": spec_int_time_ms,
+            "spec_int_time_ms": spec_int_time_ms,
             "spec_n_avg": spec_n_avg,
             "duration_sec": duration_sec,
             "toggle_source": led_names[0],
@@ -61,7 +61,7 @@ def UVIS_T(
         "UVIS_sub_measure",
         {
             "spec_type": "T",
-            "spec_int_time": spec_int_time_ms,
+            "spec_int_time_ms": spec_int_time_ms,
             "spec_n_avg": spec_n_avg,
             "duration_sec": duration_sec,
             "toggle_source": led_names[0],
@@ -89,7 +89,7 @@ def UVIS_T(
             "UVIS_sub_measure",
             {
                 "spec_type": "T",
-                "spec_int_time": spec_int_time_ms,
+                "spec_int_time_ms": spec_int_time_ms,
                 "spec_n_avg": spec_n_avg,
                 "duration_sec": duration_sec,
                 "toggle_source": led_names[0],
@@ -118,7 +118,7 @@ def UVIS_T(
         "UVIS_sub_measure",
         {
             "spec_type": "T",
-            "spec_int_time": spec_int_time_ms,
+            "spec_int_time_ms": spec_int_time_ms,
             "spec_n_avg": spec_n_avg,
             "duration_sec": duration_sec,
             "toggle_source": led_names[0],
@@ -135,7 +135,7 @@ def UVIS_T(
         "UVIS_sub_measure",
         {
             "spec_type": "T",
-            "spec_int_time": spec_int_time_ms,
+            "spec_int_time_ms": spec_int_time_ms,
             "spec_n_avg": spec_n_avg,
             "duration_sec": duration_sec,
             "toggle_source": led_names[0],
