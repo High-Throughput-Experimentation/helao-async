@@ -134,7 +134,7 @@ class cNIMAX:
         self.monitorloop_run = True
 #        myloop.create_task(self.IOloop())  #if loop terminates immediately upon starting due to False, then
                                             #starting it here is useless? maybe have another loop inside it?
-        myloop.create_task(self.monitorloop())
+#        myloop.create_task(self.monitorloop())
 
 
 
@@ -552,15 +552,15 @@ class cNIMAX:
             for i, myname in enumerate(self.config_dict["dev_monitor"]):
                 mdata[i], _ = self.base.get_lbuf(myname)
                 readtempdict[myname] = mdata[i]
-            temp_typeS = float(readtempdict["type-S"])
-            temp_typeT = float(readtempdict["type-T"])
+            temp_typeS = float(readtempdict['type-S'])
+            temp_typeT = float(readtempdict['type-T'])
             for myheat, myport in self.dev_heat.items():
                 if myheat == "heater1":
                     if temp_typeS < reservoir1_min:
                         await self.set_digital_out(do_port=myport, do_name=myheat, on=True)
                     if temp_typeS > reservoir1_max:
                         await self.set_digital_out(do_port=myport, do_name=myheat, on=False)
-                if myheat == "heater2":
+                if myheat == 'heater2':
                     if temp_typeT < reservoir2_min:
                         await self.set_digital_out(do_port=myport, do_name=myheat, on=True)
                     if temp_typeT > reservoir2_max:
