@@ -305,17 +305,11 @@ def makeApp(confPrefix, servKey, helao_root):
 
         @app.post(f"/readtemp", tags=["public"])
         async def readtemp(
-#             action: Optional[Action] = Body({}, embed=True),
-#             action_version: int = 1,
         ):
             """Runs temp measurement.  T and S thermocouples"""
-            # A = await app.base.setup_action()
-            # A.action_abbr = "getTemp"
             tempread = {}
-            #app.driver.create_Ttask()  #start task separately
             tempread= await app.driver.read_T()
             print(tempread)
-            #app.driver.stop_Ttask()   #stop task separately
             return tempread
 
     if dev_heat:
@@ -407,19 +401,14 @@ def makeApp(confPrefix, servKey, helao_root):
 #        heater(heater="heater1", on = False)
 #        heater(heater="heater2", on = False)
 
-    @app.post(f"/stoptemp", tags=["public"])
-    async def stop_temp():
-        app.driver.stop_Ttask()
+    # @app.post(f"/stoptemp", tags=["public"])
+    # async def stop_temp():
+    #     app.driver.stop_Ttask()
 
-    @app.post(f"/starttemp", tags=["public"])
-    async def start_temp():
-        app.driver.create_Ttask()
+    # @app.post(f"/starttemp", tags=["public"])
+    # async def start_temp():
+    #     app.driver.create_Ttask()
 
-
-    @app.post(f"/listtasks", tags=["public"])
-    async def list_tasks():
-        list = app.driver.tasklist()
-        return list
 
 
     @app.post(f"/{servKey}/stop", tags=["public"])
