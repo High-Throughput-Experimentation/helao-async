@@ -356,11 +356,11 @@ class cNIMAX:
         self.task_monitors.start()
         while self.monitorloop_run:
             mvalues = self.task_monitors.read()
-            print(mvalues)
+#            print(mvalues)
             for i, myname in enumerate(self.config_dict["dev_monitor"]):
-                print(myname)
+#                print(myname)
                 datastore = {myname : mvalues[i]}
-                print(datastore)    
+#                print(datastore)    
                 await self.base.put_lbuf(datastore)
             time.sleep(1)    
 
@@ -388,7 +388,7 @@ class cNIMAX:
                 dataV = self.task_6284cellvoltage.read(
                     number_of_samples_per_channel=number_of_samples
                 )
-                for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
+                for i, myname in enumerate(self.config_dict["dev_monitor"]):
                     mdata[i], _ = self.base.get_lbuf(myname)    
 
                 # this is also what NImax seems to do
@@ -547,10 +547,8 @@ class cNIMAX:
                                 
         while (time.time() - heatloopstarttime < duration) and self.Heatloop_run:
             readtempdict = {}
-            for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
-                print("myname" + myname)
+            for i, myname in enumerate(self.config_dict["dev_monitor"]):
                 mdata[i], _ = self.base.get_lbuf(myname)
-                print(mdata[i]) 
                 readtempdict[myname] = mdata[i]
             temp_typeS = float(readtempdict["type-S"])
             temp_typeT = float(readtempdict["type-T"])
@@ -754,9 +752,7 @@ class cNIMAX:
         #activeDict = {}
         rtemp = {}
         mdata = {}
-        for i, myname in enumerate(self.config_dict["dev_monitor"].items()):
-#        for i, myname in enumerate(self.config_dict["dev_monitor"]):
-            print(myname)
+        for i, myname in enumerate(self.config_dict["dev_monitor"]):
             mdata[i], _ = self.base.get_lbuf(myname) 
             print(mdata[i]) 
             rtemp[myname] = mdata[i]
