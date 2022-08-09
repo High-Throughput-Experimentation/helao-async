@@ -593,7 +593,7 @@ def ANEC_sub_CA(
 
 def ANEC_sub_photo_CA(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     WE_potential__V: Optional[float] = 0.0,
     WE_versus: Optional[str] = "ref",
     CA_duration_sec: Optional[float] = 0.1,
@@ -602,6 +602,11 @@ def ANEC_sub_photo_CA(
     ref_offset__V: Optional[float] = 0.0,
     ref_type: Optional[str] = "leakless",
     pH: Optional[float] = 6.8,
+    illumination_source: Optional[str] = "Thorlab_led",
+    illumination_wavelength: Optional[float] = 450.0,
+    illumination_intensity: Optional[float] = 9.0,
+    illumination_intensity_date: Optional[str] = "n/a",
+    illumination_side: Optional[str] = "front",
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if apm.pars.WE_versus == "ref":

@@ -348,7 +348,7 @@ async def galil_dyn_endpoints(app=None):
         async def solid_get_builtin_specref(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
-            specref_code: Optional[int] = 4,
+            specref_code: Optional[int] = 1,
         ):
             active = await app.base.setup_and_contain_action()
 
@@ -365,7 +365,7 @@ async def galil_dyn_endpoints(app=None):
             action_version: int = 1,
             plate_id: Optional[int] = None,
             sample_no: Optional[int] = None,
-            specref_code: Optional[int] = 4,
+            specref_code: Optional[int] = 1,
         ):
             active = await app.base.setup_and_contain_action()
             datadict = await app.driver.solid_get_platemap(
@@ -381,17 +381,18 @@ async def galil_dyn_endpoints(app=None):
             ][0]
             refarr = np.array(
                 [
-                    [
-                        d[k]
-                        for k in pmkeys
-                        if d["code"] == active.action.action_params["specref_code"]
-                    ]
+                    [d[k] for k in pmkeys]
                     for d in pmdlist
+                    if d["code"] == active.action.action_params["specref_code"]
                 ]
             )
-            refnos, refxys = refarr[0, :], refarr[1:, :]
+            print(refarr.shape)
+            print(refarr[:2])
+            refnos, refxys = refarr[:, 0], refarr[:, 1:]
             nearest = np.argmin(
-                ((refxys - np.array([smpd["x"], smpd["y"]])) ** 2).sum(axis=1)
+                ((refxys - np.array([smpd["x"], smpd["y"]]).reshape(1, 2)) ** 2).sum(
+                    axis=1
+                )
             )
             refno = refnos[nearest]
             refxy = list(refxys[nearest])
