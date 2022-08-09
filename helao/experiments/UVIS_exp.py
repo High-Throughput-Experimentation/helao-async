@@ -11,26 +11,23 @@ __all__ = [
     "UVIS_sub_movetosample",
     "UVIS_sub_relmove",
     "UVIS_sub_measure",
+    "UVIS_sub_setup_ref",
 ]
 
 
 from typing import Optional  # , List, Union
 from socket import gethostname
 
-from helaocore.models.action_start_condition import ActionStartCondition
 from helaocore.models.sample import SolidSample  # , LiquidSample
 from helaocore.models.machine import MachineModel as MM
 from helaocore.models.process_contrib import ProcessContrib
 from helaocore.models.run_use import RunUse
 
-# from helaocore.models.electrolyte import Electrolyte
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker  # , Action
 from helao.drivers.motion.enum import MoveModes, TransformationModes
 from helao.drivers.io.enum import TriggerType
 from helao.drivers.spec.enum import SpecType
-
-# from helao.drivers.robot.enum import PALtools, Spacingmethod
 
 
 EXPERIMENTS = __all__
@@ -194,6 +191,7 @@ def UVIS_sub_measure(
     illumination_wavelength: Optional[float] = -1,
     illumination_intensity: Optional[float] = -1,
     illumination_intensity_date: Optional[str] = "n/a",
+    illumination_side: Optional[str] = "front",
     technique_name: Optional[str] = "T_UVVIS",
     run_use: Optional[RunUse] = "data",
     comment: Optional[str] = "",
@@ -260,7 +258,7 @@ def UVIS_sub_setup_ref(
 ):
     """Determine initial and final reference measurements and move to position."""
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    if reference_sample_type == "internal":
+    if apm.pars.reference_sample_type == "internal":
         apm.add(
             MOTOR_server,
             "solid_get_nearest_specref",
@@ -280,7 +278,7 @@ def UVIS_sub_setup_ref(
             },
             from_global_params={"_refno": "sample_no"}
         )
-    elif reference_sample_type == "builtin":
+    elif apm.pars.reference_sample_type == "builtin":
         apm.add(
             MOTOR_server,
             "solid_get_builtin_specref", {},
@@ -295,7 +293,7 @@ def UVIS_sub_setup_ref(
             },
             from_global_params={"_refno": "sample_no"}
         )
-    elif reference_sample_type == "blank":
+    elif apm.pars.reference_sample_type == "blank":
         apm.add(
             ORCH_server,
             "interrupt"
