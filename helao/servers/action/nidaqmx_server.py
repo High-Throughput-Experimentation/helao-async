@@ -341,7 +341,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
 #if dev_maintainT:
 
-    @app.post(f"/{servKey}/monloop", tags=["public"])
+    @app.post(f"/monloop", tags=["public"])
     async def monloop(
        
     ):
@@ -409,6 +409,13 @@ def makeApp(confPrefix, servKey, helao_root):
     # async def start_temp():
     #     app.driver.create_Ttask()
 
+
+
+    @app.post(f"/monloop", tags=["public"])
+    async def monloopstop(
+       
+    ):
+        app.driver.stop_monitor()
 
 
     @app.post(f"/{servKey}/stop", tags=["public"])
