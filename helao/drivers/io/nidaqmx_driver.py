@@ -134,7 +134,7 @@ class cNIMAX:
         self.monitorloop_run = True
 #        myloop.create_task(self.IOloop())  #if loop terminates immediately upon starting due to False, then
                                             #starting it here is useless? maybe have another loop inside it?
-#        myloop.create_task(self.monitorloop())
+        myloop.create_task(self.monitorloop())
 
 
 
