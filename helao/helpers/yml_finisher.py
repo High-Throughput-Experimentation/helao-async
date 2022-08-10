@@ -60,13 +60,20 @@ async def move_dir(
         print_msg = lambda msg: print_message({}, "yml_finisher", msg, info=True)
 
     obj_type = hobj.__class__.__name__.lower()
+    dest_dir = "RUNS_FINISHED"
     save_dir = base.helaodirs.save_root.__str__()
     if obj_type == "action":
         yml_dir = os.path.join(save_dir, hobj.get_action_dir())
+        if hobj.manual_action:
+            dest_dir = "RUNS_DIAG"
     elif obj_type == "experiment":
         yml_dir = os.path.join(save_dir, hobj.get_experiment_dir())
+        if hobj.experiment_name == "MANUAL":
+            dest_dir = "RUNS_DIAG"
     elif obj_type == "sequence":
         yml_dir = os.path.join(save_dir, hobj.get_sequence_dir())
+        if hobj.sequence_name == "manual_seq":
+            dest_dir = "RUNS_DIAG"
     else:
         yml_dir = None
         print_msg(
@@ -74,7 +81,7 @@ async def move_dir(
         )
         return {}
 
-    new_dir = os.path.join(yml_dir.replace("RUNS_ACTIVE", "RUNS_FINISHED"))
+    new_dir = os.path.join(yml_dir.replace("RUNS_ACTIVE", dest_dir))
     await aiofiles.os.makedirs(new_dir, exist_ok=True)
 
     copy_success = False
@@ -82,7 +89,7 @@ async def move_dir(
     src_list = glob(os.path.join(yml_dir, "*"))
 
     while (not copy_success) and copy_retries <= 60:
-        dst_list = [p.replace("RUNS_ACTIVE", "RUNS_FINISHED") for p in src_list]
+        dst_list = [p.replace("RUNS_ACTIVE", dest_dir) for p in src_list]
         _ = await asyncio.gather(
             *[aioshutil.copy(src, dst) for src, dst in zip(src_list, dst_list)],
             return_exceptions=True,
