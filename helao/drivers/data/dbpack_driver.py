@@ -749,6 +749,15 @@ class DBPack:
                 f"{yml_type} {yml_path_str} is still in progress", info=True
             )
             return {}
+        if "RUNS_DIAG" in yml_path_str:
+            if yml_type == YmlType.sequence:
+                zip_target = hpth.parent.parent.joinpath(f"{hpth.parent.name}.zip")
+                self.base.print_message(
+                    f"Manual sequence has finished, creating zip: {zip_target.__str__()}"
+                )
+                zip_dir(hpth.parent, zip_target)
+                self.cleanup_root()
+            return {}
         hyml = ymlmap[yml_type](hpth, uuid_test=self.testing_uuid_dict)
         self.base.print_message(f"Loaded {yml_type} from {yml_path_str}", info=True)
         ops = YmlOps(self, hyml)
