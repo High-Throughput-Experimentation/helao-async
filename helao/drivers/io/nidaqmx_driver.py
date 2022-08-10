@@ -363,7 +363,7 @@ class cNIMAX:
 #                print(datastore)    
                 await self.base.put_lbuf(datastore)
             await asyncio.sleep(1)
-            self.monitorloop_run = False   #so it only runs once
+            #self.monitorloop_run = False   #so it only runs once
         self.task_monitors.close()    
 
     def streamIV_callback(
