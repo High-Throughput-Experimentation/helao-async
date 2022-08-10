@@ -20,10 +20,11 @@ async def yml_finisher(yml_path: str, base: object = None, retry: int = 3):
     ymld = yaml.load(Path(yml_path))
     yml_type = ymld["file_type"]
 
-    if base is not None:
-        print_msg = lambda msg: base.print_message(msg, info=True)
-    else:
-        print_msg = lambda msg: print_message({}, "yml_finisher", msg, info=True)
+    def print_msg(msg):
+        if base is not None:
+            base.print_message(msg, info=True)
+        else:
+            print_message({}, "yml_finisher", msg, info=True)
 
     if "DB" in base.world_cfg["servers"].keys():
         dbp_host = base.world_cfg["servers"]["DB"]["host"]
