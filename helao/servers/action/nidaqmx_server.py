@@ -411,7 +411,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
 
 
-    @app.post(f"/monloop", tags=["public"])
+    @app.post(f"/stopmonloop", tags=["public"])
     async def monloopstop(
        
     ):
