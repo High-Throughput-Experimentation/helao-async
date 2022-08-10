@@ -764,7 +764,7 @@ class cNIMAX:
 
     def stop_monitor(self):
         """stops instantaneous temp measurement"""
-        self.Heatloop_run = False
+        self.monitorloop_run = False
         
 
     async def stop(self):
