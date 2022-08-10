@@ -362,8 +362,9 @@ class cNIMAX:
                 datastore = {myname : mvalues[i]}
 #                print(datastore)    
                 await self.base.put_lbuf(datastore)
-            time.sleep(1)
-            self.monitorloop_run = False   #so it only runs once    
+            await asyncio.sleep(1)
+            self.monitorloop_run = False   #so it only runs once
+        self.task_monitors.close()    
 
     def streamIV_callback(
         self, task_handle, every_n_samples_event_type, number_of_samples, callback_data
@@ -542,7 +543,6 @@ class cNIMAX:
         temp task. """
         duration = duration_h * 3600
         heatloopstarttime = time.time()       
-        loopduration = time.time() - heatloopstarttime
 
         self.Heatloop_run = True
         mdata = {}
@@ -565,7 +565,7 @@ class cNIMAX:
                         await self.set_digital_out(do_port=myport, do_name=myheat, on=True)
                     if temp_typeT > reservoir2_max:
                         await self.set_digital_out(do_port=myport, do_name=myheat, on=False)
-            time.sleep(1)
+            await asyncio.sleep(1)
         return self.Heatloop_run
 
     async def set_digital_out(
