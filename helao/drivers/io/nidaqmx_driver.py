@@ -566,7 +566,9 @@ class cNIMAX:
                     if temp_typeT > reservoir2_max:
                         await self.set_digital_out(do_port=myport, do_name=myheat, on=False)
             await asyncio.sleep(1)
-        return self.Heatloop_run
+        await self.set_digital_out(do_port=myport, do_name=myheat, on=False)
+        await self.set_digital_out(do_port=myport, do_name=myheat, on=False)    
+        return self.Heatloop_run  #indicates whether heatloop terminated via time duration or stop
 
     async def set_digital_out(
         self, do_port=None, do_name: str = "", on: bool = False, *args, **kwargs
@@ -766,6 +768,9 @@ class cNIMAX:
         """stops instantaneous temp measurement"""
         self.monitorloop_run = False
         
+    def stop_heatloop(self):
+        """stops instantaneous temp measurement"""
+        self.Heatloop_run = False
 
     async def stop(self):
         """stops measurement, writes all data and returns from meas loop"""
@@ -815,5 +820,6 @@ class cNIMAX:
             time.sleep(1)
             retries += 1
         # stop IOloop and monitorloop
+        self.Heatloop_run = False
         self.monitorloop_run = False
         self.IOloop_run = False

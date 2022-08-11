@@ -417,6 +417,9 @@ def makeApp(confPrefix, servKey, helao_root):
     ):
         app.driver.stop_monitor()
 
+    @app.post(f"/stopheatloop", tags=["public"])
+    async def heatloopstop( ):
+        app.driver.stop_heatloop()
 
     @app.post(f"/{servKey}/stop", tags=["public"])
     async def stop(
