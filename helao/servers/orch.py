@@ -507,7 +507,7 @@ class Orch(Base):
 
         # now push it to the interrupt_q
         await self.interrupt_q.put(self.orchstatusmodel)
-        await self.globstat_q.put(self.orchstatusmodel.clean_dict())
+        await self.globstat_q.put(self.orchstatusmodel.as_json())
 
         return True
 
