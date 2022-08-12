@@ -259,7 +259,7 @@ def makeOrchServ(
     @app.post("/last_experiment", tags=["private"])
     def last_experiment():
         """Return the last experiment."""
-        return app.orch.get_action_group(last=True)
+        return app.orch.get_experiment(last=True)
 
     @app.post("/list_actions", tags=["private"])
     def list_actions():
@@ -274,7 +274,7 @@ def makeOrchServ(
     @app.post("/endpoints", tags=["private"])
     def get_all_urls():
         """Return a list of all endpoints on this server."""
-        return app.orch.get_endpoint_urls(app)
+        return app.orch.get_endpoint_urls()
 
     @app.post("/shutdown", tags=["private"])
     def post_shutdown():
@@ -365,7 +365,7 @@ class Orch(Base):
         
         self.globstat_q = MultisubscriberQueue()
         self.globstat_clients = set()
-        self.globstat_broadcaster = None
+        self.globstat_broadcaster = asyncio.create_task(self.globstat_broadcast_task())
 
     def start_operator(self):
         servHost = self.server_cfg["host"]
@@ -507,8 +507,28 @@ class Orch(Base):
 
         # now push it to the interrupt_q
         await self.interrupt_q.put(self.orchstatusmodel)
+        await self.globstat_q.put(self.orchstatusmodel.clean_dict())
 
         return True
+
+    async def ws_globstat(self, websocket: WebSocket):
+        """Subscribe to global status queue and send messages to websocket client."""
+        self.print_message("got new global status subscriber")
+        await websocket.accept()
+        try:
+            async for globstat_msg in self.globstat_q.subscribe():
+                await websocket.send_text(json.dumps(globstat_msg.json_dict()))
+        except Exception as e:
+            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            self.print_message(
+                f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
+                error=True,
+            )
+            
+    async def globstat_broadcast_task(self):
+        """Consume globstat_q. Does nothing for now."""
+        async for _ in self.globstat_q.subscribe():
+            await asyncio.sleep(0.01)
 
     def unpack_sequence(
         self, sequence_name, sequence_params
