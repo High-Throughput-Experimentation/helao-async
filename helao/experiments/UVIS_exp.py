@@ -254,7 +254,7 @@ def UVIS_sub_setup_ref(
     solid_custom_position: Optional[str] = "cell1_we",
     solid_plate_id: int = 1,
     solid_sample_no: int = 2,
-    specref_code: int = 4,
+    specref_code: int = 1,
 ):
     """Determine initial and final reference measurements and move to position."""
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
