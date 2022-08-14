@@ -114,8 +114,8 @@ class cNIMAX:
             "cell5",
             "cell6",
             "cell7",
-    #        "cell8",   #removed from cell list due to use of NI lines
-    #        "cell9",   #can add back in if rewiring added to box for heaters
+            "cell8",   #removed from cell list due to use of NI lines   ---- restored 8/14/2022
+            "cell9",   #can add back in if rewiring added to box for heaters
 
         ]
         self.file_conn_keys = []
@@ -403,7 +403,6 @@ class cNIMAX:
                 self.IVtimeoffset += number_of_samples / self.samplingrate
 
                 data_dict = {}
-                #T and S temp data out first is 8 when 7 cells (due to wiring) would be 10 if 9
                 for i, FIFO_cell_key in enumerate(self.FIFO_cell_keys):
                     data_dict[self.file_conn_keys[i]] = {
                         f"{self.FIFO_column_headings[0]}": time,
@@ -667,7 +666,7 @@ class cNIMAX:
 
                 for i, FIFO_cell_key in enumerate(self.FIFO_cell_keys):
                     if self.samples_in is not None:
-                        if len(self.samples_in) == 7:   #number of cells
+                        if len(self.samples_in) == 9:   #number of cells   ----restored to 9
                             file_sample_list.append([self.samples_in[i]])
                             sample_label = [self.samples_in[i].get_global_label()]
                         else:
