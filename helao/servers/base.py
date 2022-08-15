@@ -1782,6 +1782,6 @@ class Base(object):
                 # sequence and experiment meta files for
                 # manual operation
                 # create and write exp file for manual action
-                await self.base.write_exp(exp)
+                await self.base.write_exp(exp, manual=True)
                 # create and write seq file for manual action
-                await self.base.write_seq(exp)
+                await self.base.write_seq(exp, manual=True)
