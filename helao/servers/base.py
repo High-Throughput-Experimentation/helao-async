@@ -788,7 +788,7 @@ class Base(object):
     async def write_exp(self, experiment, manual=False):
         exp_dict = experiment.get_exp().clean_dict()
         if manual:
-            save_root = self.helaodirs.save_root.replace("ACTIVE", "DIAG")
+            save_root = str(self.helaodirs.save_root).replace("ACTIVE", "DIAG")
         else:
             save_root = self.helaodirs.save_root
         output_path = os.path.join(save_root, experiment.get_experiment_dir())
@@ -813,7 +813,7 @@ class Base(object):
         seq_dict = sequence.get_seq().clean_dict()
         sequence_dir = sequence.get_sequence_dir()
         if manual:
-            save_root = self.helaodirs.save_root.replace("ACTIVE", "DIAG")
+            save_root = str(self.helaodirs.save_root).replace("ACTIVE", "DIAG")
         else:
             save_root = self.helaodirs.save_root
         output_path = os.path.join(save_root, sequence_dir)
