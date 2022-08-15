@@ -785,7 +785,7 @@ class Base(object):
                 info=True,
             )
 
-    async def write_exp(self, experiment):
+    async def write_exp(self, experiment, manual=False):
         exp_dict = experiment.get_exp().clean_dict()
         output_path = os.path.join(
             self.helaodirs.save_root, experiment.get_experiment_dir()
@@ -806,8 +806,11 @@ class Base(object):
             if not output_str.endswith("\n"):
                 output_str += "\n"
             await f.write(output_str)
+        
+        if manual:
+            await self.base.aloop.create_task(move_dir(experiment, base=self.base))
 
-    async def write_seq(self, sequence):
+    async def write_seq(self, sequence, manual=False):
         seq_dict = sequence.get_seq().clean_dict()
         sequence_dir = sequence.get_sequence_dir()
         output_path = os.path.join(self.helaodirs.save_root, sequence_dir)
@@ -827,6 +830,9 @@ class Base(object):
             if not output_str.endswith("\n"):
                 output_str += "\n"
             await f.write(output_str)
+
+        if manual:
+            await self.base.aloop.create_task(move_dir(sequence, base=self.base))
 
     def new_file_conn_key(self, key: str) -> UUID:
         # return shortuuid.decode(key)
@@ -1775,7 +1781,7 @@ class Base(object):
                 # this will write the correct
                 # sequence and experiment meta files for
                 # manual operation
-                # create and write seq file for manual action
-                await self.base.write_seq(exp)
                 # create and write exp file for manual action
                 await self.base.write_exp(exp)
+                # create and write seq file for manual action
+                await self.base.write_seq(exp)
