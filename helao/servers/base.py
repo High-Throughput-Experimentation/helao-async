@@ -954,11 +954,11 @@ class Base(object):
                 )
                 await self.update_act_file()
 
-                if self.action.manual_action:
-                    # create and write seq file for manual action
-                    await self.base.write_seq(self.action)
-                    # create and write exp file for manual action
-                    await self.base.write_exp(self.action)
+                # if self.action.manual_action:
+                #     # create and write seq file for manual action
+                #     await self.base.write_seq(self.action)
+                #     # create and write exp file for manual action
+                #     await self.base.write_exp(self.action)
 
             self.base.print_message(
                 "init active: sending active data_stream_status package", info=True
