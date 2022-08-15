@@ -808,7 +808,7 @@ class Base(object):
             await f.write(output_str)
         
         if manual:
-            await self.base.aloop.create_task(move_dir(experiment, base=self.base))
+            await self.aloop.create_task(move_dir(experiment, base=self))
 
     async def write_seq(self, sequence, manual=False):
         seq_dict = sequence.get_seq().clean_dict()
@@ -832,7 +832,7 @@ class Base(object):
             await f.write(output_str)
 
         if manual:
-            await self.base.aloop.create_task(move_dir(sequence, base=self.base))
+            await self.aloop.create_task(move_dir(sequence, base=self))
 
     def new_file_conn_key(self, key: str) -> UUID:
         # return shortuuid.decode(key)
