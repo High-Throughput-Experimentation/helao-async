@@ -11,8 +11,20 @@ import aioshutil
 import aiofiles
 from ruamel.yaml import YAML
 
+from helaocore.models.process import ProcessModel
+from helaocore.models.action import ActionModel
+from helaocore.models.experiment import ExperimentModel
+from helaocore.models.sequence import SequenceModel
+
 from helao.helpers.print_message import print_message
 from helao.helpers.premodels import Sequence, Experiment, Action
+
+modmap = {
+    "action": ActionModel,
+    "experiment": ExperimentModel,
+    "sequence": SequenceModel,
+    "process": ProcessModel,
+}
 
 
 async def yml_finisher(yml_path: str, base: object = None, retry: int = 3):
@@ -56,21 +68,28 @@ async def move_dir(
     """Move directory from RUNS_ACTIVE to RUNS_FINISHED."""
 
     if base is not None:
-        print_msg = lambda msg: base.print_message(msg, info=True)
+        def print_msg(msg):
+            base.print_message(msg, info=True)
     else:
-        print_msg = lambda msg: print_message({}, "yml_finisher", msg, info=True)
+        def print_msg(msg):
+            print_message({}, "yml_finisher", msg, info=True)
 
     obj_type = hobj.__class__.__name__.lower()
     dest_dir = "RUNS_FINISHED"
     save_dir = base.helaodirs.save_root.__str__()
+
+    is_manual = False
+    
     if obj_type == "action":
         yml_dir = os.path.join(save_dir, hobj.get_action_dir())
         if hobj.manual_action:
             dest_dir = "RUNS_DIAG"
+            is_manual = True
     elif obj_type == "experiment":
         yml_dir = os.path.join(save_dir, hobj.get_experiment_dir())
         if hobj.experiment_name == "MANUAL":
             dest_dir = "RUNS_DIAG"
+            is_manual = True
     elif obj_type == "sequence":
         yml_dir = os.path.join(save_dir, hobj.get_sequence_dir())
         if hobj.sequence_name == "manual_seq":
@@ -136,3 +155,15 @@ async def move_dir(
                 print("\n".join(rm_list))
                 rm_retries += 1
             await asyncio.sleep(retry_delay)
+        
+        # propagate to experiment and sequence yamls if manual action
+        if is_manual:
+            parent_dir = os.path.dirname(yml_dir)
+            parent_yml = glob(os.path.join(parent_dir, "*.yml"))
+            if parent_yml:
+                yaml = YAML(typ="safe")
+                parent_dict = yaml.load(parent_yml)
+                file_type = parent_dict["file_type"]
+                parent_obj = modmap[file_type](**parent_dict)
+                await move_dir(parent_obj, base, retry_delay)
+
