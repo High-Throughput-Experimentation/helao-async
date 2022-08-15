@@ -787,9 +787,11 @@ class Base(object):
 
     async def write_exp(self, experiment, manual=False):
         exp_dict = experiment.get_exp().clean_dict()
-        output_path = os.path.join(
-            self.helaodirs.save_root, experiment.get_experiment_dir()
-        )
+        if manual:
+            save_root = self.helaodirs.save_root.replace("ACTIVE", "DIAG")
+        else:
+            save_root = self.helaodirs.save_root
+        output_path = os.path.join(save_root, experiment.get_experiment_dir())
         output_file = os.path.join(
             output_path,
             f"{experiment.experiment_timestamp.strftime('%Y%m%d.%H%M%S%f')}.yml",
@@ -806,14 +808,15 @@ class Base(object):
             if not output_str.endswith("\n"):
                 output_str += "\n"
             await f.write(output_str)
-        
-        if manual:
-            await self.aloop.create_task(move_dir(experiment, base=self))
 
     async def write_seq(self, sequence, manual=False):
         seq_dict = sequence.get_seq().clean_dict()
         sequence_dir = sequence.get_sequence_dir()
-        output_path = os.path.join(self.helaodirs.save_root, sequence_dir)
+        if manual:
+            save_root = self.helaodirs.save_root.replace("ACTIVE", "DIAG")
+        else:
+            save_root = self.helaodirs.save_root
+        output_path = os.path.join(save_root, sequence_dir)
         output_file = os.path.join(
             output_path,
             f"{sequence.sequence_timestamp.strftime('%Y%m%d.%H%M%S%f')}.yml",
@@ -830,9 +833,6 @@ class Base(object):
             if not output_str.endswith("\n"):
                 output_str += "\n"
             await f.write(output_str)
-
-        if manual:
-            await self.aloop.create_task(move_dir(sequence, base=self))
 
     def new_file_conn_key(self, key: str) -> UUID:
         # return shortuuid.decode(key)
