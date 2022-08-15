@@ -11,19 +11,13 @@ import aioshutil
 import aiofiles
 from ruamel.yaml import YAML
 
-from helaocore.models.process import ProcessModel
-from helaocore.models.action import ActionModel
-from helaocore.models.experiment import ExperimentModel
-from helaocore.models.sequence import SequenceModel
-
 from helao.helpers.print_message import print_message
 from helao.helpers.premodels import Sequence, Experiment, Action
 
 modmap = {
-    "action": ActionModel,
-    "experiment": ExperimentModel,
-    "sequence": SequenceModel,
-    "process": ProcessModel,
+    "action": Action,
+    "experiment": Experiment,
+    "sequence": Sequence
 }
 
 
