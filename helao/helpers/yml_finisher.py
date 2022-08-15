@@ -102,7 +102,7 @@ async def move_dir(
 
     while (not copy_success) and copy_retries <= 60:
         dst_list = [p.replace("RUNS_ACTIVE", dest_dir) for p in src_list]
-        _ = await asyncio.gather(
+        await asyncio.gather(
             *[aioshutil.copy(src, dst) for src, dst in zip(src_list, dst_list)],
             return_exceptions=True,
         )
@@ -124,12 +124,12 @@ async def move_dir(
         rm_list = glob(os.path.join(yml_dir, "*"))
         while (not rm_success) and rm_retries <= 30:
             rm_files = [x for x in rm_list if os.path.isfile(x)]
-            _ = await asyncio.gather(
+            await asyncio.gather(
                 *[aiofiles.os.remove(f) for f in rm_files], return_exceptions=True
             )
             rm_files_done = [f for f in rm_files if not os.path.exists(f)]
             if len(rm_files_done) == len(rm_files):
-                _ = await asyncio.gather(
+                await asyncio.gather(
                     aiofiles.os.rmdir(yml_dir), return_exceptions=True
                 )
                 if not os.path.exists(yml_dir):
@@ -140,6 +140,12 @@ async def move_dir(
                     yml_path = os.path.join(new_dir, f"{timestamp}.yml")
                     if not is_manual:
                         await yml_finisher(yml_path, base=base)
+                if rm_success and obj_type == "action" and is_manual:
+                    # remove active sequence and experiment dirs
+                    exp_dir = os.path.dirname(yml_dir)
+                    await asyncio.gather(aiofiles.os.rmdir(exp_dir))
+                    seq_dir = os.path.dirname(exp_dir)
+                    await asyncio.gather(aiofiles.os.rmdir(seq_dir))
             else:
                 rm_list = [f for f in rm_list if f not in rm_files_done]
                 print_msg(
