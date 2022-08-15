@@ -162,7 +162,7 @@ async def move_dir(
             parent_yml = glob(os.path.join(parent_dir, "*.yml"))
             if parent_yml:
                 yaml = YAML(typ="safe")
-                parent_dict = yaml.load(parent_yml)
+                parent_dict = yaml.load(open(parent_yml[0], 'r'))
                 file_type = parent_dict["file_type"]
                 parent_obj = modmap[file_type](**parent_dict)
                 await move_dir(parent_obj, base, retry_delay)
