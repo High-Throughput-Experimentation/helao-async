@@ -94,6 +94,7 @@ async def move_dir(
         yml_dir = os.path.join(save_dir, hobj.get_sequence_dir())
         if hobj.sequence_name == "manual_seq":
             dest_dir = "RUNS_DIAG"
+            is_manual = True
     else:
         yml_dir = None
         print_msg(
@@ -146,7 +147,8 @@ async def move_dir(
                         "%Y%m%d.%H%M%S%f"
                     )
                     yml_path = os.path.join(new_dir, f"{timestamp}.yml")
-                    await yml_finisher(yml_path, base=base)
+                    if not is_manual:
+                        await yml_finisher(yml_path, base=base)
             else:
                 rm_list = [f for f in rm_list if f not in rm_files_done]
                 print_msg(
@@ -157,7 +159,7 @@ async def move_dir(
             await asyncio.sleep(retry_delay)
         
         # propagate to experiment and sequence yamls if manual action
-        if is_manual:
+        if is_manual and obj_type != "sequence":
             parent_dir = os.path.dirname(yml_dir)
             parent_yml = glob(os.path.join(parent_dir, "*.yml"))
             if parent_yml:
