@@ -14,12 +14,6 @@ from ruamel.yaml import YAML
 from helao.helpers.print_message import print_message
 from helao.helpers.premodels import Sequence, Experiment, Action
 
-modmap = {
-    "action": Action,
-    "experiment": Experiment,
-    "sequence": Sequence
-}
-
 
 async def yml_finisher(yml_path: str, base: object = None, retry: int = 3):
     yaml = YAML(typ="safe")
@@ -154,14 +148,3 @@ async def move_dir(
                 print("\n".join(rm_list))
                 rm_retries += 1
             await asyncio.sleep(retry_delay)
-
-        # propagate to experiment and sequence yamls if manual action
-        if is_manual and obj_type != "sequence":
-            parent_dir = os.path.dirname(yml_dir)
-            parent_yml = glob(os.path.join(parent_dir, "*.yml"))
-            if parent_yml:
-                yaml = YAML(typ="safe")
-                parent_dict = yaml.load(open(parent_yml[0], "r"))
-                file_type = parent_dict["file_type"]
-                parent_obj = modmap[file_type](**parent_dict)
-                await move_dir(parent_obj, base, retry_delay)
