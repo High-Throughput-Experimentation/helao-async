@@ -309,6 +309,11 @@ class ActionPlanMaker(object):
         # add all experiment_params under self.pars
         if self._experiment.experiment_params is not None:
             for key, val in self._experiment.experiment_params.items():
+                if isinstance(val, str):
+                    if val.lower() == 'true':
+                        val = True
+                    elif val.lower() == 'false':
+                        val = False
                 setattr(self.pars, key, val)
 
         # add all other params in exp_paramdict which were
@@ -324,6 +329,11 @@ class ActionPlanMaker(object):
                     f"adding it to self.pars",
                     info=True,
                 )
+                if isinstance(val, str):
+                    if val.lower() == 'true':
+                        val = True
+                    elif val.lower() == 'false':
+                        val = False
                 setattr(self.pars, key, val)
 
         print_message(
