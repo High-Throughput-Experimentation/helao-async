@@ -10,11 +10,11 @@ config["experiment_libraries"] = ["samples_exp", "UVIS_exp"]
 config["experiment_params"] = {"toggle_is_shutter": False}
 config["sequence_libraries"] = ["UVIS_T_seq"]
 config["sequence_params"] = {
-    "led_wavelengths_nm": [385, -1],
-    "led_intensities_mw": [0.96, 0.432],
-    "led_names": ["doric_led1", "doric_wled"],
+    "led_wavelengths_nm": [-1],
+    "led_intensities_mw": [0.432],
+    "led_names": ["doric_wled"],
     "led_type": "front",
-    "led_date": "8/16/2022", # m/d/yyyy
+    "led_date": "8/16/2022",  # m/d/yyyy
     "toggle_is_shutter": False,
 }
 # config["experiment_libraries"] = ["ECHE_exp", "samples_exp"]
