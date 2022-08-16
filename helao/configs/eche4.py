@@ -8,7 +8,7 @@ config['simulation'] = False
 
 config["experiment_libraries"] = ["samples_exp", "UVIS_exp"]
 config["experiment_params"] = {"toggle_is_shutter": False}
-config["sequence_libraries"] = ["UVIS_seq"]
+config["sequence_libraries"] = ["UVIS_T_seq"]
 config["sequence_params"] = {
     "led_wavelengths_nm": [-1],
     "led_intensities_mw": [-1],
