@@ -8,9 +8,9 @@ config["dummy"] = True
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
 config["experiment_libraries"] = ["UVIS_exp", "samples_exp"]
-# config["experiment_params"] = {}
+config["experiment_params"] = {"toggle_is_shutter": True}
 config["sequence_libraries"] = ["UVIS_seq"]
-config["sequence_params"] = {}
+config["sequence_params"] = {"toggle_is_shutter": True}
 config["run_type"] = "uvis"
 config["root"] = r"C:\INST_dev2"
 
