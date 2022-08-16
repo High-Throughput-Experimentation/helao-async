@@ -7,13 +7,15 @@ config["dummy"] = True
 config['simulation'] = False
 
 config["experiment_libraries"] = ["samples_exp", "UVIS_exp"]
+config["experiment_params"] = {"toggle_is_shutter": False}
 config["sequence_libraries"] = ["UVIS_seq"]
 config["sequence_params"] = {
     "led_wavelengths_nm": [-1],
     "led_intensities_mw": [-1],
     "led_names": ["doric_wled"],
     "led_type": "front",
-    "led_date": "n/a"
+    "led_date": "n/a",
+    "toggle_is_shutter": False,
 }
 # config["experiment_libraries"] = ["ECHE_exp", "samples_exp"]
 # config["experiment_params"] = {}

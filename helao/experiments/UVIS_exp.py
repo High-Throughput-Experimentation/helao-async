@@ -188,6 +188,7 @@ def UVIS_sub_measure(
     spec_int_time_ms: Optional[int] = 35,
     duration_sec: Optional[float] = -1,
     toggle_source: Optional[str] = "doric_wled",  # this could be a shutter
+    toggle_is_shutter: Optional[bool] = False,
     illumination_wavelength: Optional[float] = -1,
     illumination_intensity: Optional[float] = -1,
     illumination_intensity_date: Optional[str] = "n/a",
@@ -206,7 +207,7 @@ def UVIS_sub_measure(
         to_global_params=["_fast_samples_in"],
     )
 
-    # depending on run_use
+    # set illumination state before measurement
     apm.add(
         IO_server,
         "set_digital_out",
@@ -237,11 +238,14 @@ def UVIS_sub_measure(
         ],
     )
 
-    #  turn off illumination source or close shutter
+    # set illumination state after measurement
     apm.add(
         IO_server,
         "set_digital_out",
-        {"do_item": apm.pars.toggle_source, "on": False},
+        {
+            "do_item": apm.pars.toggle_source,
+            "on": True if apm.pars.toggle_is_shutter else False,
+        },
     )
 
     return apm.action_list  # returns complete action list to orch
