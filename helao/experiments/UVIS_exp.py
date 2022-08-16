@@ -22,6 +22,7 @@ from helaocore.models.sample import SolidSample  # , LiquidSample
 from helaocore.models.machine import MachineModel as MM
 from helaocore.models.process_contrib import ProcessContrib
 from helaocore.models.run_use import RunUse
+from helaocore.models.action_start_condition import ActionStartCondition
 
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker  # , Action
@@ -216,6 +217,19 @@ def UVIS_sub_measure(
             "on": False if apm.pars.run_use == "ref_dark" else True,
         },
     )
+
+    # wait for 1 second for shutter to actuate
+    if apm.pars.toggle_is_shutter:
+        apm.add(
+            {
+                "action_server": ORCH_server,
+                "action_name": "wait",
+                "action_params": {
+                    "waittime": 1,
+                },
+                "start_condition": ActionStartCondition.wait_for_all,
+            }
+        )
 
     # setup spectrometer data collection
     apm.add(
