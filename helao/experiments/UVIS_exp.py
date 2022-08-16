@@ -220,16 +220,7 @@ def UVIS_sub_measure(
 
     # wait for 1 second for shutter to actuate
     if apm.pars.toggle_is_shutter:
-        apm.add(
-            {
-                "action_server": ORCH_server,
-                "action_name": "wait",
-                "action_params": {
-                    "waittime": 1,
-                },
-                "start_condition": ActionStartCondition.wait_for_all,
-            }
-        )
+        apm.add(ORCH_server, "wait", {"waittime": 1})
 
     # setup spectrometer data collection
     apm.add(
