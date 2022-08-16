@@ -18,7 +18,7 @@ def UVIS_DR(
     reference_mode: str = "internal",
     custom_position: str = "cell1_we",
     spec_n_avg: int = 1,
-    spec_int_time_ms: int = 35,
+    spec_int_time_ms: int = 10,
     duration_sec: float = -1,
     specref_code: int = 1,
     led_type: str = "front",
@@ -56,6 +56,7 @@ def UVIS_DR(
             "illumination_side": led_type,
             "technique_name": "DR_UVVIS",
             "run_use": "ref_dark",
+            "reference_mode": reference_mode,
         },
     )
     # light ref
@@ -74,6 +75,7 @@ def UVIS_DR(
             "illumination_side": led_type,
             "technique_name": "DR_UVVIS",
             "run_use": "ref_light",
+            "reference_mode": reference_mode,
         },
     )
 
@@ -103,6 +105,7 @@ def UVIS_DR(
                 "illumination_side": led_type,
                 "technique_name": "DR_UVVIS",
                 "run_use": "data",
+                "reference_mode": reference_mode,
             },
         )
 
@@ -133,6 +136,7 @@ def UVIS_DR(
             "illumination_side": led_type,
             "technique_name": "DR_UVVIS",
             "run_use": "ref_dark",
+            "reference_mode": reference_mode,
         },
     )
     # light ref
@@ -151,6 +155,7 @@ def UVIS_DR(
             "illumination_side": led_type,
             "technique_name": "DR_UVVIS",
             "run_use": "ref_light",
+            "reference_mode": reference_mode,
         },
     )
     epm.add_experiment("UVIS_sub_shutdown", {})
