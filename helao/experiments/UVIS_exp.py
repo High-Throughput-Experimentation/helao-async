@@ -186,7 +186,7 @@ def UVIS_sub_measure(
     experiment_version: int = 1,
     spec_type: Optional[SpecType] = "T",
     spec_n_avg: Optional[int] = 1,
-    spec_int_time_ms: Optional[int] = 35,
+    spec_int_time_ms: Optional[int] = 10,
     duration_sec: Optional[float] = -1,
     toggle_source: Optional[str] = "doric_wled",  # this could be a shutter
     toggle_is_shutter: Optional[bool] = False,
@@ -194,6 +194,7 @@ def UVIS_sub_measure(
     illumination_intensity: Optional[float] = -1,
     illumination_intensity_date: Optional[str] = "n/a",
     illumination_side: Optional[str] = "front",
+    reference_mode: Optional[str] = "internal",
     technique_name: Optional[str] = "T_UVVIS",
     run_use: Optional[RunUse] = "data",
     comment: Optional[str] = "",
@@ -219,7 +220,7 @@ def UVIS_sub_measure(
     )
 
     # wait for 1 second for shutter to actuate
-    if bool(apm.pars.toggle_is_shutter):
+    if apm.pars.toggle_is_shutter:
         apm.add(ORCH_server, "wait", {"waittime": 1})
 
     # setup spectrometer data collection
@@ -249,9 +250,12 @@ def UVIS_sub_measure(
         "set_digital_out",
         {
             "do_item": apm.pars.toggle_source,
-            "on": True if bool(apm.pars.toggle_is_shutter) else False,
+            "on": True if apm.pars.toggle_is_shutter else False,
         },
     )
+
+    if apm.pars.reference_mode == "blank" and apm.pars.run_use == "ref_light":
+        apm.add(ORCH_server, "interrupt", {})
 
     return apm.action_list  # returns complete action list to orch
 
@@ -259,7 +263,7 @@ def UVIS_sub_measure(
 def UVIS_sub_setup_ref(
     experiment: Experiment,
     experiment_version: int = 1,
-    reference_sample_type: str = "internal",
+    reference_mode: str = "internal",
     solid_custom_position: Optional[str] = "cell1_we",
     solid_plate_id: int = 1,
     solid_sample_no: int = 2,
@@ -267,16 +271,16 @@ def UVIS_sub_setup_ref(
 ):
     """Determine initial and final reference measurements and move to position."""
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    if apm.pars.reference_sample_type == "internal":
+    if apm.pars.reference_mode == "internal":
         apm.add(
             MOTOR_server,
             "solid_get_nearest_specref",
             {
                 "plate_id": apm.pars.solid_plate_id,
                 "sample_no": apm.pars.solid_sample_no,
-                "specref_code": apm.pars.specref_code
+                "specref_code": apm.pars.specref_code,
             },
-            to_global_params=["_refno", "_refxy"]
+            to_global_params=["_refno", "_refxy"],
         )
         apm.add(
             PAL_server,
@@ -285,13 +289,14 @@ def UVIS_sub_setup_ref(
                 "custom": apm.pars.solid_custom_position,
                 "plate_id": apm.pars.solid_plate_id,
             },
-            from_global_params={"_refno": "sample_no"}
+            from_global_params={"_refno": "sample_no"},
         )
-    elif apm.pars.reference_sample_type == "builtin":
+    elif apm.pars.reference_mode == "builtin":
         apm.add(
             MOTOR_server,
-            "solid_get_builtin_specref", {},
-            to_global_params=["_refno", "_refxy"]
+            "solid_get_builtin_specref",
+            {},
+            to_global_params=["_refno", "_refxy"],
         )
         apm.add(
             PAL_server,
@@ -300,13 +305,10 @@ def UVIS_sub_setup_ref(
                 "custom": apm.pars.solid_custom_position,
                 "plate_id": apm.pars.solid_plate_id,
             },
-            from_global_params={"_refno": "sample_no"}
+            from_global_params={"_refno": "sample_no"},
         )
-    elif apm.pars.reference_sample_type == "blank":
-        apm.add(
-            ORCH_server,
-            "interrupt"
-        )
+    elif apm.pars.reference_mode == "blank":
+        apm.add(ORCH_server, "interrupt", {})
         apm.add(
             PAL_server,
             "archive_custom_load",
