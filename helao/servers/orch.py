@@ -218,7 +218,7 @@ def makeOrchServ(
         """Stop dispatch loop for planned manual intervention."""
         active = await app.orch.setup_and_contain_action()
         await app.orch.stop()
-        finished_action = active.finish()
+        finished_action = await active.finish()
         return finished_action.as_dict()
 
     # @app.post("/append_experiment")
