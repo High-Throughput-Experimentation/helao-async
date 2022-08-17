@@ -26,7 +26,7 @@ def UVIS_TR(
     led_names: list = ["doric_wled"],
     led_wavelengths_nm: list = [-1],
     led_intensities_mw: list = [-1],
-    toggle_is_shutter: bool = False,
+    toggle_is_shutter: bool = True,
 ):
     specs = ["T", "R"]
     epm = ExperimentPlanMaker()

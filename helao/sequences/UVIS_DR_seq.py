@@ -26,7 +26,7 @@ def UVIS_DR(
     led_names: list = ["doric_wled"],
     led_wavelengths_nm: list = [-1],
     led_intensities_mw: list = [-1],
-    toggle_is_shutter: bool = False,
+    toggle_is_shutter: bool = True,
 ):
     epm = ExperimentPlanMaker()
     epm.add_experiment("UVIS_sub_unloadall_customs", {})
