@@ -23,7 +23,7 @@ def UVIS_TR(
     specref_code: int = 1,
     led_type: str = "front",
     led_date: str = "n/a",
-    led_names: list = ["doric_wled"],
+    led_names: list = ["wl_source"],
     led_wavelengths_nm: list = [-1],
     led_intensities_mw: list = [-1],
     toggle_is_shutter: bool = True,
