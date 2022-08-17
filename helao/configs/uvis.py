@@ -12,7 +12,7 @@ config["experiment_params"] = {"toggle_is_shutter": True}
 config["sequence_libraries"] = ["UVIS_T_seq", "UVIS_TR_seq"]
 config["sequence_params"] = {"toggle_is_shutter": True}
 config["run_type"] = "uvis"
-config["root"] = r"C:\INST_dev2"
+config["root"] = r"C:\INST_hlo"
 
 
 # we define all the servers here so that the overview is a bit better
