@@ -76,7 +76,7 @@ class Experiment(Sequence, ExperimentModel):
 
     # not in ExperimentModel:
     global_params: Optional[dict] = Field(default_factory=dict)
-    experiment_action_list: List[ActionModel] = Field(default_factory=list)
+    actionmodel_list: List[ActionModel] = Field(default_factory=list)
 
     def __repr__(self):
         return f"<experiment_name:{self.experiment_name}>"
@@ -118,10 +118,10 @@ class Experiment(Sequence, ExperimentModel):
         # reset file list
         exp.files = []
 
-        if self.experiment_action_list is None:
-            self.experiment_action_list = []
+        if self.actionmodel_list is None:
+            self.actionmodel_list = []
 
-        for actm in self.experiment_action_list:
+        for actm in self.actionmodel_list:
             print_message(
                 {},
                 "experiment",
