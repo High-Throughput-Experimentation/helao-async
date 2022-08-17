@@ -34,7 +34,7 @@ from typing import Optional, List
 from fastapi import Body, Query
 
 from helao.servers.base import makeActionServ
-from helaocore.models.sample import LiquidSample, SampleUnion
+from helaocore.models.sample import SampleUnion
 from helao.helpers.premodels import Action
 from helao.drivers.pstat.gamry_driver import gamry
 from helao.helpers.config_loader import config_loader
@@ -60,13 +60,8 @@ async def gamry_dyn_endpoints(app=None):
             fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
             Vinit__V: Optional[float] = 0.0,  # Initial value in volts or amps.
             Vfinal__V: Optional[float] = 1.0,  # Final value in volts or amps.
-            ScanRate__V_s: Optional[
-                float
-            ] = 1.0,  # Scan rate in volts/second or amps/second.
-#            SampleRate: Optional[
-            AcqInterval__s: Optional[
-                float
-            ] = 0.01,  # Time between data acquisition samples in seconds.
+            ScanRate__V_s: Optional[float] = 1.0,  # Scan rate in volts/sec or amps/sec.
+            AcqInterval__s: Optional[float] = 0.01,  # Time between data acq in seconds.
             TTLwait: Optional[int] = Query(
                 -1, ge=-1, le=3
             ),  # -1 disables, else select TTL 0-3
@@ -91,10 +86,7 @@ async def gamry_dyn_endpoints(app=None):
             fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
             Vval__V: Optional[float] = 0.0,
             Tval__s: Optional[float] = 10.0,
-#            SampleRate: Optional[
-            AcqInterval__s: Optional[
-                float
-            ] = 0.01,  # Time between data acquisition samples in seconds.
+            AcqInterval__s: Optional[float] = 0.01,  # Time between data acq in seconds.
             TTLwait: Optional[int] = Query(
                 -1, ge=-1, le=3
             ),  # -1 disables, else select TTL 0-3
@@ -120,10 +112,7 @@ async def gamry_dyn_endpoints(app=None):
             fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
             Ival__A: Optional[float] = 0.0,
             Tval__s: Optional[float] = 10.0,
-#            SampleRate: Optional[
-            AcqInterval__s: Optional[
-                float
-            ] = 1.0,  # Time between data acquisition samples in seconds.
+            AcqInterval__s: Optional[float] = 0.1,  # Time between data acq in seconds.
             TTLwait: Optional[int] = Query(
                 -1, ge=-1, le=3
             ),  # -1 disables, else select TTL 0-3
@@ -150,10 +139,8 @@ async def gamry_dyn_endpoints(app=None):
             Vapex1__V: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
             Vapex2__V: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
             Vfinal__V: Optional[float] = 0.0,  # Final value in volts or amps.
-            ScanRate__V_s: Optional[
-                float
-            ] = 1.0,  # scan rate in volts/second or amps/second.
-            AcqInterval__s: Optional[float] = 0.01,  # Time between data acquisition steps.
+            ScanRate__V_s: Optional[float] = 1.0,  # Scan rate in volts/sec or amps/sec.
+            AcqInterval__s: Optional[float] = 0.1,  # Time between data acq in seconds.
             Cycles: Optional[int] = 1,
             TTLwait: Optional[int] = Query(
                 -1, ge=-1, le=3
@@ -185,7 +172,7 @@ async def gamry_dyn_endpoints(app=None):
             Precision: Optional[
                 float
             ] = 0.001,  # The precision is used in a Correlation Coefficient (residual power) based test to determine whether or not to measure another cycle.
-            AcqInterval__s: Optional[float] = 0.01,
+            AcqInterval__s: Optional[float] = 0.1,  # Time between data acq in seconds.
             TTLwait: Optional[int] = Query(
                 -1, ge=-1, le=3
             ),  # -1 disables, else select TTL 0-3
@@ -210,14 +197,13 @@ async def gamry_dyn_endpoints(app=None):
             action_version: int = 1,
             fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
             Tval__s: Optional[float] = 10.0,
-            AcqInterval__s: Optional[float] = 0.01,
+            AcqInterval__s: Optional[float] = 0.1,  # Time between data acq in seconds.
             TTLwait: Optional[int] = Query(
                 -1, ge=-1, le=3
             ),  # -1 disables, else select TTL 0-3
             TTLsend: Optional[int] = Query(
                 -1, ge=-1, le=3
             ),  # -1 disables, else select TTL 0-3
-            # IErange: Optional[app.driver.gamry_range_enum] = "auto",
             IErange: Optional[app.driver.gamry_range_enum] = "auto",
         ):
             """mesasures open circuit potential
