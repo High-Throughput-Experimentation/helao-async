@@ -16,6 +16,7 @@ def config_loader(confArg, helao_root):
         conf_mod = module_from_spec(conf_spec)
         conf_spec.loader.exec_module(conf_mod)
         config = conf_mod.config
+        full_path = os.path.abspath(confArg)
     elif confArg.endswith(".py") and not os.path.exists(confArg):
         print_message({}, "launcher", f"Config not found at {os.path.abspath(confArg)}", error=True)
         raise FileNotFoundError("Launcher argument ends with .py, expected path not found.")
@@ -26,12 +27,14 @@ def config_loader(confArg, helao_root):
             f"Loading config from helao/configs/{confPrefix}.py",
             info=True,
         )
+        full_path = os.path.join(helao_root, "helao", "configs", f"{confPrefix}.py")
         config = (
             SourceFileLoader(
                 "config",
-                os.path.join(helao_root, "helao", "configs", f"{confPrefix}.py"),
+                full_path,
             )
             .load_module()
             .config
         )
+    config["loaded_config_path"] = full_path
     return config
