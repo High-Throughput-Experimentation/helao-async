@@ -15,7 +15,7 @@ from helaocore.models.file import HloHeaderModel
 
 from helao.helpers.premodels import Action
 from helao.servers.base import makeActionServ
-from helao.drivers.data.spec.calc_driver import Calc
+from helao.drivers.data.calc_driver import Calc
 from helao.helpers.config_loader import config_loader
 
 def makeApp(confPrefix, servKey, helao_root):
