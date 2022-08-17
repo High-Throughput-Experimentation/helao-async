@@ -184,7 +184,7 @@ def ECHE_sub_startup(
                 "plate_id": apm.pars.solid_plate_id,
                 "sample_no": apm.pars.solid_sample_no,
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_platexy"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,
@@ -202,7 +202,7 @@ def ECHE_sub_startup(
                 "mode": MoveModes.absolute,
                 "transformation": TransformationModes.platexy,
             },
-            "from_global_params": {"_platexy": "d_mm"},
+            "from_globalexp_params": {"_platexy": "d_mm"},
             "start_condition": ActionStartCondition.wait_for_all,
         }
     )
@@ -263,7 +263,7 @@ def ECHE_sub_CA_led(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -312,7 +312,7 @@ def ECHE_sub_CA_led(
                 "TTLsend": 0,  # -1 disables, else select TTL 0-3
                 "IErange": apm.pars.gamry_i_range,
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "technique_name": "CA",
             "process_finish": True,
@@ -355,7 +355,7 @@ def ECHE_sub_CA(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -381,7 +381,7 @@ def ECHE_sub_CA(
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": apm.pars.gamry_i_range,
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "technique_name": "CA",
             "process_finish": True,
@@ -455,7 +455,7 @@ def ECHE_sub_CV_led(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -512,7 +512,7 @@ def ECHE_sub_CV_led(
                 "TTLsend": 0,  # -1 disables, else select TTL 0-3
                 "IErange": apm.pars.gamry_i_range,
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "technique_name": "CV",
             "process_finish": True,
@@ -561,7 +561,7 @@ def ECHE_sub_CV(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -593,7 +593,7 @@ def ECHE_sub_CV(
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": apm.pars.gamry_i_range,
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "technique_name": "CV",
             "process_finish": True,
@@ -636,7 +636,7 @@ def ECHE_sub_CP(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -660,7 +660,7 @@ def ECHE_sub_CP(
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": apm.pars.gamry_i_range,
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "technique_name": "CP",
             "process_finish": True,
@@ -715,7 +715,7 @@ def ECHE_sub_CP_led(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -759,7 +759,7 @@ def ECHE_sub_CP_led(
                 "TTLsend": 0,  # -1 disables, else select TTL 0-3
                 "IErange": apm.pars.gamry_i_range,
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "technique_name": "CP",
             "process_finish": True,
@@ -794,7 +794,7 @@ def ECHE_sub_movetosample(
                 "plate_id": apm.pars.solid_plate_id,
                 "sample_no": apm.pars.solid_sample_no,
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_platexy"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,
@@ -812,7 +812,7 @@ def ECHE_sub_movetosample(
                 "mode": MoveModes.absolute,
                 "transformation": TransformationModes.platexy,
             },
-            "from_global_params": {"_platexy": "d_mm"},
+            "from_globalexp_params": {"_platexy": "d_mm"},
             "start_condition": ActionStartCondition.wait_for_all,
         }
     )
@@ -842,7 +842,7 @@ def ECHE_sub_move(
                 "mode": MoveModes.relative,
                 "transformation": TransformationModes.platexy,
             },
-            #            "from_global_params": {"_platexy": "d_mm"},
+            #            "from_globalexp_params": {"_platexy": "d_mm"},
             "start_condition": ActionStartCondition.wait_for_all,
         }
     )
@@ -916,7 +916,7 @@ def ECHE_sub_CV_led_secondtrigger(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -979,7 +979,7 @@ def ECHE_sub_CV_led_secondtrigger(
                 "TTLsend": 0,  # -1 disables, else select TTL 0-3
                 "IErange": apm.pars.gamry_i_range,
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "technique_name": "CV",
             "process_finish": True,
@@ -1041,7 +1041,7 @@ def ECHE_sub_CA_led_secondtrigger(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1098,7 +1098,7 @@ def ECHE_sub_CA_led_secondtrigger(
                 "TTLsend": 0,  # -1 disables, else select TTL 0-3
                 "IErange": apm.pars.gamry_i_range,
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "technique_name": "CA",
             "process_finish": True,
@@ -1160,7 +1160,7 @@ def ECHE_sub_CP_led_secondtrigger(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1210,7 +1210,7 @@ def ECHE_sub_CP_led_secondtrigger(
                 "TTLsend": 0,  # -1 disables, else select TTL 0-3
                 "IErange": apm.pars.gamry_i_range,
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "technique_name": "CP",
             "process_finish": True,

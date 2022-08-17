@@ -714,10 +714,10 @@ class Orch(Base):
             self.print_message("copying global vars to action")
 
             # copy requested global param to action params
-            for k, v in A.from_global_params.items():
+            for k, v in A.from_globalexp_params.items():
                 self.print_message(f"{k}:{v}")
-                if k in self.active_experiment.global_params:
-                    A.action_params.update({v: self.active_experiment.global_params[k]})
+                if k in self.active_experiment.globalexp_params:
+                    A.action_params.update({v: self.active_experiment.globalexp_params[k]})
 
             self.print_message(
                 f"dispatching action {A.action_name} on server {A.action_server.server_name}"
@@ -788,39 +788,39 @@ class Orch(Base):
                 )
                 return result_action.error_code
 
-            if result_action.to_global_params:
-                if isinstance(result_action.to_global_params, list):
+            if result_action.to_globalexp_params:
+                if isinstance(result_action.to_globalexp_params, list):
                     self.print_message(
-                        f"copying global vars {', '.join(result_action.to_global_params)} back to experiment"
+                        f"copying global vars {', '.join(result_action.to_globalexp_params)} back to experiment"
                     )
-                    for k in result_action.to_global_params:
+                    for k in result_action.to_globalexp_params:
                         if k in result_action.action_params:
                             if (
                                 result_action.action_params[k] is None
-                                and k in self.active_experiment.global_params
+                                and k in self.active_experiment.globalexp_params
                             ):
                                 self.print_message(f"clearing {k} in global vars")
-                                self.active_experiment.global_params.pop(k)
+                                self.active_experiment.globalexp_params.pop(k)
                             else:
                                 self.print_message(f"updating {k} in global vars")
-                                self.active_experiment.global_params.update(
+                                self.active_experiment.globalexp_params.update(
                                     {k: result_action.action_params[k]}
                                 )
-                elif isinstance(result_action.to_global_params, dict):
+                elif isinstance(result_action.to_globalexp_params, dict):
                     self.print_message(
-                        f"copying global vars {', '.join(result_action.to_global_params.keys())} back to experiment"
+                        f"copying global vars {', '.join(result_action.to_globalexp_params.keys())} back to experiment"
                     )
-                    for k1, k2 in result_action.to_global_params.items():
+                    for k1, k2 in result_action.to_globalexp_params.items():
                         if k1 in result_action.action_params:
                             if (
                                 result_action.action_params[k1] is None
-                                and k2 in self.active_experiment.global_params
+                                and k2 in self.active_experiment.globalexp_params
                             ):
                                 self.print_message(f"clearing {k2} in global vars")
-                                self.active_experiment.global_params.pop(k2)
+                                self.active_experiment.globalexp_params.pop(k2)
                             else:
                                 self.print_message(f"updating {k2} in global vars")
-                                self.active_experiment.global_params.update(
+                                self.active_experiment.globalexp_params.update(
                                     {k2: result_action.action_params[k1]}
                                 )
 

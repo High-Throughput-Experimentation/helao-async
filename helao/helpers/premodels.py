@@ -75,7 +75,7 @@ class Experiment(Sequence, ExperimentModel):
     "Sample-action grouping class."
 
     # not in ExperimentModel:
-    global_params: Optional[dict] = Field(default_factory=dict)
+    globalexp_params: Optional[dict] = Field(default_factory=dict)
     actionmodel_list: List[ActionModel] = Field(default_factory=list)
 
     def __repr__(self):
@@ -204,8 +204,8 @@ class Action(Experiment, ActionModel):
     # moved to ActionModel
     # error_code: Optional[ErrorCodes] = ErrorCodes.none
 
-    from_global_params: Optional[dict] = Field(default_factory=dict)
-    to_global_params: Optional[Union[list, dict]] = Field(default_factory=list)
+    from_globalexp_params: Optional[dict] = Field(default_factory=dict)
+    to_globalexp_params: Optional[Union[list, dict]] = Field(default_factory=list)
 
     # internal
     file_conn_keys: Optional[List[UUID]] = Field(default_factory=list)

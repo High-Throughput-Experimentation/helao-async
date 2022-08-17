@@ -118,7 +118,7 @@ def debug(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -137,7 +137,7 @@ def debug(
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         }
     )
@@ -637,7 +637,7 @@ def ADSS_sub_CA(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -658,7 +658,7 @@ def ADSS_sub_CA(
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "technique_name": "CA",
             "process_finish": True,
@@ -712,7 +712,7 @@ def ADSS_sub_CV(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -744,7 +744,7 @@ def ADSS_sub_CV(
                 "TTLsend": 0,  # -1 disables, else select TTL 0-3
                 "IErange": apm.pars.gamry_i_range,
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "technique_name": "CV",
             "process_finish": True,
@@ -773,7 +773,7 @@ def ADSS_sub_OCV(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -792,7 +792,7 @@ def ADSS_sub_OCV(
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "technique_name": "OCV",
             "process_finish": True,
@@ -825,7 +825,7 @@ def ADSS_sub_preCV(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -845,7 +845,7 @@ def ADSS_sub_preCV(
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "technique_name": "CA",
             "process_finish": True,
@@ -882,7 +882,7 @@ def ADSS_sub_CA_originalwithstuff(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -901,7 +901,7 @@ def ADSS_sub_CA_originalwithstuff(
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         }
     )
@@ -935,7 +935,7 @@ def ADSS_sub_CA_originalwithstuff(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -957,7 +957,7 @@ def ADSS_sub_CA_originalwithstuff(
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         }
     )
@@ -1033,7 +1033,7 @@ def ADSS_sub_CA_noaliquots(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1052,7 +1052,7 @@ def ADSS_sub_CA_noaliquots(
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "process_finish": False,
             "process_contrib": [
@@ -1072,7 +1072,7 @@ def ADSS_sub_CA_noaliquots(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1094,7 +1094,7 @@ def ADSS_sub_CA_noaliquots(
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "technique_name": "CA",
             "process_finish": True,
@@ -1148,7 +1148,7 @@ def ADSS_sub_CV_noaliquots(
             "action_params": {
                 "custom": "cell1_we",
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_fast_samples_in"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1183,7 +1183,7 @@ def ADSS_sub_CV_noaliquots(
                 "TTLsend": 0,  # -1 disables, else select TTL 0-3
                 "IErange": apm.pars.gamry_i_range,
             },
-            "from_global_params": {"_fast_samples_in": "fast_samples_in"},
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "technique_name": "CV",
             "process_finish": True,
