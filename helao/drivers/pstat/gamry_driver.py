@@ -150,9 +150,7 @@ class gamry:
 
         # for saving data localy
         self.FIFO_epoch = None
-        self.FIFO_gamryheader = (
-           {}
-        )  # measuement specific, will be reset each measurement
+        self.FIFO_gamryheader = {}  # measuement specific, reset after each measurement
         self.FIFO_column_headings = []
         self.FIFO_Gamryname = ""
 
@@ -286,11 +284,13 @@ class gamry:
                 )
 
         except Exception as e:
-            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             # this will lock up the potentiostat server
             # happens when a not activated Gamry is connected and turned on
             # TODO: find a way to avoid it
-            self.base.print_message(f"fatal error initializing Gamry: {repr(e), tb,}", error=True)
+            self.base.print_message(
+                f"fatal error initializing Gamry: {repr(e), tb,}", error=True
+            )
         self.ready = True
 
     async def open_connection(self):
@@ -310,9 +310,9 @@ class gamry:
                 return ErrorCodes.not_initialized
 
         except Exception as e:
-            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             # self.pstat = None
-            self.base.print_message(f"Gamry error init: {repr(e), tb,}", error=True)
+            self.base.print_message(f"Gamry error init: {repr(e)} {tb}", error=True)
             return ErrorCodes.critical
 
     def close_connection(self):
@@ -378,7 +378,7 @@ class gamry:
                 # InitializePstat (from exp script)
                 # https://www.gamry.com/application-notes/instrumentation/changing-potentiostat-speed-settings/
                 self.pstat.SetCell(self.GamryCOM.CellOff)
-                #####pstat.InstrumentSpecificInitialize ()
+                # pstat.InstrumentSpecificInitialize ()
                 self.pstat.SetPosFeedEnable(False)  # False
 
                 # pstat.SetStability (StabilityFast)
@@ -387,7 +387,7 @@ class gamry:
                 # StabilityFast (0), StabilityNorm (1), StabilityMed (1), StabilitySlow (2)
                 # pstat.SetCASpeed(1)#GamryCOM.CASpeedNorm)
                 # CASpeedFast (0), CASpeedNorm (1), CASpeedMed (2), CASpeedSlow (3)
-                if not self.FIFO_Gamryname.startswith('IFC1010'):
+                if not self.FIFO_Gamryname.startswith("IFC1010"):
                     self.pstat.SetSenseSpeedMode(True)
                 # pstat.SetConvention (PHE200_IConvention)
                 # anodic currents are positive
@@ -418,13 +418,13 @@ class gamry:
                 # Sets the I/E Range of the potentiostat.
                 self.pstat.SetIERange(0.03)
                 # Enable or disable current measurement auto-ranging.
-                if not self.FIFO_Gamryname.startswith('IFC1010'):
+                if not self.FIFO_Gamryname.startswith("IFC1010"):
                     self.pstat.SetIERangeMode(True)
 
                 if self.IO_IErange == self.gamry_range_enum.auto:
                     self.base.print_message("auto I range selected")
                     self.pstat.SetIERange(0.03)
-                    if not self.FIFO_Gamryname.startswith('IFC1010'):
+                    if not self.FIFO_Gamryname.startswith("IFC1010"):
                         self.pstat.SetIERangeMode(True)
                 else:
                     self.base.print_message(f"{self.IO_IErange.value} I range selected")
@@ -432,7 +432,7 @@ class gamry:
                         f"{IErangesdict[self.IO_IErange.name]} I range selected"
                     )
                     self.pstat.SetIERange(IErangesdict[self.IO_IErange.name])
-                    if not self.FIFO_Gamryname.startswith('IFC1010'):
+                    if not self.FIFO_Gamryname.startswith("IFC1010"):
                         self.pstat.SetIERangeMode(False)
                 # elif self.IO_IErange == self.gamry_range_enum.mode0:
                 #     self.pstat.SetIERangeMode(False)
@@ -562,9 +562,11 @@ class gamry:
                         else:
                             self.dtaq.Init(self.pstat, *argv)
                     except Exception as e:
-                        tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                        tb = "".join(
+                            traceback.format_exception(type(e), e, e.__traceback__)
+                        )
                         self.base.print_message(
-                            f"Gamry Error during setup: {gamry_error_decoder(e)}",
+                            f"Gamry Error during setup: {gamry_error_decoder(e)} {tb}",
                             error=True,
                         )
 
@@ -582,9 +584,9 @@ class gamry:
                     )
 
             except comtypes.COMError as e:
-                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 self.base.print_message(
-                    f"Gamry error during measurement setup: {e}", error=True
+                    f"Gamry error during measurement setup: {repr(e)} {tb}", error=True
                 )
                 error = ErrorCodes.critical
         else:
@@ -623,9 +625,10 @@ class gamry:
                 self.pstat.SetSignal(self.IO_sigramp)
                 self.base.print_message("signal ramp set")
             except Exception as e:
-                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 self.base.print_message("gamry error in signal")
                 self.base.print_message(gamry_error_decoder(e))
+                self.base.print_message(tb)
                 self.pstat.SetCell(self.GamryCOM.CellOff)
                 return {"measure": "signal_error"}
 
@@ -695,9 +698,10 @@ class gamry:
                 self.base.print_message("running dtaq")
                 self.IO_measuring = True
             except Exception as e:
-                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 self.base.print_message("gamry error run")
                 self.base.print_message(gamry_error_decoder(e))
+                self.base.print_message(tb)
                 self.close_pstat_connection()
                 return {"measure": "run_error"}
 
@@ -882,7 +886,9 @@ class gamry:
             if isinstance(requested_range, float):
                 req_num = requested_range
             else:
-                req_num, req_unit = mysplit(requested_range.replace(" ", "").replace("_",""))
+                req_num, req_unit = mysplit(
+                    requested_range.replace(" ", "").replace("_", "")
+                )
                 req_num = to_amps(number=req_num, unit=req_unit)
             if req_num is None:
                 return self.gamry_range_enum.auto
@@ -961,10 +967,12 @@ class gamry:
                     self.IO_sigramp.Init(*sigfunc_params)
                     act.error_code = ErrorCodes.none
                 except Exception as e:
-                    tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                    tb = "".join(
+                        traceback.format_exception(type(e), e, e.__traceback__)
+                    )
                     act.error_code = gamry_error_decoder(e)
                     self.base.print_message(
-                        f"IO_sigramp.Init error: {act.error_code}", error=True
+                        f"IO_sigramp.Init error: {act.error_code} {tb}", error=True
                     )
 
                 self.samples_in = samples_in
