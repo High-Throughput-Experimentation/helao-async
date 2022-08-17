@@ -93,7 +93,7 @@ def ANEC_sub_startup(
                 "plate_id": apm.pars.solid_plate_id,
                 "sample_no": apm.pars.solid_sample_no,
             },
-            "to_global_params": [
+            "to_globalexp_params": [
                 "_platexy"
             ],  # save new liquid_sample_no of eche cell to globals
             "start_condition": ActionStartCondition.wait_for_all,
@@ -112,7 +112,7 @@ def ANEC_sub_startup(
                 "mode": MoveModes.absolute,
                 "transformation": TransformationModes.platexy,
             },
-            "from_global_params": {"_platexy": "d_mm"},
+            "from_globalexp_params": {"_platexy": "d_mm"},
             "start_condition": ActionStartCondition.wait_for_all,
         }
     )
@@ -308,13 +308,13 @@ def ANEC_sub_unload_liquid(experiment: Experiment, experiment_version: int = 1,)
 
     apm = ActionPlanMaker()
     apm.add(
-        PAL_server, "archive_custom_unloadall", {}, to_global_params=["_unloaded_solid"]
+        PAL_server, "archive_custom_unloadall", {}, to_globalexp_params=["_unloaded_solid"]
     )
     apm.add(
         PAL_server,
         "archive_custom_load",
         {"custom": "cell1_we"},
-        from_global_params={"_unloaded_solid": "load_sample_in"},
+        from_globalexp_params={"_unloaded_solid": "load_sample_in"},
     )
     return apm.action_list
 
@@ -563,7 +563,7 @@ def ANEC_sub_CA(
         PAL_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
-        to_global_params=["_fast_samples_in"],
+        to_globalexp_params=["_fast_samples_in"],
     )
     apm.add(
         PSTAT_server,
@@ -576,7 +576,7 @@ def ANEC_sub_CA(
             "TTLsend": -1,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name= "CA",
         process_contrib=[
@@ -617,7 +617,7 @@ def ANEC_sub_photo_CA(
         PAL_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
-        to_global_params=["_fast_samples_in"],
+        to_globalexp_params=["_fast_samples_in"],
     )
     apm.add(NI_server, "led", {"led":"led", "on": 1})
     apm.add(
@@ -631,7 +631,7 @@ def ANEC_sub_photo_CA(
             "TTLsend": -1,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name= "CA",
         process_contrib=[
@@ -678,7 +678,7 @@ def ANEC_sub_CV(
         PAL_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
-        to_global_params=["_fast_samples_in"],
+        to_globalexp_params=["_fast_samples_in"],
     )
     apm.add(
         PSTAT_server,
@@ -695,7 +695,7 @@ def ANEC_sub_CV(
             "TTLsend": -1,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
         },
-        from_global_params={"_fast_samples_in": "fast_samples_in"},
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name= ["CV"],
         process_contrib=[
