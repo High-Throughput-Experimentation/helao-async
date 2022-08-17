@@ -9,7 +9,7 @@ import os
 import inspect
 from copy import deepcopy
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 from pydantic import Field
 from typing import List
 from collections import defaultdict
@@ -205,7 +205,7 @@ class Action(Experiment, ActionModel):
     # error_code: Optional[ErrorCodes] = ErrorCodes.none
 
     from_global_params: Optional[dict] = Field(default_factory=dict)
-    to_global_params: Optional[list] = Field(default_factory=list)
+    to_global_params: Optional[Union[list, dict]] = Field(default_factory=list)
 
     # internal
     file_conn_keys: Optional[List[UUID]] = Field(default_factory=list)
