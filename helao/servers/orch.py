@@ -1299,7 +1299,7 @@ class Orch(Base):
             self.last_sequence = deepcopy(self.active_sequence)
             self.active_sequence = None
             
-            self.counter_dispatched_actions = {}
+            self.orchstatusmodel.counter_dispatched_actions = {}
 
             # DB server call to finish_yml if DB exists
             self.aloop.create_task(move_dir(self.last_sequence, base=self))
