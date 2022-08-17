@@ -1,6 +1,7 @@
 __all__ = ["import_sequences"]
 
 import os
+import time
 from importlib.machinery import SourceFileLoader
 
 from helao.helpers.print_message import print_message
