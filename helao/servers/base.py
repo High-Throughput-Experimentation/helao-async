@@ -1773,7 +1773,7 @@ class Base(object):
 
                 # add actions to experiment
                 for action in self.action_list:
-                    exp.experiment_action_list.append(action.get_act())
+                    exp.actionmodel_list.append(action.get_act())
 
                 # add experiment to sequence
                 exp.experimentmodel_list.append(action.get_exp())

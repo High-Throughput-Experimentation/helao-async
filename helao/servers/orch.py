@@ -1316,10 +1316,10 @@ class Orch(Base):
                 f"adding matching acts to it"
             )
 
-            self.active_experiment.experiment_action_list = []
+            self.active_experiment.actionmodel_list = []
 
             # TODO use exp uuid to filter actions?
-            self.active_experiment.experiment_action_list = (
+            self.active_experiment.actionmodel_list = (
                 self.orchstatusmodel.finish_experiment(
                     exp_uuid=self.active_experiment.experiment_uuid
                 )
