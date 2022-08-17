@@ -909,10 +909,12 @@ class Orch(Base):
             # finish the last exp
             # this wait for all actions in active experiment
             # to finish and then updates the exp with the acts
-            self.print_message("finishing final experiment")
-            await self.finish_active_experiment()
-            self.print_message("finishing final sequence")
-            await self.finish_active_sequence()
+            if not self.action_dq:  # in case of interrupt, don't finish exp
+                self.print_message("finishing final experiment")
+                await self.finish_active_experiment()
+            if not self.experiment_dq:  # in case of interrupt, don't finish seq
+                self.print_message("finishing final sequence")
+                await self.finish_active_sequence()
 
             if self.orchstatusmodel.loop_state != OrchStatus.estop:
                 self.orchstatusmodel.loop_state = OrchStatus.stopped
