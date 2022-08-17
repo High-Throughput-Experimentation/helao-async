@@ -106,7 +106,7 @@ config["servers"] = dict(
             },
             dev_do={
                 "gamry_aux": 4,
-                "doric_wled1": 1,
+                "doric_wled": 1,
                 "wl_source": 1,
                 "spec_trig": 2,
                 "spec_trig2": 3,
