@@ -741,14 +741,14 @@ class Base(object):
                         self.ntp_last_sync = float(parts[0])
                         self.ntp_offset = 0.0
                     if time() - self.ntp_last_sync > resync_time:
-                        self.print_message(
-                            f"last time check was more then {resync_time/60.0:.1f} minutes ago, syncing time again."
-                        )
+                        # self.print_message(
+                        #     f"last time check was more then {resync_time/60.0:.1f} minutes ago, syncing time again."
+                        # )
                         await self.get_ntp_time()
                     else:
                         # wait_time = time() - self.ntp_last_sync
                         wait_time = resync_time
-                        self.print_message(f"waiting {wait_time} until next time check")
+                        # self.print_message(f"waiting {wait_time} until next time check")
                         await asyncio.sleep(wait_time)
         except asyncio.CancelledError:
             self.print_message("ntp sync task was cancelled", info=True)
