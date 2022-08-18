@@ -1,12 +1,11 @@
 __all__ = ["makeApp"]
 
 
-from importlib import import_module
 from socket import gethostname
 from time import strftime
 
 from fastapi import Body, Query
-from typing import Optional, List, Tuple
+from typing import Optional, List  # , Tuple
 
 from helao.servers.base import makeActionServ
 from helao.drivers.robot.pal_driver import (
@@ -16,8 +15,8 @@ from helao.drivers.robot.pal_driver import (
     PalMicroCam,
     PALposition,
     GCsampletype,
-    SampleInheritance,
-    SampleStatus,
+    # SampleInheritance,
+    # SampleStatus,
 )
 from helao.drivers.data.archive_driver import ScanDirection, ScanOperator
 
@@ -28,6 +27,7 @@ from helaocore.models.sample import (
     NoneSample,
     SolidSample,
 )
+from helaocore.models.data import DataModel
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
@@ -553,10 +553,10 @@ def makeApp(confPrefix, servKey, helao_root):
         )
         active.action.error_code = error_code
         await active.append_sample(samples=[sample], IO="in")
-        await active.enqueue_data_dflt(
-            datadict={"sample": sample.as_dict(), "error_code": error_code}
-        )
+        datadict = {"sample": sample.as_dict(), "error_code": error_code}
+        datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
         active.action.action_params.update({"_fast_samples_in": [sample.as_dict()]})
+        active.enqueue_data_nowait(datamodel, action=active.action)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -572,9 +572,9 @@ def makeApp(confPrefix, servKey, helao_root):
         ) = await app.driver.archive.tray_unloadall(**active.action.action_params)
         await active.append_sample(samples=samples_in, IO="in")
         await active.append_sample(samples=samples_out, IO="out")
-        await active.enqueue_data_dflt(
-            datadict={"unloaded": unloaded, "tray_dict": tray_dict}
-        )
+        datadict = {"unloaded": unloaded, "tray_dict": tray_dict}
+        datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
+        active.enqueue_data_nowait(datamodel, action=active.action)
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -598,9 +598,9 @@ def makeApp(confPrefix, servKey, helao_root):
         active.action.error_code = error_code
         if loaded_sample != NoneSample():
             await active.append_sample(samples=[loaded_sample], IO="in")
-        await active.enqueue_data_dflt(
-            datadict={"error_code": error_code, "sample": loaded_sample.as_dict()}
-        )
+        datadict = {"error_code": error_code, "sample": loaded_sample.as_dict()}
+        datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
+        active.enqueue_data_nowait(datamodel, action=active.action)
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -621,9 +621,9 @@ def makeApp(confPrefix, servKey, helao_root):
         ) = await app.driver.archive.tray_unload(**active.action.action_params)
         await active.append_sample(samples=samples_in, IO="in")
         await active.append_sample(samples=samples_out, IO="out")
-        await active.enqueue_data_dflt(
-            datadict={"unloaded": unloaded, "tray_dict": tray_dict}
-        )
+        datadict = {"unloaded": unloaded, "tray_dict": tray_dict}
+        datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
+        active.enqueue_data_nowait(datamodel, action=active.action)
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -638,11 +638,11 @@ def makeApp(confPrefix, servKey, helao_root):
         It will select the first empty vial which has the smallest volume that still can hold req_vol
         """
         active = await app.base.setup_and_contain_action()
-        await active.enqueue_data_dflt(
-            datadict=await app.driver.archive.tray_new_position(
-                **active.action.action_params
-            )
+        datadict = await app.driver.archive.tray_new_position(
+            **active.action.action_params
         )
+        datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
+        active.enqueue_data_nowait(datamodel, action=active.action)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -659,13 +659,13 @@ def makeApp(confPrefix, servKey, helao_root):
     ):
         """Updates app.driver vial Table. If sucessful (vial-slot was empty) returns True, else it returns False."""
         active = await app.base.setup_and_contain_action()
-        await active.enqueue_data_dflt(
-            datadict={
-                "update": await app.driver.archive.tray_update_position(
-                    **active.action.action_params
-                ),
-            }
-        )
+        datadict = {
+            "update": await app.driver.archive.tray_update_position(
+                **active.action.action_params
+            ),
+        }
+        datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
+        active.enqueue_data_nowait(datamodel, action=active.action)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -680,11 +680,11 @@ def makeApp(confPrefix, servKey, helao_root):
             action_abbr="traytojson",
             file_type="palvialtable_helao__file",
         )
-        await active.enqueue_data_dflt(
-            datadict=await app.driver.archive.tray_export_json(
-                **active.action.action_params
-            )
+        datadict = await app.driver.archive.tray_export_json(
+            **active.action.action_params
         )
+        datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
+        active.enqueue_data_nowait(datamodel, action=active.action)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -753,9 +753,9 @@ def makeApp(confPrefix, servKey, helao_root):
         )
         if loaded:
             await active.append_sample(samples=[loaded_sample], IO="in")
-        await active.enqueue_data_dflt(
-            datadict={"loaded": loaded, "customs_dict": customs_dict}
-        )
+        datadict = {"loaded": loaded, "customs_dict": customs_dict}
+        datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
+        active.enqueue_data_nowait(datamodel, action=active.action)
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -776,9 +776,9 @@ def makeApp(confPrefix, servKey, helao_root):
         )
         if loaded:
             await active.append_sample(samples=[loaded_sample], IO="in")
-        await active.enqueue_data_dflt(
-            datadict={"loaded": loaded, "customs_dict": customs_dict}
-        )
+        datadict = {"loaded": loaded, "customs_dict": customs_dict}
+        datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
+        active.enqueue_data_nowait(datamodel, action=active.action)
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -807,9 +807,9 @@ def makeApp(confPrefix, servKey, helao_root):
         )
         await active.append_sample(samples=samples_in, IO="in")
         await active.append_sample(samples=samples_out, IO="out")
-        await active.enqueue_data_dflt(
-            datadict={"unloaded": unloaded, "customs_dict": customs_dict}
-        )
+        datadict = {"unloaded": unloaded, "customs_dict": customs_dict}
+        datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
+        active.enqueue_data_nowait(datamodel, action=active.action)
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -867,10 +867,10 @@ def makeApp(confPrefix, servKey, helao_root):
         )
         active.action.error_code = error_code
         await active.append_sample(samples=[sample], IO="in")
-        await active.enqueue_data_dflt(
-            datadict={"sample": sample.as_dict(), "error_code": error_code}
-        )
+        datadict = {"sample": sample.as_dict(), "error_code": error_code}
         active.action.action_params.update({"_fast_samples_in": [sample.as_dict()]})
+        datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
+        active.enqueue_data_nowait(datamodel, action=active.action)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -915,7 +915,9 @@ def makeApp(confPrefix, servKey, helao_root):
         active.action.error_code = error_code
         await active.append_sample(samples=samples_in, IO="in")
         await active.append_sample(samples=samples_out, IO="out")
-        await active.enqueue_data_dflt(datadict={"error_code": error_code})
+        datadict = {"error_code": error_code}
+        datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
+        active.enqueue_data_nowait(datamodel, action=active.action)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -937,10 +939,9 @@ def makeApp(confPrefix, servKey, helao_root):
         # clear samples_in
         active.action.samples_in = []
         await active.append_sample(samples=samples, IO="in")
-
-        await active.enqueue_data_dflt(
-            datadict={"samples": [sample.as_dict() for sample in samples]}
-        )
+        datadict = {"samples": [sample.as_dict() for sample in samples]}
+        datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
+        active.enqueue_data_nowait(datamodel, action=active.action)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -982,9 +983,9 @@ def makeApp(confPrefix, servKey, helao_root):
         active.action.samples_in = []
         active.action.samples_out = []
         await active.append_sample(samples=samples, IO="out")
-        await active.enqueue_data_dflt(
-            datadict={"samples": [sample.as_dict() for sample in samples]}
-        )
+        datadict = {"samples": [sample.as_dict() for sample in samples]}
+        datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
+        active.enqueue_data_nowait(datamodel, action=active.action)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
