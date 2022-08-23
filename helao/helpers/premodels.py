@@ -28,9 +28,10 @@ from helaocore.models.action_start_condition import ActionStartCondition
 
 
 class Sequence(SequenceModel):
-    # not in SequenceModel:
+    "Experiment grouping class."
 
-    # this holds experiments from an active sequence
+    # not in SequenceModel:
+    globalseq_params: Optional[dict] = Field(default_factory=dict)
     experimentmodel_list: List[ExperimentModel] = Field(default_factory=list)
 
     def __repr__(self):
@@ -77,6 +78,9 @@ class Experiment(Sequence, ExperimentModel):
     # not in ExperimentModel:
     globalexp_params: Optional[dict] = Field(default_factory=dict)
     actionmodel_list: List[ActionModel] = Field(default_factory=list)
+
+    from_globalseq_params: Optional[dict] = Field(default_factory=dict)
+    to_globalseq_params: Optional[Union[list, dict]] = Field(default_factory=list)
 
     def __repr__(self):
         return f"<experiment_name:{self.experiment_name}>"
