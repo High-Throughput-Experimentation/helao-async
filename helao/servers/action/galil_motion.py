@@ -351,11 +351,9 @@ async def galil_dyn_endpoints(app=None):
             specref_code: Optional[int] = 1,
         ):
             active = await app.base.setup_and_contain_action()
-
-            refno = 0
             refxy = app.base.world_cfg["builtin_ref_motorxy"]
-            active.action.action_params.update({"_refno": refno, "_refxy": refxy})
-            await active.enqueue_data_dflt(datadict={"_refno": refno, "_refxy": refxy})
+            active.action.action_params.update({"_refxy": refxy})
+            await active.enqueue_data_dflt(datadict={"_refxy": refxy})
             finished_action = await active.finish()
             return finished_action.as_dict()
 

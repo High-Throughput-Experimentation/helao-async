@@ -296,16 +296,16 @@ def UVIS_sub_setup_ref(
             MOTOR_server,
             "solid_get_builtin_specref",
             {},
-            to_globalexp_params=["_refno", "_refxy"],
+            to_globalexp_params=["_refxy"],
         )
         apm.add(
             PAL_server,
             "archive_custom_load_solid",
             {
                 "custom": apm.pars.solid_custom_position,
+                "sample_no": apm.pars.solid_sample_no,
                 "plate_id": apm.pars.solid_plate_id,
             },
-            from_globalexp_params={"_refno": "sample_no"},
         )
     elif apm.pars.reference_mode == "blank":
         apm.add(ORCH_server, "interrupt", {})
