@@ -362,7 +362,7 @@ class Orch(Base):
         self.last_wait_ts = 0
 
         self.status_subscriber = asyncio.create_task(self.subscribe_all())
-        
+
         self.globstat_q = MultisubscriberQueue()
         self.globstat_clients = set()
         self.globstat_broadcaster = asyncio.create_task(self.globstat_broadcast_task())
@@ -519,12 +519,12 @@ class Orch(Base):
             async for globstat_msg in self.globstat_q.subscribe():
                 await websocket.send_text(json.dumps(globstat_msg.json_dict()))
         except Exception as e:
-            tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             self.print_message(
                 f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
                 error=True,
             )
-            
+
     async def globstat_broadcast_task(self):
         """Consume globstat_q. Does nothing for now."""
         async for _ in self.globstat_q.subscribe():
@@ -601,6 +601,16 @@ class Orch(Base):
         # generate uids when populating,
         # generate timestamp when acquring
         self.active_experiment = self.experiment_dq.popleft()
+
+        self.print_message("copying global vars to experiment")
+        # copy requested global param to experiment params
+        for k, v in self.active_experiment.from_globalseq_params.items():
+            self.print_message(f"{k}:{v}")
+            if k in self.active_sequence.globalseq_params:
+                self.active_experiment.experiment_params.update(
+                    {v: self.active_sequence.globalseq_params[k]}
+                )
+
         self.print_message(
             f"new active experiment is {self.active_experiment.experiment_name}"
         )
@@ -712,12 +722,13 @@ class Orch(Base):
                     await self.orch_wait_for_all_actions()
 
             self.print_message("copying global vars to action")
-
             # copy requested global param to action params
             for k, v in A.from_globalexp_params.items():
                 self.print_message(f"{k}:{v}")
                 if k in self.active_experiment.globalexp_params:
-                    A.action_params.update({v: self.active_experiment.globalexp_params[k]})
+                    A.action_params.update(
+                        {v: self.active_experiment.globalexp_params[k]}
+                    )
 
             self.print_message(
                 f"dispatching action {A.action_name} on server {A.action_server.server_name}"
@@ -1300,7 +1311,7 @@ class Orch(Base):
             await self.write_seq(self.active_sequence)
             self.last_sequence = deepcopy(self.active_sequence)
             self.active_sequence = None
-            
+
             self.orchstatusmodel.counter_dispatched_actions = {}
 
             # DB server call to finish_yml if DB exists
