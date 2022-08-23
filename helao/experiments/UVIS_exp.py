@@ -256,6 +256,7 @@ def UVIS_sub_measure(
 
     if apm.pars.reference_mode == "blank" and apm.pars.run_use == "ref_light":
         apm.add(ORCH_server, "interrupt", {})
+        apm.add(ORCH_server, "wait", {"waittime": 1})
 
     return apm.action_list  # returns complete action list to orch
 
