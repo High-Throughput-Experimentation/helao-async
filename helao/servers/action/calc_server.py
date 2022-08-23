@@ -10,13 +10,14 @@ import time
 from typing import Optional, List
 from fastapi import Body
 
-from helaocore.models.sample import SampleUnion
-from helaocore.models.file import HloHeaderModel
+from helaocore.models.sequence import SequenceModel
+from helaocore.models.experiment import ExperimentModel
 
 from helao.helpers.premodels import Action
 from helao.servers.base import makeActionServ
 from helao.drivers.data.calc_driver import Calc
 from helao.helpers.config_loader import config_loader
+
 
 def makeApp(confPrefix, servKey, helao_root):
     config = config_loader(confPrefix, helao_root)
@@ -28,4 +29,13 @@ def makeApp(confPrefix, servKey, helao_root):
         version=0.1,
         driver_class=Calc,
     )
+
+    @app.post(f"/{servKey}/calc_uvis_basics")
+    async def calc_uvis_basics(
+        action: Optional[Action] = Body({}, embed=True),
+        action_version: int = 1,
+        sequence_in: Optional[SequenceModel] = Body({}, embed=True),
+    ):
+        pass
+
     return app
