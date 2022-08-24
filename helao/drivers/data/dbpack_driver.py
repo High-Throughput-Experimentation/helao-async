@@ -381,7 +381,7 @@ class ExpYml(HelaoYml):
             print_message(
                 {},
                 "DB",
-                f"Process terminating action has no process_name. Using action_name.",
+                f"Process terminating action has no technique_name. Using action_name.",
             )
         fill_process = {
             "action_params": self.dict["experiment_params"],
