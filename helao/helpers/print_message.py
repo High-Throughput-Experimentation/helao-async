@@ -16,7 +16,7 @@ def print_message(server_cfg, server_name, *args, **kwargs):
             os.makedirs(output_path, exist_ok=True)
         with open(output_file, "a+") as f:
             for arg in msg_part2:
-                f.write(f"[{msg_type}{msg_part1}: {arg}\n")
+                f.write(f"{msg_type}{msg_part1}: {arg}\n")
 
     precolor = ""
     msg_type = ""
