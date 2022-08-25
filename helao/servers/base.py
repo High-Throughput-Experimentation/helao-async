@@ -642,7 +642,7 @@ class Base(object):
                     status_msg.act.action_name
                 ].active_dict.update({status_msg.act.action_uuid: status_msg})
 
-                # sort the status (finished_dict is empty at this point)
+                # sort the status (nonactive_dict is empty at this point)
                 self.actionserver.endpoints[status_msg.act.action_name].sort_status()
                 self.print_message(
                     f"log_status_task sending status "

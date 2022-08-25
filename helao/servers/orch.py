@@ -754,7 +754,7 @@ class Orch(Base):
                 A.action_server.as_key()
             ].endpoints[A.action_name]
             endpoint_uuids = [k.hex for k in endpoint_status.active_dict.keys()] + [
-                k.hex for k in endpoint_status.finished_dict[HloStatus.finished].keys()
+                k.hex for k in endpoint_status.nonactive_dict[HloStatus.finished].keys()
             ]
             self.print_message(
                 f"Current {A.action_name} received uuids: {endpoint_uuids}"
@@ -769,7 +769,7 @@ class Orch(Base):
                 )
                 try:
                     await asyncio.wait_for(self.wait_for_interrupt(), timeout=1.0)
-                except TimeoutError:
+                except asyncio.TimeoutError:
                     print("!!! Did not receive interrupt after 1 sec, retrying. !!!")
                 # endpoint_status = deepcopy(
                 #     self.orchstatusmodel.server_dict[
@@ -778,7 +778,7 @@ class Orch(Base):
                 # )
                 endpoint_uuids = [k.hex for k in endpoint_status.active_dict.keys()] + [
                     k.hex
-                    for k in endpoint_status.finished_dict[HloStatus.finished].keys()
+                    for k in endpoint_status.nonactive_dict[HloStatus.finished].keys()
                 ]
             self.print_message(f"New status registered on {A.action_name}.")
             if error_code is not ErrorCodes.none:
