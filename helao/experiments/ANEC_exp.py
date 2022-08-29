@@ -38,6 +38,7 @@ from helaocore.models.action_start_condition import ActionStartCondition
 from helaocore.models.process_contrib import ProcessContrib
 from helao.helpers.ref_electrode import REF_TABLE
 from helao.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
+from helao.drivers.io.enum import TriggerType
 
 # list valid experiment functions
 EXPERIMENTS = __all__
@@ -48,6 +49,9 @@ MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).json_di
 NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).json_dict()
 ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).json_dict()
 PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).json_dict()
+IO_server = MachineModel(server_name="IO", machine_name=ORCH_HOST).json_dict()
+
+toggle_triggertype = TriggerType.fallingedge
 
 
 # z positions for ADSS cell
@@ -607,6 +611,10 @@ def ANEC_sub_photo_CA(
     illumination_intensity: Optional[float] = 9.0,
     illumination_intensity_date: Optional[str] = "n/a",
     illumination_side: Optional[str] = "front",
+    toggle_dark_time_init: Optional[float] = 0.0,
+    toggle_illum_duty: Optional[float] = 0.5,
+    toggle_illum_period: Optional[float] = 2.0,
+    toggle_illum_time: Optional[float] = -1,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if apm.pars.WE_versus == "ref":
@@ -619,7 +627,28 @@ def ANEC_sub_photo_CA(
         {"custom": "cell1_we"},
         to_globalexp_params=["_fast_samples_in"],
     )
-    apm.add(NI_server, "led", {"led":"led", "on": 1})
+#    apm.add(NI_server, "led", {"led":"led", "on": 1})
+# adding IO server for Galil LED toggle control instead of NI
+    apm.add(
+        IO_server,
+        "set_digital_cycle",
+        {
+                "trigger_name": "gamry_ttl0",
+                "triggertype": toggle_triggertype,
+                "out_name": apm.pars.illumination_source,
+                "out_name_gamry": "gamry_aux",
+                "toggle_init_delay": apm.pars.toggle_dark_time_init,
+                "toggle_duty": apm.pars.toggle_illum_duty,
+                "toggle_period": apm.pars.toggle_illum_period,
+                "toggle_duration": apm.pars.toggle_illum_time,
+        },
+        process_finish = False,
+        process_contrib= [
+                ProcessContrib.files,
+            ],
+    )
+
+
     apm.add(
         PSTAT_server,
         "run_CA",
@@ -641,7 +670,7 @@ def ANEC_sub_photo_CA(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(NI_server, "led", {"led":"led", "on": 0})
+#    apm.add(NI_server, "led", {"led":"led", "on": 0})
     # apm.add(ORCH_server, "wait", {"waittime": 10})
 
     return apm.action_list
