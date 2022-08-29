@@ -13,7 +13,7 @@ def read_hlo(path: str) -> Tuple[dict, dict]:
     with path_to_hlo.open() as f:
         lines = f.readlines()
 
-    sep_index = lines.index('%%\n')
+    sep_index = lines.index("%%\n")
 
     yaml = YAML(typ="safe")
     meta = yaml.load("".join(lines[:sep_index]))
