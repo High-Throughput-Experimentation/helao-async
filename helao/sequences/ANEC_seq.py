@@ -220,6 +220,10 @@ def ANEC_photo_CA(
     led_date: str = "01/01/2000",
     led_intensities_mw: float = 9.0,
     led_name_CA: str = "Thorlab_led",
+    toggleCA_illum_duty: float = 0.5,
+    toggleCA_illum_period: float = 1.0,
+    toggleCA_dark_time_init: float = 0,
+    toggleCA_illum_time: float = -1,
     toolGC: str = "HS 2",
     toolarchive: str = "LS 3",
     volume_ul_GC: int = 300,
@@ -290,6 +294,10 @@ def ANEC_photo_CA(
                 "illumination_intensity": led_intensities_mw,
                 "illumination_intensity_date": led_date,
                 "illumination_side": led_type,
+                "toggle_illum_duty": toggleCA_illum_duty,
+                "toggle_illum_period": toggleCA_illum_period,
+                "toggle_illum_time": toggleCA_illum_time,
+                "toggle_dark_time_init": toggleCA_dark_time_init,
             },
         )
 

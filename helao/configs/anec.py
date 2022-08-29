@@ -70,6 +70,24 @@ config["servers"] = dict(
             dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
         ),
     ),
+    IO=dict(
+        host=hostip,
+        port=8005,
+        group="action",
+        fast="galil_io",
+        params=dict(
+            galil_ip_str="192.168.99.222",
+            dev_ai={},
+            dev_ao={},
+            dev_di={
+                "gamry_ttl0": 1,
+            },
+            dev_do={
+                "gamry_aux": 1,
+                "Thorlab_led": 7,
+            },
+        ),
+    ),
     NI=dict(
         host="127.0.0.1",
         port=8006,
