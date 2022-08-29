@@ -30,12 +30,21 @@ def makeApp(confPrefix, servKey, helao_root):
         driver_class=Calc,
     )
 
-    @app.post(f"/{servKey}/calc_uvis_basics")
-    async def calc_uvis_basics(
+    @app.post(f"/{servKey}/calc_uvis_abs")
+    async def calc_uvis_abs(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
-        sequence_in: Optional[SequenceModel] = Body({}, embed=True),
+        ev_parts: list = [1.5, 2.0, 2.5, 3.0],
+        bin_width: int = 3,
+        window_length: int = 45,
+        poly_order: int = 4,
+        lower_wl: float = 370,
+        upper_wl: float = 1020,
     ):
-        pass
+        active = await app.base.setup_and_contain_action(action_abbr="calcAbs")
+        datadict = app.driver.calc_uvis_abs(active)
+        await active.enqueue_data_dflt(datadict=datadict)
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
     return app
