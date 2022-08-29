@@ -136,42 +136,47 @@ class Calc:
             }
 
         params = activeobj.action.action_params
+        pred = {}
+        for k, sd in specd.items():
+            pred[k] = {"full": {}, "bin": {}, "smooth": {}}
+            wl = np.array(sd["wlarr"])
+            pred[k]["full"]["wl"] = wl
+            wlmask = np.where((wl > params["lower_wl"]) & (wl < params["upper_wl"]))[0]
+            pred[k]["full"]["sig"] = np.array(sd["bsnlist"])[:, wlmask]
+            binds = [
+                [y for y in range(x, x + params["bin_width"]) if y < wl.shape[0]]
+                for x in range(0, wl.shape[0], params["bin_width"])
+            ]
+            pred[k]["bin"]["wl"] = np.array([np.median(wl[inds]) for inds in binds])
+            bsig = np.array(
+                [pred[k]["full"]["sig"][:, inds].mean(axis=1) for inds in binds]
+            ).transpose()
+            pred[k]["bin"]["sig"] = bsig
+
         if len(specd.keys()) == 2:  # TR_UVVIS technique
-            wlT = np.array(specd["T"]["wlarr"])
-            flT = np.where((wlT > params["lower_wl"]) & (wlT < params["upper_wl"]))[0]
-            arrT = np.array(specd["T"]["bsnlist"])[:, flT]
+            pred["TR"] = {"full": {}, "bin": {}, "smooth": {}}
+            for k in specd.keys():
+                pred["TR"]["full"][k] = pred[k]["full"]["sig"]
+                pred["TR"]["bin"][k] = pred[k]["bin"]["sig"]
+
+            # TODO: loop through binning and smoothing
             smpT = np.array(specd["T"]["smplist"])
-            bindT = [
-                list(range(x, x + params["bin_width"]))
-                for x in range(0, wlT.shape[0], params["bin_width"])
-            ]
-            bwlT = [np.median(wlT[inds]) for inds in bindT]
-            barrT = [arrT[:, inds].mean(axis=1) for inds in bindT]
-
             asT = np.argsort(smpT)
-            wlR = np.array(specd["R"]["wlarr"])
-            flR = np.where((wlR > params["lower_wl"]) & (wlR < params["upper_wl"]))[0]
-            arrR = np.array(specd["R"]["bsnlist"])[asT, flR]
-            smpR = np.array(specd["R"]["smplist"])[asT]
-            bindR = [
-                list(range(x, x + params["bin_width"]))
-                for x in range(0, wlR.shape[0], params["bin_width"])
-            ]
-            bwlR = [np.median(wlR[inds]) for inds in bindR]
-            barrR = [arrR[:, inds].mean(axis=1) for inds in bindR]
-
-            rsi = [np.median(inds) for inds in bindT]
-            hv = [1239.8 / x for x in bwlT]
-
-            arrTR = arrT / (1 - arrR)
-            omTR = 1 - arrT - arrR
+            rsi = [np.median(inds) for inds in binds]
+            hv = [1239.8 / x for x in pred["T"]["bin"]["wl"]]
+            pred["TR"]["bin"].update({"rawselectinds": rsi, "hv": hv}, "smooth": {}})
+            arrTR = pred["T"]["full"]["sig"] / (1 - pred["R"]["full"]["sig"])
+            pred["TR"]["full"]["TR"] = arrTR
+            omTR = 1 - pred["T"]["full"]["sig"] - pred["R"]["full"]["sig"]
+            pred["TR"]["full"]["omTR"] = omTR
             absTR = -np.log(arrTR)
 
             barrTR = [arrTR[:, inds].mean(axis=1) for inds in bindT]
+            barrTR = np.array(barrTR).transpose()
             bomTR = [omTR[:, inds].mean(axis=1) for inds in bindT]
+            bomTR = np.array(bomTR).transpose()
             babsTR = [absTR[:, inds].mean(axis=1) for inds in bindT]
-
-
+            babsTR = np.array(babsTR).transpose()
 
         elif len(specd.keys()) == 1 and "T" in specd.keys():  # T_UVVIS only
             wlT = np.array(specd["T"]["wlarr"])
@@ -179,11 +184,11 @@ class Calc:
             arrT = np.array(specd["T"]["bsnlist"])[:, flT]
             smpT = np.array(specd["T"]["smplist"])
             bindT = [
-                list(range(x, x + params["bin_width"]))
+                [y for y in range(x, x + params["bin_width"]) if y < wlT.shape[0]]
                 for x in range(0, wlT.shape[0], params["bin_width"])
             ]
             bwlT = [np.median(wlT[inds]) for inds in bindT]
-            barrT = [arrT[:, inds].mean(axis=1) for inds in bindT]
+            barrT = np.array([arrT[:, inds].mean(axis=1) for inds in bindT]).transpose()
 
             rsi = [np.median(inds) for inds in bindT]
             hv = [1239.8 / x for x in bwlT]
@@ -194,11 +199,11 @@ class Calc:
             arrR = np.array(specd["R"]["bsnlist"])[:, flR]
             smpR = np.array(specd["R"]["smplist"])
             bindR = [
-                list(range(x, x + params["bin_width"]))
+                [y for y in range(x, x + params["bin_width"]) if y < wlR.shape[0]]
                 for x in range(0, wlR.shape[0], params["bin_width"])
             ]
             bwlR = [np.median(wlR[inds]) for inds in bindR]
-            barrR = [arrR[:, inds].mean(axis=1) for inds in bindR]
+            barrR = np.array([arrR[:, inds].mean(axis=1) for inds in bindR]).transpose()
 
             rsi = [np.median(inds) for inds in bindR]
             hv = [1239.8 / x for x in bwlR]
