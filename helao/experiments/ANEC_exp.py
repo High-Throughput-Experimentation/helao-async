@@ -657,7 +657,7 @@ def ANEC_sub_photo_CA(
             "Tval__s": apm.pars.CA_duration_sec,
             "AcqInterval__s": apm.pars.SampleRate,
             "TTLwait": -1,  # -1 disables, else select TTL 0-3
-            "TTLsend": -1,  # -1 disables, else select TTL 0-3
+            "TTLsend": 0,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
