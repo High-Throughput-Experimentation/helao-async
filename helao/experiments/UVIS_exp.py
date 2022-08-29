@@ -39,6 +39,7 @@ SPEC_T_server = MM(server_name="SPEC_T", machine_name=gethostname()).json_dict()
 SPEC_R_server = MM(server_name="SPEC_R", machine_name=gethostname()).json_dict()
 ORCH_server = MM(server_name="ORCH", machine_name=gethostname()).json_dict()
 PAL_server = MM(server_name="PAL", machine_name=gethostname()).json_dict()
+CALC_server = MM(server_name="CALC", machine_name=gethostname()).json_dict()
 
 toggle_triggertype = TriggerType.fallingedge
 
@@ -342,4 +343,14 @@ def UVIS_sub_setup_ref(
         },
         from_globalexp_params={"_refxy": "d_mm"},
     )
+    return apm.action_list  # returns complete action list to orch
+
+
+def UVIS_calc_abs(
+    experiment: Experiment,
+    experiment_version: int = 1,
+):
+    """Calculate absorption from sequence info."""
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(CALC_server, "calc_uvis_abs", {})
     return apm.action_list  # returns complete action list to orch
