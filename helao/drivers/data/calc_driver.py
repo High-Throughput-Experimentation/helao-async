@@ -138,74 +138,149 @@ class Calc:
         params = activeobj.action.action_params
         pred = {}
         for k, sd in specd.items():
-            pred[k] = {"full": {}, "bin": {}, "smooth": {}}
+            pred[k] = {
+                "full": {},
+                "bin": {},
+                "smooth": {},
+                "smooth_refadj": {},
+                "smooth_refadj_scl": {},
+            }
             wl = np.array(sd["wlarr"])
-            pred[k]["full"]["wl"] = wl
             wlmask = np.where((wl > params["lower_wl"]) & (wl < params["upper_wl"]))[0]
+            pred[k]["full"]["wl"] = wl[wlmask]
             pred[k]["full"]["sig"] = np.array(sd["bsnlist"])[:, wlmask]
             binds = [
                 [y for y in range(x, x + params["bin_width"]) if y < wl.shape[0]]
                 for x in range(0, wl.shape[0], params["bin_width"])
             ]
+            pred[k]["binds"] = binds
+            rsi = [np.median(inds) for inds in pred[k]["binds"]]
+            pred[k]["rsi"] = rsi
             pred[k]["bin"]["wl"] = np.array([np.median(wl[inds]) for inds in binds])
-            bsig = np.array(
-                [pred[k]["full"]["sig"][:, inds].mean(axis=1) for inds in binds]
-            ).transpose()
-            pred[k]["bin"]["sig"] = bsig
+            hv = [1239.8 / x for x in pred[k]["bin"]["wl"]]
+            pred[k]["hv"] = hv
+            dx = hv[1] - hv[0]
+            dx += [(hv[idx + 1] - hv[idx - 1]) / 2.0 for idx in range(1, len(rsi - 1))]
+            dx += hv[-1] - hv[-2]
+            pred[k]["dx"] = dx
 
         if len(specd.keys()) == 2:  # TR_UVVIS technique
-            pred["TR"] = {"full": {}, "bin": {}, "smooth": {}}
-            for k in specd.keys():
-                pred["TR"]["full"][k] = pred[k]["full"]["sig"]
-                pred["TR"]["bin"][k] = pred[k]["bin"]["sig"]
+            if pred["T"]["binds"] != pred["R"]["binds"]:
+                raise Exception
 
-            # TODO: loop through binning and smoothing
+            pred["TR"] = {
+                "full": {},
+                "bin": {},
+                "smooth": {},
+                "smooth_refadj": {},
+                "smooth_refadj_scl": {},
+            }
             smpT = np.array(specd["T"]["smplist"])
             asT = np.argsort(smpT)
-            rsi = [np.median(inds) for inds in binds]
-            hv = [1239.8 / x for x in pred["T"]["bin"]["wl"]]
-            pred["TR"]["bin"].update({"rawselectinds": rsi, "hv": hv}, "smooth": {}})
-            arrTR = pred["T"]["full"]["sig"] / (1 - pred["R"]["full"]["sig"])
-            pred["TR"]["full"]["TR"] = arrTR
-            omTR = 1 - pred["T"]["full"]["sig"] - pred["R"]["full"]["sig"]
+            arrTR = pred["T"]["full"]["sig"] / (1 - pred["R"]["full"]["sig"][asT, :])
+            pred["TR"]["full"]["sig"] = arrTR
+            omTR = 1 - pred["T"]["full"]["sig"] - pred["R"]["full"]["sig"][asT, :]
             pred["TR"]["full"]["omTR"] = omTR
-            absTR = -np.log(arrTR)
-
-            barrTR = [arrTR[:, inds].mean(axis=1) for inds in bindT]
-            barrTR = np.array(barrTR).transpose()
-            bomTR = [omTR[:, inds].mean(axis=1) for inds in bindT]
-            bomTR = np.array(bomTR).transpose()
-            babsTR = [absTR[:, inds].mean(axis=1) for inds in bindT]
-            babsTR = np.array(babsTR).transpose()
+            pred["TR"]["full"]["abs"] = -np.log(arrTR)
+            for copyk in ("binds", "rsi", "hv", "dx"):
+                pred["TR"][copyk] = pred["T"][copyk]
+            pred["TR"]["bin"]["wl"] = pred["T"]["bin"]["wl"]
 
         elif len(specd.keys()) == 1 and "T" in specd.keys():  # T_UVVIS only
-            wlT = np.array(specd["T"]["wlarr"])
-            flT = np.where((wlT > params["lower_wl"]) & (wlT < params["upper_wl"]))[0]
-            arrT = np.array(specd["T"]["bsnlist"])[:, flT]
-            smpT = np.array(specd["T"]["smplist"])
-            bindT = [
-                [y for y in range(x, x + params["bin_width"]) if y < wlT.shape[0]]
-                for x in range(0, wlT.shape[0], params["bin_width"])
-            ]
-            bwlT = [np.median(wlT[inds]) for inds in bindT]
-            barrT = np.array([arrT[:, inds].mean(axis=1) for inds in bindT]).transpose()
-
-            rsi = [np.median(inds) for inds in bindT]
-            hv = [1239.8 / x for x in bwlT]
+            pred["T"]["full"]["abs"] = -np.log(pred["T"]["full"]["sig"])
 
         elif len(specd.keys()) == 1 and "R" in specd.keys():  # DR_UVVIS only
-            wlR = np.array(specd["R"]["wlarr"])
-            flR = np.where((wlR > params["lower_wl"]) & (wlR < params["upper_wl"]))[0]
-            arrR = np.array(specd["R"]["bsnlist"])[:, flR]
-            smpR = np.array(specd["R"]["smplist"])
-            bindR = [
-                [y for y in range(x, x + params["bin_width"]) if y < wlR.shape[0]]
-                for x in range(0, wlR.shape[0], params["bin_width"])
-            ]
-            bwlR = [np.median(wlR[inds]) for inds in bindR]
-            barrR = np.array([arrR[:, inds].mean(axis=1) for inds in bindR]).transpose()
+            pred["R"]["full"]["abs"] = (1.0 - np.log(pred["R"]["full"]["sig"])) ** 2 / (
+                2.0 * pred["R"]["full"]["sig"]
+            )
 
-            rsi = [np.median(inds) for inds in bindR]
-            hv = [1239.8 / x for x in bwlR]
+        for sk in [pk for pk in pred.keys() if pk in ("T", "R", "TR")]:
+            # bin full arrays that haven't been binned
+            for k, arr in pred[sk]["full"].items():
+                if k not in pred[sk]["bin"].keys():
+                    pred[sk]["bin"][k] = [arr[:, inds].mean(axis=1) for inds in binds]
+                    pred[sk]["bin"][k] = np.array(pred[sk]["bin"][k]).transpose()
+            # smooth binned arrays that haven't been smoothed
+            for k, arr in pred[sk]["bin"].items():
+                if k != "abs" and k not in pred[sk]["smooth"].keys():
+                    v = arr
+                    v[np.isnan(v)] = 0.1
+                    pred[sk]["smooth"][k] = savgol_filter(
+                        v,
+                        polyorder=params["poly_order"],
+                        delta=params["delta"],
+                        deriv=0,
+                    )
 
+            # smooth sig
+            v = pred[sk]["smooth"]["sig"]
+            pred[sk]["smooth_refadj"]["sig"] = v
+            pred[sk]["min_rescaled"] = False
+            pred[sk]["max_rescaled"] = False
+            if min(v) >= params["min_mthd_allowed"] and min(v) < params["min_limit"]:
+                pred[sk]["min_rescaled"] = True
+                pred[sk]["smooth_refadj"]["sig"] = v - min(v) + params["min_limit"]
+            v = pred[sk]["smooth_refadj"]["sig"]
+            if max(v) <= params["max_mthd_allowed"] and max(v) >= params["max_limit"]:
+                pred[sk]["max_rescaled"] = True
+                pred[sk]["smooth_refadj"]["sig"] = v / (max(v) + 0.02)
+
+            # smooth abs
+            if len(specd.keys()) == 1 and "R" in specd.keys():
+                pred[sk]["smooth_refadj"]["abs"] = -np.log(
+                    pred[sk]["smooth_refadj"]["sig"]
+                )
+            else:
+                pred[sk]["smooth_refadj"]["abs"] = (
+                    1.0 - np.log(pred[sk]["smooth_refadj"]["sig"])
+                ) ** 2 / (2.0 * pred[sk]["smooth_refadj"]["sig"])
+            pred[sk]["smooth_refadj"]["DA_unscl"] = (
+                pred[sk]["smooth_refadj"]["abs"] * pred[sk]["hv"]
+            ) ** 2
+            pred[sk]["smooth_refadj"]["DA"] = pred[sk]["smooth_refadj"][
+                "DA_unscl"
+            ] / np.nanmax(pred[sk]["smooth_refadj"]["DA_unscl"])
+            pred[sk]["smooth_refadj"]["IA_unscl"] = (
+                pred[sk]["smooth_refadj"]["abs"] * pred[sk]["hv"]
+            ) ** 0.5
+            pred[sk]["smooth_refadj"]["IA"] = pred[sk]["smooth_refadj"][
+                "IA_unscl"
+            ] / np.nanmax(pred[sk]["smooth_refadj"]["IA_unscl"])
+            pred[sk]["smooth_refadj"]["DF_unscl"] = (
+                pred[sk]["smooth_refadj"]["abs"] * pred[sk]["hv"]
+            ) ** (2.0 / 3.0)
+            pred[sk]["smooth_refadj"]["DF"] = pred[sk]["smooth_refadj"][
+                "DF_unscl"
+            ] / np.nanmax(pred[sk]["smooth_refadj"]["DF_unscl"])
+            pred[sk]["smooth_refadj"]["IF_unscl"] = (
+                pred[sk]["smooth_refadj"]["abs"] * pred[sk]["hv"]
+            ) ** (1.0 / 3.0)
+            pred[sk]["smooth_refadj"]["IF"] = pred[sk]["smooth_refadj"][
+                "IF_unscl"
+            ] / np.nanmax(pred[sk]["smooth_refadj"]["IF_unscl"])
+
+            # abs_smooth_refadj_scl
+            pred[sk]["smooth_refadj_scl"]["abs"] = pred[sk]["smooth_refadj"][
+                k
+            ] / np.nanmax(pred[sk]["smooth_refadj"]["abs"])
+            v = pred[sk]["smooth_refadj_scl"]["abs"]
+            v[np.isnan(v)] = 0.1
+            pred[sk]["smooth_refadj_scl"]["abs_1stderiv"] = (
+                savgol_filter(
+                    v,
+                    polyorder=params["poly_order"],
+                    delta=params["delta"],
+                    deriv=1,
+                )
+                / pred[sk]["dx"]
+            )
+            pred[sk]["smooth_refadj_scl"]["abs_2ndderiv"] = (
+                savgol_filter(
+                    v,
+                    polyorder=params["poly_order"],
+                    delta=params["delta"],
+                    deriv=2,
+                )
+                / pred[sk]["dx"] ** 2
+            )
         return datadict
