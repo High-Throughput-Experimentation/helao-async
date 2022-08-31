@@ -618,6 +618,8 @@ def ANEC_sub_photo_CA(
     toggle_illum_time: Optional[float] = -1,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    if int(round(apm.pars.toggle_illum_time)) == -1:
+        apm.pars.toggle_illum_time = apm.pars.CA_duration_sec
     if apm.pars.WE_versus == "ref":
         potential_vsRef = apm.pars.WE_potential__V - 1.0 * apm.pars.ref_offset__V
     elif apm.pars.WE_versus == "rhe":
@@ -766,6 +768,7 @@ def ANEC_sub_photo_CV(
     toggle_illum_period: Optional[float] = 2.0,
     toggle_illum_time: Optional[float] = -1,
 ):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     CV_duration_sec = (
         abs(apm.pars.WE_potential_apex1__V - apm.pars.WE_potential_init__V) / apm.pars.ScanRate_V_s
     )
@@ -781,7 +784,6 @@ def ANEC_sub_photo_CV(
 
     if int(round(apm.pars.toggle_illum_time)) == -1:
         apm.pars.toggle_illum_time = CV_duration_sec 
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if apm.pars.WE_versus == "ref":
         potential_init_vsRef = apm.pars.WE_potential_init__V - 1.0 * apm.pars.ref_offset__V
         potential_apex1_vsRef = apm.pars.WE_potential_apex1__V - 1.0 * apm.pars.ref_offset__V
