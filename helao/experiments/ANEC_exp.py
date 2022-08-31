@@ -766,6 +766,21 @@ def ANEC_sub_photo_CV(
     toggle_illum_period: Optional[float] = 2.0,
     toggle_illum_time: Optional[float] = -1,
 ):
+    CV_duration_sec = (
+        abs(apm.pars.WE_potential_apex1__V - apm.pars.WE_potential_init__V) / apm.pars.ScanRate_V_s
+    )
+    CV_duration_sec += (
+        abs(apm.pars.WE_potential_final__V - apm.pars.WE_potential_apex2__V) / apm.pars.ScanRate_V_s
+    )
+    CV_duration_sec += (
+        abs(apm.pars.WE_potential_apex2__V - apm.pars.WE_potential_apex1__V) / apm.pars.ScanRate_V_s * apm.pars.Cycles
+    )
+    CV_duration_sec += (
+        abs(apm.pars.WE_potential_apex2__V - apm.pars.WE_potential_apex1__V) / apm.pars.ScanRate_V_s * 2.0 * (apm.pars.Cycles - 1)
+    )
+
+    if int(round(apm.pars.toggle_illum_time)) == -1:
+        apm.pars.toggle_illum_time = CV_duration_sec 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if apm.pars.WE_versus == "ref":
         potential_init_vsRef = apm.pars.WE_potential_init__V - 1.0 * apm.pars.ref_offset__V
@@ -798,7 +813,7 @@ def ANEC_sub_photo_CV(
                 "toggle_init_delay": apm.pars.toggle_dark_time_init,
                 "toggle_duty": apm.pars.toggle_illum_duty,
                 "toggle_period": apm.pars.toggle_illum_period,
-                "toggle_duration": apm.pars.toggle_illum_time,
+                "toggle_duration": CV_duration_sec,
         },
         process_finish = False,
         process_contrib= [
