@@ -21,7 +21,7 @@ class Calc:
     def gather_sequence_data(self, seq_reldir: str):
         # get all files from current sequence directory
         # produce tuples, (run_type, technique_name, run_use, hlo_path)
-        active_save_dir = self.base.save_root.__str__()
+        active_save_dir = self.base.helaodirs.save_root.__str__()
         diag = os.path.join(active_save_dir.replace("ACTIVE", "DIAG"), seq_reldir)
         finished = os.path.join(
             active_save_dir.replace("ACTIVE", "FINISHED"), seq_reldir
