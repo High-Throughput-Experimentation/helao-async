@@ -813,7 +813,7 @@ def ANEC_sub_photo_CV(
                 "toggle_init_delay": apm.pars.toggle_dark_time_init,
                 "toggle_duty": apm.pars.toggle_illum_duty,
                 "toggle_period": apm.pars.toggle_illum_period,
-                "toggle_duration": CV_duration_sec,
+                "toggle_duration": apm.pars.toggle_illum_time,
         },
         process_finish = False,
         process_contrib= [
