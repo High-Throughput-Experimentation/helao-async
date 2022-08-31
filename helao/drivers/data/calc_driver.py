@@ -353,3 +353,6 @@ class Calc:
         #TODO: export interd vectors
 
         return datadict
+
+    def shutdown(self):
+        pass
