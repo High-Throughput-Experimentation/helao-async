@@ -12,6 +12,7 @@ __all__ = [
     "UVIS_sub_relmove",
     "UVIS_sub_measure",
     "UVIS_sub_setup_ref",
+    "UVIS_calc_abs",
 ]
 
 
