@@ -1,6 +1,6 @@
 """Sequence library for ANEC"""
 
-__all__ = ["ANEC_sample_ready", "ANEC_series_CA", "ANEC_photo_CA", "ANEC_cleanup_disengage","ANEC_repeat_CA", "ANEC_repeat_CV", "ANEC_CA_pretreat", "ANEC_gasonly_CA", "GC_Archiveliquid_analysis", "HPLC_Archiveliquid_analysis"]
+__all__ = ["ANEC_sample_ready", "ANEC_series_CA", "ANEC_photo_CA", "ANEC_photo_CV", "ANEC_cleanup_disengage","ANEC_repeat_CA", "ANEC_repeat_CV", "ANEC_CA_pretreat", "ANEC_gasonly_CA", "GC_Archiveliquid_analysis", "HPLC_Archiveliquid_analysis"]
 
 from typing import List
 from typing import Optional
@@ -318,6 +318,108 @@ def ANEC_photo_CA(
         epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
     if len(WE_potential__V)>1:
         epm.add_experiment("ANEC_sub_alloff", {})
+    return epm.experiment_plan_list
+
+def ANEC_photo_CV(
+    sequence_version: int = 1,
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 6.8,
+    num_repeats: int = 1,
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
+    reservoir_liquid_sample_no: int = 1,
+    volume_ul_cell_liquid: float = 1000,
+    WE_potential_init__V: float = 0.0,
+    WE_potential_apex1__V: float = -1.0,
+    WE_potential_apex2__V: float = -1.0,
+    WE_potential_final__V: float = 0.0,
+    ScanRate_V_s: float = 0.01,
+    Cycles: int = 1,
+    SampleRate: float = 0.01,
+    IErange: str = "auto",
+    ref_offset: float = 0.0,
+    led_wavelengths_nm: float = 450.0,
+    led_type: str = "front",
+    led_date: str = "01/01/2000",
+    led_intensities_mw: float = 9.0,
+    led_name_CA: str = "Thorlab_led",
+    toggleCA_illum_duty: float = 0.5,
+    toggleCA_illum_period: float = 1.0,
+    toggleCA_dark_time_init: float = 0,
+    toggleCA_illum_time: float = -1,
+):
+    """Repeat CV at the cell1_we position.
+
+    Flush and fill cell, run CV, and drain.
+
+    (1) Fill cell with liquid for 90 seconds
+    (2) Equilibrate for 15 seconds
+    (3) run CV
+    (5) Drain cell and purge with CO2 for 60 seconds
+
+    Args:
+        exp (Experiment): Active experiment object supplied by Orchestrator
+        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
+        volume_ul_GC: GC injection volume
+
+
+
+    """
+
+    epm = ExperimentPlanMaker()
+
+    # housekeeping
+    epm.add_experiment("ANEC_sub_unload_cell", {})
+
+    #epm.add_experiment("ANEC_sub_normal_state", {})
+
+    epm.add_experiment(
+        "ANEC_sub_load_solid",
+        {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no},
+    )
+
+    for _ in range(num_repeats):
+
+        epm.add_experiment(
+            "ANEC_sub_flush_fill_cell",
+            {
+                "liquid_flush_time": 80,
+                "co2_purge_time": 15,
+                "equilibration_time": 1.0,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "volume_ul_cell_liquid": volume_ul_cell_liquid,
+            },
+        )
+
+        epm.add_experiment(
+            "ANEC_sub_photoCV",
+            {
+                "WE_versus": WE_versus,
+                "ref_type": ref_type,
+                "pH": pH,
+                "WE_potential_init__V": WE_potential_init__V,
+                "WE_potential_apex1__V": WE_potential_apex1__V,
+                "WE_potential_apex2__V": WE_potential_apex2__V,
+                "WE_potential_final__V": WE_potential_final__V,
+                "ScanRate_V_s": ScanRate_V_s,
+                "Cycles": Cycles,
+                "SampleRate": SampleRate,
+                "IErange": IErange,
+                "illumination_source": led_name_CA,
+                "illumination_wavelength": led_wavelengths_nm,
+                "illumination_intensity": led_intensities_mw,
+                "illumination_intensity_date": led_date,
+                "illumination_side": led_type,
+                "toggle_illum_duty": toggleCA_illum_duty,
+                "toggle_illum_period": toggleCA_illum_period,
+                "toggle_illum_time": toggleCA_illum_time,
+                "toggle_dark_time_init": toggleCA_dark_time_init,
+            },
+        )
+
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
+
     return epm.experiment_plan_list
 
 def ANEC_cleanup_disengage(
