@@ -393,7 +393,7 @@ def ANEC_photo_CV(
         )
 
         epm.add_experiment(
-            "ANEC_sub_photoCV",
+            "ANEC_sub_photo_CV",
             {
                 "WE_versus": WE_versus,
                 "ref_type": ref_type,

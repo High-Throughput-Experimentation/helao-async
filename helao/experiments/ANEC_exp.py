@@ -21,7 +21,7 @@ __all__ = [
     "ANEC_sub_aliquot",
     "ANEC_sub_alloff",
     "ANEC_sub_CV",
-    "ANEC_sub_photoCV",
+    "ANEC_sub_photo_CV",
     "ANEC_sub_photo_CA",
     "ANEC_sub_GCLiquid_analysis",
     "ANEC_sub_HPLCLiquid_analysis"
@@ -741,7 +741,7 @@ def ANEC_sub_CV(
 
     return apm.action_list
 
-def ANEC_sub_photoCV(
+def ANEC_sub_photo_CV(
     experiment: Experiment,
     experiment_version: int = 1,
     WE_versus: Optional[str] = "ref",
@@ -816,7 +816,7 @@ def ANEC_sub_photoCV(
             "Cycles": apm.pars.Cycles,
             "AcqInterval__s": apm.pars.SampleRate,
             "TTLwait": -1,  # -1 disables, else select TTL 0-3
-            "TTLsend": -1,  # -1 disables, else select TTL 0-3
+            "TTLsend": 0,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
