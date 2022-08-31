@@ -785,23 +785,25 @@ def ANEC_sub_photo_CV(
         to_globalexp_params=["_fast_samples_in"],
     )
     
+#    apm.add(NI_server, "led", {"led":"led", "on": 1})
+# adding IO server for Galil LED toggle control instead of NI
     apm.add(
-    IO_server,
-    "set_digital_cycle",
-    {
-            "trigger_name": "gamry_ttl0",
-            "triggertype": toggle_triggertype,
-            "out_name": apm.pars.illumination_source,
-            "out_name_gamry": "gamry_aux",
-            "toggle_init_delay": apm.pars.toggle_dark_time_init,
-            "toggle_duty": apm.pars.toggle_illum_duty,
-            "toggle_period": apm.pars.toggle_illum_period,
-            "toggle_duration": apm.pars.toggle_illum_time,
-    },
-    process_finish = False,
-    process_contrib= [
-            ProcessContrib.files,
-        ],
+        IO_server,
+        "set_digital_cycle",
+        {
+                "trigger_name": "gamry_ttl0",
+                "triggertype": toggle_triggertype,
+                "out_name": apm.pars.illumination_source,
+                "out_name_gamry": "gamry_aux",
+                "toggle_init_delay": apm.pars.toggle_dark_time_init,
+                "toggle_duty": apm.pars.toggle_illum_duty,
+                "toggle_period": apm.pars.toggle_illum_period,
+                "toggle_duration": apm.pars.toggle_illum_time,
+        },
+        process_finish = False,
+        process_contrib= [
+                ProcessContrib.files,
+            ],
     )
     
     apm.add(
