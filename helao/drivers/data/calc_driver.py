@@ -45,9 +45,9 @@ class Calc:
                     actp.replace("FINISHED", "SYNCED")
                     actd = self.yaml.load(Path(actp))
 
-                expp = os.path.join(
-                    glob(os.path.dirname(os.path.dirname(p)))[0], "*.yml"
-                )
+                expp = glob(os.path.join(os.path.dirname(os.path.dirname(p)), "*.yml"))[
+                    0
+                ]
                 try:
                     expd = self.yaml.load(Path(expp))
                 except FileNotFoundError:
@@ -291,28 +291,46 @@ class Calc:
         # assemble datadict with scalar FOMs and intermediate outputs
         if len(specd.keys()) == 2:  # TR_UVVIS technique
             interd = pred["TR"]
-            
+
             evp = params["ev_parts"]
             for i in range(len(evp) - 1):
                 lo, hi = evp[i], evp[i + 1]
                 evrange = (interd["hv"] > lo) and (interd["hv"] < hi)
-                datadict[f"1-T-R_av_{lo}_{hi}"] = interd["smooth"]["omTR"][:,evrange].mean(axis=1)
+                datadict[f"1-T-R_av_{lo}_{hi}"] = interd["smooth"]["omTR"][
+                    :, evrange
+                ].mean(axis=1)
             # full range
             lo, hi = evp[0], evp[-1]
             evrange = (interd["hv"] > lo) and (interd["hv"] < hi)
-            datadict[f"1-T-R_av_{lo}_{hi}"] = interd["smooth"]["omTR"][:,evrange].mean(axis=1)
-            datadict["TplusR_0to1"] = np.all((interd["smooth"]["omTR"] > 0.0) and (interd["smooth"]["omTR"] < 1.0))
+            datadict[f"1-T-R_av_{lo}_{hi}"] = interd["smooth"]["omTR"][:, evrange].mean(
+                axis=1
+            )
+            datadict["TplusR_0to1"] = np.all(
+                (interd["smooth"]["omTR"] > 0.0) and (interd["smooth"]["omTR"] < 1.0)
+            )
 
-            datadict["T_0to1"] = np.all((pred["T"]["smooth"]["sig"] > 0.0) and (pred["T"]["smooth"]["sig"] < 1.0))
-            datadict["R_0to1"] = np.all((pred["R"]["smooth"]["sig"] > 0.0) and (pred["R"]["smooth"]["sig"] < 1.0))
+            datadict["T_0to1"] = np.all(
+                (pred["T"]["smooth"]["sig"] > 0.0)
+                and (pred["T"]["smooth"]["sig"] < 1.0)
+            )
+            datadict["R_0to1"] = np.all(
+                (pred["R"]["smooth"]["sig"] > 0.0)
+                and (pred["R"]["smooth"]["sig"] < 1.0)
+            )
 
         elif len(specd.keys()) == 1 and "T" in specd.keys():  # T_UVVIS only
             interd = pred["T"]
-            datadict["T_0to1"] = np.all((pred["T"]["smooth"]["sig"] > 0.0) and (pred["T"]["smooth"]["sig"] < 1.0))
+            datadict["T_0to1"] = np.all(
+                (pred["T"]["smooth"]["sig"] > 0.0)
+                and (pred["T"]["smooth"]["sig"] < 1.0)
+            )
 
         elif len(specd.keys()) == 1 and "R" in specd.keys():  # DR_UVVIS only
             interd = pred["R"]
-            datadict["DR_0to1"] = np.all((pred["R"]["smooth"]["sig"] > 0.0) and (pred["R"]["smooth"]["sig"] < 1.0))
+            datadict["DR_0to1"] = np.all(
+                (pred["R"]["smooth"]["sig"] > 0.0)
+                and (pred["R"]["smooth"]["sig"] < 1.0)
+            )
 
         datadict["max_abs"] = np.nanmax(interd["smooth_refadj"]["abs"], axis=1)
         checknanrange = (interd["bin"]["wl"] >= 410) and (interd["bin"]["wl"] <= 850)
@@ -333,24 +351,31 @@ class Calc:
             interd["smooth_refadj"]["abs"][:, evrange], x=interd["hv"][evrange]
         )
 
-        datadict["max_abs2ndderiv"] = np.nanmax(interd["smooth_refadj_scl"]["abs_2ndderiv"], axis=1)
-        datadict["min_abs1stderiv"] = np.nanmin(interd["smooth_refadj_scl"]["abs_1stderiv"], axis=1)
+        datadict["max_abs2ndderiv"] = np.nanmax(
+            interd["smooth_refadj_scl"]["abs_2ndderiv"], axis=1
+        )
+        datadict["min_abs1stderiv"] = np.nanmin(
+            interd["smooth_refadj_scl"]["abs_1stderiv"], axis=1
+        )
 
         for z in ("DA", "IA", "DF", "IF"):
             v = interd["smooth_refadj"][z]
             v[np.isnan(v)] = 0.1
-            slope = savgol_filter(
-                v, 
-                window_length=params["window_length"],
-                polyorder=params["poly_order"],
-                delta=1.0,
-                deriv=1
-            ) / interd["dx"]
+            slope = (
+                savgol_filter(
+                    v,
+                    window_length=params["window_length"],
+                    polyorder=params["poly_order"],
+                    delta=1.0,
+                    deriv=1,
+                )
+                / interd["dx"]
+            )
             datadict[f"{z}_minslope"] = np.nanmin(slope, axis=1)
 
         datadict["sample_label"] = smplist
-        
-        #TODO: export interd vectors
+
+        # TODO: export interd vectors
 
         return datadict
 
