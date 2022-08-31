@@ -21,6 +21,7 @@ __all__ = [
     "ANEC_sub_aliquot",
     "ANEC_sub_alloff",
     "ANEC_sub_CV",
+    "ANEC_sub_photoCV",
     "ANEC_sub_photo_CA",
     "ANEC_sub_GCLiquid_analysis",
     "ANEC_sub_HPLCLiquid_analysis"
@@ -709,6 +710,100 @@ def ANEC_sub_CV(
         {"custom": "cell1_we"},
         to_globalexp_params=["_fast_samples_in"],
     )
+    
+    apm.add(
+        PSTAT_server,
+        "run_CV",
+        {
+            "Vinit__V": potential_init_vsRef,
+            "Vapex1__V": potential_apex1_vsRef,
+            "Vapex2__V": potential_apex2_vsRef,
+            "Vfinal__V": potential_final_vsRef,
+            "ScanRate__V_s": apm.pars.ScanRate_V_s,
+            "Cycles": apm.pars.Cycles,
+            "AcqInterval__s": apm.pars.SampleRate,
+            "TTLwait": -1,  # -1 disables, else select TTL 0-3
+            "TTLsend": -1,  # -1 disables, else select TTL 0-3
+            "IErange": apm.pars.IErange,
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        process_finish=True,
+        technique_name= ["CV"],
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+
+    # apm.add(ORCH_server, "wait", {"waittime": 10})
+
+    return apm.action_list
+
+def ANEC_sub_photoCV(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    WE_versus: Optional[str] = "ref",
+    ref_type: Optional[str] = "leakless",
+    pH: Optional[float] = 6.8,
+    WE_potential_init__V: Optional[float] = 0.0,
+    WE_potential_apex1__V: Optional[float] = -1.0,
+    WE_potential_apex2__V: Optional[float] = -1.0,
+    WE_potential_final__V: Optional[float] = 0.0,
+    ScanRate_V_s: Optional[float] = 0.01,
+    Cycles: Optional[int] = 1,
+    SampleRate: Optional[float] = 0.01,
+    IErange: Optional[str] = "auto",
+    ref_offset__V: Optional[float] = 0.0,
+    illumination_source: Optional[str] = "Thorlab_led",
+    illumination_wavelength: Optional[float] = 450.0,
+    illumination_intensity: Optional[float] = 9.0,
+    illumination_intensity_date: Optional[str] = "n/a",
+    illumination_side: Optional[str] = "front",
+    toggle_dark_time_init: Optional[float] = 0.0,
+    toggle_illum_duty: Optional[float] = 0.5,
+    toggle_illum_period: Optional[float] = 2.0,
+    toggle_illum_time: Optional[float] = -1,
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    if apm.pars.WE_versus == "ref":
+        potential_init_vsRef = apm.pars.WE_potential_init__V - 1.0 * apm.pars.ref_offset__V
+        potential_apex1_vsRef = apm.pars.WE_potential_apex1__V - 1.0 * apm.pars.ref_offset__V
+        potential_apex2_vsRef = apm.pars.WE_potential_apex2__V - 1.0 * apm.pars.ref_offset__V
+        potential_final_vsRef = apm.pars.WE_potential_final__V - 1.0 * apm.pars.ref_offset__V
+    elif apm.pars.WE_versus == "rhe":
+        potential_init_vsRef = apm.pars.WE_potential_init__V - 1.0 * apm.pars.ref_offset__V - 0.059 * apm.pars.pH - REF_TABLE[ref_type]
+        potential_apex1_vsRef = apm.pars.WE_potential_apex1__V - 1.0 * apm.pars.ref_offset__V - 0.059 * apm.pars.pH - REF_TABLE[ref_type]
+        potential_apex2_vsRef = apm.pars.WE_potential_apex2__V - 1.0 * apm.pars.ref_offset__V - 0.059 * apm.pars.pH - REF_TABLE[ref_type]
+        potential_final_vsRef = apm.pars.WE_potential_final__V - 1.0 * apm.pars.ref_offset__V - 0.059 * apm.pars.pH - REF_TABLE[ref_type]
+        
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {"custom": "cell1_we"},
+        to_globalexp_params=["_fast_samples_in"],
+    )
+    
+    apm.add(
+    IO_server,
+    "set_digital_cycle",
+    {
+            "trigger_name": "gamry_ttl0",
+            "triggertype": toggle_triggertype,
+            "out_name": apm.pars.illumination_source,
+            "out_name_gamry": "gamry_aux",
+            "toggle_init_delay": apm.pars.toggle_dark_time_init,
+            "toggle_duty": apm.pars.toggle_illum_duty,
+            "toggle_period": apm.pars.toggle_illum_period,
+            "toggle_duration": apm.pars.toggle_illum_time,
+    },
+    process_finish = False,
+    process_contrib= [
+            ProcessContrib.files,
+        ],
+    )
+    
     apm.add(
         PSTAT_server,
         "run_CV",
