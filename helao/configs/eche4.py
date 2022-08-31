@@ -146,6 +146,13 @@ config["servers"] = dict(
             # id_product = 0x0322,
         ),
     ),
+    CALC=dict(
+        host=hostip,
+        port=8012,
+        group="action",
+        fast="calc_server",
+        params={},
+    ),
     # #########################################################################
     # Visualizers (bokeh servers)
     # #########################################################################

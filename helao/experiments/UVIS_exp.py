@@ -352,5 +352,20 @@ def UVIS_calc_abs(
 ):
     """Calculate absorption from sequence info."""
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    apm.add(CALC_server, "calc_uvis_abs", {})
+    apm.add(
+        CALC_server,
+        "calc_uvis_abs",
+        {
+            "ev_parts": [1.5, 2.0, 2.5, 3.0],
+            "bin_width": 3,
+            "window_length": 45,
+            "poly_order": 4,
+            "lower_wl": 370,
+            "upper_wl": 1020,
+            "max_mthd_allowed": 1.2,
+            "max_limit": 0.99,
+            "min_mthd_allowed": -0.2,
+            "min_limit": 0.01,
+        }
+        )
     return apm.action_list  # returns complete action list to orch
