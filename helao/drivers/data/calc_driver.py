@@ -38,7 +38,7 @@ class Calc:
                     p.replace("FINISHED", "SYNCED")
                     meta, data = read_hlo(p)
 
-                actp = os.path.join(glob(os.path.dirname(p))[0], "*.yml")
+                actp = glob(os.path.join(os.path.dirname(p), "*.yml"))[0]
                 try:
                     actd = self.yaml.load(Path(actp))
                 except FileNotFoundError:
