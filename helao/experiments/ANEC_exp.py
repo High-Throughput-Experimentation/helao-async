@@ -1115,7 +1115,7 @@ def ANEC_sub_photo_CP(
         PSTAT_server,
         "run_CP",
         {
-            "Ival__A": apm.pars.CP_current,
+            "Ival": apm.pars.CP_current,
             "Tval__s": apm.pars.CP_duration_sec,
             "AcqInterval__s": apm.pars.SampleRate,
             "TTLwait": -1,  # -1 disables, else select TTL 0-3
