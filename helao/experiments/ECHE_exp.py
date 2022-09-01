@@ -323,6 +323,13 @@ def ECHE_sub_CA_led(
             ],
         },
     )
+    apm.add_action(
+        {
+            "action_server": IO_server,
+            "action_name": "stop_digital_cycle",
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        },
+    )
 
     return apm.action_list  # returns complete action list to orch
 
@@ -521,6 +528,13 @@ def ECHE_sub_CV_led(
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
+        },
+    )
+    apm.add_action(
+        {
+            "action_server": IO_server,
+            "action_name": "stop_digital_cycle",
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         },
     )
 
@@ -770,6 +784,13 @@ def ECHE_sub_CP_led(
             ],
         },
     )
+    apm.add_action(
+        {
+            "action_server": IO_server,
+            "action_name": "stop_digital_cycle",
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        },
+    )
 
     return apm.action_list  # returns complete action list to orch
 
@@ -990,6 +1011,13 @@ def ECHE_sub_CV_led_secondtrigger(
             ],
         },
     )
+    apm.add_action(
+        {
+            "action_server": IO_server,
+            "action_name": "stop_digital_cycle",
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        },
+    )
 
     return apm.action_list  # returns complete action list to orch
 
@@ -1109,6 +1137,13 @@ def ECHE_sub_CA_led_secondtrigger(
             ],
         },
     )
+    apm.add_action(
+        {
+            "action_server": IO_server,
+            "action_name": "stop_digital_cycle",
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        },
+    )
 
     return apm.action_list  # returns complete action list to orch
 
@@ -1219,6 +1254,13 @@ def ECHE_sub_CP_led_secondtrigger(
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
+        },
+    )
+    apm.add_action(
+        {
+            "action_server": IO_server,
+            "action_name": "stop_digital_cycle",
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         },
     )
 
