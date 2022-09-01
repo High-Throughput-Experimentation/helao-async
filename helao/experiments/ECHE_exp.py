@@ -323,14 +323,14 @@ def ECHE_sub_CA_led(
             ],
         },
     )
-    apm.add_action(
-        {
-            "action_server": IO_server,
-            "action_name": "stop_digital_cycle",
-            "action_params": {},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        },
-    )
+    # apm.add_action(
+    #     {
+    #         "action_server": IO_server,
+    #         "action_name": "stop_digital_cycle",
+    #         "action_params": {},
+    #         "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    #     },
+    # )
 
     return apm.action_list  # returns complete action list to orch
 
