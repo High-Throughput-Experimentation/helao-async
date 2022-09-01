@@ -853,7 +853,7 @@ def ANEC_sub_photo_CV(
     )
     apm.add(
         IO_server,
-        "stop_digital_cycle",
+        "stop_digital_cycle",{},
     )
     # apm.add(ORCH_server, "wait", {"waittime": 10})
 
@@ -1055,7 +1055,7 @@ def ANEC_sub_photo_LSV(
     )
     apm.add(
         IO_server,
-        "stop_digital_cycle",
+        "stop_digital_cycle",{},
     )
 
     # apm.add(ORCH_server, "wait", {"waittime": 10})
@@ -1142,7 +1142,7 @@ def ANEC_sub_photo_CP(
     )
     apm.add(
         IO_server,
-        "stop_digital_cycle",
+        "stop_digital_cycle",{},
     )
 
     return apm.action_list  # returns complete action list to orch
