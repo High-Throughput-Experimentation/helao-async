@@ -842,7 +842,7 @@ def ANEC_sub_photo_CV(
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
-        technique_name= ["CV"],
+        technique_name= "CV",
         process_contrib=[
             ProcessContrib.action_params,
             ProcessContrib.files,
