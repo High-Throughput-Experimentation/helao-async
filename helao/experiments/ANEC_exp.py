@@ -675,12 +675,12 @@ def ANEC_sub_photo_CA(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(
-        IO_server,
-        "stop_digital_cycle",
-        {},
-    )
-    #    apm.add(NI_server, "led", {"led":"led", "on": 0})
+    # apm.add(
+    #     IO_server,
+    #     "stop_digital_cycle",
+    #     {},
+    # )
+    # #    apm.add(NI_server, "led", {"led":"led", "on": 0})
     # apm.add(ORCH_server, "wait", {"waittime": 10})
 
     return apm.action_list
@@ -856,11 +856,11 @@ def ANEC_sub_photo_CV(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(
-        IO_server,
-        "stop_digital_cycle",
-        {},
-    )
+    # apm.add(
+    #     IO_server,
+    #     "stop_digital_cycle",
+    #     {},
+    # )
     # apm.add(ORCH_server, "wait", {"waittime": 10})
 
     return apm.action_list
@@ -1059,11 +1059,11 @@ def ANEC_sub_photo_LSV(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(
-        IO_server,
-        "stop_digital_cycle",
-        {},
-    )
+    # apm.add(
+    #     IO_server,
+    #     "stop_digital_cycle",
+    #     {},
+    # )
 
     # apm.add(ORCH_server, "wait", {"waittime": 10})
 
@@ -1147,11 +1147,11 @@ def ANEC_sub_photo_CP(
                 ProcessContrib.samples_out,
             ],
     )
-    apm.add(
-        IO_server,
-        "stop_digital_cycle",
-        {},
-    )
+    # apm.add(
+    #     IO_server,
+    #     "stop_digital_cycle",
+    #     {},
+    # )
 
     return apm.action_list  # returns complete action list to orch
 
