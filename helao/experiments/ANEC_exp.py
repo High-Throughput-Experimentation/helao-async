@@ -24,7 +24,9 @@ __all__ = [
     "ANEC_sub_photo_CV",
     "ANEC_sub_photo_CA",
     "ANEC_sub_GCLiquid_analysis",
-    "ANEC_sub_HPLCLiquid_analysis"
+    "ANEC_sub_HPLCLiquid_analysis",
+    "ANEC_sub_photo_LSV",
+    "ANEC_sub_photo_CP"
 ]
 
 ###
@@ -1052,7 +1054,7 @@ def ANEC_sub_photo_LSV(
 
     return apm.action_list
 
-def ECHE_sub_CP_led(
+def ANEC_sub_photo_CP(
     experiment: Experiment,
     experiment_version: int = 1,
     WE_versus: Optional[str] = "ref",
