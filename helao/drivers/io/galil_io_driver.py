@@ -242,6 +242,7 @@ class Galil:
         toggle_duration: Union[float, List[float]],  # seconds
         out_name_gamry: Optional[str] = None,
         req_out_name: Optional[str] = None,
+        stop_via_ttl: Optional[bool] = True,
         *args,
         **kwargs,
     ):
@@ -342,8 +343,12 @@ class Galil:
             )
             return {"error_code": ErrorCodes.not_available}
 
+        if stop_via_ttl:
+            main_dmc = "galil_toggle_main.dmc"
+        else:
+            main_dmc = "galil_toggle_main_nostop.dmc"
         mainprog = pathlib.Path(
-            os.path.join(driver_path, "galil_toggle_main.dmc")
+            os.path.join(driver_path, main_dmc)
         ).read_text()
         if req_out_name is not None:
             req_port = self.dev_do[req_out_name]
