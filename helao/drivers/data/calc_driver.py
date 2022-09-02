@@ -2,12 +2,10 @@ import os
 import numpy as np
 from scipy.signal import savgol_filter
 from ruamel.yaml import YAML
-from pathlib import Path
-from glob import glob
 
 from helaocore.models.data import DataModel
 from helao.servers.base import Base
-from helao.helpers.read_hlo import read_hlo
+from helao.helpers.file_mapper import FileMapper
 
 
 class Calc:
@@ -18,54 +16,50 @@ class Calc:
         self.config_dict = action_serv.server_cfg["params"]
         self.yaml = YAML(typ="safe")
 
-    def gather_sequence_data(self, seq_reldir: str):
+    def gather_spec_data(self, seq_reldir: str):
         # get all files from current sequence directory
         # produce tuples, (run_type, technique_name, run_use, hlo_path)
         active_save_dir = self.base.helaodirs.save_root.__str__()
-        diag = os.path.join(active_save_dir.replace("ACTIVE", "DIAG"), seq_reldir)
-        finished = os.path.join(
-            active_save_dir.replace("ACTIVE", "FINISHED"), seq_reldir
-        )
-        synced = os.path.join(active_save_dir.replace("ACTIVE", "SYNCED"), seq_reldir)
+        seq_absdir = os.path.join(active_save_dir, seq_reldir)
+        FM = FileMapper(seq_absdir)
+        aspec_paths = [x for x in FM.relstrs if "acquire_spec" in x]
+        aspec_hlos = sorted([x for x in aspec_paths if x.endswith(".hlo")])
+        aspec_ymls = sorted([x for x in aspec_paths if x.endswith(".yml")])
+
+        if len(aspec_hlos) != len(aspec_ymls):
+            self.base.print_message(
+                f"mismatch number of data files ({len(aspec_hlos)}), metadata files ({len(aspec_ymls)})",
+                error=True,
+            )
+            return {}
+
         hlo_dict = {}
-        for prefix in (diag, finished, synced):
-            for p in glob(
-                os.path.join(prefix, "*__UVIS_sub_measure", "*__acquire_spec", "*.hlo")
-            ):
-                try:
-                    meta, data = read_hlo(p)
-                except FileNotFoundError:
-                    p.replace("FINISHED", "SYNCED")
-                    meta, data = read_hlo(p)
+        for hp, yp in zip(aspec_hlos, aspec_ymls):
+            meta, data = FM.read_hlo(hp)
+            actd = FM.read_yml(yp)
 
-                actp = glob(os.path.join(os.path.dirname(p), "*.yml"))[0]
-                try:
-                    actd = self.yaml.load(Path(actp))
-                except FileNotFoundError:
-                    actp.replace("FINISHED", "SYNCED")
-                    actd = self.yaml.load(Path(actp))
+            expp = os.path.dirname(os.path.dirname(yp))
+            ep = [
+                x
+                for x in FM.relstrs
+                if x.startswith(expp)
+                and x.endswith(".yml")
+                and os.path.dirname(x) == expp
+            ][0]
+            expd = FM.read_yml(ep)
 
-                expp = glob(os.path.join(os.path.dirname(os.path.dirname(p)), "*.yml"))[
-                    0
-                ]
-                try:
-                    expd = self.yaml.load(Path(expp))
-                except FileNotFoundError:
-                    expp.replace("FINISHED", "SYNCED")
-                    expd = self.yaml.load(Path(expp))
-
-                hlo_dict[p] = {
-                    "meta": meta,
-                    "data": data,
-                    "actd": actd,
-                    "expd": expd,
-                }
+            hlo_dict[hp] = {
+                "meta": meta,
+                "data": data,
+                "actd": actd,
+                "expd": expd,
+            }
 
         return hlo_dict
 
     def calc_uvis_abs(self, activeobj):
         seq_reldir = activeobj.action.get_sequence_dir()
-        hlo_dict = self.gather_sequence_data(seq_reldir)
+        hlo_dict = self.gather_spec_data(seq_reldir)
 
         spec_types = ["T", "R"]
         specd = {}
