@@ -35,7 +35,7 @@ class FileMapper:
 
     def locate(self, p: str):
         for state in self.states:
-            testp = Path(os.path.join(self.runpos, f"RUNS_{state}", p))
+            testp = Path(os.path.join(self.prestr, f"RUNS_{state}", p))
             if testp.exists():
                 return testp
         return None
