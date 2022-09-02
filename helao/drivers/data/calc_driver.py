@@ -62,6 +62,7 @@ class Calc:
         hlo_dict = self.gather_spec_data(seq_reldir)
 
         spec_types = ["T", "R"]
+        ru_keys = ("ref_dark", "ref_light", "data")
         specd = {}
         for spec in spec_types:
             rud = {
@@ -71,15 +72,15 @@ class Calc:
                     if d["actd"]["run_use"] == ru
                     and d["expd"]["experiment_params"]["spec_type"] == spec
                 }
-                for ru in ("ref_dark", "ref_light", "data")
+                for ru in ru_keys
             }
 
-            for hlod in rud.values():
-                for d in hlod.values():
-                    rud["technique_name"] = d["expd"]["experiment_params"][
+            for rk in list(rud.keys()):
+                for dk in list(rud[rk].keys()):
+                    rud["technique_name"] = rud[rk][dk]["expd"]["experiment_params"][
                         "technique_name"
                     ]
-                    data = d["data"]
+                    data = rud[rk][dk]["data"]
                     vals = [
                         data[dk]
                         for dk in sorted(
@@ -88,7 +89,7 @@ class Calc:
                         )
                     ]
                     arr = np.array(vals).transpose()
-                    d.update(
+                    rud[rk][dk].update(
                         {
                             "raw": arr,
                             "median": np.median(arr, axis=0),
