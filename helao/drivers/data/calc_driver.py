@@ -68,14 +68,17 @@ class Calc:
                 ru: {
                     p: d
                     for p, d in hlo_dict.items()
-                    if d["actd"]["run_use"] == ru and d["expd"]["spec_type"] == spec
+                    if d["actd"]["run_use"] == ru
+                    and d["expd"]["experiment_params"]["spec_type"] == spec
                 }
                 for ru in ("ref_dark", "ref_light", "data")
             }
 
             for hlod in rud.values():
                 for d in hlod.values():
-                    rud["technique_name"] = d["expd"]["technique_name"]
+                    rud["technique_name"] = d["expd"]["experiment_params"][
+                        "technique_name"
+                    ]
                     data = d["data"]
                     vals = [
                         data[dk]
