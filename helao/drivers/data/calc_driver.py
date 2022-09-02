@@ -112,7 +112,7 @@ class Calc:
             bsnlist = []
 
             for d in rud["data"].values():
-                wllist.append(d["meta"]["wl"])
+                wllist.append(d["meta"]["optional"]["wl"])
                 actd = d["actd"]
                 actuuids.append(actd["action_uuid"])
                 smplist.append(
