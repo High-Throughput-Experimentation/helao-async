@@ -96,7 +96,7 @@ class Calc:
                             "mean": arr.mean(axis=0),
                         }
                     )
-            
+
             if rud["ref_dark"] and rud["ref_light"] and rud["data"]:
 
                 refdark = np.concatenate(
@@ -150,19 +150,23 @@ class Calc:
             pred[k]["full"]["wl"] = wl[wlmask]
             pred[k]["full"]["sig"] = np.array(sd["bsnlist"])[:, wlmask]
             binds = [
-                [y for y in range(x, x + params["bin_width"]) if y < wl.shape[0]]
-                for x in range(0, wl.shape[0], params["bin_width"])
+                [
+                    y
+                    for y in range(x, x + params["bin_width"])
+                    if y < pred[k]["full"]["wl"].shape[0]
+                ]
+                for x in range(0, pred[k]["full"]["wl"].shape[0], params["bin_width"])
             ]
             pred[k]["binds"] = binds
             rsi = [np.median(inds) for inds in pred[k]["binds"]]
             pred[k]["rsi"] = rsi
             pred[k]["bin"]["wl"] = np.array([np.median(wl[inds]) for inds in binds])
             hv = [1239.8 / x for x in pred[k]["bin"]["wl"]]
-            pred[k]["hv"] = hv
-            dx = hv[1] - hv[0]
-            dx += [(hv[idx + 1] - hv[idx - 1]) / 2.0 for idx in range(1, len(rsi - 1))]
-            dx += hv[-1] - hv[-2]
-            pred[k]["dx"] = dx
+            pred[k]["hv"] = np.array(hv)
+            dx = [hv[1] - hv[0]]
+            dx += [(hv[idx + 1] - hv[idx - 1]) / 2.0 for idx in range(1, len(rsi) - 1)]
+            dx += [hv[-1] - hv[-2]]
+            pred[k]["dx"] = np.array(dx)
 
         if len(specd.keys()) == 2:  # TR_UVVIS technique
             if pred["T"]["binds"] != pred["R"]["binds"]:
@@ -218,11 +222,15 @@ class Calc:
             pred[sk]["smooth_refadj"]["sig"] = v
             pred[sk]["min_rescaled"] = False
             pred[sk]["max_rescaled"] = False
-            if min(v) >= params["min_mthd_allowed"] and min(v) < params["min_limit"]:
+            if np.bitwise_and(
+                (min(v) >= params["min_mthd_allowed"]), (min(v) < params["min_limit"])
+            ).all():
                 pred[sk]["min_rescaled"] = True
                 pred[sk]["smooth_refadj"]["sig"] = v - min(v) + params["min_limit"]
             v = pred[sk]["smooth_refadj"]["sig"]
-            if max(v) <= params["max_mthd_allowed"] and max(v) >= params["max_limit"]:
+            if np.bitwise_and(
+                (max(v) <= params["max_mthd_allowed"]), (max(v) >= params["max_limit"])
+            ).all():
                 pred[sk]["max_rescaled"] = True
                 pred[sk]["smooth_refadj"]["sig"] = v / (max(v) + 0.02)
 
@@ -320,33 +328,33 @@ class Calc:
 
         elif len(specd.keys()) == 1 and "T" in specd.keys():  # T_UVVIS only
             interd = pred["T"]
-            datadict["T_0to1"] = np.all(
-                (pred["T"]["smooth"]["sig"] > 0.0)
-                and (pred["T"]["smooth"]["sig"] < 1.0)
-            )
+            datadict["T_0to1"] = np.bitwise_and(
+                (pred["T"]["smooth"]["sig"] > 0.0), (pred["T"]["smooth"]["sig"] < 1.0)
+            ).all()
 
         elif len(specd.keys()) == 1 and "R" in specd.keys():  # DR_UVVIS only
             interd = pred["R"]
-            datadict["DR_0to1"] = np.all(
-                (pred["R"]["smooth"]["sig"] > 0.0)
-                and (pred["R"]["smooth"]["sig"] < 1.0)
-            )
+            datadict["DR_0to1"] = np.bitwise_and(
+                (pred["R"]["smooth"]["sig"] > 0.0), (pred["R"]["smooth"]["sig"] < 1.0)
+            ).all()
 
         datadict["max_abs"] = np.nanmax(interd["smooth_refadj"]["abs"], axis=1)
-        checknanrange = (interd["bin"]["wl"] >= 410) and (interd["bin"]["wl"] <= 850)
+        checknanrange = np.bitwise_and(
+            (interd["bin"]["wl"] >= 410), (interd["bin"]["wl"] <= 850)
+        )
         datadict["abs_hasnan"] = np.any(
             np.isnan(interd["smooth_refadj"]["abs"][:, checknanrange]), axis=1
         )
         evp = params["ev_parts"]
         for i in range(len(evp) - 1):
             lo, hi = evp[i], evp[i + 1]
-            evrange = (interd["hv"] > lo) and (interd["hv"] < hi)
+            evrange = np.bitwise_and((interd["hv"] > lo), (interd["hv"] < hi))
             datadict[f"abs_{lo}_{hi}"] = np.trapz(
                 interd["smooth_refadj"]["abs"][:, evrange], x=interd["hv"][evrange]
             )
         # full range
         lo, hi = evp[0], evp[-1]
-        evrange = (interd["hv"] > lo) and (interd["hv"] < hi)
+        evrange = np.bitwise_and((interd["hv"] > lo), (interd["hv"] < hi))
         datadict[f"abs_{lo}_{hi}"] = np.trapz(
             interd["smooth_refadj"]["abs"][:, evrange], x=interd["hv"][evrange]
         )
