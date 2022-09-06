@@ -69,8 +69,8 @@ class Calc:
                 ru: {
                     p: d
                     for p, d in hlo_dict.items()
-                    if d["actd"]["run_use"] == ru
-                    and d["expd"]["experiment_params"]["spec_type"] == spec
+                    if (d["actd"]["run_use"] == ru)
+                    and (d["expd"]["experiment_params"]["spec_type"] == spec)
                 }
                 for ru in ru_keys
             }
@@ -82,8 +82,8 @@ class Calc:
                     ]
                     data = rud[rk][dk]["data"]
                     vals = [
-                        data[dk]
-                        for dk in sorted(
+                        data[chk]
+                        for chk in sorted(
                             [k for k in data.keys() if k.startswith("ch_")],
                             key=lambda x: int(x.split("_")[-1]),
                         )
@@ -96,42 +96,44 @@ class Calc:
                             "mean": arr.mean(axis=0),
                         }
                     )
+            
+            if rud["ref_dark"] and rud["ref_light"] and rud["data"]:
 
-            refdark = np.concatenate(
-                [d["mean"] for d in rud["ref_dark"].values()], axis=0
-            )
-            reflight = np.concatenate(
-                [d["mean"] for d in rud["ref_light"].values()], axis=0
-            )
-            mindark = refdark.min(axis=0)
-            maxlight = reflight.max(axis=0)
-
-            actuuids = []
-            smplist = []
-            wllist = []
-            bsnlist = []
-
-            for d in rud["data"].values():
-                wllist.append(d["meta"]["optional"]["wl"])
-                actd = d["actd"]
-                actuuids.append(actd["action_uuid"])
-                smplist.append(
-                    [
-                        s["global_label"]
-                        for s in actd["samples_in"]
-                        if s["sample_type"] == "solid"
-                    ][0]
+                refdark = np.concatenate(
+                    [d["mean"] for d in rud["ref_dark"].values()], axis=0
                 )
-                bsnlist.append((d["mean"] - mindark) / maxlight)
+                reflight = np.concatenate(
+                    [d["mean"] for d in rud["ref_light"].values()], axis=0
+                )
+                mindark = refdark.min(axis=0)
+                maxlight = reflight.max(axis=0)
 
-            wlarr = np.array(wllist).mean(axis=0)
-            specd[spec] = {
-                "smplist": smplist,
-                "action_uuids": actuuids,
-                "bsnlist": bsnlist,
-                "wlarr": wlarr,
-                "technique": rud["technique_name"],
-            }
+                actuuids = []
+                smplist = []
+                wllist = []
+                bsnlist = []
+
+                for d in rud["data"].values():
+                    wllist.append(d["meta"]["optional"]["wl"])
+                    actd = d["actd"]
+                    actuuids.append(actd["action_uuid"])
+                    smplist.append(
+                        [
+                            s["global_label"]
+                            for s in actd["samples_in"]
+                            if s["sample_type"] == "solid"
+                        ][0]
+                    )
+                    bsnlist.append((d["mean"] - mindark) / maxlight)
+
+                wlarr = np.array(wllist).mean(axis=0)
+                specd[spec] = {
+                    "smplist": smplist,
+                    "action_uuids": actuuids,
+                    "bsnlist": bsnlist,
+                    "wlarr": wlarr,
+                    "technique": rud["technique_name"],
+                }
 
         params = activeobj.action.action_params
         pred = {}
