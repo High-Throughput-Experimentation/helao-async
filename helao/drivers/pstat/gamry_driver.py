@@ -644,9 +644,9 @@ class gamry:
             self.base.print_message(f"Gamry DigiIn state: {self.pstat.DigitalIn()}")
             # first, wait for trigger
             if self.IO_TTLwait >= 0:
+                self.base.print_message(f"Gamry DIbits: {bits}, waiting for trigger.")
                 while self.IO_do_meas:
                     bits = self.pstat.DigitalIn()
-                    self.base.print_message(f"Gamry DIbits: {bits}")
                     if self.IO_TTLwait & bits:
                         break
                     # break  # for testing, we don't want to wait forever
