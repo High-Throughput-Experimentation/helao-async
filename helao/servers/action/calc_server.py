@@ -44,6 +44,7 @@ def makeApp(confPrefix, servKey, helao_root):
         max_limit: float = 0.99,
         min_mthd_allowed: float = -0.2,
         min_limit: float = 0.01,
+        delta: float = 1.0,
     ):
         active = await app.base.setup_and_contain_action(action_abbr="calcAbs")
         datadict = app.driver.calc_uvis_abs(active)
