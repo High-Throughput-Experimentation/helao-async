@@ -398,7 +398,7 @@ class Galil:
             _ = self.galilcmd(cmd)
             self.digital_cycle_out_gamry = None
 
-        return {}
+        return {"error_code": ErrorCodes.none}
 
     def shutdown(self):
         # this gets called when the server is shut down or reloaded to ensure a clean
