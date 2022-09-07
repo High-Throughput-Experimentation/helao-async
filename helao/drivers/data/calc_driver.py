@@ -349,13 +349,13 @@ class Calc:
         for i in range(len(evp) - 1):
             lo, hi = evp[i], evp[i + 1]
             evrange = np.bitwise_and((interd["hv"] > lo), (interd["hv"] < hi))
-            datadict[f"abs_{lo}_{hi}"] = np.trapz(
+            datadict[f"abs_{lo}_{hi}"] = -1 * np.trapz(
                 interd["smooth_refadj"]["abs"][:, evrange], x=interd["hv"][evrange]
             )
         # full range
         lo, hi = evp[0], evp[-1]
         evrange = np.bitwise_and((interd["hv"] > lo), (interd["hv"] < hi))
-        datadict[f"abs_{lo}_{hi}"] = np.trapz(
+        datadict[f"abs_{lo}_{hi}"] = -1 * np.trapz(
             interd["smooth_refadj"]["abs"][:, evrange], x=interd["hv"][evrange]
         )
 
