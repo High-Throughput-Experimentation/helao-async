@@ -314,30 +314,28 @@ class Calc:
             datadict[f"1-T-R_av_{lo}_{hi}"] = interd["smooth"]["omTR"][:, evrange].mean(
                 axis=1
             )
-            datadict["TplusR_0to1"] = np.all(
-                (interd["smooth"]["omTR"] > 0.0) and (interd["smooth"]["omTR"] < 1.0)
-            )
+            datadict["TplusR_0to1"] = np.bitwise_and(
+                (interd["smooth"]["omTR"] > 0.0), (interd["smooth"]["omTR"] < 1.0)
+            ).all(axis=1)
 
-            datadict["T_0to1"] = np.all(
-                (pred["T"]["smooth"]["sig"] > 0.0)
-                and (pred["T"]["smooth"]["sig"] < 1.0)
-            )
-            datadict["R_0to1"] = np.all(
-                (pred["R"]["smooth"]["sig"] > 0.0)
-                and (pred["R"]["smooth"]["sig"] < 1.0)
-            )
+            datadict["T_0to1"] = np.bitwise_and(
+                (pred["T"]["smooth"]["sig"] > 0.0), (pred["T"]["smooth"]["sig"] < 1.0)
+            ).all(axis=1)
+            datadict["R_0to1"] = np.bitwise_and(
+                (pred["R"]["smooth"]["sig"] > 0.0), (pred["R"]["smooth"]["sig"] < 1.0)
+            ).all(axis=1)
 
         elif len(specd.keys()) == 1 and "T" in specd.keys():  # T_UVVIS only
             interd = pred["T"]
             datadict["T_0to1"] = np.bitwise_and(
                 (pred["T"]["smooth"]["sig"] > 0.0), (pred["T"]["smooth"]["sig"] < 1.0)
-            ).all()
+            ).all(axis=1)
 
         elif len(specd.keys()) == 1 and "R" in specd.keys():  # DR_UVVIS only
             interd = pred["R"]
             datadict["DR_0to1"] = np.bitwise_and(
                 (pred["R"]["smooth"]["sig"] > 0.0), (pred["R"]["smooth"]["sig"] < 1.0)
-            ).all()
+            ).all(axis=1)
 
         datadict["max_abs"] = np.nanmax(interd["smooth_refadj"]["abs"], axis=1)
         checknanrange = np.bitwise_and(
@@ -385,6 +383,11 @@ class Calc:
         datadict["sample_label"] = smplist
 
         # TODO: export interd vectors
+
+        datadict = {
+            k: v.tolist() if isinstance(v, np.ndarray) else v
+            for k, v in datadict.items()
+        }
 
         return datadict
 
