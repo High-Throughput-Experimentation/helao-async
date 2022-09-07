@@ -150,23 +150,21 @@ class Calc:
             pred[k]["full"]["wl"] = wl[wlmask]
             pred[k]["full"]["sig"] = np.array(sd["bsnlist"])[:, wlmask]
             binds = [
-                [
-                    y
-                    for y in range(x, x + params["bin_width"])
-                    if y < pred[k]["full"]["wl"].shape[0]
-                ]
+                [y for y in range(x, x + params["bin_width"]) if y < pred[k]["full"]["wl"].shape[0]]
                 for x in range(0, pred[k]["full"]["wl"].shape[0], params["bin_width"])
             ]
             pred[k]["binds"] = binds
-            rsi = [np.median(inds) for inds in pred[k]["binds"]]
+            rsi = [np.median(inds).astype(int) for inds in pred[k]["binds"]]
             pred[k]["rsi"] = rsi
-            pred[k]["bin"]["wl"] = np.array([np.median(wl[inds]) for inds in binds])
+            pred[k]["bin"]["wl"] = pred["T"]["full"]["wl"][rsi]
             hv = [1239.8 / x for x in pred[k]["bin"]["wl"]]
             pred[k]["hv"] = np.array(hv)
             dx = [hv[1] - hv[0]]
             dx += [(hv[idx + 1] - hv[idx - 1]) / 2.0 for idx in range(1, len(rsi) - 1)]
             dx += [hv[-1] - hv[-2]]
             pred[k]["dx"] = np.array(dx)
+
+
 
         if len(specd.keys()) == 2:  # TR_UVVIS technique
             if pred["T"]["binds"] != pred["R"]["binds"]:
