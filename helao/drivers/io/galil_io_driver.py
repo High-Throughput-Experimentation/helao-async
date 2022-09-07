@@ -284,6 +284,9 @@ class Galil:
             elif triggertype == TriggerType.fallingedge:
                 trigger_port_on = -trigger_port
                 trigger_port_off = trigger_port
+            elif triggertype == TriggerType.blip:
+                trigger_port_on = trigger_port
+                trigger_port_off = trigger_port
 
         if (
             valid_trig
