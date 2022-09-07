@@ -150,7 +150,11 @@ class Calc:
             pred[k]["full"]["wl"] = wl[wlmask]
             pred[k]["full"]["sig"] = np.array(sd["bsnlist"])[:, wlmask]
             binds = [
-                [y for y in range(x, x + params["bin_width"]) if y < pred[k]["full"]["wl"].shape[0]]
+                [
+                    y
+                    for y in range(x, x + params["bin_width"])
+                    if y < pred[k]["full"]["wl"].shape[0]
+                ]
                 for x in range(0, pred[k]["full"]["wl"].shape[0], params["bin_width"])
             ]
             pred[k]["binds"] = binds
@@ -163,8 +167,6 @@ class Calc:
             dx += [(hv[idx + 1] - hv[idx - 1]) / 2.0 for idx in range(1, len(rsi) - 1)]
             dx += [hv[-1] - hv[-2]]
             pred[k]["dx"] = np.array(dx)
-
-
 
         if len(specd.keys()) == 2:  # TR_UVVIS technique
             if pred["T"]["binds"] != pred["R"]["binds"]:
@@ -270,27 +272,28 @@ class Calc:
             pred[sk]["smooth_refadj_scl"]["abs"] = pred[sk]["smooth_refadj"][
                 k
             ] / np.nanmax(pred[sk]["smooth_refadj"]["abs"])
-            v = pred[sk]["smooth_refadj_scl"]["abs"]
-            v[np.isnan(v)] = 0.1
+            sv = pred[sk]["smooth_refadj_scl"]["abs"][::-1]
+            sv[np.isnan(sv)] = 0.1
+            sdx = -1 * pred[sk]["dx"][::-1]
             pred[sk]["smooth_refadj_scl"]["abs_1stderiv"] = (
                 savgol_filter(
-                    v,
+                    sv,
                     window_length=params["window_length"],
                     polyorder=params["poly_order"],
                     delta=params["delta"],
                     deriv=1,
                 )
-                / pred[sk]["dx"]
+                / sdx
             )
             pred[sk]["smooth_refadj_scl"]["abs_2ndderiv"] = (
                 savgol_filter(
-                    v,
+                    sv,
                     window_length=params["window_length"],
                     polyorder=params["poly_order"],
                     delta=params["delta"],
                     deriv=2,
                 )
-                / pred[sk]["dx"] ** 2
+                / sdx**2
             )
 
         datadict = {}
