@@ -219,20 +219,26 @@ class Calc:
 
             # smooth sig
             v = pred[sk]["smooth"]["sig"]
+
             pred[sk]["smooth_refadj"]["sig"] = v
-            pred[sk]["min_rescaled"] = False
-            pred[sk]["max_rescaled"] = False
-            if np.bitwise_and(
-                (min(v) >= params["min_mthd_allowed"]), (min(v) < params["min_limit"])
-            ).all():
-                pred[sk]["min_rescaled"] = True
-                pred[sk]["smooth_refadj"]["sig"] = v - min(v) + params["min_limit"]
+            pred[sk]["min_rescaled"] = np.bitwise_and(
+                (v.min(axis=1) >= params["min_mthd_allowed"]),
+                (v.min(axis=1) < params["min_limit"]),
+            )
+            pred[sk]["smooth_refadj"]["sig"][pred[sk]["min_rescaled"], :] = (
+                v[pred[sk]["min_rescaled"], :]
+                - v[pred[sk]["min_rescaled"], :].min(axis=1).reshape(-1, 1)
+                + params["min_limit"]
+            )
+
             v = pred[sk]["smooth_refadj"]["sig"]
-            if np.bitwise_and(
-                (max(v) <= params["max_mthd_allowed"]), (max(v) >= params["max_limit"])
-            ).all():
-                pred[sk]["max_rescaled"] = True
-                pred[sk]["smooth_refadj"]["sig"] = v / (max(v) + 0.02)
+            pred[sk]["max_rescaled"] = np.bitwise_and(
+                (v.max(axis=1) <= params["max_mthd_allowed"]),
+                (v.max(axis=1) >= params["max_limit"]),
+            )
+            pred[sk]["smooth_refadj"]["sig"][pred[sk]["max_rescaled"], :] = v[
+                pred[sk]["max_rescaled"], :
+            ] / (v[pred[sk]["max_rescaled"], :].max(axis=1).reshape(-1, 1) + 0.02)
 
             # smooth abs
             if len(specd.keys()) == 1 and "R" in specd.keys():
@@ -381,6 +387,9 @@ class Calc:
             datadict[f"{z}_minslope"] = np.nanmin(slope, axis=1)
 
         datadict["sample_label"] = smplist
+        datadict["min_rescaled"] = interd["min_rescaled"]
+        datadict["max_rescaled"] = interd["max_rescaled"]
+
 
         # TODO: export interd vectors
 
