@@ -380,12 +380,12 @@ def makeApp(confPrefix, servKey, helao_root):
 #            temp_dict = await readtemp()
 #            for k,v in temp_dict.items():
 #                temp_dict[k] = float(v)
-#            print(type(temp_dict['type-S']))
+#            print(type(temp_dict['type-K']))
 #            print(type(temp_dict['type-T']))
-#            if temp_dict['type-S'] < reservoir1_min_C:
+#            if temp_dict['type-K'] < reservoir1_min_C:
 #                print("heat1on")
 #                heater(heater="heater1", on = True)
-#            if temp_dict['type-S'] > reservoir1_max_C:
+#            if temp_dict['type-K'] > reservoir1_max_C:
 #                print("heat1off")
 #                heater(heater="heater1", on = False)
 #            if temp_dict['type-T'] < reservoir2_min_C:

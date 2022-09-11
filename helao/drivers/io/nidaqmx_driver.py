@@ -123,7 +123,7 @@ class cNIMAX:
             "t_s",
             "Icell_A",
             "Ecell_V",
-            "Ttemp_type-S_C",
+            "Ttemp_type-K_C",
             "Ttemp_type-T_C",            
      ]
 
@@ -204,9 +204,9 @@ class cNIMAX:
         )
 # #        self.task_6289cellcurrent = nidaqmx.Task()
 #         self.task_6289cellcurrent.ai_channels.add_ai_thrmcpl_chan(
-# #            physical_channel= 'type-S',
+# #            physical_channel= 'type-K',
 #             physical_channel= 'PXI-6289/ai0',
-#             name_to_assign_to_channel="Temp_typeS",
+#             name_to_assign_to_channel="Temp_typeK",
 #             min_val=0,
 #             max_val=150,
 #             units=TemperatureUnits.DEG_C,
@@ -252,9 +252,9 @@ class cNIMAX:
 #         """configures and starts a NImax task for nonexperiment temp measurements"""
 #         self.task_tempinst_S = nidaqmx.Task()
 #         self.task_tempinst_S.ai_channels.add_ai_thrmcpl_chan(
-# #           physical_channel= 'type-S',
+# #           physical_channel= 'type-K',
 #             physical_channel= 'PXI-6289/ai2', 
-#             name_to_assign_to_channel="Temp_typeS",
+#             name_to_assign_to_channel="Temp_typeK",
 #             min_val=0,
 #             max_val=150,
 #             units=TemperatureUnits.DEG_C,
@@ -324,8 +324,8 @@ class cNIMAX:
         self.task_monitors = nidaqmx.Task()
         for myname, mydev in self.config_dict["dev_monitor"].items():
             #can add if filter for different types of monitors (other than Temp)
-            if myname == 'type-S':
-                TCtype=ThermocoupleType.S
+            if myname == 'type-K':
+                TCtype=ThermocoupleType.K
             if myname == 'type-T':
                 TCtype=ThermocoupleType.T
             else:
@@ -551,13 +551,13 @@ class cNIMAX:
             for i, myname in enumerate(self.config_dict["dev_monitor"]):
                 mdata[i], _ = self.base.get_lbuf(myname)
                 readtempdict[myname] = mdata[i]
-            temp_typeS = float(readtempdict['type-S'])
+            temp_typeK = float(readtempdict['type-K'])
             temp_typeT = float(readtempdict['type-T'])
             for myheat, myport in self.dev_heat.items():
                 if myheat == "heater1":
-                    if temp_typeS < reservoir1_min:
+                    if temp_typeK < reservoir1_min:
                         await self.set_digital_out(do_port=myport, do_name=myheat, on=True)
-                    if temp_typeS > reservoir1_max:
+                    if temp_typeK > reservoir1_max:
                         await self.set_digital_out(do_port=myport, do_name=myheat, on=False)
                 if myheat == 'heater2':
                     if temp_typeT < reservoir2_min:
