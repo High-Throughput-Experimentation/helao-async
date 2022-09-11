@@ -14,6 +14,7 @@ __all__ = [
     "ECHE_sub_CV_led",
     "ECHE_sub_CV",
     "ECHE_sub_preCV",
+    "ECHE_sub_OCV",
     "ECHE_sub_CP_led",
     "ECHE_sub_CP",
     "ECHE_sub_movetosample",
@@ -340,6 +341,7 @@ def ECHE_sub_OCV(
     experiment: Experiment,
     experiment_version: int = 1,
 ):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add_action(
         {
             "action_server": PAL_server,
@@ -376,6 +378,56 @@ def ECHE_sub_OCV(
             ],
         },
     )
+def ECHE_sub_preCV(
+    experiment: Experiment,
+    experiment_version: int = 2,
+    CA_potential: Optional[float] = 0.0,  #need to get from CV initial
+    samplerate_sec: Optional[float] = .05,
+    CA_duration_sec: Optional[float] = 3, #adjustable pre_CV time
+):
+    """last functionality test: 11/29/2021"""
+
+    apm = ActionPlanMaker()  # exposes function parameters via sq.pars
+
+    # get sample for gamry
+    apm.add_action(
+        {
+            "action_server": PAL_server,
+            "action_name": "archive_custom_query_sample",
+            "action_params": {
+                "custom": "cell1_we",
+            },
+            "to_globalexp_params": [
+                "_fast_samples_in"
+            ],  # save new liquid_sample_no of eche cell to globals
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        }
+    )
+    apm.add_action(
+        {
+            "action_server": PSTAT_server,
+            "action_name": "run_CA",
+            "action_params": {
+                "Vval": apm.pars.CA_potential,
+                "Tval__s": apm.pars.CA_duration_sec,
+                "SampleRate": apm.pars.samplerate_sec,
+                "TTLwait": -1,  # -1 disables, else select TTL 0-3
+                "TTLsend": -1,  # -1 disables, else select TTL 0-3
+                "IErange": "auto",
+            },
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "technique_name": "CA",
+            "process_finish": True,
+            "process_contrib": [
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        }
+    )
+
+    return apm.action_list  # returns complete action list to orch
 
 def ECHE_sub_CA(
     experiment: Experiment,
