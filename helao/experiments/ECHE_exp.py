@@ -330,7 +330,6 @@ def ECHE_sub_CA_led(
             "action_server": IO_server,
             "action_name": "stop_digital_cycle",
             "action_params": {},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         },
     )
 
@@ -378,6 +377,8 @@ def ECHE_sub_OCV(
             ],
         },
     )
+    return apm.action_list  # returns complete action list to orch
+
 def ECHE_sub_preCV(
     experiment: Experiment,
     experiment_version: int = 2,
@@ -630,7 +631,6 @@ def ECHE_sub_CV_led(
             "action_server": IO_server,
             "action_name": "stop_digital_cycle",
             "action_params": {},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         },
     )
 
@@ -885,7 +885,6 @@ def ECHE_sub_CP_led(
             "action_server": IO_server,
             "action_name": "stop_digital_cycle",
             "action_params": {},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         },
     )
 
@@ -1113,7 +1112,6 @@ def ECHE_sub_CV_led_secondtrigger(
             "action_server": IO_server,
             "action_name": "stop_digital_cycle",
             "action_params": {},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         },
     )
 
@@ -1240,7 +1238,6 @@ def ECHE_sub_CA_led_secondtrigger(
             "action_server": IO_server,
             "action_name": "stop_digital_cycle",
             "action_params": {},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         },
     )
 
@@ -1360,7 +1357,6 @@ def ECHE_sub_CP_led_secondtrigger(
             "action_server": IO_server,
             "action_name": "stop_digital_cycle",
             "action_params": {},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         },
     )
 
