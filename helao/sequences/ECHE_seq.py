@@ -96,6 +96,7 @@ def ECHE_4CA_led_1CV_led(
     CV_scanrate_voltsec: float = 0.02,
     CV_samplerate_mV: float = 1,
     CV_cycles: int = 1,
+    preCV_duration = 3,
     gamry_i_range: str = "auto",
     led_type: str = "front",
     led_date: str = "01/01/2000",
@@ -135,6 +136,12 @@ def ECHE_4CA_led_1CV_led(
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
+        #OCV
+        pl.add_experiment(
+            "ECHE_sub_OCV",
+            {
+            }
+        )
         # CA1
         pl.add_experiment(
             "ECHE_sub_CA_led",
@@ -162,6 +169,12 @@ def ECHE_4CA_led_1CV_led(
                 "toggle_illum_time": toggleCA_illum_time,
                 "toggle_dark_time_init": toggleCA_dark_time_init,
             },
+        )
+        #OCV
+        pl.add_experiment(
+            "ECHE_sub_OCV",
+            {
+            }
         )
         # CA2
         pl.add_experiment(
@@ -191,6 +204,12 @@ def ECHE_4CA_led_1CV_led(
                 "toggle_dark_time_init": toggleCA_dark_time_init,
             },
         )
+        #OCV
+        pl.add_experiment(
+            "ECHE_sub_OCV",
+            {
+            }
+        )
         # CA3
         pl.add_experiment(
             "ECHE_sub_CA_led",
@@ -218,6 +237,12 @@ def ECHE_4CA_led_1CV_led(
                 "toggle_illum_time": toggleCA_illum_time,
                 "toggle_dark_time_init": toggleCA_dark_time_init,
             },
+        )
+        #OCV
+        pl.add_experiment(
+            "ECHE_sub_OCV",
+            {
+            }
         )
         # CA4
         pl.add_experiment(
@@ -249,6 +274,16 @@ def ECHE_4CA_led_1CV_led(
         )
 
         # CV1
+        pl.add_experiment(
+            "ECHE_sub_preCV",
+            {
+                "CA_potential": CV_Vinit_vsRHE
+                    - 1.0 * ref_vs_nhe
+                    - 0.059 * solution_ph,
+                "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
+                "CA_duration_sec": preCV_duration,
+            },
+        )
         pl.add_experiment(
             "ECHE_sub_CV_led",
             {
@@ -304,6 +339,7 @@ def ECHE_CV_CA_CV(
     CV1_scanrate_voltsec: float = 0.02,
     CV1_samplerate_mV: float = 1,
     CV1_cycles: int = 1,
+    preCV_duration = 3,
     CA2_potential_vsRHE: float = 1.23,
     CA2_duration_sec: float = 4,
     CA_samplerate_sec: float = 0.05,
@@ -337,6 +373,16 @@ def ECHE_CV_CA_CV(
             },
         )
 
+        pl.add_experiment(
+            "ECHE_sub_preCV",
+            {
+                "CA_potential": CV1_Vinit_vsRHE
+                    - 1.0 * ref_vs_nhe
+                    - 0.059 * solution_ph,
+                "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
+                "CA_duration_sec": preCV_duration,
+            },
+        )
         # CV1
         pl.add_experiment(
             "ECHE_sub_CV",
@@ -359,6 +405,12 @@ def ECHE_CV_CA_CV(
             },
         )
 
+        #OCV
+        pl.add_experiment(
+            "ECHE_sub_OCV",
+            {
+            }
+        )
         # CA2
         pl.add_experiment(
             "ECHE_sub_CA",
@@ -377,7 +429,17 @@ def ECHE_CV_CA_CV(
             },
         )
 
-        # CV3
+        pl.add_experiment(
+            "ECHE_sub_preCV",
+            {
+                "CA_potential": CV3_Vinit_vsRHE
+                    - 1.0 * ref_vs_nhe
+                    - 0.059 * solution_ph,
+                "samplerate_sec": CV3_samplerate_mV / (CV3_scanrate_voltsec * 1000),
+                "CA_duration_sec": preCV_duration,
+            },
+        )
+    # CV3
         pl.add_experiment(
             "ECHE_sub_CV",
             {
@@ -422,6 +484,7 @@ def ECHE_CV(
     CV1_scanrate_voltsec: float = 0.02,
     CV1_samplerate_mV: float = 1,
     CV1_cycles: int = 1,
+    preCV_duration = 3,
     gamry_i_range: str = "auto",
 ):
 
@@ -444,6 +507,16 @@ def ECHE_CV(
             },
         )
 
+        pl.add_experiment(
+            "ECHE_sub_preCV",
+            {
+                "CA_potential": CV1_Vinit_vsRHE
+                    - 1.0 * ref_vs_nhe
+                    - 0.059 * solution_ph,
+                "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
+                "CA_duration_sec": preCV_duration,
+            },
+        )
         # CV1
         pl.add_experiment(
             "ECHE_sub_CV",
@@ -507,6 +580,12 @@ def ECHE_CA(
             },
         )
 
+        #OCV
+        pl.add_experiment(
+            "ECHE_sub_OCV",
+            {
+            }
+        )
         # CA1
         pl.add_experiment(
             "ECHE_sub_CA",
@@ -575,6 +654,12 @@ def ECHE_CA_led(
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
+        #OCV
+        pl.add_experiment(
+            "ECHE_sub_OCV",
+            {
+            }
+        )
         # CA1
         pl.add_experiment(
             "ECHE_sub_CA_led",
@@ -627,6 +712,7 @@ def ECHE_CV_led(
     CV_scanrate_voltsec: float = 0.02,
     CV_samplerate_mV: float = 1,
     CV_cycles: int = 1,
+    preCV_duration = 3,
     gamry_i_range: str = "auto",
     led_type: str = "front",
     led_date: str = "01/01/2000",
@@ -660,6 +746,16 @@ def ECHE_CV_led(
         )
 
         # CV1
+        pl.add_experiment(
+            "ECHE_sub_preCV",
+            {
+                "CA_potential": CV_Vinit_vsRHE
+                    - 1.0 * ref_vs_nhe
+                    - 0.059 * solution_ph,
+                "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
+                "CA_duration_sec": preCV_duration,
+            },
+        )
         pl.add_experiment(
             "ECHE_sub_CV_led",
             {
@@ -853,6 +949,7 @@ def ECHE_CV_led_spectrometer(
     CV_scanrate_voltsec: float = 0.02,
     CV_samplerate_mV: float = 1,
     CV_cycles: int = 1,
+    preCV_duration = 3,
     gamry_i_range: str = "auto",
     led_type: str = "front",
     led_date: str = "01/01/2000",
@@ -890,6 +987,16 @@ def ECHE_CV_led_spectrometer(
         )
 
         # CV1
+        pl.add_experiment(
+            "ECHE_sub_preCV",
+            {
+                "CA_potential": CV_Vinit_vsRHE
+                    - 1.0 * ref_vs_nhe
+                    - 0.059 * solution_ph,
+                "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
+                "CA_duration_sec": preCV_duration,
+            },
+        )
         pl.add_experiment(
             "ECHE_sub_CV_led_secondtrigger",
             {
@@ -979,6 +1086,12 @@ def ECHE_CA_led_spectrometer(
                 "solution_bubble_gas": solution_bubble_gas,
                 "liquid_volume_ml": liquid_volume_ml,
             },
+        )
+        #OCV
+        pl.add_experiment(
+            "ECHE_sub_OCV",
+            {
+            }
         )
         # CA1
         pl.add_experiment(

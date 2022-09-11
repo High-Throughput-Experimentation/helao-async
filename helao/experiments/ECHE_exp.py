@@ -13,6 +13,7 @@ __all__ = [
     "ECHE_sub_CA",
     "ECHE_sub_CV_led",
     "ECHE_sub_CV",
+    "ECHE_sub_preCV",
     "ECHE_sub_CP_led",
     "ECHE_sub_CP",
     "ECHE_sub_movetosample",
@@ -334,6 +335,47 @@ def ECHE_sub_CA_led(
 
     return apm.action_list  # returns complete action list to orch
 
+
+def ECHE_sub_OCV(
+    experiment: Experiment,
+    experiment_version: int = 1,
+):
+    apm.add_action(
+        {
+            "action_server": PAL_server,
+            "action_name": "archive_custom_query_sample",
+            "action_params": {
+                "custom": "cell1_we",
+            },
+            "to_globalexp_params": [
+                "_fast_samples_in"
+            ],  # save new liquid_sample_no of eche cell to globals
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        }
+    )
+    apm.add_action(
+        {
+#    "OCV",
+            "action_server": PSTAT_server,
+            "action_name": "run_OCV",
+            "action_params": {
+                "Tval__s": 1,
+                "SampleRate": 0.05,
+                "TTLwait": -1,  # -1 disables, else select TTL 0-3
+                "TTLsend": -1,  # -1 disables, else select TTL 0-3
+                "IErange": "auto",
+            },
+            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "technique_name": "OCV",
+            "process_finish": True,
+            "process_contrib": [
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
+        },
+    )
 
 def ECHE_sub_CA(
     experiment: Experiment,
