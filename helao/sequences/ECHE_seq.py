@@ -654,12 +654,12 @@ def ECHE_CA_led(
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
-        #OCV
-        pl.add_experiment(
-            "ECHE_sub_OCV",
-            {
-            }
-        )
+        # #OCV
+        # pl.add_experiment(
+        #     "ECHE_sub_OCV",
+        #     {
+        #     }
+        # )
         # CA1
         pl.add_experiment(
             "ECHE_sub_CA_led",
@@ -746,16 +746,16 @@ def ECHE_CV_led(
         )
 
         # CV1
-        pl.add_experiment(
-            "ECHE_sub_preCV",
-            {
-                "CA_potential": CV_Vinit_vsRHE
-                    - 1.0 * ref_vs_nhe
-                    - 0.059 * solution_ph,
-                "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
-                "CA_duration_sec": preCV_duration,
-            },
-        )
+        # pl.add_experiment(
+        #     "ECHE_sub_preCV",
+        #     {
+        #         "CA_potential": CV_Vinit_vsRHE
+        #             - 1.0 * ref_vs_nhe
+        #             - 0.059 * solution_ph,
+        #         "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
+        #         "CA_duration_sec": preCV_duration,
+        #     },
+        # )
         pl.add_experiment(
             "ECHE_sub_CV_led",
             {
