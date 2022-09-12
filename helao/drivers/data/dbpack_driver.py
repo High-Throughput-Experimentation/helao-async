@@ -384,7 +384,7 @@ class ExpYml(HelaoYml):
                 f"Process terminating action has no technique_name. Using action_name.",
             )
         fill_process = {
-            "action_params": self.dict["experiment_params"],
+            "action_params": self.dict.get("experiment_params", {}),
             "samples_in": [],
             "samples_out": [],
             "files": [],
