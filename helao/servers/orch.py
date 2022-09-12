@@ -745,17 +745,17 @@ class Orch(Base):
             result_actiondict, error_code = await async_action_dispatcher(
                 self.world_cfg, A
             )
-            endpoint_status = deepcopy(
-                self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[
-                    A.action_name
-                ]
-            )
-            # endpoint_status = self.orchstatusmodel.server_dict[
-            #     A.action_server.as_key()
-            # ].endpoints[A.action_name]
-            endpoint_uuids = [str(k) for k in endpoint_status.active_dict.keys()] + [
-                str(k) for k in endpoint_status.nonactive_dict["finished"].keys()
-            ]
+            # endpoint_status = deepcopy(
+            #     self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[
+            #         A.action_name
+            #     ]
+            # )
+            # endpoint_uuids = [str(k) for k in endpoint_status.active_dict.keys()] + [
+            #     str(k) for k in endpoint_status.nonactive_dict["finished"].keys()
+            # ]
+            endpoint_uuids = [
+                str(k) for k in self.orchstatusmodel.active_dict.keys()
+            ] + [str(k) for k in self.orchstatusmodel.nonactive_dict["finished"].keys()]
             self.print_message(
                 f"Current {A.action_name} received uuids: {endpoint_uuids}"
             )
@@ -770,15 +770,21 @@ class Orch(Base):
                 try:
                     await asyncio.wait_for(self.wait_for_interrupt(), timeout=5.0)
                 except asyncio.TimeoutError:
-                    print("!!! Did not receive interrupt after 1 sec, retrying. !!!")
-                endpoint_status = deepcopy(
-                    self.orchstatusmodel.server_dict[
-                        A.action_server.as_key()
-                    ].endpoints[A.action_name]
-                )
+                    print("!!! Did not receive interrupt after 5 sec, retrying. !!!")
+                # endpoint_status = deepcopy(
+                #     self.orchstatusmodel.server_dict[
+                #         A.action_server.as_key()
+                #     ].endpoints[A.action_name]
+                # )
+                # endpoint_uuids = [
+                #     str(k) for k in endpoint_status.active_dict.keys()
+                # ] + [str(k) for k in endpoint_status.nonactive_dict["finished"].keys()]
                 endpoint_uuids = [
-                    str(k) for k in endpoint_status.active_dict.keys()
-                ] + [str(k) for k in endpoint_status.nonactive_dict["finished"].keys()]
+                    str(k) for k in self.orchstatusmodel.active_dict.keys()
+                ] + [
+                    str(k)
+                    for k in self.orchstatusmodel.nonactive_dict["finished"].keys()
+                ]
             self.print_message(f"New status registered on {A.action_name}.")
             if error_code is not ErrorCodes.none:
                 return error_code
