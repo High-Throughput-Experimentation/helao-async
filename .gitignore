@@ -15,4 +15,4 @@ helao/core/*
 helao/core
 helao/config/.ipynb_checkpoints/simulate-checkpoint.ipynb
 *-checkpoint.*
-*-checkpoint.*
+.env
