@@ -99,11 +99,11 @@ class Calc:
 
             if rud["ref_dark"] and rud["ref_light"] and rud["data"]:
 
-                refdark = np.concatenate(
-                    [d["mean"] for d in rud["ref_dark"].values()], axis=0
+                refdark = np.vstack(
+                    [d["mean"] for d in rud["ref_dark"].values()]
                 )
-                reflight = np.concatenate(
-                    [d["mean"] for d in rud["ref_light"].values()], axis=0
+                reflight = np.vstack(
+                    [d["mean"] for d in rud["ref_light"].values()]
                 )
                 mindark = refdark.min(axis=0)
                 maxlight = reflight.max(axis=0)
