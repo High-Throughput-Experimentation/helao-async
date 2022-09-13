@@ -70,7 +70,7 @@ def ECHE_move(
 
 
 def ECHE_4CA_led_1CV_led(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -96,7 +96,8 @@ def ECHE_4CA_led_1CV_led(
     CV_scanrate_voltsec: float = 0.02,
     CV_samplerate_mV: float = 1,
     CV_cycles: int = 1,
-    preCV_duration = 3,
+    preCV_duration: float = 3,
+    OCV_duration: float =1,
     gamry_i_range: str = "auto",
     led_type: str = "front",
     led_date: str = "01/01/2000",
@@ -140,6 +141,8 @@ def ECHE_4CA_led_1CV_led(
         pl.add_experiment(
             "ECHE_sub_OCV",
             {
+                "Tval__s": OCV_duration,
+                "SampleRate": 0.05,
             }
         )
         # CA1
@@ -174,6 +177,8 @@ def ECHE_4CA_led_1CV_led(
         pl.add_experiment(
             "ECHE_sub_OCV",
             {
+                "Tval__s": OCV_duration,
+                "SampleRate": 0.05,
             }
         )
         # CA2
@@ -208,6 +213,8 @@ def ECHE_4CA_led_1CV_led(
         pl.add_experiment(
             "ECHE_sub_OCV",
             {
+                "Tval__s": OCV_duration,
+                "SampleRate": 0.05,
             }
         )
         # CA3
@@ -242,6 +249,8 @@ def ECHE_4CA_led_1CV_led(
         pl.add_experiment(
             "ECHE_sub_OCV",
             {
+                "Tval__s": OCV_duration,
+                "SampleRate": 0.05,
             }
         )
         # CA4
@@ -322,7 +331,7 @@ def ECHE_4CA_led_1CV_led(
 
 
 def ECHE_CV_CA_CV(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -339,7 +348,8 @@ def ECHE_CV_CA_CV(
     CV1_scanrate_voltsec: float = 0.02,
     CV1_samplerate_mV: float = 1,
     CV1_cycles: int = 1,
-    preCV_duration = 3,
+    preCV_duration: float = 3,
+    OCV_duration: float =1,
     CA2_potential_vsRHE: float = 1.23,
     CA2_duration_sec: float = 4,
     CA_samplerate_sec: float = 0.05,
@@ -409,6 +419,8 @@ def ECHE_CV_CA_CV(
         pl.add_experiment(
             "ECHE_sub_OCV",
             {
+                "Tval__s": OCV_duration,
+                "SampleRate": 0.05,
             }
         )
         # CA2
@@ -467,7 +479,7 @@ def ECHE_CV_CA_CV(
 
 
 def ECHE_CV(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -484,7 +496,7 @@ def ECHE_CV(
     CV1_scanrate_voltsec: float = 0.02,
     CV1_samplerate_mV: float = 1,
     CV1_cycles: int = 1,
-    preCV_duration = 3,
+    preCV_duration: float = 3,
     gamry_i_range: str = "auto",
 ):
 
@@ -545,7 +557,7 @@ def ECHE_CV(
 
 
 def ECHE_CA(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -558,6 +570,7 @@ def ECHE_CA(
     CA_potential_vsRHE: float = 1.23,
     CA_duration_sec: float = 4,
     CA_samplerate_sec: float = 0.05,
+    OCV_duration: float = 1,
     gamry_i_range: str = "auto",
 ):
 
@@ -584,6 +597,8 @@ def ECHE_CA(
         pl.add_experiment(
             "ECHE_sub_OCV",
             {
+                "Tval__s": OCV_duration,
+                "SampleRate": 0.05,
             }
         )
         # CA1
@@ -610,7 +625,7 @@ def ECHE_CA(
 
 
 def ECHE_CA_led(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -623,6 +638,7 @@ def ECHE_CA_led(
     CA_potential_vsRHE: float = 1.23,
     CA_duration_sec: float = 15,
     CA_samplerate_sec: float = 0.05,
+    OCV_duration: float = 1,
     gamry_i_range: str = "auto",
     led_type: str = "front",
     led_date: str = "01/01/2000",
@@ -654,13 +670,15 @@ def ECHE_CA_led(
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
-        # #OCV
-        # pl.add_experiment(
-        #     "ECHE_sub_OCV",
-        #     {
-        #     }
-        # )
-        # CA1
+        #OCV
+        pl.add_experiment(
+            "ECHE_sub_OCV",
+            {
+                "Tval__s": OCV_duration,
+                "SampleRate": 0.05,
+            }
+        )
+        CA1
         pl.add_experiment(
             "ECHE_sub_CA_led",
             {
@@ -695,7 +713,7 @@ def ECHE_CA_led(
 
 
 def ECHE_CV_led(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -712,7 +730,7 @@ def ECHE_CV_led(
     CV_scanrate_voltsec: float = 0.02,
     CV_samplerate_mV: float = 1,
     CV_cycles: int = 1,
-    preCV_duration = 3,
+    preCV_duration: float = 3,
     gamry_i_range: str = "auto",
     led_type: str = "front",
     led_date: str = "01/01/2000",
@@ -745,17 +763,17 @@ def ECHE_CV_led(
             },
         )
 
-        # CV1
-        # pl.add_experiment(
-        #     "ECHE_sub_preCV",
-        #     {
-        #         "CA_potential": CV_Vinit_vsRHE
-        #             - 1.0 * ref_vs_nhe
-        #             - 0.059 * solution_ph,
-        #         "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
-        #         "CA_duration_sec": preCV_duration,
-        #     },
-        # )
+        CV1
+        pl.add_experiment(
+            "ECHE_sub_preCV",
+            {
+                "CA_potential": CV_Vinit_vsRHE
+                    - 1.0 * ref_vs_nhe
+                    - 0.059 * solution_ph,
+                "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
+                "CA_duration_sec": preCV_duration,
+            },
+        )
         pl.add_experiment(
             "ECHE_sub_CV_led",
             {
@@ -932,7 +950,7 @@ def ECHE_CP_led(
 
 
 def ECHE_CV_led_spectrometer(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -949,7 +967,7 @@ def ECHE_CV_led_spectrometer(
     CV_scanrate_voltsec: float = 0.02,
     CV_samplerate_mV: float = 1,
     CV_cycles: int = 1,
-    preCV_duration = 3,
+    preCV_duration: float = 3,
     gamry_i_range: str = "auto",
     led_type: str = "front",
     led_date: str = "01/01/2000",
@@ -1039,7 +1057,7 @@ def ECHE_CV_led_spectrometer(
 
 
 def ECHE_CA_led_spectrometer(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -1052,6 +1070,7 @@ def ECHE_CA_led_spectrometer(
     CA_potential_vsRHE: float = 1.23,
     CA_duration_sec: float = 15,
     CA_samplerate_sec: float = 0.05,
+    OCV_duration: float = 1,
     gamry_i_range: str = "auto",
     led_type: str = "front",
     led_date: str = "01/01/2000",
@@ -1091,6 +1110,8 @@ def ECHE_CA_led_spectrometer(
         pl.add_experiment(
             "ECHE_sub_OCV",
             {
+                "Tval__s": OCV_duration,
+                "SampleRate": 0.05,
             }
         )
         # CA1

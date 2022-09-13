@@ -227,7 +227,7 @@ def ECHE_sub_shutdown(experiment: Experiment):
 
 def ECHE_sub_CA_led(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     CA_potential_vsRHE: Optional[float] = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -339,6 +339,8 @@ def ECHE_sub_CA_led(
 def ECHE_sub_OCV(
     experiment: Experiment,
     experiment_version: int = 1,
+    Tval__s: float = 1,
+    SampleRate: float = 0.05,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add_action(
@@ -360,8 +362,8 @@ def ECHE_sub_OCV(
             "action_server": PSTAT_server,
             "action_name": "run_OCV",
             "action_params": {
-                "Tval__s": 1,
-                "SampleRate": 0.05,
+                "Tval__s": Tval__s,
+                "SampleRate": SampleRate,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
                 "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
@@ -381,7 +383,7 @@ def ECHE_sub_OCV(
 
 def ECHE_sub_preCV(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 1,
     CA_potential: Optional[float] = 0.0,  #need to get from CV initial
     samplerate_sec: Optional[float] = .05,
     CA_duration_sec: Optional[float] = 3, #adjustable pre_CV time
@@ -501,7 +503,7 @@ def ECHE_sub_CA(
 
 def ECHE_sub_CV_led(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
@@ -787,7 +789,7 @@ def ECHE_sub_CP(
 
 def ECHE_sub_CP_led(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     CP_current: Optional[float] = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -969,7 +971,7 @@ def ECHE_sub_move(
 
 def ECHE_sub_CV_led_secondtrigger(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
@@ -1120,7 +1122,7 @@ def ECHE_sub_CV_led_secondtrigger(
 
 def ECHE_sub_CA_led_secondtrigger(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     CA_potential_vsRHE: Optional[float] = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -1246,7 +1248,7 @@ def ECHE_sub_CA_led_secondtrigger(
 
 def ECHE_sub_CP_led_secondtrigger(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     CP_current: Optional[float] = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
