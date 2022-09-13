@@ -124,7 +124,7 @@ class Calc:
                             if s["sample_type"] == "solid"
                         ][0]
                     )
-                    bsnlist.append((d["mean"] - mindark) / maxlight)
+                    bsnlist.append((d["mean"] - mindark) / (maxlight - mindark))
 
                 wlarr = np.array(wllist).mean(axis=0)
                 specd[spec] = {
