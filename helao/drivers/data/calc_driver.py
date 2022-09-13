@@ -310,13 +310,13 @@ class Calc:
             evp = params["ev_parts"]
             for i in range(len(evp) - 1):
                 lo, hi = evp[i], evp[i + 1]
-                evrange = (interd["hv"] > lo) and (interd["hv"] < hi)
+                evrange = np.bitwise_and((interd["hv"] > lo), (interd["hv"] < hi))
                 datadict[f"1-T-R_av_{lo}_{hi}"] = interd["smooth"]["omTR"][
                     :, evrange
                 ].mean(axis=1)
             # full range
             lo, hi = evp[0], evp[-1]
-            evrange = (interd["hv"] > lo) and (interd["hv"] < hi)
+            evrange = np.bitwise_and((interd["hv"] > lo), (interd["hv"] < hi))
             datadict[f"1-T-R_av_{lo}_{hi}"] = interd["smooth"]["omTR"][:, evrange].mean(
                 axis=1
             )
