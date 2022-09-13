@@ -1,11 +1,56 @@
 import os
 import numpy as np
+from copy import copy
 from scipy.signal import savgol_filter
 from ruamel.yaml import YAML
 
 from helaocore.models.data import DataModel
 from helao.servers.base import Base
 from helao.helpers.file_mapper import FileMapper
+
+
+def handlenan_savgol_filter(
+    d_arr, window_length, polyorder, delta=1.0, deriv=0, replacenan_value=0.1
+):
+    nans = np.isnan(d_arr)
+    xarr = np.arange(len(d_arr))
+    if len(nans) > 1 and len(nans) < len(d_arr):
+        d_arr[nans] = np.interp(xarr[nans], xarr[~nans], d_arr[~nans])
+        naninds = np.where(np.isnan(d_arr))[0]
+        if len(naninds) > 1:
+            d_arr[naninds] = np.array(
+                [
+                    np.nanmean(d_arr[max(0, nind - 3) : min(nind + 3, len(d_arr))])
+                    for nind in naninds
+                ]
+            )
+    try:
+        return savgol_filter(d_arr, window_length, polyorder, delta=delta, deriv=deriv)
+    except:
+        nans = np.isnan(d_arr)
+        if len(nans) > 1:
+            d_arr[nans] = replacenan_value
+        return savgol_filter(d_arr, window_length, polyorder, delta=delta, deriv=deriv)
+
+
+def refadjust(v, min_mthd_allowed, max_mthd_allowed, min_limit, max_limit):
+    w = copy(v)
+    min_rescaled = np.bitwise_and(
+        (w.min(axis=1) >= min_mthd_allowed),
+        (w.min(axis=1) < min_limit),
+    )
+    w[min_rescaled, :] = (
+        w[min_rescaled, :] - w[min_rescaled, :].min(axis=1).reshape(-1, 1) + min_limit
+    )
+    max_rescaled = np.bitwise_and(
+        (w.max(axis=1) <= max_mthd_allowed),
+        (w.max(axis=1) >= max_limit),
+    )
+    w[max_rescaled, :] = w[max_rescaled, :] / (
+        w[max_rescaled, :].max(axis=1).reshape(-1, 1) + 0.02
+    )
+
+    return min_rescaled, max_rescaled, w
 
 
 class Calc:
@@ -99,12 +144,8 @@ class Calc:
 
             if rud["ref_dark"] and rud["ref_light"] and rud["data"]:
 
-                refdark = np.vstack(
-                    [d["mean"] for d in rud["ref_dark"].values()]
-                )
-                reflight = np.vstack(
-                    [d["mean"] for d in rud["ref_light"].values()]
-                )
+                refdark = np.vstack([d["mean"] for d in rud["ref_dark"].values()])
+                reflight = np.vstack([d["mean"] for d in rud["ref_light"].values()])
                 mindark = refdark.min(axis=0)
                 maxlight = reflight.max(axis=0)
 
@@ -209,7 +250,7 @@ class Calc:
                 if k != "abs" and k not in pred[sk]["smooth"].keys():
                     v = arr
                     v[np.isnan(v)] = 0.1
-                    pred[sk]["smooth"][k] = savgol_filter(
+                    pred[sk]["smooth"][k] = handlenan_savgol_filter(
                         v,
                         window_length=params["window_length"],
                         polyorder=params["poly_order"],
@@ -218,37 +259,36 @@ class Calc:
                     )
 
             # smooth sig
-            v = pred[sk]["smooth"]["sig"]
-
-            pred[sk]["smooth_refadj"]["sig"] = v
-            pred[sk]["min_rescaled"] = np.bitwise_and(
-                (v.min(axis=1) >= params["min_mthd_allowed"]),
-                (v.min(axis=1) < params["min_limit"]),
+            (
+                pred[sk]["min_rescaled"],
+                pred[sk]["max_rescaled"],
+                pred[sk]["smooth_refadj"]["sig"],
+            ) = refadjust(
+                pred[sk]["smooth"]["sig"],
+                params["min_mthd_allowed"],
+                params["max_mthd_allowed"],
+                params["min_limit"],
+                params["max_limit"],
             )
-            pred[sk]["smooth_refadj"]["sig"][pred[sk]["min_rescaled"], :] = (
-                v[pred[sk]["min_rescaled"], :]
-                - v[pred[sk]["min_rescaled"], :].min(axis=1).reshape(-1, 1)
-                + params["min_limit"]
-            )
-
-            v = pred[sk]["smooth_refadj"]["sig"]
-            pred[sk]["max_rescaled"] = np.bitwise_and(
-                (v.max(axis=1) <= params["max_mthd_allowed"]),
-                (v.max(axis=1) >= params["max_limit"]),
-            )
-            pred[sk]["smooth_refadj"]["sig"][pred[sk]["max_rescaled"], :] = v[
-                pred[sk]["max_rescaled"], :
-            ] / (v[pred[sk]["max_rescaled"], :].max(axis=1).reshape(-1, 1) + 0.02)
 
             # smooth abs
-            if len(specd.keys()) == 1 and "R" in specd.keys():
+            if len(specd.keys()) == 2:
                 pred[sk]["smooth_refadj"]["abs"] = -np.log(
                     pred[sk]["smooth_refadj"]["sig"]
                 )
-            else:
+            elif len(specd.keys()) == 1 and "R" in specd.keys():
                 pred[sk]["smooth_refadj"]["abs"] = (
                     1.0 - np.log(pred[sk]["smooth_refadj"]["sig"])
                 ) ** 2 / (2.0 * pred[sk]["smooth_refadj"]["sig"])
+            else:
+                _, _, pred[sk]["smooth_refadj"]["abs"] = refadjust(
+                    pred[sk]["smooth"]["abs"],
+                    params["min_mthd_allowed"],
+                    params["max_mthd_allowed"],
+                    params["min_limit"],
+                    params["max_limit"],
+                )
+
             pred[sk]["smooth_refadj"]["DA_unscl"] = (
                 pred[sk]["smooth_refadj"]["abs"] * pred[sk]["hv"]
             ) ** 2
@@ -282,7 +322,7 @@ class Calc:
             sv[np.isnan(sv)] = 0.1
             sdx = -1 * pred[sk]["dx"][::-1]
             pred[sk]["smooth_refadj_scl"]["abs_1stderiv"] = (
-                savgol_filter(
+                handlenan_savgol_filter(
                     sv,
                     window_length=params["window_length"],
                     polyorder=params["poly_order"],
@@ -292,7 +332,7 @@ class Calc:
                 / sdx
             )
             pred[sk]["smooth_refadj_scl"]["abs_2ndderiv"] = (
-                savgol_filter(
+                handlenan_savgol_filter(
                     sv,
                     window_length=params["window_length"],
                     polyorder=params["poly_order"],
@@ -375,7 +415,7 @@ class Calc:
             v = interd["smooth_refadj"][z]
             v[np.isnan(v)] = 0.1
             slope = (
-                savgol_filter(
+                handlenan_savgol_filter(
                     v,
                     window_length=params["window_length"],
                     polyorder=params["poly_order"],
@@ -389,7 +429,6 @@ class Calc:
         datadict["sample_label"] = smplist
         datadict["min_rescaled"] = interd["min_rescaled"]
         datadict["max_rescaled"] = interd["max_rescaled"]
-
 
         # TODO: export interd vectors
 
