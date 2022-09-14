@@ -94,7 +94,7 @@ def ECHE_4CA_led_1CV_led(
     CV_samplerate_mV: float = 1,
     CV_cycles: int = 1,
     preCV_duration: float = 3,
-    OCV_duration: float =1,
+    OCV_duration: float = 1,
     gamry_i_range: str = "auto",
     led_type: str = "front",
     led_date: str = "01/01/2000",
@@ -134,13 +134,13 @@ def ECHE_4CA_led_1CV_led(
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
-        #OCV
+        # OCV
         pl.add_experiment(
             "ECHE_sub_OCV",
             {
                 "Tval__s": OCV_duration,
                 "SampleRate": 0.05,
-            }
+            },
         )
         # CA1
         pl.add_experiment(
@@ -158,7 +158,9 @@ def ECHE_4CA_led_1CV_led(
                 "CA_duration_sec": CA1_duration_sec,
                 "gamry_i_range": gamry_i_range,
                 "illumination_source": led_name_CA1,
-                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA1)],
+                "illumination_wavelength": led_wavelengths_nm[
+                    led_names.index(led_name_CA1)
+                ],
                 "illumination_intensity": led_intensities_mw[
                     led_names.index(led_name_CA1)
                 ],
@@ -170,13 +172,13 @@ def ECHE_4CA_led_1CV_led(
                 "toggle_dark_time_init": toggleCA_dark_time_init,
             },
         )
-        #OCV
+        # OCV
         pl.add_experiment(
             "ECHE_sub_OCV",
             {
                 "Tval__s": OCV_duration,
                 "SampleRate": 0.05,
-            }
+            },
         )
         # CA2
         pl.add_experiment(
@@ -194,7 +196,9 @@ def ECHE_4CA_led_1CV_led(
                 "CA_duration_sec": CA2_duration_sec,
                 "gamry_i_range": gamry_i_range,
                 "illumination_source": led_name_CA2,
-                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA2)],
+                "illumination_wavelength": led_wavelengths_nm[
+                    led_names.index(led_name_CA2)
+                ],
                 "illumination_intensity": led_intensities_mw[
                     led_names.index(led_name_CA2)
                 ],
@@ -206,13 +210,13 @@ def ECHE_4CA_led_1CV_led(
                 "toggle_dark_time_init": toggleCA_dark_time_init,
             },
         )
-        #OCV
+        # OCV
         pl.add_experiment(
             "ECHE_sub_OCV",
             {
                 "Tval__s": OCV_duration,
                 "SampleRate": 0.05,
-            }
+            },
         )
         # CA3
         pl.add_experiment(
@@ -230,7 +234,9 @@ def ECHE_4CA_led_1CV_led(
                 "CA_duration_sec": CA3_duration_sec,
                 "gamry_i_range": gamry_i_range,
                 "illumination_source": led_name_CA3,
-                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA3)],
+                "illumination_wavelength": led_wavelengths_nm[
+                    led_names.index(led_name_CA3)
+                ],
                 "illumination_intensity": led_intensities_mw[
                     led_names.index(led_name_CA3)
                 ],
@@ -242,13 +248,13 @@ def ECHE_4CA_led_1CV_led(
                 "toggle_dark_time_init": toggleCA_dark_time_init,
             },
         )
-        #OCV
+        # OCV
         pl.add_experiment(
             "ECHE_sub_OCV",
             {
                 "Tval__s": OCV_duration,
                 "SampleRate": 0.05,
-            }
+            },
         )
         # CA4
         pl.add_experiment(
@@ -266,7 +272,9 @@ def ECHE_4CA_led_1CV_led(
                 "CA_duration_sec": CA4_duration_sec,
                 "gamry_i_range": gamry_i_range,
                 "illumination_source": led_name_CA4,
-                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA4)],
+                "illumination_wavelength": led_wavelengths_nm[
+                    led_names.index(led_name_CA4)
+                ],
                 "illumination_intensity": led_intensities_mw[
                     led_names.index(led_name_CA4)
                 ],
@@ -283,9 +291,7 @@ def ECHE_4CA_led_1CV_led(
         pl.add_experiment(
             "ECHE_sub_preCV",
             {
-                "CA_potential": CV_Vinit_vsRHE
-                    - 1.0 * ref_vs_nhe
-                    - 0.059 * solution_ph,
+                "CA_potential": CV_Vinit_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
                 "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
                 "CA_duration_sec": preCV_duration,
             },
@@ -309,7 +315,9 @@ def ECHE_4CA_led_1CV_led(
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "illumination_source": led_name_CV,
-                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CV)],
+                "illumination_wavelength": led_wavelengths_nm[
+                    led_names.index(led_name_CV)
+                ],
                 "illumination_intensity": led_intensities_mw[
                     led_names.index(led_name_CV)
                 ],
@@ -346,7 +354,7 @@ def ECHE_CV_CA_CV(
     CV1_samplerate_mV: float = 1,
     CV1_cycles: int = 1,
     preCV_duration: float = 3,
-    OCV_duration: float =1,
+    OCV_duration: float = 1,
     CA2_potential_vsRHE: float = 1.23,
     CA2_duration_sec: float = 4,
     CA_samplerate_sec: float = 0.05,
@@ -384,8 +392,8 @@ def ECHE_CV_CA_CV(
             "ECHE_sub_preCV",
             {
                 "CA_potential": CV1_Vinit_vsRHE
-                    - 1.0 * ref_vs_nhe
-                    - 0.059 * solution_ph,
+                - 1.0 * ref_vs_nhe
+                - 0.059 * solution_ph,
                 "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
                 "CA_duration_sec": preCV_duration,
             },
@@ -412,13 +420,13 @@ def ECHE_CV_CA_CV(
             },
         )
 
-        #OCV
+        # OCV
         pl.add_experiment(
             "ECHE_sub_OCV",
             {
                 "Tval__s": OCV_duration,
                 "SampleRate": 0.05,
-            }
+            },
         )
         # CA2
         pl.add_experiment(
@@ -442,13 +450,13 @@ def ECHE_CV_CA_CV(
             "ECHE_sub_preCV",
             {
                 "CA_potential": CV3_Vinit_vsRHE
-                    - 1.0 * ref_vs_nhe
-                    - 0.059 * solution_ph,
+                - 1.0 * ref_vs_nhe
+                - 0.059 * solution_ph,
                 "samplerate_sec": CV3_samplerate_mV / (CV3_scanrate_voltsec * 1000),
                 "CA_duration_sec": preCV_duration,
             },
         )
-    # CV3
+        # CV3
         pl.add_experiment(
             "ECHE_sub_CV",
             {
@@ -520,8 +528,8 @@ def ECHE_CV(
             "ECHE_sub_preCV",
             {
                 "CA_potential": CV1_Vinit_vsRHE
-                    - 1.0 * ref_vs_nhe
-                    - 0.059 * solution_ph,
+                - 1.0 * ref_vs_nhe
+                - 0.059 * solution_ph,
                 "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
                 "CA_duration_sec": preCV_duration,
             },
@@ -590,13 +598,13 @@ def ECHE_CA(
             },
         )
 
-        #OCV
+        # OCV
         pl.add_experiment(
             "ECHE_sub_OCV",
             {
                 "Tval__s": OCV_duration,
                 "SampleRate": 0.05,
-            }
+            },
         )
         # CA1
         pl.add_experiment(
@@ -667,15 +675,15 @@ def ECHE_CA_led(
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
-        #OCV
+        # OCV
         pl.add_experiment(
             "ECHE_sub_OCV",
             {
                 "Tval__s": OCV_duration,
                 "SampleRate": 0.05,
-            }
+            },
         )
-#        CA1
+        # CA1
         pl.add_experiment(
             "ECHE_sub_CA_led",
             {
@@ -691,7 +699,9 @@ def ECHE_CA_led(
                 "CA_duration_sec": CA_duration_sec,
                 "gamry_i_range": gamry_i_range,
                 "illumination_source": led_name_CA,
-                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA)],
+                "illumination_wavelength": led_wavelengths_nm[
+                    led_names.index(led_name_CA)
+                ],
                 "illumination_intensity": led_intensities_mw[
                     led_names.index(led_name_CA)
                 ],
@@ -760,13 +770,11 @@ def ECHE_CV_led(
             },
         )
 
-  #      CV1
+        # CV1
         pl.add_experiment(
             "ECHE_sub_preCV",
             {
-                "CA_potential": CV_Vinit_vsRHE
-                    - 1.0 * ref_vs_nhe
-                    - 0.059 * solution_ph,
+                "CA_potential": CV_Vinit_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
                 "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
                 "CA_duration_sec": preCV_duration,
             },
@@ -790,7 +798,9 @@ def ECHE_CV_led(
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "illumination_source": led_name_CV,
-                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CV)],
+                "illumination_wavelength": led_wavelengths_nm[
+                    led_names.index(led_name_CV)
+                ],
                 "illumination_intensity": led_intensities_mw[
                     led_names.index(led_name_CV)
                 ],
@@ -928,7 +938,9 @@ def ECHE_CP_led(
                 "CP_duration_sec": CP_duration_sec,
                 "gamry_i_range": gamry_i_range,
                 "illumination_source": led_name_CP,
-                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CP)],
+                "illumination_wavelength": led_wavelengths_nm[
+                    led_names.index(led_name_CP)
+                ],
                 "illumination_intensity": led_intensities_mw[
                     led_names.index(led_name_CP)
                 ],
@@ -944,4 +956,3 @@ def ECHE_CP_led(
         pl.add_experiment("ECHE_sub_shutdown", {})
 
     return pl.experiment_plan_list  # returns complete experiment list
-

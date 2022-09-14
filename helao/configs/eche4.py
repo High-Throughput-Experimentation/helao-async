@@ -6,9 +6,9 @@ config = {}
 config["dummy"] = True
 config['simulation'] = False
 
-config["experiment_libraries"] = ["samples_exp", "UVIS_exp"]
+config["experiment_libraries"] = ["samples_exp", "ECHE_exp", "ECHEUVIS_exp", "UVIS_exp"]
 config["experiment_params"] = {"toggle_is_shutter": False}
-config["sequence_libraries"] = ["UVIS_T_seq"]
+config["sequence_libraries"] = ["ECHE_seq", "ECHEUVIS_seq", "UVIS_T_seq"]
 config["sequence_params"] = {
     "led_wavelengths_nm": [-1],
     "led_intensities_mw": [0.432],
@@ -17,9 +17,6 @@ config["sequence_params"] = {
     "led_date": "8/16/2022",  # m/d/yyyy
     "toggle_is_shutter": False,
 }
-# config["experiment_libraries"] = ["ECHE_exp", "samples_exp"]
-# config["experiment_params"] = {}
-# config["sequence_libraries"] = ["ECHE_seq"]
 # config["sequence_params"] = {
 #     "led_wavelengths_nm": [385, 455, 515, 590],
 #     "led_intensities_mw": [1.725, 1.478, 0.585, 0.366],

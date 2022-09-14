@@ -15,14 +15,13 @@ from socket import gethostname
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helaocore.models.action_start_condition import ActionStartCondition
-from helaocore.models.sample import SolidSample, LiquidSample
 from helaocore.models.machine import MachineModel as MM
 from helaocore.models.process_contrib import ProcessContrib
 from helaocore.models.electrolyte import Electrolyte
 
-from helao.drivers.motion.enum import MoveModes, TransformationModes
 from helao.drivers.io.enum import TriggerType
 from helao.drivers.spec.enum import SpecType
+
 
 EXPERIMENTS = __all__
 
@@ -57,7 +56,7 @@ def ECHE_sub_CV_led_secondtrigger(
     measurement_area: float = 0.071,  # 3mm diameter droplet
     ref_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
-    illumination_source: Optional[str] = "doric_led1",
+    illumination_source: Optional[str] = "doric_wled",
     illumination_wavelength: Optional[float] = 0.0,
     illumination_intensity: Optional[float] = 0.0,
     illumination_intensity_date: Optional[str] = "n/a",
@@ -71,8 +70,9 @@ def ECHE_sub_CV_led_secondtrigger(
     toggle2_duty: Optional[float] = 0.5,
     toggle2_period: Optional[float] = 2.0,
     toggle2_time: Optional[float] = -1,
-    integration_time: Optional[float] = 15,
-    n_spec_avg: Optional[int] = 1,
+    spec_int_time_ms: Optional[float] = 15,
+    spec_n_avg: Optional[int] = 1,
+    spec_type: Optional[SpecType] = "T",
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -155,8 +155,8 @@ def ECHE_sub_CV_led_secondtrigger(
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "action_params": {
-                "int_time": apm.pars.integration_time,
-                "n_avg": apm.pars.n_spec_avg,
+                "int_time": apm.pars.spec_int_time_ms,
+                "n_avg": apm.pars.spec_n_avg,
             },
             "process_contrib": [
                 ProcessContrib.files,
@@ -237,7 +237,7 @@ def ECHE_sub_CA_led_secondtrigger(
     samplerate_sec: Optional[float] = 0.1,
     CA_duration_sec: Optional[float] = 60,
     gamry_i_range: Optional[str] = "auto",
-    illumination_source: Optional[str] = "doric_led1",
+    illumination_source: Optional[str] = "doric_wled",
     illumination_wavelength: Optional[float] = 0.0,
     illumination_intensity: Optional[float] = 0.0,
     illumination_intensity_date: Optional[str] = "n/a",
@@ -251,8 +251,9 @@ def ECHE_sub_CA_led_secondtrigger(
     toggle2_duty: Optional[float] = 0.5,
     toggle2_period: Optional[float] = 2.0,
     toggle2_time: Optional[float] = -1,
-    integration_time: Optional[float] = 15,
-    n_spec_avg: Optional[int] = 1,
+    spec_int_time_ms: Optional[float] = 15,
+    spec_n_avg: Optional[int] = 1,
+    spec_type: Optional[SpecType] = "T",
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -317,8 +318,8 @@ def ECHE_sub_CA_led_secondtrigger(
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "action_params": {
-                "int_time": apm.pars.integration_time,
-                "n_avg": apm.pars.n_spec_avg,
+                "int_time": apm.pars.spec_int_time_ms,
+                "n_avg": apm.pars.spec_n_avg,
             },
             "process_contrib": [
                 ProcessContrib.files,
@@ -393,7 +394,7 @@ def ECHE_sub_CP_led_secondtrigger(
     samplerate_sec: Optional[float] = 0.1,
     CP_duration_sec: Optional[float] = 60,
     gamry_i_range: Optional[str] = "auto",
-    illumination_source: Optional[str] = "doric_led1",
+    illumination_source: Optional[str] = "doric_wled",
     illumination_wavelength: Optional[float] = 0.0,
     illumination_intensity: Optional[float] = 0.0,
     illumination_intensity_date: Optional[str] = "n/a",
@@ -407,8 +408,9 @@ def ECHE_sub_CP_led_secondtrigger(
     toggle2_duty: Optional[float] = 0.5,
     toggle2_period: Optional[float] = 2.0,
     toggle2_time: Optional[float] = -1,
-    integration_time: Optional[float] = 15,
-    n_spec_avg: Optional[int] = 1,
+    spec_int_time_ms: Optional[float] = 15,
+    spec_n_avg: Optional[int] = 1,
+    spec_type: Optional[SpecType] = "T",
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -473,8 +475,8 @@ def ECHE_sub_CP_led_secondtrigger(
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             "action_params": {
-                "int_time": apm.pars.integration_time,
-                "n_avg": apm.pars.n_spec_avg,
+                "int_time": apm.pars.spec_int_time_ms,
+                "n_avg": apm.pars.spec_n_avg,
             },
             "process_contrib": [
                 ProcessContrib.files,
