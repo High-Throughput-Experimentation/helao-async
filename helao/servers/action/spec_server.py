@@ -108,11 +108,15 @@ def makeApp(confPrefix, servKey, helao_root):
         # app.base.print_message("External trigger task initiated.", info=True)
         return active_dict
 
-    @app.post(f"/{servKey}/stop_extrig")
-    async def stop_extrig():
+    @app.post(f"/{servKey}/stop_extrig_after")
+    async def stop_extrig(
+        action: Optional[Action] = Body({}, embed=True),
+        action_version: int = 1,
+        delay: int = 0,
+    ):
         """Acquire spectra based on external trigger."""
         active = app.base.setup_and_contain_action()
-        await app.driver.stop()
+        await app.driver.stop(delay=active.action.action_params["delay"])
         finished_action = await active.finish()
         return finished_action.as_dict()
 

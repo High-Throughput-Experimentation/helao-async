@@ -428,9 +428,10 @@ class SM303:
         else:
             pass
 
-    async def stop(self):
+    async def stop(self, delay: int = 0):
         """stops measurement, writes all data and returns from meas loop"""
         if self.IO_measuring:
+            await asyncio.sleep(delay=delay)
             self.IO_do_meas = False  # will stop meas loop
             await self.set_IO_signalq(False)
 
