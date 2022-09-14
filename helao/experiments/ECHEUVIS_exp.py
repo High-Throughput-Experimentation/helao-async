@@ -158,6 +158,11 @@ def ECHE_sub_CV_led_secondtrigger(
                 "int_time": apm.pars.integration_time,
                 "n_avg": apm.pars.n_spec_avg,
             },
+            "process_contrib": [
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
         }
     )
 
@@ -315,6 +320,11 @@ def ECHE_sub_CA_led_secondtrigger(
                 "int_time": apm.pars.integration_time,
                 "n_avg": apm.pars.n_spec_avg,
             },
+            "process_contrib": [
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
         }
     )
 
@@ -466,6 +476,11 @@ def ECHE_sub_CP_led_secondtrigger(
                 "int_time": apm.pars.integration_time,
                 "n_avg": apm.pars.n_spec_avg,
             },
+            "process_contrib": [
+                ProcessContrib.files,
+                ProcessContrib.samples_in,
+                ProcessContrib.samples_out,
+            ],
         }
     )
 
