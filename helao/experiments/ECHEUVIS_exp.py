@@ -157,6 +157,7 @@ def ECHE_sub_CV_led_secondtrigger(
             "action_params": {
                 "int_time": apm.pars.spec_int_time_ms,
                 "n_avg": apm.pars.spec_n_avg,
+                "duration": apm.pars.toggle2_time,
             },
             "process_contrib": [
                 ProcessContrib.files,
@@ -192,7 +193,7 @@ def ECHE_sub_CV_led_secondtrigger(
                 "IErange": apm.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "start_condition": ActionStartCondition.wait_for_server, 
             "technique_name": "CV",
             "process_finish": True,
             "process_contrib": [
@@ -320,6 +321,7 @@ def ECHE_sub_CA_led_secondtrigger(
             "action_params": {
                 "int_time": apm.pars.spec_int_time_ms,
                 "n_avg": apm.pars.spec_n_avg,
+                "duration": apm.pars.toggle2_time,
             },
             "process_contrib": [
                 ProcessContrib.files,
@@ -349,7 +351,7 @@ def ECHE_sub_CA_led_secondtrigger(
                 "IErange": apm.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "start_condition": ActionStartCondition.wait_for_server, 
             "technique_name": "CA",
             "process_finish": True,
             "process_contrib": [
@@ -477,6 +479,7 @@ def ECHE_sub_CP_led_secondtrigger(
             "action_params": {
                 "int_time": apm.pars.spec_int_time_ms,
                 "n_avg": apm.pars.spec_n_avg,
+                "duration": apm.pars.toggle2_time,
             },
             "process_contrib": [
                 ProcessContrib.files,
@@ -499,7 +502,7 @@ def ECHE_sub_CP_led_secondtrigger(
                 "IErange": apm.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "start_condition": ActionStartCondition.wait_for_server, 
             "technique_name": "CP",
             "process_finish": True,
             "process_contrib": [
