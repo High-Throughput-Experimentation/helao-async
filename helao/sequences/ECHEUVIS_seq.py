@@ -12,7 +12,6 @@ from helaocore.models.electrolyte import Electrolyte
 SEQUENCES = __all__
 
 
-
 def ECHE_CV_led_spectrometer(
     sequence_version: int = 3,
     plate_id: int = 1,
@@ -35,10 +34,10 @@ def ECHE_CV_led_spectrometer(
     gamry_i_range: str = "auto",
     led_type: str = "front",
     led_date: str = "01/01/2000",
-    led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
-    led_wavelengths_nm: list = [385, 450, 515, 595],
-    led_intensities_mw: list = [-1, -1, -1, -1],
-    led_name_CV: str = "doric_led1",
+    led_names: list = ["doric_wled"],
+    led_wavelengths_nm: list = [-1],
+    led_intensities_mw: list = [0.432],
+    led_name_CV: str = "doric_wled",
     toggleCV_illum_duty: float = 0.667,
     toggleCV_illum_period: float = 3.0,
     toggleCV_dark_time_init: float = 0,
@@ -47,8 +46,8 @@ def ECHE_CV_led_spectrometer(
     toggleSpec_period: float = 0.6,
     toggleSpec_init_delay: float = 0.0,
     toggleSpec_time: float = -1,
-    integration_time: float = 15,
-    n_spec_avg: int = 1,
+    spec_int_time_ms: float = 15,
+    spec_n_avg: int = 1,
 ):
 
     pl = ExperimentPlanMaker()
@@ -74,9 +73,7 @@ def ECHE_CV_led_spectrometer(
         pl.add_experiment(
             "ECHE_sub_preCV",
             {
-                "CA_potential": CV_Vinit_vsRHE
-                    - 1.0 * ref_vs_nhe
-                    - 0.059 * solution_ph,
+                "CA_potential": CV_Vinit_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
                 "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
                 "CA_duration_sec": preCV_duration,
             },
@@ -100,7 +97,9 @@ def ECHE_CV_led_spectrometer(
                 "reference_electrode_type": "NHE",
                 "ref_vs_nhe": ref_vs_nhe,
                 "illumination_source": led_name_CV,
-                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CV)],
+                "illumination_wavelength": led_wavelengths_nm[
+                    led_names.index(led_name_CV)
+                ],
                 "illumination_intensity": led_intensities_mw[
                     led_names.index(led_name_CV)
                 ],
@@ -114,8 +113,8 @@ def ECHE_CV_led_spectrometer(
                 "toggle2_period": toggleSpec_period,
                 "toggle2_init_delay": toggleSpec_init_delay,
                 "toggle2_time": toggleSpec_time,
-                "integration_time": integration_time,
-                "n_spec_avg": n_spec_avg,
+                "spec_int_time_ms": spec_int_time_ms,
+                "spec_n_avg": spec_n_avg,
             },
         )
 
@@ -142,10 +141,10 @@ def ECHE_CA_led_spectrometer(
     gamry_i_range: str = "auto",
     led_type: str = "front",
     led_date: str = "01/01/2000",
-    led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
-    led_wavelengths_nm: list = [385, 450, 515, 595],
-    led_intensities_mw: list = [-1, -1, -1, -1],
-    led_name_CA: str = "doric_led1",
+    led_names: list = ["doric_wled"],
+    led_wavelengths_nm: list = [-1],
+    led_intensities_mw: list = [0.432],
+    led_name_CA: str = "doric_wled",
     toggleCA_illum_duty: float = 0.5,
     toggleCA_illum_period: float = 1.0,
     toggleCA_dark_time_init: float = 0,
@@ -154,8 +153,8 @@ def ECHE_CA_led_spectrometer(
     toggleSpec_period: float = 0.6,
     toggleSpec_init_delay: float = 0.0,
     toggleSpec_time: float = -1,
-    integration_time: float = 15,
-    n_spec_avg: int = 1,
+    spec_int_time_ms: float = 15,
+    spec_n_avg: int = 1,
 ):
 
     pl = ExperimentPlanMaker()
@@ -176,13 +175,13 @@ def ECHE_CA_led_spectrometer(
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
-        #OCV
+        # OCV
         pl.add_experiment(
             "ECHE_sub_OCV",
             {
                 "Tval__s": OCV_duration,
                 "SampleRate": 0.05,
-            }
+            },
         )
         # CA1
         pl.add_experiment(
@@ -200,7 +199,9 @@ def ECHE_CA_led_spectrometer(
                 "CA_duration_sec": CA_duration_sec,
                 "gamry_i_range": gamry_i_range,
                 "illumination_source": led_name_CA,
-                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CA)],
+                "illumination_wavelength": led_wavelengths_nm[
+                    led_names.index(led_name_CA)
+                ],
                 "illumination_intensity": led_intensities_mw[
                     led_names.index(led_name_CA)
                 ],
@@ -214,8 +215,8 @@ def ECHE_CA_led_spectrometer(
                 "toggle2_period": toggleSpec_period,
                 "toggle2_init_delay": toggleSpec_init_delay,
                 "toggle2_time": toggleSpec_time,
-                "integration_time": integration_time,
-                "n_spec_avg": n_spec_avg,
+                "spec_int_time_ms": spec_int_time_ms,
+                "spec_n_avg": spec_n_avg,
             },
         )
 
@@ -239,12 +240,12 @@ def ECHE_CP_led_spectrometer(
     CP_duration_sec: float = 15,
     CP_samplerate_sec: float = 0.05,
     gamry_i_range: str = "auto",
-    led_name_CP: str = "doric_led1",
     led_type: str = "front",
     led_date: str = "01/01/2000",
-    led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
-    led_wavelengths_nm: list = [385, 450, 515, 595],
-    led_intensities_mw: list = [-1, -1, -1, -1],
+    led_names: list = ["doric_wled"],
+    led_wavelengths_nm: list = [-1],
+    led_intensities_mw: list = [0.432],
+    led_name_CP: str = "doric_wled",
     toggleCP_illum_duty: float = 0.5,
     toggleCP_illum_period: float = 1.0,
     toggleCP_dark_time_init: float = 0.0,
@@ -253,8 +254,8 @@ def ECHE_CP_led_spectrometer(
     toggleSpec_period: float = 0.6,
     toggleSpec_init_delay: float = 0.0,
     toggleSpec_time: float = -1,
-    integration_time: float = 15,
-    n_spec_avg: int = 1,
+    spec_int_time_ms: float = 15,
+    spec_n_avg: int = 1,
 ):
 
     pl = ExperimentPlanMaker()
@@ -291,7 +292,9 @@ def ECHE_CP_led_spectrometer(
                 "CP_duration_sec": CP_duration_sec,
                 "gamry_i_range": gamry_i_range,
                 "illumination_source": led_name_CP,
-                "illumination_wavelength": led_wavelengths_nm[led_names.index(led_name_CP)],
+                "illumination_wavelength": led_wavelengths_nm[
+                    led_names.index(led_name_CP)
+                ],
                 "illumination_intensity": led_intensities_mw[
                     led_names.index(led_name_CP)
                 ],
@@ -305,8 +308,8 @@ def ECHE_CP_led_spectrometer(
                 "toggle2_period": toggleSpec_period,
                 "toggle2_init_delay": toggleSpec_init_delay,
                 "toggle2_time": toggleSpec_time,
-                "integration_time": integration_time,
-                "n_spec_avg": n_spec_avg,
+                "spec_int_time_ms": spec_int_time_ms,
+                "spec_n_avg": spec_n_avg,
             },
         )
 

@@ -19,9 +19,6 @@ __all__ = [
     "ECHE_sub_CP",
     "ECHE_sub_movetosample",
     "ECHE_sub_move",
-    "ECHE_sub_CV_led_secondtrigger",
-    "ECHE_sub_CA_led_secondtrigger",
-    "ECHE_sub_CP_led_secondtrigger",
 ]
 
 
@@ -358,7 +355,7 @@ def ECHE_sub_OCV(
     )
     apm.add_action(
         {
-#    "OCV",
+            #    "OCV",
             "action_server": PSTAT_server,
             "action_name": "run_OCV",
             "action_params": {
@@ -381,12 +378,13 @@ def ECHE_sub_OCV(
     )
     return apm.action_list  # returns complete action list to orch
 
+
 def ECHE_sub_preCV(
     experiment: Experiment,
     experiment_version: int = 1,
-    CA_potential: Optional[float] = 0.0,  #need to get from CV initial
-    samplerate_sec: Optional[float] = .05,
-    CA_duration_sec: Optional[float] = 3, #adjustable pre_CV time
+    CA_potential: Optional[float] = 0.0,  # need to get from CV initial
+    samplerate_sec: Optional[float] = 0.05,
+    CA_duration_sec: Optional[float] = 3,  # adjustable pre_CV time
 ):
     """last functionality test: 11/29/2021"""
 
@@ -431,6 +429,7 @@ def ECHE_sub_preCV(
     )
 
     return apm.action_list  # returns complete action list to orch
+
 
 def ECHE_sub_CA(
     experiment: Experiment,
@@ -543,14 +542,19 @@ def ECHE_sub_CV_led(
         abs(apm.pars.Vfinal_vsRHE - apm.pars.Vapex2_vsRHE) / apm.pars.scanrate_voltsec
     )
     CV_duration_sec += (
-        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE) / apm.pars.scanrate_voltsec * apm.pars.cycles
+        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE)
+        / apm.pars.scanrate_voltsec
+        * apm.pars.cycles
     )
     CV_duration_sec += (
-        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE) / apm.pars.scanrate_voltsec * 2.0 * (apm.pars.cycles - 1)
+        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE)
+        / apm.pars.scanrate_voltsec
+        * 2.0
+        * (apm.pars.cycles - 1)
     )
 
     if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = CV_duration_sec 
+        apm.pars.toggle_illum_time = CV_duration_sec
 
     # get sample for gamry
     apm.add_action(
@@ -967,4 +971,3 @@ def ECHE_sub_move(
     )
 
     return apm.action_list  # returns complete action list to orch
-
