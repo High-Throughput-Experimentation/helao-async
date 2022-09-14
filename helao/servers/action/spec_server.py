@@ -111,7 +111,9 @@ def makeApp(confPrefix, servKey, helao_root):
     @app.post(f"/stop_extrig")
     async def stop_extrig():
         """Acquire spectra based on external trigger."""
-        resp = await app.driver.stop()
-        return resp
+        active = app.base.setup_and_contain_action()
+        await app.driver.stop()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
     return app
