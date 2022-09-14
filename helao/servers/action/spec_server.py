@@ -108,7 +108,7 @@ def makeApp(confPrefix, servKey, helao_root):
         # app.base.print_message("External trigger task initiated.", info=True)
         return active_dict
 
-    @app.post(f"/stop_extrig")
+    @app.post(f"/{servKey}/stop_extrig")
     async def stop_extrig():
         """Acquire spectra based on external trigger."""
         active = app.base.setup_and_contain_action()
