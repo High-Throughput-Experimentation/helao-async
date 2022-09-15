@@ -272,7 +272,7 @@ class Calc:
                     pred[sk]["bin"][k] = np.array(pred[sk]["bin"][k]).transpose()
             # smooth binned arrays that haven't been smoothed
             for k, arr in pred[sk]["bin"].items():
-                if k != "abs" and k not in pred[sk]["smooth"].keys():
+                if (k != "abs" or sk == "T") and k not in pred[sk]["smooth"].keys():
                     v = arr
                     v[np.isnan(v)] = 0.1
                     pred[sk]["smooth"][k] = handlenan_savgol_filter(
@@ -305,7 +305,7 @@ class Calc:
                 ) ** 2 / (2.0 * pred[sk]["smooth_refadj"]["sig"])
             else:
                 _, _, pred[sk]["smooth_refadj"]["abs"] = refadjust(
-                    pred[sk]["smooth"]["sig"],
+                    pred[sk]["smooth"]["abs"],
                     params["min_mthd_allowed"],
                     params["max_mthd_allowed"],
                     params["min_limit"],
