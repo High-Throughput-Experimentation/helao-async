@@ -305,7 +305,7 @@ class Calc:
                 ) ** 2 / (2.0 * pred[sk]["smooth_refadj"]["sig"])
             else:
                 _, _, pred[sk]["smooth_refadj"]["abs"] = refadjust(
-                    pred[sk]["smooth"]["abs"],
+                    pred[sk]["smooth"]["sig"],
                     params["min_mthd_allowed"],
                     params["max_mthd_allowed"],
                     params["min_limit"],
