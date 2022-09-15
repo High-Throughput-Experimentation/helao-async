@@ -12,6 +12,7 @@ from helao.helpers.file_mapper import FileMapper
 def handlenan_savgol_filter(
     d_arr, window_length, polyorder, delta=1.0, deriv=0, replacenan_value=0.1
 ):
+    """Custom savgol_filter from JCAPDataProcess uvis_basics.py, updated for array ops."""
     nans = np.isnan(d_arr)
     xarr = np.arange(len(d_arr))
     if len(nans) > 1 and len(nans) < len(d_arr):
@@ -26,7 +27,7 @@ def handlenan_savgol_filter(
             )
     try:
         return savgol_filter(d_arr, window_length, polyorder, delta=delta, deriv=deriv)
-    except:
+    except Exception:
         nans = np.isnan(d_arr)
         if len(nans) > 1:
             d_arr[nans] = replacenan_value
@@ -34,6 +35,7 @@ def handlenan_savgol_filter(
 
 
 def refadjust(v, min_mthd_allowed, max_mthd_allowed, min_limit, max_limit):
+    """Normalization func from JCAPDataProcess uvis_basics.py, updated for array ops."""
     w = copy(v)
     min_rescaled = np.bitwise_and(
         (w.min(axis=1) >= min_mthd_allowed),
@@ -54,7 +56,7 @@ def refadjust(v, min_mthd_allowed, max_mthd_allowed, min_limit, max_limit):
 
 
 class Calc:
-    """_summary_"""
+    """In-sequence FOM calculation driver."""
 
     def __init__(self, action_serv: Base):
         self.base = action_serv
@@ -62,6 +64,7 @@ class Calc:
         self.yaml = YAML(typ="safe")
 
     def gather_spec_data(self, seq_reldir: str):
+        """Get all spectrum files using FileMapper to traverse ACTIVE/FINISHED/SYNCED."""
         # get all files from current sequence directory
         # produce tuples, (run_type, technique_name, run_use, hlo_path)
         active_save_dir = self.base.helaodirs.save_root.__str__()
@@ -103,13 +106,23 @@ class Calc:
         return hlo_dict
 
     def calc_uvis_abs(self, activeobj):
+        """Figure of merit calculator for UVIS TR, DR, and T techniques."""
         seq_reldir = activeobj.action.get_sequence_dir()
         hlo_dict = self.gather_spec_data(seq_reldir)
 
         spec_types = ["T", "R"]
         ru_keys = ("ref_dark", "ref_light", "data")
         specd = {}
+        # specd holds bkg-sub, normalized spectra for "T" and/or "R"
+        # specd["T"] = {
+        #     "smplist": list of sample_labels with len (num_samples)
+        #     "action_uuids": list of action_uuids, ordered by smplist
+        #     "bsnlist": list of background-sub'd, normalized spectra, ordered by smplist
+        #     "wlarr": mean wavelength array over samples with shape (num_wavlengths,)
+        #     "technique": technique_name from experiment yaml
+        # }
         for spec in spec_types:
+            # run_use dict 'rud' holds per-sample averaged signals
             rud = {
                 ru: {
                     p: d
@@ -143,12 +156,10 @@ class Calc:
                     )
 
             if rud["ref_dark"] and rud["ref_light"] and rud["data"]:
-
                 refdark = np.vstack([d["mean"] for d in rud["ref_dark"].values()])
                 reflight = np.vstack([d["mean"] for d in rud["ref_light"].values()])
                 mindark = refdark.min(axis=0)
                 maxlight = reflight.max(axis=0)
-
                 actuuids = []
                 smplist = []
                 wllist = []
@@ -178,6 +189,18 @@ class Calc:
 
         params = activeobj.action.action_params
         pred = {}
+        # pred holds intermediate outputs for "T", "R", and/or "TR"
+        # pred["TR"] = {
+        #     "full": full resolution vectors between lower_wl and upper_wl limits
+        #     "bin": binned 'full' vectors
+        #     "smooth": smoothed 'bin' vectors
+        #     "smooth_refadj": refadjust() applied to 'smooth' vectors
+        #     "smooth_refadj_scl": max-normalized 'smooth_refadj'
+        # }
+        # pred["TR"]["full"]["sig"] vector refers to "TR_unsmth_fullrng"
+        # pred["TR"]["bin"]["sig"] vector refers to "TR_unsmth_binned"
+        # pred["TR"]["smooth"]["sig"] vector refers to "TR_smth"
+        # pred["TR"]["smooth_refadj"]["sig"] vector refers to "TR_smth_refadj"
         for k, sd in specd.items():
             pred[k] = {
                 "full": {},
@@ -198,11 +221,13 @@ class Calc:
                 ]
                 for x in range(0, pred[k]["full"]["wl"].shape[0], params["bin_width"])
             ]
-            pred[k]["binds"] = binds
+            pred[k]["binds"] = binds  # list of lists of indices per bin
             rsi = [np.median(inds).astype(int) for inds in pred[k]["binds"]]
-            pred[k]["rsi"] = rsi
-            pred[k]["bin"]["wl"] = pred["T"]["full"]["wl"][rsi]
-            hv = [1239.8 / x for x in pred[k]["bin"]["wl"]]
+            pred[k]["rsi"] = rsi  # raw indices from full vector
+            pred[k]["bin"]["wl"] = pred["T"]["full"]["wl"][rsi]  # center index of bin
+            hv = [
+                1239.8 / x for x in pred[k]["bin"]["wl"]
+            ]  # convert binned wl[nm] to energy[eV]
             pred[k]["hv"] = np.array(hv)
             dx = [hv[1] - hv[0]]
             dx += [(hv[idx + 1] - hv[idx - 1]) / 2.0 for idx in range(1, len(rsi) - 1)]
@@ -258,7 +283,6 @@ class Calc:
                         deriv=0,
                     )
 
-            # smooth sig
             (
                 pred[sk]["min_rescaled"],
                 pred[sk]["max_rescaled"],
@@ -271,7 +295,6 @@ class Calc:
                 params["max_limit"],
             )
 
-            # smooth abs
             if len(specd.keys()) == 2:
                 pred[sk]["smooth_refadj"]["abs"] = -np.log(
                     pred[sk]["smooth_refadj"]["sig"]
@@ -343,7 +366,7 @@ class Calc:
             )
 
         datadict = {}
-        # assemble datadict with scalar FOMs and intermediate outputs
+        # assemble datadict with scalar FOMs
         if len(specd.keys()) == 2:  # TR_UVVIS technique
             interd = pred["TR"]
 
