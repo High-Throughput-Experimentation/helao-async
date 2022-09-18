@@ -24,7 +24,8 @@ __all__ = [
     "ADSS_sub_tray_unload",
     "ADSS_sub_CA_noaliquots", #only one with process contrib
     "ADSS_sub_CV_noaliquots", #only one with process contrib
-    "ADSS_sub_CA_originalwithstuff"
+    "ADSS_sub_CA_originalwithstuff",
+    "ADSS_sub_rel_move",
 
     
 ]
@@ -1274,3 +1275,33 @@ def ADSS_sub_tray_unload(
     )
 
     return sq.action_list  # returns complete action list to orch
+
+def ADSS_sub_rel_move(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    offset_x_mm: float = 1.0,
+    offset_y_mm: float = 1.0,
+    offset_z_mm: float = 0.0,
+):
+    """Sub experiment
+    last functionality test: -"""
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    # move to position
+    apm.add_action(
+        {
+            "action_server": MOTOR_server,
+            "action_name": "move",
+            "action_params": {
+                "d_mm": [apm.pars.offset_x_mm, apm.pars.offset_y_mm, apm.pars.offset_z_mm],
+                "axis": ["x", "y", "z"],
+                "mode": MoveModes.relative,
+                "transformation": TransformationModes.platexy,
+            },
+            #            "from_globalexp_params": {"_platexy": "d_mm"},
+            "start_condition": ActionStartCondition.wait_for_all,
+        }
+    )
+
+    return apm.action_list  # returns complete action list to orch
