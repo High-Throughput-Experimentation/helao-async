@@ -18,7 +18,7 @@ from helao.helpers.premodels import ExperimentPlanMaker
 SEQUENCES = __all__
 
 def ADSS_CV(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
 #    plate_sample_no_list: list = [1],   #list instead of map select
@@ -93,7 +93,7 @@ def ADSS_CV(
     return pl.experiment_plan_list  # returns complete experiment list
 
 def ADSS_CA(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
 #    plate_sample_no_list: list = [1], #list instead of map select
@@ -107,6 +107,7 @@ def ADSS_CA(
     ph: float = 9.53,
     ref_vs_nhe: float = 0.21,
     CA_duration_sec: float = 1320,
+    OCV_duration: float = 1,
     samplerate_sec: float = 0.05,
 ):
 
@@ -149,6 +150,8 @@ def ADSS_CA(
     pl.add_experiment(
         "ADSS_sub_OCV",
         {
+            "Tval__s": OCV_duration,
+            "SampleRate": 0.05,
         }
     )
 
