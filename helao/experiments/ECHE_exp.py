@@ -18,7 +18,7 @@ __all__ = [
     "ECHE_sub_CP_led",
     "ECHE_sub_CP",
     "ECHE_sub_movetosample",
-    "ECHE_sub_move",
+    "ECHE_sub_rel_move",
 ]
 
 
@@ -943,11 +943,11 @@ def ECHE_sub_movetosample(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_sub_move(
+def ECHE_sub_rel_move(
     experiment: Experiment,
     experiment_version: int = 1,
-    x_mm: float = 1.0,
-    y_mm: float = 1.0,
+    offset_x_mm: float = 1.0,
+    offset_y_mm: float = 1.0,
 ):
     """Sub experiment
     last functionality test: -"""
@@ -960,7 +960,7 @@ def ECHE_sub_move(
             "action_server": MOTOR_server,
             "action_name": "move",
             "action_params": {
-                "d_mm": [apm.pars.x_mm, apm.pars.y_mm],
+                "d_mm": [apm.pars.offset_x_mm, apm.pars.offset_y_mm],
                 "axis": ["x", "y"],
                 "mode": MoveModes.relative,
                 "transformation": TransformationModes.platexy,

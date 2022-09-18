@@ -54,10 +54,10 @@ def ECHE_move(
     pl = ExperimentPlanMaker()
 
     pl.add_experiment(
-        "ECHE_sub_move",
+        "ECHE_sub_rel_move",
         {
-            "x_mm": move_x_mm,
-            "y_mm": move_y_mm,
+            "offset_x_mm": move_x_mm,
+            "offset_y_mm": move_y_mm,
         },
     )
 
