@@ -221,6 +221,14 @@ def ECHE_sub_CV_led_secondtrigger(
         },
     )
 
+    apm.add_action(
+        {
+            "action_server": CALC_server,
+            "action_name": "calc_uvis_abs",
+            "action_params": {},
+        },
+    )
+
     return apm.action_list  # returns complete action list to orch
 
 
@@ -379,6 +387,14 @@ def ECHE_sub_CA_led_secondtrigger(
         },
     )
 
+    apm.add_action(
+        {
+            "action_server": CALC_server,
+            "action_name": "calc_uvis_abs",
+            "action_params": {},
+        },
+    )
+
     return apm.action_list  # returns complete action list to orch
 
 
@@ -526,6 +542,14 @@ def ECHE_sub_CP_led_secondtrigger(
         {
             "action_server": IO_server,
             "action_name": "stop_digital_cycle",
+            "action_params": {},
+        },
+    )
+
+    apm.add_action(
+        {
+            "action_server": CALC_server,
+            "action_name": "calc_uvis_abs",
             "action_params": {},
         },
     )
