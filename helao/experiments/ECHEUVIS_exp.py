@@ -209,7 +209,7 @@ def ECHE_sub_CV_led_secondtrigger(
             "action_server": SPEC_T_server,
             "action_name": "stop_extrig_after",
             "start_condition": ActionStartCondition.no_wait,
-            "action_params": {"delay": apm.pars.CV_duration_sec},
+            "action_params": {"delay": apm.pars.toggle2_time},
         }
     )
 
@@ -375,7 +375,7 @@ def ECHE_sub_CA_led_secondtrigger(
             "action_server": SPEC_T_server,
             "action_name": "stop_extrig_after",
             "start_condition": ActionStartCondition.no_wait,
-            "action_params": {"delay": apm.pars.CA_duration_sec},
+            "action_params": {"delay": apm.pars.toggle2_time},
         }
     )
 
@@ -534,7 +534,7 @@ def ECHE_sub_CP_led_secondtrigger(
             "action_server": SPEC_T_server,
             "action_name": "stop_extrig_after",
             "start_condition": ActionStartCondition.no_wait,
-            "action_params": {"delay": apm.pars.CP_duration_sec},
+            "action_params": {"delay": apm.pars.toggle2_time},
         }
     )
 
