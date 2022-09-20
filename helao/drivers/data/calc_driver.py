@@ -128,16 +128,14 @@ class Calc:
                     p: d
                     for p, d in hlo_dict.items()
                     if (d["actd"]["run_use"] == ru)
-                    and (d["expd"]["experiment_params"]["spec_type"] == spec)
+                    and (d["actd"]["action_server"]["server_name"].split("_")[0] == spec)
                 }
                 for ru in ru_keys
             }
 
             for rk in list(rud.keys()):
                 for dk in list(rud[rk].keys()):
-                    rud["technique_name"] = rud[rk][dk]["expd"]["experiment_params"][
-                        "technique_name"
-                    ]
+                    rud["technique_name"] = rud[rk][dk]["actd"]["technique_name"]
                     data = rud[rk][dk]["data"]
                     vals = [
                         data[chk]
