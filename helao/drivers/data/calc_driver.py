@@ -128,7 +128,7 @@ class Calc:
                     p: d
                     for p, d in hlo_dict.items()
                     if (d["actd"]["run_use"] == ru)
-                    and (d["actd"]["action_server"]["server_name"].split("_")[0] == spec)
+                    and (d["actd"]["action_server"]["server_name"].split("_")[1] == spec)
                 }
                 for ru in ru_keys
             }
