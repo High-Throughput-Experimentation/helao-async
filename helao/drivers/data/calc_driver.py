@@ -292,15 +292,15 @@ class Calc:
                 params["max_limit"],
             )
 
-            if len(specd.keys()) == 2:
+            if specd.get("T", {}) and specd.get("R", {}):
                 pred[sk]["smooth_refadj"]["abs"] = -np.log(
                     pred[sk]["smooth_refadj"]["sig"]
                 )
-            elif len(specd.keys()) == 1 and "R" in specd.keys():
+            elif specd.get("R", {}) and not specd.get("T", {}):
                 pred[sk]["smooth_refadj"]["abs"] = (
                     1.0 - np.log(pred[sk]["smooth_refadj"]["sig"])
                 ) ** 2 / (2.0 * pred[sk]["smooth_refadj"]["sig"])
-            else:
+            elif specd.get("T", {}) and not specd.get("R", {}):
                 _, _, pred[sk]["smooth_refadj"]["abs"] = refadjust(
                     pred[sk]["smooth"]["abs"],
                     params["min_mthd_allowed"],
@@ -364,7 +364,7 @@ class Calc:
 
         datadict = {}
         # assemble datadict with scalar FOMs
-        if len(specd.keys()) == 2:  # TR_UVVIS technique
+        if specd.get("T", {}) and specd.get("R", {}):  # TR_UVVIS technique
             interd = pred["TR"]
 
             evp = params["ev_parts"]
@@ -391,13 +391,13 @@ class Calc:
                 (pred["R"]["smooth"]["sig"] > 0.0), (pred["R"]["smooth"]["sig"] < 1.0)
             ).all(axis=1)
 
-        elif len(specd.keys()) == 1 and "T" in specd.keys():  # T_UVVIS only
+        elif specd.get("T", {}) and not specd.get("R", {}):  # T_UVVIS only
             interd = pred["T"]
             datadict["T_0to1"] = np.bitwise_and(
                 (pred["T"]["smooth"]["sig"] > 0.0), (pred["T"]["smooth"]["sig"] < 1.0)
             ).all(axis=1)
 
-        elif len(specd.keys()) == 1 and "R" in specd.keys():  # DR_UVVIS only
+        elif specd.get("R", {}) and not specd.get("T", {}):  # DR_UVVIS only
             interd = pred["R"]
             datadict["DR_0to1"] = np.bitwise_and(
                 (pred["R"]["smooth"]["sig"] > 0.0), (pred["R"]["smooth"]["sig"] < 1.0)
