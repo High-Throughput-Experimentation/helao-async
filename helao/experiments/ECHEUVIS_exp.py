@@ -4,9 +4,9 @@ server_key must be a FastAPI action server defined in config
 """
 
 __all__ = [
-    "ECHE_sub_CV_led_T_UVVIS",
-    "ECHE_sub_CA_led_T_UVVIS",
-    "ECHE_sub_CP_led_T_UVVIS",
+    "ECHE_sub_CV_led_UVVIS",
+    "ECHE_sub_CA_led_UVVIS",
+    "ECHE_sub_CP_led_UVVIS",
 ]
 
 
@@ -20,7 +20,6 @@ from helaocore.models.process_contrib import ProcessContrib
 from helaocore.models.electrolyte import Electrolyte
 
 from helao.drivers.io.enum import TriggerType
-from helao.drivers.spec.enum import SpecType
 
 
 EXPERIMENTS = __all__
@@ -29,6 +28,7 @@ PSTAT_server = MM(server_name="PSTAT", machine_name=gethostname()).json_dict()
 MOTOR_server = MM(server_name="MOTOR", machine_name=gethostname()).json_dict()
 IO_server = MM(server_name="IO", machine_name=gethostname()).json_dict()
 SPEC_T_server = MM(server_name="SPEC_T", machine_name=gethostname()).json_dict()
+SPEC_R_server = MM(server_name="SPEC_R", machine_name=gethostname()).json_dict()
 ORCH_server = MM(server_name="ORCH", machine_name=gethostname()).json_dict()
 PAL_server = MM(server_name="PAL", machine_name=gethostname()).json_dict()
 CALC_server = MM(server_name="CALC", machine_name=gethostname()).json_dict()
@@ -36,7 +36,7 @@ CALC_server = MM(server_name="CALC", machine_name=gethostname()).json_dict()
 toggle_triggertype = TriggerType.fallingedge
 
 
-def ECHE_sub_CV_led_T_UVVIS(
+def ECHE_sub_CV_led_UVVIS(
     experiment: Experiment,
     experiment_version: int = 3,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
@@ -72,6 +72,7 @@ def ECHE_sub_CV_led_T_UVVIS(
     toggle2_time: Optional[float] = -1,
     spec_int_time_ms: Optional[float] = 15,
     spec_n_avg: Optional[int] = 1,
+    spec_technique: Optional[str] = "T_UVVIS",
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -147,25 +148,47 @@ def ECHE_sub_CV_led_T_UVVIS(
         },
     )
 
-    apm.add_action(
-        {
-            "action_server": SPEC_T_server,
-            "action_name": "acquire_spec_extrig",
-            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "action_params": {
-                "int_time": apm.pars.spec_int_time_ms,
-                "n_avg": apm.pars.spec_n_avg,
-                "duration": apm.pars.toggle2_time,
-            },
-            "technique_name": "T_UVVIS",
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
-        }
-    )
+    if apm.pars.spec_technique in ["T_UVVIS", "TR_UVVIS"]:
+        apm.add_action(
+            {
+                "action_server": SPEC_T_server,
+                "action_name": "acquire_spec_extrig",
+                "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
+                "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+                "action_params": {
+                    "int_time": apm.pars.spec_int_time_ms,
+                    "n_avg": apm.pars.spec_n_avg,
+                    "duration": apm.pars.toggle2_time,
+                },
+                "technique_name": apm.pars.spec_technique,
+                "process_contrib": [
+                    ProcessContrib.files,
+                    ProcessContrib.samples_in,
+                    ProcessContrib.samples_out,
+                ],
+            }
+        )
+
+    if apm.pars.spec_technique in ["TR_UVVIS", "DR_UVVIS"]:
+        apm.add_action(
+            {
+                "action_server": SPEC_R_server,
+                "action_name": "acquire_spec_extrig",
+                "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
+                "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+                "action_params": {
+                    "int_time": apm.pars.spec_int_time_ms,
+                    "n_avg": apm.pars.spec_n_avg,
+                    "duration": apm.pars.toggle2_time,
+                },
+                "technique_name": apm.pars.spec_technique,
+                "process_contrib": [
+                    ProcessContrib.files,
+                    ProcessContrib.samples_in,
+                    ProcessContrib.samples_out,
+                ],
+            }
+        )
 
     # apply potential
     apm.add_action(
@@ -204,14 +227,25 @@ def ECHE_sub_CV_led_T_UVVIS(
         },
     )
 
-    apm.add_action(
-        {
-            "action_server": SPEC_T_server,
-            "action_name": "stop_extrig_after",
-            "start_condition": ActionStartCondition.no_wait,
-            "action_params": {"delay": apm.pars.toggle2_time},
-        }
-    )
+    if apm.pars.spec_technique in ["T_UVVIS", "TR_UVVIS"]:
+        apm.add_action(
+            {
+                "action_server": SPEC_T_server,
+                "action_name": "stop_extrig_after",
+                "start_condition": ActionStartCondition.no_wait,
+                "action_params": {"delay": apm.pars.toggle2_time},
+            }
+        )
+
+    if apm.pars.spec_technique in ["TR_UVVIS", "DR_UVVIS"]:
+        apm.add_action(
+            {
+                "action_server": SPEC_R_server,
+                "action_name": "stop_extrig_after",
+                "start_condition": ActionStartCondition.no_wait,
+                "action_params": {"delay": apm.pars.toggle2_time},
+            }
+        )
 
     apm.add_action(
         {
@@ -225,14 +259,14 @@ def ECHE_sub_CV_led_T_UVVIS(
         {
             "action_server": CALC_server,
             "action_name": "calc_uvis_abs",
-            "action_params": {"spec_type": "T", "technique_name": "T_UVVIS"},
+            "action_params": {"technique_name": apm.pars.spec_technique},
         },
     )
 
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_sub_CA_led_T_UVVIS(
+def ECHE_sub_CA_led_UVVIS(
     experiment: Experiment,
     experiment_version: int = 3,
     CA_potential_vsRHE: Optional[float] = 0.0,
@@ -262,6 +296,7 @@ def ECHE_sub_CA_led_T_UVVIS(
     toggle2_time: Optional[float] = -1,
     spec_int_time_ms: Optional[float] = 15,
     spec_n_avg: Optional[int] = 1,
+    spec_technique: Optional[str] = "T_UVVIS",
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -319,25 +354,47 @@ def ECHE_sub_CA_led_T_UVVIS(
         },
     )
 
-    apm.add_action(
-        {
-            "action_server": SPEC_T_server,
-            "action_name": "acquire_spec_extrig",
-            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "action_params": {
-                "int_time": apm.pars.spec_int_time_ms,
-                "n_avg": apm.pars.spec_n_avg,
-                "duration": apm.pars.toggle2_time,
-            },
-            "technique_name": "T_UVVIS",
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
-        }
-    )
+    if apm.pars.spec_technique in ["T_UVVIS", "TR_UVVIS"]:
+        apm.add_action(
+            {
+                "action_server": SPEC_T_server,
+                "action_name": "acquire_spec_extrig",
+                "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
+                "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+                "action_params": {
+                    "int_time": apm.pars.spec_int_time_ms,
+                    "n_avg": apm.pars.spec_n_avg,
+                    "duration": apm.pars.toggle2_time,
+                },
+                "technique_name": apm.pars.spec_technique,
+                "process_contrib": [
+                    ProcessContrib.files,
+                    ProcessContrib.samples_in,
+                    ProcessContrib.samples_out,
+                ],
+            }
+        )
+
+    if apm.pars.spec_technique in ["TR_UVVIS", "DR_UVVIS"]:
+        apm.add_action(
+            {
+                "action_server": SPEC_R_server,
+                "action_name": "acquire_spec_extrig",
+                "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
+                "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+                "action_params": {
+                    "int_time": apm.pars.spec_int_time_ms,
+                    "n_avg": apm.pars.spec_n_avg,
+                    "duration": apm.pars.toggle2_time,
+                },
+                "technique_name": apm.pars.spec_technique,
+                "process_contrib": [
+                    ProcessContrib.files,
+                    ProcessContrib.samples_in,
+                    ProcessContrib.samples_out,
+                ],
+            }
+        )
 
     # apply potential
     potential = (
@@ -370,14 +427,25 @@ def ECHE_sub_CA_led_T_UVVIS(
         },
     )
 
-    apm.add_action(
-        {
-            "action_server": SPEC_T_server,
-            "action_name": "stop_extrig_after",
-            "start_condition": ActionStartCondition.no_wait,
-            "action_params": {"delay": apm.pars.toggle2_time},
-        }
-    )
+    if apm.pars.spec_technique in ["T_UVVIS", "TR_UVVIS"]:
+        apm.add_action(
+            {
+                "action_server": SPEC_T_server,
+                "action_name": "stop_extrig_after",
+                "start_condition": ActionStartCondition.no_wait,
+                "action_params": {"delay": apm.pars.toggle2_time},
+            }
+        )
+
+    if apm.pars.spec_technique in ["TR_UVVIS", "DR_UVVIS"]:
+        apm.add_action(
+            {
+                "action_server": SPEC_R_server,
+                "action_name": "stop_extrig_after",
+                "start_condition": ActionStartCondition.no_wait,
+                "action_params": {"delay": apm.pars.toggle2_time},
+            }
+        )
 
     apm.add_action(
         {
@@ -398,7 +466,7 @@ def ECHE_sub_CA_led_T_UVVIS(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_sub_CP_led_T_UVVIS(
+def ECHE_sub_CP_led_UVVIS(
     experiment: Experiment,
     experiment_version: int = 3,
     CP_current: Optional[float] = 0.0,
@@ -428,6 +496,7 @@ def ECHE_sub_CP_led_T_UVVIS(
     toggle2_time: Optional[float] = -1,
     spec_int_time_ms: Optional[float] = 15,
     spec_n_avg: Optional[int] = 1,
+    spec_technique: Optional[str] = "T_UVVIS",
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -485,32 +554,53 @@ def ECHE_sub_CP_led_T_UVVIS(
         },
     )
 
-    apm.add_action(
-        {
-            "action_server": SPEC_T_server,
-            "action_name": "acquire_spec_extrig",
-            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "action_params": {
-                "int_time": apm.pars.spec_int_time_ms,
-                "n_avg": apm.pars.spec_n_avg,
-                "duration": apm.pars.toggle2_time,
-            },
-            "technique_name": "T_UVVIS",
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
-        }
-    )
+    if apm.pars.spec_technique in ["T_UVVIS", "TR_UVVIS"]:
+        apm.add_action(
+            {
+                "action_server": SPEC_T_server,
+                "action_name": "acquire_spec_extrig",
+                "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
+                "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+                "action_params": {
+                    "int_time": apm.pars.spec_int_time_ms,
+                    "n_avg": apm.pars.spec_n_avg,
+                    "duration": apm.pars.toggle2_time,
+                },
+                "technique_name": apm.pars.spec_technique,
+                "process_contrib": [
+                    ProcessContrib.files,
+                    ProcessContrib.samples_in,
+                    ProcessContrib.samples_out,
+                ],
+            }
+        )
 
+    if apm.pars.spec_technique in ["TR_UVVIS", "DR_UVVIS"]:
+        apm.add_action(
+            {
+                "action_server": SPEC_R_server,
+                "action_name": "acquire_spec_extrig",
+                "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
+                "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+                "action_params": {
+                    "int_time": apm.pars.spec_int_time_ms,
+                    "n_avg": apm.pars.spec_n_avg,
+                    "duration": apm.pars.toggle2_time,
+                },
+                "technique_name": apm.pars.spec_technique,
+                "process_contrib": [
+                    ProcessContrib.files,
+                    ProcessContrib.samples_in,
+                    ProcessContrib.samples_out,
+                ],
+            }
+        )
     apm.add_action(
         {
             "action_server": PSTAT_server,
             "action_name": "run_CP",
             "action_params": {
-                "Ival__A": CP_current,
+                "Ival__A": apm.pars.CP_current,
                 "Tval__s": apm.pars.CP_duration_sec,
                 "AcqInterval__s": apm.pars.samplerate_sec,
                 "TTLwait": -1,  # -1 disables, else select TTL 0-3
@@ -529,14 +619,25 @@ def ECHE_sub_CP_led_T_UVVIS(
         },
     )
 
-    apm.add_action(
-        {
-            "action_server": SPEC_T_server,
-            "action_name": "stop_extrig_after",
-            "start_condition": ActionStartCondition.no_wait,
-            "action_params": {"delay": apm.pars.toggle2_time},
-        }
-    )
+    if apm.pars.spec_technique in ["T_UVVIS", "TR_UVVIS"]:
+        apm.add_action(
+            {
+                "action_server": SPEC_T_server,
+                "action_name": "stop_extrig_after",
+                "start_condition": ActionStartCondition.no_wait,
+                "action_params": {"delay": apm.pars.toggle2_time},
+            }
+        )
+
+    if apm.pars.spec_technique in ["TR_UVVIS", "DR_UVVIS"]:
+        apm.add_action(
+            {
+                "action_server": SPEC_R_server,
+                "action_name": "stop_extrig_after",
+                "start_condition": ActionStartCondition.no_wait,
+                "action_params": {"delay": apm.pars.toggle2_time},
+            }
+        )
 
     apm.add_action(
         {
