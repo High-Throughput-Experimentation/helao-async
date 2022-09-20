@@ -59,7 +59,7 @@ def import_experiments(
             os.path.splitext(userfile)[0] for userfile in os.listdir(user_experiment_path) if userfile.endswith(".py")
         ]
         for userfile in userfiles:
-            get_exps(exp_path=user_experiment_path, exp_userfile=userfile)
+            get_exps(exp_path=user_experiment_path, exp_file=userfile)
             print_message(
                 world_config_dict,
                 server_name,
