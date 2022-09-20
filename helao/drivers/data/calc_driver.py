@@ -231,7 +231,7 @@ class Calc:
             dx += [hv[-1] - hv[-2]]
             pred[k]["dx"] = np.array(dx)
 
-        if len(specd.keys()) == 2:  # TR_UVVIS technique
+        if specd.get("T", {}) and specd.get("R", {}):  # TR_UVVIS technique
             if pred["T"]["binds"] != pred["R"]["binds"]:
                 raise Exception
 
@@ -253,10 +253,10 @@ class Calc:
                 pred["TR"][copyk] = pred["T"][copyk]
             pred["TR"]["bin"]["wl"] = pred["T"]["bin"]["wl"]
 
-        elif len(specd.keys()) == 1 and "T" in specd.keys():  # T_UVVIS only
+        elif specd.get("T", {}) and not specd.get("R", {}):  # T_UVVIS only
             pred["T"]["full"]["abs"] = -np.log(pred["T"]["full"]["sig"])
 
-        elif len(specd.keys()) == 1 and "R" in specd.keys():  # DR_UVVIS only
+        elif specd.get("R", {}) and not specd.get("T", {}):  # DR_UVVIS only
             pred["R"]["full"]["abs"] = (1.0 - np.log(pred["R"]["full"]["sig"])) ** 2 / (
                 2.0 * pred["R"]["full"]["sig"]
             )
