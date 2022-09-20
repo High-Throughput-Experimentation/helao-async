@@ -755,7 +755,7 @@ class Orch(Base):
             # ]
             endpoint_uuids = [
                 str(k) for k in self.orchstatusmodel.active_dict.keys()
-            ] + [str(k) for k in self.orchstatusmodel.nonactive_dict["finished"].keys()]
+            ] + [str(k) for k in self.orchstatusmodel.nonactive_dict.get("finished", {}).keys()]
             self.print_message(
                 f"Current {A.action_name} received uuids: {endpoint_uuids}"
             )
@@ -783,7 +783,7 @@ class Orch(Base):
                     str(k) for k in self.orchstatusmodel.active_dict.keys()
                 ] + [
                     str(k)
-                    for k in self.orchstatusmodel.nonactive_dict["finished"].keys()
+                    for k in self.orchstatusmodel.nonactive_dict.get("finished", {}).keys()
                 ]
             self.print_message(f"New status registered on {A.action_name}.")
             if error_code is not ErrorCodes.none:
