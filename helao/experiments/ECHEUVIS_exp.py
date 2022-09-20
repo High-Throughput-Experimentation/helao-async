@@ -4,9 +4,9 @@ server_key must be a FastAPI action server defined in config
 """
 
 __all__ = [
-    "ECHE_sub_CV_led_secondtrigger",
-    "ECHE_sub_CA_led_secondtrigger",
-    "ECHE_sub_CP_led_secondtrigger",
+    "ECHE_sub_CV_led_T_UVVIS",
+    "ECHE_sub_CA_led_T_UVVIS",
+    "ECHE_sub_CP_led_T_UVVIS",
 ]
 
 
@@ -36,7 +36,7 @@ CALC_server = MM(server_name="CALC", machine_name=gethostname()).json_dict()
 toggle_triggertype = TriggerType.fallingedge
 
 
-def ECHE_sub_CV_led_secondtrigger(
+def ECHE_sub_CV_led_T_UVVIS(
     experiment: Experiment,
     experiment_version: int = 3,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
@@ -232,7 +232,7 @@ def ECHE_sub_CV_led_secondtrigger(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_sub_CA_led_secondtrigger(
+def ECHE_sub_CA_led_T_UVVIS(
     experiment: Experiment,
     experiment_version: int = 3,
     CA_potential_vsRHE: Optional[float] = 0.0,
@@ -398,7 +398,7 @@ def ECHE_sub_CA_led_secondtrigger(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_sub_CP_led_secondtrigger(
+def ECHE_sub_CP_led_T_UVVIS(
     experiment: Experiment,
     experiment_version: int = 3,
     CP_current: Optional[float] = 0.0,

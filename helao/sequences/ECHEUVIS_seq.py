@@ -48,6 +48,7 @@ def ECHE_CV_led_spectrometer(
     toggleSpec_time: float = -1,
     spec_int_time_ms: float = 15,
     spec_n_avg: int = 1,
+    spec_type: str = "T",
 ):
 
     pl = ExperimentPlanMaker()
@@ -79,7 +80,7 @@ def ECHE_CV_led_spectrometer(
             },
         )
         pl.add_experiment(
-            "ECHE_sub_CV_led_secondtrigger",
+            "ECHE_sub_CV_led_T_UVVIS",
             {
                 "Vinit_vsRHE": CV_Vinit_vsRHE,
                 "Vapex1_vsRHE": CV_Vapex1_vsRHE,
@@ -115,6 +116,7 @@ def ECHE_CV_led_spectrometer(
                 "toggle2_time": toggleSpec_time,
                 "spec_int_time_ms": spec_int_time_ms,
                 "spec_n_avg": spec_n_avg,
+                "spec_type": spec_type,
             },
         )
 
@@ -155,6 +157,7 @@ def ECHE_CA_led_spectrometer(
     toggleSpec_time: float = -1,
     spec_int_time_ms: float = 15,
     spec_n_avg: int = 1,
+    spec_type: str = "T",
 ):
 
     pl = ExperimentPlanMaker()
@@ -185,7 +188,7 @@ def ECHE_CA_led_spectrometer(
         )
         # CA1
         pl.add_experiment(
-            "ECHE_sub_CA_led_secondtrigger",
+            "ECHE_sub_CA_led_T_UVVIS",
             {
                 "CA_potential_vsRHE": CA_potential_vsRHE,
                 "solution_ph": solution_ph,
@@ -217,6 +220,7 @@ def ECHE_CA_led_spectrometer(
                 "toggle2_time": toggleSpec_time,
                 "spec_int_time_ms": spec_int_time_ms,
                 "spec_n_avg": spec_n_avg,
+                "spec_type": spec_type,
             },
         )
 
@@ -256,6 +260,7 @@ def ECHE_CP_led_spectrometer(
     toggleSpec_time: float = -1,
     spec_int_time_ms: float = 15,
     spec_n_avg: int = 1,
+    spec_type: str = "T",
 ):
 
     pl = ExperimentPlanMaker()
@@ -278,7 +283,7 @@ def ECHE_CP_led_spectrometer(
         )
         # CP1
         pl.add_experiment(
-            "ECHE_sub_CP_led_secondtrigger",
+            "ECHE_sub_CP_led_T_UVVIS",
             {
                 "CP_current": CP_current,
                 "solution_ph": solution_ph,
@@ -310,6 +315,7 @@ def ECHE_CP_led_spectrometer(
                 "toggle2_time": toggleSpec_time,
                 "spec_int_time_ms": spec_int_time_ms,
                 "spec_n_avg": spec_n_avg,
+                "spec_type": spec_type,
             },
         )
 
