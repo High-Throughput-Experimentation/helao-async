@@ -910,7 +910,8 @@ class YmlOps:
             self.dbp.base.print_message("Cannot push to API with S3 upload pending.")
             return ErrorCodes.not_allowed
         meta_type = pdict["type"]
-        if meta_type == "experiment":
+        # if meta_type == "experiment":
+        if isinstance(self.yml, ExpYml):
             # don't push to API until all actions are done (check current_actions)
             if not all(
                 [
@@ -919,7 +920,8 @@ class YmlOps:
                 ]
             ):
                 return False
-        elif meta_type == "sequence":
+        # elif meta_type == "sequence":
+        elif isinstance(self.yml, SeqYml):
             # don't push to API until all experiments are done (check current_experiments)
             if not all(
                 [
