@@ -72,7 +72,6 @@ def ECHE_sub_CV_led_T_UVVIS(
     toggle2_time: Optional[float] = -1,
     spec_int_time_ms: Optional[float] = 15,
     spec_n_avg: Optional[int] = 1,
-    spec_type: Optional[SpecType] = "T",
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -159,6 +158,7 @@ def ECHE_sub_CV_led_T_UVVIS(
                 "n_avg": apm.pars.spec_n_avg,
                 "duration": apm.pars.toggle2_time,
             },
+            "technique_name": "T_UVVIS",
             "process_contrib": [
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
@@ -225,7 +225,7 @@ def ECHE_sub_CV_led_T_UVVIS(
         {
             "action_server": CALC_server,
             "action_name": "calc_uvis_abs",
-            "action_params": {},
+            "action_params": {"spec_type": "T", "technique_name": "T_UVVIS"},
         },
     )
 
@@ -262,7 +262,6 @@ def ECHE_sub_CA_led_T_UVVIS(
     toggle2_time: Optional[float] = -1,
     spec_int_time_ms: Optional[float] = 15,
     spec_n_avg: Optional[int] = 1,
-    spec_type: Optional[SpecType] = "T",
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -331,6 +330,7 @@ def ECHE_sub_CA_led_T_UVVIS(
                 "n_avg": apm.pars.spec_n_avg,
                 "duration": apm.pars.toggle2_time,
             },
+            "technique_name": "T_UVVIS",
             "process_contrib": [
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
@@ -359,7 +359,7 @@ def ECHE_sub_CA_led_T_UVVIS(
                 "IErange": apm.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_server, 
+            "start_condition": ActionStartCondition.wait_for_server,
             "technique_name": "CA",
             "process_finish": True,
             "process_contrib": [
@@ -391,7 +391,7 @@ def ECHE_sub_CA_led_T_UVVIS(
         {
             "action_server": CALC_server,
             "action_name": "calc_uvis_abs",
-            "action_params": {},
+            "action_params": {"spec_type": "T", "technique_name": "T_UVVIS"},
         },
     )
 
@@ -428,7 +428,6 @@ def ECHE_sub_CP_led_T_UVVIS(
     toggle2_time: Optional[float] = -1,
     spec_int_time_ms: Optional[float] = 15,
     spec_n_avg: Optional[int] = 1,
-    spec_type: Optional[SpecType] = "T",
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -497,6 +496,7 @@ def ECHE_sub_CP_led_T_UVVIS(
                 "n_avg": apm.pars.spec_n_avg,
                 "duration": apm.pars.toggle2_time,
             },
+            "technique_name": "T_UVVIS",
             "process_contrib": [
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
@@ -518,7 +518,7 @@ def ECHE_sub_CP_led_T_UVVIS(
                 "IErange": apm.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_server, 
+            "start_condition": ActionStartCondition.wait_for_server,
             "technique_name": "CP",
             "process_finish": True,
             "process_contrib": [
@@ -550,7 +550,7 @@ def ECHE_sub_CP_led_T_UVVIS(
         {
             "action_server": CALC_server,
             "action_name": "calc_uvis_abs",
-            "action_params": {},
+            "action_params": {"spec_type": "T", "technique_name": "T_UVVIS"},
         },
     )
 
