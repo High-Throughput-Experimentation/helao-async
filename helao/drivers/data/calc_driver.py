@@ -4,7 +4,6 @@ from copy import copy
 from scipy.signal import savgol_filter
 from ruamel.yaml import YAML
 
-from helaocore.models.data import DataModel
 from helao.servers.base import Base
 from helao.helpers.file_mapper import FileMapper
 
