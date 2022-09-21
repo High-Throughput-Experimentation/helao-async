@@ -5,7 +5,15 @@ config['simulation'] = False
 
 # action library provides generator functions which produce actions
 config["experiment_libraries"] = ["ANEC_exp", "samples_exp"]
+config["experiment_params"] ={
+    "gamrychannelwait": -1,
+    "gamrychannelsend": 1,
+}
 config["sequence_libraries"] = ["ANEC_seq"]
+config["sequence_params"] = {
+    "gamrychannelwait": -1,
+    "gamrychannelsend": 1,
+}
 config["run_type"] = "anec"
 config["root"] = r"C:\INST_hlo"
 

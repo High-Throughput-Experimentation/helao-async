@@ -9,7 +9,15 @@ config['simulation'] = False
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
 config["experiment_libraries"] = ["ECHE_exp", "samples_exp"]
+config["experiment_params"] = {
+    "gamrychannelwait": -1,
+    "gamrychannelsend": -1,
+}
 config["sequence_libraries"] = ["ECHE_seq"]
+config["sequence_params"] = {
+    "gamrychannelwait": -1,
+    "gamrychannelsend": -1,
+}
 config["run_type"] = "eche"
 config["root"] = r"C:\INST_hlo"
 
