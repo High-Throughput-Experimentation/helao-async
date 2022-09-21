@@ -10,7 +10,15 @@ config['simulation'] = False
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
 config["experiment_libraries"] = ["ADSS_exp", "samples_exp"]
+config["experiment_params"] = {
+    "gamrychannelwait": -1,
+    "gamrychannelsend": -1,
+}
 config["sequence_libraries"] = ["ADSS_seq"]
+config["sequence_params"] = {
+    "gamrychannelwait": -1,
+    "gamrychannelsend": -1,
+}
 config["run_type"] = "adss"
 config["root"] = r"C:\INST_hlo"
 

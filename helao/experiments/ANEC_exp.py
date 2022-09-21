@@ -579,8 +579,6 @@ def ANEC_sub_CA(
             "Vval__V": potential_vsRef,
             "Tval__s": apm.pars.CA_duration_sec,
             "AcqInterval__s": apm.pars.SampleRate,
-            "TTLwait": -1,  # -1 disables, else select TTL 0-3
-            "TTLsend": -1,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
@@ -606,6 +604,8 @@ def ANEC_sub_photo_CA(
     CA_duration_sec: Optional[float] = 0.1,
     SampleRate: Optional[float] = 0.01,
     IErange: Optional[str] = "auto",
+    gamrychannelwait: Optional[int]= -1,
+    gamrychannelsend: Optional [int]= 1,
     ref_offset__V: Optional[float] = 0.0,
     ref_type: Optional[str] = "leakless",
     pH: Optional[float] = 6.8,
@@ -661,8 +661,8 @@ def ANEC_sub_photo_CA(
             "Vval__V": potential_vsRef,
             "Tval__s": apm.pars.CA_duration_sec,
             "AcqInterval__s": apm.pars.SampleRate,
-            "TTLwait": -1,  # -1 disables, else select TTL 0-3
-            "TTLsend": 0,  # -1 disables, else select TTL 0-3
+            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
@@ -731,8 +731,6 @@ def ANEC_sub_CV(
             "ScanRate__V_s": apm.pars.ScanRate_V_s,
             "Cycles": apm.pars.Cycles,
             "AcqInterval__s": apm.pars.SampleRate,
-            "TTLwait": -1,  # -1 disables, else select TTL 0-3
-            "TTLsend": -1,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
@@ -764,6 +762,8 @@ def ANEC_sub_photo_CV(
     Cycles: Optional[int] = 1,
     SampleRate: Optional[float] = 0.01,
     IErange: Optional[str] = "auto",
+    gamrychannelwait: Optional[int]= -1,
+    gamrychannelsend: Optional [int]= 1,
     ref_offset__V: Optional[float] = 0.0,
     illumination_source: Optional[str] = "Thorlab_led",
     illumination_wavelength: Optional[float] = 450.0,
@@ -842,8 +842,8 @@ def ANEC_sub_photo_CV(
             "ScanRate__V_s": apm.pars.ScanRate_V_s,
             "Cycles": apm.pars.Cycles,
             "AcqInterval__s": apm.pars.SampleRate,
-            "TTLwait": -1,  # -1 disables, else select TTL 0-3
-            "TTLsend": 0,  # -1 disables, else select TTL 0-3
+            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
@@ -984,6 +984,8 @@ def ANEC_sub_photo_LSV(
     ScanRate_V_s: Optional[float] = 0.01,
     SampleRate: Optional[float] = 0.01,
     IErange: Optional[str] = "auto",
+    gamrychannelwait: Optional[int]= -1,
+    gamrychannelsend: Optional [int]= 1,
     ref_offset__V: Optional[float] = 0.0,
     illumination_source: Optional[str] = "Thorlab_led",
     illumination_wavelength: Optional[float] = 450.0,
@@ -1045,8 +1047,8 @@ def ANEC_sub_photo_LSV(
             "Vfinal__V": potential_apex1_vsRef,
             "ScanRate__V_s": apm.pars.ScanRate_V_s,
             "AcqInterval__s": apm.pars.SampleRate,
-            "TTLwait": -1,  # -1 disables, else select TTL 0-3
-            "TTLsend": 0,  # -1 disables, else select TTL 0-3
+            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
@@ -1079,6 +1081,8 @@ def ANEC_sub_photo_CP(
     SampleRate: Optional[float] = 0.01,
     CP_duration_sec: Optional[float] = 60,
     IErange: Optional[str] = "auto",
+    gamrychannelwait: Optional[int]= -1,
+    gamrychannelsend: Optional [int]= 1,
     illumination_source: Optional[str] = "Thorlab_led",
     illumination_wavelength: Optional[float] = 450.0,
     illumination_intensity: Optional[float] = 9.0,
@@ -1133,8 +1137,8 @@ def ANEC_sub_photo_CP(
             "Ival": apm.pars.CP_current,
             "Tval__s": apm.pars.CP_duration_sec,
             "AcqInterval__s": apm.pars.SampleRate,
-            "TTLwait": -1,  # -1 disables, else select TTL 0-3
-            "TTLsend": 0,  # -1 disables, else select TTL 0-3
+            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
         },
         from_globalexp_params ={"_fast_samples_in": "fast_samples_in"},

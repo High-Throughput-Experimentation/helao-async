@@ -49,6 +49,8 @@ def ECHE_sub_CV_led_secondtrigger(
     samplerate_sec: Optional[float] = 0.1,
     cycles: Optional[int] = 1,
     gamry_i_range: Optional[str] = "auto",
+    gamrychannelwait: Optional[int]= -1,
+    gamrychannelsend: Optional [int]= 0,
     solution_ph: float = 0,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
@@ -188,8 +190,8 @@ def ECHE_sub_CV_led_secondtrigger(
                 "ScanRate__V_s": apm.pars.scanrate_voltsec,
                 "AcqInterval__s": apm.pars.samplerate_sec,
                 "Cycles": apm.pars.cycles,
-                "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                "TTLsend": 0,  # -1 disables, else select TTL 0-3
+                "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
+                "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
                 "IErange": apm.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
@@ -238,6 +240,8 @@ def ECHE_sub_CA_led_secondtrigger(
     samplerate_sec: Optional[float] = 0.1,
     CA_duration_sec: Optional[float] = 60,
     gamry_i_range: Optional[str] = "auto",
+    gamrychannelwait: Optional[int]= -1,
+    gamrychannelsend: Optional [int]= 0,
     illumination_source: Optional[str] = "doric_wled",
     illumination_wavelength: Optional[float] = 0.0,
     illumination_intensity: Optional[float] = 0.0,
@@ -346,8 +350,8 @@ def ECHE_sub_CA_led_secondtrigger(
                 "Vval__V": potential,
                 "Tval__s": apm.pars.CA_duration_sec,
                 "AcqInterval__s": apm.pars.samplerate_sec,
-                "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                "TTLsend": 0,  # -1 disables, else select TTL 0-3
+                "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
+                "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
                 "IErange": apm.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
@@ -396,6 +400,8 @@ def ECHE_sub_CP_led_secondtrigger(
     samplerate_sec: Optional[float] = 0.1,
     CP_duration_sec: Optional[float] = 60,
     gamry_i_range: Optional[str] = "auto",
+    gamrychannelwait: Optional[int]= -1,
+    gamrychannelsend: Optional [int]= 0,
     illumination_source: Optional[str] = "doric_wled",
     illumination_wavelength: Optional[float] = 0.0,
     illumination_intensity: Optional[float] = 0.0,
@@ -497,8 +503,8 @@ def ECHE_sub_CP_led_secondtrigger(
                 "Ival__A": CP_current,
                 "Tval__s": apm.pars.CP_duration_sec,
                 "AcqInterval__s": apm.pars.samplerate_sec,
-                "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                "TTLsend": 0,  # -1 disables, else select TTL 0-3
+                "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
+                "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
                 "IErange": apm.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},

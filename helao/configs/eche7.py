@@ -9,7 +9,10 @@ config['simulation'] = False
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
 config["experiment_libraries"] = ["ECHE_exp", "samples_exp"]
-# config["experiment_params"] = { }
+config["experiment_params"] = { 
+    "gamrychannelwait": -1,
+    "gamrychannelsend": 0,
+}
 config["sequence_libraries"] = ["ECHE_seq"]
 config["sequence_params"] = {
     "led_wavelengths_nm": [385, 450, 515, 595],
@@ -17,6 +20,8 @@ config["sequence_params"] = {
     "led_names": ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
     "led_type": "front",
     "led_date": "3/13/2019",
+    "gamrychannelwait": -1,
+    "gamrychannelsend": 0,
 }
 config["run_type"] = "eche"
 config["root"] = r"C:\INST_hlo"
