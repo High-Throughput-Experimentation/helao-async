@@ -184,6 +184,10 @@ class Calc:
                     "technique": rud["technique_name"],
                 }
 
+        if not specd:
+            self.base.print_message("Missing references and/or data. Cannot calculate FOMs.")
+            return {}
+
         params = activeobj.action.action_params
         pred = {}
         # pred holds intermediate outputs for "T", "R", and/or "TR"
@@ -402,6 +406,7 @@ class Calc:
             datadict["DR_0to1"] = np.bitwise_and(
                 (pred["R"]["smooth"]["sig"] > 0.0), (pred["R"]["smooth"]["sig"] < 1.0)
             ).all(axis=1)
+        
 
         datadict["max_abs"] = np.nanmax(interd["smooth_refadj"]["abs"], axis=1)
         checknanrange = np.bitwise_and(
