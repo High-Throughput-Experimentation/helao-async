@@ -219,7 +219,7 @@ def makeOrchServ(
     ):
         """Stop dispatch loop for planned manual intervention."""
         active = await app.orch.setup_and_contain_action()
-        app.orch.orch_op.current_stop_message = reason
+        app.orch.orch_op.current_stop_message = active.action.action_params["reason"]
         await app.orch.stop()
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -882,7 +882,7 @@ class Orch(Base):
                 self.print_message(
                     f"current content of sequence_dq: {self.sequence_dq}"
                 )
-                await asyncio.sleep(0.001)
+                # await asyncio.sleep(0.001)
 
                 # if no acts and no exps, disptach next sequence
                 if not self.experiment_dq and not self.action_dq:
@@ -914,9 +914,12 @@ class Orch(Base):
                     error_code = await self.loop_task_dispatch_action()
                     while (
                         num_exp_actions
-                        == self.orchstatusmodel.counter_dispatched_actions[
-                            self.active_experiment.experiment_uuid
-                        ]
+                        == self.orchstatusmodel.counter_dispatched_actions.get(
+                            self.active_experiment.experiment_uuid,
+                            self.orchstatusmodel.counter_dispatched_actions[
+                                self.last_experiment.experiment_uuid
+                            ],
+                        )
                     ):
                         await asyncio.sleep(0.001)
 
@@ -926,6 +929,8 @@ class Orch(Base):
                     )
                     # await self.intend_stop()
                     await self.intend_estop()
+
+                await self.update_operator(True)
 
             if (
                 self.orchstatusmodel.loop_state == OrchStatus.estop
