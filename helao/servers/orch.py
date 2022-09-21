@@ -916,9 +916,9 @@ class Orch(Base):
                         self.active_experiment.experiment_uuid
                         not in self.orchstatusmodel.counter_dispatched_actions.keys()
                     ):
-                        check_experiment = self.last_experiment
+                        check_experiment = self.last_experiment.experiment_uuid
                     else:
-                        check_experiment = self.active_experiment
+                        check_experiment = self.active_experiment.experiment_uuid
                     while (
                         num_exp_actions
                         == self.orchstatusmodel.counter_dispatched_actions[
