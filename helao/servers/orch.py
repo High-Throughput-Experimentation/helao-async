@@ -912,14 +912,18 @@ class Orch(Base):
                         ]
                     )
                     error_code = await self.loop_task_dispatch_action()
+                    if (
+                        self.active_experiment.experiment_uuid
+                        not in self.orchstatusmodel.counter_dispatched_actions.keys()
+                    ):
+                        check_experiment = self.last_experiment
+                    else:
+                        check_experiment = self.active_experiment
                     while (
                         num_exp_actions
-                        == self.orchstatusmodel.counter_dispatched_actions.get(
-                            self.active_experiment.experiment_uuid,
-                            self.orchstatusmodel.counter_dispatched_actions[
-                                self.last_experiment.experiment_uuid
-                            ],
-                        )
+                        == self.orchstatusmodel.counter_dispatched_actions[
+                            check_experiment
+                        ]
                     ):
                         await asyncio.sleep(0.001)
 
