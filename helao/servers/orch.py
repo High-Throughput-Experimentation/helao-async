@@ -1523,6 +1523,7 @@ class Operator:
         self.vis.doc.add_next_tick_callback(partial(self.get_experiments))
         self.vis.doc.add_next_tick_callback(partial(self.get_actions))
         self.vis.doc.add_next_tick_callback(partial(self.get_active_actions))
+        self.vis.doc.add_next_tick_callback(partial(self.get_current_stop_message))
 
         self.experimentplan_source = ColumnDataSource(data=self.experiment_plan_list)
         self.columns_expplan = [
@@ -1917,7 +1918,7 @@ class Operator:
         self.IOloop_run = False
         self.IOtask.cancel()
 
-    def get_current_stop_message(self):
+    async def get_current_stop_message(self):
         self.update_stop_message(self.current_stop_message)
 
     def get_sequence_lib(self):
