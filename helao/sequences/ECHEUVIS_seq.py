@@ -1,18 +1,19 @@
 __all__ = [
-    "ECHE_CV_led_spectrometer",
-    "ECHE_CA_led_spectrometer",
-    "ECHE_CP_led_spectrometer",
+    "ECHEUVIS_CV_led",
+    "ECHEUVIS_CA_led",
+    "ECHEUVIS_CP_led",
 ]
 
 
 from helao.helpers.premodels import ExperimentPlanMaker
+from helao.helpers.spec_map import SPEC_MAP
 from helaocore.models.electrolyte import Electrolyte
 
 
 SEQUENCES = __all__
 
 
-def ECHE_CV_led_spectrometer(
+def ECHEUVIS_CV_led(
     sequence_version: int = 3,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -46,19 +47,82 @@ def ECHE_CV_led_spectrometer(
     toggleSpec_period: float = 0.6,
     toggleSpec_init_delay: float = 0.0,
     toggleSpec_time: float = -1,
+    spec_ref_duration: float = 2,
     spec_int_time_ms: float = 15,
     spec_n_avg: int = 1,
     spec_technique: str = "T_UVVIS",
 ):
 
-    pl = ExperimentPlanMaker()
+    epm = ExperimentPlanMaker()
 
-    # (1) house keeping
-    pl.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add_experiment(
+        "ECHEUVIS_sub_interrupt",
+        {"reason": "Stop flow and prepare for xy motion to ref location."},
+    )
+    epm.add_experiment(
+        "UVIS_sub_setup_ref",
+        {
+            "reference_mode": "builtin",
+            "solid_custom_position": "cell1_we",
+            "solid_plate_id": plate_id,
+            "solid_sample_no": plate_sample_no_list[0],
+            "specref_code": 1,
+        },
+    )
+    epm.add_experiment(
+        "ECHEUVIS_sub_interrupt",
+        {"reason": "Restore flow and prepare for reference measurement."},
+    )
 
-    for plate_sample in plate_sample_no_list:
+    # dark ref
+    for st in SPEC_MAP[spec_technique]:
+        epm.add_experiment(
+            "UVIS_sub_measure",
+            {
+                "spec_type": st,
+                "spec_int_time_ms": spec_int_time_ms,
+                "spec_n_avg": spec_n_avg,
+                "duration_sec": spec_ref_duration,
+                "toggle_source": led_names[0],
+                "toggle_is_shutter": False,
+                "illumination_wavelength": led_wavelengths_nm[0],
+                "illumination_intensity": led_intensities_mw[0],
+                "illumination_intensity_date": led_date,
+                "illumination_side": led_type,
+                "technique_name": spec_technique,
+                "run_use": "ref_dark",
+                "reference_mode": "builtin",
+            },
+        )
+    # light ref
+    for st in SPEC_MAP[spec_technique]:
+        epm.add_experiment(
+            "UVIS_sub_measure",
+            {
+                "spec_type": st,
+                "spec_int_time_ms": spec_int_time_ms,
+                "spec_n_avg": spec_n_avg,
+                "duration_sec": spec_ref_duration,
+                "toggle_source": led_names[0],
+                "toggle_is_shutter": False,
+                "illumination_wavelength": led_wavelengths_nm[0],
+                "illumination_intensity": led_intensities_mw[0],
+                "illumination_intensity_date": led_date,
+                "illumination_side": led_type,
+                "technique_name": spec_technique,
+                "run_use": "ref_light",
+                "reference_mode": "builtin",
+            },
+        )
+    epm.add_experiment(
+        "ECHEUVIS_sub_interrupt",
+        {"reason": "Stop flow and prepare for xy motion to starting sample."},
+    )
 
-        pl.add_experiment(
+    for i, plate_sample in enumerate(plate_sample_no_list):
+
+        epm.add_experiment(
             "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
@@ -70,8 +134,14 @@ def ECHE_CV_led_spectrometer(
             },
         )
 
+        if i == 0:  # initial sample
+            epm.add_experiment(
+                "ECHEUVIS_sub_interrupt",
+                {"reason": "Restore flow and prepare for sample measurement."},
+            )
+
         # CV1
-        pl.add_experiment(
+        epm.add_experiment(
             "ECHE_sub_preCV",
             {
                 "CA_potential": CV_Vinit_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
@@ -79,8 +149,8 @@ def ECHE_CV_led_spectrometer(
                 "CA_duration_sec": preCV_duration,
             },
         )
-        pl.add_experiment(
-            "ECHE_sub_CV_led_UVVIS",
+        epm.add_experiment(
+            "ECHEUVIS_sub_CV_led",
             {
                 "Vinit_vsRHE": CV_Vinit_vsRHE,
                 "Vapex1_vsRHE": CV_Vapex1_vsRHE,
@@ -120,12 +190,72 @@ def ECHE_CV_led_spectrometer(
             },
         )
 
-        pl.add_experiment("ECHE_sub_shutdown", {})
+    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add_experiment(
+        "ECHEUVIS_sub_interrupt",
+        {"reason": "Stop flow and prepare for xy motion to ref location."},
+    )
+    epm.add_experiment(
+        "UVIS_sub_setup_ref",
+        {
+            "reference_mode": "builtin",
+            "solid_custom_position": "cell1_we",
+            "solid_plate_id": plate_id,
+            "solid_sample_no": plate_sample_no_list[-1],
+            "specref_code": 1,
+        },
+    )
+    epm.add_experiment(
+        "ECHEUVIS_sub_interrupt",
+        {"reason": "Restore flow and prepare for reference measurement."},
+    )
+    # dark ref
+    for st in SPEC_MAP[spec_technique]:
+        epm.add_experiment(
+            "UVIS_sub_measure",
+            {
+                "spec_type": st,
+                "spec_int_time_ms": spec_int_time_ms,
+                "spec_n_avg": spec_n_avg,
+                "duration_sec": spec_ref_duration,
+                "toggle_source": led_names[0],
+                "toggle_is_shutter": False,
+                "illumination_wavelength": led_wavelengths_nm[0],
+                "illumination_intensity": led_intensities_mw[0],
+                "illumination_intensity_date": led_date,
+                "illumination_side": led_type,
+                "technique_name": spec_technique,
+                "run_use": "ref_dark",
+                "reference_mode": "builtin",
+            },
+        )
+    # light ref
+    for st in SPEC_MAP[spec_technique]:
+        epm.add_experiment(
+            "UVIS_sub_measure",
+            {
+                "spec_type": st,
+                "spec_int_time_ms": spec_int_time_ms,
+                "spec_n_avg": spec_n_avg,
+                "duration_sec": spec_ref_duration,
+                "toggle_source": led_names[0],
+                "toggle_is_shutter": False,
+                "illumination_wavelength": led_wavelengths_nm[0],
+                "illumination_intensity": led_intensities_mw[0],
+                "illumination_intensity_date": led_date,
+                "illumination_side": led_type,
+                "technique_name": spec_technique,
+                "run_use": "ref_light",
+                "reference_mode": "builtin",
+            },
+        )
+    epm.add_experiment("UVIS_calc_abs", {})
+    epm.add_experiment("ECHE_sub_shutdown", {})
 
-    return pl.experiment_plan_list  # returns complete experiment list
+    return epm.experiment_plan_list  # returns complete experiment list
 
 
-def ECHE_CA_led_spectrometer(
+def ECHEUVIS_CA_led(
     sequence_version: int = 3,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -160,14 +290,14 @@ def ECHE_CA_led_spectrometer(
     spec_technique: str = "T_UVVIS",
 ):
 
-    pl = ExperimentPlanMaker()
+    epm = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add_experiment("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
-        pl.add_experiment(
+        epm.add_experiment(
             "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
@@ -179,7 +309,7 @@ def ECHE_CA_led_spectrometer(
             },
         )
         # OCV
-        pl.add_experiment(
+        epm.add_experiment(
             "ECHE_sub_OCV",
             {
                 "Tval__s": OCV_duration,
@@ -187,8 +317,8 @@ def ECHE_CA_led_spectrometer(
             },
         )
         # CA1
-        pl.add_experiment(
-            "ECHE_sub_CA_led_UVVIS",
+        epm.add_experiment(
+            "ECHEUVIS_sub_CA_led",
             {
                 "CA_potential_vsRHE": CA_potential_vsRHE,
                 "solution_ph": solution_ph,
@@ -224,12 +354,13 @@ def ECHE_CA_led_spectrometer(
             },
         )
 
-        pl.add_experiment("ECHE_sub_shutdown", {})
+        epm.add_experiment("UVIS_calc_abs", {})
+        epm.add_experiment("ECHE_sub_shutdown", {})
 
-    return pl.experiment_plan_list  # returns complete experiment list
+    return epm.experiment_plan_list  # returns complete experiment list
 
 
-def ECHE_CP_led_spectrometer(
+def ECHEUVIS_CP_led(
     sequence_version: int = 2,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -263,14 +394,14 @@ def ECHE_CP_led_spectrometer(
     spec_technique: str = "T_UVVIS",
 ):
 
-    pl = ExperimentPlanMaker()
+    epm = ExperimentPlanMaker()
 
     # (1) house keeping
-    pl.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add_experiment("ECHE_sub_unloadall_customs", {})
 
     for plate_sample in plate_sample_no_list:
 
-        pl.add_experiment(
+        epm.add_experiment(
             "ECHE_sub_startup",
             {
                 "solid_custom_position": "cell1_we",
@@ -282,8 +413,8 @@ def ECHE_CP_led_spectrometer(
             },
         )
         # CP1
-        pl.add_experiment(
-            "ECHE_sub_CP_led_UVVIS",
+        epm.add_experiment(
+            "ECHEUVIS_sub_CP_led",
             {
                 "CP_current": CP_current,
                 "solution_ph": solution_ph,
@@ -319,6 +450,7 @@ def ECHE_CP_led_spectrometer(
             },
         )
 
-        pl.add_experiment("ECHE_sub_shutdown", {})
+        epm.add_experiment("UVIS_calc_abs", {})
+        epm.add_experiment("ECHE_sub_shutdown", {})
 
-    return pl.experiment_plan_list  # returns complete experiment list
+    return epm.experiment_plan_list  # returns complete experiment list
