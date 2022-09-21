@@ -16,16 +16,16 @@ __all__ = [
 ]
 
 
-from typing import Optional  # , List, Union
+from typing import Optional
 from socket import gethostname
 
-from helaocore.models.sample import SolidSample  # , LiquidSample
+from helaocore.models.sample import SolidSample
 from helaocore.models.machine import MachineModel as MM
 from helaocore.models.process_contrib import ProcessContrib
 from helaocore.models.run_use import RunUse
 
 
-from helao.helpers.premodels import Experiment, ActionPlanMaker  # , Action
+from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.drivers.motion.enum import MoveModes, TransformationModes
 from helao.drivers.io.enum import TriggerType
 from helao.drivers.spec.enum import SpecType
@@ -258,7 +258,11 @@ def UVIS_sub_measure(
     )
 
     if apm.pars.reference_mode == "blank" and apm.pars.run_use == "ref_light":
-        apm.add(ORCH_server, "interrupt", {})
+        apm.add(
+            ORCH_server,
+            "interrupt",
+            {"reason": "Reference measurement complete, load sample library."},
+        )
         apm.add(ORCH_server, "wait", {"waittime": 1})
 
     return apm.action_list  # returns complete action list to orch
@@ -312,7 +316,11 @@ def UVIS_sub_setup_ref(
             },
         )
     elif apm.pars.reference_mode == "blank":
-        apm.add(ORCH_server, "interrupt", {})
+        apm.add(
+            ORCH_server,
+            "interrupt",
+            {"reason": "Load blank substrate for reference measurement."},
+        )
         apm.add(
             PAL_server,
             "archive_custom_load",
