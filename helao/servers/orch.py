@@ -882,8 +882,7 @@ class Orch(Base):
                 self.print_message(
                     f"current content of sequence_dq: {self.sequence_dq}"
                 )
-                # await asyncio.sleep(0.001)
-                self.orch_op.current_stop_message = ""
+                await asyncio.sleep(0.001)
 
                 # if no acts and no exps, disptach next sequence
                 if not self.experiment_dq and not self.action_dq:
@@ -996,6 +995,7 @@ class Orch(Base):
     async def start_loop(self):
         if self.orchstatusmodel.loop_state == OrchStatus.stopped:
             self.print_message("starting orch loop")
+            self.orch_op.current_stop_message = ""
             self.loop_task = asyncio.create_task(self.dispatch_loop_task())
         elif self.orchstatusmodel.loop_state == OrchStatus.estop:
             self.print_message(
