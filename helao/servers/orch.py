@@ -214,9 +214,12 @@ def makeOrchServ(
         return partial_action
 
     @app.post(f"/{server_key}/interrupt")
-    async def interrupt(action: Optional[Action] = Body({}, embed=True)):
+    async def interrupt(
+        action: Optional[Action] = Body({}, embed=True), reason: Optional[str] = "wait"
+    ):
         """Stop dispatch loop for planned manual intervention."""
         active = await app.orch.setup_and_contain_action()
+        app.orch.orch_op.current_stop_message = reason
         await app.orch.stop()
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -755,7 +758,10 @@ class Orch(Base):
             # ]
             endpoint_uuids = [
                 str(k) for k in self.orchstatusmodel.active_dict.keys()
-            ] + [str(k) for k in self.orchstatusmodel.nonactive_dict.get("finished", {}).keys()]
+            ] + [
+                str(k)
+                for k in self.orchstatusmodel.nonactive_dict.get("finished", {}).keys()
+            ]
             self.print_message(
                 f"Current {A.action_name} received uuids: {endpoint_uuids}"
             )
@@ -783,7 +789,9 @@ class Orch(Base):
                     str(k) for k in self.orchstatusmodel.active_dict.keys()
                 ] + [
                     str(k)
-                    for k in self.orchstatusmodel.nonactive_dict.get("finished", {}).keys()
+                    for k in self.orchstatusmodel.nonactive_dict.get(
+                        "finished", {}
+                    ).keys()
                 ]
             self.print_message(f"New status registered on {A.action_name}.")
             if error_code is not ErrorCodes.none:
@@ -874,7 +882,8 @@ class Orch(Base):
                 self.print_message(
                     f"current content of sequence_dq: {self.sequence_dq}"
                 )
-                await asyncio.sleep(0.001)
+                # await asyncio.sleep(0.001)
+                self.orch_op.current_stop_message = ""
 
                 # if no acts and no exps, disptach next sequence
                 if not self.experiment_dq and not self.action_dq:
@@ -1504,6 +1513,8 @@ class Operator:
         self.experiments = []
         self.experiment_lib = self.orch.experiment_lib
 
+        self.current_stop_message = ""
+
         # FastAPI calls
         self.get_sequence_lib()
         self.get_experiment_lib()
@@ -1768,18 +1779,20 @@ class Operator:
             ]
         )
 
+        self.orch_section = Div(
+            text="<b>Orch:</b>",
+            width=self.max_width - 20,
+            height=32,
+            style={"font-size": "150%", "color": "red"},
+        )
+
         self.layout4 = layout(
             [
                 Spacer(height=10),
                 layout(
                     [
                         Spacer(width=20),
-                        Div(
-                            text="<b>Orch:</b>",
-                            width=self.max_width - 20,
-                            height=32,
-                            style={"font-size": "150%", "color": "red"},
-                        ),
+                        self.orch_section,
                     ],
                     background="#C0C0C0",
                     width=self.max_width,
@@ -1903,6 +1916,9 @@ class Operator:
         self.vis.print_message("Operator Bokeh session closed", info=True)
         self.IOloop_run = False
         self.IOtask.cancel()
+
+    def get_current_stop_message(self):
+        self.update_stop_message(self.current_stop_message)
 
     def get_sequence_lib(self):
         """Return the current list of sequences."""
@@ -2650,6 +2666,9 @@ class Operator:
             x, y, size=5, color=None, alpha=0.5, line_color="black", name="PMplot"
         )
 
+    def update_stop_message(self, value):
+        self.orch_section.text = f"<b>Orch: {value}</b>"
+
     def get_pm(self, plateid, sender):
         """gets plate map"""
         private_input, param_input = self.find_param_private_input(sender)
@@ -2839,6 +2858,7 @@ class Operator:
         await self.get_experiments()
         await self.get_actions()
         await self.get_active_actions()
+        await self.get_current_stop_message()
         for key in self.experiment_plan_list:
             self.experiment_plan_list[key] = []
         if self.sequence is not None:
