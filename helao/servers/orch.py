@@ -334,6 +334,9 @@ class Orch(Base):
         self.experiment_dq = deque([])
         self.action_dq = deque([])
 
+        # holder for tracking dispatched action in status
+        self.last_dispatched_action_uuid = None
+        self.last_10_action_uuids = []
         # hold schema objects
         self.active_experiment = None
         self.last_experiment = None
@@ -369,6 +372,14 @@ class Orch(Base):
         self.globstat_q = MultisubscriberQueue()
         self.globstat_clients = set()
         self.globstat_broadcaster = asyncio.create_task(self.globstat_broadcast_task())
+
+    def register_action_uuid(self, action_uuid):
+        if len(self.last_10_action_uuids) == 10:
+            self.last_10_action_uuids.pop(0)
+        self.last_10_action_uuids.append(action_uuid)
+
+    def track_action_uuid(self, action_uuid):
+        self.last_dispatched_action_uuid = action_uuid
 
     def start_operator(self):
         servHost = self.server_cfg["host"]
@@ -478,13 +489,14 @@ class Orch(Base):
                 "all FastAPI servers in config file are accessible."
             )
 
-    async def update_status(self, actionserver: Optional[ActionServerModel] = None):
+    async def update_status(self, actionservermodel: Optional[ActionServerModel] = None):
         """Dict update method for action server to push status messages."""
-        if actionserver is None:
+        if actionservermodel is None:
             return False
         # update GlobalStatusModel with new ActionServerModel
         # and sort the new status dict
-        self.orchstatusmodel.update_global_with_acts(actionserver=actionserver)
+        self.register_action_uuid(actionservermodel.last_action_uuid)
+        self.orchstatusmodel.update_global_with_acts(actionserver=actionservermodel)
 
         # check if one action is in estop in the error list:
         estop_uuids = self.orchstatusmodel.find_hlostatus_in_finished(
@@ -766,6 +778,7 @@ class Orch(Base):
                 f"Current {A.action_name} received uuids: {endpoint_uuids}"
             )
             result_uuid = result_actiondict["action_uuid"]
+            self.track_action_uuid(UUID(result_uuid))
             self.print_message(
                 f"Action {A.action_name} dispatched with uuid: {result_uuid}"
             )
@@ -884,18 +897,17 @@ class Orch(Base):
                 )
                 # await asyncio.sleep(0.001)
 
-                # if no acts and no exps, disptach next sequence
-                if not self.experiment_dq and not self.action_dq:
-                    self.print_message(
-                        "!!!waiting for all actions to finish before dispatching next sequence",
-                        info=True,
-                    )
-                    await self.orch_wait_for_all_actions()
-                    self.print_message("!!!dispatching next sequence", info=True)
-                    error_code = await self.loop_task_dispatch_sequence()
-
-                # check if we have still actions to dispatch
-                elif not self.action_dq:
+                if self.action_dq:
+                    self.print_message("!!!dispatching next action", info=True)
+                    # num_exp_actions = deepcopy(
+                    #     self.orchstatusmodel.counter_dispatched_actions[
+                    #         self.active_experiment.experiment_uuid
+                    #     ]
+                    # )
+                    error_code = await self.loop_task_dispatch_action()
+                    if self.last_dispatched_action_uuid not in self.last_10_action_uuids:
+                        await asyncio.sleep(0.001)
+                elif self.experiment_dq:
                     self.print_message(
                         "!!!waiting for all actions to finish before dispatching next experiment",
                         info=True,
@@ -903,29 +915,15 @@ class Orch(Base):
                     await self.orch_wait_for_all_actions()
                     self.print_message("!!!dispatching next experiment", info=True)
                     error_code = await self.loop_task_dispatch_experiment()
-
-                else:
-                    self.print_message("!!!dispatching next action", info=True)
-                    num_exp_actions = deepcopy(
-                        self.orchstatusmodel.counter_dispatched_actions[
-                            self.active_experiment.experiment_uuid
-                        ]
+                # if no acts and no exps, disptach next sequence
+                elif self.sequence_dq:
+                    self.print_message(
+                        "!!!waiting for all actions to finish before dispatching next sequence",
+                        info=True,
                     )
-                    error_code = await self.loop_task_dispatch_action()
-                    if (
-                        self.active_experiment.experiment_uuid
-                        not in self.orchstatusmodel.counter_dispatched_actions.keys()
-                    ):
-                        check_experiment = self.last_experiment.experiment_uuid
-                    else:
-                        check_experiment = self.active_experiment.experiment_uuid
-                    while (
-                        num_exp_actions
-                        == self.orchstatusmodel.counter_dispatched_actions[
-                            check_experiment
-                        ]
-                    ):
-                        await asyncio.sleep(0.001)
+                    await self.orch_wait_for_all_actions()
+                    self.print_message("!!!dispatching next sequence", info=True)
+                    error_code = await self.loop_task_dispatch_sequence()
 
                 if error_code is not ErrorCodes.none:
                     self.print_message(
