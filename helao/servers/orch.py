@@ -102,12 +102,15 @@ def makeOrchServ(
 
     @app.post("/update_status", tags=["private"])
     async def update_status(
-        actionservermodel: Optional[ActionServerModel]
+        actionservermodel: Optional[ActionServerModel] = Body({}, embed=True)
     ):
         if actionservermodel is None:
             return False
         app.orch.print_message(
-            f"orch '{app.orch.server.server_name}' got status from '{actionservermodel.action_server.server_name}': {actionservermodel.endpoints}"
+            f"orch '{app.orch.server.server_name}' "
+            f"got status from "
+            f"'{actionservermodel.action_server.server_name}': "
+            f"{actionservermodel.endpoints}"
         )
         return await app.orch.update_status(actionservermodel=actionservermodel)
 
