@@ -554,7 +554,7 @@ class Galil:
         # expected time for each move, used for axis stop check
         timeofmove = []
 
-        if self.base.actionserver.estop:
+        if self.base.actionservermodel.estop:
             self.motor_busy = False
             return {
                 "moved_axis": None,
@@ -708,20 +708,20 @@ class Galil:
         # wait for expected axis move time before checking if axis stoppped
         self.base.print_message(f"axis expected to stop in {tmax} sec")
 
-        if not self.base.actionserver.estop:
+        if not self.base.actionservermodel.estop:
 
             # check if all axis stopped
             tstart = time.time()
 
             while (
                 time.time() - tstart < self.motor_timeout
-            ) and not self.base.actionserver.estop:
+            ) and not self.base.actionservermodel.estop:
                 qmove = await self.query_axis_moving(axis=axis)
                 await asyncio.sleep(0.5)
                 if all(status == "stopped" for status in qmove["motor_status"]):
                     break
 
-            if not self.base.actionserver.estop:
+            if not self.base.actionservermodel.estop:
                 # stop of motor movement (motor still on)
                 if time.time() - tstart > self.motor_timeout:
                     await self.stop_axis(axis)
@@ -893,10 +893,10 @@ class Galil:
             await self.stop_axis(self.get_all_axis())
             await self.motor_off(self.get_all_axis())
             # set flag (move command need to check for it)
-            self.base.actionserver.estop = True
+            self.base.actionservermodel.estop = True
         else:
             # need only to set the flag
-            self.base.actionserver.estop = False
+            self.base.actionservermodel.estop = False
         return switch
 
     async def stop_axis(self, axis):
