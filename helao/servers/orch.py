@@ -489,14 +489,18 @@ class Orch(Base):
                 "all FastAPI servers in config file are accessible."
             )
 
-    async def update_status(self, actionservermodel: Optional[ActionServerModel] = None):
+    async def update_status(
+        self, actionservermodel: Optional[ActionServerModel] = None
+    ):
         """Dict update method for action server to push status messages."""
         if actionservermodel is None:
             return False
         # update GlobalStatusModel with new ActionServerModel
         # and sort the new status dict
         self.register_action_uuid(actionservermodel.last_action_uuid)
-        self.orchstatusmodel.update_global_with_acts(actionserver=actionservermodel)
+        self.orchstatusmodel.update_global_with_acts(
+            actionservermodel=actionservermodel
+        )
 
         # check if one action is in estop in the error list:
         estop_uuids = self.orchstatusmodel.find_hlostatus_in_finished(
@@ -905,7 +909,10 @@ class Orch(Base):
                     #     ]
                     # )
                     error_code = await self.loop_task_dispatch_action()
-                    if self.last_dispatched_action_uuid not in self.last_10_action_uuids:
+                    if (
+                        self.last_dispatched_action_uuid
+                        not in self.last_10_action_uuids
+                    ):
                         await asyncio.sleep(0.001)
                 elif self.experiment_dq:
                     self.print_message(
