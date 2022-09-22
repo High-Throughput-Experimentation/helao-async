@@ -118,7 +118,7 @@ def makeActionServ(
 
     @app.post("/get_status", tags=["private"])
     def status_wrapper():
-        return app.base.actionserver
+        return app.base.actionservermodel
 
     @app.post("/attach_client", tags=["private"])
     async def attach_client(client_servkey: str):
@@ -146,7 +146,7 @@ def makeActionServ(
             )
         else:
             app.driver.base.print_message("driver has NO estop function", info=True)
-            app.driver.base.actionserver.estop = switch
+            app.driver.base.actionservermodel.estop = switch
         if switch:
             active.action.action_status.append(HloStatus.estopped)
         finished_action = await active.finish()

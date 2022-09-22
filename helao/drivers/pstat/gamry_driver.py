@@ -177,10 +177,10 @@ class gamry:
                 self.IO_do_meas = await self.IO_signalq.get()
                 if self.IO_do_meas:
                     # are we in estop?
-                    if not self.base.actionserver.estop:
+                    if not self.base.actionservermodel.estop:
                         self.base.print_message("Gamry got measurement request")
                         await self.measure()
-                        if self.base.actionserver.estop:
+                        if self.base.actionservermodel.estop:
                             self.IO_do_meas = False
                             self.base.print_message(
                                 "Gamry is in estop after measurement.", error=True
@@ -789,7 +789,7 @@ class gamry:
         """same as stop, set or clear estop flag with switch parameter"""
         # should be the same as stop()
         switch = bool(switch)
-        self.base.actionserver.estop = switch
+        self.base.actionservermodel.estop = switch
         if self.IO_measuring:
             if switch:
                 self.IO_do_meas = False  # will stop meas loop
@@ -931,7 +931,7 @@ class gamry:
             self.pstat
             and not self.IO_do_meas
             and not self.IO_measuring
-            and not self.base.actionserver.estop
+            and not self.base.actionservermodel.estop
             and act.error_code is ErrorCodes.none
         ):
             # open connection, will be closed after measurement in IOloop
@@ -943,7 +943,7 @@ class gamry:
         elif not self.IO_do_meas:
             act.error_code = ErrorCodes.in_progress
 
-        elif self.base.actionserver.estop:
+        elif self.base.actionservermodel.estop:
             act.error_code = ErrorCodes.estop
 
         elif self.IO_measuring:

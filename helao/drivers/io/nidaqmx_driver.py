@@ -369,7 +369,7 @@ class cNIMAX:
     def streamIV_callback(
         self, task_handle, every_n_samples_event_type, number_of_samples, callback_data
     ):
-        if self.IO_do_meas and not self.base.actionserver.estop:
+        if self.IO_do_meas and not self.base.actionservermodel.estop:
             try:
                 self.IO_measuring = True
 
@@ -422,7 +422,7 @@ class cNIMAX:
                 tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                 self.base.print_message(f"canceling NImax IV stream: {repr(e), tb,}", error=True)
 
-        elif self.base.actionserver.estop and self.IO_do_meas:
+        elif self.base.actionservermodel.estop and self.IO_do_meas:
             _ = self.task_6289cellcurrent.read(
                 number_of_samples_per_channel=number_of_samples
             )
@@ -461,7 +461,7 @@ class cNIMAX:
                 self.IO_do_meas = await self.IO_signalq.get()
                 if self.IO_do_meas and not self.IO_measuring:
                     # are we in estop?
-                    if not self.base.actionserver.estop:
+                    if not self.base.actionservermodel.estop:
                         self.base.print_message("NImax IV task got measurement request")
 
                         # start slave first
@@ -501,7 +501,7 @@ class cNIMAX:
                         self.action = None
                         self.samples_in = []
 
-                        if self.base.actionserver.estop:
+                        if self.base.actionservermodel.estop:
                             self.base.print_message("NImax IV task is in estop.")
                         else:
                             self.base.print_message("setting NImax IV task to idle")
@@ -780,7 +780,7 @@ class cNIMAX:
     async def estop(self, switch: bool, *args, **kwargs):
         """same as estop, but also sets flag"""
         switch = bool(switch)
-        self.base.actionserver.estop = switch
+        self.base.actionservermodel.estop = switch
 
         for do_name, do_port in self.dev_led.items():
             await self.set_digital_out(do_port=do_port, do_name=do_name, on=False)
