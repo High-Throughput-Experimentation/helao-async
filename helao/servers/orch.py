@@ -102,7 +102,7 @@ def makeOrchServ(
 
     @app.post("/update_status", tags=["private"])
     async def update_status(
-        actionservermodel: Optional[ActionServerModel] = Body({}, embed=True)
+        actionservermodel: Optional[ActionServerModel]
     ):
         if actionservermodel is None:
             return False
