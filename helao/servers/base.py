@@ -496,9 +496,7 @@ class Base(object):
         action_name: Optional[str] = None,
     ) -> bool:
         # needs private dispatcher
-        json_dict = {
-            "actionserver": self.actionservermodel.get_fastapi_json(action_name=action_name)
-        }
+        json_dict = self.actionservermodel.get_fastapi_json(action_name=action_name)
         response, error_code = await async_private_dispatcher(
             world_config_dict=self.world_cfg,
             server=client_servkey,
