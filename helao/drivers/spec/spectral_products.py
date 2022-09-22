@@ -92,13 +92,13 @@ class SM303:
                 self.IO_do_meas = await self.IO_signalq.get()
                 if self.IO_do_meas:
                     # are we in estop?
-                    if not self.base.actionserver.estop:
+                    if not self.base.actionservermodel.estop:
                         self.base.print_message("Spec got measurement request")
                         try:
                             await asyncio.wait_for(self.continuous_read(), self.trigger_duration + self.start_margin)
                         except asyncio.exceptions.TimeoutError:
                             pass
-                        if self.base.actionserver.estop:
+                        if self.base.actionservermodel.estop:
                             self.IO_do_meas = False
                             self.base.print_message(
                                 "Spec is in estop after measurement.", error=True
@@ -439,7 +439,7 @@ class SM303:
         """same as stop, set or clear estop flag with switch parameter"""
         # should be the same as stop()
         switch = bool(switch)
-        self.base.actionserver.estop = switch
+        self.base.actionservermodel.estop = switch
         if self.IO_measuring:
             if switch:
                 self.IO_do_meas = False  # will stop meas loop
