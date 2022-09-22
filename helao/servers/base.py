@@ -236,8 +236,8 @@ class Base(object):
 
         self.actives: Dict[UUID, object] = {}
         # basemodel to describe the full action server
-        self.actionserver = ActionServerModel(action_server=self.server)
-        self.actionserver.init_endpoints()
+        self.actionservermodel = ActionServerModel(action_server=self.server)
+        self.actionservermodel.init_endpoints()
 
         self.status_q = MultisubscriberQueue()
         self.data_q = MultisubscriberQueue()
@@ -296,12 +296,12 @@ class Base(object):
         for route in self.fastapp.routes:
             # print(route.path)
             if route.path.startswith(f"/{self.server.server_name}"):
-                self.actionserver.endpoints.update(
+                self.actionservermodel.endpoints.update(
                     {route.name: EndpointModel(endpoint_name=route.name)}
                 )
 
         self.print_message(
-            f"Found {len(self.actionserver.endpoints.keys())} endpoints "
+            f"Found {len(self.actionservermodel.endpoints.keys())} endpoints "
             f"for status monitoring on {self.server.server_name}."
         )
 
@@ -497,7 +497,7 @@ class Base(object):
     ) -> bool:
         # needs private dispatcher
         json_dict = {
-            "actionserver": self.actionserver.get_fastapi_json(action_name=action_name)
+            "actionserver": self.actionservermodel.get_fastapi_json(action_name=action_name)
         }
         response, error_code = await async_private_dispatcher(
             world_config_dict=self.world_cfg,
@@ -633,17 +633,18 @@ class Base(object):
             async for status_msg in self.status_q.subscribe():
                 # add it to the correct "EndpointModel"
                 # in the "ActionServerModel"
-                if status_msg.act.action_name not in self.actionserver.endpoints:
+                if status_msg.act.action_name not in self.actionservermodel.endpoints:
                     # a new endpoints became available
-                    self.actionserver.endpoints[
+                    self.actionservermodel.endpoints[
                         status_msg.act.action_name
                     ] = EndpointModel(endpoint_name=status_msg.act.action_name)
-                self.actionserver.endpoints[
+                self.actionservermodel.endpoints[
                     status_msg.act.action_name
                 ].active_dict.update({status_msg.act.action_uuid: status_msg})
+                self.actionservermodel.last_action_uuid = status_msg.act.action_uuid
 
                 # sort the status (nonactive_dict is empty at this point)
-                self.actionserver.endpoints[status_msg.act.action_name].sort_status()
+                self.actionservermodel.endpoints[status_msg.act.action_name].sort_status()
                 self.print_message(
                     f"log_status_task sending status "
                     f"{status_msg.act.action_status} for action "
@@ -679,7 +680,7 @@ class Base(object):
                         )
                 # now delete the errored and finsihed statuses after
                 # all are send to the subscribers
-                self.actionserver.endpoints[status_msg.act.action_name].clear_finished()
+                self.actionservermodel.endpoints[status_msg.act.action_name].clear_finished()
                 # TODO:write to log if save_root exists
                 self.print_message("all log_status_task messages send.")
 
