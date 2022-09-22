@@ -66,7 +66,7 @@ class SM303:
 
         # for saving data localy
         self.FIFO_epoch = None
-        self.FIFO_header ={}  # measuement specific, will be reset each measurement
+        self.FIFO_header = {}  # measuement specific, will be reset each measurement
         self.FIFO_column_headings = []
         self.FIFO_name = ""
 
@@ -95,7 +95,10 @@ class SM303:
                     if not self.base.actionservermodel.estop:
                         self.base.print_message("Spec got measurement request")
                         try:
-                            await asyncio.wait_for(self.continuous_read(), self.trigger_duration + self.start_margin)
+                            await asyncio.wait_for(
+                                self.continuous_read(),
+                                self.trigger_duration + self.start_margin,
+                            )
                         except asyncio.exceptions.TimeoutError:
                             pass
                         if self.base.actionservermodel.estop:
@@ -180,6 +183,7 @@ class SM303:
 
     def set_trigger_mode(self, mode: SpecTrigType = SpecTrigType.off):
         resp = self.spec.spSetTrgEx(mode, self.dev_num)
+        time.sleep(0.1)
         if resp == 1:
             self.base.print_message(f"Successfully set trigger mode to {str(mode)}")
             self.trigmode = mode
@@ -192,6 +196,7 @@ class SM303:
     def set_extedge_mode(self, mode: TriggerType = TriggerType.risingedge):
         cedge_mode = ctypes.c_short(mode)
         resp = self.spec.spSetExtEdgeMode(cedge_mode, self.dev_num)
+        time.sleep(0.1)
         if resp == 1:
             self.base.print_message(
                 f"Successfully set ext. trigger edge mode to {str(mode)}"
@@ -208,6 +213,7 @@ class SM303:
         self.int_time = float(int_time)
         cint_time = ctypes.c_double(int_time)
         resp = self.spec.spSetDblIntEx(cint_time, self.dev_num)
+        time.sleep(0.1)
         if resp == 1:
             self.base.print_message(
                 f"Successfully set integration time to {int_time:.1f} msec"
@@ -243,10 +249,10 @@ class SM303:
                 retdict["error_code"] = ErrorCodes.none
                 return retdict
             else:
-                self.base.print_message(f"No data available.", info=True)
+                self.base.print_message("No data available.", info=True)
                 return {"error_code": ErrorCodes.not_available}
         self.base.print_message(
-            f"Trigger or integration time could not be set.", info=True
+            "Trigger or integration time could not be set.", info=True
         )
         return {"error_code": ErrorCodes.not_available}
 
@@ -362,7 +368,7 @@ class SM303:
 
     async def continuous_read(self):
         """Async polling task.
-        
+
         'start_margin' is the number of seconds to extend the trigger acquisition window
         to account for the time delay between SPEC and PSTAT actions
         """
@@ -393,7 +399,7 @@ class SM303:
             except asyncio.exceptions.TimeoutError:
                 self.data = []
             # if first_print:
-                # self.base.print_message(f"spReadDataAdvEx was called")
+            # self.base.print_message(f"spReadDataAdvEx was called")
             if self.data:
                 self.data = [self._data[i] for i in range(1056)][10:1034]
                 # enqueue data
@@ -413,10 +419,10 @@ class SM303:
             self.spec_time = time.time()
             # first_print = False
 
-        self.base.print_message(f"polling loop duration complete, finishing")
+        self.base.print_message("polling loop duration complete, finishing")
         self.trigger_duration = 0
         self.close_spec_connection()
-        return {"measure": f"done_extrig"}
+        return {"measure": "done_extrig"}
 
     def close_spec_connection(self):
         if self.IO_measuring:
