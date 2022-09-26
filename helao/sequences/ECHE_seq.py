@@ -96,6 +96,8 @@ def ECHE_4CA_led_1CV_led(
     preCV_duration: float = 3,
     OCV_duration: float = 1,
     gamry_i_range: str = "auto",
+    gamrychannelwait: Optional[int]= -1,
+    gamrychannelsend: Optional [int]= 0,
     led_type: str = "front",
     led_date: str = "01/01/2000",
     led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
@@ -157,6 +159,8 @@ def ECHE_4CA_led_1CV_led(
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA1_duration_sec,
                 "gamry_i_range": gamry_i_range,
+                "gamrychannelwait": gamrychannelwait,
+                "gamrychannelsend": gamrychannelsend,
                 "illumination_source": led_name_CA1,
                 "illumination_wavelength": led_wavelengths_nm[
                     led_names.index(led_name_CA1)
@@ -645,6 +649,8 @@ def ECHE_CA_led(
     CA_samplerate_sec: float = 0.05,
     OCV_duration: float = 1,
     gamry_i_range: str = "auto",
+    gamrychannelwait: Optional[int]= -1,
+    gamrychannelsend: Optional [int]= 0,
     led_type: str = "front",
     led_date: str = "01/01/2000",
     led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
@@ -698,6 +704,8 @@ def ECHE_CA_led(
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA_duration_sec,
                 "gamry_i_range": gamry_i_range,
+                "gamrychannelwait": gamrychannelwait,
+                "gamrychannelsend": gamrychannelsend,
                 "illumination_source": led_name_CA,
                 "illumination_wavelength": led_wavelengths_nm[
                     led_names.index(led_name_CA)
@@ -739,6 +747,8 @@ def ECHE_CV_led(
     CV_cycles: int = 1,
     preCV_duration: float = 3,
     gamry_i_range: str = "auto",
+    gamrychannelwait: Optional[int]= -1,
+    gamrychannelsend: Optional [int]= 0,
     led_type: str = "front",
     led_date: str = "01/01/2000",
     led_names: list = ["doric_led1", "doric_led2", "doric_led3", "doric_led4"],
@@ -790,6 +800,8 @@ def ECHE_CV_led(
                 "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
                 "cycles": CV_cycles,
                 "gamry_i_range": gamry_i_range,
+                "gamrychannelwait": gamrychannelwait,
+                "gamrychannelsend": gamrychannelsend,
                 "solution_ph": solution_ph,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
@@ -892,6 +904,8 @@ def ECHE_CP_led(
     CP_duration_sec: float = 15,
     CP_samplerate_sec: float = 0.05,
     gamry_i_range: str = "auto",
+    gamrychannelwait: Optional[int]= -1,
+    gamrychannelsend: Optional [int]= 0,
     led_name_CP: str = "doric_led1",
     led_type: str = "front",
     led_date: str = "01/01/2000",
@@ -937,6 +951,8 @@ def ECHE_CP_led(
                 "samplerate_sec": CP_samplerate_sec,
                 "CP_duration_sec": CP_duration_sec,
                 "gamry_i_range": gamry_i_range,
+                "gamrychannelwait": gamrychannelwait,
+                "gamrychannelsend": gamrychannelsend,
                 "illumination_source": led_name_CP,
                 "illumination_wavelength": led_wavelengths_nm[
                     led_names.index(led_name_CP)
