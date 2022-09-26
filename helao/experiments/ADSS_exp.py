@@ -26,6 +26,8 @@ __all__ = [
     "ADSS_sub_CV_noaliquots", #only one with process contrib
     "ADSS_sub_CA_originalwithstuff",
     "ADSS_sub_rel_move",
+    "ADSS_sub_heat",
+    "ADSS_sub_stopheat",
 
     
 ]
@@ -134,8 +136,8 @@ def debug(
             "action_params": {
                 "Tval": 10.0,
                 "SampleRate": 1.0,
-                "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                "TTLsend": -1,  # -1 disables, else select TTL 0-3
+                "TTLwait": sq.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
+                "TTLsend": sq.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
@@ -655,8 +657,6 @@ def ADSS_sub_CA(
                 "Vval": potential,
                 "Tval__s": sq.pars.CA_duration_sec,
                 "SampleRate": sq.pars.samplerate_sec,
-                "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
@@ -741,8 +741,6 @@ def ADSS_sub_CV(
                 "ScanRate__V_s": apm.pars.scanrate_voltsec,
                 "AcqInterval__s": apm.pars.samplerate_sec,
                 "Cycles": apm.pars.cycles,
-                "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                "TTLsend": 0,  # -1 disables, else select TTL 0-3
                 "IErange": apm.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
@@ -789,8 +787,6 @@ def ADSS_sub_OCV(
             "action_params": {
                 "Tval__s": 1,
                 "SampleRate": 0.05,
-                "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
@@ -842,8 +838,6 @@ def ADSS_sub_preCV(
                 "Vval": sq.pars.CA_potential,
                 "Tval__s": sq.pars.CA_duration_sec,
                 "SampleRate": sq.pars.samplerate_sec,
-                "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
@@ -898,8 +892,6 @@ def ADSS_sub_CA_originalwithstuff(
             "action_params": {
                 "Tval": sq.pars.OCV_duration_sec,
                 "SampleRate": sq.pars.samplerate_sec,
-                "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
@@ -954,8 +946,6 @@ def ADSS_sub_CA_originalwithstuff(
                 "Vval": potential,
                 "Tval": sq.pars.CA_duration_sec,
                 "SampleRate": sq.pars.samplerate_sec,
-                "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
@@ -1049,8 +1039,6 @@ def ADSS_sub_CA_noaliquots(
             "action_params": {
                 "Tval": sq.pars.OCV_duration_sec,
                 "SampleRate": sq.pars.samplerate_sec,
-                "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
@@ -1091,8 +1079,6 @@ def ADSS_sub_CA_noaliquots(
                 "Vval": potential,
                 "Tval": sq.pars.CA_duration_sec,
                 "SampleRate": sq.pars.samplerate_sec,
-                "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
@@ -1180,8 +1166,6 @@ def ADSS_sub_CV_noaliquots(
                 "ScanRate__V_s": apm.pars.scanrate_voltsec,
                 "AcqInterval__s": apm.pars.samplerate_sec,
                 "Cycles": apm.pars.cycles,
-                "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                "TTLsend": 0,  # -1 disables, else select TTL 0-3
                 "IErange": apm.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
@@ -1304,4 +1288,74 @@ def ADSS_sub_rel_move(
         }
     )
 
+    return apm.action_list  # returns complete action list to orch
+
+def ADSS_sub_heat(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    duration_hrs: float = 2.0,
+    reservoir1_min_C: float = 74.5,
+    reservoir1_max_C: float = 75.5,
+    reservoir2_min_C: float = 84.5,
+    reservoir2_max_C: float = 85.5,
+):
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    apm.add_action(
+        {
+            "action_server": NI_server,
+            "action_name": "monloop",
+            "action_params": {
+            },
+        }
+    )
+    apm.add_action(
+        {
+            "action_server": NI_server,
+            "action_name": "heatloop",
+            "action_params": {
+                "duration_hrs": apm.pars.duration_hrs,
+                "reservoir1_min_C": apm.pars.reservoir1_min_C,
+                "reservoir1_max_C": apm.pars.reservoir1_max_C,
+                "reservoir2_min_C": apm.pars.reservoir2_min_C,
+                "reservoir2_max_C": apm.pars.reservoir2_max_C,
+            },
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "process_finish": True,
+            "process_contrib": [
+                ProcessContrib.files,
+            ]
+        }
+    )
+    return apm.action_list  # returns complete action list to orch
+
+def ADSS_sub_stopheat(
+    experiment: Experiment,
+    experiment_version: int = 1,
+):
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    apm.add_action(
+        {
+            "action_server": NI_server,
+            "action_name": "heatloopstop",
+            "action_params": {
+            },
+            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            "process_finish": True,
+            "process_contrib": [
+                ProcessContrib.files,
+            ]
+        }
+    )
+    apm.add_action(
+        {
+            "action_server": NI_server,
+            "action_name": "monloopstop",
+            "action_params": {
+            },
+        }
+    )
     return apm.action_list  # returns complete action list to orch
