@@ -363,8 +363,8 @@ def ECHE_sub_OCV(
             "action_params": {
                 "Tval__s": Tval__s,
                 "SampleRate": SampleRate,
-                "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-                "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
+                "TTLwait": -1,  # -1 disables, else select TTL 0-3
+                "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
@@ -414,8 +414,8 @@ def ECHE_sub_preCV(
                 "Vval": apm.pars.CA_potential,
                 "Tval__s": apm.pars.CA_duration_sec,
                 "SampleRate": apm.pars.samplerate_sec,
-                "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-                "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
+                "TTLwait": -1,  # -1 disables, else select TTL 0-3
+                "TTLsend": -1,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
