@@ -4,7 +4,6 @@ from copy import copy
 from scipy.signal import savgol_filter
 from ruamel.yaml import YAML
 
-from helaocore.models.data import DataModel
 from helao.servers.base import Base
 from helao.helpers.file_mapper import FileMapper
 
@@ -128,16 +127,14 @@ class Calc:
                     p: d
                     for p, d in hlo_dict.items()
                     if (d["actd"]["run_use"] == ru)
-                    and (d["expd"]["experiment_params"]["spec_type"] == spec)
+                    and (d["actd"]["action_server"]["server_name"].split("_")[1] == spec)
                 }
                 for ru in ru_keys
             }
 
             for rk in list(rud.keys()):
                 for dk in list(rud[rk].keys()):
-                    rud["technique_name"] = rud[rk][dk]["expd"]["experiment_params"][
-                        "technique_name"
-                    ]
+                    rud["technique_name"] = rud[rk][dk]["actd"]["technique_name"]
                     data = rud[rk][dk]["data"]
                     vals = [
                         data[chk]
@@ -187,6 +184,10 @@ class Calc:
                     "technique": rud["technique_name"],
                 }
 
+        if not specd:
+            self.base.print_message("Missing references and/or data. Cannot calculate FOMs.")
+            return {}
+
         params = activeobj.action.action_params
         pred = {}
         # pred holds intermediate outputs for "T", "R", and/or "TR"
@@ -234,7 +235,7 @@ class Calc:
             dx += [hv[-1] - hv[-2]]
             pred[k]["dx"] = np.array(dx)
 
-        if len(specd.keys()) == 2:  # TR_UVVIS technique
+        if specd.get("T", {}) and specd.get("R", {}):  # TR_UVVIS technique
             if pred["T"]["binds"] != pred["R"]["binds"]:
                 raise Exception
 
@@ -256,10 +257,10 @@ class Calc:
                 pred["TR"][copyk] = pred["T"][copyk]
             pred["TR"]["bin"]["wl"] = pred["T"]["bin"]["wl"]
 
-        elif len(specd.keys()) == 1 and "T" in specd.keys():  # T_UVVIS only
+        elif specd.get("T", {}) and not specd.get("R", {}):  # T_UVVIS only
             pred["T"]["full"]["abs"] = -np.log(pred["T"]["full"]["sig"])
 
-        elif len(specd.keys()) == 1 and "R" in specd.keys():  # DR_UVVIS only
+        elif specd.get("R", {}) and not specd.get("T", {}):  # DR_UVVIS only
             pred["R"]["full"]["abs"] = (1.0 - np.log(pred["R"]["full"]["sig"])) ** 2 / (
                 2.0 * pred["R"]["full"]["sig"]
             )
@@ -295,15 +296,15 @@ class Calc:
                 params["max_limit"],
             )
 
-            if len(specd.keys()) == 2:
+            if specd.get("T", {}) and specd.get("R", {}):
                 pred[sk]["smooth_refadj"]["abs"] = -np.log(
                     pred[sk]["smooth_refadj"]["sig"]
                 )
-            elif len(specd.keys()) == 1 and "R" in specd.keys():
+            elif specd.get("R", {}) and not specd.get("T", {}):
                 pred[sk]["smooth_refadj"]["abs"] = (
                     1.0 - np.log(pred[sk]["smooth_refadj"]["sig"])
                 ) ** 2 / (2.0 * pred[sk]["smooth_refadj"]["sig"])
-            else:
+            elif specd.get("T", {}) and not specd.get("R", {}):
                 _, _, pred[sk]["smooth_refadj"]["abs"] = refadjust(
                     pred[sk]["smooth"]["abs"],
                     params["min_mthd_allowed"],
@@ -367,7 +368,7 @@ class Calc:
 
         datadict = {}
         # assemble datadict with scalar FOMs
-        if len(specd.keys()) == 2:  # TR_UVVIS technique
+        if specd.get("T", {}) and specd.get("R", {}):  # TR_UVVIS technique
             interd = pred["TR"]
 
             evp = params["ev_parts"]
@@ -394,17 +395,18 @@ class Calc:
                 (pred["R"]["smooth"]["sig"] > 0.0), (pred["R"]["smooth"]["sig"] < 1.0)
             ).all(axis=1)
 
-        elif len(specd.keys()) == 1 and "T" in specd.keys():  # T_UVVIS only
+        elif specd.get("T", {}) and not specd.get("R", {}):  # T_UVVIS only
             interd = pred["T"]
             datadict["T_0to1"] = np.bitwise_and(
                 (pred["T"]["smooth"]["sig"] > 0.0), (pred["T"]["smooth"]["sig"] < 1.0)
             ).all(axis=1)
 
-        elif len(specd.keys()) == 1 and "R" in specd.keys():  # DR_UVVIS only
+        elif specd.get("R", {}) and not specd.get("T", {}):  # DR_UVVIS only
             interd = pred["R"]
             datadict["DR_0to1"] = np.bitwise_and(
                 (pred["R"]["smooth"]["sig"] > 0.0), (pred["R"]["smooth"]["sig"] < 1.0)
             ).all(axis=1)
+        
 
         datadict["max_abs"] = np.nanmax(interd["smooth_refadj"]["abs"], axis=1)
         checknanrange = np.bitwise_and(
