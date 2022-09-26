@@ -6,6 +6,7 @@ config = {}
 config["dummy"] = True
 config['simulation'] = False
 
+config["builtin_ref_motorxy"] = [110, 15]
 config["experiment_libraries"] = ["samples_exp", "ECHE_exp", "ECHEUVIS_exp", "UVIS_exp"]
 config["experiment_params"] = {
     "toggle_is_shutter": False,

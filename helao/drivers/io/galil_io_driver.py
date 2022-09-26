@@ -110,10 +110,10 @@ class Galil:
                     do_name=do_name,
                 )
             # set flag
-            self.base.actionserver.estop = True
+            self.base.actionservermodel.estop = True
         else:
             # need only to set the flag
-            self.base.actionserver.estop = False
+            self.base.actionservermodel.estop = False
         return switch
 
     async def get_analog_in(

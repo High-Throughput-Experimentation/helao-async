@@ -115,7 +115,7 @@ def makeApp(confPrefix, servKey, helao_root):
         delay: int = 0,
     ):
         """Acquire spectra based on external trigger."""
-        active = app.base.setup_and_contain_action()
+        active = await app.base.setup_and_contain_action()
         await app.driver.stop(delay=active.action.action_params["delay"])
         finished_action = await active.finish()
         return finished_action.as_dict()

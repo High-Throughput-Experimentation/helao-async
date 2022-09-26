@@ -102,17 +102,17 @@ def makeOrchServ(
 
     @app.post("/update_status", tags=["private"])
     async def update_status(
-        actionserver: Optional[ActionServerModel] = Body({}, embed=True)
+        actionservermodel: Optional[ActionServerModel] = Body({}, embed=True)
     ):
-        if actionserver is None:
+        if actionservermodel is None:
             return False
         app.orch.print_message(
             f"orch '{app.orch.server.server_name}' "
             f"got status from "
-            f"'{actionserver.action_server.server_name}': "
-            f"{actionserver.endpoints}"
+            f"'{actionservermodel.action_server.server_name}': "
+            f"{actionservermodel.endpoints}"
         )
-        return await app.orch.update_status(actionserver=actionserver)
+        return await app.orch.update_status(actionservermodel=actionservermodel)
 
     @app.post("/attach_client", tags=["private"])
     async def attach_client(client_servkey: str):
@@ -214,9 +214,13 @@ def makeOrchServ(
         return partial_action
 
     @app.post(f"/{server_key}/interrupt")
-    async def interrupt(action: Optional[Action] = Body({}, embed=True)):
+    async def interrupt(
+        action: Optional[Action] = Body({}, embed=True), reason: Optional[str] = "wait"
+    ):
         """Stop dispatch loop for planned manual intervention."""
         active = await app.orch.setup_and_contain_action()
+        app.orch.orch_op.current_stop_message = active.action.action_params["reason"]
+        app.orch.orch_op.callback_update_stop_message()
         await app.orch.stop()
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -331,6 +335,9 @@ class Orch(Base):
         self.experiment_dq = deque([])
         self.action_dq = deque([])
 
+        # holder for tracking dispatched action in status
+        self.last_dispatched_action_uuid = None
+        self.last_10_action_uuids = []
         # hold schema objects
         self.active_experiment = None
         self.last_experiment = None
@@ -366,6 +373,14 @@ class Orch(Base):
         self.globstat_q = MultisubscriberQueue()
         self.globstat_clients = set()
         self.globstat_broadcaster = asyncio.create_task(self.globstat_broadcast_task())
+
+    def register_action_uuid(self, action_uuid):
+        if len(self.last_10_action_uuids) == 10:
+            self.last_10_action_uuids.pop(0)
+        self.last_10_action_uuids.append(action_uuid)
+
+    def track_action_uuid(self, action_uuid):
+        self.last_dispatched_action_uuid = action_uuid
 
     def start_operator(self):
         servHost = self.server_cfg["host"]
@@ -475,13 +490,18 @@ class Orch(Base):
                 "all FastAPI servers in config file are accessible."
             )
 
-    async def update_status(self, actionserver: Optional[ActionServerModel] = None):
+    async def update_status(
+        self, actionservermodel: Optional[ActionServerModel] = None
+    ):
         """Dict update method for action server to push status messages."""
-        if actionserver is None:
+        if actionservermodel is None:
             return False
         # update GlobalStatusModel with new ActionServerModel
         # and sort the new status dict
-        self.orchstatusmodel.update_global_with_acts(actionserver=actionserver)
+        self.register_action_uuid(actionservermodel.last_action_uuid)
+        self.orchstatusmodel.update_global_with_acts(
+            actionservermodel=actionservermodel
+        )
 
         # check if one action is in estop in the error list:
         estop_uuids = self.orchstatusmodel.find_hlostatus_in_finished(
@@ -755,11 +775,15 @@ class Orch(Base):
             # ]
             endpoint_uuids = [
                 str(k) for k in self.orchstatusmodel.active_dict.keys()
-            ] + [str(k) for k in self.orchstatusmodel.nonactive_dict["finished"].keys()]
+            ] + [
+                str(k)
+                for k in self.orchstatusmodel.nonactive_dict.get("finished", {}).keys()
+            ]
             self.print_message(
                 f"Current {A.action_name} received uuids: {endpoint_uuids}"
             )
             result_uuid = result_actiondict["action_uuid"]
+            self.track_action_uuid(UUID(result_uuid))
             self.print_message(
                 f"Action {A.action_name} dispatched with uuid: {result_uuid}"
             )
@@ -783,7 +807,9 @@ class Orch(Base):
                     str(k) for k in self.orchstatusmodel.active_dict.keys()
                 ] + [
                     str(k)
-                    for k in self.orchstatusmodel.nonactive_dict["finished"].keys()
+                    for k in self.orchstatusmodel.nonactive_dict.get(
+                        "finished", {}
+                    ).keys()
                 ]
             self.print_message(f"New status registered on {A.action_name}.")
             if error_code is not ErrorCodes.none:
@@ -874,10 +900,31 @@ class Orch(Base):
                 self.print_message(
                     f"current content of sequence_dq: {self.sequence_dq}"
                 )
-                await asyncio.sleep(0.001)
+                # await asyncio.sleep(0.001)
 
+                if self.action_dq:
+                    self.print_message("!!!dispatching next action", info=True)
+                    # num_exp_actions = deepcopy(
+                    #     self.orchstatusmodel.counter_dispatched_actions[
+                    #         self.active_experiment.experiment_uuid
+                    #     ]
+                    # )
+                    error_code = await self.loop_task_dispatch_action()
+                    if (
+                        self.last_dispatched_action_uuid
+                        not in self.last_10_action_uuids
+                    ):
+                        await asyncio.sleep(0.001)
+                elif self.experiment_dq:
+                    self.print_message(
+                        "!!!waiting for all actions to finish before dispatching next experiment",
+                        info=True,
+                    )
+                    await self.orch_wait_for_all_actions()
+                    self.print_message("!!!dispatching next experiment", info=True)
+                    error_code = await self.loop_task_dispatch_experiment()
                 # if no acts and no exps, disptach next sequence
-                if not self.experiment_dq and not self.action_dq:
+                elif self.sequence_dq:
                     self.print_message(
                         "!!!waiting for all actions to finish before dispatching next sequence",
                         info=True,
@@ -886,38 +933,14 @@ class Orch(Base):
                     self.print_message("!!!dispatching next sequence", info=True)
                     error_code = await self.loop_task_dispatch_sequence()
 
-                # check if we have still actions to dispatch
-                elif not self.action_dq:
-                    self.print_message(
-                        "!!!waiting for all actions to finish before dispatching next experiment",
-                        info=True,
-                    )
-                    await self.orch_wait_for_all_actions()
-                    self.print_message("!!!dispatching next experiment", info=True)
-                    error_code = await self.loop_task_dispatch_experiment()
-
-                else:
-                    self.print_message("!!!dispatching next action", info=True)
-                    num_exp_actions = deepcopy(
-                        self.orchstatusmodel.counter_dispatched_actions[
-                            self.active_experiment.experiment_uuid
-                        ]
-                    )
-                    error_code = await self.loop_task_dispatch_action()
-                    while (
-                        num_exp_actions
-                        == self.orchstatusmodel.counter_dispatched_actions[
-                            self.active_experiment.experiment_uuid
-                        ]
-                    ):
-                        await asyncio.sleep(0.001)
-
                 if error_code is not ErrorCodes.none:
                     self.print_message(
                         f"stopping orch with error code: {error_code}", error=True
                     )
                     # await self.intend_stop()
                     await self.intend_estop()
+
+                await self.update_operator(True)
 
             if (
                 self.orchstatusmodel.loop_state == OrchStatus.estop
@@ -987,6 +1010,8 @@ class Orch(Base):
     async def start_loop(self):
         if self.orchstatusmodel.loop_state == OrchStatus.stopped:
             self.print_message("starting orch loop")
+            self.orch_op.current_stop_message = ""
+            self.orch_op.callback_update_stop_message()
             self.loop_task = asyncio.create_task(self.dispatch_loop_task())
         elif self.orchstatusmodel.loop_state == OrchStatus.estop:
             self.print_message(
@@ -1504,6 +1529,8 @@ class Operator:
         self.experiments = []
         self.experiment_lib = self.orch.experiment_lib
 
+        self.current_stop_message = ""
+
         # FastAPI calls
         self.get_sequence_lib()
         self.get_experiment_lib()
@@ -1512,6 +1539,7 @@ class Operator:
         self.vis.doc.add_next_tick_callback(partial(self.get_experiments))
         self.vis.doc.add_next_tick_callback(partial(self.get_actions))
         self.vis.doc.add_next_tick_callback(partial(self.get_active_actions))
+        self.vis.doc.add_next_tick_callback(partial(self.get_current_stop_message))
 
         self.experimentplan_source = ColumnDataSource(data=self.experiment_plan_list)
         self.columns_expplan = [
@@ -1768,18 +1796,20 @@ class Operator:
             ]
         )
 
+        self.orch_section = Div(
+            text="<b>Orch:</b>",
+            width=self.max_width - 20,
+            height=32,
+            style={"font-size": "150%", "color": "red"},
+        )
+
         self.layout4 = layout(
             [
                 Spacer(height=10),
                 layout(
                     [
                         Spacer(width=20),
-                        Div(
-                            text="<b>Orch:</b>",
-                            width=self.max_width - 20,
-                            height=32,
-                            style={"font-size": "150%", "color": "red"},
-                        ),
+                        self.orch_section,
                     ],
                     background="#C0C0C0",
                     width=self.max_width,
@@ -1903,6 +1933,9 @@ class Operator:
         self.vis.print_message("Operator Bokeh session closed", info=True)
         self.IOloop_run = False
         self.IOtask.cancel()
+
+    async def get_current_stop_message(self):
+        self.update_stop_message(self.current_stop_message)
 
     def get_sequence_lib(self):
         """Return the current list of sequences."""
@@ -2093,6 +2126,9 @@ class Operator:
         self.active_action_source.data = self.active_action_list
         self.vis.print_message(f"current active actions: {self.active_action_list}")
 
+    def callback_update_stop_message(self):
+        self.vis.doc.add_next_tick_callback(partial(self.get_current_stop_message))
+
     def callback_sequence_select(self, attr, old, new):
         idx = self.sequence_select_list.index(new)
         self.update_seq_param_layout(idx)
@@ -2185,6 +2221,7 @@ class Operator:
         if self.orch.orchstatusmodel.loop_state == OrchStatus.stopped:
             self.vis.print_message("starting orch")
             self.vis.doc.add_next_tick_callback(partial(self.orch.start))
+            self.vis.doc.add_next_tick_callback(partial(self.get_current_stop_message))
         elif self.orch.orchstatusmodel.loop_state == OrchStatus.estop:
             self.vis.print_message("orch is in estop", error=True)
         else:
@@ -2650,6 +2687,9 @@ class Operator:
             x, y, size=5, color=None, alpha=0.5, line_color="black", name="PMplot"
         )
 
+    def update_stop_message(self, value):
+        self.orch_section.text = f"<b>Orch: {value}</b>"
+
     def get_pm(self, plateid, sender):
         """gets plate map"""
         private_input, param_input = self.find_param_private_input(sender)
@@ -2839,6 +2879,7 @@ class Operator:
         await self.get_experiments()
         await self.get_actions()
         await self.get_active_actions()
+        await self.get_current_stop_message()
         for key in self.experiment_plan_list:
             self.experiment_plan_list[key] = []
         if self.sequence is not None:

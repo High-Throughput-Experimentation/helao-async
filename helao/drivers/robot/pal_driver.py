@@ -1946,7 +1946,7 @@ class PAL:
             self.sshhost is not None
             and not self.IO_do_meas
             and not self.IO_measuring
-            and not self.base.actionserver.estop
+            and not self.base.actionservermodel.estop
         ):
             self.base.print_message("init PAL IO loop", info=True)
             self.IO_error = ErrorCodes.none
@@ -1988,7 +1988,7 @@ class PAL:
 
             activeDict = self.active.action.as_dict()
 
-        elif self.base.actionserver.estop:
+        elif self.base.actionservermodel.estop:
             self.base.print_message("PAL is in estop.", error=True)
             A.error_code = ErrorCodes.estop
             activeDict = A.as_dict()
@@ -2185,7 +2185,7 @@ class PAL:
         self.IO_do_meas = False
         self.IO_action_run_counter = 0
 
-        if self.base.actionserver.estop:
+        if self.base.actionservermodel.estop:
             self.base.print_message("PAL is in estop.")
         else:
             self.base.print_message("setting PAL to idle")
@@ -2877,7 +2877,7 @@ class PAL:
     async def estop(self, switch: bool, *args, **kwargs):
         """same as estop, but also sets flag"""
         switch = bool(switch)
-        self.base.actionserver.estop = switch
+        self.base.actionservermodel.estop = switch
         if self.IO_do_meas:
             if switch:
                 await self.set_IO_signalq(False)

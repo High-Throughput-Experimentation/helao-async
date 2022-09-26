@@ -4,9 +4,10 @@ server_key must be a FastAPI action server defined in config
 """
 
 __all__ = [
-    "ECHE_sub_CV_led_secondtrigger",
-    "ECHE_sub_CA_led_secondtrigger",
-    "ECHE_sub_CP_led_secondtrigger",
+    "ECHEUVIS_sub_CV_led",
+    "ECHEUVIS_sub_CA_led",
+    "ECHEUVIS_sub_CP_led",
+    "ECHEUVIS_sub_interrupt",
 ]
 
 
@@ -14,13 +15,13 @@ from typing import Optional
 from socket import gethostname
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
+from helao.helpers.spec_map import SPECSRV_MAP
 from helaocore.models.action_start_condition import ActionStartCondition
 from helaocore.models.machine import MachineModel as MM
 from helaocore.models.process_contrib import ProcessContrib
 from helaocore.models.electrolyte import Electrolyte
 
 from helao.drivers.io.enum import TriggerType
-from helao.drivers.spec.enum import SpecType
 
 
 EXPERIMENTS = __all__
@@ -29,6 +30,7 @@ PSTAT_server = MM(server_name="PSTAT", machine_name=gethostname()).json_dict()
 MOTOR_server = MM(server_name="MOTOR", machine_name=gethostname()).json_dict()
 IO_server = MM(server_name="IO", machine_name=gethostname()).json_dict()
 SPEC_T_server = MM(server_name="SPEC_T", machine_name=gethostname()).json_dict()
+SPEC_R_server = MM(server_name="SPEC_R", machine_name=gethostname()).json_dict()
 ORCH_server = MM(server_name="ORCH", machine_name=gethostname()).json_dict()
 PAL_server = MM(server_name="PAL", machine_name=gethostname()).json_dict()
 CALC_server = MM(server_name="CALC", machine_name=gethostname()).json_dict()
@@ -36,7 +38,7 @@ CALC_server = MM(server_name="CALC", machine_name=gethostname()).json_dict()
 toggle_triggertype = TriggerType.fallingedge
 
 
-def ECHE_sub_CV_led_secondtrigger(
+def ECHEUVIS_sub_CV_led(
     experiment: Experiment,
     experiment_version: int = 3,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
@@ -74,7 +76,7 @@ def ECHE_sub_CV_led_secondtrigger(
     toggle2_time: Optional[float] = -1,
     spec_int_time_ms: Optional[float] = 15,
     spec_n_avg: Optional[int] = 1,
-    spec_type: Optional[SpecType] = "T",
+    spec_technique: Optional[str] = "T_UVVIS",
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -150,24 +152,26 @@ def ECHE_sub_CV_led_secondtrigger(
         },
     )
 
-    apm.add_action(
-        {
-            "action_server": SPEC_T_server,
-            "action_name": "acquire_spec_extrig",
-            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "action_params": {
-                "int_time": apm.pars.spec_int_time_ms,
-                "n_avg": apm.pars.spec_n_avg,
-                "duration": apm.pars.toggle2_time,
-            },
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
-        }
-    )
+    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
+        apm.add_action(
+            {
+                "action_server": ss,
+                "action_name": "acquire_spec_extrig",
+                "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
+                "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+                "action_params": {
+                    "int_time": apm.pars.spec_int_time_ms,
+                    "n_avg": apm.pars.spec_n_avg,
+                    "duration": apm.pars.toggle2_time,
+                },
+                "technique_name": apm.pars.spec_technique,
+                "process_contrib": [
+                    ProcessContrib.files,
+                    ProcessContrib.samples_in,
+                    ProcessContrib.samples_out,
+                ],
+            }
+        )
 
     # apply potential
     apm.add_action(
@@ -206,14 +210,15 @@ def ECHE_sub_CV_led_secondtrigger(
         },
     )
 
-    apm.add_action(
-        {
-            "action_server": SPEC_T_server,
-            "action_name": "stop_extrig_after",
-            "start_condition": ActionStartCondition.no_wait,
-            "action_params": {"delay": apm.pars.CV_duration_sec},
-        }
-    )
+    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
+        apm.add_action(
+            {
+                "action_server": ss,
+                "action_name": "stop_extrig_after",
+                "start_condition": ActionStartCondition.no_wait,
+                "action_params": {"delay": apm.pars.toggle2_time},
+            }
+        )
 
     apm.add_action(
         {
@@ -226,7 +231,7 @@ def ECHE_sub_CV_led_secondtrigger(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_sub_CA_led_secondtrigger(
+def ECHEUVIS_sub_CA_led(
     experiment: Experiment,
     experiment_version: int = 3,
     CA_potential_vsRHE: Optional[float] = 0.0,
@@ -258,7 +263,7 @@ def ECHE_sub_CA_led_secondtrigger(
     toggle2_time: Optional[float] = -1,
     spec_int_time_ms: Optional[float] = 15,
     spec_n_avg: Optional[int] = 1,
-    spec_type: Optional[SpecType] = "T",
+    spec_technique: Optional[str] = "T_UVVIS",
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -316,24 +321,26 @@ def ECHE_sub_CA_led_secondtrigger(
         },
     )
 
-    apm.add_action(
-        {
-            "action_server": SPEC_T_server,
-            "action_name": "acquire_spec_extrig",
-            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "action_params": {
-                "int_time": apm.pars.spec_int_time_ms,
-                "n_avg": apm.pars.spec_n_avg,
-                "duration": apm.pars.toggle2_time,
-            },
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
-        }
-    )
+    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
+        apm.add_action(
+            {
+                "action_server": ss,
+                "action_name": "acquire_spec_extrig",
+                "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
+                "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+                "action_params": {
+                    "int_time": apm.pars.spec_int_time_ms,
+                    "n_avg": apm.pars.spec_n_avg,
+                    "duration": apm.pars.toggle2_time,
+                },
+                "technique_name": apm.pars.spec_technique,
+                "process_contrib": [
+                    ProcessContrib.files,
+                    ProcessContrib.samples_in,
+                    ProcessContrib.samples_out,
+                ],
+            }
+        )
 
     # apply potential
     potential = (
@@ -355,7 +362,7 @@ def ECHE_sub_CA_led_secondtrigger(
                 "IErange": apm.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_server, 
+            "start_condition": ActionStartCondition.wait_for_server,
             "technique_name": "CA",
             "process_finish": True,
             "process_contrib": [
@@ -366,14 +373,15 @@ def ECHE_sub_CA_led_secondtrigger(
         },
     )
 
-    apm.add_action(
-        {
-            "action_server": SPEC_T_server,
-            "action_name": "stop_extrig_after",
-            "start_condition": ActionStartCondition.no_wait,
-            "action_params": {"delay": apm.pars.CA_duration_sec},
-        }
-    )
+    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
+        apm.add_action(
+            {
+                "action_server": ss,
+                "action_name": "stop_extrig_after",
+                "start_condition": ActionStartCondition.no_wait,
+                "action_params": {"delay": apm.pars.toggle2_time},
+            }
+        )
 
     apm.add_action(
         {
@@ -386,7 +394,7 @@ def ECHE_sub_CA_led_secondtrigger(
     return apm.action_list  # returns complete action list to orch
 
 
-def ECHE_sub_CP_led_secondtrigger(
+def ECHEUVIS_sub_CP_led(
     experiment: Experiment,
     experiment_version: int = 3,
     CP_current: Optional[float] = 0.0,
@@ -418,7 +426,7 @@ def ECHE_sub_CP_led_secondtrigger(
     toggle2_time: Optional[float] = -1,
     spec_int_time_ms: Optional[float] = 15,
     spec_n_avg: Optional[int] = 1,
-    spec_type: Optional[SpecType] = "T",
+    spec_technique: Optional[str] = "T_UVVIS",
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -476,31 +484,33 @@ def ECHE_sub_CP_led_secondtrigger(
         },
     )
 
-    apm.add_action(
-        {
-            "action_server": SPEC_T_server,
-            "action_name": "acquire_spec_extrig",
-            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "action_params": {
-                "int_time": apm.pars.spec_int_time_ms,
-                "n_avg": apm.pars.spec_n_avg,
-                "duration": apm.pars.toggle2_time,
-            },
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
-        }
-    )
+    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
+        apm.add_action(
+            {
+                "action_server": ss,
+                "action_name": "acquire_spec_extrig",
+                "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
+                "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+                "action_params": {
+                    "int_time": apm.pars.spec_int_time_ms,
+                    "n_avg": apm.pars.spec_n_avg,
+                    "duration": apm.pars.toggle2_time,
+                },
+                "technique_name": apm.pars.spec_technique,
+                "process_contrib": [
+                    ProcessContrib.files,
+                    ProcessContrib.samples_in,
+                    ProcessContrib.samples_out,
+                ],
+            }
+        )
 
     apm.add_action(
         {
             "action_server": PSTAT_server,
             "action_name": "run_CP",
             "action_params": {
-                "Ival__A": CP_current,
+                "Ival__A": apm.pars.CP_current,
                 "Tval__s": apm.pars.CP_duration_sec,
                 "AcqInterval__s": apm.pars.samplerate_sec,
                 "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
@@ -508,7 +518,7 @@ def ECHE_sub_CP_led_secondtrigger(
                 "IErange": apm.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_server, 
+            "start_condition": ActionStartCondition.wait_for_server,
             "technique_name": "CP",
             "process_finish": True,
             "process_contrib": [
@@ -519,14 +529,15 @@ def ECHE_sub_CP_led_secondtrigger(
         },
     )
 
-    apm.add_action(
-        {
-            "action_server": SPEC_T_server,
-            "action_name": "stop_extrig_after",
-            "start_condition": ActionStartCondition.no_wait,
-            "action_params": {"delay": apm.pars.CP_duration_sec},
-        }
-    )
+    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
+        apm.add_action(
+            {
+                "action_server": ss,
+                "action_name": "stop_extrig_after",
+                "start_condition": ActionStartCondition.no_wait,
+                "action_params": {"delay": apm.pars.toggle2_time},
+            }
+        )
 
     apm.add_action(
         {
@@ -537,3 +548,13 @@ def ECHE_sub_CP_led_secondtrigger(
     )
 
     return apm.action_list  # returns complete action list to orch
+
+
+def ECHEUVIS_sub_interrupt(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    reason: str = "wait",
+):
+    apm = ActionPlanMaker()
+    apm.add(ORCH_server, "interrupt", {"reason": apm.pars.reason})
+    return apm.action_list
