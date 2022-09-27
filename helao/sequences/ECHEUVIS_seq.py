@@ -201,7 +201,7 @@ def ECHEUVIS_CV_led(
             "reference_mode": "builtin",
             "solid_custom_position": "cell1_we",
             "solid_plate_id": plate_id,
-            "solid_sample_no": plate_sample_no_list[-1],
+            "solid_sample_no": plate_sample_no_list[0], #changed from -1
             "specref_code": 1,
         },
     )
