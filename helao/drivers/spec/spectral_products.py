@@ -99,6 +99,8 @@ class SM303:
                                 self.continuous_read(),
                                 self.trigger_duration + self.start_margin,
                             )
+                            self.spec.spCloseGivenChannel(self.dev_num)
+                            self.setup_sm303()
                         except asyncio.exceptions.TimeoutError:
                             pass
                         if self.base.actionservermodel.estop:
