@@ -229,19 +229,9 @@ class SM303:
         trigset = self.set_trigger_mode(SpecTrigType.off)
         inttset = self.set_integration_time(int_time_ms)
         if trigset and inttset:
-            if "n_avg" in kwargs or "fft" in kwargs:
-                _n_avg = kwargs.get("n_avg", 1)
-                _fft = kwargs.get("fft", 0)
-                result = self.spec.spReadDataAdvEx(
-                    ctypes.byref(self._data),
-                    ctypes.c_short(_n_avg),
-                    ctypes.c_short(_fft),
-                    ctypes.c_short(0),
-                    ctypes.byref(self.bad_px),
-                    self.dev_num,
-                )
-            else:
-                result = self.spec.spReadDataEx(ctypes.byref(self._data), self.dev_num)
+            self.n_avg = kwargs.get("n_avg", 1)
+            self.fft = kwargs.get("fft", 0)
+            result = self.read_data()
             if result == 1:
                 self.data = [self._data[i] for i in range(1056)][10:1034]
                 retdict = {"epoch_ns": self.base.get_realtime_nowait()}
@@ -353,14 +343,20 @@ class SM303:
         return activeDict
 
     def read_data(self):
-        result = self.spec.spReadDataAdvEx(
-            ctypes.byref(self._data),
-            ctypes.c_short(self.n_avg),
-            ctypes.c_short(self.fft),
-            ctypes.c_short(0),
-            ctypes.byref(self.bad_px),
-            self.dev_num,
-        )
+        if self.n_avg != 1 and self.fft != 0:
+            result = self.spec.spReadDataAdvEx(
+                ctypes.byref(self._data),
+                ctypes.c_short(self.n_avg),
+                ctypes.c_short(self.fft),
+                ctypes.c_short(0),
+                ctypes.byref(self.bad_px),
+                self.dev_num,
+            )
+        else:
+            result = self.spec.spReadDataEx(
+                ctypes.byref(self._data),
+                self.dev_num,
+            )
         if result == 1:
             self.data = list(self._data)[10:1034]
         else:
