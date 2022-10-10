@@ -227,8 +227,11 @@ class SM303:
 
     def acquire_spec_adv(self, int_time_ms: float, **kwargs):
         trigset = self.set_trigger_mode(SpecTrigType.off)
+        intmset = self.spec.spSetIntMode(
+            ctypes.c_short(2), ctypes.c_double(float(int_time_ms)), self.dev_num
+        )
         inttset = self.set_integration_time(int_time_ms)
-        if trigset and inttset:
+        if trigset and inttset and intmset:
             self.n_avg = kwargs.get("n_avg", 1)
             self.fft = kwargs.get("fft", 0)
             result = self.read_data()
