@@ -233,7 +233,7 @@ class SM303:
             self.fft = kwargs.get("fft", 0)
             result = self.read_data()
             if result == 1:
-                self.data = [self._data[i] for i in range(1056)][10:1034]
+                # self.data = [self._data[i] for i in range(1056)][10:1034]
                 retdict = {"epoch_ns": self.base.get_realtime_nowait()}
                 retdict.update({f"ch_{i:04}": x for i, x in enumerate(self.data)})
                 retdict["error_code"] = ErrorCodes.none
@@ -343,6 +343,7 @@ class SM303:
         return activeDict
 
     def read_data(self):
+        self._data = (ctypes.c_long * 1056)()
         if self.n_avg != 1 and self.fft != 0:
             result = self.spec.spReadDataAdvEx(
                 ctypes.byref(self._data),
@@ -361,6 +362,7 @@ class SM303:
             self.data = list(self._data)[10:1034]
         else:
             self.data = []
+        return result
 
     async def continuous_read(self):
         """Async polling task.
