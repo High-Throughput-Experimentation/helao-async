@@ -7,6 +7,7 @@ are the preferred method for synchronizing spectral capture with illumination so
 
 __all__ = ["makeApp"]
 
+import asyncio
 import time
 from typing import Optional, List
 from fastapi import Body
@@ -58,6 +59,8 @@ def makeApp(confPrefix, servKey, helao_root):
         while time.time() - starttime < duration_sec:
             specdict = app.driver.acquire_spec_adv(**active.action.action_params)
             await active.enqueue_data_dflt(datadict=specdict)
+        # wait 1 second to capture dangling data messages
+        await asyncio.sleep(1)
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -86,6 +89,8 @@ def makeApp(confPrefix, servKey, helao_root):
         while time.time() - starttime < duration_sec:
             specdict = app.driver.acquire_spec_adv(**active.action.action_params)
             await active.enqueue_data_dflt(datadict=specdict)
+        # wait 1 second to capture dangling data messages
+        await asyncio.sleep(1)
         finished_act = await active.finish()
         return finished_act.as_dict()
 
