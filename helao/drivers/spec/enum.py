@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import Enum, IntEnum
 
 
-class SpecTrigType(int, Enum):
+class SpecTrigType(IntEnum):
     off = 10
     internal = 11
     external = 12
