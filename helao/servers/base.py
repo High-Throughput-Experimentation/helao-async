@@ -1252,9 +1252,9 @@ class Base(object):
                             f"UUID {data_msg.action_uuid} "
                             f"is not in listen_uuids:"
                             f" {self.listen_uuids}",
-                            error=True,
+                            warn=True,
                         )
-                        self.base.print_message(f"data_msg: \n{data_msg}", error=True)
+                        self.base.print_message(f"data_msg: \n{data_msg}", warn=True)
 
                         continue
 
