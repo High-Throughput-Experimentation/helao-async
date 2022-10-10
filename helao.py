@@ -417,7 +417,7 @@ if __name__ == "__main__":
             "launcher",
             "",
             "helao.py launcher was not called from a 'helao' conda environment.",
-            warn=True,
+            warning=True,
         )
     python_path = os.environ.get("PYTHONPATH")
     if python_path is None:
