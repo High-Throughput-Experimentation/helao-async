@@ -543,7 +543,7 @@ class Orch(Base):
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             self.print_message(
                 f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
-                error=True,
+                warning=True,
             )
 
     async def globstat_broadcast_task(self):
