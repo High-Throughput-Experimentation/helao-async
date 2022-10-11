@@ -1538,7 +1538,6 @@ class Operator:
         self.vis.doc.add_next_tick_callback(partial(self.get_experiments))
         self.vis.doc.add_next_tick_callback(partial(self.get_actions))
         self.vis.doc.add_next_tick_callback(partial(self.get_active_actions))
-        self.vis.doc.add_next_tick_callback(partial(self.get_current_stop_message))
 
         self.experimentplan_source = ColumnDataSource(data=self.experiment_plan_list)
         self.columns_expplan = [
@@ -2876,7 +2875,6 @@ class Operator:
         await self.get_experiments()
         await self.get_actions()
         await self.get_active_actions()
-        await self.get_current_stop_message()
         for key in self.experiment_plan_list:
             self.experiment_plan_list[key] = []
         if self.sequence is not None:
