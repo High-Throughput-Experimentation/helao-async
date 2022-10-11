@@ -665,7 +665,7 @@ class Galil:
                 timeofmove.append(abs(counts / speed))
 
                 # ret = ""
-                self.base.print_message(f"BUGCHECK: {cmd_seq}")
+                # self.base.print_message(f"BUGCHECK: {cmd_seq}")
                 # BUG
                 # TODO
                 # it can happen that it crashes below for some reasons
