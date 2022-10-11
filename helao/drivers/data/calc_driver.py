@@ -127,7 +127,9 @@ class Calc:
                     p: d
                     for p, d in hlo_dict.items()
                     if (d["actd"]["run_use"] == ru)
-                    and (d["actd"]["action_server"]["server_name"].split("_")[1] == spec)
+                    and (
+                        d["actd"]["action_server"]["server_name"].split("_")[1] == spec
+                    )
                 }
                 for ru in ru_keys
             }
@@ -165,21 +167,25 @@ class Calc:
                 for d in rud["data"].values():
                     actd = d["actd"]
                     solid_matches = [
-                            s["global_label"]
-                            for s in actd["samples_in"]
-                            if s["sample_type"] == "solid"
-                        ]
+                        s["global_label"]
+                        for s in actd["samples_in"]
+                        if s["sample_type"] == "solid"
+                    ]
                     assem_matches = [
-                            s["sample_details"]["parts"]
-                            for s in actd["samples_in"]
-                            if s["sample_type"] == "assembly"
-                        ]
+                        s["parts"]
+                        for s in actd["samples_in"]
+                        if s["sample_type"] == "assembly"
+                    ]
                     solid_smp = False
                     if solid_matches:
                         solid_smp = solid_matches[0]
                     elif assem_matches:
                         parts = assem_matches[0]
-                        solid_parts = [x['global_label'] for x in parts if x['sample_type'] == "solid"]
+                        solid_parts = [
+                            x["global_label"]
+                            for x in parts
+                            if x["sample_type"] == "solid"
+                        ]
                         if solid_parts:
                             solid_smp = solid_parts[0]
                     if solid_smp:
@@ -198,7 +204,9 @@ class Calc:
                 }
 
         if not specd:
-            self.base.print_message("Missing references and/or data. Cannot calculate FOMs.")
+            self.base.print_message(
+                "Missing references and/or data. Cannot calculate FOMs."
+            )
             return {}
 
         params = activeobj.action.action_params
@@ -427,7 +435,6 @@ class Calc:
             datadict["DR_0to1"] = np.bitwise_and(
                 (pred["R"]["smooth"]["sig"] > 0.0), (pred["R"]["smooth"]["sig"] < 1.0)
             ).all(axis=1)
-        
 
         datadict["max_abs"] = np.nanmax(interd["smooth_refadj"]["abs"], axis=1)
         checknanrange = np.bitwise_and(
