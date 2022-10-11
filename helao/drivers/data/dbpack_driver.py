@@ -1020,7 +1020,7 @@ class YmlOps:
                 # self.dbp.base.print_message(f"Successfully uploaded {target}")
                 return True
             except botocore.exceptions.ClientError as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+                _ = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 self.dbp.base.print_message(e)
                 self.dbp.base.print_message(
                     f"Retry S3 upload [{i}/{retry_num}]: {self.dbp.bucket}, {target}"
@@ -1100,7 +1100,7 @@ class YmlOps:
                 file_path.finished.parent.mkdir(parents=True, exist_ok=True)
                 # self.dbp.base.print_message(f"moving {file_path.__str__()} to FINISHED")
                 move_success = False
-                while move_success == False:
+                while not move_success:
                     try:
                         file_path.replace(file_path.finished)
                         move_success = True
@@ -1128,7 +1128,7 @@ class YmlOps:
                 file_path.synced.parent.mkdir(parents=True, exist_ok=True)
                 # self.dbp.base.print_message(f"moving {file_path.__str__()} to SYNCED")
                 move_success = False
-                while move_success == False:
+                while not move_success:
                     try:
                         file_path.replace(file_path.synced)
                         move_success = True
