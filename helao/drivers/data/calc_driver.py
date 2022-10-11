@@ -251,7 +251,9 @@ class Calc:
             arrTR = pred["T"]["full"]["sig"] / (1 - pred["R"]["full"]["sig"][asT, :])
             pred["TR"]["full"]["sig"] = arrTR
             omTR = 1 - pred["T"]["full"]["sig"] - pred["R"]["full"]["sig"][asT, :]
+            omT = 1 - pred["T"]["full"]["sig"]
             pred["TR"]["full"]["omTR"] = omTR
+            pred["TR"]["full"]["omT"] = omT
             pred["TR"]["full"]["abs"] = -np.log(arrTR)
             for copyk in ("binds", "rsi", "hv", "dx"):
                 pred["TR"][copyk] = pred["T"][copyk]
@@ -378,10 +380,16 @@ class Calc:
                 datadict[f"1-T-R_av_{lo}_{hi}"] = interd["smooth"]["omTR"][
                     :, evrange
                 ].mean(axis=1)
+                datadict[f"1-T_av_{lo}_{hi}"] = interd["smooth"]["omT"][
+                    :, evrange
+                ].mean(axis=1)
             # full range
             lo, hi = evp[0], evp[-1]
             evrange = np.bitwise_and((interd["hv"] > lo), (interd["hv"] < hi))
             datadict[f"1-T-R_av_{lo}_{hi}"] = interd["smooth"]["omTR"][:, evrange].mean(
+                axis=1
+            )
+            datadict[f"1-T_av_{lo}_{hi}"] = interd["smooth"]["omT"][:, evrange].mean(
                 axis=1
             )
             datadict["TplusR_0to1"] = np.bitwise_and(
