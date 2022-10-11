@@ -53,7 +53,7 @@ def import_sequences(
     if user_sequence_path is not None:
         userfiles = [os.path.splitext(userfile)[0] for userfile in os.listdir(user_sequence_path) if userfile.endswith(".py")]
         for userfile in userfiles:
-            get_seqs(seq_path=user_sequence_path, seq_userfile=userfile)
+            get_seqs(seq_path=user_sequence_path, seq_file=userfile)
             print_message(
                 world_config_dict,
                 server_name,
