@@ -163,17 +163,30 @@ class Calc:
                 bsnlist = []
 
                 for d in rud["data"].values():
-                    wllist.append(d["meta"]["optional"]["wl"])
                     actd = d["actd"]
-                    actuuids.append(actd["action_uuid"])
-                    smplist.append(
-                        [
+                    solid_matches = [
                             s["global_label"]
                             for s in actd["samples_in"]
                             if s["sample_type"] == "solid"
-                        ][0]
-                    )
-                    bsnlist.append((d["mean"] - mindark) / (maxlight - mindark))
+                        ]
+                    assem_matches = [
+                            s["sample_details"]["parts"]
+                            for s in actd["samples_in"]
+                            if s["sample_type"] == "assembly"
+                        ]
+                    solid_smp = False
+                    if solid_matches:
+                        solid_smp = solid_matches[0]
+                    elif assem_matches:
+                        parts = assem_matches[0]
+                        solid_parts = [x['global_label'] for x in parts if x['sample_type'] == "solid"]
+                        if solid_parts:
+                            solid_smp = solid_parts[0]
+                    if solid_smp:
+                        smplist.append(solid_smp)
+                        wllist.append(d["meta"]["optional"]["wl"])
+                        actuuids.append(actd["action_uuid"])
+                        bsnlist.append((d["mean"] - mindark) / (maxlight - mindark))
 
                 wlarr = np.array(wllist).mean(axis=0)
                 specd[spec] = {
