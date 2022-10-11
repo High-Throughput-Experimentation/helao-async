@@ -137,7 +137,7 @@ class HelaoPath(type(Path())):
                 check_dir.rmdir()
                 return "success"
             except PermissionError as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+                _ = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 return e
 
 
@@ -590,7 +590,7 @@ class DBPack:
             )
         else:
             self.read_log()
-        if self.config_dict.get("testing", False) == True:
+        if self.config_dict.get("testing", False):
             self.base.print_message(
                 "testing flag is True, UUIDs will be regenerated for API/S3 push.",
                 info=True,
