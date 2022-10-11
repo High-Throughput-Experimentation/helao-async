@@ -219,9 +219,7 @@ def makeOrchServ(
     ):
         """Stop dispatch loop for planned manual intervention."""
         active = await app.orch.setup_and_contain_action()
-        app.orch.orch_op.current_stop_message = active.action.action_params["reason"]
-        app.orch.orch_op.callback_update_stop_message()
-        app.orch.orch_op.vis.doc.add_next_tick_callback(partial(app.orch.orch_op.get_current_stop_message))
+        app.orch.orch_op.callback_update_stop_message(active.action.action_params["reason"])
         await app.orch.stop()
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -1012,7 +1010,7 @@ class Orch(Base):
         if self.orchstatusmodel.loop_state == OrchStatus.stopped:
             self.print_message("starting orch loop")
             self.orch_op.current_stop_message = ""
-            self.orch_op.callback_update_stop_message()
+            self.orch_op.callback_update_stop_message("")
             self.loop_task = asyncio.create_task(self.dispatch_loop_task())
         elif self.orchstatusmodel.loop_state == OrchStatus.estop:
             self.print_message(
@@ -1696,6 +1694,13 @@ class Operator:
             height=40,
         )
 
+        self.orch_section = Div(
+            text="<b>Orch:</b>",
+            width=self.max_width - 20,
+            height=32,
+            style={"font-size": "150%", "color": "red"},
+        )
+
         self.layout0 = layout(
             [
                 layout(
@@ -1795,13 +1800,6 @@ class Operator:
                     width=self.max_width,
                 ),
             ]
-        )
-
-        self.orch_section = Div(
-            text="<b>Orch:</b>",
-            width=self.max_width - 20,
-            height=32,
-            style={"font-size": "150%", "color": "red"},
         )
 
         self.layout4 = layout(
@@ -1934,9 +1932,6 @@ class Operator:
         self.vis.print_message("Operator Bokeh session closed", info=True)
         self.IOloop_run = False
         self.IOtask.cancel()
-
-    async def get_current_stop_message(self):
-        self.update_stop_message(self.current_stop_message)
 
     def get_sequence_lib(self):
         """Return the current list of sequences."""
@@ -2127,8 +2122,8 @@ class Operator:
         self.active_action_source.data = self.active_action_list
         self.vis.print_message(f"current active actions: {self.active_action_list}")
 
-    def callback_update_stop_message(self):
-        self.vis.doc.add_next_tick_callback(partial(self.get_current_stop_message))
+    def callback_update_stop_message(self, txt_value):
+        self.vis.doc.add_next_tick_callback(partial(self.update_stop_message, self.orch_section, ""))
 
     def callback_sequence_select(self, attr, old, new):
         idx = self.sequence_select_list.index(new)
@@ -2223,7 +2218,7 @@ class Operator:
             self.vis.print_message("starting orch")
             self.current_stop_message = ""
             self.vis.doc.add_next_tick_callback(partial(self.orch.start))
-            self.vis.doc.add_next_tick_callback(partial(self.get_current_stop_message))
+            self.vis.doc.add_next_tick_callback(partial(self.update_stop_message, self.orch_section, ""))
         elif self.orch.orchstatusmodel.loop_state == OrchStatus.estop:
             self.vis.print_message("orch is in estop", error=True)
         else:
@@ -2689,8 +2684,8 @@ class Operator:
             x, y, size=5, color=None, alpha=0.5, line_color="black", name="PMplot"
         )
 
-    def update_stop_message(self, value):
-        self.orch_section.text = f"<b>Orch: {value}</b>"
+    def update_stop_message(self, section_div, txt_value):
+        section_div.text = f"<b>Orch: {txt_value}</b>"
 
     def get_pm(self, plateid, sender):
         """gets plate map"""
