@@ -2887,7 +2887,7 @@ class Operator:
             self.orch_status_button.label = "started"
             self.orch_status_button.button_type = "success"
         elif self.orch.orchstatusmodel.loop_state == OrchStatus.stopped:
-            stop_msg = '\n' + self.orch.current_stop_message if self.orch.current_stop_message != '' else ''
+            stop_msg = ': ' + self.orch.current_stop_message if self.orch.current_stop_message != '' else ''
             self.orch_status_button.label = f"stopped{stop_msg}"
             self.orch_status_button.button_type = "success"
             # self.orch_status_button.button_type = "danger"
