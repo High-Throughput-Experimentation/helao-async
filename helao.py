@@ -468,7 +468,7 @@ if __name__ == "__main__":
         cprint(git_stat, "cyan")
     cprint(f"\n\nusing config: {config['loaded_config_path']}\n", "white", attrs=["bold"])
     cprint("launching HELAO in 5 seconds...\n\n", "white")
-    time.sleep(3)
+    time.sleep(5)
 
     # compress old logs:
     log_root = os.path.join(config["root"], "LOGS")
