@@ -219,7 +219,7 @@ def makeOrchServ(
     ):
         """Stop dispatch loop for planned manual intervention."""
         active = await app.orch.setup_and_contain_action()
-        app.orch.orch_op.current_stop_message = active.action.action_params["reason"]
+        app.orch.current_stop_message = active.action.action_params["reason"]
         app.orch.orch_op.callback_set_stop_message()
         await app.orch.stop()
         await app.orch.update_operator(True)
@@ -374,6 +374,7 @@ class Orch(Base):
         self.globstat_q = MultisubscriberQueue()
         self.globstat_clients = set()
         self.globstat_broadcaster = asyncio.create_task(self.globstat_broadcast_task())
+        self.current_stop_message = ""
 
     def register_action_uuid(self, action_uuid):
         if len(self.last_10_action_uuids) == 10:
@@ -1007,7 +1008,7 @@ class Orch(Base):
                 self.print_message("experiment list is empty")
         else:
             self.print_message("already running")
-        self.orch_op.current_stop_message = ""
+        self.current_stop_message = ""
         self.orch_op.callback_set_stop_message()
         await self.update_operator(True)
 
@@ -1531,7 +1532,6 @@ class Operator:
         self.experiments = []
         self.experiment_lib = self.orch.experiment_lib
 
-        self.current_stop_message = ""
 
         # FastAPI calls
         self.get_sequence_lib()
@@ -1697,7 +1697,7 @@ class Operator:
         )
 
         self.orch_section = Div(
-            text="<b>Orch:</b>",
+            text=f"<b>Orch: {self.orch.current_stop_message}</b>",
             width=self.max_width - 20,
             height=32,
             style={"font-size": "150%", "color": "red"},
@@ -2686,7 +2686,7 @@ class Operator:
         )
 
     def set_stop_message(self):
-        self.update_text(self.orch_section, f"<b>Orch: {self.current_stop_message}</b>")
+        self.update_text(self.orch_section, f"<b>Orch: {self.orch.current_stop_message}</b>")
 
     def callback_set_stop_message(self):
         self.vis.doc.add_next_tick_callback(partial(self.set_stop_message))
