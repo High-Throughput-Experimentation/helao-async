@@ -220,7 +220,7 @@ def makeOrchServ(
         """Stop dispatch loop for planned manual intervention."""
         active = await app.orch.setup_and_contain_action()
         app.orch.orch_op.current_stop_message = active.action.action_params["reason"]
-        app.orch.orch_op.callback_set_stop_message()
+        app.orch.orch_op.set_stop_message()
         await app.orch.stop()
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -1615,9 +1615,7 @@ class Operator:
         self.button_start_orch = Button(
             label="Start Orch", button_type="default", width=70
         )
-        self.button_start_orch.on_event(
-            ButtonClick, self.callback_start_orch, self.callback_set_stop_message
-        )
+        self.button_start_orch.on_event(ButtonClick, self.callback_start_orch)
         self.button_estop_orch = Button(
             label="ESTOP", button_type="danger", width=400, height=100
         )
@@ -2210,13 +2208,11 @@ class Operator:
         self.vis.print_message("estop orch")
         self.vis.doc.add_next_tick_callback(partial(self.orch.estop_loop))
 
-    def callback_set_stop_message(self, event):
-        self.vis.doc.add_next_tick_callback(partial(self.set_stop_message))
-
     def callback_start_orch(self, event):
         if self.orch.orchstatusmodel.loop_state == OrchStatus.stopped:
             self.vis.print_message("starting orch")
             self.current_stop_message = ""
+            self.set_stop_message()
             self.vis.doc.add_next_tick_callback(partial(self.orch.start))
         elif self.orch.orchstatusmodel.loop_state == OrchStatus.estop:
             self.vis.print_message("orch is in estop", error=True)
