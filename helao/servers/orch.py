@@ -220,7 +220,6 @@ def makeOrchServ(
         """Stop dispatch loop for planned manual intervention."""
         active = await app.orch.setup_and_contain_action()
         app.orch.current_stop_message = active.action.action_params["reason"]
-        app.orch.orch_op.callback_set_stop_message()
         await app.orch.stop()
         await app.orch.update_operator(True)
         finished_action = await active.finish()
@@ -1009,7 +1008,6 @@ class Orch(Base):
         else:
             self.print_message("already running")
         self.current_stop_message = ""
-        self.orch_op.callback_set_stop_message()
         await self.update_operator(True)
 
     async def start_loop(self):
@@ -1643,7 +1641,7 @@ class Operator:
         )
         self.button_clear_expplan.on_event(ButtonClick, self.callback_clear_expplan)
         self.orch_status_button = Toggle(
-            label="Disabled", disabled=True, button_type="danger", width=50
+            label="Disabled", disabled=True, button_type="danger", width=400
         )  # success: green, danger: red
 
         self.button_clear_seqs = Button(
@@ -1697,7 +1695,7 @@ class Operator:
         )
 
         self.orch_section = Div(
-            text=f"<b>Orch: {self.orch.current_stop_message}</b>",
+            text=f"<b>Orch:</b>",
             width=self.max_width - 20,
             height=32,
             style={"font-size": "150%", "color": "red"},
@@ -2682,12 +2680,6 @@ class Operator:
             x, y, size=5, color=None, alpha=0.5, line_color="black", name="PMplot"
         )
 
-    def set_stop_message(self):
-        self.orch_section.text = f"<b>Orch: {self.orch.current_stop_message}</b>"
-
-    def callback_set_stop_message(self):
-        self.vis.doc.add_next_tick_callback(partial(self.set_stop_message))
-
     def get_pm(self, plateid, sender):
         """gets plate map"""
         private_input, param_input = self.find_param_private_input(sender)
@@ -2894,10 +2886,8 @@ class Operator:
         if self.orch.orchstatusmodel.loop_state == OrchStatus.started:
             self.orch_status_button.label = "started"
             self.orch_status_button.button_type = "success"
-            self.orch.current_stop_message = ""
-            self.orch_section.text = f"<b>Orch: {self.orch.current_stop_message}</b>"
         elif self.orch.orchstatusmodel.loop_state == OrchStatus.stopped:
-            self.orch_status_button.label = "stopped"
+            self.orch_status_button.label = f"stopped{'\n' + self.orch.current_stop_message if self.orch.current_stop_message != '' else ''}"
             self.orch_status_button.button_type = "success"
             # self.orch_status_button.button_type = "danger"
         else:
@@ -2906,7 +2896,6 @@ class Operator:
             )
             self.orch_status_button.button_type = "danger"
 
-        self.callback_set_stop_message()
 
     async def IOloop(self):
         self.IOloop_run = True
