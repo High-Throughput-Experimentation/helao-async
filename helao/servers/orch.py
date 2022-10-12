@@ -2365,9 +2365,6 @@ class Operator:
     def update_input_value(self, sender, value):
         sender.value = value
 
-    def update_text(self, sender, text):
-        sender.text = text
-
     def update_seq_param_layout(self, idx):
         args = self.sequences[idx]["args"]
         defaults = self.sequences[idx]["defaults"]
@@ -2686,7 +2683,7 @@ class Operator:
         )
 
     def set_stop_message(self):
-        self.update_text(self.orch_section, f"<b>Orch: {self.orch.current_stop_message}</b>")
+        self.orch_section.text = f"<b>Orch: {self.orch.current_stop_message}</b>"
 
     def callback_set_stop_message(self):
         self.vis.doc.add_next_tick_callback(partial(self.set_stop_message))
@@ -2897,6 +2894,8 @@ class Operator:
         if self.orch.orchstatusmodel.loop_state == OrchStatus.started:
             self.orch_status_button.label = "started"
             self.orch_status_button.button_type = "success"
+            self.orch.current_stop_message = ""
+            self.orch_section.text = f"<b>Orch: {self.orch.current_stop_message}</b>"
         elif self.orch.orchstatusmodel.loop_state == OrchStatus.stopped:
             self.orch_status_button.label = "stopped"
             self.orch_status_button.button_type = "success"
