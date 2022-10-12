@@ -1006,6 +1006,7 @@ class Orch(Base):
                 self.print_message("experiment list is empty")
         else:
             self.print_message("already running")
+        await self.update_operator(True)
 
     async def start_loop(self):
         if self.orchstatusmodel.loop_state == OrchStatus.stopped:
@@ -2218,7 +2219,7 @@ class Operator:
         elif self.orch.orchstatusmodel.loop_state == OrchStatus.estop:
             self.vis.print_message("orch is in estop", error=True)
         else:
-            self.vis.print_message("Cannot start orch. Sequence is empty.")
+            self.vis.print_message("Cannot start orch when not in a stopped state.")
 
     def callback_add_expplan(self, event):
         """add experiment plan as new sequene to orch sequence_dq"""
