@@ -222,6 +222,7 @@ def makeOrchServ(
         app.orch.orch_op.current_stop_message = active.action.action_params["reason"]
         app.orch.orch_op.callback_set_stop_message()
         await app.orch.stop()
+        await app.orch.update_operator(True)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -2212,10 +2213,10 @@ class Operator:
     def callback_start_orch(self, event):
         if self.orch.orchstatusmodel.loop_state == OrchStatus.stopped:
             self.vis.print_message("starting orch")
-            self.orch_section.text = "<b>Orch:</b>"
             self.current_stop_message = ""
             self.callback_set_stop_message()
             self.vis.doc.add_next_tick_callback(partial(self.orch.start))
+            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
         elif self.orch.orchstatusmodel.loop_state == OrchStatus.estop:
             self.vis.print_message("orch is in estop", error=True)
         else:
