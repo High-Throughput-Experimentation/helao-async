@@ -2359,6 +2359,9 @@ class Operator:
     def update_input_value(self, sender, value):
         sender.value = value
 
+    def update_text(self, sender, text):
+        sender.text = text
+
     def update_seq_param_layout(self, idx):
         args = self.sequences[idx]["args"]
         defaults = self.sequences[idx]["defaults"]
@@ -2676,8 +2679,10 @@ class Operator:
             x, y, size=5, color=None, alpha=0.5, line_color="black", name="PMplot"
         )
 
-    def update_stop_message(self):
-        self.orch_section.text = f"<b>Orch: {self.current_stop_message}</b>"
+    def set_stop_message(self):
+        self.vis.doc.add_next_tick_callback(
+            partial(self.update_text, self.orch_section, f"<b>Orch: {self.current_stop_message}</b>")
+        )
 
     def get_pm(self, plateid, sender):
         """gets plate map"""
@@ -2886,13 +2891,13 @@ class Operator:
             self.orch_status_button.label = "started"
             self.orch_status_button.button_type = "success"
             self.current_stop_message = ""
-            self.update_stop_message()
+            await self.set_stop_message()
 
         elif self.orch.orchstatusmodel.loop_state == OrchStatus.stopped:
             self.orch_status_button.label = "stopped"
             self.orch_status_button.button_type = "success"
             # self.orch_status_button.button_type = "danger"
-            self.update_stop_message()
+            await self.set_stop_message()
         else:
             self.orch_status_button.label = (
                 f"{self.orch.orchstatusmodel.loop_state.value}"
