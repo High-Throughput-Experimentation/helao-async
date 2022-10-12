@@ -219,9 +219,7 @@ def makeOrchServ(
     ):
         """Stop dispatch loop for planned manual intervention."""
         active = await app.orch.setup_and_contain_action()
-        app.orch.orch_op.callback_update_stop_message(
-            active.action.action_params["reason"]
-        )
+        app.orch.orch_op.current_stop_message = active.action.action_params["reason"]
         await app.orch.stop()
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -1011,8 +1009,6 @@ class Orch(Base):
     async def start_loop(self):
         if self.orchstatusmodel.loop_state == OrchStatus.stopped:
             self.print_message("starting orch loop")
-            self.orch_op.current_stop_message = ""
-            self.orch_op.callback_update_stop_message("")
             self.loop_task = asyncio.create_task(self.dispatch_loop_task())
         elif self.orchstatusmodel.loop_state == OrchStatus.estop:
             self.print_message(
@@ -2123,11 +2119,6 @@ class Operator:
         self.active_action_source.data = self.active_action_list
         self.vis.print_message(f"current active actions: {self.active_action_list}")
 
-    def callback_update_stop_message(self, txt_value):
-        self.vis.doc.add_next_tick_callback(
-            partial(self.update_stop_message, txt_value)
-        )
-
     def callback_sequence_select(self, attr, old, new):
         idx = self.sequence_select_list.index(new)
         self.update_seq_param_layout(idx)
@@ -2220,7 +2211,6 @@ class Operator:
         if self.orch.orchstatusmodel.loop_state == OrchStatus.stopped:
             self.vis.print_message("starting orch")
             self.vis.doc.add_next_tick_callback(partial(self.orch.start))
-            self.vis.doc.add_next_tick_callback(partial(self.update_stop_message, ""))
         elif self.orch.orchstatusmodel.loop_state == OrchStatus.estop:
             self.vis.print_message("orch is in estop", error=True)
         else:
@@ -2686,8 +2676,8 @@ class Operator:
             x, y, size=5, color=None, alpha=0.5, line_color="black", name="PMplot"
         )
 
-    def update_stop_message(self, txt_value):
-        self.orch_section.text = f"<b>Orch: {txt_value}</b>"
+    def update_stop_message(self):
+        self.orch_section.text = f"<b>Orch: {self.current_stop_message}</b>"
 
     def get_pm(self, plateid, sender):
         """gets plate map"""
@@ -2895,12 +2885,14 @@ class Operator:
         if self.orch.orchstatusmodel.loop_state == OrchStatus.started:
             self.orch_status_button.label = "started"
             self.orch_status_button.button_type = "success"
-            self.update_stop_message(" ")
+            self.current_stop_message = ""
+            self.update_stop_message()
 
         elif self.orch.orchstatusmodel.loop_state == OrchStatus.stopped:
             self.orch_status_button.label = "stopped"
             self.orch_status_button.button_type = "success"
             # self.orch_status_button.button_type = "danger"
+            self.update_stop_message()
         else:
             self.orch_status_button.label = (
                 f"{self.orch.orchstatusmodel.loop_state.value}"
