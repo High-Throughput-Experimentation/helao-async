@@ -2219,7 +2219,6 @@ class Operator:
     def callback_start_orch(self, event):
         if self.orch.orchstatusmodel.loop_state == OrchStatus.stopped:
             self.vis.print_message("starting orch")
-            self.current_stop_message = ""
             self.vis.doc.add_next_tick_callback(partial(self.orch.start))
             self.vis.doc.add_next_tick_callback(partial(self.update_stop_message, ""))
         elif self.orch.orchstatusmodel.loop_state == OrchStatus.estop:
@@ -2896,6 +2895,7 @@ class Operator:
         if self.orch.orchstatusmodel.loop_state == OrchStatus.started:
             self.orch_status_button.label = "started"
             self.orch_status_button.button_type = "success"
+            self.update_stop_message(" ")
 
         elif self.orch.orchstatusmodel.loop_state == OrchStatus.stopped:
             self.orch_status_button.label = "stopped"
