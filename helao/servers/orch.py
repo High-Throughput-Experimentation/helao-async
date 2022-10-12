@@ -2679,9 +2679,13 @@ class Operator:
             x, y, size=5, color=None, alpha=0.5, line_color="black", name="PMplot"
         )
 
-    def set_stop_message(self):
+    async def set_stop_message(self):
         self.vis.doc.add_next_tick_callback(
-            partial(self.update_text, self.orch_section, f"<b>Orch: {self.current_stop_message}</b>")
+            partial(
+                self.update_text,
+                self.orch_section,
+                f"<b>Orch: {self.current_stop_message}</b>",
+            )
         )
 
     def get_pm(self, plateid, sender):
