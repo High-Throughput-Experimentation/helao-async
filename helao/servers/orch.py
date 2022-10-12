@@ -220,6 +220,7 @@ def makeOrchServ(
         """Stop dispatch loop for planned manual intervention."""
         active = await app.orch.setup_and_contain_action()
         app.orch.orch_op.current_stop_message = active.action.action_params["reason"]
+        app.orch.orch_op.callback_set_stop_message()
         await app.orch.stop()
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -1614,7 +1615,9 @@ class Operator:
         self.button_start_orch = Button(
             label="Start Orch", button_type="default", width=70
         )
-        self.button_start_orch.on_event(ButtonClick, self.callback_start_orch, self.set_stop_message)
+        self.button_start_orch.on_event(
+            ButtonClick, self.callback_start_orch, self.callback_set_stop_message
+        )
         self.button_estop_orch = Button(
             label="ESTOP", button_type="danger", width=400, height=100
         )
@@ -2910,13 +2913,14 @@ class Operator:
             )
             self.orch_status_button.button_type = "danger"
 
+        self.set_stop_message()
+
     async def IOloop(self):
         self.IOloop_run = True
         while self.IOloop_run:
             try:
                 await asyncio.sleep(0.1)
                 self.vis.doc.add_next_tick_callback(partial(self.update_tables))
-                self.vis.doc.add_next_tick_callback(partial(self.set_stop_message))
                 _ = await self.update_q.get()
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
