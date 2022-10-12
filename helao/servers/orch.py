@@ -1614,7 +1614,7 @@ class Operator:
         self.button_start_orch = Button(
             label="Start Orch", button_type="default", width=70
         )
-        self.button_start_orch.on_event(ButtonClick, self.callback_start_orch)
+        self.button_start_orch.on_event(ButtonClick, self.callback_start_orch, self.set_stop_message)
         self.button_estop_orch = Button(
             label="ESTOP", button_type="danger", width=400, height=100
         )
@@ -2207,9 +2207,13 @@ class Operator:
         self.vis.print_message("estop orch")
         self.vis.doc.add_next_tick_callback(partial(self.orch.estop_loop))
 
+    def callback_set_stop_message(self, event):
+        self.vis.doc.add_next_tick_callback(partial(self.set_stop_message))
+
     def callback_start_orch(self, event):
         if self.orch.orchstatusmodel.loop_state == OrchStatus.stopped:
             self.vis.print_message("starting orch")
+            self.current_stop_message = ""
             self.vis.doc.add_next_tick_callback(partial(self.orch.start))
         elif self.orch.orchstatusmodel.loop_state == OrchStatus.estop:
             self.vis.print_message("orch is in estop", error=True)
@@ -2679,7 +2683,7 @@ class Operator:
             x, y, size=5, color=None, alpha=0.5, line_color="black", name="PMplot"
         )
 
-    async def set_stop_message(self):
+    def set_stop_message(self):
         self.vis.doc.add_next_tick_callback(
             partial(
                 self.update_text,
@@ -2895,13 +2899,11 @@ class Operator:
             self.orch_status_button.label = "started"
             self.orch_status_button.button_type = "success"
             self.current_stop_message = ""
-            await self.set_stop_message()
 
         elif self.orch.orchstatusmodel.loop_state == OrchStatus.stopped:
             self.orch_status_button.label = "stopped"
             self.orch_status_button.button_type = "success"
             # self.orch_status_button.button_type = "danger"
-            await self.set_stop_message()
         else:
             self.orch_status_button.label = (
                 f"{self.orch.orchstatusmodel.loop_state.value}"
@@ -2914,6 +2916,7 @@ class Operator:
             try:
                 await asyncio.sleep(0.1)
                 self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+                self.vis.doc.add_next_tick_callback(partial(self.set_stop_message))
                 _ = await self.update_q.get()
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
