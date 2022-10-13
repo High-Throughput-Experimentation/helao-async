@@ -996,7 +996,7 @@ class C_specvis:
 
     def cleanup_session(self, session_context):
         self.vis.print_message(
-            f"'{self.potentiostat_key}' Bokeh session closed", info=True
+            f"'{self.spec_key}' Bokeh session closed", info=True
         )
         self.IOloop_data_run = False
         self.IOtask.cancel()
@@ -1156,7 +1156,7 @@ class C_specvis:
             }
             self.data_dict = {}
             self.datasource.data = self.data_dict
-            self._add_plots()
+        self._add_plots()
 
 
 def find_server_names(vis: Vis, fast_key: str) -> list:
