@@ -964,7 +964,7 @@ class C_specvis:
                 [
                     Spacer(width=20),
                     Div(
-                        text=f'<b>Spectrometer Visualizer module for server <a href="http://{specserv_host}:{specserv_port}/docs#/" target="_blank">\'{self.potentiostat_key}\'</a></b>',
+                        text=f'<b>Spectrometer Visualizer module for server <a href="http://{specserv_host}:{specserv_port}/docs#/" target="_blank">\'{self.spec_key}\'</a></b>',
                         width=1004,
                         height=15,
                     ),
