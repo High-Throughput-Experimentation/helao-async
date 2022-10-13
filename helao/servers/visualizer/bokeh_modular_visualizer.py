@@ -925,7 +925,7 @@ class C_specvis:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict = {}
+        self.data_dict = {"channel": []}
 
         self.datasource = ColumnDataSource(data=self.data_dict)
         self.datasource_prev = ColumnDataSource(data=deepcopy(self.data_dict))
@@ -1087,7 +1087,7 @@ class C_specvis:
                 deepcopy(key): deepcopy(val)
                 for key, val in self.datasource.data.items()
             }
-            self.data_dict = {}
+            self.data_dict = {"channel": []}
 
         # update self.data_dict with incoming data package
         for _, data_dict in datapackage.datamodel.data.items():
