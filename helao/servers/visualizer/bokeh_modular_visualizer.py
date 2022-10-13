@@ -969,7 +969,7 @@ class C_specvis:
                         height=15,
                     ),
                 ],
-                [self.input_max_points],
+                [self.input_max_spectra],
                 [
                     Paragraph(text="""x-axis:""", width=500, height=15),
                     Paragraph(text="""y-axis:""", width=500, height=15),
@@ -1002,7 +1002,7 @@ class C_specvis:
         self.IOtask.cancel()
 
     def callback_input_max_spectra(self, attr, old, new, sender):
-        """callback for input_max_points"""
+        """callback for input_max_spectra"""
 
         def to_int(val):
             try:
@@ -1024,10 +1024,10 @@ class C_specvis:
         if newpts > 10000:
             newpts = 10000
 
-        self.max_points = newpts
+        self.max_spectra = newpts
 
         self.vis.doc.add_next_tick_callback(
-            partial(self.update_input_value, sender, f"{self.max_points}")
+            partial(self.update_input_value, sender, f"{self.max_spectra}")
         )
 
     def update_input_value(self, sender, value):
