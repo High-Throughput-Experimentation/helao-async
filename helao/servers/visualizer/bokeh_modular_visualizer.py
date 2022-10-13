@@ -1221,7 +1221,7 @@ def makeBokehApp(doc, confPrefix, servKey, helao_root):
     specservnames = find_server_names(vis=app.vis, fast_key="spec_server")
     specvis = []
     for specservname in specservnames:
-        specvis.append(C_specvis(visServ=app.vis, nidaqmx_key=specservname))
+        specvis.append(C_specvis(visServ=app.vis, spec_key=specservname))
 
     # find all configured PAL servers
     palservnames = find_server_names(vis=app.vis, fast_key="pal_server")
