@@ -1146,7 +1146,7 @@ class C_specvis:
             self.plot_prev.line(
                 x="channel",
                 y=dt,
-                line_color="blue" if i != len(ds_keys) - 1 else "red",
+                line_color="blue" if i != len(dsp_keys) - 1 else "red",
                 source=self.datasource_prev,
                 name=self.prev_action_uuid,
                 legend_label=dt,
