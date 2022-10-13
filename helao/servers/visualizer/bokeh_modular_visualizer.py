@@ -987,7 +987,7 @@ class C_specvis:
         # self.xselect = self.xaxis_selector_group.active
         # self.yselect = self.yaxis_selector_group.active
 
-        self.reset_plot(self.cur_action_uuid, forceupdate=True)
+        self._add_plots()
 
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
