@@ -1035,8 +1035,6 @@ class C_specvis:
 
     def add_points(self, datapackage: DataPackageModel):
 
-        self.reset_plot(str(datapackage.action_uuid))
-
         # update self.data_dict with incoming data package
         for _, data_dict in datapackage.datamodel.data.items():
             # unpack and sort epoch and channels
@@ -1060,6 +1058,7 @@ class C_specvis:
         self.data_dict.update({"channel": list(range(len(ch_vals)))})
 
         self.datasource.data = self.data_dict
+        self.reset_plot(str(datapackage.action_uuid))
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
         self.vis.print_message(
