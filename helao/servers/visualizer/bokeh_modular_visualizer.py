@@ -214,7 +214,7 @@ class C_nidaqmxvis:
         # they are all in sequence of cell1 to cell9 in the dict
         cellnum = 1
 
-        for fileconnkey, data_dict in datapackage.datamodel.data.items():
+        for _, data_dict in datapackage.datamodel.data.items():
             datalen = len(list(data_dict.values())[0])
             for key in data_dict:
                 if key == "t_s" and cellnum == 1:
@@ -493,7 +493,7 @@ class C_potvis:
             delpts = len(self.data_dict[self.data_dict_keys[0]]) - self.max_points
             for key in self.data_dict_keys:
                 del self.data_dict[key][:delpts]
-        for fileconnkey, data_dict in datapackage.datamodel.data.items():
+        for _, data_dict in datapackage.datamodel.data.items():
             datalen = len(list(data_dict.values())[0])
             for key in self.data_dict_keys:
                 _add_helper(
@@ -1057,7 +1057,7 @@ class C_specvis:
                 self.data_dict.pop(key)
 
         # add channel column
-        self.data_dict.update({"channel": [i for i in range(len(ch_vals))]})
+        self.data_dict.update({"channel": list(range(len(ch_vals)))})
 
         self.datasource.data = self.data_dict
 
@@ -1154,7 +1154,7 @@ class C_specvis:
                 deepcopy(key): deepcopy(val)
                 for key, val in self.datasource.data.items()
             }
-            self.data_dict = {key: [] for key in self.data_dict_keys}
+            self.data_dict = {}
             self.datasource.data = self.data_dict
             self._add_plots()
 
