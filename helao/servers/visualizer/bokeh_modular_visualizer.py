@@ -995,9 +995,7 @@ class C_specvis:
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
     def cleanup_session(self, session_context):
-        self.vis.print_message(
-            f"'{self.spec_key}' Bokeh session closed", info=True
-        )
+        self.vis.print_message(f"'{self.spec_key}' Bokeh session closed", info=True)
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
@@ -1032,33 +1030,6 @@ class C_specvis:
 
     def update_input_value(self, sender, value):
         sender.value = value
-
-    def add_points(self, datapackage: DataPackageModel):
-
-        # update self.data_dict with incoming data package
-        for _, data_dict in datapackage.datamodel.data.items():
-            # unpack and sort epoch and channels
-            epoch = data_dict["epoch_ns"]
-            dtstr = datetime.fromtimestamp(epoch / 1e9).strftime("%Y-%m-%d %H:%M:%S.%f")
-            ch_keys = sorted(
-                [k for k in data_dict.keys() if k.startswith("ch_")],
-                key=lambda x: int(x.split("_")[-1]),
-            )
-            ch_vals = [data_dict[k] for k in ch_keys]
-            self.data_dict.update({dtstr: ch_vals})
-
-        # trim number of spectra being plotted
-        if len(self.data_dict.keys()) > self.max_spectra:
-            datetime_keys = sorted(self.data_dict.keys())
-            delpts = len(self.data_dict.keys()) - self.max_spectra
-            for key in datetime_keys[:delpts]:
-                self.data_dict.pop(key)
-
-        # add channel column
-        self.data_dict.update({"channel": list(range(len(ch_vals)))})
-
-        self.datasource.data = self.data_dict
-        self.reset_plot(str(datapackage.action_uuid))
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
         self.vis.print_message(
@@ -1103,6 +1074,45 @@ class C_specvis:
                 self.vis.print_message("IOloop closed", info=True)
                 break
 
+    def add_points(self, datapackage: DataPackageModel):
+        # check if uuid has changed
+        new_action_uuid = str(datapackage.action_uuid)
+        if new_action_uuid != self.cur_action_uuid:
+            self.vis.print_message(" ... reseting Spec graph")
+            self.prev_action_uuid = self.cur_action_uuid
+            self.cur_action_uuid = new_action_uuid
+
+            # copy old data to "prev" plot
+            self.datasource_prev.data = {
+                deepcopy(key): deepcopy(val)
+                for key, val in self.datasource.data.items()
+            }
+            self.data_dict = {}
+
+        # update self.data_dict with incoming data package
+        for _, data_dict in datapackage.datamodel.data.items():
+            # unpack and sort epoch and channels
+            epoch = data_dict["epoch_ns"]
+            dtstr = datetime.fromtimestamp(epoch / 1e9).strftime("%Y-%m-%d %H:%M:%S.%f")
+            ch_keys = sorted(
+                [k for k in data_dict.keys() if k.startswith("ch_")],
+                key=lambda x: int(x.split("_")[-1]),
+            )
+            ch_vals = [data_dict[k] for k in ch_keys]
+            self.data_dict.update({dtstr: ch_vals})
+
+        # trim number of spectra being plotted
+        if len(self.data_dict.keys()) > self.max_spectra:
+            datetime_keys = sorted(self.data_dict.keys())
+            delpts = len(self.data_dict.keys()) - self.max_spectra
+            for key in datetime_keys[:delpts]:
+                self.data_dict.pop(key)
+
+        # add channel column and update datasource
+        self.data_dict.update({"channel": list(range(len(ch_vals)))})
+        self.datasource.data = self.data_dict
+        self._add_plots()
+
     def _add_plots(self):
         # clear legend
         if self.plot.renderers:
@@ -1141,21 +1151,6 @@ class C_specvis:
                 name=self.prev_action_uuid,
                 legend_label=dt,
             )
-
-    def reset_plot(self, new_action_uuid: UUID, forceupdate: bool = False):
-        if (new_action_uuid != self.cur_action_uuid) or forceupdate:
-            self.vis.print_message(" ... reseting Spec graph")
-            self.prev_action_uuid = self.cur_action_uuid
-            self.cur_action_uuid = new_action_uuid
-
-            # copy old data to "prev" plot
-            self.datasource_prev.data = {
-                deepcopy(key): deepcopy(val)
-                for key, val in self.datasource.data.items()
-            }
-            self.data_dict = {}
-            self.datasource.data = self.data_dict
-        self._add_plots()
 
 
 def find_server_names(vis: Vis, fast_key: str) -> list:
