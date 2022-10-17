@@ -25,6 +25,11 @@ class HTELegacyAPI:
             r"J:\hte_jcap_app_proto\plate",
         ]
 
+        self.info_cache = {}
+        self.map_cache = {}
+        self.infopath_cache = {}
+        self.pmpath_pid_cache = {}
+
     def get_rcp_plateid(self, plateid: int):
         self.base.print_message(f" ... get rcp for plateid: {plateid}")
         return None
@@ -41,7 +46,9 @@ class HTELegacyAPI:
 
             # 3. checks that a print and anneal record exist in the info file
             if "prints" not in infod or "anneals" not in infod:
-                self.base.print_message("Warning: no print or anneal record exists", warning=True)
+                self.base.print_message(
+                    "Warning: no print or anneal record exists", warning=True
+                )
 
             # 4. gets platemap and passes to alignment code
             # pmpath=getplatemappath_plateid(plateid, return_pmidstr=True)
@@ -62,7 +69,7 @@ class HTELegacyAPI:
     def check_printrecord_plateid(self, plateid: int):
         infod = self.importinfo(plateid)
         if infod is not None:
-            if not "prints" in infod:
+            if "prints" not in infod:
                 return False
             else:
                 return True
@@ -70,17 +77,21 @@ class HTELegacyAPI:
     def check_annealrecord_plateid(self, plateid: int):
         infod = self.importinfo(plateid)
         if infod is not None:
-            if not "anneals" in infod:
+            if "anneals" not in infod:
                 return False
             else:
                 return True
 
     def get_platemap_plateid(self, plateid: int):
-        pmpath = self.getplatemappath_plateid(plateid)
-        if pmpath is None:
-            return []
-        pmdlist, fid = self.readsingleplatemaptxt(pmpath)
-        return pmdlist
+        if plateid in self.map_cache.keys():
+            return self.map_cache[plateid]
+        else:
+            pmpath = self.getplatemappath_plateid(plateid)
+            if pmpath is None:
+                return []
+            pmdlist, fid = self.readsingleplatemaptxt(pmpath)
+            self.map_cache[plateid] = pmdlist
+            return pmdlist
 
     def get_elements_plateid(
         self,
@@ -96,13 +107,17 @@ class HTELegacyAPI:
             infofiled = self.importinfo(plateid)
             if infofiled is None:
                 return None
+            if plateid in self.els_cache.keys():
+                return self.els_cache[plateid]
         requiredkeysthere = (
-            lambda infofiled, print_key_or_keyword=print_key_or_keyword: ("screening_print_id" in infofiled)
+            lambda infofiled, print_key_or_keyword=print_key_or_keyword: (
+                "screening_print_id" in infofiled
+            )
             if print_key_or_keyword == "screening_print_id"
             else (print_key_or_keyword in infofiled["prints"])
         )
         while not ("prints" in infofiled and requiredkeysthere(infofiled)):
-            if not "lineage" in infofiled or not "," in infofiled["lineage"]:
+            if "lineage" not in infofiled or "," not in infofiled["lineage"]:
                 return None
             parentplateidstr = infofiled["lineage"].split(",")[-2].strip()
             infofiled = self.importinfo(parentplateidstr)
@@ -117,24 +132,29 @@ class HTELegacyAPI:
             printd = printdlist[0]
         else:
             printd = infofiled["prints"][print_key_or_keyword]
-        if not "elements" in printd:
+        if "elements" not in printd:
             return None
-        els = [x for x in printd["elements"].split(",") if x not in exclude_elements_list]
+        els = [
+            x for x in printd["elements"].split(",") if x not in exclude_elements_list
+        ]
 
         if multielementink_concentrationinfo_bool:
-            return (
+            self.els_cache[plateid] = (
                 els,
                 self.get_multielementink_concentrationinfo(
                     printd, els, return_defaults_if_none=return_defaults_if_none
                 ),
             )
 
-        return els
+        self.els_cache[plateid] = els
+
+        return self.els_cache[plateid]
 
     ##########################################################################
     # Helper functions
     ##########################################################################
-    getnumspaces = lambda self, a: len(a) - len(a.lstrip(" "))
+    def getnumspaces(a):
+        return len(a) - len(a.lstrip(" "))
 
     def rcp_to_dict(self, rcppath):  # read standard rcp/exp/ana/info structure to dict
         dlist = []
@@ -210,58 +230,68 @@ class HTELegacyAPI:
         return_pmidstr=False,
         pmidstr=None,
     ):
-        pmfold = self.tryprependpath(self.PLATEMAPFOLDERS, "")
-        self.base.print_message(f"PM folder is {pmfold}", info=True)
-        p = None
-        if pmidstr is None:
-            pmidstr = ""
-            infop = self.getinfopath_plateid(plateid)
-            if infop is None:
-                self.base.print_message("getinfopath_plateid returned None", info=True)
+        if plateid in self.pmpath_pid_cache.keys():
+            p, pmidstr = self.pmpath_pid_cache[plateid]
+        else:
+            pmfold = self.tryprependpath(self.PLATEMAPFOLDERS, "")
+            self.base.print_message(f"PM folder is {pmfold}", info=True)
+            p = None
+            if pmidstr is None:
+                pmidstr = ""
+                infop = self.getinfopath_plateid(plateid)
+                if infop is None:
+                    self.base.print_message("getinfopath_plateid returned None", info=True)
+                    if erroruifcn is not None:
+                        p = erroruifcn("", self.tryprependpath(self.PLATEMAPFOLDERS, ""))
+                    return (p, pmidstr) if return_pmidstr else p
+                self.base.print_message(f"reading {infop}", info=True)
+                with open(infop, mode="r") as f:
+                    s = f.read(1000)
+                if pmfold == "" or (infokey not in s and "prints" not in s):
+                    self.base.print_message(
+                        "PM folder is '' or info has no print.", info=True
+                    )
+                    if erroruifcn is not None:
+                        p = erroruifcn("", self.tryprependpath(self.PLATEMAPFOLDERS, ""))
+                    return (p, pmidstr) if return_pmidstr else p
+                pmidstr = s.partition(infokey)[2].partition("\n")[0].strip()
+                if pmidstr == "" and "prints" in s:
+                    infod = self.rcp_to_dict(infop)
+                    printdlist = [v for k, v in infod["prints"].items()]
+                    printdlist.sort(key=lambda x: int(x["id"]), reverse=True)
+                    printd = printdlist[0]
+                    pmidstr = printd["map_id"]
+            fns = [
+                fn
+                for fn in os.listdir(pmfold)
+                if fn.startswith("0" * (4 - len(pmidstr)) + pmidstr + "-")
+                and fn.endswith("-mp.txt")
+            ]
+            if len(fns) != 1:
                 if erroruifcn is not None:
                     p = erroruifcn("", self.tryprependpath(self.PLATEMAPFOLDERS, ""))
-                return (p, pmidstr) if return_pmidstr else p
-            self.base.print_message(f"reading {infop}", info=True)
-            with open(infop, mode="r") as f:
-                s = f.read(1000)
-            if pmfold == "" or (infokey not in s and "prints" not in s):
-                self.base.print_message(f"PM folder is '' or info has no print.", info=True)
-                if erroruifcn is not None:
-                    p = erroruifcn("", self.tryprependpath(self.PLATEMAPFOLDERS, ""))
-                return (p, pmidstr) if return_pmidstr else p
-            pmidstr = s.partition(infokey)[2].partition("\n")[0].strip()
-            if pmidstr == "" and "prints" in s:
-                infod = self.rcp_to_dict(infop)
-                printdlist = [v for k, v in infod["prints"].items()]
-                printdlist.sort(key=lambda x: int(x["id"]), reverse=True)
-                printd = printdlist[0]
-                pmidstr = printd["map_id"]
-        fns = [
-            fn
-            for fn in os.listdir(pmfold)
-            if fn.startswith("0" * (4 - len(pmidstr)) + pmidstr + "-") and fn.endswith("-mp.txt")
-        ]
-        if len(fns) != 1:
-            if erroruifcn is not None:
-                p = erroruifcn("", self.tryprependpath(self.PLATEMAPFOLDERS, ""))
-            return (p, pmidstr) if return_pmidstr else p
-        p = os.path.join(pmfold, fns[0])
+            p = os.path.join(pmfold, fns[0])
+            self.pmpath_pid_cache[plateid] = (p, pmidstr)
         return (p, pmidstr) if return_pmidstr else p
 
     def importinfo(self, plateid: int):
-        fn = str(plateid) + ".info"
-        p = self.tryprependpath(
-            self.PLATEFOLDERS,
-            os.path.join(str(plateid), fn),
-            testfile=True,
-            testdir=False,
-        )
-        if not os.path.isfile(p):
-            return None
-        with open(p, mode="r") as f:
-            lines = f.readlines()
-        infofiled = self.filedict_lines(lines)
-        return infofiled
+        if plateid in self.info_cache.keys():
+            return self.info_cache[plateid]
+        else:
+            fn = str(plateid) + ".info"
+            p = self.tryprependpath(
+                self.PLATEFOLDERS,
+                os.path.join(str(plateid), fn),
+                testfile=True,
+                testdir=False,
+            )
+            if not os.path.isfile(p):
+                return None
+            with open(p, mode="r") as f:
+                lines = f.readlines()
+            infofiled = self.filedict_lines(lines)
+            self.info_cache[plateid] = infofiled
+            return infofiled
 
     def tryprependpath(self, preppendfolderlist, p, testfile=True, testdir=True):
         # if (testfile and os.path.isfile(p)) or (testdir and os.path.isdir(p)):
@@ -275,16 +305,20 @@ class HTELegacyAPI:
         return ""
 
     def getinfopath_plateid(self, plateid: int, erroruifcn=None):
-        p = ""
-        fld = os.path.join(self.tryprependpath(self.PLATEFOLDERS, ""), str(plateid))
-        if os.path.isdir(fld):
-            l = [fn for fn in os.listdir(fld) if fn.endswith("info")] + ["None"]
-            p = os.path.join(fld, l[0])
-        if (not os.path.isfile(p)) and not erroruifcn is None:
-            p = erroruifcn("", "")
-        if not os.path.isfile(p):
-            return None
-        return p
+        if plateid in self.infopath_cache.keys():
+            return self.infopath_cache[plateid]
+        else:
+            p = ""
+            fld = os.path.join(self.tryprependpath(self.PLATEFOLDERS, ""), str(plateid))
+            if os.path.isdir(fld):
+                l = [fn for fn in os.listdir(fld) if fn.endswith("info")] + ["None"]
+                p = os.path.join(fld, l[0])
+            if (not os.path.isfile(p)) and erroruifcn is not None:
+                p = erroruifcn("", "")
+            if not os.path.isfile(p):
+                return None
+            self.infopath_cache[plateid] = p
+            return p
 
     def filedict_lines(self, lines):
         lines = [l for l in lines if len(l.strip()) > 0]
@@ -318,7 +352,9 @@ class HTELegacyAPI:
         searchstr2 = "concentration_values"
         if not (searchstr1 in printd and searchstr2 in printd):
             if return_defaults_if_none:
-                nels_printchannels = [len(regexcompile("[A-Z][a-z]*").findall(el)) for el in els]
+                nels_printchannels = [
+                    len(regexcompile("[A-Z][a-z]*").findall(el)) for el in els
+                ]
                 if max(nels_printchannels) > 1:
                     return (
                         True,
@@ -328,10 +364,12 @@ class HTELegacyAPI:
                 if len(els_set) < len(
                     els
                 ):  # only known cases of this (same element used in multiple print channels and no concentration info provided) is when Co printed in library and as internal reference, in which case 2 channels never printed together but make code assume each ink with equal concentration regardless of duplicates
-                    conc_el_chan = numpy.zeros((len(els_set), len(els)), dtype="float64")
+                    conc_el_chan = numpy.zeros(
+                        (len(els_set), len(els)), dtype="float64"
+                    )
                     cels_set_ordered = []
                     for j, cel in enumerate(els):  # assume
-                        if not cel in cels_set_ordered:
+                        if cel not in cels_set_ordered:
                             cels_set_ordered += [cel]
                         i = cels_set_ordered.index(cel)
                         conc_el_chan[i, j] = 1
@@ -351,7 +389,11 @@ class HTELegacyAPI:
             conclist[0] != cv for cv in conclist
         ]:  # concentrations available where an element is used multiple times. or 1 of the concentrations is different from the rest
             els_printchannels = [regexcompile("[A-Z][a-z]*").findall(el) for el in els]
-            els_tuplist = [(el, i, j) for i, l in enumerate(els_printchannels) for j, el in enumerate(l)]
+            els_tuplist = [
+                (el, i, j)
+                for i, l in enumerate(els_printchannels)
+                for j, el in enumerate(l)
+            ]
             cels_tuplist = []
             for cel in cels:
                 while len(els_tuplist) > 0:
@@ -366,7 +408,7 @@ class HTELegacyAPI:
                 )
             cels_set_ordered = []
             for cel, chanind, ind_elwithinchan in cels_tuplist:
-                if not cel in cels_set_ordered:
+                if cel not in cels_set_ordered:
                     cels_set_ordered += [cel]
 
             conc_el_chan = numpy.zeros(
@@ -400,7 +442,11 @@ class HTELegacyAPI:
         return c
 
     def readsingleplatemaptxt(
-        self, p, returnfiducials: Optional[bool] = False, erroruifcn=None, lines: Optional[list] = None
+        self,
+        p,
+        returnfiducials: Optional[bool] = False,
+        erroruifcn=None,
+        lines: Optional[list] = None,
     ):
 
         dlist = []
@@ -424,7 +470,7 @@ class HTELegacyAPI:
         if returnfiducials:
             s = ls[0].partition("=")[2].partition("mm")[0].strip()
             if (
-                not "," in s[s.find("(") : s.find(")")]
+                "," not in s[s.find("(") : s.find(")")]
             ):  # needed because sometimes x,y in fiducials is comma delim and sometimes not
                 self.base.print_message(
                     "WARNING: commas inserted into fiducials line to adhere to format.",
@@ -495,7 +541,7 @@ class HTELegacyAPI:
             d = dict([(k, self.myeval(s.strip())) for k, s in zip(keys, sl)])
             dlist += [d]
 
-        if not "sample_no" in keys:
+        if "sample_no" not in keys:
             dlist = [dict(d, sample_no=d["Sample"]) for d in dlist]
 
         return dlist, fid
