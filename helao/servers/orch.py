@@ -1530,7 +1530,6 @@ class Operator:
         self.experiments = []
         self.experiment_lib = self.orch.experiment_lib
 
-
         # FastAPI calls
         self.get_sequence_lib()
         self.get_experiment_lib()
@@ -1695,7 +1694,7 @@ class Operator:
         )
 
         self.orch_section = Div(
-            text=f"<b>Orch:</b>",
+            text="<b>Orch:</b>",
             width=self.max_width - 20,
             height=32,
             style={"font-size": "150%", "color": "red"},
@@ -2055,7 +2054,7 @@ class Operator:
             )
 
         self.sequence_source.data = self.sequence_list
-        self.vis.print_message(f"current queued sequences: {self.sequence_list}")
+        self.vis.print_message(f"current queued sequences: {self.sequence_list[:5]}... ({len(self.sequence_list)})")
 
     async def get_experiments(self):
         """get experiment list from orch"""
@@ -2073,7 +2072,7 @@ class Operator:
             )
 
         self.experiment_source.data = self.experiment_list
-        self.vis.print_message(f"current queued experiments: {self.experiment_list}")
+        self.vis.print_message(f"current queued experiments: {self.experiment_list[:5]}... ({len(self.experiment_list)})")
 
     async def get_actions(self):
         """get action list from orch"""
@@ -2088,7 +2087,7 @@ class Operator:
             self.action_list["action_uuid"].append(actdict.get("action_uuid", None))
 
         self.action_source.data = self.action_list
-        self.vis.print_message(f"current queued actions: {self.action_list}")
+        self.vis.print_message(f"current queued actions: {self.action_list[:5]}... ({len(self.action_list)})")
 
     async def get_active_actions(self):
         """get action list from orch"""
