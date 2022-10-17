@@ -1207,13 +1207,13 @@ class Orch(Base):
             self.experiment_dq.append(D)
             self.print_message(f"experiment {D.experiment_name} appended to queue")
 
-    def list_sequences(self):
+    def list_sequences(self, limit=10):
         """Return the current queue of sequence_dq."""
-        return [sequence.get_seq() for sequence in self.sequence_dq]
+        return [self.sequence_dq[i].get_seq() for i in range(min(len(self.sequence_dq), limit))]
 
-    def list_experiments(self):
+    def list_experiments(self, limit=10):
         """Return the current queue of experiment_dq."""
-        return [experiment.get_exp() for experiment in self.experiment_dq]
+        return [self.experiment_dq[i].get_exp() for i in range(min(len(self.experiment_dq), limit))]
 
     def get_experiment(self, last=False):
         """Return the active or last experiment."""
@@ -1233,9 +1233,9 @@ class Orch(Base):
             for uuid, statusmodel in self.orchstatusmodel.active_dict.items()
         ]
 
-    def list_actions(self):
+    def list_actions(self, limit=10):
         """Return the current queue of action_dq."""
-        return [action.get_act() for action in self.action_dq]
+        return [self.action_dq[i].get_act() for i in range(min(len(self.action_dq), limit))]
 
     def supplement_error_action(self, check_uuid: UUID, sup_action: Action):
         """Insert action at front of action queue with
@@ -1268,9 +1268,9 @@ class Orch(Base):
         self, by_index: Optional[int] = None, by_uuid: Optional[UUID] = None
     ):
         """Remove experiment in list by enumeration index or uuid."""
-        if by_index:
+        if by_index is not None:
             i = by_index
-        elif by_uuid:
+        elif by_uuid is not None:
             i = [
                 i
                 for i, D in enumerate(list(self.experiment_dq))
