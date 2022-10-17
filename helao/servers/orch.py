@@ -894,12 +894,12 @@ class Orch(Base):
             while self.orchstatusmodel.loop_state == OrchStatus.started and (
                 self.action_dq or self.experiment_dq or self.sequence_dq
             ):
-                self.print_message(f"current content of action_dq: {list(self.action_dq)[:5]}... ({len(self.action_dq)})")
+                self.print_message(f"current content of action_dq: {[self.action_dq[i] for i in range(min(len(self.action_dq), 5))]}... ({len(self.action_dq)})")
                 self.print_message(
-                    f"current content of experiment_dq: {list(self.experiment_dq)[:5]}... ({len(self.experiment_dq)})"
+                    f"current content of experiment_dq: {[self.experiment_dq[i] for i in range(min(len(self.experiment_dq), 5))]}... ({len(self.experiment_dq)})"
                 )
                 self.print_message(
-                    f"current content of sequence_dq: {list(self.sequence_dq)[:5]}... ({len(self.sequence_dq)})"
+                    f"current content of sequence_dq: {[self.sequence_dq[i] for i in range(min(len(self.sequence_dq[i]), 5))]}... ({len(self.sequence_dq)})"
                 )
                 # await asyncio.sleep(0.001)
 
