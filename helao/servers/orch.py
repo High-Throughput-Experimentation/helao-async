@@ -899,7 +899,7 @@ class Orch(Base):
                     f"current content of experiment_dq: {[self.experiment_dq[i] for i in range(min(len(self.experiment_dq), 5))]}... ({len(self.experiment_dq)})"
                 )
                 self.print_message(
-                    f"current content of sequence_dq: {[self.sequence_dq[i] for i in range(min(len(self.sequence_dq[i]), 5))]}... ({len(self.sequence_dq)})"
+                    f"current content of sequence_dq: {[self.sequence_dq[i] for i in range(min(len(self.sequence_dq), 5))]}... ({len(self.sequence_dq)})"
                 )
                 # await asyncio.sleep(0.001)
 
