@@ -618,12 +618,12 @@ class Orch(Base):
         self.print_message("finishing last active experiment first")
         await self.finish_active_experiment()
 
-        self.print_message("getting new experiment to fill action_dq")
+        # self.print_message("getting new experiment to fill action_dq")
         # generate uids when populating,
         # generate timestamp when acquring
         self.active_experiment = self.experiment_dq.popleft()
 
-        self.print_message("copying global vars to experiment")
+        # self.print_message("copying global vars to experiment")
         # copy requested global param to experiment params
         for k, v in self.active_experiment.from_globalseq_params.items():
             self.print_message(f"{k}:{v}")
@@ -660,7 +660,7 @@ class Orch(Base):
             self.action_dq = deque([])
             return ErrorCodes.none
 
-        self.print_message("setting action order")
+        # self.print_message("setting action order")
         for i, act in enumerate(unpacked_acts):
             # init uuid now for tracking later
             act.action_uuid = gen_uuid()
@@ -670,7 +670,7 @@ class Orch(Base):
             act.orch_submit_order = int(i)
 
         # TODO:update experiment code
-        self.print_message("adding unpacked actions to action_dq")
+        # self.print_message("adding unpacked actions to action_dq")
         self.action_dq = deque(unpacked_acts)
         self.print_message(f"got: {self.action_dq}")
         self.print_message(
@@ -682,7 +682,7 @@ class Orch(Base):
         return ErrorCodes.none
 
     async def loop_task_dispatch_action(self) -> ErrorCodes:
-        self.print_message("actions in action_dq, processing them")
+        # self.print_message("actions in action_dq, processing them")
         if self.orchstatusmodel.loop_intent == OrchStatus.stop:
             self.print_message("stopping orchestrator")
             # monitor status of running action_dq, then end loop
@@ -742,7 +742,7 @@ class Orch(Base):
                 else:  # unsupported value
                     await self.orch_wait_for_all_actions()
 
-            self.print_message("copying global vars to action")
+            # self.print_message("copying global vars to action")
             # copy requested global param to action params
             for k, v in A.from_globalexp_params.items():
                 self.print_message(f"{k}:{v}")
@@ -839,9 +839,9 @@ class Orch(Base):
 
             if result_action.to_globalexp_params:
                 if isinstance(result_action.to_globalexp_params, list):
-                    self.print_message(
-                        f"copying global vars {', '.join(result_action.to_globalexp_params)} back to experiment"
-                    )
+                    # self.print_message(
+                    #     f"copying global vars {', '.join(result_action.to_globalexp_params)} back to experiment"
+                    # )
                     for k in result_action.to_globalexp_params:
                         if k in result_action.action_params:
                             if (
@@ -856,9 +856,9 @@ class Orch(Base):
                                     {k: result_action.action_params[k]}
                                 )
                 elif isinstance(result_action.to_globalexp_params, dict):
-                    self.print_message(
-                        f"copying global vars {', '.join(result_action.to_globalexp_params.keys())} back to experiment"
-                    )
+                    # self.print_message(
+                    #     f"copying global vars {', '.join(result_action.to_globalexp_params.keys())} back to experiment"
+                    # )
                     for k1, k2 in result_action.to_globalexp_params.items():
                         if k1 in result_action.action_params:
                             if (
@@ -873,7 +873,7 @@ class Orch(Base):
                                     {k2: result_action.action_params[k1]}
                                 )
 
-                self.print_message("done copying global vars back to experiment")
+                # self.print_message("done copying global vars back to experiment")
 
         return ErrorCodes.none
 
@@ -883,10 +883,10 @@ class Orch(Base):
         self.print_message("--- started operator orch ---")
         self.print_message(f"current orch status: {self.orchstatusmodel.orch_state}")
         # clause for resuming paused action list
-        self.print_message(f"current orch sequences: {list(self.sequence_dq)[:5]}... ({len(self.sequence_dq)})")
-        self.print_message(f"current orch descisions: {list(self.experiment_dq)[:5]}... ({len(self.experiment_dq)})")
-        self.print_message(f"current orch actions: {list(self.action_dq)[:5]}... ({len(self.action_dq)})")
-        self.print_message("--- resuming orch loop now ---")
+        # self.print_message(f"current orch sequences: {list(self.sequence_dq)[:5]}... ({len(self.sequence_dq)})")
+        # self.print_message(f"current orch descisions: {list(self.experiment_dq)[:5]}... ({len(self.experiment_dq)})")
+        # self.print_message(f"current orch actions: {list(self.action_dq)[:5]}... ({len(self.action_dq)})")
+        # self.print_message("--- resuming orch loop now ---")
 
         self.orchstatusmodel.loop_state = OrchStatus.started
 
@@ -981,7 +981,7 @@ class Orch(Base):
     async def orch_wait_for_all_actions(self):
         """waits for all action assigned to this orch to finish"""
 
-        self.print_message("orch is waiting for all action_dq to finish")
+        # self.print_message("orch is waiting for all action_dq to finish")
 
         # some actions are active
         # we need to wait for them to finish
@@ -992,9 +992,9 @@ class Orch(Base):
             # we check again once the active action
             # updates its status again
             await self.wait_for_interrupt()
-            self.print_message("got status update")
+            # self.print_message("got status update")
             # we got a status update
-        self.print_message("all actions are idle")
+        # self.print_message("all actions are idle")
 
     async def start(self):
         """Begin experimenting experiment and action queues."""
