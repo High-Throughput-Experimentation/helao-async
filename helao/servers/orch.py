@@ -2054,7 +2054,7 @@ class Operator:
             )
 
         self.sequence_source.data = self.sequence_list
-        self.vis.print_message(f"current queued sequences: {self.sequence_list[:5]}... ({len(self.sequence_list)})")
+        self.vis.print_message(f"current queued sequences: ({len(self.sequence_list)})")
 
     async def get_experiments(self):
         """get experiment list from orch"""
@@ -2072,7 +2072,7 @@ class Operator:
             )
 
         self.experiment_source.data = self.experiment_list
-        self.vis.print_message(f"current queued experiments: {self.experiment_list[:5]}... ({len(self.experiment_list)})")
+        self.vis.print_message(f"current queued experiments: ({len(self.experiment_list)})")
 
     async def get_actions(self):
         """get action list from orch"""
@@ -2087,7 +2087,7 @@ class Operator:
             self.action_list["action_uuid"].append(actdict.get("action_uuid", None))
 
         self.action_source.data = self.action_list
-        self.vis.print_message(f"current queued actions: {self.action_list[:5]}... ({len(self.action_list)})")
+        self.vis.print_message(f"current queued actions: ({len(self.action_list)})")
 
     async def get_active_actions(self):
         """get action list from orch"""
