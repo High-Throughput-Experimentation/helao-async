@@ -145,15 +145,14 @@ class HTELegacyAPI:
                     printd, els, return_defaults_if_none=return_defaults_if_none
                 ),
             )
-
-        self.els_cache[plateid] = els
-
+        else:
+            self.els_cache[plateid] = els
         return self.els_cache[plateid]
 
     ##########################################################################
     # Helper functions
     ##########################################################################
-    def getnumspaces(a):
+    def getnumspaces(self, a):
         return len(a) - len(a.lstrip(" "))
 
     def rcp_to_dict(self, rcppath):  # read standard rcp/exp/ana/info structure to dict
