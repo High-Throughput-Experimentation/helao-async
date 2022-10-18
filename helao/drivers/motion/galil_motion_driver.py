@@ -284,14 +284,14 @@ class Galil:
 
             # set absolute zero to current position
             q = self.galilcmd("TP")  # query position of all axis
-            self.base.print_message(f"q1: {q}")
+            # self.base.print_message(f"q1: {q}")
             cmd = "DP "
             for i in range(len(q.split(","))):
                 if i == 0:
                     cmd += "0"
                 else:
                     cmd += ",0"
-            self.base.print_message(f"cmd: {cmd}")
+            # self.base.print_message(f"cmd: {cmd}")
 
             # sets abs zero here
             _ = self.galilcmd(cmd)
@@ -673,7 +673,7 @@ class Galil:
                 for cmd in cmd_seq:
                     _ = self.galilcmd(cmd)
                     # ret.join(_)
-                self.base.print_message(f"Galil cmd: {cmd_seq}")
+                # self.base.print_message(f"Galil cmd: {cmd_seq}")
                 ret_moved_axis.append(axl)
                 ret_speed.append(speed)
                 ret_accepted_rel_dist.append(None)

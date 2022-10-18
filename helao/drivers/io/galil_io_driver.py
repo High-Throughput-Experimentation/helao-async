@@ -123,7 +123,7 @@ class Galil:
         ret = None
         if ai_name in self.dev_ai and self.dev_ai[ai_name] == ai_port:
             cmd = f"MG @AN[{int(ai_port)}]"
-            self.base.print_message(f"cmd: '{cmd}'", info=True)
+            # self.base.print_message(f"cmd: '{cmd}'", info=True)
             ret = self.galilcmd(cmd)
         else:
             err_code = ErrorCodes.not_available
@@ -143,7 +143,7 @@ class Galil:
         ret = None
         if di_name in self.dev_di and self.dev_di[di_name] == di_port:
             cmd = f"MG @IN[{int(di_port)}]"
-            self.base.print_message(f"cmd: '{cmd}'", info=True)
+            # self.base.print_message(f"cmd: '{cmd}'", info=True)
             ret = self.galilcmd(cmd)
         else:
             err_code = ErrorCodes.not_available
@@ -163,7 +163,7 @@ class Galil:
         ret = None
         if do_name in self.dev_do and self.dev_do[do_name] == do_port:
             cmd = f"MG @OUT[{int(do_port)}]"
-            self.base.print_message(f"cmd: '{cmd}'", info=True)
+            # self.base.print_message(f"cmd: '{cmd}'", info=True)
             ret = self.galilcmd(cmd)
         else:
             err_code = ErrorCodes.not_available
@@ -208,10 +208,10 @@ class Galil:
                 cmd = f"SB {int(do_port)}"
             else:
                 cmd = f"CB {int(do_port)}"
-            self.base.print_message(f"cmd: '{cmd}'", info=True)
+            # self.base.print_message(f"cmd: '{cmd}'", info=True)
             _ = self.galilcmd(cmd)
             cmd = f"MG @OUT[{int(do_port)}]"
-            self.base.print_message(f"cmd: '{cmd}'", info=True)
+            # self.base.print_message(f"cmd: '{cmd}'", info=True)
             ret = self.galilcmd(cmd)
         else:
             err_code = ErrorCodes.not_available
