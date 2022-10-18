@@ -759,7 +759,8 @@ def ADSS_sub_CV(
 
 def ADSS_sub_OCV(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
+    Tval__s: Optional[float] = 60.0,
 ):
 
     sq = ActionPlanMaker()  # exposes function parameters via sq.pars
@@ -785,7 +786,7 @@ def ADSS_sub_OCV(
             "action_server": PSTAT_server,
             "action_name": "run_OCV",
             "action_params": {
-                "Tval__s": 1,
+                "Tval__s": sq.pars.Tval__s,
                 "SampleRate": 0.05,
                 "IErange": "auto",
             },
