@@ -342,6 +342,7 @@ class Orch(Base):
         self.active_experiment = None
         self.last_experiment = None
         self.active_sequence = None
+        self.active_seq_exp_counter = 0
         self.last_sequence = None
         self.bokehapp = None
         self.orch_op = None
@@ -622,6 +623,7 @@ class Orch(Base):
         # generate uids when populating,
         # generate timestamp when acquring
         self.active_experiment = self.experiment_dq.popleft()
+        self.active_seq_exp_counter += 1
 
         # self.print_message("copying global vars to experiment")
         # copy requested global param to experiment params
@@ -894,7 +896,9 @@ class Orch(Base):
             while self.orchstatusmodel.loop_state == OrchStatus.started and (
                 self.action_dq or self.experiment_dq or self.sequence_dq
             ):
-                self.print_message(f"current content of action_dq: {[self.action_dq[i] for i in range(min(len(self.action_dq), 5))]}... ({len(self.action_dq)})")
+                self.print_message(
+                    f"current content of action_dq: {[self.action_dq[i] for i in range(min(len(self.action_dq), 5))]}... ({len(self.action_dq)})"
+                )
                 self.print_message(
                     f"current content of experiment_dq: {[self.experiment_dq[i] for i in range(min(len(self.experiment_dq), 5))]}... ({len(self.experiment_dq)})"
                 )
@@ -1209,11 +1213,17 @@ class Orch(Base):
 
     def list_sequences(self, limit=10):
         """Return the current queue of sequence_dq."""
-        return [self.sequence_dq[i].get_seq() for i in range(min(len(self.sequence_dq), limit))]
+        return [
+            self.sequence_dq[i].get_seq()
+            for i in range(min(len(self.sequence_dq), limit))
+        ]
 
     def list_experiments(self, limit=10):
         """Return the current queue of experiment_dq."""
-        return [self.experiment_dq[i].get_exp() for i in range(min(len(self.experiment_dq), limit))]
+        return [
+            self.experiment_dq[i].get_exp()
+            for i in range(min(len(self.experiment_dq), limit))
+        ]
 
     def get_experiment(self, last=False):
         """Return the active or last experiment."""
@@ -1235,7 +1245,9 @@ class Orch(Base):
 
     def list_actions(self, limit=10):
         """Return the current queue of action_dq."""
-        return [self.action_dq[i].get_act() for i in range(min(len(self.action_dq), limit))]
+        return [
+            self.action_dq[i].get_act() for i in range(min(len(self.action_dq), limit))
+        ]
 
     def supplement_error_action(self, check_uuid: UUID, sup_action: Action):
         """Insert action at front of action queue with
@@ -1348,6 +1360,7 @@ class Orch(Base):
             await self.write_seq(self.active_sequence)
             self.last_sequence = deepcopy(self.active_sequence)
             self.active_sequence = None
+            self.active_seq_exp_counter = 0
 
             self.orchstatusmodel.counter_dispatched_actions = {}
 
@@ -1402,7 +1415,11 @@ class Orch(Base):
         await self.write_exp(self.active_experiment)
 
     async def write_active_sequence_seq(self):
-        await self.write_seq(self.active_sequence)
+        if self.active_seq_exp_counter > 1:
+            active_exp = self.active_experiment.get_exp()
+            await self.append_exp_to_seq(active_exp, self.active_sequence)
+        else:
+            await self.write_seq(self.active_sequence)
 
     async def shutdown(self):
         await self.detach_subscribers()
@@ -2072,7 +2089,9 @@ class Operator:
             )
 
         self.experiment_source.data = self.experiment_list
-        self.vis.print_message(f"current queued experiments: ({len(self.experiment_list)})")
+        self.vis.print_message(
+            f"current queued experiments: ({len(self.experiment_list)})"
+        )
 
     async def get_actions(self):
         """get action list from orch"""
@@ -2886,7 +2905,11 @@ class Operator:
             self.orch_status_button.label = "started"
             self.orch_status_button.button_type = "success"
         elif self.orch.orchstatusmodel.loop_state == OrchStatus.stopped:
-            stop_msg = ': ' + self.orch.current_stop_message if self.orch.current_stop_message != '' else ''
+            stop_msg = (
+                ": " + self.orch.current_stop_message
+                if self.orch.current_stop_message != ""
+                else ""
+            )
             self.orch_status_button.label = f"stopped{stop_msg}"
             self.orch_status_button.button_type = "success"
             # self.orch_status_button.button_type = "danger"
@@ -2895,7 +2918,6 @@ class Operator:
                 f"{self.orch.orchstatusmodel.loop_state.value}"
             )
             self.orch_status_button.button_type = "danger"
-
 
     async def IOloop(self):
         self.IOloop_run = True

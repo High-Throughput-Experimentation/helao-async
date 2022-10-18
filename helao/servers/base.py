@@ -496,7 +496,11 @@ class Base(object):
         action_name: Optional[str] = None,
     ) -> bool:
         # needs private dispatcher
-        json_dict = {"actionservermodel": self.actionservermodel.get_fastapi_json(action_name=action_name)}
+        json_dict = {
+            "actionservermodel": self.actionservermodel.get_fastapi_json(
+                action_name=action_name
+            )
+        }
         response, error_code = await async_private_dispatcher(
             world_config_dict=self.world_cfg,
             server=client_servkey,
@@ -642,7 +646,9 @@ class Base(object):
                 self.actionservermodel.last_action_uuid = status_msg.act.action_uuid
 
                 # sort the status (nonactive_dict is empty at this point)
-                self.actionservermodel.endpoints[status_msg.act.action_name].sort_status()
+                self.actionservermodel.endpoints[
+                    status_msg.act.action_name
+                ].sort_status()
                 self.print_message(
                     f"log_status_task sending status "
                     f"{status_msg.act.action_status} for action "
@@ -678,7 +684,9 @@ class Base(object):
                         )
                 # now delete the errored and finsihed statuses after
                 # all are send to the subscribers
-                self.actionservermodel.endpoints[status_msg.act.action_name].clear_finished()
+                self.actionservermodel.endpoints[
+                    status_msg.act.action_name
+                ].clear_finished()
                 # TODO:write to log if save_root exists
                 self.print_message("all log_status_task messages send.")
 
@@ -832,6 +840,26 @@ class Base(object):
             if not output_str.endswith("\n"):
                 output_str += "\n"
             await f.write(output_str)
+
+    async def append_exp_to_seq(self, exp, seq):
+        append_dict = {
+            "experiment_uuid": str(exp.experiment_uuid),
+            "experiment_name": exp.experiment_name,
+            "experiment_output_dir": exp.experiment_output_dir,
+        }
+        append_str = (
+            "\n".join(["  " + x for x in pyaml.dump([append_dict]).split("\n")][:-1])
+            + "\n"
+        )
+        sequence_dir = seq.get_sequence_dir()
+        save_root = self.helaodirs.save_root
+        output_path = os.path.join(save_root, sequence_dir)
+        output_file = os.path.join(
+            output_path,
+            f"{seq.sequence_timestamp.strftime('%Y%m%d.%H%M%S%f')}.yml",
+        )
+        async with aiofiles.open(output_file, mode="a") as f:
+            await f.write(append_str)
 
     def new_file_conn_key(self, key: str) -> UUID:
         # return shortuuid.decode(key)
