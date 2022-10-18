@@ -623,8 +623,8 @@ def ADSS_sub_CA(
     experiment: Experiment,
     experiment_version: int = 2,
     CA_potential: Optional[float] = 0.0,
-    ph: float = 9.53,
-    ref_vs_nhe: float = 0.21,
+    ph: Optional[float] = 9.53,
+    ref_vs_nhe: Optional[float] = 0.21,
     samplerate_sec: Optional[float] = .05,
     CA_duration_sec: Optional[float] = 1800,
 ):
