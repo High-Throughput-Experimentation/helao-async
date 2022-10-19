@@ -703,7 +703,7 @@ class Base(object):
     async def detach_subscribers(self):
         await self.status_q.put(StopAsyncIteration)
         await self.data_q.put(StopAsyncIteration)
-        await asyncio.sleep(5)
+        await asyncio.sleep(1)
 
     async def get_realtime(
         self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
@@ -733,30 +733,30 @@ class Base(object):
         self.sync_ntp_task_run = True
         try:
             while self.sync_ntp_task_run:
-                await asyncio.sleep(10)
-                lock = asyncio.Lock()
-                async with lock:
-                    ntp_last_sync = ""
-                    if self.ntp_last_sync_file is not None:
-                        async with aiofiles.open(self.ntp_last_sync_file, "r") as f:
-                            ntp_last_sync = await f.readline()
-                    parts = ntp_last_sync.strip().split(",")
-                    if len(parts) == 2:
-                        self.ntp_last_sync = float(parts[0])
-                        self.ntp_offset = float(parts[1])
-                    else:
-                        self.ntp_last_sync = float(parts[0])
-                        self.ntp_offset = 0.0
-                    if time() - self.ntp_last_sync > resync_time:
-                        # self.print_message(
-                        #     f"last time check was more then {resync_time/60.0:.1f} minutes ago, syncing time again."
-                        # )
-                        await self.get_ntp_time()
-                    else:
-                        # wait_time = time() - self.ntp_last_sync
-                        wait_time = resync_time
-                        # self.print_message(f"waiting {wait_time} until next time check")
-                        await asyncio.sleep(wait_time)
+                # await asyncio.sleep(10)
+                # lock = asyncio.Lock()
+                # async with lock:
+                ntp_last_sync = ""
+                if self.ntp_last_sync_file is not None:
+                    async with aiofiles.open(self.ntp_last_sync_file, "r") as f:
+                        ntp_last_sync = await f.readline()
+                parts = ntp_last_sync.strip().split(",")
+                if len(parts) == 2:
+                    self.ntp_last_sync = float(parts[0])
+                    self.ntp_offset = float(parts[1])
+                else:
+                    self.ntp_last_sync = float(parts[0])
+                    self.ntp_offset = 0.0
+                if time() - self.ntp_last_sync > resync_time:
+                    # self.print_message(
+                    #     f"last time check was more then {resync_time/60.0:.1f} minutes ago, syncing time again."
+                    # )
+                    await self.get_ntp_time()
+                else:
+                    # wait_time = time() - self.ntp_last_sync
+                    wait_time = resync_time
+                    # self.print_message(f"waiting {wait_time} until next time check")
+                    await asyncio.sleep(wait_time)
         except asyncio.CancelledError:
             self.print_message("ntp sync task was cancelled", info=True)
 
