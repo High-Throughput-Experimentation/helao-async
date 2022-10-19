@@ -959,7 +959,7 @@ class YmlOps:
                         self.dbp.base.print_message(
                             f"[{i+1}/{retry_num}] {api_str} {p_uuid} response: {last_response}"
                         )
-                    await asyncio.sleep(1)
+                    # await asyncio.sleep(1)
 
         if pdict["api"]:
             # self.dbp.base.print_message(f"{api_str} {p_uuid} success")
