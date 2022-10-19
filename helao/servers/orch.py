@@ -595,9 +595,9 @@ class Orch(Base):
             # todo: use seq model instead to initialize some parameters
             # of the experiment
             for experimenttemplate in self.active_sequence.experiment_plan_list:
-                self.print_message(
-                    f"unpack experiment {experimenttemplate.experiment_name}"
-                )
+                # self.print_message(
+                #     f"unpack experiment {experimenttemplate.experiment_name}"
+                # )
                 await self.add_experiment(
                     seq=self.seq_file,
                     experimenttemplate=experimenttemplate,
@@ -651,9 +651,9 @@ class Orch(Base):
 
         # additional experiment params should be stored
         # in experiment.experiment_params
-        self.print_message(
-            f"unpacking actions for {self.active_experiment.experiment_name}"
-        )
+        # self.print_message(
+        #     f"unpacking actions for {self.active_experiment.experiment_name}"
+        # )
         unpacked_acts = self.experiment_lib[self.active_experiment.experiment_name](
             self.active_experiment
         )
