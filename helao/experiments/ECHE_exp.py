@@ -224,7 +224,7 @@ def ECHE_sub_shutdown(experiment: Experiment):
 
 def ECHE_sub_CA_led(
     experiment: Experiment,
-    experiment_version: int = 4,
+    experiment_version: int = 3,
     CA_potential_vsRHE: Optional[float] = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -232,7 +232,7 @@ def ECHE_sub_CA_led(
     solution_bubble_gas: str = "O2",
     measurement_area: float = 0.071,  # 3mm diameter droplet
     ref_electrode_type: str = "NHE",
-    ref_type: Optional[str] = "inhouse",
+    ref_vs_nhe: float = 0.21,
     samplerate_sec: Optional[float] = 0.1,
     CA_duration_sec: Optional[float] = 60,
     gamry_i_range: Optional[str] = "auto",
@@ -443,7 +443,7 @@ def ECHE_sub_CA(
     solution_bubble_gas: str = "O2",
     measurement_area: float = 0.071,  # 3mm diameter droplet
     ref_electrode_type: str = "NHE",
-    ref_type: Optional[str] = "inhouse",
+    ref_vs_nhe: float = 0.21,
     samplerate_sec: Optional[float] = 0.1,
     CA_duration_sec: Optional[float] = 60,
     gamry_i_range: Optional[str] = "auto",
@@ -521,7 +521,7 @@ def ECHE_sub_CV_led(
     solution_bubble_gas: str = "O2",
     measurement_area: float = 0.071,  # 3mm diameter droplet
     ref_electrode_type: str = "NHE",
-    ref_type: Optional[str] = "inhouse",
+    ref_vs_nhe: float = 0.21,
     illumination_source: Optional[str] = "doric_led1",
     illumination_wavelength: Optional[float] = 0.0,
     illumination_intensity: Optional[float] = 0.0,
@@ -664,7 +664,7 @@ def ECHE_sub_CV(
     solution_bubble_gas: str = "O2",
     measurement_area: float = 0.071,  # 3mm diameter droplet
     ref_electrode_type: str = "NHE",
-    ref_type: Optional[str] = "inhouse",
+    ref_vs_nhe: float = 0.21,
     comment: Optional[str] = "",
 ):
     """last functionality test: -"""
@@ -734,7 +734,7 @@ def ECHE_sub_CP(
     solution_bubble_gas: str = "O2",
     measurement_area: float = 0.071,  # 3mm diameter droplet
     ref_electrode_type: str = "NHE",
-    ref_type: Optional[str] = "inhouse",
+    ref_vs_nhe: float = 0.21,
     samplerate_sec: Optional[float] = 0.1,
     CP_duration_sec: Optional[float] = 60,
     gamry_i_range: Optional[str] = "auto",
@@ -799,7 +799,7 @@ def ECHE_sub_CP_led(
     solution_bubble_gas: str = "O2",
     measurement_area: float = 0.071,  # 3mm diameter droplet
     ref_electrode_type: str = "NHE",
-    ref_type: Optional[str] = "inhouse",
+    ref_vs_nhe: float = 0.21,
     samplerate_sec: Optional[float] = 0.1,
     CP_duration_sec: Optional[float] = 60,
     gamry_i_range: Optional[str] = "auto",

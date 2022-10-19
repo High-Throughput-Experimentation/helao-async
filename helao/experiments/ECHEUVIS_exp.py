@@ -59,7 +59,7 @@ def ECHEUVIS_sub_CV_led(
     solution_bubble_gas: str = "O2",
     measurement_area: float = 0.071,  # 3mm diameter droplet
     ref_electrode_type: str = "NHE",
-    ref_type: Optional[str] = "inhouse",
+    ref_vs_nhe: float = 0.21,
     illumination_source: Optional[str] = "doric_wled",
     illumination_wavelength: Optional[float] = 0.0,
     illumination_intensity: Optional[float] = 0.0,
@@ -241,7 +241,7 @@ def ECHEUVIS_sub_CA_led(
     solution_bubble_gas: str = "O2",
     measurement_area: float = 0.071,  # 3mm diameter droplet
     ref_electrode_type: str = "NHE",
-    ref_type: Optional[str] = "inhouse",
+    ref_vs_nhe: float = 0.21,
     samplerate_sec: Optional[float] = 0.1,
     CA_duration_sec: Optional[float] = 60,
     gamry_i_range: Optional[str] = "auto",
@@ -404,7 +404,7 @@ def ECHEUVIS_sub_CP_led(
     solution_bubble_gas: str = "O2",
     measurement_area: float = 0.071,  # 3mm diameter droplet
     ref_electrode_type: str = "NHE",
-    ref_type: Optional[str] = "inhouse",
+    ref_vs_nhe: float = 0.21,
     samplerate_sec: Optional[float] = 0.1,
     CP_duration_sec: Optional[float] = 60,
     gamry_i_range: Optional[str] = "auto",
