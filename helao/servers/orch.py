@@ -599,7 +599,7 @@ class Orch(Base):
                     f"unpack experiment {experimenttemplate.experiment_name}"
                 )
                 await self.add_experiment(
-                    seq=self.active_sequence.get_seq(),
+                    seq=self.seq_file,
                     experimenttemplate=experimenttemplate,
                 )
 
@@ -1201,15 +1201,15 @@ class Orch(Base):
         if D.orchestrator.server_name is None or D.orchestrator.machine_name is None:
             D.orchestrator = self.server
 
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.0001)
         if at_index:
             self.experiment_dq.insert(i=at_index, x=D)
         elif prepend:
             self.experiment_dq.appendleft(D)
-            self.print_message(f"experiment {D.experiment_name} prepended to queue")
+            # self.print_message(f"experiment {D.experiment_name} prepended to queue")
         else:
             self.experiment_dq.append(D)
-            self.print_message(f"experiment {D.experiment_name} appended to queue")
+            # self.print_message(f"experiment {D.experiment_name} appended to queue")
 
     def list_sequences(self, limit=10):
         """Return the current queue of sequence_dq."""
