@@ -19,7 +19,7 @@ from helao.helpers.premodels import ExperimentPlanMaker
 SEQUENCES = __all__
 
 def ADSS_CV(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
 #    plate_sample_no_list: list = [1],   #list instead of map select
@@ -38,7 +38,9 @@ def ADSS_CV(
     preCV_duration = 3,
     gamry_i_range: str = "auto",
     ph: float = 9.53,
-    ref_vs_nhe: float = 0.21,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
+
 ):
 
     pl = ExperimentPlanMaker()
@@ -65,9 +67,11 @@ def ADSS_CV(
     pl.add_experiment(
         "ADSS_sub_preCV",
         {
-            "CA_potential": CV1_Vinit_vsRHE
-                - 1.0 * ref_vs_nhe
-                - 0.059 * ph,
+            "CA_potential": CV1_Vinit_vsRHE,
+            "ph": ph,
+            "ref_type": ref_type,
+            "ref_offset__V": ref_offset__V,
+            "gamry_i_range": gamry_i_range,
             "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
             "CA_duration_sec": preCV_duration,
         },
@@ -85,7 +89,8 @@ def ADSS_CV(
             "cycles": CV1_cycles,
             "gamry_i_range": gamry_i_range,
             "ph": ph,
-            "ref_vs_nhe": ref_vs_nhe,
+            "ref_type": ref_type,
+            "ref_offset__V": ref_offset__V,
         },
     )
 
@@ -94,7 +99,7 @@ def ADSS_CV(
     return pl.experiment_plan_list  # returns complete experiment list
 
 def ADSS_CA(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
 #    plate_sample_no_list: list = [1], #list instead of map select
@@ -106,7 +111,8 @@ def ADSS_CA(
     CA_potential_vsRHE: float = 1.0,
 #    CA_potentials_vsRHE: List[float] = [-0.2, 0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
     ph: float = 9.53,
-    ref_vs_nhe: float = 0.21,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
     CA_duration_sec: float = 1320,
     OCV_duration: float = 1,
     samplerate_sec: float = 0.05,
@@ -161,7 +167,8 @@ def ADSS_CA(
         {
             "CA_potential": CA_potential_vsRHE,
             "ph": ph,
-            "ref_vs_nhe": ref_vs_nhe,
+            "ref_type": ref_type,
+            "ref_offset__V": ref_offset__V,
             "samplerate_sec": samplerate_sec,
             "CA_duration_sec": CA_duration_sec,
         },
@@ -180,7 +187,8 @@ def ADSS_CombineEche(
     liquid_custom_position: str = "elec_res1",
     liquid_sample_no: int = 1,
     ph: float = 9.53,
-    ref_vs_nhe: float = 0.21,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
 #    CA_potentials_vsRHE: List[float] = [-0.2, 0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
     OCV_duration: float = 60.0,
     CV1_Vinit_vsRHE: float = 0.7,
@@ -251,7 +259,8 @@ def ADSS_CombineEche(
             "cycles": CV1_cycles,
             "gamry_i_range": gamry_i_range,
             "ph": ph,
-            "ref_vs_nhe": ref_vs_nhe,
+            "ref_type": ref_type,
+            "ref_offset__V": ref_offset__V,
         },
     )
 
@@ -275,7 +284,8 @@ def ADSS_CombineEche(
             "cycles": CV2_cycles,
             "gamry_i_range": gamry_i_range,
             "ph": ph,
-            "ref_vs_nhe": ref_vs_nhe,
+            "ref_type": ref_type,
+            "ref_offset__V": ref_offset__V,
         },
     )
 
@@ -292,7 +302,8 @@ def ADSS_CombineEche(
         {
             "CA_potential": CA_potential_vsRHE,
             "ph": ph,
-            "ref_vs_nhe": ref_vs_nhe,
+            "ref_type": ref_type,
+            "ref_offset__V": ref_offset__V,
             "samplerate_sec": samplerate_sec,
             "CA_duration_sec": CA_duration_sec,
         },
@@ -318,7 +329,8 @@ def ADSS_minimum_CV(
     CV1_cycles: int = 1,
     gamry_i_range: str = "auto",
     ph: float = 9.53,
-    ref_vs_nhe: float = 0.21,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
     aliquot_times_sec: List[float] = [60, 600, 1140],
     filltime_sec: float = 10.0,
 ):
@@ -361,7 +373,8 @@ def ADSS_minimum_CV(
             "cycles": CV1_cycles,
             "gamry_i_range": gamry_i_range,
             "ph": ph,
-            "ref_vs_nhe": ref_vs_nhe,
+            "ref_type": ref_type,
+            "ref_offset__V": ref_offset__V,
             "aliquot_times_sec": aliquot_times_sec,
         },
     )
@@ -384,7 +397,8 @@ def ADSS_minimum_CA(
     CA_potential_vsRHE: float = 1.0,
 #    CA_potentials_vsRHE: List[float] = [-0.2, 0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
     ph: float = 9.53,
-    ref_vs_nhe: float = 0.21,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
     CA_duration_sec: float = 1320,
     aliquot_times_sec: List[float] = [60, 600, 1140],
     OCV_duration_sec: float = 60,
@@ -433,7 +447,8 @@ def ADSS_minimum_CA(
         {
             "CA_potential": CA_potential_vsRHE,
             "ph": ph,
-            "ref_vs_nhe": ref_vs_nhe,
+            "ref_type": ref_type,
+            "ref_offset__V": ref_offset__V,
             "samplerate_sec": samplerate_sec,
             "OCV_duration_sec": OCV_duration_sec,
             "CA_duration_sec": CA_duration_sec,
@@ -456,7 +471,8 @@ def ADSS_duaribilty_CAv1(
     liquid_sample_no: int = 3,
     CA_potentials_vsRHE: List[float] = [-0.2, 0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
     ph: float = 9.53,
-    ref_vs_nhe: float = 0.21,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
     CA_duration_sec: float = 1320,
     aliquot_times_sec: List[float] = [60, 600, 1140],
     OCV_duration_sec: float = 60,
@@ -499,7 +515,8 @@ def ADSS_duaribilty_CAv1(
             {
                 "CA_potential": potential,
                 "ph": ph,
-                "ref_vs_nhe": ref_vs_nhe,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
                 "samplerate_sec": samplerate_sec,
                 "OCV_duration_sec": OCV_duration_sec,
                 "CA_duration_sec": CA_duration_sec,
