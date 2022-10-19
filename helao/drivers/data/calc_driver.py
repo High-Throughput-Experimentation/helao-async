@@ -282,6 +282,8 @@ class Calc:
 
         elif specd.get("T", {}) and not specd.get("R", {}):  # T_UVVIS only
             pred["T"]["full"]["abs"] = -np.log(pred["T"]["full"]["sig"])
+            omT = 1 - pred["T"]["full"]["sig"]
+            pred["T"]["full"]["omT"] = omT
 
         elif specd.get("R", {}) and not specd.get("T", {}):  # DR_UVVIS only
             pred["R"]["full"]["abs"] = (1.0 - np.log(pred["R"]["full"]["sig"])) ** 2 / (
@@ -426,6 +428,19 @@ class Calc:
 
         elif specd.get("T", {}) and not specd.get("R", {}):  # T_UVVIS only
             interd = pred["T"]
+            evp = params["ev_parts"]
+            for i in range(len(evp) - 1):
+                lo, hi = evp[i], evp[i + 1]
+                evrange = np.bitwise_and((interd["hv"] > lo), (interd["hv"] < hi))
+                datadict[f"1-T_av_{lo}_{hi}"] = interd["smooth"]["omT"][
+                    :, evrange
+                ].mean(axis=1)
+            # full range
+            lo, hi = evp[0], evp[-1]
+            evrange = np.bitwise_and((interd["hv"] > lo), (interd["hv"] < hi))
+            datadict[f"1-T_av_{lo}_{hi}"] = interd["smooth"]["omT"][:, evrange].mean(
+                axis=1
+            )
             datadict["T_0to1"] = np.bitwise_and(
                 (pred["T"]["smooth"]["sig"] > 0.0), (pred["T"]["smooth"]["sig"] < 1.0)
             ).all(axis=1)
