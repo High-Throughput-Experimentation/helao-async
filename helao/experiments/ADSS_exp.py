@@ -42,6 +42,7 @@ from helaocore.models.sample import SolidSample, LiquidSample
 from helaocore.models.machine import MachineModel
 from helaocore.models.process_contrib import ProcessContrib
 from helaocore.models.electrolyte import Electrolyte
+from helao.helpers.ref_electrode import REF_TABLE
 
 from helao.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
 from helao.drivers.robot.pal_driver import Spacingmethod, PALtools
@@ -621,10 +622,13 @@ def ADSS_sub_fill(
 
 def ADSS_sub_CA(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     CA_potential: Optional[float] = 0.0,
     ph: Optional[float] = 9.53,
-    ref_vs_nhe: Optional[float] = 0.21,
+    potential_versus: Optional[str] = "rhe",
+    ref_type: Optional[str] = "inhouse",
+    ref_offset__V: Optional[float] = 0.0,
+    gamry_i_range: Optional[str] = "auto",
     samplerate_sec: Optional[float] = .05,
     CA_duration_sec: Optional[float] = 1800,
 ):
@@ -647,17 +651,17 @@ def ADSS_sub_CA(
         }
     )
     # apply potential
-    potential = sq.pars.CA_potential - 1.0 * sq.pars.ref_vs_nhe - 0.059 * sq.pars.ph
+    potential = sq.pars.CA_potential - 1.0 * sq.pars.ref_offset__V - 0.059 * sq.pars.ph - REF_TABLE[sq.pars.ref_type]
     print(f"ADSS_sub_CA potential: {potential}")
     sq.add_action(
         {
             "action_server": PSTAT_server,
             "action_name": "run_CA",
             "action_params": {
-                "Vval": potential,
+                "Vval__V": potential,
                 "Tval__s": sq.pars.CA_duration_sec,
                 "SampleRate": sq.pars.samplerate_sec,
-                "IErange": "auto",
+                "IErange": sq.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -675,7 +679,7 @@ def ADSS_sub_CA(
 
 def ADSS_sub_CV(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
@@ -686,7 +690,9 @@ def ADSS_sub_CV(
 
     gamry_i_range: Optional[str] = "auto",
     ph: float = 9.53,
-    ref_vs_nhe: float = 0.21,
+    potential_versus: Optional[str] = "rhe",
+    ref_type: Optional[str] = "inhouse",
+    ref_offset__V: Optional[float] = 0.0,
 ):
 
     
@@ -727,16 +733,20 @@ def ADSS_sub_CV(
             "action_name": "run_CV",
             "action_params": {
                 "Vinit__V": apm.pars.Vinit_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
+                - 1.0 * apm.pars.ref_offset__V
+                - REF_TABLE[apm.pars.ref_type] 
                 - 0.059 * apm.pars.ph,
                 "Vapex1__V": apm.pars.Vapex1_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
+                - 1.0 * apm.pars.ref_offset__V
+                - REF_TABLE[apm.pars.ref_type] 
                 - 0.059 * apm.pars.ph,
                 "Vapex2__V": apm.pars.Vapex2_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
+                - 1.0 * apm.pars.ref_offset__V
+                - REF_TABLE[apm.pars.ref_type] 
                 - 0.059 * apm.pars.ph,
                 "Vfinal__V": apm.pars.Vfinal_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
+                - 1.0 * apm.pars.ref_offset__V
+                - REF_TABLE[apm.pars.ref_type] 
                 - 0.059 * apm.pars.ph,
                 "ScanRate__V_s": apm.pars.scanrate_voltsec,
                 "AcqInterval__s": apm.pars.samplerate_sec,
@@ -759,8 +769,9 @@ def ADSS_sub_CV(
 
 def ADSS_sub_OCV(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     Tval__s: Optional[float] = 60.0,
+    gamry_i_range: Optional[str] = "auto",
 ):
 
     sq = ActionPlanMaker()  # exposes function parameters via sq.pars
@@ -788,7 +799,7 @@ def ADSS_sub_OCV(
             "action_params": {
                 "Tval__s": sq.pars.Tval__s,
                 "SampleRate": 0.05,
-                "IErange": "auto",
+                "IErange": sq.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -806,8 +817,12 @@ def ADSS_sub_OCV(
 
 def ADSS_sub_preCV(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     CA_potential: Optional[float] = 0.0,  #need to get from CV initial
+    ph: Optional[float] = 9.53,
+    ref_type: Optional[str] = "inhouse",
+    ref_offset__V: Optional[float] = 0.0,
+    gamry_i_range: Optional[str] = "auto",
     samplerate_sec: Optional[float] = .05,
     CA_duration_sec: Optional[float] = 3, #adjustable pre_CV time
 ):
@@ -830,16 +845,16 @@ def ADSS_sub_preCV(
         }
     )
     # apply potential
-    print(f"ADSS_sub_CA potential: {sq.pars.CA_potential}")
+    potential = sq.pars.CA_potential - 1.0 * sq.pars.ref_offset__V - 0.059 * sq.pars.ph - REF_TABLE[sq.pars.ref_type]
     sq.add_action(
         {
             "action_server": PSTAT_server,
             "action_name": "run_CA",
             "action_params": {
-                "Vval": sq.pars.CA_potential,
+                "Vval__V": potential,
                 "Tval__s": sq.pars.CA_duration_sec,
                 "SampleRate": sq.pars.samplerate_sec,
-                "IErange": "auto",
+                "IErange": sq.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -857,10 +872,13 @@ def ADSS_sub_preCV(
 
 def ADSS_sub_CA_originalwithstuff(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     CA_potential: Optional[float] = 0.0,
     ph: float = 9.53,
-    ref_vs_nhe: float = 0.21,
+    potential_versus: Optional[str] = "rhe",
+    ref_type: Optional[str] = "inhouse",
+    ref_offset__V: Optional[float] = 0.0,
+    gamry_i_range: Optional[str] = "auto",
     samplerate_sec: Optional[float] = 1,
     OCV_duration_sec: Optional[float] = 60,
     CA_duration_sec: Optional[float] = 1320,
@@ -893,7 +911,7 @@ def ADSS_sub_CA_originalwithstuff(
             "action_params": {
                 "Tval": sq.pars.OCV_duration_sec,
                 "SampleRate": sq.pars.samplerate_sec,
-                "IErange": "auto",
+                "IErange": sq.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -937,15 +955,15 @@ def ADSS_sub_CA_originalwithstuff(
     )
 
     # apply potential
-    potential = sq.pars.CA_potential - 1.0 * sq.pars.ref_vs_nhe - 0.059 * sq.pars.ph
+    potential = sq.pars.CA_potential - 1.0 * sq.pars.ref_offset__V - 0.059 * sq.pars.ph - REF_TABLE[sq.pars.ref_type]
     print(f"ADSS_sub_CA potential: {potential}")
     sq.add_action(
         {
             "action_server": PSTAT_server,
             "action_name": "run_CA",
             "action_params": {
-                "Vval": potential,
-                "Tval": sq.pars.CA_duration_sec,
+                "Vval__V": potential,
+                "Tval__s": sq.pars.CA_duration_sec,
                 "SampleRate": sq.pars.samplerate_sec,
                 "IErange": "auto",
             },
@@ -1004,10 +1022,13 @@ def ADSS_sub_CA_originalwithstuff(
 
 def ADSS_sub_CA_noaliquots(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     CA_potential: Optional[float] = 0.0,
     ph: float = 9.53,
-    ref_vs_nhe: float = 0.21,
+    potential_versus: Optional[str] = "rhe",
+    ref_type: Optional[str] = "inhouse",
+    ref_offset__V: Optional[float] = 0.0,
+    gamry_i_range: Optional[str] = "auto",
     samplerate_sec: Optional[float] = .05,
     OCV_duration_sec: Optional[float] = 60,
     CA_duration_sec: Optional[float] = 1320,
@@ -1040,7 +1061,7 @@ def ADSS_sub_CA_noaliquots(
             "action_params": {
                 "Tval": sq.pars.OCV_duration_sec,
                 "SampleRate": sq.pars.samplerate_sec,
-                "IErange": "auto",
+                "IErange": sq.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1070,15 +1091,15 @@ def ADSS_sub_CA_noaliquots(
     )
 
     # apply potential
-    potential = sq.pars.CA_potential - 1.0 * sq.pars.ref_vs_nhe - 0.059 * sq.pars.ph
+    potential = sq.pars.CA_potential - 1.0 * sq.pars.ref_offset__V - 0.059 * sq.pars.ph - REF_TABLE[sq.pars.ref_type]
     print(f"ADSS_sub_CA potential: {potential}")
     sq.add_action(
         {
             "action_server": PSTAT_server,
             "action_name": "run_CA",
             "action_params": {
-                "Vval": potential,
-                "Tval": sq.pars.CA_duration_sec,
+                "Vval__V": potential,
+                "Tval__s": sq.pars.CA_duration_sec,
                 "SampleRate": sq.pars.samplerate_sec,
                 "IErange": "auto",
             },
@@ -1098,7 +1119,7 @@ def ADSS_sub_CA_noaliquots(
 
 def ADSS_sub_CV_noaliquots(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
@@ -1108,7 +1129,9 @@ def ADSS_sub_CV_noaliquots(
     cycles: Optional[int] = 1,
     gamry_i_range: Optional[str] = "auto",
     ph: float = 9.53,
-    ref_vs_nhe: float = 0.21,
+    potential_versus: Optional[str] = "rhe",
+    ref_type: Optional[str] = "inhouse",
+    ref_offset__V: Optional[float] = 0.0,
     aliquot_times_sec: Optional[List[float]] = [60, 600, 1140],
 ):
 
@@ -1153,16 +1176,20 @@ def ADSS_sub_CV_noaliquots(
             "action_name": "run_CV",
             "action_params": {
                 "Vinit__V": apm.pars.Vinit_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
+                - 1.0 * apm.pars.ref_offset__V
+                - REF_TABLE[apm.pars.ref_type] 
                 - 0.059 * apm.pars.ph,
                 "Vapex1__V": apm.pars.Vapex1_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
+                - 1.0 * apm.pars.ref_offset__V
+                - REF_TABLE[apm.pars.ref_type] 
                 - 0.059 * apm.pars.ph,
                 "Vapex2__V": apm.pars.Vapex2_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
+                - 1.0 * apm.pars.ref_offset__V
+                - REF_TABLE[apm.pars.ref_type] 
                 - 0.059 * apm.pars.ph,
                 "Vfinal__V": apm.pars.Vfinal_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
+                - 1.0 * apm.pars.ref_offset__V
+                - REF_TABLE[apm.pars.ref_type] 
                 - 0.059 * apm.pars.ph,
                 "ScanRate__V_s": apm.pars.scanrate_voltsec,
                 "AcqInterval__s": apm.pars.samplerate_sec,
