@@ -365,7 +365,7 @@ class Calc:
 
             # abs_smooth_refadj_scl
             pred[sk]["smooth_refadj_scl"]["abs"] = pred[sk]["smooth_refadj"][
-                k
+               "abs" 
             ] / np.nanmax(pred[sk]["smooth_refadj"]["abs"])
             sv = pred[sk]["smooth_refadj_scl"]["abs"][::-1]
             sv[np.isnan(sv)] = 0.1
