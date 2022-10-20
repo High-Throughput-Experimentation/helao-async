@@ -594,7 +594,9 @@ class Orch(Base):
             # add all experiments from sequence to experiment queue
             # todo: use seq model instead to initialize some parameters
             # of the experiment
-            for experimenttemplate in self.active_sequence.experiment_plan_list:
+            for i, experimenttemplate in enumerate(
+                self.active_sequence.experiment_plan_list
+            ):
                 # self.print_message(
                 #     f"unpack experiment {experimenttemplate.experiment_name}"
                 # )
@@ -602,8 +604,8 @@ class Orch(Base):
                     seq=self.seq_file,
                     experimenttemplate=experimenttemplate,
                 )
-
-            self.orchstatusmodel.loop_state = OrchStatus.started
+                if i == 0:
+                    self.orchstatusmodel.loop_state = OrchStatus.started
 
         else:
             self.print_message("sequence queue is empty, cannot start orch loop")
