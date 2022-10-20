@@ -660,7 +660,7 @@ def ADSS_sub_CA(
             "action_params": {
                 "Vval__V": potential,
                 "Tval__s": sq.pars.CA_duration_sec,
-                "SampleRate": sq.pars.samplerate_sec,
+                "AcqInterval__s": sq.pars.samplerate_sec,
                 "IErange": sq.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
