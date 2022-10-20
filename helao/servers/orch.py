@@ -2,7 +2,6 @@ __all__ = ["Orch", "makeOrchServ"]
 
 import asyncio
 import sys
-from collections import deque
 from copy import deepcopy
 from typing import Optional, List
 from uuid import UUID
@@ -57,6 +56,7 @@ from helao.servers.base import Base
 from helao.servers.vis import Vis
 from helao.helpers.legacy_api import HTELegacyAPI
 from helao.helpers.gen_uuid import gen_uuid
+from helao.helpers.zdeque import zdeque
 
 
 # ANSI color codes converted to the Windows versions
@@ -331,9 +331,9 @@ class Orch(Base):
         )
 
         # instantiate experiment/experiment queue, action queue
-        self.sequence_dq = deque([])
-        self.experiment_dq = deque([])
-        self.action_dq = deque([])
+        self.sequence_dq = zdeque([])
+        self.experiment_dq = zdeque([])
+        self.action_dq = zdeque([])
 
         # holder for tracking dispatched action in status
         self.last_dispatched_action_uuid = None
@@ -659,7 +659,7 @@ class Orch(Base):
         )
         if unpacked_acts is None:
             self.print_message("no actions in experiment", error=True)
-            self.action_dq = deque([])
+            self.action_dq = zdeque([])
             return ErrorCodes.none
 
         # self.print_message("setting action order")
@@ -673,7 +673,7 @@ class Orch(Base):
 
         # TODO:update experiment code
         # self.print_message("adding unpacked actions to action_dq")
-        self.action_dq = deque(unpacked_acts)
+        self.action_dq = zdeque(unpacked_acts)
         self.print_message(f"got: {self.action_dq}")
         self.print_message(
             f"optional params: {self.active_experiment.experiment_params}"
