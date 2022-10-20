@@ -3,7 +3,7 @@ import zlib
 import pickle
 
 
-class cdeque(deque):
+class zdeque(deque):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
