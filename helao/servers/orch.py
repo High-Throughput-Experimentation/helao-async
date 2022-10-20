@@ -670,10 +670,10 @@ class Orch(Base):
             # actual order should be the same at the beginning
             # will be incremented as necessary
             act.orch_submit_order = int(i)
+            self.action_dq.append(act)
 
         # TODO:update experiment code
         # self.print_message("adding unpacked actions to action_dq")
-        self.action_dq = zdeque(unpacked_acts)
         self.print_message(f"got: {self.action_dq}")
         self.print_message(
             f"optional params: {self.active_experiment.experiment_params}"
