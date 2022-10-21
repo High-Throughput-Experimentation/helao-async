@@ -43,13 +43,13 @@ def ADSS_CV(
 
 ):
 
-    pl = ExperimentPlanMaker()
+    epm = ExperimentPlanMaker()
 
-    pl.add_experiment("ADSS_sub_unloadall_customs",{})
+    epm.add_experiment("ADSS_sub_unloadall_customs",{})
 
 #    for solid_sample_no in plate_sample_no_list:   #have to indent add expts if used
 
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_load_solid",
         {
             "solid_custom_position": solid_custom_position,
@@ -57,14 +57,14 @@ def ADSS_CV(
             "solid_sample_no": solid_sample_no,
         },
     )
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_load_liquid",
         {
             "liquid_custom_position": liquid_custom_position,
             "liquid_sample_no": liquid_sample_no,
         },
     )
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_preCV",
         {
             "CA_potential": CV1_Vinit_vsRHE,
@@ -77,7 +77,7 @@ def ADSS_CV(
         },
     )
 
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_CV",
         {
             "Vinit_vsRHE": CV1_Vinit_vsRHE,
@@ -94,9 +94,9 @@ def ADSS_CV(
         },
     )
 
-#    pl.add_experiment("ADSS_sub_shutdown", {})
+#    epm.add_experiment("ADSS_sub_shutdown", {})
 
-    return pl.experiment_plan_list  # returns complete experiment list
+    return epm.experiment_plan_list  # returns complete experiment list
 
 def ADSS_CA(
     sequence_version: int = 3,
@@ -122,9 +122,9 @@ def ADSS_CA(
 
     last functionality test: tbd"""
 
-    pl = ExperimentPlanMaker()
+    epm = ExperimentPlanMaker()
 
-    # pl.add_experiment(
+    # epm.add_experiment(
     #     "ADSS_sub_startup",
     #     {
     #         "solid_custom_position": solid_custom_position,
@@ -134,11 +134,11 @@ def ADSS_CA(
     #         "liquid_sample_no": liquid_sample_no,
     #     },
     # )
-    pl.add_experiment("ADSS_sub_unloadall_customs",{})
+    epm.add_experiment("ADSS_sub_unloadall_customs",{})
 
 #    for solid_sample_no in plate_sample_no_list:   #have to indent add expts if used
 
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_load_solid",
         {
             "solid_custom_position": solid_custom_position,
@@ -146,7 +146,7 @@ def ADSS_CA(
             "solid_sample_no": solid_sample_no,
         },
     )
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_load_liquid",
         {
             "liquid_custom_position": liquid_custom_position,
@@ -154,7 +154,7 @@ def ADSS_CA(
         },
     )
 
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_OCV",
         {
             "Tval__s": OCV_duration,
@@ -162,7 +162,7 @@ def ADSS_CA(
         }
     )
 
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_CA",
         {
             "CA_potential": CA_potential_vsRHE,
@@ -173,8 +173,8 @@ def ADSS_CA(
             "CA_duration_sec": CA_duration_sec,
         },
     )
-#    pl.add_experiment("ADSS_sub_shutdown", {})
-    return pl.experiment_plan_list  # returns complete experiment list
+#    epm.add_experiment("ADSS_sub_shutdown", {})
+    return epm.experiment_plan_list  # returns complete experiment list
 
 def ADSS_CombineEche(
     sequence_version: int = 1,
@@ -215,9 +215,9 @@ def ADSS_CombineEche(
 
     last functionality test: tbd"""
 
-    pl = ExperimentPlanMaker()
+    epm = ExperimentPlanMaker()
 
-    # pl.add_experiment(
+    # epm.add_experiment(
     #     "ADSS_sub_startup",
     #     {
     #         "solid_custom_position": solid_custom_position,
@@ -227,11 +227,11 @@ def ADSS_CombineEche(
     #         "liquid_sample_no": liquid_sample_no,
     #     },
     # )
-    pl.add_experiment("ADSS_sub_unloadall_customs",{})
+    epm.add_experiment("ADSS_sub_unloadall_customs",{})
 
 #    for solid_sample_no in plate_sample_no_list:   #have to indent add expts if used
 
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_load_solid",
         {
             "solid_custom_position": solid_custom_position,
@@ -239,7 +239,7 @@ def ADSS_CombineEche(
             "solid_sample_no": solid_sample_no,
         },
     )
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_load_liquid",
         {
             "liquid_custom_position": liquid_custom_position,
@@ -247,7 +247,7 @@ def ADSS_CombineEche(
         },
     )
 
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_CV",
         {
             "Vinit_vsRHE": CV1_Vinit_vsRHE,
@@ -264,7 +264,7 @@ def ADSS_CombineEche(
         },
     )
 
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_OCV",
         {
             "Tval__s": OCV_duration,
@@ -272,7 +272,7 @@ def ADSS_CombineEche(
         }
     )
 
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_CV",
         {
             "Vinit_vsRHE": CV2_Vinit_vsRHE,
@@ -289,7 +289,7 @@ def ADSS_CombineEche(
         },
     )
 
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_OCV",
         {
             "Tval__s": OCV_duration,
@@ -297,7 +297,7 @@ def ADSS_CombineEche(
         }
     )
     
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_CA",
         {
             "CA_potential": CA_potential_vsRHE,
@@ -308,8 +308,8 @@ def ADSS_CombineEche(
             "CA_duration_sec": CA_duration_sec,
         },
     )
-#    pl.add_experiment("ADSS_sub_shutdown", {})
-    return pl.experiment_plan_list  # returns complete experiment list
+#    epm.add_experiment("ADSS_sub_shutdown", {})
+    return epm.experiment_plan_list  # returns complete experiment list
 
 def ADSS_minimum_CV(
     sequence_version: int = 1,
@@ -339,12 +339,12 @@ def ADSS_minimum_CV(
 
     last functionality test: tbd"""
 
-    pl = ExperimentPlanMaker()
+    epm = ExperimentPlanMaker()
 
-    pl.add_experiment("ADSS_sub_unloadall_customs",{})
+    epm.add_experiment("ADSS_sub_unloadall_customs",{})
 
 
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_load_solid",
         {
             "solid_custom_position": solid_custom_position,
@@ -352,7 +352,7 @@ def ADSS_minimum_CV(
             "solid_sample_no": solid_sample_no,
         },
     )
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_load_liquid",
         {
             "liquid_custom_position": liquid_custom_position,
@@ -361,7 +361,7 @@ def ADSS_minimum_CV(
     )
 
 
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_CV_noaliquots",
         {
             "Vinit_vsRHE": CV1_Vinit_vsRHE,
@@ -379,9 +379,9 @@ def ADSS_minimum_CV(
         },
     )
 
-#    pl.add_experiment("ADSS_sub_shutdown", {})
+#    epm.add_experiment("ADSS_sub_shutdown", {})
 
-    return pl.experiment_plan_list  # returns complete experiment list
+    return epm.experiment_plan_list  # returns complete experiment list
 
 
 
@@ -410,9 +410,9 @@ def ADSS_minimum_CA(
 
     last functionality test: tbd"""
 
-    pl = ExperimentPlanMaker()
+    epm = ExperimentPlanMaker()
 
-    # pl.add_experiment(
+    # epm.add_experiment(
     #     "ADSS_sub_startup",
     #     {
     #         "solid_custom_position": solid_custom_position,
@@ -422,10 +422,10 @@ def ADSS_minimum_CA(
     #         "liquid_sample_no": liquid_sample_no,
     #     },
     # )
-    pl.add_experiment("ADSS_sub_unloadall_customs",{})
+    epm.add_experiment("ADSS_sub_unloadall_customs",{})
 
 
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_load_solid",
         {
             "solid_custom_position": solid_custom_position,
@@ -433,7 +433,7 @@ def ADSS_minimum_CA(
             "solid_sample_no": solid_sample_no,
         },
     )
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_load_liquid",
         {
             "liquid_custom_position": liquid_custom_position,
@@ -442,7 +442,7 @@ def ADSS_minimum_CA(
     )
 
 
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_CA_noaliquots",
         {
             "CA_potential": CA_potential_vsRHE,
@@ -455,8 +455,8 @@ def ADSS_minimum_CA(
             "aliquot_times_sec": aliquot_times_sec,
         },
     )
-#    pl.add_experiment("ADSS_sub_shutdown", {})
-    return pl.experiment_plan_list  # returns complete experiment list
+#    epm.add_experiment("ADSS_sub_shutdown", {})
+    return epm.experiment_plan_list  # returns complete experiment list
 
 
 
@@ -484,9 +484,9 @@ def ADSS_duaribilty_CAv1(
 
     last functionality test: tbd"""
 
-    pl = ExperimentPlanMaker()
+    epm = ExperimentPlanMaker()
 
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_startup",
         {
             "x_mm": x_mm,
@@ -502,15 +502,15 @@ def ADSS_duaribilty_CAv1(
     for cycle, potential in enumerate(CA_potentials_vsRHE):
         print(f" ... cycle {cycle} potential:", potential)
         if cycle == 0:
-            pl.add_experiment(
+            epm.add_experiment(
                 "ADSS_sub_fillfixed",
                 {"fill_vol_ul": 10000, "filltime_sec": filltime_sec},
             )
 
         else:
-            pl.add_experiment("ADSS_sub_fill", {"fill_vol_ul": 1000})
+            epm.add_experiment("ADSS_sub_fill", {"fill_vol_ul": 1000})
 
-        pl.add_experiment(
+        epm.add_experiment(
             "ADSS_sub_CA",
             {
                 "CA_potential": potential,
@@ -524,9 +524,9 @@ def ADSS_duaribilty_CAv1(
             },
         )
 
-    pl.add_experiment("ADSS_sub_shutdown", {})
+    epm.add_experiment("ADSS_sub_shutdown", {})
 
-    return pl.experiment_plan_list  # returns complete experiment list
+    return epm.experiment_plan_list  # returns complete experiment list
 
 
 def ADSS_tray_unload(
@@ -548,9 +548,9 @@ def ADSS_tray_unload(
     main_runs: sweep channel centered on element partial_molarity
     rack: position of the tray in the icpms instrument, usually 2.
     """
-    pl = ExperimentPlanMaker()
+    epm = ExperimentPlanMaker()
 
-    pl.add_experiment(
+    epm.add_experiment(
         "ADSS_sub_tray_unload",
         {
             "tray": tray,
@@ -560,6 +560,6 @@ def ADSS_tray_unload(
             "rack": rack,
         },
     )
-#    pl.add_experiment("ADSS_sub_shutdown", {})
+#    epm.add_experiment("ADSS_sub_shutdown", {})
 
-    return pl.experiment_plan_list  # returns complete experiment list
+    return epm.experiment_plan_list  # returns complete experiment list
