@@ -390,7 +390,7 @@ def ECHE_sub_preCV(
 ):
     """last functionality test: 11/29/2021"""
 
-    apm = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # get sample for gamry
     apm.add_action(

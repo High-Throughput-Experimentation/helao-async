@@ -90,9 +90,9 @@ def debug(
     # 2: orch is waiting for server to become available
     # 3: (or other): orch is waiting for all action_dq to finish
 
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "archive_custom_unload",
@@ -101,7 +101,7 @@ def debug(
         }
     )
 
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "archive_custom_load",
@@ -115,7 +115,7 @@ def debug(
         }
     )
 
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "archive_custom_query_sample",
@@ -130,15 +130,15 @@ def debug(
     )
 
     # OCV
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PSTAT_server,
             "action_name": "run_OCV",
             "action_params": {
                 "Tval": 10.0,
                 "SampleRate": 1.0,
-                "TTLwait": sq.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-                "TTLsend": sq.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
+                "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
+                "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
                 "IErange": "auto",
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
@@ -146,15 +146,15 @@ def debug(
         }
     )
 
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 
 def ADSS_sub_unloadall_customs(experiment: Experiment):
     """last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "archive_custom_unloadall",
@@ -165,7 +165,7 @@ def ADSS_sub_unloadall_customs(experiment: Experiment):
         }
     )
 
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 
 def ADSS_sub_load_solid(
@@ -177,17 +177,17 @@ def ADSS_sub_load_solid(
 ):
     """last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
-    sq.add_action(
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "archive_custom_load",
             "action_params": {
-                "custom": sq.pars.solid_custom_position,
+                "custom": apm.pars.solid_custom_position,
                 "load_sample_in": SolidSample(
                     **{
-                        "sample_no": sq.pars.solid_sample_no,
-                        "plate_id": sq.pars.solid_plate_id,
+                        "sample_no": apm.pars.solid_sample_no,
+                        "plate_id": apm.pars.solid_plate_id,
                         "machine_name": "legacy",
                     }
                 ).dict(),
@@ -195,7 +195,7 @@ def ADSS_sub_load_solid(
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         }
     )
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 
 def ADSS_sub_load_liquid(
@@ -206,16 +206,16 @@ def ADSS_sub_load_liquid(
 ):
     """last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
-    sq.add_action(
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "archive_custom_load",
             "action_params": {
-                "custom": sq.pars.liquid_custom_position,
+                "custom": apm.pars.liquid_custom_position,
                 "load_sample_in": LiquidSample(
                     **{
-                        "sample_no": sq.pars.liquid_sample_no,
+                        "sample_no": apm.pars.liquid_sample_no,
                         "machine_name": gethostname(),
                     }
                 ).dict(),
@@ -223,7 +223,7 @@ def ADSS_sub_load_liquid(
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         }
     )
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 
 def ADSS_sub_startup(
@@ -246,31 +246,31 @@ def ADSS_sub_startup(
 
     last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # unload all samples from custom positions
-    sq.add_action_list(ADSS_sub_unloadall_customs(experiment=experiment))
+    apm.add_action_list(ADSS_sub_unloadall_customs(experiment=experiment))
 
     # load new requested samples
-    sq.add_action_list(
+    apm.add_action_list(
         ADSS_sub_load_solid(
             experiment=experiment,
-            solid_custom_position=sq.pars.solid_custom_position,
-            solid_plate_id=sq.pars.solid_plate_id,
-            solid_sample_no=sq.pars.solid_sample_no,
+            solid_custom_position=apm.pars.solid_custom_position,
+            solid_plate_id=apm.pars.solid_plate_id,
+            solid_sample_no=apm.pars.solid_sample_no,
         )
     )
 
-    sq.add_action_list(
+    apm.add_action_list(
         ADSS_sub_load_liquid(
             experiment=experiment,
-            liquid_custom_position=sq.pars.liquid_custom_position,
-            liquid_sample_no=sq.pars.liquid_sample_no,
+            liquid_custom_position=apm.pars.liquid_custom_position,
+            liquid_sample_no=apm.pars.liquid_sample_no,
         )
     )
 
     # turn pump off
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": NI_server,
             "action_name": "pump",
@@ -283,7 +283,7 @@ def ADSS_sub_startup(
     )
 
     # set pump flow forward
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": NI_server,
             "action_name": "pump",
@@ -296,15 +296,15 @@ def ADSS_sub_startup(
     )
 
     # move z to home
-    sq.add_action_list(ADSS_sub_disengage(experiment))
+    apm.add_action_list(ADSS_sub_disengage(experiment))
 
     # move to position
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": MOTOR_server,
             "action_name": "move",
             "action_params": {
-                "d_mm": [sq.pars.x_mm, sq.pars.y_mm],
+                "d_mm": [apm.pars.x_mm, apm.pars.y_mm],
                 "axis": ["x", "y"],
                 "mode": MoveModes.absolute,
                 "transformation": TransformationModes.platexy,
@@ -316,9 +316,9 @@ def ADSS_sub_startup(
     )
 
     # seal cell
-    sq.add_action_list(ADSS_sub_engage(experiment))
+    apm.add_action_list(ADSS_sub_engage(experiment))
 
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 
 def ADSS_sub_shutdown(experiment: Experiment):
@@ -330,15 +330,15 @@ def ADSS_sub_shutdown(experiment: Experiment):
 
     last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # deep clean
-    sq.add_action_list(
+    apm.add_action_list(
         ADSS_sub_clean_PALtool(
             experiment, clean_tool=PALtools.LS3, clean_volume_ul=500
         )
     )
-    # sq.add_action({
+    # apm.add_action({
     #     "action_server": PAL_server,
     #     "action_name": "PAL_deepclean",
     #     "action_params": {
@@ -352,7 +352,7 @@ def ADSS_sub_shutdown(experiment: Experiment):
     #     })
 
     # set pump flow backward
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": NI_server,
             "action_name": "pump",
@@ -365,7 +365,7 @@ def ADSS_sub_shutdown(experiment: Experiment):
     )
 
     # wait some time to pump out the liquid
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": ORCH_server,
             "action_name": "wait",
@@ -377,10 +377,10 @@ def ADSS_sub_shutdown(experiment: Experiment):
     )
 
     # drain, TODO
-    # sq.add_action_list(ADSS_sub_drain(experiment))
+    # apm.add_action_list(ADSS_sub_drain(experiment))
 
     # turn pump off
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": NI_server,
             "action_name": "pump",
@@ -393,7 +393,7 @@ def ADSS_sub_shutdown(experiment: Experiment):
     )
 
     # set pump flow forward
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": NI_server,
             "action_name": "pump",
@@ -407,9 +407,9 @@ def ADSS_sub_shutdown(experiment: Experiment):
 
     # move z to home
     # cannot do this without proper drain for now
-    # sq.add_action_list(ADSS_sub_disengage(experiment))
+    # apm.add_action_list(ADSS_sub_disengage(experiment))
 
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 
 def ADSS_sub_drain(experiment: Experiment):
@@ -418,9 +418,9 @@ def ADSS_sub_drain(experiment: Experiment):
 
     last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     # TODO
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 
 def ADSS_sub_engage(experiment: Experiment):
@@ -429,10 +429,10 @@ def ADSS_sub_engage(experiment: Experiment):
 
     last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # engage
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": MOTOR_server,
             "action_name": "move",
@@ -449,7 +449,7 @@ def ADSS_sub_engage(experiment: Experiment):
     )
 
     # seal
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": MOTOR_server,
             "action_name": "move",
@@ -465,7 +465,7 @@ def ADSS_sub_engage(experiment: Experiment):
         }
     )
 
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 
 def ADSS_sub_disengage(experiment: Experiment):
@@ -474,9 +474,9 @@ def ADSS_sub_disengage(experiment: Experiment):
 
     last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": MOTOR_server,
             "action_name": "move",
@@ -492,7 +492,7 @@ def ADSS_sub_disengage(experiment: Experiment):
         }
     )
 
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 
 def ADSS_sub_clean_PALtool(
@@ -506,22 +506,22 @@ def ADSS_sub_clean_PALtool(
 
     last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # deep clean
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "PAL_deepclean",
             "action_params": {
-                "tool": sq.pars.clean_tool,
-                "volume_ul": sq.pars.clean_volume_ul,
+                "tool": apm.pars.clean_tool,
+                "volume_ul": apm.pars.clean_volume_ul,
             },
             "start_condition": ActionStartCondition.wait_for_all,
         }
     )
 
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 
 def ADSS_sub_fillfixed(
@@ -530,10 +530,10 @@ def ADSS_sub_fillfixed(
     fill_vol_ul: Optional[int] = 10000,
     filltime_sec: Optional[float] = 10.0,
 ):
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # fill liquid, no wash (assume it was cleaned before)
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "PAL_fillfixed",
@@ -541,7 +541,7 @@ def ADSS_sub_fillfixed(
                 "tool": PALtools.LS3,
                 "source": "elec_res1",
                 "dest": "cell1_we",
-                "volume_ul": sq.pars.fill_vol_ul,
+                "volume_ul": apm.pars.fill_vol_ul,
                 "wash1": 0,
                 "wash2": 0,
                 "wash3": 0,
@@ -552,7 +552,7 @@ def ADSS_sub_fillfixed(
     )
 
     # set pump flow forward
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": NI_server,
             "action_name": "pump",
@@ -565,7 +565,7 @@ def ADSS_sub_fillfixed(
     )
 
     # turn on pump
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": NI_server,
             "action_name": "pump",
@@ -578,18 +578,18 @@ def ADSS_sub_fillfixed(
     )
 
     # wait some time to pump in the liquid
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": ORCH_server,
             "action_name": "wait",
             "action_params": {
-                "waittime": sq.pars.filltime_sec,
+                "waittime": apm.pars.filltime_sec,
             },
             "start_condition": ActionStartCondition.wait_for_all,
         }
     )
 
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 
 def ADSS_sub_fill(
@@ -597,10 +597,10 @@ def ADSS_sub_fill(
     experiment_version: int = 1,
     fill_vol_ul: Optional[int] = 1000,
 ):
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # fill liquid, no wash (assume it was cleaned before)
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "PAL_fill",
@@ -608,7 +608,7 @@ def ADSS_sub_fill(
                 "tool": PALtools.LS3,
                 "source": "elec_res1",
                 "dest": "cell1_we",
-                "volume_ul": sq.pars.fill_vol_ul,
+                "volume_ul": apm.pars.fill_vol_ul,
                 "wash1": 0,
                 "wash2": 0,
                 "wash3": 0,
@@ -618,7 +618,7 @@ def ADSS_sub_fill(
         }
     )
 
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 def ADSS_sub_CA(
     experiment: Experiment,
@@ -634,10 +634,10 @@ def ADSS_sub_CA(
 ):
     """last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # get sample for gamry
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "archive_custom_query_sample",
@@ -651,17 +651,17 @@ def ADSS_sub_CA(
         }
     )
     # apply potential
-    potential = sq.pars.CA_potential - 1.0 * sq.pars.ref_offset__V - 0.059 * sq.pars.ph - REF_TABLE[sq.pars.ref_type]
+    potential = apm.pars.CA_potential - 1.0 * apm.pars.ref_offset__V - 0.059 * apm.pars.ph - REF_TABLE[apm.pars.ref_type]
     print(f"ADSS_sub_CA potential: {potential}")
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PSTAT_server,
             "action_name": "run_CA",
             "action_params": {
                 "Vval__V": potential,
-                "Tval__s": sq.pars.CA_duration_sec,
-                "AcqInterval__s": sq.pars.samplerate_sec,
-                "IErange": sq.pars.gamry_i_range,
+                "Tval__s": apm.pars.CA_duration_sec,
+                "AcqInterval__s": apm.pars.samplerate_sec,
+                "IErange": apm.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -675,7 +675,7 @@ def ADSS_sub_CA(
         }
     )
 
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 def ADSS_sub_CV(
     experiment: Experiment,
@@ -696,7 +696,7 @@ def ADSS_sub_CV(
 ):
 
     
-    apm = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     CV_duration_sec = (
         abs(apm.pars.Vapex1_vsRHE - apm.pars.Vinit_vsRHE) / apm.pars.scanrate_voltsec
@@ -774,10 +774,10 @@ def ADSS_sub_OCV(
     gamry_i_range: Optional[str] = "auto",
 ):
 
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # get sample for gamry
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "archive_custom_query_sample",
@@ -792,14 +792,14 @@ def ADSS_sub_OCV(
     )
 
     # OCV
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PSTAT_server,
             "action_name": "run_OCV",
             "action_params": {
-                "Tval__s": sq.pars.Tval__s,
+                "Tval__s": apm.pars.Tval__s,
                 "SampleRate": 0.05,
-                "IErange": sq.pars.gamry_i_range,
+                "IErange": apm.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -813,7 +813,7 @@ def ADSS_sub_OCV(
 
         }
     )
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 def ADSS_sub_preCV(
     experiment: Experiment,
@@ -828,10 +828,10 @@ def ADSS_sub_preCV(
 ):
     """last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # get sample for gamry
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "archive_custom_query_sample",
@@ -845,16 +845,16 @@ def ADSS_sub_preCV(
         }
     )
     # apply potential
-    potential = sq.pars.CA_potential - 1.0 * sq.pars.ref_offset__V - 0.059 * sq.pars.ph - REF_TABLE[sq.pars.ref_type]
-    sq.add_action(
+    potential = apm.pars.CA_potential - 1.0 * apm.pars.ref_offset__V - 0.059 * apm.pars.ph - REF_TABLE[apm.pars.ref_type]
+    apm.add_action(
         {
             "action_server": PSTAT_server,
             "action_name": "run_CA",
             "action_params": {
                 "Vval__V": potential,
-                "Tval__s": sq.pars.CA_duration_sec,
-                "SampleRate": sq.pars.samplerate_sec,
-                "IErange": sq.pars.gamry_i_range,
+                "Tval__s": apm.pars.CA_duration_sec,
+                "SampleRate": apm.pars.samplerate_sec,
+                "IErange": apm.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -868,7 +868,7 @@ def ADSS_sub_preCV(
         }
     )
 
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 def ADSS_sub_CA_originalwithstuff(
     experiment: Experiment,
@@ -886,10 +886,10 @@ def ADSS_sub_CA_originalwithstuff(
 ):
     """last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # get sample for gamry
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "archive_custom_query_sample",
@@ -904,14 +904,14 @@ def ADSS_sub_CA_originalwithstuff(
     )
 
     # OCV
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PSTAT_server,
             "action_name": "run_OCV",
             "action_params": {
-                "Tval": sq.pars.OCV_duration_sec,
-                "SampleRate": sq.pars.samplerate_sec,
-                "IErange": sq.pars.gamry_i_range,
+                "Tval": apm.pars.OCV_duration_sec,
+                "SampleRate": apm.pars.samplerate_sec,
+                "IErange": apm.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -919,7 +919,7 @@ def ADSS_sub_CA_originalwithstuff(
     )
 
     # take liquid sample
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "PAL_archive",
@@ -940,7 +940,7 @@ def ADSS_sub_CA_originalwithstuff(
         }
     )
 
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "archive_custom_query_sample",
@@ -955,16 +955,16 @@ def ADSS_sub_CA_originalwithstuff(
     )
 
     # apply potential
-    potential = sq.pars.CA_potential - 1.0 * sq.pars.ref_offset__V - 0.059 * sq.pars.ph - REF_TABLE[sq.pars.ref_type]
+    potential = apm.pars.CA_potential - 1.0 * apm.pars.ref_offset__V - 0.059 * apm.pars.ph - REF_TABLE[apm.pars.ref_type]
     print(f"ADSS_sub_CA potential: {potential}")
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PSTAT_server,
             "action_name": "run_CA",
             "action_params": {
                 "Vval__V": potential,
-                "Tval__s": sq.pars.CA_duration_sec,
-                "SampleRate": sq.pars.samplerate_sec,
+                "Tval__s": apm.pars.CA_duration_sec,
+                "SampleRate": apm.pars.samplerate_sec,
                 "IErange": "auto",
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
@@ -973,7 +973,7 @@ def ADSS_sub_CA_originalwithstuff(
     )
 
     # take multiple scheduled liquid samples
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "PAL_archive",
@@ -981,7 +981,7 @@ def ADSS_sub_CA_originalwithstuff(
                 "tool": PALtools.LS3,
                 "source": "cell1_we",
                 "volume_ul": 200,
-                "sampleperiod": sq.pars.aliquot_times_sec,  # 1min, 10min, 10min
+                "sampleperiod": apm.pars.aliquot_times_sec,  # 1min, 10min, 10min
                 "spacingmethod": Spacingmethod.custom,
                 "spacingfactor": 1.0,
                 "timeoffset": 60.0,
@@ -995,7 +995,7 @@ def ADSS_sub_CA_originalwithstuff(
     )
 
     # take last liquid sample and clean
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "PAL_archive",
@@ -1016,7 +1016,7 @@ def ADSS_sub_CA_originalwithstuff(
         }
     )
 
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 
 
@@ -1036,10 +1036,10 @@ def ADSS_sub_CA_noaliquots(
 ):
     """last functionality test: 11/29/2021"""
 
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # get sample for gamry
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "archive_custom_query_sample",
@@ -1054,14 +1054,14 @@ def ADSS_sub_CA_noaliquots(
     )
 
     # OCV
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PSTAT_server,
             "action_name": "run_OCV",
             "action_params": {
-                "Tval": sq.pars.OCV_duration_sec,
-                "SampleRate": sq.pars.samplerate_sec,
-                "IErange": sq.pars.gamry_i_range,
+                "Tval": apm.pars.OCV_duration_sec,
+                "SampleRate": apm.pars.samplerate_sec,
+                "IErange": apm.pars.gamry_i_range,
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
             "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1076,7 +1076,7 @@ def ADSS_sub_CA_noaliquots(
     )
 
 
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "archive_custom_query_sample",
@@ -1091,16 +1091,16 @@ def ADSS_sub_CA_noaliquots(
     )
 
     # apply potential
-    potential = sq.pars.CA_potential - 1.0 * sq.pars.ref_offset__V - 0.059 * sq.pars.ph - REF_TABLE[sq.pars.ref_type]
+    potential = apm.pars.CA_potential - 1.0 * apm.pars.ref_offset__V - 0.059 * apm.pars.ph - REF_TABLE[apm.pars.ref_type]
     print(f"ADSS_sub_CA potential: {potential}")
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PSTAT_server,
             "action_name": "run_CA",
             "action_params": {
                 "Vval__V": potential,
-                "Tval__s": sq.pars.CA_duration_sec,
-                "SampleRate": sq.pars.samplerate_sec,
+                "Tval__s": apm.pars.CA_duration_sec,
+                "SampleRate": apm.pars.samplerate_sec,
                 "IErange": "auto",
             },
             "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
@@ -1115,7 +1115,7 @@ def ADSS_sub_CA_noaliquots(
         }
     )
 
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 def ADSS_sub_CV_noaliquots(
     experiment: Experiment,
@@ -1136,7 +1136,7 @@ def ADSS_sub_CV_noaliquots(
 ):
 
     
-    apm = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     CV_duration_sec = (
         abs(apm.pars.Vapex1_vsRHE - apm.pars.Vinit_vsRHE) / apm.pars.scanrate_voltsec
@@ -1233,60 +1233,60 @@ def ADSS_sub_tray_unload(
     rack: position of the tray in the icpms instrument, usually 2.
     """
 
-    sq = ActionPlanMaker()  # exposes function parameters via sq.pars
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "archive_tray_export_json",
             "action_params": {
-                "tray": sq.pars.tray,
-                "slot": sq.pars.slot,
+                "tray": apm.pars.tray,
+                "slot": apm.pars.slot,
             },
             "start_condition": ActionStartCondition.wait_for_all,
         }
     )
 
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "archive_tray_export_csv",
             "action_params": {
-                "tray": sq.pars.tray,
-                "slot": sq.pars.slot,
+                "tray": apm.pars.tray,
+                "slot": apm.pars.slot,
             },
             "start_condition": ActionStartCondition.wait_for_all,
         }
     )
 
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "archive_tray_export_icpms",
             "action_params": {
-                "tray": sq.pars.tray,
-                "slot": sq.pars.slot,
-                "survey_runs": sq.pars.survey_runs,
-                "main_runs": sq.pars.main_runs,
-                "rack": sq.pars.rack,
+                "tray": apm.pars.tray,
+                "slot": apm.pars.slot,
+                "survey_runs": apm.pars.survey_runs,
+                "main_runs": apm.pars.main_runs,
+                "rack": apm.pars.rack,
             },
             "start_condition": ActionStartCondition.wait_for_all,
         }
     )
 
-    sq.add_action(
+    apm.add_action(
         {
             "action_server": PAL_server,
             "action_name": "archive_tray_unload",
             "action_params": {
-                "tray": sq.pars.tray,
-                "slot": sq.pars.slot,
+                "tray": apm.pars.tray,
+                "slot": apm.pars.slot,
             },
             "start_condition": ActionStartCondition.wait_for_all,
         }
     )
 
-    return sq.action_list  # returns complete action list to orch
+    return apm.action_list  # returns complete action list to orch
 
 def ADSS_sub_rel_move(
     experiment: Experiment,
