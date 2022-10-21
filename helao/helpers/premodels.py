@@ -19,7 +19,11 @@ from helao.helpers.print_message import print_message
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.set_time import set_time
 from helaocore.models.action import ActionModel, ShortActionModel
-from helaocore.models.experiment import ExperimentModel, ShortExperimentModel, ExperimentTemplate
+from helaocore.models.experiment import (
+    ExperimentModel,
+    ShortExperimentModel,
+    ExperimentTemplate,
+)
 from helaocore.models.sequence import SequenceModel
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.action_start_condition import ActionStartCondition
@@ -42,7 +46,9 @@ class Sequence(SequenceModel):
 
     def get_seq(self):
         seq = SequenceModel(**self.dict())
-        seq.experiment_list = [ShortExperimentModel(**exp.dict()) for exp in self.experimentmodel_list]
+        seq.experiment_list = [
+            ShortExperimentModel(**exp.dict()) for exp in self.experimentmodel_list
+        ]
         # either we have a plan at the beginning or not
         # don't add it later from the experimentmodel_list
         # seq.experiment_plan_list = [ExperimentTemplate(**exp.dict()) for exp in self.experimentmodel_list]
@@ -64,11 +70,17 @@ class Sequence(SequenceModel):
         HMS = self.sequence_timestamp.strftime("%H%M%S")
         year_week = self.sequence_timestamp.strftime("%y.%U")
         sequence_date = self.sequence_timestamp.strftime("%Y%m%d")
+        plate = self.sequence.sequence_params.get("plate_id", "")
+        if plate:
+            serial = f"{plate}{str(sum([int(x) for x in str(plate)]) % 10)}"
+            append_plate = f"-{serial}"
+        else:
+            append_plate = ""
 
         return os.path.join(
             year_week,
             sequence_date,
-            f"{HMS}__{self.sequence_name}__{self.sequence_label}",
+            f"{HMS}__{self.sequence_name}__{self.sequence_label}{append_plate}",
         )
 
 
@@ -141,7 +153,9 @@ class Experiment(Sequence, ExperimentModel):
                 exp.files.append(file)
 
             for _sample in actm.samples_in:
-                identical = self._check_sample(new_sample=_sample, sample_list=exp.samples_in)
+                identical = self._check_sample(
+                    new_sample=_sample, sample_list=exp.samples_in
+                )
                 if identical is None:
                     _sample.action_uuid = []
                     _sample.action_uuid.append(actm.action_uuid)
@@ -151,7 +165,9 @@ class Experiment(Sequence, ExperimentModel):
 
             for _sample in actm.samples_out:
 
-                identical = self._check_sample(new_sample=_sample, sample_list=exp.samples_out)
+                identical = self._check_sample(
+                    new_sample=_sample, sample_list=exp.samples_out
+                )
                 if identical is None:
                     _sample.action_uuid = []
                     _sample.action_uuid.append(actm.action_uuid)
@@ -280,7 +296,8 @@ class ActionPlanMaker(object):
                     print_message(
                         {},
                         "actionplanmaker",
-                        f"{self.expname}: found Experiment BaseModel under " f"parameter '{arg}'",
+                        f"{self.expname}: found Experiment BaseModel under "
+                        f"parameter '{arg}'",
                         info=True,
                     )
                     self._experiment = deepcopy(argparam)
@@ -314,9 +331,9 @@ class ActionPlanMaker(object):
         if self._experiment.experiment_params is not None:
             for key, val in self._experiment.experiment_params.items():
                 if isinstance(val, str):
-                    if val.lower() == 'true':
+                    if val.lower() == "true":
                         val = True
-                    elif val.lower() == 'false':
+                    elif val.lower() == "false":
                         val = False
                 setattr(self.pars, key, val)
 
@@ -334,9 +351,9 @@ class ActionPlanMaker(object):
                     info=True,
                 )
                 if isinstance(val, str):
-                    if val.lower() == 'true':
+                    if val.lower() == "true":
                         val = True
-                    elif val.lower() == 'false':
+                    elif val.lower() == "false":
                         val = False
                 setattr(self.pars, key, val)
 
