@@ -55,15 +55,13 @@ def ECHE_sub_unloadall_customs(experiment: Experiment):
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    apm.add_action(
+    apm.add(
+        PAL_server,
+        "archive_custom_unloadall",
         {
-            "action_server": PAL_server,
-            "action_name": "archive_custom_unloadall",
-            "action_params": {
-                "destroy_liquid": True,
-            },
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+            "destroy_liquid": True,
+        },
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
     return apm.action_list  # returns complete action list to orch
@@ -79,25 +77,23 @@ def ECHE_sub_add_liquid(
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    apm.add_action(
+    apm.add(
+        PAL_server,
+        "archive_custom_add_liquid",
         {
-            "action_server": PAL_server,
-            "action_name": "archive_custom_add_liquid",
-            "action_params": {
-                "custom": apm.pars.solid_custom_position,
-                "source_liquid_in": LiquidSample(
-                    **{
-                        "sample_no": apm.pars.reservoir_liquid_sample_no,
-                        "machine_name": gethostname(),
-                    }
-                ).dict(),
-                "volume_ml": apm.pars.liquid_volume_ml,
-                "reservoir_bubbler_gas": apm.pars.solution_bubble_gas,
-                "combine_liquids": True,
-                "dilute_liquids": True,
-            },
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+            "custom": apm.pars.solid_custom_position,
+            "source_liquid_in": LiquidSample(
+                **{
+                    "sample_no": apm.pars.reservoir_liquid_sample_no,
+                    "machine_name": gethostname(),
+                }
+            ).dict(),
+            "volume_ml": apm.pars.liquid_volume_ml,
+            "reservoir_bubbler_gas": apm.pars.solution_bubble_gas,
+            "combine_liquids": True,
+            "dilute_liquids": True,
+        },
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
     return apm.action_list  # returns complete action list to orch
@@ -114,22 +110,20 @@ def ECHE_sub_load_solid(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    apm.add_action(
+    apm.add(
+        PAL_server,
+        "archive_custom_load",
         {
-            "action_server": PAL_server,
-            "action_name": "archive_custom_load",
-            "action_params": {
-                "custom": apm.pars.solid_custom_position,
-                "load_sample_in": SolidSample(
-                    **{
-                        "sample_no": apm.pars.solid_sample_no,
-                        "plate_id": apm.pars.solid_plate_id,
-                        "machine_name": "legacy",
-                    }
-                ).dict(),
-            },
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+            "custom": apm.pars.solid_custom_position,
+            "load_sample_in": SolidSample(
+                **{
+                    "sample_no": apm.pars.solid_sample_no,
+                    "plate_id": apm.pars.solid_plate_id,
+                    "machine_name": "legacy",
+                }
+            ).dict(),
+        },
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
     return apm.action_list  # returns complete action list to orch
@@ -175,35 +169,31 @@ def ECHE_sub_startup(
     )
 
     # get sample plate coordinates
-    apm.add_action(
+    apm.add(
+        MOTOR_server,
+        "solid_get_samples_xy",
         {
-            "action_server": MOTOR_server,
-            "action_name": "solid_get_samples_xy",
-            "action_params": {
-                "plate_id": apm.pars.solid_plate_id,
-                "sample_no": apm.pars.solid_sample_no,
-            },
-            "to_globalexp_params": [
-                "_platexy"
-            ],  # save new liquid_sample_no of eche cell to globals
-            "start_condition": ActionStartCondition.wait_for_all,
-        }
+            "plate_id": apm.pars.solid_plate_id,
+            "sample_no": apm.pars.solid_sample_no,
+        },
+        to_globalexp_params=[
+            "_platexy"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,
     )
 
     # move to position
-    apm.add_action(
+    apm.add(
+        MOTOR_server,
+        "move",
         {
-            "action_server": MOTOR_server,
-            "action_name": "move",
-            "action_params": {
-                # "d_mm": [apm.pars.x_mm, apm.pars.y_mm],
-                "axis": ["x", "y"],
-                "mode": MoveModes.absolute,
-                "transformation": TransformationModes.platexy,
-            },
-            "from_globalexp_params": {"_platexy": "d_mm"},
-            "start_condition": ActionStartCondition.wait_for_all,
-        }
+            # "d_mm": [apm.pars.x_mm, apm.pars.y_mm],
+            "axis": ["x", "y"],
+            "mode": MoveModes.absolute,
+            "transformation": TransformationModes.platexy,
+        },
+        from_globalexp_params={"_platexy": "d_mm"},
+        start_condition=ActionStartCondition.wait_for_all,
     )
 
     return apm.action_list  # returns complete action list to orch
@@ -236,8 +226,8 @@ def ECHE_sub_CA_led(
     samplerate_sec: Optional[float] = 0.1,
     CA_duration_sec: Optional[float] = 60,
     gamry_i_range: Optional[str] = "auto",
-    gamrychannelwait: Optional[int]= -1,
-    gamrychannelsend: Optional [int]= 0,
+    gamrychannelwait: Optional[int] = -1,
+    gamrychannelsend: Optional[int] = 0,
     illumination_source: Optional[str] = "doric_led1",
     illumination_wavelength: Optional[float] = 0.0,
     illumination_intensity: Optional[float] = 0.0,
@@ -257,41 +247,37 @@ def ECHE_sub_CA_led(
         apm.pars.toggle_illum_time = apm.pars.CA_duration_sec
 
     # get sample for gamry
-    apm.add_action(
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
         {
-            "action_server": PAL_server,
-            "action_name": "archive_custom_query_sample",
-            "action_params": {
-                "custom": "cell1_we",
-            },
-            "to_globalexp_params": [
-                "_fast_samples_in"
-            ],  # save new liquid_sample_no of eche cell to globals
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
     # setup toggle on galil_io
-    apm.add_action(
+    apm.add(
+        IO_server,
+        "set_digital_cycle",
         {
-            "action_server": IO_server,
-            "action_name": "set_digital_cycle",
-            "action_params": {
-                "trigger_name": "gamry_ttl0",
-                "triggertype": toggle_triggertype,
-                "out_name": apm.pars.illumination_source,
-                "out_name_gamry": "gamry_aux",
-                "toggle_init_delay": apm.pars.toggle_dark_time_init,
-                "toggle_duty": apm.pars.toggle_illum_duty,
-                "toggle_period": apm.pars.toggle_illum_period,
-                "toggle_duration": apm.pars.toggle_illum_time,
-            },
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "process_finish": False,
-            "process_contrib": [
-                ProcessContrib.files,
-            ],
+            "trigger_name": "gamry_ttl0",
+            "triggertype": toggle_triggertype,
+            "out_name": apm.pars.illumination_source,
+            "out_name_gamry": "gamry_aux",
+            "toggle_init_delay": apm.pars.toggle_dark_time_init,
+            "toggle_duty": apm.pars.toggle_illum_duty,
+            "toggle_period": apm.pars.toggle_illum_period,
+            "toggle_duration": apm.pars.toggle_illum_time,
         },
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.files,
+        ],
     )
 
     # apply potential
@@ -301,36 +287,28 @@ def ECHE_sub_CA_led(
         - 0.059 * apm.pars.solution_ph
     )
     print(f"ECHE_sub_CA potential: {potential}")
-    apm.add_action(
+    apm.add(
+        PSTAT_server,
+        "run_CA",
         {
-            "action_server": PSTAT_server,
-            "action_name": "run_CA",
-            "action_params": {
-                "Vval__V": potential,
-                "Tval__s": apm.pars.CA_duration_sec,
-                "AcqInterval__s": apm.pars.samplerate_sec,
-                "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-                "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
-                "IErange": apm.pars.gamry_i_range,
-            },
-            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "technique_name": "CA",
-            "process_finish": True,
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
+            "Vval__V": potential,
+            "Tval__s": apm.pars.CA_duration_sec,
+            "AcqInterval__s": apm.pars.samplerate_sec,
+            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": apm.pars.gamry_i_range,
         },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        technique_name="CA",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
-    apm.add_action(
-        {
-            "action_server": IO_server,
-            "action_name": "stop_digital_cycle",
-            "action_params": {},
-        },
-    )
+    apm.add(IO_server, "stop_digital_cycle", {})
 
     return apm.action_list  # returns complete action list to orch
 
@@ -342,41 +320,36 @@ def ECHE_sub_OCV(
     SampleRate: float = 0.05,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    apm.add_action(
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
         {
-            "action_server": PAL_server,
-            "action_name": "archive_custom_query_sample",
-            "action_params": {
-                "custom": "cell1_we",
-            },
-            "to_globalexp_params": [
-                "_fast_samples_in"
-            ],  # save new liquid_sample_no of eche cell to globals
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
-    )
-    apm.add_action(
-        {
-            #    "OCV",
-            "action_server": PSTAT_server,
-            "action_name": "run_OCV",
-            "action_params": {
-                "Tval__s": Tval__s,
-                "SampleRate": SampleRate,
-                "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                "TTLsend": -1,  # -1 disables, else select TTL 0-3
-                "IErange": "auto",
-            },
-            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "technique_name": "OCV",
-            "process_finish": True,
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
+            "custom": "cell1_we",
         },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    )
+    apm.add(
+        PSTAT_server,
+        "run_OCV",
+        {
+            "Tval__s": Tval__s,
+            "SampleRate": SampleRate,
+            "TTLwait": -1,  # -1 disables, else select TTL 0-3
+            "TTLsend": -1,  # -1 disables, else select TTL 0-3
+            "IErange": "auto",
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        technique_name="OCV",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
     return apm.action_list  # returns complete action list to orch
 
@@ -393,41 +366,37 @@ def ECHE_sub_preCV(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # get sample for gamry
-    apm.add_action(
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
         {
-            "action_server": PAL_server,
-            "action_name": "archive_custom_query_sample",
-            "action_params": {
-                "custom": "cell1_we",
-            },
-            "to_globalexp_params": [
-                "_fast_samples_in"
-            ],  # save new liquid_sample_no of eche cell to globals
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
-    apm.add_action(
+    apm.add(
+        PSTAT_server,
+        "run_CA",
         {
-            "action_server": PSTAT_server,
-            "action_name": "run_CA",
-            "action_params": {
-                "Vval": apm.pars.CA_potential,
-                "Tval__s": apm.pars.CA_duration_sec,
-                "SampleRate": apm.pars.samplerate_sec,
-                "TTLwait": -1,  # -1 disables, else select TTL 0-3
-                "TTLsend": -1,  # -1 disables, else select TTL 0-3
-                "IErange": "auto",
-            },
-            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "technique_name": "CA",
-            "process_finish": True,
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
-        }
+            "Vval": apm.pars.CA_potential,
+            "Tval__s": apm.pars.CA_duration_sec,
+            "SampleRate": apm.pars.samplerate_sec,
+            "TTLwait": -1,  # -1 disables, else select TTL 0-3
+            "TTLsend": -1,  # -1 disables, else select TTL 0-3
+            "IErange": "auto",
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        technique_name="CA",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
 
     return apm.action_list  # returns complete action list to orch
@@ -454,18 +423,16 @@ def ECHE_sub_CA(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # get sample for gamry
-    apm.add_action(
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
         {
-            "action_server": PAL_server,
-            "action_name": "archive_custom_query_sample",
-            "action_params": {
-                "custom": "cell1_we",
-            },
-            "to_globalexp_params": [
-                "_fast_samples_in"
-            ],  # save new liquid_sample_no of eche cell to globals
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
     # apply potential
@@ -475,26 +442,24 @@ def ECHE_sub_CA(
         - 0.059 * apm.pars.solution_ph
     )
     print(f"ECHE_sub_CA potential: {potential}")
-    apm.add_action(
+    apm.add(
+        PSTAT_server,
+        "run_CA",
         {
-            "action_server": PSTAT_server,
-            "action_name": "run_CA",
-            "action_params": {
-                "Vval__V": potential,
-                "Tval__s": apm.pars.CA_duration_sec,
-                "AcqInterval__s": apm.pars.samplerate_sec,
-                "IErange": apm.pars.gamry_i_range,
-            },
-            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "technique_name": "CA",
-            "process_finish": True,
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
+            "Vval__V": potential,
+            "Tval__s": apm.pars.CA_duration_sec,
+            "AcqInterval__s": apm.pars.samplerate_sec,
+            "IErange": apm.pars.gamry_i_range,
         },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        technique_name="CA",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
 
     return apm.action_list  # returns complete action list to orch
@@ -513,8 +478,8 @@ def ECHE_sub_CV_led(
     samplerate_sec: Optional[float] = 0.1,
     cycles: Optional[int] = 1,
     gamry_i_range: Optional[str] = "auto",
-    gamrychannelwait: Optional[int]= -1,
-    gamrychannelsend: Optional [int]= 0,
+    gamrychannelwait: Optional[int] = -1,
+    gamrychannelsend: Optional[int] = 0,
     solution_ph: float = 0,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
@@ -559,88 +524,76 @@ def ECHE_sub_CV_led(
         apm.pars.toggle_illum_time = CV_duration_sec
 
     # get sample for gamry
-    apm.add_action(
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
         {
-            "action_server": PAL_server,
-            "action_name": "archive_custom_query_sample",
-            "action_params": {
-                "custom": "cell1_we",
-            },
-            "to_globalexp_params": [
-                "_fast_samples_in"
-            ],  # save new liquid_sample_no of eche cell to globals
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
     # setup toggle on galil_io
-    apm.add_action(
+    apm.add(
+        IO_server,
+        "set_digital_cycle",
         {
-            "action_server": IO_server,
-            "action_name": "set_digital_cycle",
-            "action_params": {
-                "trigger_name": "gamry_ttl0",
-                "triggertype": toggle_triggertype,
-                "out_name": apm.pars.illumination_source,
-                "out_name_gamry": "gamry_aux",
-                "toggle_init_delay": apm.pars.toggle_dark_time_init,
-                "toggle_duty": apm.pars.toggle_illum_duty,
-                "toggle_period": apm.pars.toggle_illum_period,
-                "toggle_duration": apm.pars.toggle_illum_time,
-            },
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "process_finish": False,
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
+            "trigger_name": "gamry_ttl0",
+            "triggertype": toggle_triggertype,
+            "out_name": apm.pars.illumination_source,
+            "out_name_gamry": "gamry_aux",
+            "toggle_init_delay": apm.pars.toggle_dark_time_init,
+            "toggle_duty": apm.pars.toggle_illum_duty,
+            "toggle_period": apm.pars.toggle_illum_period,
+            "toggle_duration": apm.pars.toggle_illum_time,
         },
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
 
     # apply potential
-    apm.add_action(
+    apm.add(
+        PSTAT_server,
+        "run_CV",
         {
-            "action_server": PSTAT_server,
-            "action_name": "run_CV",
-            "action_params": {
-                "Vinit__V": apm.pars.Vinit_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.solution_ph,
-                "Vapex1__V": apm.pars.Vapex1_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.solution_ph,
-                "Vapex2__V": apm.pars.Vapex2_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.solution_ph,
-                "Vfinal__V": apm.pars.Vfinal_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.solution_ph,
-                "ScanRate__V_s": apm.pars.scanrate_voltsec,
-                "AcqInterval__s": apm.pars.samplerate_sec,
-                "Cycles": apm.pars.cycles,
-                "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-                "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
-                "IErange": apm.pars.gamry_i_range,
-            },
-            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "technique_name": "CV",
-            "process_finish": True,
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
+            "Vinit__V": apm.pars.Vinit_vsRHE
+            - 1.0 * apm.pars.ref_vs_nhe
+            - 0.059 * apm.pars.solution_ph,
+            "Vapex1__V": apm.pars.Vapex1_vsRHE
+            - 1.0 * apm.pars.ref_vs_nhe
+            - 0.059 * apm.pars.solution_ph,
+            "Vapex2__V": apm.pars.Vapex2_vsRHE
+            - 1.0 * apm.pars.ref_vs_nhe
+            - 0.059 * apm.pars.solution_ph,
+            "Vfinal__V": apm.pars.Vfinal_vsRHE
+            - 1.0 * apm.pars.ref_vs_nhe
+            - 0.059 * apm.pars.solution_ph,
+            "ScanRate__V_s": apm.pars.scanrate_voltsec,
+            "AcqInterval__s": apm.pars.samplerate_sec,
+            "Cycles": apm.pars.cycles,
+            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": apm.pars.gamry_i_range,
         },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        technique_name="CV",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
-    apm.add_action(
-        {
-            "action_server": IO_server,
-            "action_name": "stop_digital_cycle",
-            "action_params": {},
-        },
-    )
+    apm.add(IO_server, "stop_digital_cycle", {})
 
     return apm.action_list  # returns complete action list to orch
 
@@ -672,53 +625,49 @@ def ECHE_sub_CV(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # get sample for gamry
-    apm.add_action(
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
         {
-            "action_server": PAL_server,
-            "action_name": "archive_custom_query_sample",
-            "action_params": {
-                "custom": "cell1_we",
-            },
-            "to_globalexp_params": [
-                "_fast_samples_in"
-            ],  # save new liquid_sample_no of eche cell to globals
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
     # apply potential
-    apm.add_action(
+    apm.add(
+        PSTAT_server,
+        "run_CV",
         {
-            "action_server": PSTAT_server,
-            "action_name": "run_CV",
-            "action_params": {
-                "Vinit__V": apm.pars.Vinit_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.solution_ph,
-                "Vapex1__V": apm.pars.Vapex1_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.solution_ph,
-                "Vapex2__V": apm.pars.Vapex2_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.solution_ph,
-                "Vfinal__V": apm.pars.Vfinal_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.solution_ph,
-                "ScanRate__V_s": apm.pars.scanrate_voltsec,
-                "AcqInterval__s": apm.pars.samplerate_sec,
-                "Cycles": apm.pars.cycles,
-                "IErange": apm.pars.gamry_i_range,
-            },
-            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "technique_name": "CV",
-            "process_finish": True,
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
+            "Vinit__V": apm.pars.Vinit_vsRHE
+            - 1.0 * apm.pars.ref_vs_nhe
+            - 0.059 * apm.pars.solution_ph,
+            "Vapex1__V": apm.pars.Vapex1_vsRHE
+            - 1.0 * apm.pars.ref_vs_nhe
+            - 0.059 * apm.pars.solution_ph,
+            "Vapex2__V": apm.pars.Vapex2_vsRHE
+            - 1.0 * apm.pars.ref_vs_nhe
+            - 0.059 * apm.pars.solution_ph,
+            "Vfinal__V": apm.pars.Vfinal_vsRHE
+            - 1.0 * apm.pars.ref_vs_nhe
+            - 0.059 * apm.pars.solution_ph,
+            "ScanRate__V_s": apm.pars.scanrate_voltsec,
+            "AcqInterval__s": apm.pars.samplerate_sec,
+            "Cycles": apm.pars.cycles,
+            "IErange": apm.pars.gamry_i_range,
         },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        technique_name="CV",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
 
     return apm.action_list  # returns complete action list to orch
@@ -745,18 +694,16 @@ def ECHE_sub_CP(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # get sample for gamry
-    apm.add_action(
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
         {
-            "action_server": PAL_server,
-            "action_name": "archive_custom_query_sample",
-            "action_params": {
-                "custom": "cell1_we",
-            },
-            "to_globalexp_params": [
-                "_fast_samples_in"
-            ],  # save new liquid_sample_no of eche cell to globals
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
     #    # apply potential
@@ -764,26 +711,24 @@ def ECHE_sub_CP(
     #        apm.pars.CA_potential_vsRHE - 1.0 * apm.pars.ref_vs_nhe - 0.059 * apm.pars.solution_ph
     #    )
     #    print(f"ECHE_sub_CA potential: {potential}")
-    apm.add_action(
+    apm.add(
+        PSTAT_server,
+        "run_CP",
         {
-            "action_server": PSTAT_server,
-            "action_name": "run_CP",
-            "action_params": {
-                "Ival__A": CP_current,
-                "Tval__s": apm.pars.CP_duration_sec,
-                "AcqInterval__s": apm.pars.samplerate_sec,
-                "IErange": apm.pars.gamry_i_range,
-            },
-            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "technique_name": "CP",
-            "process_finish": True,
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
+            "Ival__A": CP_current,
+            "Tval__s": apm.pars.CP_duration_sec,
+            "AcqInterval__s": apm.pars.samplerate_sec,
+            "IErange": apm.pars.gamry_i_range,
         },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        technique_name="CP",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
 
     return apm.action_list  # returns complete action list to orch
@@ -803,8 +748,8 @@ def ECHE_sub_CP_led(
     samplerate_sec: Optional[float] = 0.1,
     CP_duration_sec: Optional[float] = 60,
     gamry_i_range: Optional[str] = "auto",
-    gamrychannelwait: Optional[int]= -1,
-    gamrychannelsend: Optional [int]= 0,
+    gamrychannelwait: Optional[int] = -1,
+    gamrychannelsend: Optional[int] = 0,
     illumination_source: Optional[str] = "doric_led1",
     illumination_wavelength: Optional[float] = 0.0,
     illumination_intensity: Optional[float] = 0.0,
@@ -824,75 +769,63 @@ def ECHE_sub_CP_led(
         apm.pars.toggle_illum_time = apm.pars.CP_duration_sec
 
     # get sample for gamry
-    apm.add_action(
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
         {
-            "action_server": PAL_server,
-            "action_name": "archive_custom_query_sample",
-            "action_params": {
-                "custom": "cell1_we",
-            },
-            "to_globalexp_params": [
-                "_fast_samples_in"
-            ],  # save new liquid_sample_no of eche cell to globals
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
     # setup toggle on galil_io
-    apm.add_action(
+    apm.add(
+        IO_server,
+        "set_digital_cycle",
         {
-            "action_server": IO_server,
-            "action_name": "set_digital_cycle",
-            "action_params": {
-                "trigger_name": "gamry_ttl0",
-                "triggertype": toggle_triggertype,
-                "out_name": apm.pars.illumination_source,
-                "out_name_gamry": "gamry_aux",
-                "toggle_init_delay": apm.pars.toggle_dark_time_init,
-                "toggle_duty": apm.pars.toggle_illum_duty,
-                "toggle_period": apm.pars.toggle_illum_period,
-                "toggle_duration": apm.pars.toggle_illum_time,
-            },
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "process_finish": False,
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
+            "trigger_name": "gamry_ttl0",
+            "triggertype": toggle_triggertype,
+            "out_name": apm.pars.illumination_source,
+            "out_name_gamry": "gamry_aux",
+            "toggle_init_delay": apm.pars.toggle_dark_time_init,
+            "toggle_duty": apm.pars.toggle_illum_duty,
+            "toggle_period": apm.pars.toggle_illum_period,
+            "toggle_duration": apm.pars.toggle_illum_time,
         },
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
 
-    apm.add_action(
+    apm.add(
+        PSTAT_server,
+        "run_CP",
         {
-            "action_server": PSTAT_server,
-            "action_name": "run_CP",
-            "action_params": {
-                "Ival__A": apm.pars.CP_current,
-                "Tval__s": apm.pars.CP_duration_sec,
-                "AcqInterval__s": apm.pars.samplerate_sec,
-                "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-                "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
-                "IErange": apm.pars.gamry_i_range,
-            },
-            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "technique_name": "CP",
-            "process_finish": True,
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
+            "Ival__A": apm.pars.CP_current,
+            "Tval__s": apm.pars.CP_duration_sec,
+            "AcqInterval__s": apm.pars.samplerate_sec,
+            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": apm.pars.gamry_i_range,
         },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        technique_name="CP",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
-    apm.add_action(
-        {
-            "action_server": IO_server,
-            "action_name": "stop_digital_cycle",
-            "action_params": {},
-        },
-    )
+    apm.add(IO_server, "stop_digital_cycle", {})
 
     return apm.action_list  # returns complete action list to orch
 
@@ -909,35 +842,31 @@ def ECHE_sub_movetosample(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # get sample plate coordinates
-    apm.add_action(
+    apm.add(
+        MOTOR_server,
+        "solid_get_samples_xy",
         {
-            "action_server": MOTOR_server,
-            "action_name": "solid_get_samples_xy",
-            "action_params": {
-                "plate_id": apm.pars.solid_plate_id,
-                "sample_no": apm.pars.solid_sample_no,
-            },
-            "to_globalexp_params": [
-                "_platexy"
-            ],  # save new liquid_sample_no of eche cell to globals
-            "start_condition": ActionStartCondition.wait_for_all,
-        }
+            "plate_id": apm.pars.solid_plate_id,
+            "sample_no": apm.pars.solid_sample_no,
+        },
+        to_globalexp_params=[
+            "_platexy"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,
     )
 
     # move to position
-    apm.add_action(
+    apm.add(
+        MOTOR_server,
+        "move",
         {
-            "action_server": MOTOR_server,
-            "action_name": "move",
-            "action_params": {
-                # "d_mm": [apm.pars.x_mm, apm.pars.y_mm],
-                "axis": ["x", "y"],
-                "mode": MoveModes.absolute,
-                "transformation": TransformationModes.platexy,
-            },
-            "from_globalexp_params": {"_platexy": "d_mm"},
-            "start_condition": ActionStartCondition.wait_for_all,
-        }
+            # "d_mm": [apm.pars.x_mm, apm.pars.y_mm],
+            "axis": ["x", "y"],
+            "mode": MoveModes.absolute,
+            "transformation": TransformationModes.platexy,
+        },
+        from_globalexp_params={"_platexy": "d_mm"},
+        start_condition=ActionStartCondition.wait_for_all,
     )
 
     return apm.action_list  # returns complete action list to orch
@@ -955,19 +884,17 @@ def ECHE_sub_rel_move(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     # move to position
-    apm.add_action(
+    apm.add(
+        MOTOR_server,
+        "move",
         {
-            "action_server": MOTOR_server,
-            "action_name": "move",
-            "action_params": {
-                "d_mm": [apm.pars.offset_x_mm, apm.pars.offset_y_mm],
-                "axis": ["x", "y"],
-                "mode": MoveModes.relative,
-                "transformation": TransformationModes.platexy,
-            },
-            #            "from_globalexp_params": {"_platexy": "d_mm"},
-            "start_condition": ActionStartCondition.wait_for_all,
-        }
+            "d_mm": [apm.pars.offset_x_mm, apm.pars.offset_y_mm],
+            "axis": ["x", "y"],
+            "mode": MoveModes.relative,
+            "transformation": TransformationModes.platexy,
+        },
+        #            "from_globalexp_params": {"_platexy": "d_mm"},
+        start_condition=ActionStartCondition.wait_for_all,
     )
 
     return apm.action_list  # returns complete action list to orch

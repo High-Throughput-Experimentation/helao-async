@@ -51,8 +51,8 @@ def ECHEUVIS_sub_CV_led(
     samplerate_sec: Optional[float] = 0.1,
     cycles: Optional[int] = 1,
     gamry_i_range: Optional[str] = "auto",
-    gamrychannelwait: Optional[int]= -1,
-    gamrychannelsend: Optional [int]= 0,
+    gamrychannelwait: Optional[int] = -1,
+    gamrychannelsend: Optional[int] = 0,
     solution_ph: float = 0,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
@@ -107,126 +107,110 @@ def ECHEUVIS_sub_CV_led(
         apm.pars.toggle2_time = CV_duration_sec
 
     # get sample for gamry
-    apm.add_action(
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
         {
-            "action_server": PAL_server,
-            "action_name": "archive_custom_query_sample",
-            "action_params": {
-                "custom": "cell1_we",
-            },
-            "to_globalexp_params": [
-                "_fast_samples_in"
-            ],  # save new liquid_sample_no of eche cell to globals
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
     # setup toggle on galil_io
-    apm.add_action(
+    apm.add(
+        IO_server,
+        "set_digital_cycle",
         {
-            "action_server": IO_server,
-            "action_name": "set_digital_cycle",
-            "action_params": {
-                "trigger_name": "gamry_ttl0",
-                "triggertype": toggle_triggertype,
-                "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
-                "out_name_gamry": None,
-                "toggle_init_delay": [
-                    apm.pars.toggle_dark_time_init,
-                    apm.pars.toggle2_init_delay,
-                ],
-                "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
-                "toggle_period": [
-                    apm.pars.toggle_illum_period,
-                    apm.pars.toggle2_period,
-                ],
-                "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
+            "trigger_name": "gamry_ttl0",
+            "triggertype": toggle_triggertype,
+            "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
+            "out_name_gamry": None,
+            "toggle_init_delay": [
+                apm.pars.toggle_dark_time_init,
+                apm.pars.toggle2_init_delay,
+            ],
+            "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
+            "toggle_period": [
+                apm.pars.toggle_illum_period,
+                apm.pars.toggle2_period,
+            ],
+            "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
+        },
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+
+    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
+        apm.add(
+            ss,
+            "acquire_spec_extrig",
+            {
+                "int_time": apm.pars.spec_int_time_ms,
+                "n_avg": apm.pars.spec_n_avg,
+                "duration": apm.pars.toggle2_time,
             },
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "process_finish": False,
-            "process_contrib": [
+            from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+            start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            technique_name=apm.pars.spec_technique,
+            process_contrib=[
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
-        },
-    )
-
-    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
-        apm.add_action(
-            {
-                "action_server": ss,
-                "action_name": "acquire_spec_extrig",
-                "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-                "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-                "action_params": {
-                    "int_time": apm.pars.spec_int_time_ms,
-                    "n_avg": apm.pars.spec_n_avg,
-                    "duration": apm.pars.toggle2_time,
-                },
-                "technique_name": apm.pars.spec_technique,
-                "process_contrib": [
-                    ProcessContrib.files,
-                    ProcessContrib.samples_in,
-                    ProcessContrib.samples_out,
-                ],
-            }
         )
 
     # apply potential
-    apm.add_action(
+    apm.add(
+        PSTAT_server,
+        "run_CV",
         {
-            "action_server": PSTAT_server,
-            "action_name": "run_CV",
-            "action_params": {
-                "Vinit__V": apm.pars.Vinit_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.solution_ph,
-                "Vapex1__V": apm.pars.Vapex1_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.solution_ph,
-                "Vapex2__V": apm.pars.Vapex2_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.solution_ph,
-                "Vfinal__V": apm.pars.Vfinal_vsRHE
-                - 1.0 * apm.pars.ref_vs_nhe
-                - 0.059 * apm.pars.solution_ph,
-                "ScanRate__V_s": apm.pars.scanrate_voltsec,
-                "AcqInterval__s": apm.pars.samplerate_sec,
-                "Cycles": apm.pars.cycles,
-                "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-                "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
-                "IErange": apm.pars.gamry_i_range,
-            },
-            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_server,
-            "technique_name": "CV",
-            "process_finish": True,
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
+            "Vinit__V": apm.pars.Vinit_vsRHE
+            - 1.0 * apm.pars.ref_vs_nhe
+            - 0.059 * apm.pars.solution_ph,
+            "Vapex1__V": apm.pars.Vapex1_vsRHE
+            - 1.0 * apm.pars.ref_vs_nhe
+            - 0.059 * apm.pars.solution_ph,
+            "Vapex2__V": apm.pars.Vapex2_vsRHE
+            - 1.0 * apm.pars.ref_vs_nhe
+            - 0.059 * apm.pars.solution_ph,
+            "Vfinal__V": apm.pars.Vfinal_vsRHE
+            - 1.0 * apm.pars.ref_vs_nhe
+            - 0.059 * apm.pars.solution_ph,
+            "ScanRate__V_s": apm.pars.scanrate_voltsec,
+            "AcqInterval__s": apm.pars.samplerate_sec,
+            "Cycles": apm.pars.cycles,
+            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": apm.pars.gamry_i_range,
         },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_server,
+        technique_name="CV",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
 
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
-        apm.add_action(
-            {
-                "action_server": ss,
-                "action_name": "stop_extrig_after",
-                "start_condition": ActionStartCondition.no_wait,
-                "action_params": {"delay": apm.pars.toggle2_time},
-            }
+        apm.add(
+            ss,
+            "stop_extrig_after",
+            {"delay": apm.pars.toggle2_time},
+            start_condition=ActionStartCondition.no_wait,
         )
 
-    apm.add_action(
-        {
-            "action_server": IO_server,
-            "action_name": "stop_digital_cycle",
-            "action_params": {},
-        },
-    )
+    apm.add(IO_server, "stop_digital_cycle", {})
 
     return apm.action_list  # returns complete action list to orch
 
@@ -245,8 +229,8 @@ def ECHEUVIS_sub_CA_led(
     samplerate_sec: Optional[float] = 0.1,
     CA_duration_sec: Optional[float] = 60,
     gamry_i_range: Optional[str] = "auto",
-    gamrychannelwait: Optional[int]= -1,
-    gamrychannelsend: Optional [int]= 0,
+    gamrychannelwait: Optional[int] = -1,
+    gamrychannelsend: Optional[int] = 0,
     illumination_source: Optional[str] = "doric_wled",
     illumination_wavelength: Optional[float] = 0.0,
     illumination_intensity: Optional[float] = 0.0,
@@ -276,70 +260,64 @@ def ECHEUVIS_sub_CA_led(
         apm.pars.toggle2_time = apm.pars.CA_duration_sec
 
     # get sample for gamry
-    apm.add_action(
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
         {
-            "action_server": PAL_server,
-            "action_name": "archive_custom_query_sample",
-            "action_params": {
-                "custom": "cell1_we",
-            },
-            "to_globalexp_params": [
-                "_fast_samples_in"
-            ],  # save new liquid_sample_no of eche cell to globals
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
     # setup toggle on galil_io
-    apm.add_action(
+    apm.add(
+        IO_server,
+        "set_digital_cycle",
         {
-            "action_server": IO_server,
-            "action_name": "set_digital_cycle",
-            "action_params": {
-                "trigger_name": "gamry_ttl0",
-                "triggertype": toggle_triggertype,
-                "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
-                "out_name_gamry": None,
-                "toggle_init_delay": [
-                    apm.pars.toggle_dark_time_init,
-                    apm.pars.toggle2_init_delay,
-                ],
-                "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
-                "toggle_period": [
-                    apm.pars.toggle_illum_period,
-                    apm.pars.toggle2_period,
-                ],
-                "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
+            "trigger_name": "gamry_ttl0",
+            "triggertype": toggle_triggertype,
+            "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
+            "out_name_gamry": None,
+            "toggle_init_delay": [
+                apm.pars.toggle_dark_time_init,
+                apm.pars.toggle2_init_delay,
+            ],
+            "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
+            "toggle_period": [
+                apm.pars.toggle_illum_period,
+                apm.pars.toggle2_period,
+            ],
+            "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
+        },
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+
+    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
+        apm.add(
+            ss,
+            "acquire_spec_extrig",
+            {
+                "int_time": apm.pars.spec_int_time_ms,
+                "n_avg": apm.pars.spec_n_avg,
+                "duration": apm.pars.toggle2_time,
             },
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "process_finish": False,
-            "process_contrib": [
+            from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+            start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            technique_name=apm.pars.spec_technique,
+            process_contrib=[
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
-        },
-    )
-
-    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
-        apm.add_action(
-            {
-                "action_server": ss,
-                "action_name": "acquire_spec_extrig",
-                "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-                "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-                "action_params": {
-                    "int_time": apm.pars.spec_int_time_ms,
-                    "n_avg": apm.pars.spec_n_avg,
-                    "duration": apm.pars.toggle2_time,
-                },
-                "technique_name": apm.pars.spec_technique,
-                "process_contrib": [
-                    ProcessContrib.files,
-                    ProcessContrib.samples_in,
-                    ProcessContrib.samples_out,
-                ],
-            }
         )
 
     # apply potential
@@ -349,47 +327,37 @@ def ECHEUVIS_sub_CA_led(
         - 0.059 * apm.pars.solution_ph
     )
     print(f"ECHE_sub_CA potential: {potential}")
-    apm.add_action(
+    apm.add(
+        PSTAT_server,
+        "run_CA",
         {
-            "action_server": PSTAT_server,
-            "action_name": "run_CA",
-            "action_params": {
-                "Vval__V": potential,
-                "Tval__s": apm.pars.CA_duration_sec,
-                "AcqInterval__s": apm.pars.samplerate_sec,
-                "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-                "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
-                "IErange": apm.pars.gamry_i_range,
-            },
-            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_server,
-            "technique_name": "CA",
-            "process_finish": True,
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
+            "Vval__V": potential,
+            "Tval__s": apm.pars.CA_duration_sec,
+            "AcqInterval__s": apm.pars.samplerate_sec,
+            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": apm.pars.gamry_i_range,
         },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_server,
+        technique_name="CA",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
 
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
-        apm.add_action(
-            {
-                "action_server": ss,
-                "action_name": "stop_extrig_after",
-                "start_condition": ActionStartCondition.no_wait,
-                "action_params": {"delay": apm.pars.toggle2_time},
-            }
+        apm.add(
+            ss,
+            "stop_extrig_after",
+            {"delay": apm.pars.toggle2_time},
+            start_condition=ActionStartCondition.no_wait,
         )
 
-    apm.add_action(
-        {
-            "action_server": IO_server,
-            "action_name": "stop_digital_cycle",
-            "action_params": {},
-        },
-    )
+    apm.add(IO_server, "stop_digital_cycle", {})
 
     return apm.action_list  # returns complete action list to orch
 
@@ -408,8 +376,8 @@ def ECHEUVIS_sub_CP_led(
     samplerate_sec: Optional[float] = 0.1,
     CP_duration_sec: Optional[float] = 60,
     gamry_i_range: Optional[str] = "auto",
-    gamrychannelwait: Optional[int]= -1,
-    gamrychannelsend: Optional [int]= 0,
+    gamrychannelwait: Optional[int] = -1,
+    gamrychannelsend: Optional[int] = 0,
     illumination_source: Optional[str] = "doric_wled",
     illumination_wavelength: Optional[float] = 0.0,
     illumination_intensity: Optional[float] = 0.0,
@@ -439,112 +407,100 @@ def ECHEUVIS_sub_CP_led(
         apm.pars.toggle2_time = apm.pars.CP_duration_sec
 
     # get sample for gamry
-    apm.add_action(
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
         {
-            "action_server": PAL_server,
-            "action_name": "archive_custom_query_sample",
-            "action_params": {
-                "custom": "cell1_we",
-            },
-            "to_globalexp_params": [
-                "_fast_samples_in"
-            ],  # save new liquid_sample_no of eche cell to globals
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        }
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
     # setup toggle on galil_io
-    apm.add_action(
+    apm.add(
+        IO_server,
+        "set_digital_cycle",
         {
-            "action_server": IO_server,
-            "action_name": "set_digital_cycle",
-            "action_params": {
-                "trigger_name": "gamry_ttl0",
-                "triggertype": toggle_triggertype,
-                "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
-                "out_name_gamry": None,
-                "toggle_init_delay": [
-                    apm.pars.toggle_dark_time_init,
-                    apm.pars.toggle2_init_delay,
-                ],
-                "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
-                "toggle_period": [
-                    apm.pars.toggle_illum_period,
-                    apm.pars.toggle2_period,
-                ],
-                "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
+            "trigger_name": "gamry_ttl0",
+            "triggertype": toggle_triggertype,
+            "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
+            "out_name_gamry": None,
+            "toggle_init_delay": [
+                apm.pars.toggle_dark_time_init,
+                apm.pars.toggle2_init_delay,
+            ],
+            "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
+            "toggle_period": [
+                apm.pars.toggle_illum_period,
+                apm.pars.toggle2_period,
+            ],
+            "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
+        },
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+
+    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
+        apm.add(
+            ss,
+            "acquire_spec_extrig",
+            {
+                "int_time": apm.pars.spec_int_time_ms,
+                "n_avg": apm.pars.spec_n_avg,
+                "duration": apm.pars.toggle2_time,
             },
-            "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            "process_finish": False,
-            "process_contrib": [
+            from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+            start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            technique_name=apm.pars.spec_technique,
+            process_contrib=[
                 ProcessContrib.files,
                 ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
+        )
+
+    apm.add(
+        PSTAT_server,
+        "run_CP",
+        {
+            "Ival__A": apm.pars.CP_current,
+            "Tval__s": apm.pars.CP_duration_sec,
+            "AcqInterval__s": apm.pars.samplerate_sec,
+            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": apm.pars.gamry_i_range,
         },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_server,
+        technique_name="CP",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
     )
 
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
-        apm.add_action(
-            {
-                "action_server": ss,
-                "action_name": "acquire_spec_extrig",
-                "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-                "start_condition": ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-                "action_params": {
-                    "int_time": apm.pars.spec_int_time_ms,
-                    "n_avg": apm.pars.spec_n_avg,
-                    "duration": apm.pars.toggle2_time,
-                },
-                "technique_name": apm.pars.spec_technique,
-                "process_contrib": [
-                    ProcessContrib.files,
-                    ProcessContrib.samples_in,
-                    ProcessContrib.samples_out,
-                ],
-            }
+        apm.add(
+            ss,
+            "stop_extrig_after",
+            {"delay": apm.pars.toggle2_time},
+            start_condition=ActionStartCondition.no_wait,
         )
 
-    apm.add_action(
-        {
-            "action_server": PSTAT_server,
-            "action_name": "run_CP",
-            "action_params": {
-                "Ival__A": apm.pars.CP_current,
-                "Tval__s": apm.pars.CP_duration_sec,
-                "AcqInterval__s": apm.pars.samplerate_sec,
-                "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
-                "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
-                "IErange": apm.pars.gamry_i_range,
-            },
-            "from_globalexp_params": {"_fast_samples_in": "fast_samples_in"},
-            "start_condition": ActionStartCondition.wait_for_server,
-            "technique_name": "CP",
-            "process_finish": True,
-            "process_contrib": [
-                ProcessContrib.files,
-                ProcessContrib.samples_in,
-                ProcessContrib.samples_out,
-            ],
-        },
-    )
-
-    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
-        apm.add_action(
-            {
-                "action_server": ss,
-                "action_name": "stop_extrig_after",
-                "start_condition": ActionStartCondition.no_wait,
-                "action_params": {"delay": apm.pars.toggle2_time},
-            }
-        )
-
-    apm.add_action(
-        {
-            "action_server": IO_server,
-            "action_name": "stop_digital_cycle",
-            "action_params": {},
-        },
+    apm.add(
+        IO_server,
+        "stop_digital_cycle",
+        {},
     )
 
     return apm.action_list  # returns complete action list to orch
