@@ -603,14 +603,14 @@ class DBPack:
             )
             self.testing_uuid_dict = None
         self.loop = asyncio.get_event_loop()
-        self.task_queue = asyncio.PriorityQueue()
+        self.task_queue = asyncio.Queue()
         self.loop.create_task(self.yml_task())
         self.current_task = None
         self.cleanup_root()
 
     async def yml_task(self):
         while True:
-            _, yml_target = await self.task_queue.get()
+            yml_target = await self.task_queue.get()
             if os.path.exists(yml_target):
                 try:
                     await asyncio.sleep(1.0)  # delay to release base/orch file handles
@@ -721,8 +721,8 @@ class DBPack:
         #     )
         return self.log_dict
 
-    async def add_yml_task(self, yml_path: str, priority=0):
-        await self.task_queue.put((priority, yml_path))
+    async def add_yml_task(self, yml_path: str):
+        await self.task_queue.put(yml_path)
         self.base.print_message(f"Added {yml_path} to tasks.")
 
     async def finish_yml(self, yml_path: Union[str, HelaoPath]):
