@@ -742,8 +742,18 @@ class Orch(Base):
                         server_free = self.orchstatusmodel.server_free(
                             action_server=A.action_server
                         )
-
                         if server_free:
+                            break
+                elif A.start_condition == ActionStartCondition.wait_for_orch:
+                    self.print_message(
+                        "orch is waiting for endpoint to become available"
+                    )
+                    while True:
+                        await self.wait_for_interrupt()
+                        endpoint_free = self.orchstatusmodel.endpoint_free(
+                            action_server=A.orchestrator, endpoint_name="wait"
+                        )
+                        if endpoint_free:
                             break
                 elif A.start_condition == ActionStartCondition.wait_for_all:
                     await self.orch_wait_for_all_actions()
