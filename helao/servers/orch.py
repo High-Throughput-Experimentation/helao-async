@@ -560,6 +560,20 @@ class Orch(Base):
         else:
             return []
 
+    async def seq_unpacker(self):
+        for i, experimenttemplate in enumerate(
+            self.active_sequence.experiment_plan_list
+        ):
+            # self.print_message(
+            #     f"unpack experiment {experimenttemplate.experiment_name}"
+            # )
+            await self.add_experiment(
+                seq=self.seq_file,
+                experimenttemplate=experimenttemplate,
+            )
+            if i == 0:
+                self.orchstatusmodel.loop_state = OrchStatus.started
+
     async def loop_task_dispatch_sequence(self) -> ErrorCodes:
         if self.sequence_dq:
             self.print_message("finishing last sequence")
@@ -594,18 +608,9 @@ class Orch(Base):
             # add all experiments from sequence to experiment queue
             # todo: use seq model instead to initialize some parameters
             # of the experiment
-            for i, experimenttemplate in enumerate(
-                self.active_sequence.experiment_plan_list
-            ):
-                # self.print_message(
-                #     f"unpack experiment {experimenttemplate.experiment_name}"
-                # )
-                await self.add_experiment(
-                    seq=self.seq_file,
-                    experimenttemplate=experimenttemplate,
-                )
-                if i == 0:
-                    self.orchstatusmodel.loop_state = OrchStatus.started
+
+            self.aloop.create_task(self.seq_unpacker())
+            await asyncio.sleep(1)
 
         else:
             self.print_message("sequence queue is empty, cannot start orch loop")
