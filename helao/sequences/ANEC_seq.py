@@ -10,9 +10,9 @@ from helao.helpers.premodels import ExperimentPlanMaker
 SEQUENCES = __all__
 
 def ANEC_sample_ready(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     num_repeats: int = 1,
-    solid_plate_id: int = 4534,
+    plate_id: int = 4534,
     solid_sample_no: int = 1,
     z_move_mm: float = 3.0,
     reservoir_liquid_sample_no: int = 1,
@@ -49,7 +49,7 @@ def ANEC_sample_ready(
     # move to solid sample
     epm.add_experiment(
         "ANEC_sub_startup",
-        {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no, "z_move_mm": z_move_mm},
+        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no, "z_move_mm": z_move_mm},
     )
     
     #clean the cell & purge with CO2
@@ -63,7 +63,7 @@ def ANEC_sample_ready(
 
     epm.add_experiment(
         "ANEC_sub_load_solid",
-        {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no},
+        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
     )
 
     for _ in range(num_repeats):
@@ -101,7 +101,7 @@ def ANEC_sample_ready(
 
 def ANEC_series_CA(
     sequence_version: int = 1,
-    solid_plate_id: int = 4534,
+    plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: float = 1000,
@@ -150,7 +150,7 @@ def ANEC_series_CA(
 
     epm.add_experiment(
         "ANEC_sub_load_solid",
-        {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no},
+        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
     )
 
     for cycle, (potential, time) in enumerate(zip(WE_potential__V, CA_duration_sec)):
@@ -203,7 +203,7 @@ def ANEC_series_CA(
 
 def ANEC_photo_CA(
     sequence_version: int = 3,
-    solid_plate_id: int = 4534,
+    plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: float = 1000,
@@ -263,7 +263,7 @@ def ANEC_photo_CA(
 
     epm.add_experiment(
         "ANEC_sub_load_solid",
-        {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no},
+        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
     )
 
     for cycle, (potential, time) in enumerate(zip(WE_potential__V, CA_duration_sec)):
@@ -330,7 +330,7 @@ def ANEC_photo_CV(
     ref_type: str = "leakless",
     pH: float = 6.8,
     num_repeats: int = 1,
-    solid_plate_id: int = 4534,
+    plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: float = 1000,
@@ -382,7 +382,7 @@ def ANEC_photo_CV(
 
     epm.add_experiment(
         "ANEC_sub_load_solid",
-        {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no},
+        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
     )
 
     for _ in range(num_repeats):
@@ -450,7 +450,7 @@ def ANEC_cleanup_disengage(
 def ANEC_CA_pretreat(
     sequence_version: int = 1,
     num_repeats: int = 1,
-    solid_plate_id: int = 4534,
+    plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: float = 1000,
@@ -490,7 +490,7 @@ def ANEC_CA_pretreat(
 
     epm.add_experiment(
         "ANEC_sub_load_solid",
-        {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no},
+        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
     )
 
     for _ in range(num_repeats):
@@ -529,7 +529,7 @@ def ANEC_CA_pretreat(
 def ANEC_repeat_CA(
     sequence_version: int = 1,
     num_repeats: int = 1,
-    solid_plate_id: int = 4534,
+    plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: float = 1000,
@@ -578,7 +578,7 @@ def ANEC_repeat_CA(
 
     epm.add_experiment(
         "ANEC_sub_load_solid",
-        {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no},
+        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
     )
 
     for _ in range(num_repeats):
@@ -629,7 +629,7 @@ def ANEC_repeat_CA(
 def ANEC_gasonly_CA(
     sequence_version: int = 1,
     num_repeats: int = 1,
-    solid_plate_id: int = 4534,
+    plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: float = 1000,
@@ -672,7 +672,7 @@ def ANEC_gasonly_CA(
 
     epm.add_experiment(
         "ANEC_sub_load_solid",
-        {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no},
+        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
     )
 
     for _ in range(num_repeats):
@@ -722,7 +722,7 @@ def ANEC_repeat_CV(
     ref_type: str = "leakless",
     pH: float = 6.8,
     num_repeats: int = 1,
-    solid_plate_id: int = 4534,
+    plate_id: int = 4534,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1,
     volume_ul_cell_liquid: float = 1000,
@@ -763,7 +763,7 @@ def ANEC_repeat_CV(
 
     epm.add_experiment(
         "ANEC_sub_load_solid",
-        {"solid_plate_id": solid_plate_id, "solid_sample_no": solid_sample_no},
+        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
     )
 
     for _ in range(num_repeats):
