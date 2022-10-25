@@ -533,7 +533,7 @@ if __name__ == "__main__":
                         try:
                             codeKey = [
                                 k
-                                for k in pidd.servers[(sg, sn)].keys()
+                                for k in pidd.servers[sg][sn].keys()
                                 if k in pidd.codeKeys
                             ][0]
                             S = stop_server(sg, sn)
