@@ -5,7 +5,6 @@ server_key must be a FastAPI action server defined in config
 
 __all__ = [
     "debug",
-    # "ADSS_duaribilty_CAv1",
     "ADSS_sub_startup",
     "ADSS_sub_shutdown",
     "ADSS_sub_engage",
@@ -15,16 +14,12 @@ __all__ = [
     "ADSS_sub_CA",  # latest
     "ADSS_sub_CV",  # latest
     "ADSS_sub_OCV",  # at beginning of all sequences
-    "ADSS_sub_preCV",  # separate CA before every CV
     "ADSS_sub_unloadall_customs",
     "ADSS_sub_load_solid",
     "ADSS_sub_load_liquid",
     "ADSS_sub_fillfixed",
     "ADSS_sub_fill",
     "ADSS_sub_tray_unload",
-    "ADSS_sub_CA_noaliquots",  # only one with process contrib
-    "ADSS_sub_CV_noaliquots",  # only one with process contrib
-    "ADSS_sub_CA_originalwithstuff",
     "ADSS_sub_rel_move",
     "ADSS_sub_heat",
     "ADSS_sub_stopheat",
@@ -209,6 +204,41 @@ def ADSS_sub_load_liquid(
     return apm.action_list  # returns complete action list to orch
 
 
+def ADSS_sub_load(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    solid_custom_position: Optional[str] = "cell1_we",
+    solid_plate_id: Optional[int] = 4534,
+    solid_sample_no: Optional[int] = 1,
+    liquid_custom_position: Optional[str] = "elec_res1",
+    liquid_sample_no: Optional[int] = 1,
+):
+    apm = ActionPlanMaker()
+
+    # unload all samples from custom positions
+    apm.add_action_list(ADSS_sub_unloadall_customs(experiment=experiment))
+
+    # load new requested samples
+    apm.add_action_list(
+        ADSS_sub_load_solid(
+            experiment=experiment,
+            solid_custom_position=apm.pars.solid_custom_position,
+            solid_plate_id=apm.pars.solid_plate_id,
+            solid_sample_no=apm.pars.solid_sample_no,
+        )
+    )
+
+    apm.add_action_list(
+        ADSS_sub_load_liquid(
+            experiment=experiment,
+            liquid_custom_position=apm.pars.liquid_custom_position,
+            liquid_sample_no=apm.pars.liquid_sample_no,
+        )
+    )
+
+    return apm.action_list
+
+
 def ADSS_sub_startup(
     experiment: Experiment,
     experiment_version: int = 1,
@@ -231,22 +261,12 @@ def ADSS_sub_startup(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    # unload all samples from custom positions
-    apm.add_action_list(ADSS_sub_unloadall_customs(experiment=experiment))
-
-    # load new requested samples
     apm.add_action_list(
-        ADSS_sub_load_solid(
+        ADSS_sub_load(
             experiment=experiment,
             solid_custom_position=apm.pars.solid_custom_position,
             solid_plate_id=apm.pars.solid_plate_id,
             solid_sample_no=apm.pars.solid_sample_no,
-        )
-    )
-
-    apm.add_action_list(
-        ADSS_sub_load_liquid(
-            experiment=experiment,
             liquid_custom_position=apm.pars.liquid_custom_position,
             liquid_sample_no=apm.pars.liquid_sample_no,
         )
@@ -560,7 +580,7 @@ def ADSS_sub_fill(
 
 def ADSS_sub_CA(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 4,
     CA_potential: Optional[float] = 0.0,
     ph: Optional[float] = 9.53,
     potential_versus: Optional[str] = "rhe",
@@ -569,8 +589,19 @@ def ADSS_sub_CA(
     gamry_i_range: Optional[str] = "auto",
     samplerate_sec: Optional[float] = 0.05,
     CA_duration_sec: Optional[float] = 1800,
+    aliquot_intervals_sec: Optional[List[float]] = [],
+    aliquot_insitu: Optional[bool] = False,
 ):
-    """last functionality test: 11/29/2021"""
+    """Primary CA experiment with optional PAL sampling.
+
+    aliquot_intervals_sec is an optional list of intervals after which an aliquot
+    is sampled from the cell, e.g. [600, 600, 600] will take 3 aliquots at 10-minute
+    intervals; note due to PAL overhead, intervals must be longer than 4 minutes
+
+    aliquot_insitu flags whether the sampling interval timer begins at the start of the
+    PSTAT action (True) or after the PSTAT action (False)
+
+    """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -586,7 +617,8 @@ def ADSS_sub_CA(
         ],  # save new liquid_sample_no of eche cell to globals
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
-    # apply potential
+
+    # calculate potential
     potential = (
         apm.pars.CA_potential
         - 1.0 * apm.pars.ref_offset__V
@@ -594,6 +626,8 @@ def ADSS_sub_CA(
         - REF_TABLE[apm.pars.ref_type]
     )
     print(f"ADSS_sub_CA potential: {potential}")
+
+    # apply potential
     apm.add(
         PSTAT_server,
         "run_CA",
@@ -608,18 +642,65 @@ def ADSS_sub_CA(
         technique_name="CA",
         process_finish=True,
         process_contrib=[
+            ProcessContrib.action_params,
             ProcessContrib.files,
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
+            ProcessContrib.run_use,
         ],
     )
+
+    # check if aliquot sample should happen in-situ or after PSTAT action
+    if apm.pars.aliquot_insitu:
+        startcond = ActionStartCondition.no_wait
+    else:
+        startcond = ActionStartCondition.wait_for_orch
+
+    if apm.pars.aliquot_times_sec:
+        for i, aliquot_time in enumerate(apm.pars.aliquot_times_sec):
+            if i == 0 and not apm.pars.aliquot_insitu:
+                apm.add(
+                    ORCH_server,
+                    "wait",
+                    {"waittime": aliquot_time},
+                    ActionStartCondition.wait_for_all,
+                )
+            else:
+                apm.add(ORCH_server, "wait", {"waittime": aliquot_time}, startcond)
+            apm.add(
+                PAL_server,
+                "PAL_archive",
+                {
+                    "tool": PALtools.LS3,
+                    "source": "cell1_we",
+                    "volume_ul": 200,
+                    "sampleperiod": [0.0],
+                    "spacingmethod": Spacingmethod.custom,
+                    "spacingfactor": 1.0,
+                    "timeoffset": 60.0,
+                    "wash1": 0,
+                    "wash2": 0,
+                    "wash3": 0,
+                    "wash4": 0,
+                },
+                start_condition=ActionStartCondition.wait_for_orch,
+                technique_name="liquid_product_archive",
+                process_finish=True,
+                process_contrib=[
+                    ProcessContrib.action_params,
+                    ProcessContrib.files,
+                    ProcessContrib.samples_in,
+                    ProcessContrib.samples_out,
+                    ProcessContrib.run_use,
+                ],
+            )
 
     return apm.action_list  # returns complete action list to orch
 
 
 def ADSS_sub_CV(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
@@ -634,6 +715,8 @@ def ADSS_sub_CV(
     potential_versus: Optional[str] = "rhe",
     ref_type: Optional[str] = "inhouse",
     ref_offset__V: Optional[float] = 0.0,
+    aliquot_intervals_sec: Optional[List[float]] = [],
+    aliquot_insitu: Optional[bool] = False,
 ):
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -700,20 +783,69 @@ def ADSS_sub_CV(
         technique_name="CV",
         process_finish=True,
         process_contrib=[
+            ProcessContrib.action_params,
             ProcessContrib.files,
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
+            ProcessContrib.run_use,
         ],
     )
+
+    # check if aliquot sample should happen in-situ or after PSTAT action
+    if apm.pars.aliquot_insitu:
+        startcond = ActionStartCondition.no_wait
+    else:
+        startcond = ActionStartCondition.wait_for_orch
+
+    if apm.pars.aliquot_times_sec:
+        for i, aliquot_time in enumerate(apm.pars.aliquot_times_sec):
+            if i == 0 and not apm.pars.aliquot_insitu:
+                apm.add(
+                    ORCH_server,
+                    "wait",
+                    {"waittime": aliquot_time},
+                    ActionStartCondition.wait_for_all,
+                )
+            else:
+                apm.add(ORCH_server, "wait", {"waittime": aliquot_time}, startcond)
+            apm.add(
+                PAL_server,
+                "PAL_archive",
+                {
+                    "tool": PALtools.LS3,
+                    "source": "cell1_we",
+                    "volume_ul": 200,
+                    "sampleperiod": [0.0],
+                    "spacingmethod": Spacingmethod.custom,
+                    "spacingfactor": 1.0,
+                    "timeoffset": 60.0,
+                    "wash1": 0,
+                    "wash2": 0,
+                    "wash3": 0,
+                    "wash4": 0,
+                },
+                start_condition=ActionStartCondition.wait_for_orch,
+                technique_name="liquid_product_archive",
+                process_finish=True,
+                process_contrib=[
+                    ProcessContrib.action_params,
+                    ProcessContrib.files,
+                    ProcessContrib.samples_in,
+                    ProcessContrib.samples_out,
+                    ProcessContrib.run_use,
+                ],
+            )
 
     return apm.action_list  # returns complete action list to orch
 
 
 def ADSS_sub_OCV(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 4,
     Tval__s: Optional[float] = 60.0,
     gamry_i_range: Optional[str] = "auto",
+    aliquot_intervals_sec: Optional[List[float]] = [],
+    aliquot_insitu: Optional[bool] = False,
 ):
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -745,394 +877,58 @@ def ADSS_sub_OCV(
         technique_name="OCV",
         process_finish=True,
         process_contrib=[
+            ProcessContrib.action_params,
             ProcessContrib.files,
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
-        ],
-    )
-    return apm.action_list  # returns complete action list to orch
-
-
-def ADSS_sub_preCV(
-    experiment: Experiment,
-    experiment_version: int = 3,
-    CA_potential: Optional[float] = 0.0,  # need to get from CV initial
-    ph: Optional[float] = 9.53,
-    ref_type: Optional[str] = "inhouse",
-    ref_offset__V: Optional[float] = 0.0,
-    gamry_i_range: Optional[str] = "auto",
-    samplerate_sec: Optional[float] = 0.05,
-    CA_duration_sec: Optional[float] = 3,  # adjustable pre_CV time
-):
-    """last functionality test: 11/29/2021"""
-
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    # get sample for gamry
-    apm.add(
-        PAL_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_globalexp_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    )
-    # apply potential
-    potential = (
-        apm.pars.CA_potential
-        - 1.0 * apm.pars.ref_offset__V
-        - 0.059 * apm.pars.ph
-        - REF_TABLE[apm.pars.ref_type]
-    )
-    apm.add(
-        PSTAT_server,
-        "run_CA",
-        {
-            "Vval__V": potential,
-            "Tval__s": apm.pars.CA_duration_sec,
-            "SampleRate": apm.pars.samplerate_sec,
-            "IErange": apm.pars.gamry_i_range,
-        },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        technique_name="CA",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
+            ProcessContrib.run_use,
         ],
     )
 
-    return apm.action_list  # returns complete action list to orch
+    # check if aliquot sample should happen in-situ or after PSTAT action
+    if apm.pars.aliquot_insitu:
+        startcond = ActionStartCondition.no_wait
+    else:
+        startcond = ActionStartCondition.wait_for_orch
 
-
-def ADSS_sub_CA_originalwithstuff(
-    experiment: Experiment,
-    experiment_version: int = 2,
-    CA_potential: Optional[float] = 0.0,
-    ph: float = 9.53,
-    potential_versus: Optional[str] = "rhe",
-    ref_type: Optional[str] = "inhouse",
-    ref_offset__V: Optional[float] = 0.0,
-    gamry_i_range: Optional[str] = "auto",
-    samplerate_sec: Optional[float] = 1,
-    OCV_duration_sec: Optional[float] = 60,
-    CA_duration_sec: Optional[float] = 1320,
-    aliquot_times_sec: Optional[List[float]] = [60, 600, 1140],
-):
-    """last functionality test: 11/29/2021"""
-
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    # get sample for gamry
-    apm.add(
-        PAL_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_globalexp_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    )
-
-    # OCV
-    apm.add(
-        PSTAT_server,
-        "run_OCV",
-        {
-            "Tval": apm.pars.OCV_duration_sec,
-            "SampleRate": apm.pars.samplerate_sec,
-            "IErange": apm.pars.gamry_i_range,
-        },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    )
-
-    # take liquid sample
-    apm.add(
-        PAL_server,
-        "PAL_archive",
-        {
-            "tool": PALtools.LS3,
-            "source": "cell1_we",
-            "volume_ul": 200,
-            "sampleperiod": [0.0],
-            "spacingmethod": Spacingmethod.linear,
-            "spacingfactor": 1.0,
-            "timeoffset": 0.0,
-            "wash1": 0,
-            "wash2": 0,
-            "wash3": 0,
-            "wash4": 0,
-        },
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    )
-
-    apm.add(
-        PAL_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_globalexp_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    )
-
-    # apply potential
-    potential = (
-        apm.pars.CA_potential
-        - 1.0 * apm.pars.ref_offset__V
-        - 0.059 * apm.pars.ph
-        - REF_TABLE[apm.pars.ref_type]
-    )
-    print(f"ADSS_sub_CA potential: {potential}")
-    apm.add(
-        PSTAT_server,
-        "run_CA",
-        {
-            "Vval__V": potential,
-            "Tval__s": apm.pars.CA_duration_sec,
-            "SampleRate": apm.pars.samplerate_sec,
-            "IErange": "auto",
-        },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    )
-
-    # take multiple scheduled liquid samples
-    apm.add(
-        PAL_server,
-        "PAL_archive",
-        {
-            "tool": PALtools.LS3,
-            "source": "cell1_we",
-            "volume_ul": 200,
-            "sampleperiod": apm.pars.aliquot_times_sec,  # 1min, 10min, 10min
-            "spacingmethod": Spacingmethod.custom,
-            "spacingfactor": 1.0,
-            "timeoffset": 60.0,
-            "wash1": 0,
-            "wash2": 0,
-            "wash3": 0,
-            "wash4": 0,
-        },
-        start_condition=ActionStartCondition.wait_for_endpoint,  # orch is waiting for all action_dq to finish
-    )
-
-    # take last liquid sample and clean
-    apm.add(
-        PAL_server,
-        "PAL_archive",
-        {
-            "tool": PALtools.LS3,
-            "source": "cell1_we",
-            "volume_ul": 200,
-            "sampleperiod": [0.0],
-            "spacingmethod": Spacingmethod.linear,
-            "spacingfactor": 1.0,
-            "timeoffset": 0.0,
-            "wash1": 1,  # dont use True or False but 0 AND 1
-            "wash2": 1,
-            "wash3": 1,
-            "wash4": 1,
-        },
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    )
-
-    return apm.action_list  # returns complete action list to orch
-
-
-def ADSS_sub_CA_noaliquots(
-    experiment: Experiment,
-    experiment_version: int = 2,
-    CA_potential: Optional[float] = 0.0,
-    ph: float = 9.53,
-    potential_versus: Optional[str] = "rhe",
-    ref_type: Optional[str] = "inhouse",
-    ref_offset__V: Optional[float] = 0.0,
-    gamry_i_range: Optional[str] = "auto",
-    samplerate_sec: Optional[float] = 0.05,
-    OCV_duration_sec: Optional[float] = 60,
-    CA_duration_sec: Optional[float] = 1320,
-    aliquot_times_sec: Optional[List[float]] = [60, 600, 1140],
-):
-    """last functionality test: 11/29/2021"""
-
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    # get sample for gamry
-    apm.add(
-        PAL_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_globalexp_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    )
-
-    # OCV
-    apm.add(
-        PSTAT_server,
-        "run_OCV",
-        {
-            "Tval": apm.pars.OCV_duration_sec,
-            "SampleRate": apm.pars.samplerate_sec,
-            "IErange": apm.pars.gamry_i_range,
-        },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        process_finish=False,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
-    )
-
-    apm.add(
-        PAL_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_globalexp_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    )
-
-    # apply potential
-    potential = (
-        apm.pars.CA_potential
-        - 1.0 * apm.pars.ref_offset__V
-        - 0.059 * apm.pars.ph
-        - REF_TABLE[apm.pars.ref_type]
-    )
-    print(f"ADSS_sub_CA potential: {potential}")
-    apm.add(
-        PSTAT_server,
-        "run_CA",
-        {
-            "Vval__V": potential,
-            "Tval__s": apm.pars.CA_duration_sec,
-            "SampleRate": apm.pars.samplerate_sec,
-            "IErange": "auto",
-        },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        technique_name="CA",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
-    )
-
-    return apm.action_list  # returns complete action list to orch
-
-
-def ADSS_sub_CV_noaliquots(
-    experiment: Experiment,
-    experiment_version: int = 2,
-    Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
-    Vapex1_vsRHE: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
-    Vapex2_vsRHE: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
-    Vfinal_vsRHE: Optional[float] = 0.0,  # Final value in volts or amps.
-    scanrate_voltsec: Optional[
-        float
-    ] = 0.02,  # scan rate in volts/second or amps/second.
-    samplerate_sec: Optional[float] = 0.1,
-    cycles: Optional[int] = 1,
-    gamry_i_range: Optional[str] = "auto",
-    ph: float = 9.53,
-    potential_versus: Optional[str] = "rhe",
-    ref_type: Optional[str] = "inhouse",
-    ref_offset__V: Optional[float] = 0.0,
-    aliquot_times_sec: Optional[List[float]] = [60, 600, 1140],
-):
-
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    CV_duration_sec = (
-        abs(apm.pars.Vapex1_vsRHE - apm.pars.Vinit_vsRHE) / apm.pars.scanrate_voltsec
-    )
-    CV_duration_sec += (
-        abs(apm.pars.Vfinal_vsRHE - apm.pars.Vapex2_vsRHE) / apm.pars.scanrate_voltsec
-    )
-    CV_duration_sec += (
-        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE)
-        / apm.pars.scanrate_voltsec
-        * apm.pars.cycles
-    )
-    CV_duration_sec += (
-        abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE)
-        / apm.pars.scanrate_voltsec
-        * 2.0
-        * (apm.pars.cycles - 1)
-    )
-
-    # get sample for gamry
-    apm.add(
-        PAL_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_globalexp_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    )
-
-    # apply potential
-
-    apm.add(
-        PSTAT_server,
-        "run_CV",
-        {
-            "Vinit__V": apm.pars.Vinit_vsRHE
-            - 1.0 * apm.pars.ref_offset__V
-            - REF_TABLE[apm.pars.ref_type]
-            - 0.059 * apm.pars.ph,
-            "Vapex1__V": apm.pars.Vapex1_vsRHE
-            - 1.0 * apm.pars.ref_offset__V
-            - REF_TABLE[apm.pars.ref_type]
-            - 0.059 * apm.pars.ph,
-            "Vapex2__V": apm.pars.Vapex2_vsRHE
-            - 1.0 * apm.pars.ref_offset__V
-            - REF_TABLE[apm.pars.ref_type]
-            - 0.059 * apm.pars.ph,
-            "Vfinal__V": apm.pars.Vfinal_vsRHE
-            - 1.0 * apm.pars.ref_offset__V
-            - REF_TABLE[apm.pars.ref_type]
-            - 0.059 * apm.pars.ph,
-            "ScanRate__V_s": apm.pars.scanrate_voltsec,
-            "AcqInterval__s": apm.pars.samplerate_sec,
-            "Cycles": apm.pars.cycles,
-            "IErange": apm.pars.gamry_i_range,
-        },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        technique_name="CV",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
-    )
+    if apm.pars.aliquot_times_sec:
+        for i, aliquot_time in enumerate(apm.pars.aliquot_times_sec):
+            if i == 0 and not apm.pars.aliquot_insitu:
+                apm.add(
+                    ORCH_server,
+                    "wait",
+                    {"waittime": aliquot_time},
+                    ActionStartCondition.wait_for_all,
+                )
+            else:
+                apm.add(ORCH_server, "wait", {"waittime": aliquot_time}, startcond)
+            apm.add(
+                PAL_server,
+                "PAL_archive",
+                {
+                    "tool": PALtools.LS3,
+                    "source": "cell1_we",
+                    "volume_ul": 200,
+                    "sampleperiod": [0.0],
+                    "spacingmethod": Spacingmethod.custom,
+                    "spacingfactor": 1.0,
+                    "timeoffset": 60.0,
+                    "wash1": 0,
+                    "wash2": 0,
+                    "wash3": 0,
+                    "wash4": 0,
+                },
+                start_condition=ActionStartCondition.wait_for_orch,
+                technique_name="liquid_product_archive",
+                process_finish=True,
+                process_contrib=[
+                    ProcessContrib.action_params,
+                    ProcessContrib.files,
+                    ProcessContrib.samples_in,
+                    ProcessContrib.samples_out,
+                    ProcessContrib.run_use,
+                ],
+            )
 
     return apm.action_list  # returns complete action list to orch
 
@@ -1294,3 +1090,386 @@ def ADSS_sub_stopheat(
         {},
     )
     return apm.action_list  # returns complete action list to orch
+
+
+# def ADSS_sub_CA_originalwithstuff(
+#     experiment: Experiment,
+#     experiment_version: int = 2,
+#     CA_potential: Optional[float] = 0.0,
+#     ph: float = 9.53,
+#     potential_versus: Optional[str] = "rhe",
+#     ref_type: Optional[str] = "inhouse",
+#     ref_offset__V: Optional[float] = 0.0,
+#     gamry_i_range: Optional[str] = "auto",
+#     samplerate_sec: Optional[float] = 1,
+#     OCV_duration_sec: Optional[float] = 60,
+#     CA_duration_sec: Optional[float] = 1320,
+#     aliquot_times_sec: Optional[List[float]] = [60, 600, 1140],
+# ):
+#     """last functionality test: 11/29/2021"""
+
+#     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+#     # get sample for gamry
+#     apm.add(
+#         PAL_server,
+#         "archive_custom_query_sample",
+#         {
+#             "custom": "cell1_we",
+#         },
+#         to_globalexp_params=[
+#             "_fast_samples_in"
+#         ],  # save new liquid_sample_no of eche cell to globals
+#         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#     )
+
+#     # OCV
+#     apm.add(
+#         PSTAT_server,
+#         "run_OCV",
+#         {
+#             "Tval": apm.pars.OCV_duration_sec,
+#             "SampleRate": apm.pars.samplerate_sec,
+#             "IErange": apm.pars.gamry_i_range,
+#         },
+#         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+#         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#     )
+
+#     # take liquid sample
+#     apm.add(
+#         PAL_server,
+#         "PAL_archive",
+#         {
+#             "tool": PALtools.LS3,
+#             "source": "cell1_we",
+#             "volume_ul": 200,
+#             "sampleperiod": [0.0],
+#             "spacingmethod": Spacingmethod.linear,
+#             "spacingfactor": 1.0,
+#             "timeoffset": 0.0,
+#             "wash1": 0,
+#             "wash2": 0,
+#             "wash3": 0,
+#             "wash4": 0,
+#         },
+#         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#     )
+
+#     apm.add(
+#         PAL_server,
+#         "archive_custom_query_sample",
+#         {
+#             "custom": "cell1_we",
+#         },
+#         to_globalexp_params=[
+#             "_fast_samples_in"
+#         ],  # save new liquid_sample_no of eche cell to globals
+#         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#     )
+
+#     # apply potential
+#     potential = (
+#         apm.pars.CA_potential
+#         - 1.0 * apm.pars.ref_offset__V
+#         - 0.059 * apm.pars.ph
+#         - REF_TABLE[apm.pars.ref_type]
+#     )
+#     print(f"ADSS_sub_CA potential: {potential}")
+#     apm.add(
+#         PSTAT_server,
+#         "run_CA",
+#         {
+#             "Vval__V": potential,
+#             "Tval__s": apm.pars.CA_duration_sec,
+#             "SampleRate": apm.pars.samplerate_sec,
+#             "IErange": "auto",
+#         },
+#         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+#         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#     )
+
+#     # take multiple scheduled liquid samples
+#     apm.add(
+#         PAL_server,
+#         "PAL_archive",
+#         {
+#             "tool": PALtools.LS3,
+#             "source": "cell1_we",
+#             "volume_ul": 200,
+#             "sampleperiod": apm.pars.aliquot_times_sec,  # 1min, 10min, 10min
+#             "spacingmethod": Spacingmethod.custom,
+#             "spacingfactor": 1.0,
+#             "timeoffset": 60.0,
+#             "wash1": 0,
+#             "wash2": 0,
+#             "wash3": 0,
+#             "wash4": 0,
+#         },
+#         start_condition=ActionStartCondition.wait_for_endpoint,  # orch is waiting for all action_dq to finish
+#     )
+
+#     # take last liquid sample and clean
+#     apm.add(
+#         PAL_server,
+#         "PAL_archive",
+#         {
+#             "tool": PALtools.LS3,
+#             "source": "cell1_we",
+#             "volume_ul": 200,
+#             "sampleperiod": [0.0],
+#             "spacingmethod": Spacingmethod.linear,
+#             "spacingfactor": 1.0,
+#             "timeoffset": 0.0,
+#             "wash1": 1,  # dont use True or False but 0 AND 1
+#             "wash2": 1,
+#             "wash3": 1,
+#             "wash4": 1,
+#         },
+#         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#     )
+
+#     return apm.action_list  # returns complete action list to orch
+
+
+# def ADSS_sub_preCV(
+#     experiment: Experiment,
+#     experiment_version: int = 3,
+#     CA_potential: Optional[float] = 0.0,  # need to get from CV initial
+#     ph: Optional[float] = 9.53,
+#     ref_type: Optional[str] = "inhouse",
+#     ref_offset__V: Optional[float] = 0.0,
+#     gamry_i_range: Optional[str] = "auto",
+#     samplerate_sec: Optional[float] = 0.05,
+#     CA_duration_sec: Optional[float] = 3,  # adjustable pre_CV time
+# ):
+#     """last functionality test: 11/29/2021"""
+
+#     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+#     # get sample for gamry
+#     apm.add(
+#         PAL_server,
+#         "archive_custom_query_sample",
+#         {
+#             "custom": "cell1_we",
+#         },
+#         to_globalexp_params=[
+#             "_fast_samples_in"
+#         ],  # save new liquid_sample_no of eche cell to globals
+#         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#     )
+#     # apply potential
+#     potential = (
+#         apm.pars.CA_potential
+#         - 1.0 * apm.pars.ref_offset__V
+#         - 0.059 * apm.pars.ph
+#         - REF_TABLE[apm.pars.ref_type]
+#     )
+#     apm.add(
+#         PSTAT_server,
+#         "run_CA",
+#         {
+#             "Vval__V": potential,
+#             "Tval__s": apm.pars.CA_duration_sec,
+#             "SampleRate": apm.pars.samplerate_sec,
+#             "IErange": apm.pars.gamry_i_range,
+#         },
+#         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+#         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#         technique_name="CA",
+#         process_finish=True,
+#         process_contrib=[
+#             ProcessContrib.files,
+#             ProcessContrib.samples_in,
+#             ProcessContrib.samples_out,
+#         ],
+#     )
+
+#     return apm.action_list  # returns complete action list to orch
+
+# def ADSS_sub_CA_noaliquots(
+#     experiment: Experiment,
+#     experiment_version: int = 2,
+#     CA_potential: Optional[float] = 0.0,
+#     ph: float = 9.53,
+#     potential_versus: Optional[str] = "rhe",
+#     ref_type: Optional[str] = "inhouse",
+#     ref_offset__V: Optional[float] = 0.0,
+#     gamry_i_range: Optional[str] = "auto",
+#     samplerate_sec: Optional[float] = 0.05,
+#     OCV_duration_sec: Optional[float] = 60,
+#     CA_duration_sec: Optional[float] = 1320,
+#     aliquot_times_sec: Optional[List[float]] = [60, 600, 1140],
+# ):
+#     """last functionality test: 11/29/2021"""
+
+#     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+#     # get sample for gamry
+#     apm.add(
+#         PAL_server,
+#         "archive_custom_query_sample",
+#         {
+#             "custom": "cell1_we",
+#         },
+#         to_globalexp_params=[
+#             "_fast_samples_in"
+#         ],  # save new liquid_sample_no of eche cell to globals
+#         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#     )
+
+#     # OCV
+#     apm.add(
+#         PSTAT_server,
+#         "run_OCV",
+#         {
+#             "Tval": apm.pars.OCV_duration_sec,
+#             "SampleRate": apm.pars.samplerate_sec,
+#             "IErange": apm.pars.gamry_i_range,
+#         },
+#         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+#         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#         process_finish=False,
+#         process_contrib=[
+#             ProcessContrib.files,
+#             ProcessContrib.samples_in,
+#             ProcessContrib.samples_out,
+#         ],
+#     )
+
+#     apm.add(
+#         PAL_server,
+#         "archive_custom_query_sample",
+#         {
+#             "custom": "cell1_we",
+#         },
+#         to_globalexp_params=[
+#             "_fast_samples_in"
+#         ],  # save new liquid_sample_no of eche cell to globals
+#         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#     )
+
+#     # apply potential
+#     potential = (
+#         apm.pars.CA_potential
+#         - 1.0 * apm.pars.ref_offset__V
+#         - 0.059 * apm.pars.ph
+#         - REF_TABLE[apm.pars.ref_type]
+#     )
+#     print(f"ADSS_sub_CA potential: {potential}")
+#     apm.add(
+#         PSTAT_server,
+#         "run_CA",
+#         {
+#             "Vval__V": potential,
+#             "Tval__s": apm.pars.CA_duration_sec,
+#             "SampleRate": apm.pars.samplerate_sec,
+#             "IErange": "auto",
+#         },
+#         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+#         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#         technique_name="CA",
+#         process_finish=True,
+#         process_contrib=[
+#             ProcessContrib.files,
+#             ProcessContrib.samples_in,
+#             ProcessContrib.samples_out,
+#         ],
+#     )
+
+#     return apm.action_list  # returns complete action list to orch
+
+
+# def ADSS_sub_CV_noaliquots(
+#     experiment: Experiment,
+#     experiment_version: int = 2,
+#     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
+#     Vapex1_vsRHE: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
+#     Vapex2_vsRHE: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
+#     Vfinal_vsRHE: Optional[float] = 0.0,  # Final value in volts or amps.
+#     scanrate_voltsec: Optional[
+#         float
+#     ] = 0.02,  # scan rate in volts/second or amps/second.
+#     samplerate_sec: Optional[float] = 0.1,
+#     cycles: Optional[int] = 1,
+#     gamry_i_range: Optional[str] = "auto",
+#     ph: float = 9.53,
+#     potential_versus: Optional[str] = "rhe",
+#     ref_type: Optional[str] = "inhouse",
+#     ref_offset__V: Optional[float] = 0.0,
+#     aliquot_times_sec: Optional[List[float]] = [60, 600, 1140],
+# ):
+
+#     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+#     CV_duration_sec = (
+#         abs(apm.pars.Vapex1_vsRHE - apm.pars.Vinit_vsRHE) / apm.pars.scanrate_voltsec
+#     )
+#     CV_duration_sec += (
+#         abs(apm.pars.Vfinal_vsRHE - apm.pars.Vapex2_vsRHE) / apm.pars.scanrate_voltsec
+#     )
+#     CV_duration_sec += (
+#         abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE)
+#         / apm.pars.scanrate_voltsec
+#         * apm.pars.cycles
+#     )
+#     CV_duration_sec += (
+#         abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE)
+#         / apm.pars.scanrate_voltsec
+#         * 2.0
+#         * (apm.pars.cycles - 1)
+#     )
+
+#     # get sample for gamry
+#     apm.add(
+#         PAL_server,
+#         "archive_custom_query_sample",
+#         {
+#             "custom": "cell1_we",
+#         },
+#         to_globalexp_params=[
+#             "_fast_samples_in"
+#         ],  # save new liquid_sample_no of eche cell to globals
+#         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#     )
+
+#     # apply potential
+
+#     apm.add(
+#         PSTAT_server,
+#         "run_CV",
+#         {
+#             "Vinit__V": apm.pars.Vinit_vsRHE
+#             - 1.0 * apm.pars.ref_offset__V
+#             - REF_TABLE[apm.pars.ref_type]
+#             - 0.059 * apm.pars.ph,
+#             "Vapex1__V": apm.pars.Vapex1_vsRHE
+#             - 1.0 * apm.pars.ref_offset__V
+#             - REF_TABLE[apm.pars.ref_type]
+#             - 0.059 * apm.pars.ph,
+#             "Vapex2__V": apm.pars.Vapex2_vsRHE
+#             - 1.0 * apm.pars.ref_offset__V
+#             - REF_TABLE[apm.pars.ref_type]
+#             - 0.059 * apm.pars.ph,
+#             "Vfinal__V": apm.pars.Vfinal_vsRHE
+#             - 1.0 * apm.pars.ref_offset__V
+#             - REF_TABLE[apm.pars.ref_type]
+#             - 0.059 * apm.pars.ph,
+#             "ScanRate__V_s": apm.pars.scanrate_voltsec,
+#             "AcqInterval__s": apm.pars.samplerate_sec,
+#             "Cycles": apm.pars.cycles,
+#             "IErange": apm.pars.gamry_i_range,
+#         },
+#         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+#         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+#         technique_name="CV",
+#         process_finish=True,
+#         process_contrib=[
+#             ProcessContrib.files,
+#             ProcessContrib.samples_in,
+#             ProcessContrib.samples_out,
+#         ],
+#     )
+
+#     return apm.action_list  # returns complete action list to orch
