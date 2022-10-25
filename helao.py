@@ -290,7 +290,7 @@ def wait_key():
     try:
         keypress = click.getchar()
     except KeyboardInterrupt:
-        keypress =  "\x03"
+        keypress = "\x03"
     except EOFError:
         if os.name == "nt":
             keypress = "\x1a"
@@ -466,7 +466,9 @@ if __name__ == "__main__":
             f'git --git-dir={os.path.join(x, ".git")} show --stat'
         )
         cprint(git_stat, "cyan")
-    cprint(f"\n\nusing config: {config['loaded_config_path']}\n", "white", attrs=["bold"])
+    cprint(
+        f"\n\nusing config: {config['loaded_config_path']}\n", "white", attrs=["bold"]
+    )
     cprint("launching HELAO in 5 seconds...\n\n", "white")
     time.sleep(5)
 
@@ -505,8 +507,12 @@ if __name__ == "__main__":
         result = None
         while result not in ["\x18", "\x04"]:
             if result == "\x12":
-                print_message({}, "launcher", f"Detected CTRL-r, checking restart options.")
-                slist = [(gk, sk) for gk, gd in pidd.servers.items() for sk in gd.keys()]
+                print_message(
+                    {}, "launcher", f"Detected CTRL-r, checking restart options."
+                )
+                slist = [
+                    (gk, sk) for gk, gd in pidd.servers.items() for sk in gd.keys()
+                ]
                 opts = range(len(slist))
                 while True:
                     print("Currently running server type/name:")
@@ -525,6 +531,11 @@ if __name__ == "__main__":
                             {}, "launcher", f"Got option {sind}. Restarting {sg}/{sn}."
                         )
                         try:
+                            codeKey = [
+                                k
+                                for k in pidd.servers[(sg, sn)].keys()
+                                if k in pidd.codeKeys
+                            ][0]
                             S = stop_server(sg, sn)
                             print_message(
                                 {}, "launcher", f"{sn} successful shutdown() event."
@@ -533,7 +544,7 @@ if __name__ == "__main__":
                             print_message(
                                 {}, "launcher", f"Successfully closed {sn} process."
                             )
-                            cmd = ["python", "fast_launcher.py", confArg, sn]
+                            cmd = ["python", f"{codeKey}_launcher.py", confArg, sn]
                             p = subprocess.Popen(cmd, cwd=helao_root)
                             ppid = p.pid
                             pidd.store_pid(sn, S["host"], S["port"], ppid)
@@ -541,7 +552,9 @@ if __name__ == "__main__":
                                 for orchserv in pidd.orchServs:
                                     OS = pidd.servers["orchestrator"][orchserv]
                                     print_message(
-                                        {}, "launcher", f"Reregistering {sn} on {orchserv}."
+                                        {},
+                                        "launcher",
+                                        f"Reregistering {sn} on {orchserv}.",
                                     )
                                     requests.post(
                                         f"http://{OS['host']}:{OS['port']}/attach_client",
@@ -552,14 +565,21 @@ if __name__ == "__main__":
                                 traceback.format_exception(type(e), e, e.__traceback__)
                             )
                             print_message(
-                                {}, "launcher", " ... got error: ", repr(e), tb, error=True
+                                {},
+                                "launcher",
+                                " ... got error: ",
+                                repr(e),
+                                tb,
+                                error=True,
                             )
                         break
                     elif sind == "":
                         print_message({}, "launcher", f"Cancelling restart.")
                         break
                     else:
-                        print_message({}, "launcher", f"'{sind}' is not a valid option.")
+                        print_message(
+                            {}, "launcher", f"'{sind}' is not a valid option."
+                        )
                 result = None
             hotkey_msg()
             result = wait_key()
@@ -571,7 +591,9 @@ if __name__ == "__main__":
                 try:
                     stop_server("orchestrator", server)
                 except Exception as e:
-                    tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+                    tb = "".join(
+                        traceback.format_exception(type(e), e, e.__traceback__)
+                    )
                     print_message(
                         {}, "launcher", " ... got error: ", repr(e), tb, error=True
                     )
@@ -606,5 +628,6 @@ if __name__ == "__main__":
                 "launcher",
                 f"Disconnecting action monitor. Launch 'python helao.py {confArg}' to reconnect.",
             )
+
     x = threading.Thread(target=thread_waitforkey)
     x.start()
