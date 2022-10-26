@@ -351,7 +351,7 @@ class gamry:
         else:
             pass
 
-    async def measurement_setup(self, AcqFreq, mode: Gamry_modes = None, *argv):
+    async def measurement_setup(self, act_params, mode: Gamry_modes = None, *argv):
         """setting up the measurement parameters
         need to initialize and open connection to gamry first"""
         await asyncio.sleep(0.001)
@@ -474,7 +474,7 @@ class gamry:
                     ]
                     self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
                     self.pstat.SetVchRangeMode(False)
-                    setpointv = np.abs(self.action.action_params["Vval__V"])
+                    setpointv = np.abs(act_params["Vval__V"])
                     vchrangeval = self.pstat.TestVchRange(setpointv * 1.1)
                     self.pstat.SetVchRange(vchrangeval)
                 elif mode == Gamry_modes.CP:
@@ -494,7 +494,7 @@ class gamry:
                     ]
                     self.pstat.SetCtrlMode(self.GamryCOM.GstatMode)
                     self.pstat.SetIERangeMode(False)
-                    setpointie = np.abs(self.action.action_params["Ival__A"])
+                    setpointie = np.abs(act_params["Ival__A"])
                     ierangeval = self.pstat.TestIERange(setpointie)
                     self.pstat.SetIERange(ierangeval)
                 elif mode == Gamry_modes.CV:
@@ -516,7 +516,7 @@ class gamry:
                     self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
                     self.pstat.SetVchRangeMode(False)
                     vkeys = ["Vinit", "Vapex1", "Vapex2", "Vfinal"]
-                    setpointvs = [self.action.action_params[f"{x}__V"] for x in vkeys]
+                    setpointvs = [act_params[f"{x}__V"] for x in vkeys]
                     setpointv = np.max(np.abs(setpointvs))
                     vchrangeval = self.pstat.TestVchRange(setpointv * 1.1)
                     self.pstat.SetVchRange(vchrangeval)
@@ -538,7 +538,7 @@ class gamry:
                     self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
                     self.pstat.SetVchRangeMode(False)
                     vkeys = ["Vinit", "Vfinal"]
-                    setpointvs = [self.action.action_params[f"{x}__V"] for x in vkeys]
+                    setpointvs = [act_params[f"{x}__V"] for x in vkeys]
                     setpointv = np.max(np.abs(setpointvs))
                     vchrangeval = self.pstat.TestVchRange(setpointv * 1.1)
                     self.pstat.SetVchRange(vchrangeval)
@@ -559,7 +559,7 @@ class gamry:
                     ]
                     self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
                     self.pstat.SetVchRangeMode(False)
-                    setpointv = np.abs(self.action.action_params["Vval__V"])
+                    setpointv = np.abs(act_params["Vval__V"])
                     vchrangeval = self.pstat.TestVchRange(setpointv * 1.1)
                     self.pstat.SetVchRange(vchrangeval)
                 elif mode == Gamry_modes.OCV:
@@ -993,7 +993,7 @@ class gamry:
             # set parameters for IOloop meas
             self.IO_meas_mode = measmode
             act.error_code = await self.measurement_setup(
-                1.0 / samplerate, self.IO_meas_mode, *setupargs
+                act.action_params, self.IO_meas_mode, *setupargs
             )
             if act.error_code is ErrorCodes.none:
                 # setup the experiment specific signal ramp
