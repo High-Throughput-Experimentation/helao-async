@@ -988,6 +988,7 @@ class gamry:
 
         activeDict = act.as_dict()
 
+        self.action = act
         if act.error_code is ErrorCodes.none:
             # set parameters for IOloop meas
             self.IO_meas_mode = measmode
@@ -1010,7 +1011,6 @@ class gamry:
                     )
 
                 self.samples_in = samples_in
-                self.action = act
 
                 # write header lines with one function call
                 self.FIFO_gamryheader.update(
