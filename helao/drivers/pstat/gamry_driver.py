@@ -126,6 +126,8 @@ class gamry:
         self.gamry_range_enum = Gamry_IErange_dflt
         self.allow_no_sample = self.config_dict.get("allow_no_sample", False)
         self.Gamry_devid = self.config_dict.get("dev_id", 0)
+        self.filterfreq_hz = 1.0 * self.config_dict.get("filterfreq_hz", 1000.0)
+        self.grounded = int(self.config_dict.get("grounded", True))
 
         asyncio.gather(self.init_Gamry(self.Gamry_devid))
 
@@ -393,22 +395,28 @@ class gamry:
                 # anodic currents are positive
                 self.pstat.SetIConvention(self.GamryCOM.Anodic)
 
-                self.pstat.SetGround(self.GamryCOM.Float)
+                self.pstat.SetGround(self.grounded)  # 0=Float, 1=Earth
 
                 # Set current channel range.
                 # Setting the IchRange using a voltage is preferred. The measured current is converted into a voltage on the I channel using the I/E converter.
                 # 0 0.03 V range, 1 0.30 V range, 2 3.00 V range, 3 30.00 V (PCI4) 12V (PC5)
                 # The floating point number is the maximum anticipated voltage (in Volts).
-                self.pstat.SetIchRange(12.0)
+                ichrangeval = self.pstat.TestIchRange(3.0)
+                self.pstat.SetIchRange(ichrangeval)
                 self.pstat.SetIchRangeMode(True)  # auto-set
                 self.pstat.SetIchOffsetEnable(False)
-                self.pstat.SetIchFilter(AcqFreq)
+                # per framework manual, first call TestIchFilter before setting SetIchFilter
+                ichfilterval = self.pstat.TestIchFilter(self.filterfreq_hz)
+                self.pstat.SetIchFilter(ichfilterval)
 
                 # Set voltage channel range.
-                self.pstat.SetVchRange(12.0)
+                vchrangeval = self.pstat.TestVchRange(12.0)
+                self.pstat.SetVchRange(vchrangeval)
                 self.pstat.SetVchRangeMode(True)
                 self.pstat.SetVchOffsetEnable(False)
-                self.pstat.SetVchFilter(AcqFreq)
+                # per framework manual, first call TestVchFilter before setting SetVchFilter
+                vchfilterval = self.pstat.TestVchFilter(self.filterfreq_hz)
+                self.pstat.SetVchFilter(vchfilterval)
 
                 # Sets the range of the Auxiliary A/D input.
                 self.pstat.SetAchRange(3.0)
@@ -427,9 +435,8 @@ class gamry:
                     if not self.FIFO_Gamryname.startswith("IFC1010"):
                         self.pstat.SetIERangeMode(True)
                 else:
-                    self.base.print_message(f"{self.IO_IErange.value} I range selected")
                     self.base.print_message(
-                        f"{IErangesdict[self.IO_IErange.name]} I range selected"
+                        f"I-range: {self.IO_IErange.value}, mode{IErangesdict[self.IO_IErange.name]} selected"
                     )
                     self.pstat.SetIERange(IErangesdict[self.IO_IErange.name])
                     if not self.FIFO_Gamryname.startswith("IFC1010"):
@@ -466,6 +473,10 @@ class gamry:
                         "StopTest",
                     ]
                     self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
+                    self.pstat.SetVchRangeMode(False)
+                    setpointv = np.abs(self.action.action_params["Vval__V"])
+                    vchrangeval = self.pstat.TestVchRange(setpointv * 1.1)
+                    self.pstat.SetVchRange(vchrangeval)
                 elif mode == Gamry_modes.CP:
                     Dtaqmode = "GamryCOM.GamryDtaqChrono"
                     Dtaqtype = self.GamryCOM.ChronoPot
@@ -482,6 +493,10 @@ class gamry:
                         "StopTest",
                     ]
                     self.pstat.SetCtrlMode(self.GamryCOM.GstatMode)
+                    self.pstat.SetIERangeMode(False)
+                    setpointie = np.abs(self.action.action_params["Ival__A"])
+                    ierangeval = self.pstat.TestIERange(setpointie)
+                    self.pstat.SetIERange(ierangeval)
                 elif mode == Gamry_modes.CV:
                     Dtaqmode = "GamryCOM.GamryDtaqRcv"
                     Dtaqtype = None
@@ -499,6 +514,12 @@ class gamry:
                         "unknown1",
                     ]
                     self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
+                    self.pstat.SetVchRangeMode(False)
+                    vkeys = ["Vinit", "Vapex1", "Vapex2", "Vfinal"]
+                    setpointvs = [self.action.action_params[f"{x}__V"] for x in vkeys]
+                    setpointv = np.max(np.abs(setpointvs))
+                    vchrangeval = self.pstat.TestVchRange(setpointv * 1.1)
+                    self.pstat.SetVchRange(vchrangeval)
                 elif mode == Gamry_modes.LSV:
                     Dtaqmode = "GamryCOM.GamryDtaqCpiv"
                     Dtaqtype = None
@@ -515,6 +536,12 @@ class gamry:
                         "unknown1",
                     ]
                     self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
+                    self.pstat.SetVchRangeMode(False)
+                    vkeys = ["Vinit", "Vfinal"]
+                    setpointvs = [self.action.action_params[f"{x}__V"] for x in vkeys]
+                    setpointv = np.max(np.abs(setpointvs))
+                    vchrangeval = self.pstat.TestVchRange(setpointv * 1.1)
+                    self.pstat.SetVchRange(vchrangeval)
                 elif mode == Gamry_modes.EIS:
                     #                Dtaqmode = "GamryCOM.GamryReadZ"
                     Dtaqmode = "GamryCOM.GamryDtaqEis"
@@ -531,6 +558,10 @@ class gamry:
                         "Zmod",
                     ]
                     self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
+                    self.pstat.SetVchRangeMode(False)
+                    setpointv = np.abs(self.action.action_params["Vval__V"])
+                    vchrangeval = self.pstat.TestVchRange(setpointv * 1.1)
+                    self.pstat.SetVchRange(vchrangeval)
                 elif mode == Gamry_modes.OCV:
                     Dtaqmode = "GamryCOM.GamryDtaqOcv"
                     Dtaqtype = None
@@ -546,7 +577,11 @@ class gamry:
                         "unknown2",
                         "unknown3",
                     ]
-                    self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
+                    self.pstat.SetCtrlMode(self.GamryCOM.GstatMode)
+                    self.pstat.SetIERangeMode(False)
+                    setpointie = 0
+                    ierangeval = self.pstat.TestIERange(setpointie)
+                    self.pstat.SetIERange(ierangeval)
                 else:
                     self.base.print_message(f"'mode {mode} not supported'", error=True)
                     error = ErrorCodes.not_available
@@ -859,9 +894,7 @@ class gamry:
                 return number * exp
 
         if requested_range is None:
-            self.base.print_message(
-                "could not detect IErange, using 'auto'", error=True
-            )
+            self.base.print_message("could not detect IErange, using 'auto'", warn=True)
             return self.gamry_range_enum.auto
 
         self.base.print_message(f"got IErange request for {requested_range}", info=True)
@@ -1142,7 +1175,7 @@ class gamry:
         A: Action,
     ):
         """CP definition"""
-        Ival = A.action_params["Ival"]
+        Ival = A.action_params["Ival__A"]
         Tval = A.action_params["Tval__s"]
         SampleRate = A.action_params["AcqInterval__s"]
         TTLwait = A.action_params["TTLwait"]
@@ -1157,7 +1190,7 @@ class gamry:
 
         # setup partial header which will be completed in measure loop
         self.FIFO_gamryheader = {
-            "Ival": Ival,
+            "Ival__A": Ival,
             "Tval__s": Tval,
             "AcqInterval__s": SampleRate,
             "ETA__s": eta,
