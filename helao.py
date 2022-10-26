@@ -451,8 +451,11 @@ if __name__ == "__main__":
     print("\x1b[2J")  # clear screen
     print("\n\n")
     cprint(
-        figlet_format(f"HELAO\n{get_hlo_version().strip('Vv')}", font="nancyj-fancy"),
-        "green",
+        figlet_format(
+            f"HELAO\n{'dummy' if config['dummy'] else get_hlo_version().strip('Vv')}",
+            font="nancyj-fancy",
+        ),
+        "orange" if config["dummy"] else "green",
         attrs=["bold"],
     )
     for x in python_paths:
