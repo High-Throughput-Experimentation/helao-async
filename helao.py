@@ -472,7 +472,8 @@ if __name__ == "__main__":
     cprint(
         f"\n\nusing config: {config['loaded_config_path']}\n", "white", attrs=["bold"]
     )
-    cprint("launching HELAO in 5 seconds...\n\n", "white")
+    modestring = "dummy" if config["dummy"] else "production"
+    cprint(f"launching HELAO ({modestring} mode) in 5 seconds...\n\n", "white")
     time.sleep(5)
 
     # compress old logs:
