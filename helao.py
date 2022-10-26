@@ -462,7 +462,7 @@ if __name__ == "__main__":
         repo = os.path.basename(x)
         cprint(
             f"\n\nlocal repo '{repo}' on branch: '{branches[repo]}'",
-            "cyan",
+            "yellow" if config["dummy"] else "cyan",
             attrs=["bold"],
         )
         git_stat = subprocess.getoutput(
