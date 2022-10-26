@@ -455,7 +455,7 @@ if __name__ == "__main__":
             f"HELAO\n{'dummy' if config['dummy'] else get_hlo_version().strip('Vv')}",
             font="nancyj-fancy",
         ),
-        "orange" if config["dummy"] else "green",
+        "magenta" if config["dummy"] else "green",
         attrs=["bold"],
     )
     for x in python_paths:
@@ -468,7 +468,7 @@ if __name__ == "__main__":
         git_stat = subprocess.getoutput(
             f'git --git-dir={os.path.join(x, ".git")} show --stat'
         )
-        cprint(git_stat, "cyan")
+        cprint(git_stat, "yellow" if config["dummy"] else "cyan")
     cprint(
         f"\n\nusing config: {config['loaded_config_path']}\n", "white", attrs=["bold"]
     )
