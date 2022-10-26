@@ -76,6 +76,8 @@ config["servers"] = dict(
         fast="gamry_server",
         params=dict(
             dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
+            filterfreq_hz=1000.0,
+            grounded=True,
         ),
     ),
     IO=dict(
