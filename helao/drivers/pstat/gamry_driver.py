@@ -577,11 +577,8 @@ class gamry:
                         "unknown2",
                         "unknown3",
                     ]
-                    self.pstat.SetCtrlMode(self.GamryCOM.GstatMode)
-                    self.pstat.SetIERangeMode(False)
-                    setpointie = 0
-                    ierangeval = self.pstat.TestIERange(setpointie)
-                    self.pstat.SetIERange(ierangeval)
+                    self.pstat.SetCtrlMode(self.GamryCOM.PstatMode)
+                    self.pstat.SetVchRangeMode(True)
                 else:
                     self.base.print_message(f"'mode {mode} not supported'", error=True)
                     error = ErrorCodes.not_available
