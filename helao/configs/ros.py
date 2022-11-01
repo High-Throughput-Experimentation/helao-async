@@ -1,15 +1,14 @@
-
 __all__ = ["config"]
 
-hostip = "131.215.44.107"
-# hostip = "127.0.0.1"
+# hostip = "131.215.44.107"
+hostip = "127.0.0.1"
 config = {}
-config['dummy'] = True
+config["dummy"] = True
 
 # action library provides generator functions which produce action
 # lists from input decision_id grouping
 # config["action_libraries"] = ["lisa_eche_demo"]
-config["experiment_libraries"] = ["lisa_ANEC2"]
+# config["experiment_libraries"] = ["lisa_ANEC2"]
 config["run_type"] = "rosdev"
 config["root"] = r"C:\INST_dev2\RUNS"
 
@@ -20,100 +19,110 @@ config["servers"] = dict(
     # Orchestrator
     ##########################################################################
     orchestrator=dict(
-        host=hostip, port=8001, group="orchestrator", fast="async_orch2",
+        host=hostip,
+        port=8001,
+        group="orchestrator",
+        fast="async_orch2",
     ),
     ##########################################################################
     # Instrument Servers
     ##########################################################################
-    data=dict(
+    syringe=dict(
         host=hostip,
         port=8002,
         group="action",
-        fast="HTEdata_server",
-        mode="legacy",  # lagcy; modelyst
-        params=dict(
-            liquid_DBpath=r"C:\INST_dev2\DATABASE",
-            liquid_DBfile="liquid_ID_database.csv",
-        ),
+        fast="legato_server.py",
+        params=dict(port="COM8", pump_addrs={"zero": 0, "one": 1}),
     ),
-    motor=dict(
-        host=hostip,
-        port=8003,
-        group="action",
-        fast="galil_motion",
-        simulate=False,  # choose between simulator(default) or real device
-        params=dict(
-            Transfermatrix=[
-                [1, 0, 0],
-                [0, 1, 0],
-                [0, 0, 1],
-            ],  # default Transfermatrix for plate calibration
-            # 4x6 plate
-            # M_instr = [[1,0,0,-76.525],[0,1,0,-50.875],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
-            # 100mm wafer
-            M_instr=[
-                [1, 0, 0, -76.525 + (3 * 25.4 - 50)],
-                [0, 1, 0, -50.875 + 2.71],
-                [0, 0, 1, 0],
-                [0, 0, 0, 1],
-            ],  # instrument specific calibration
-            count_to_mm=dict(
-                A=1.0 / 15835.31275,  # 1.0/15690.3,
-                B=1.0 / 6398.771436,  # 1.0/6395.45,
-                C=1.0 / 6396.315722,  # 1.0/6395.45,
-                D=1.0 / 3154.787,  # 1.0/3154.787,
-            ),
-            galil_ip_str="192.168.200.234",
-            def_speed_count_sec=10000,
-            max_speed_count_sec=25000,
-            ipstr="192.168.200.234",
-            axis_id=dict(
-                x="D",
-                y="B",
-                z="A",
-                Rz="C",
-                # t="E",
-                # u="F"
-            ),
-            axis_zero=dict(
-                A=0.0,  # z
-                B=77.0,  # y
-                C=77.0,  # x
-                D=52.0,  # Rz
-                # t="E",
-                # u="F"
-            ),
-            # axlett="ABCD", # not needed anymore
-            timeout=10 * 60,  # timeout for axis stop in sec
-            tbroadcast=2,  # frequency of websocket broadcast (only broadcasts if something changes but need to reduce the frequeny of that if necessary)
-        ),
-    ),
-    potentiostat=dict(
-        host=hostip,
-        port=8004,
-        group="action",
-        fast="gamry_server",
-        simulate=False,  # choose between simulator(default) or real device
-        params=dict(
-            # path_to_gamrycom=r"C:\Program Files (x86)\Gamry Instruments\Framework\GamryCOM.exe"
-            # dev_family = 'Interface', # 'Interface' or 'Reference', not need anymore, we can autodetect this
-            dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
-            # path_to_gamrycom=r"C:\Program Files (x86)\Gamry Instruments\Framework\GamryCOM.exe"
-            # path_to_gamrycom=r"C:\Program Files (x86)\Gamry Instruments\Framework 6\GamryCOM.exe"
-        ),
-    ),
-    aligner=dict(
-        host=hostip,
-        port=8005,
-        group="action",
-        fast="alignment_server",
-        params=dict(
-            data_server="data",  # will use this to get PM_map temporaily, else need to parse it as JSON later
-            motor_server="motor",  # will use this to get PM_map temporaily, else need to parse it as JSON later
-            vis_server="aligner_vis",  # will use this to get PM_map temporaily, else need to parse it as JSON later
-            cutoff=6,  # cutoff of digits for TransferMatrix calculation
-        ),
-    ),
+    # data=dict(
+    #     host=hostip,
+    #     port=8002,
+    #     group="action",
+    #     fast="HTEdata_server",
+    #     mode="legacy",  # lagcy; modelyst
+    #     params=dict(
+    #         liquid_DBpath=r"C:\INST_dev2\DATABASE",
+    #         liquid_DBfile="liquid_ID_database.csv",
+    #     ),
+    # ),
+    # motor=dict(
+    #     host=hostip,
+    #     port=8003,
+    #     group="action",
+    #     fast="galil_motion",
+    #     simulate=False,  # choose between simulator(default) or real device
+    #     params=dict(
+    #         Transfermatrix=[
+    #             [1, 0, 0],
+    #             [0, 1, 0],
+    #             [0, 0, 1],
+    #         ],  # default Transfermatrix for plate calibration
+    #         # 4x6 plate
+    #         # M_instr = [[1,0,0,-76.525],[0,1,0,-50.875],[0,0,1,0],[0,0,0,1]], # instrument specific calibration
+    #         # 100mm wafer
+    #         M_instr=[
+    #             [1, 0, 0, -76.525 + (3 * 25.4 - 50)],
+    #             [0, 1, 0, -50.875 + 2.71],
+    #             [0, 0, 1, 0],
+    #             [0, 0, 0, 1],
+    #         ],  # instrument specific calibration
+    #         count_to_mm=dict(
+    #             A=1.0 / 15835.31275,  # 1.0/15690.3,
+    #             B=1.0 / 6398.771436,  # 1.0/6395.45,
+    #             C=1.0 / 6396.315722,  # 1.0/6395.45,
+    #             D=1.0 / 3154.787,  # 1.0/3154.787,
+    #         ),
+    #         galil_ip_str="192.168.200.234",
+    #         def_speed_count_sec=10000,
+    #         max_speed_count_sec=25000,
+    #         ipstr="192.168.200.234",
+    #         axis_id=dict(
+    #             x="D",
+    #             y="B",
+    #             z="A",
+    #             Rz="C",
+    #             # t="E",
+    #             # u="F"
+    #         ),
+    #         axis_zero=dict(
+    #             A=0.0,  # z
+    #             B=77.0,  # y
+    #             C=77.0,  # x
+    #             D=52.0,  # Rz
+    #             # t="E",
+    #             # u="F"
+    #         ),
+    #         # axlett="ABCD", # not needed anymore
+    #         timeout=10 * 60,  # timeout for axis stop in sec
+    #         tbroadcast=2,  # frequency of websocket broadcast (only broadcasts if something changes but need to reduce the frequeny of that if necessary)
+    #     ),
+    # ),
+    # potentiostat=dict(
+    #     host=hostip,
+    #     port=8004,
+    #     group="action",
+    #     fast="gamry_server",
+    #     simulate=False,  # choose between simulator(default) or real device
+    #     params=dict(
+    #         # path_to_gamrycom=r"C:\Program Files (x86)\Gamry Instruments\Framework\GamryCOM.exe"
+    #         # dev_family = 'Interface', # 'Interface' or 'Reference', not need anymore, we can autodetect this
+    #         dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
+    #         # path_to_gamrycom=r"C:\Program Files (x86)\Gamry Instruments\Framework\GamryCOM.exe"
+    #         # path_to_gamrycom=r"C:\Program Files (x86)\Gamry Instruments\Framework 6\GamryCOM.exe"
+    #     ),
+    # ),
+    # aligner=dict(
+    #     host=hostip,
+    #     port=8005,
+    #     group="action",
+    #     fast="alignment_server",
+    #     params=dict(
+    #         data_server="data",  # will use this to get PM_map temporaily, else need to parse it as JSON later
+    #         motor_server="motor",  # will use this to get PM_map temporaily, else need to parse it as JSON later
+    #         vis_server="aligner_vis",  # will use this to get PM_map temporaily, else need to parse it as JSON later
+    #         cutoff=6,  # cutoff of digits for TransferMatrix calculation
+    #     ),
+    # ),
     #     nimax=dict(
     #         host=hostip,
     #         port=8006,
