@@ -1,4 +1,4 @@
-""" A device class for the KD Scientific Legato pump, used by a FastAPI server instance.
+""" A device class for the KD Scientific Legato 100 series syringe pump.
 
 """
 
@@ -51,29 +51,70 @@ class Legato:
 
         self.motor_busy = False
         self.bokehapp = None
-        
+
         # read pump addr and strings from config dict
-        # hold serial connections in self.coms
-        self.coms = None
-    
-    def set_direction(self, pump_addr: int, direction: int):
-        "Set motion direction forward (1) or reverse (-1)"
-        pass
+        self.com = serial.Serial(
+            port=self.config_dict["port"],
+            baudrate=115200,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=0.1,
+            xonxoff=False,
+            rtscts=False,
+        )
+        self.sio = io.TextIOWrapper(io.BufferedRWPair(self.com, self.com))
 
-    def set_force(self, pump_addr: int, force_val: int):
+    def send(self, command_str: str):
+        if not command_str.endswith("\r"):
+            command_str = command_str + "\r"
+        self.sio.write(command_str)
+        self.sio.flush()
+        resp = [x.strip() for x in self.sio.readlines()]
+        resp = [x for x in resp if x and not x.endswith("\x11")]
+        return resp
+
+    def start_pump(self, pump_name: str, direction: int):
+        "Start motion in direction forward/infuse (1) or reverse/withdraw (-1)"
+        if direction == 1:
+            cmd = "irun"
+        elif direction == -1:
+            cmd = "wrun"
+        else:
+            return False
+        addr = self.config_dict["pump_addrs"][pump_name]
+        command_str = f"{addr:02}@{cmd}\r"
+        resp = self.send(command_str)
+        return resp
+
+    def set_force(self, pump_name: str, force_val: int):
         "Set infusion force value in percentage"
-        pass
-    
-    def set_rate(self, pump_addr: int, rate_val: int, direction: int):
-        "Set infusion|withdraw rate in units TODO"
-        pass
+        addr = self.config_dict["pump_addrs"][pump_name]
+        command_str = f"{addr:02}@forc {force_val}\r"
+        resp = self.send(command_str)
+        return resp
 
-    def set_ramp(self, pump_addr: int, start_rate:int, end_rate: int, direction: int):
-        "Set infusion|withdraw ramp rate in unites TODO"
+    def set_rate(self, pump_name: str, rate_val: int, direction: int):
+        "Set infusion|withdraw rate in units TODO"
+        if direction == 1:
+            cmd = "irate"
+        elif direction == -1:
+            cmd = "wrate"
+        else:
+            return False
+        addr = self.config_dict["pump_addrs"][pump_name]
+        command_str = f"{addr:02}@{cmd} {rate_val}\r" # TODO: units
+        resp = self.send(command_str)
+        return resp
+
+    def set_ramp(self, pump_name: str, start_rate: int, end_rate: int, direction: int):
+        "Set infusion|withdraw ramp rate in units TODO"
         pass
 
     def shutdown(self):
         # this gets called when the server is shut down
         # or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
-        self.base.print_message("shutting down syringe pump")
+        self.base.print_message("shutting down syringe pump(s)")
+        for addr in self.config_dict["pump_addrs"].values():
+            _ = self.send(f"{addr:02}@stop\r")
+        self.com.close()
