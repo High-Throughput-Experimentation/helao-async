@@ -6,10 +6,11 @@ Calc server is used for in-sequence data processing.
 
 __all__ = ["makeApp"]
 
+import json
 from typing import Optional
 from fastapi import Body
 
-
+from helaocore.models.file import HloHeaderModel, HloFileGroup
 from helao.helpers.premodels import Action
 from helao.servers.base import makeActionServ
 from helao.drivers.data.calc_driver import Calc
@@ -44,8 +45,38 @@ def makeApp(confPrefix, servKey, helao_root):
         delta: float = 1.0,
     ):
         active = await app.base.setup_and_contain_action(action_abbr="calcAbs")
-        datadict = app.driver.calc_uvis_abs(active)
+        datadict, arraydict = app.driver.calc_uvis_abs(active)
         await active.enqueue_data_dflt(datadict=datadict)
+        for k, ad in arraydict.items():
+            # convert ad to strings
+            datalist = ad["data"]
+            smplabs = ad["sample_label"]
+            uuidlst = ad["action_uuids"]
+            fulllst = [smplabs, uuidlst] + datalist
+            jsondata = json.dumps(fulllst)
+            header = HloHeaderModel(
+                action_name=active.action.action_name,
+                column_headings=["sample_label", "action_uuid"]
+                + [str(i) for i in range(len(datalist))],
+                optional={"wl": ad["wl"]},
+                epoch_ns=app.base.get_realtime_nowait(),
+            )
+            abbr = active.action.action_abbr
+            subi = active.action.orch_submit_order
+            acti = active.action.action_order
+            retry = active.action.action_retry
+            split = active.action.action_split
+            suffix = f"{k}.hlo"
+            active.write_file(
+                output_str=jsondata,
+                file_type="helao_calc__file",
+                filename=f"{abbr}.{subi}.{acti}.{retry}.{split}__{suffix}",
+                file_group=HloFileGroup.helao_files,
+                header=header.clean_dict(),
+                file_sample_label=ad["sample_label"],
+                json_data_keys=list(ad.keys()),
+                action=active.action,
+            )
         finished_action = await active.finish()
         return finished_action.as_dict()
 
