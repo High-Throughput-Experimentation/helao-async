@@ -1,5 +1,6 @@
 import os
 import numpy as np
+from collections import defaultdict
 from copy import copy
 from scipy.signal import savgol_filter
 from ruamel.yaml import YAML
@@ -120,6 +121,8 @@ class Calc:
         #     "wlarr": mean wavelength array over samples with shape (num_wavlengths,)
         #     "technique": technique_name from experiment yaml
         # }
+        refd = {}
+        # refd holds raw ref_dark and ref_light spectra
         for spec in spec_types:
             # run_use dict 'rud' holds per-sample averaged signals
             rud = {
@@ -153,6 +156,52 @@ class Calc:
                             "mean": arr.mean(axis=0),
                         }
                     )
+            
+            for ref_type in ["ref_dark", "ref_light"]:
+                if rud[ref_type]:
+                    actuuids = []
+                    smplist = []
+                    wllist = []
+                    siglist = []
+
+                    for d in rud[ref_type].values():
+                        actd = d["actd"]
+                        solid_matches = [
+                            s["global_label"]
+                            for s in actd["samples_in"]
+                            if s["sample_type"] == "solid"
+                        ]
+                        assem_matches = [
+                            s["parts"]
+                            for s in actd["samples_in"]
+                            if s["sample_type"] == "assembly"
+                        ]
+                        solid_smp = False
+                        if solid_matches:
+                            solid_smp = solid_matches[0]
+                        elif assem_matches:
+                            parts = assem_matches[0]
+                            solid_parts = [
+                                x["global_label"]
+                                for x in parts
+                                if x["sample_type"] == "solid"
+                            ]
+                            if solid_parts:
+                                solid_smp = solid_parts[0]
+                        if solid_smp:
+                            smplist.append(solid_smp)
+                            wllist.append(d["meta"]["optional"]["wl"])
+                            actuuids.append(actd["action_uuid"])
+                            siglist.append(d["mean"])
+
+                    wlarr = np.array(wllist).mean(axis=0)
+                    refd[ref_type][spec] = {
+                        "smplist": smplist,
+                        "action_uuids": actuuids,
+                        "siglist": siglist,
+                        "wlarr": wlarr,
+                        "technique": rud["technique_name"],
+                    }
 
             if rud["ref_dark"] and rud["ref_light"] and rud["data"]:
                 refdark = np.vstack([d["mean"] for d in rud["ref_dark"].values()])
@@ -211,6 +260,7 @@ class Calc:
 
         params = activeobj.action.action_params
         pred = {}
+        binds = []
         # pred holds intermediate outputs for "T", "R", and/or "TR"
         # pred["TR"] = {
         #     "full": full resolution vectors between lower_wl and upper_wl limits
@@ -256,6 +306,7 @@ class Calc:
             dx += [hv[-1] - hv[-2]]
             pred[k]["dx"] = np.array(dx)
 
+        smplist = []
         if specd.get("T", {}) and specd.get("R", {}):  # TR_UVVIS technique
             if pred["T"]["binds"] != pred["R"]["binds"]:
                 raise Exception
@@ -267,7 +318,8 @@ class Calc:
                 "smooth_refadj": {},
                 "smooth_refadj_scl": {},
             }
-            smpT = np.array(specd["T"]["smplist"])
+            smplist = specd["T"]["smplist"]
+            smpT = np.array(smplist)
             asT = np.argsort(smpT)
             arrTR = pred["T"]["full"]["sig"] / (1 - pred["R"]["full"]["sig"][asT, :])
             pred["TR"]["full"]["sig"] = arrTR
@@ -281,11 +333,13 @@ class Calc:
             pred["TR"]["bin"]["wl"] = pred["T"]["bin"]["wl"]
 
         elif specd.get("T", {}) and not specd.get("R", {}):  # T_UVVIS only
+            smplist = specd["T"]["smplist"]
             pred["T"]["full"]["abs"] = -np.log(pred["T"]["full"]["sig"])
             omT = 1 - pred["T"]["full"]["sig"]
             pred["T"]["full"]["omT"] = omT
 
         elif specd.get("R", {}) and not specd.get("T", {}):  # DR_UVVIS only
+            smplist = specd["R"]["smplist"]
             pred["R"]["full"]["abs"] = (1.0 - np.log(pred["R"]["full"]["sig"])) ** 2 / (
                 2.0 * pred["R"]["full"]["sig"]
             )
@@ -365,7 +419,7 @@ class Calc:
 
             # abs_smooth_refadj_scl
             pred[sk]["smooth_refadj_scl"]["abs"] = pred[sk]["smooth_refadj"][
-               "abs" 
+                "abs"
             ] / np.nanmax(pred[sk]["smooth_refadj"]["abs"])
             sv = pred[sk]["smooth_refadj_scl"]["abs"][::-1]
             sv[np.isnan(sv)] = 0.1
@@ -392,6 +446,7 @@ class Calc:
             )
 
         datadict = {}
+        interd = {}
         # assemble datadict with scalar FOMs
         if specd.get("T", {}) and specd.get("R", {}):  # TR_UVVIS technique
             interd = pred["TR"]
@@ -482,6 +537,9 @@ class Calc:
         for z in ("DA", "IA", "DF", "IF"):
             v = interd["smooth_refadj"][z]
             v[np.isnan(v)] = 0.1
+            sv = v[::-1]
+            sv[np.isnan(sv)] = 0.1
+            sdx = -1 * interd["dx"][::-1]
             slope = (
                 handlenan_savgol_filter(
                     v,
@@ -490,7 +548,7 @@ class Calc:
                     delta=1.0,
                     deriv=1,
                 )
-                / interd["dx"]
+                / sdx
             )
             datadict[f"{z}_minslope"] = np.nanmin(slope, axis=1)
 
@@ -498,14 +556,59 @@ class Calc:
         datadict["min_rescaled"] = interd["min_rescaled"]
         datadict["max_rescaled"] = interd["max_rescaled"]
 
+        for spectype in ["T", "R"]:
+            if spectype in specd.keys():
+                datadict[f"{spectype}__action_uuid"] = specd[spectype]['action_uuids']
+
         # TODO: export interd vectors
+        arraydict = defaultdict(dict)
+        
+        for rk, rd in refd.items():
+            for sk, sd in rd.items():
+                ad = {
+                    "sample_label": sd['smplist'],
+                    "action_uuid": sd['action_uuids'],
+                    "wavelength": sd['wlarr'].tolist(),
+                    "data": sd['siglist']
+                }
+                arraydict[f"rawlen_{rk}__{sk}"] = ad
+
+        lenmap = {
+            "full": "trunclen_bkgsub",
+            "bin": "interlen_binned",
+            "smooth": "interlen_smooth",
+            "smooth_refadj": "interlen_smoothrefadj"
+        }
+        keymap = {
+            "omTR": "one_minus_T_minus_R",
+            "omT": "one_minus_T",
+        }
+        for sk, sd in pred.items():
+            for bk, bd in sd.items():
+                for ik in ["sig", "abs", "omT", "omTR"]:
+                    if ik in bd.keys() and ik=="sig":
+                        arrayname = f"{lenmap[bk]}__{sk}"
+                    elif ik in bd.keys():
+                        arrayname = f"{lenmap[bk]}__{keymap[ik]}"
+                    else:
+                        continue
+                    uk = "T" if sk == "TR" else sk
+                    ad = {
+                        "sample_label": specd[uk]["smplist"],
+                        "action_uuid": specd[uk]["action_uuids"],
+                        "wavelength": sd["bin"]["wl"].tolist() if bk.startswith("smooth") else bd["wl"].tolist(),
+                        "data": bd[ik].tolist()
+                    }
+                    arraydict[f"{arrayname}"] = ad
+                        
+
 
         datadict = {
             k: v.tolist() if isinstance(v, np.ndarray) else v
             for k, v in datadict.items()
         }
 
-        return datadict
+        return datadict, arraydict
 
     def shutdown(self):
         pass

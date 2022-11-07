@@ -1435,8 +1435,11 @@ class Base(object):
 
                 self.base.print_message("writing non stream data to: {output_file}")
 
-                async with aiofiles.open(output_file, mode="w") as f:
-                    await f.write(header + output_str)
+                async with aiofiles.open(output_file, mode="a+") as f:
+                    if header:
+                        await f.write(header)
+                    await f.write("%%\n")
+                    await f.write(output_str)
                     action.files.append(file_info)
                     return output_file
             else:
@@ -1477,8 +1480,11 @@ class Base(object):
                 if not os.path.exists(output_path):
                     os.makedirs(output_path, exist_ok=True)
                 self.base.print_message("writing non stream data to: {output_file}")
-                with open(output_file, mode="w") as f:
-                    f.write(header + output_str)
+                with open(output_file, mode="a+") as f:
+                    if header:
+                        f.write(header)
+                    f.write("%%\n")
+                    f.write(output_str)
                     action.files.append(file_info)
                     return output_file
             else:
