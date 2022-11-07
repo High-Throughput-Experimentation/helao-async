@@ -156,7 +156,7 @@ class Calc:
                             "mean": arr.mean(axis=0),
                         }
                     )
-            
+
             for ref_type in ["ref_dark", "ref_light"]:
                 if rud[ref_type]:
                     actuuids = []
@@ -558,18 +558,18 @@ class Calc:
 
         for spectype in ["T", "R"]:
             if spectype in specd.keys():
-                datadict[f"{spectype}__action_uuid"] = specd[spectype]['action_uuids']
+                datadict[f"{spectype}__action_uuid"] = specd[spectype]["action_uuids"]
 
         # TODO: export interd vectors
         arraydict = defaultdict(dict)
-        
+
         for rk, rd in refd.items():
             for sk, sd in rd.items():
                 ad = {
-                    "sample_label": sd['smplist'],
-                    "action_uuid": sd['action_uuids'],
-                    "wavelength": sd['wlarr'].tolist(),
-                    "data": sd['siglist']
+                    "sample_label": sd["smplist"],
+                    "action_uuid": sd["action_uuids"],
+                    "wavelength": sd["wlarr"].tolist(),
+                    "data": sd["siglist"],
                 }
                 arraydict[f"rawlen_{rk}__{sk}"] = ad
 
@@ -577,7 +577,7 @@ class Calc:
             "full": "trunclen_bkgsub",
             "bin": "interlen_binned",
             "smooth": "interlen_smooth",
-            "smooth_refadj": "interlen_smoothrefadj"
+            "smooth_refadj": "interlen_smoothrefadj",
         }
         keymap = {
             "omTR": "one_minus_T_minus_R",
@@ -586,7 +586,7 @@ class Calc:
         for sk, sd in pred.items():
             for bk, bd in sd.items():
                 for ik in ["sig", "abs", "omT", "omTR"]:
-                    if ik in bd.keys() and ik=="sig":
+                    if ik in bd.keys() and ik == "sig":
                         arrayname = f"{lenmap[bk]}__{sk}"
                     elif ik in bd.keys():
                         arrayname = f"{lenmap[bk]}__{keymap[ik]}"
@@ -596,12 +596,12 @@ class Calc:
                     ad = {
                         "sample_label": specd[uk]["smplist"],
                         "action_uuid": specd[uk]["action_uuids"],
-                        "wavelength": sd["bin"]["wl"].tolist() if bk.startswith("smooth") else bd["wl"].tolist(),
-                        "data": bd[ik].tolist()
+                        "wavelength": sd["bin"]["wl"].tolist()
+                        if bk.startswith("smooth")
+                        else bd["wl"].tolist(),
+                        "data": bd[ik].tolist(),
                     }
                     arraydict[f"{arrayname}"] = ad
-                        
-
 
         datadict = {
             k: v.tolist() if isinstance(v, np.ndarray) else v
