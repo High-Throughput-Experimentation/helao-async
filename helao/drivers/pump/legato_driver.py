@@ -39,6 +39,35 @@ sio.flush()
 resp = sio.readlines()
 ser.close()
 ```
+
+Supported operation modes:
+1. volume input + rate/ramp input
+2. time input + rate/ramp input
+
+Supported volume units:
+ml, ul, nl pl
+
+Supported rate units:
+ml, ul, nl, pl / Hr, Min, Sec
+
+Prompt statuses:
+: (idle)
+> (infusing)
+< (withdrawing)
+* (stalled)
+T* (target reached)
+
+
+General workflow:
+1. load inject | withdraw program (load qs i | load qs w)
+2. clear time
+3. clear volume
+4. set syringe volume
+5. set rate | ramp
+6. set target time | volume
+7. run inject | withdraw
+8. poll status flags or promp
+9. issue manual stop
 """
 
 
@@ -63,6 +92,10 @@ class Legato:
             rtscts=False,
         )
         self.sio = io.TextIOWrapper(io.BufferedRWPair(self.com, self.com))
+        
+        # set POLL to on for all pumps
+        # clear time and volume, issue stop for all pumps
+        # disable writes to NVRAM? faster response but no recovery
 
     def send(self, command_str: str):
         if not command_str.endswith("\r"):
@@ -71,6 +104,7 @@ class Legato:
         self.sio.flush()
         resp = [x.strip() for x in self.sio.readlines()]
         resp = [x for x in resp if x and not x.endswith("\x11")]
+        # if POLL is on, may want to poll under \x11 is received; read prompt @ \x11
         return resp
 
     def start_pump(self, pump_name: str, direction: int):
