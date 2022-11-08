@@ -358,7 +358,17 @@ def UVIS_sub_setup_ref(
 
 def UVIS_calc_abs(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
+    ev_parts: list = [1.5, 2.0, 2.5, 3.0],
+    bin_width: int = 3,
+    window_length: int = 45,
+    poly_order: int = 4,
+    lower_wl: float = 370.0,
+    upper_wl: float = 1020.0,
+    max_mthd_allowed: float = 1.2,
+    max_limit: float = 0.99,
+    min_mthd_allowed: float = -0.2,
+    min_limit: float = 0.01,
 ):
     """Calculate absorption from sequence info."""
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -366,16 +376,16 @@ def UVIS_calc_abs(
         CALC_server,
         "calc_uvis_abs",
         {
-            "ev_parts": [1.5, 2.0, 2.5, 3.0],
-            "bin_width": 3,
-            "window_length": 45,
-            "poly_order": 4,
-            "lower_wl": 370,
-            "upper_wl": 1020,
-            "max_mthd_allowed": 1.2,
-            "max_limit": 0.99,
-            "min_mthd_allowed": -0.2,
-            "min_limit": 0.01,
+            "ev_parts": apm.pars.ev_parts,
+            "bin_width": apm.pars.bin_width,
+            "window_length": apm.pars.window_length,
+            "poly_order": apm.pars.poly_order,
+            "lower_wl": apm.pars.lower_wl,
+            "upper_wl": apm.pars.upper_wl,
+            "max_mthd_allowed": apm.pars.max_mthd_allowed,
+            "max_limit": apm.pars.max_limit,
+            "min_mthd_allowed": apm.pars.min_mthd_allowed,
+            "min_limit": apm.pars.min_limit,
         },
     )
     return apm.action_list  # returns complete action list to orch
