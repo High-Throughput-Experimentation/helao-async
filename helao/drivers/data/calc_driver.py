@@ -192,7 +192,7 @@ class Calc:
                             smplist.append(solid_smp)
                             wllist.append(d["meta"]["optional"]["wl"])
                             actuuids.append(actd["action_uuid"])
-                            siglist.append(d["mean"])
+                            siglist.append(d["mean"].tolist())
 
                     wlarr = np.array(wllist).mean(axis=0)
                     refd[ref_type][spec] = {

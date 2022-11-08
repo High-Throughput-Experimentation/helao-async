@@ -58,7 +58,7 @@ def makeApp(confPrefix, servKey, helao_root):
                 action_name=active.action.action_name,
                 column_headings=["sample_label", "action_uuid"]
                 + [str(i) for i in range(len(datalist))],
-                optional={"wl": ad["wl"]},
+                optional={"wl": ad["wavelength"]},
                 epoch_ns=app.base.get_realtime_nowait(),
             )
             abbr = active.action.action_abbr
