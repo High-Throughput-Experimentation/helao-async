@@ -582,6 +582,7 @@ class Calc:
         keymap = {
             "omTR": "one_minus_T_minus_R",
             "omT": "one_minus_T",
+            "abs": "abs"
         }
         for sk, sd in pred.items():
             for bk, bd in sd.items():
