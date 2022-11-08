@@ -49,15 +49,18 @@ def makeApp(confPrefix, servKey, helao_root):
         await active.enqueue_data_dflt(datadict=datadict)
         for k, ad in arraydict.items():
             # convert ad to strings
-            datalist = ad["data"]
+            datalst = ad["data"]
             smplabs = ad["sample_label"]
             uuidlst = ad["action_uuids"]
-            fulllst = [smplabs, uuidlst] + datalist
-            jsondata = json.dumps(fulllst)
+            fulllst = [smplabs, uuidlst] + datalst
+            colnames = ["sample_label", "action_uuid"] + [
+                str(i) for i in range(len(datalst))
+            ]
+            jsondict = {k: v for k, v in zip(colnames, fulllst)}
+            jsondata = json.dumps(jsondict)
             header = HloHeaderModel(
                 action_name=active.action.action_name,
-                column_headings=["sample_label", "action_uuid"]
-                + [str(i) for i in range(len(datalist))],
+                column_headings=colnames,
                 optional={"wl": ad["wavelength"]},
                 epoch_ns=app.base.get_realtime_nowait(),
             )
