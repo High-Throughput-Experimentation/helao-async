@@ -49,7 +49,7 @@ def makeApp(confPrefix, servKey, helao_root):
         await active.enqueue_data_dflt(datadict=datadict)
         for k, ad in arraydict.items():
             # convert ad to strings
-            datalst = ad["data"]
+            datalst = list(zip(*ad["data"]))
             smplabs = ad["sample_label"]
             uuidlst = ad["action_uuids"]
             fulllst = [smplabs, uuidlst] + datalst
