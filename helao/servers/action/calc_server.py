@@ -31,7 +31,7 @@ def makeApp(confPrefix, servKey, helao_root):
     @app.post(f"/{servKey}/calc_uvis_abs")
     async def calc_uvis_abs(
         action: Optional[Action] = Body({}, embed=True),
-        action_version: int = 1,
+        action_version: int = 2,
         ev_parts: list = [1.5, 2.0, 2.5, 3.0],
         bin_width: int = 3,
         window_length: int = 45,

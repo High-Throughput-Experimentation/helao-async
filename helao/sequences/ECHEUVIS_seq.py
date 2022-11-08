@@ -14,7 +14,7 @@ SEQUENCES = __all__
 
 
 def ECHEUVIS_CV_led(
-    sequence_version: int = 3,
+    sequence_version: int = 4,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -51,6 +51,12 @@ def ECHEUVIS_CV_led(
     spec_int_time_ms: float = 15,
     spec_n_avg: int = 1,
     spec_technique: str = "T_UVVIS",
+    calc_ev_parts: list = [1.5, 2.0, 2.5, 3.0],
+    calc_bin_width: int = 3,
+    calc_window_length: int = 45,
+    calc_poly_order: int = 4,
+    calc_lower_wl: float = 370.0,
+    calc_upper_wl: float = 1020.0,
 ):
 
     epm = ExperimentPlanMaker()
@@ -249,14 +255,24 @@ def ECHEUVIS_CV_led(
                 "reference_mode": "builtin",
             },
         )
-    epm.add_experiment("UVIS_calc_abs", {})
+    epm.add_experiment(
+        "UVIS_calc_abs",
+        {
+            "ev_parts": calc_ev_parts,
+            "bin_width": calc_bin_width,
+            "window_length": calc_window_length,
+            "poly_order": calc_poly_order,
+            "lower_wl": calc_lower_wl,
+            "upper_wl": calc_upper_wl,
+        },
+    )
     epm.add_experiment("ECHE_sub_shutdown", {})
 
     return epm.experiment_plan_list  # returns complete experiment list
 
 
 def ECHEUVIS_CA_led(
-    sequence_version: int = 3,
+    sequence_version: int = 4,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -285,17 +301,86 @@ def ECHEUVIS_CA_led(
     toggleSpec_period: float = 0.6,
     toggleSpec_init_delay: float = 0.0,
     toggleSpec_time: float = -1,
+    spec_ref_duration: float = 2,
     spec_int_time_ms: float = 15,
     spec_n_avg: int = 1,
     spec_technique: str = "T_UVVIS",
+    calc_ev_parts: list = [1.5, 2.0, 2.5, 3.0],
+    calc_bin_width: int = 3,
+    calc_window_length: int = 45,
+    calc_poly_order: int = 4,
+    calc_lower_wl: float = 370.0,
+    calc_upper_wl: float = 1020.0,
 ):
 
     epm = ExperimentPlanMaker()
 
-    # (1) house keeping
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add_experiment(
+        "ECHEUVIS_sub_interrupt",
+        {"reason": "Stop flow and prepare for xy motion to ref location."},
+    )
+    epm.add_experiment(
+        "UVIS_sub_setup_ref",
+        {
+            "reference_mode": "builtin",
+            "solid_custom_position": "cell1_we",
+            "solid_plate_id": plate_id,
+            "solid_sample_no": plate_sample_no_list[0],
+            "specref_code": 1,
+        },
+    )
+    epm.add_experiment(
+        "ECHEUVIS_sub_interrupt",
+        {"reason": "Restore flow and prepare for reference measurement."},
+    )
 
-    for plate_sample in plate_sample_no_list:
+    # dark ref
+    for st in SPEC_MAP[spec_technique]:
+        epm.add_experiment(
+            "UVIS_sub_measure",
+            {
+                "spec_type": st,
+                "spec_int_time_ms": spec_int_time_ms,
+                "spec_n_avg": spec_n_avg,
+                "duration_sec": spec_ref_duration,
+                "toggle_source": led_names[0],
+                "toggle_is_shutter": False,
+                "illumination_wavelength": led_wavelengths_nm[0],
+                "illumination_intensity": led_intensities_mw[0],
+                "illumination_intensity_date": led_date,
+                "illumination_side": led_type,
+                "technique_name": spec_technique,
+                "run_use": "ref_dark",
+                "reference_mode": "builtin",
+            },
+        )
+    # light ref
+    for st in SPEC_MAP[spec_technique]:
+        epm.add_experiment(
+            "UVIS_sub_measure",
+            {
+                "spec_type": st,
+                "spec_int_time_ms": spec_int_time_ms,
+                "spec_n_avg": spec_n_avg,
+                "duration_sec": spec_ref_duration,
+                "toggle_source": led_names[0],
+                "toggle_is_shutter": False,
+                "illumination_wavelength": led_wavelengths_nm[0],
+                "illumination_intensity": led_intensities_mw[0],
+                "illumination_intensity_date": led_date,
+                "illumination_side": led_type,
+                "technique_name": spec_technique,
+                "run_use": "ref_light",
+                "reference_mode": "builtin",
+            },
+        )
+    epm.add_experiment(
+        "ECHEUVIS_sub_interrupt",
+        {"reason": "Stop flow and prepare for xy motion to starting sample."},
+    )
+
+    for i, plate_sample in enumerate(plate_sample_no_list):
 
         epm.add_experiment(
             "ECHE_sub_startup",
@@ -308,6 +393,13 @@ def ECHEUVIS_CA_led(
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
+
+        if i == 0:  # initial sample
+            epm.add_experiment(
+                "ECHEUVIS_sub_interrupt",
+                {"reason": "Restore flow and prepare for sample measurement."},
+            )
+
         # OCV
         epm.add_experiment(
             "ECHE_sub_OCV",
@@ -354,14 +446,83 @@ def ECHEUVIS_CA_led(
             },
         )
 
-        epm.add_experiment("UVIS_calc_abs", {})
-        epm.add_experiment("ECHE_sub_shutdown", {})
+    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add_experiment(
+        "ECHEUVIS_sub_interrupt",
+        {"reason": "Stop flow and prepare for xy motion to ref location."},
+    )
+    epm.add_experiment(
+        "UVIS_sub_setup_ref",
+        {
+            "reference_mode": "builtin",
+            "solid_custom_position": "cell1_we",
+            "solid_plate_id": plate_id,
+            "solid_sample_no": plate_sample_no_list[-1],
+            "specref_code": 1,
+        },
+    )
+    epm.add_experiment(
+        "ECHEUVIS_sub_interrupt",
+        {"reason": "Restore flow and prepare for reference measurement."},
+    )
+    # dark ref
+    for st in SPEC_MAP[spec_technique]:
+        epm.add_experiment(
+            "UVIS_sub_measure",
+            {
+                "spec_type": st,
+                "spec_int_time_ms": spec_int_time_ms,
+                "spec_n_avg": spec_n_avg,
+                "duration_sec": spec_ref_duration,
+                "toggle_source": led_names[0],
+                "toggle_is_shutter": False,
+                "illumination_wavelength": led_wavelengths_nm[0],
+                "illumination_intensity": led_intensities_mw[0],
+                "illumination_intensity_date": led_date,
+                "illumination_side": led_type,
+                "technique_name": spec_technique,
+                "run_use": "ref_dark",
+                "reference_mode": "builtin",
+            },
+        )
+    # light ref
+    for st in SPEC_MAP[spec_technique]:
+        epm.add_experiment(
+            "UVIS_sub_measure",
+            {
+                "spec_type": st,
+                "spec_int_time_ms": spec_int_time_ms,
+                "spec_n_avg": spec_n_avg,
+                "duration_sec": spec_ref_duration,
+                "toggle_source": led_names[0],
+                "toggle_is_shutter": False,
+                "illumination_wavelength": led_wavelengths_nm[0],
+                "illumination_intensity": led_intensities_mw[0],
+                "illumination_intensity_date": led_date,
+                "illumination_side": led_type,
+                "technique_name": spec_technique,
+                "run_use": "ref_light",
+                "reference_mode": "builtin",
+            },
+        )
+    epm.add_experiment(
+        "UVIS_calc_abs",
+        {
+            "ev_parts": calc_ev_parts,
+            "bin_width": calc_bin_width,
+            "window_length": calc_window_length,
+            "poly_order": calc_poly_order,
+            "lower_wl": calc_lower_wl,
+            "upper_wl": calc_upper_wl,
+        },
+    )
+    epm.add_experiment("ECHE_sub_shutdown", {})
 
     return epm.experiment_plan_list  # returns complete experiment list
 
 
 def ECHEUVIS_CP_led(
-    sequence_version: int = 2,
+    sequence_version: int = 4,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -389,17 +550,86 @@ def ECHEUVIS_CP_led(
     toggleSpec_period: float = 0.6,
     toggleSpec_init_delay: float = 0.0,
     toggleSpec_time: float = -1,
+    spec_ref_duration: float = 2,
     spec_int_time_ms: float = 15,
     spec_n_avg: int = 1,
     spec_technique: str = "T_UVVIS",
+    calc_ev_parts: list = [1.5, 2.0, 2.5, 3.0],
+    calc_bin_width: int = 3,
+    calc_window_length: int = 45,
+    calc_poly_order: int = 4,
+    calc_lower_wl: float = 370.0,
+    calc_upper_wl: float = 1020.0,
 ):
 
     epm = ExperimentPlanMaker()
 
-    # (1) house keeping
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add_experiment(
+        "ECHEUVIS_sub_interrupt",
+        {"reason": "Stop flow and prepare for xy motion to ref location."},
+    )
+    epm.add_experiment(
+        "UVIS_sub_setup_ref",
+        {
+            "reference_mode": "builtin",
+            "solid_custom_position": "cell1_we",
+            "solid_plate_id": plate_id,
+            "solid_sample_no": plate_sample_no_list[0],
+            "specref_code": 1,
+        },
+    )
+    epm.add_experiment(
+        "ECHEUVIS_sub_interrupt",
+        {"reason": "Restore flow and prepare for reference measurement."},
+    )
 
-    for plate_sample in plate_sample_no_list:
+    # dark ref
+    for st in SPEC_MAP[spec_technique]:
+        epm.add_experiment(
+            "UVIS_sub_measure",
+            {
+                "spec_type": st,
+                "spec_int_time_ms": spec_int_time_ms,
+                "spec_n_avg": spec_n_avg,
+                "duration_sec": spec_ref_duration,
+                "toggle_source": led_names[0],
+                "toggle_is_shutter": False,
+                "illumination_wavelength": led_wavelengths_nm[0],
+                "illumination_intensity": led_intensities_mw[0],
+                "illumination_intensity_date": led_date,
+                "illumination_side": led_type,
+                "technique_name": spec_technique,
+                "run_use": "ref_dark",
+                "reference_mode": "builtin",
+            },
+        )
+    # light ref
+    for st in SPEC_MAP[spec_technique]:
+        epm.add_experiment(
+            "UVIS_sub_measure",
+            {
+                "spec_type": st,
+                "spec_int_time_ms": spec_int_time_ms,
+                "spec_n_avg": spec_n_avg,
+                "duration_sec": spec_ref_duration,
+                "toggle_source": led_names[0],
+                "toggle_is_shutter": False,
+                "illumination_wavelength": led_wavelengths_nm[0],
+                "illumination_intensity": led_intensities_mw[0],
+                "illumination_intensity_date": led_date,
+                "illumination_side": led_type,
+                "technique_name": spec_technique,
+                "run_use": "ref_light",
+                "reference_mode": "builtin",
+            },
+        )
+    epm.add_experiment(
+        "ECHEUVIS_sub_interrupt",
+        {"reason": "Stop flow and prepare for xy motion to starting sample."},
+    )
+
+    for i, plate_sample in enumerate(plate_sample_no_list):
 
         epm.add_experiment(
             "ECHE_sub_startup",
@@ -412,6 +642,13 @@ def ECHEUVIS_CP_led(
                 "liquid_volume_ml": liquid_volume_ml,
             },
         )
+
+        if i == 0:  # initial sample
+            epm.add_experiment(
+                "ECHEUVIS_sub_interrupt",
+                {"reason": "Restore flow and prepare for sample measurement."},
+            )
+
         # CP1
         epm.add_experiment(
             "ECHEUVIS_sub_CP_led",
@@ -450,7 +687,76 @@ def ECHEUVIS_CP_led(
             },
         )
 
-        epm.add_experiment("UVIS_calc_abs", {})
-        epm.add_experiment("ECHE_sub_shutdown", {})
+    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add_experiment(
+        "ECHEUVIS_sub_interrupt",
+        {"reason": "Stop flow and prepare for xy motion to ref location."},
+    )
+    epm.add_experiment(
+        "UVIS_sub_setup_ref",
+        {
+            "reference_mode": "builtin",
+            "solid_custom_position": "cell1_we",
+            "solid_plate_id": plate_id,
+            "solid_sample_no": plate_sample_no_list[-1],
+            "specref_code": 1,
+        },
+    )
+    epm.add_experiment(
+        "ECHEUVIS_sub_interrupt",
+        {"reason": "Restore flow and prepare for reference measurement."},
+    )
+    # dark ref
+    for st in SPEC_MAP[spec_technique]:
+        epm.add_experiment(
+            "UVIS_sub_measure",
+            {
+                "spec_type": st,
+                "spec_int_time_ms": spec_int_time_ms,
+                "spec_n_avg": spec_n_avg,
+                "duration_sec": spec_ref_duration,
+                "toggle_source": led_names[0],
+                "toggle_is_shutter": False,
+                "illumination_wavelength": led_wavelengths_nm[0],
+                "illumination_intensity": led_intensities_mw[0],
+                "illumination_intensity_date": led_date,
+                "illumination_side": led_type,
+                "technique_name": spec_technique,
+                "run_use": "ref_dark",
+                "reference_mode": "builtin",
+            },
+        )
+    # light ref
+    for st in SPEC_MAP[spec_technique]:
+        epm.add_experiment(
+            "UVIS_sub_measure",
+            {
+                "spec_type": st,
+                "spec_int_time_ms": spec_int_time_ms,
+                "spec_n_avg": spec_n_avg,
+                "duration_sec": spec_ref_duration,
+                "toggle_source": led_names[0],
+                "toggle_is_shutter": False,
+                "illumination_wavelength": led_wavelengths_nm[0],
+                "illumination_intensity": led_intensities_mw[0],
+                "illumination_intensity_date": led_date,
+                "illumination_side": led_type,
+                "technique_name": spec_technique,
+                "run_use": "ref_light",
+                "reference_mode": "builtin",
+            },
+        )
+    epm.add_experiment(
+        "UVIS_calc_abs",
+        {
+            "ev_parts": calc_ev_parts,
+            "bin_width": calc_bin_width,
+            "window_length": calc_window_length,
+            "poly_order": calc_poly_order,
+            "lower_wl": calc_lower_wl,
+            "upper_wl": calc_upper_wl,
+        },
+    )
+    epm.add_experiment("ECHE_sub_shutdown", {})
 
     return epm.experiment_plan_list  # returns complete experiment list

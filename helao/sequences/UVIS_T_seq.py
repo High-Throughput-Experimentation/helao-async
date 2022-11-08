@@ -12,7 +12,7 @@ SEQUENCES = __all__
 
 
 def UVIS_T(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reference_mode: str = "internal",
@@ -27,6 +27,12 @@ def UVIS_T(
     led_wavelengths_nm: list = [-1],
     led_intensities_mw: list = [-1],
     toggle_is_shutter: bool = False,
+    calc_ev_parts: list = [1.5, 2.0, 2.5, 3.0],
+    calc_bin_width: int = 3,
+    calc_window_length: int = 45,
+    calc_poly_order: int = 4,
+    calc_lower_wl: float = 370.0,
+    calc_upper_wl: float = 1020.0,
 ):
     epm = ExperimentPlanMaker()
     epm.add_experiment("UVIS_sub_unloadall_customs", {})
@@ -159,7 +165,17 @@ def UVIS_T(
         },
     )
 
-    epm.add_experiment("UVIS_calc_abs", {})
+    epm.add_experiment(
+        "UVIS_calc_abs",
+        {
+            "ev_parts": calc_ev_parts,
+            "bin_width": calc_bin_width,
+            "window_length": calc_window_length,
+            "poly_order": calc_poly_order,
+            "lower_wl": calc_lower_wl,
+            "upper_wl": calc_upper_wl,
+        },
+    )
 
     epm.add_experiment("UVIS_sub_shutdown", {})
 
