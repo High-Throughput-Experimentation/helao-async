@@ -587,6 +587,8 @@ class Calc:
         }
         for sk, sd in pred.items():
             for bk, bd in sd.items():
+                if not isinstance(bd, dict):
+                    continue
                 for ik in ["sig", "abs", "omT", "omTR"]:
                     if ik in bd.keys() and ik == "sig":
                         arrayname = f"{lenmap[bk]}__{sk}"
