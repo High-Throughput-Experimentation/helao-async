@@ -1424,6 +1424,7 @@ class Base(object):
                     filename=filename,
                     file_group=file_group,
                 )
+                action.files.append(file_info)
                 output_path = os.path.join(
                     self.base.helaodirs.save_root,
                     action.action_output_dir,
@@ -1440,7 +1441,6 @@ class Base(object):
                         await f.write(header)
                     await f.write("%%\n")
                     await f.write(output_str)
-                    action.files.append(file_info)
                     return output_file
             else:
                 return None

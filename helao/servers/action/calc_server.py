@@ -67,7 +67,7 @@ def makeApp(confPrefix, servKey, helao_root):
             retry = active.action.action_retry
             split = active.action.action_split
             suffix = f"{k}.hlo"
-            active.write_file(
+            await active.write_file(
                 output_str=jsondata,
                 file_type="helao_calc__file",
                 filename=f"{abbr}.{subi}.{acti}.{retry}.{split}__{suffix}",
