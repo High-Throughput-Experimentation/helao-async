@@ -229,7 +229,7 @@ def UVIS_sub_measure(
     # setup spectrometer data collection
     apm.add(
         SPEC_T_server if apm.pars.spec_type == SpecType.T else SPEC_R_server,
-        "acquire_spec",
+        "acquire_spec_adv",
         {
             "int_time_ms": apm.pars.spec_int_time_ms,
             "n_avg": apm.pars.spec_n_avg,
