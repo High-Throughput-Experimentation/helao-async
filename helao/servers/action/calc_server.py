@@ -77,7 +77,7 @@ def makeApp(confPrefix, servKey, helao_root):
                 file_group=HloFileGroup.helao_files,
                 header=header.clean_dict(),
                 file_sample_label=ad["sample_label"],
-                json_data_keys=list(ad.keys()),
+                json_data_keys=colnames,
                 action=active.action,
             )
         finished_action = await active.finish()
