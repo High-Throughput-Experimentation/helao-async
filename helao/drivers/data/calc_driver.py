@@ -567,7 +567,7 @@ class Calc:
             for sk, sd in rd.items():
                 ad = {
                     "sample_label": sd["smplist"],
-                    "action_uuid": sd["action_uuids"],
+                    "action_uuids": sd["action_uuids"],
                     "wavelength": sd["wlarr"].tolist(),
                     "data": sd["siglist"],
                 }
@@ -599,7 +599,7 @@ class Calc:
                     uk = "T" if sk == "TR" else sk
                     ad = {
                         "sample_label": specd[uk]["smplist"],
-                        "action_uuid": specd[uk]["action_uuids"],
+                        "action_uuids": specd[uk]["action_uuids"],
                         "wavelength": sd["bin"]["wl"].tolist()
                         if bk.startswith("smooth")
                         else bd["wl"].tolist(),
