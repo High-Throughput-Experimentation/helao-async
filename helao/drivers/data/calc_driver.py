@@ -121,7 +121,7 @@ class Calc:
         #     "wlarr": mean wavelength array over samples with shape (num_wavlengths,)
         #     "technique": technique_name from experiment yaml
         # }
-        refd = {}
+        refd = defaultdict(dict) 
         # refd holds raw ref_dark and ref_light spectra
         for spec in spec_types:
             # run_use dict 'rud' holds per-sample averaged signals
