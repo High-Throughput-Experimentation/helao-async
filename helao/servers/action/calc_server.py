@@ -54,7 +54,7 @@ def makeApp(confPrefix, servKey, helao_root):
             uuidlst = ad["action_uuids"]
             fulllst = [smplabs, uuidlst] + datalst
             colnames = ["sample_label", "action_uuid"] + [
-                str(i) for i in range(len(datalst))
+                f"idx_{i:04}" for i in range(len(datalst))
             ]
             jsondict = {k: v for k, v in zip(colnames, fulllst)}
             jsondata = json.dumps(jsondict)
