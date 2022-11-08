@@ -135,7 +135,7 @@ async def move_dir(
                     timestamp = getattr(hobj, f"{obj_type}_timestamp").strftime(
                         "%Y%m%d.%H%M%S%f"
                     )
-                    yml_path = os.path.join(new_dir, f"{timestamp}.yml")
+                    yml_path = os.path.join(new_dir, f"{timestamp}-{obj_type[:3]}.yml")
                     if not is_manual:
                         await yml_finisher(yml_path, base=base)
                 if rm_success and obj_type == "action" and is_manual:
