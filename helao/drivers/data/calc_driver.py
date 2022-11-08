@@ -578,6 +578,7 @@ class Calc:
             "bin": "interlen_binned",
             "smooth": "interlen_smooth",
             "smooth_refadj": "interlen_smoothrefadj",
+            "smooth_refadj_scl": "interlen_smoothrefadjscl",
         }
         keymap = {
             "omTR": "one_minus_T_minus_R",
