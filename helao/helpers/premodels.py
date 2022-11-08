@@ -69,7 +69,7 @@ class Sequence(SequenceModel):
     def get_sequence_dir(self):
         HMS = self.sequence_timestamp.strftime("%H%M%S")
         year_week = self.sequence_timestamp.strftime("%y.%U")
-        sequence_date = self.sequence_timestamp.strftime("%Y%m%d")
+        sequence_date = self.sequence_timestamp.strftime("%Y%m%d.%H%M%S%f")
         plate = self.sequence_params.get("plate_id", "")
         if plate:
             serial = f"{plate}{str(sum([int(x) for x in str(plate)]) % 10)}"
@@ -114,7 +114,7 @@ class Experiment(Sequence, ExperimentModel):
 
     def get_experiment_dir(self):
         """accepts action or experiment object"""
-        experiment_time = self.experiment_timestamp.strftime("%H%M%S%f")
+        experiment_time = self.experiment_timestamp.strftime("%Y%m%d.%H%M%S%f")
         sequence_dir = self.get_sequence_dir()
         return os.path.join(
             sequence_dir,
