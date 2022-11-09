@@ -78,8 +78,8 @@ class Legato:
         self.config_dict = action_serv.server_cfg["params"]
         self.unified_db = UnifiedSampleDataAPI(self.base)
 
-        self.motor_busy = False
         self.bokehapp = None
+        self.pump_tasks = {k: None for k in self.config_dict["pump_addrs"].values()}
 
         # read pump addr and strings from config dict
         self.com = serial.Serial(
@@ -103,8 +103,11 @@ class Legato:
         self.sio.write(command_str)
         self.sio.flush()
         resp = [x.strip() for x in self.sio.readlines()]
-        resp = [x for x in resp if x and not x.endswith("\x11")]
-        # if POLL is on, may want to poll under \x11 is received; read prompt @ \x11
+        # look for "\x11" end of response character when POLL is on
+        while not resp[-1] .endswith("\x11"):
+            time.sleep(0.05) # wait 50 msec and re-read, response 
+            newlines = [x.strip() for x in self.sio.readlines()]
+            resp += newlines
         return resp
 
     def start_pump(self, pump_name: str, direction: int):
