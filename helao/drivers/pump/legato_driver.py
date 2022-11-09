@@ -70,6 +70,14 @@ General workflow:
 9. issue manual stop
 """
 
+STATES = {
+    ":": "idle",
+    ">": "infusing",
+    "<": "withdrawing",
+    "*": "stalled",
+    "T*": "target reached",
+}
+
 
 class Legato:
     def __init__(self, action_serv: Base):
@@ -92,7 +100,7 @@ class Legato:
             rtscts=False,
         )
         self.sio = io.TextIOWrapper(io.BufferedRWPair(self.com, self.com))
-        
+
         # set POLL to on for all pumps
         # clear time and volume, issue stop for all pumps
         # disable writes to NVRAM? faster response but no recovery
@@ -102,12 +110,13 @@ class Legato:
             command_str = command_str + "\r"
         self.sio.write(command_str)
         self.sio.flush()
-        resp = [x.strip() for x in self.sio.readlines()]
+        resp = [x.strip() for x in self.sio.readlines() if x.strip()]
         # look for "\x11" end of response character when POLL is on
-        while not resp[-1] .endswith("\x11"):
-            time.sleep(0.05) # wait 50 msec and re-read, response 
-            newlines = [x.strip() for x in self.sio.readlines()]
-            resp += newlines
+        if resp:
+            while not resp[-1].endswith("\x11"):
+                time.sleep(0.1)  # wait 100 msec and re-read, response
+                newlines = [x.strip() for x in self.sio.readlines() if x.strip()]
+                resp += newlines
         return resp
 
     def start_pump(self, pump_name: str, direction: int):
@@ -139,7 +148,7 @@ class Legato:
         else:
             return False
         addr = self.config_dict["pump_addrs"][pump_name]
-        command_str = f"{addr:02}@{cmd} {rate_val}\r" # TODO: units
+        command_str = f"{addr:02}@{cmd} {rate_val}\r"  # TODO: units
         resp = self.send(command_str)
         return resp
 
