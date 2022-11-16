@@ -71,9 +71,10 @@ class SprintIR:
         for k, v in fw_map.items():
             resp = self.send(v)
             self.base.print_message(f"{k}: {resp}")
-            fw_val = resp[0].split()[-1].replace(v, "").strip()
-            if fw_val not in ['?', '']:
-                self.fw[k] = int(fw_val)
+            if resp:
+                fw_val = resp[0].split()[-1].replace(v, "").strip()
+                if fw_val not in ['?', '']:
+                    self.fw[k] = int(fw_val)
             time.sleep(0.1)
 
         self.action = None
