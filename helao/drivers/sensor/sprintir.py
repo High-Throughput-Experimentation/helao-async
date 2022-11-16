@@ -77,11 +77,10 @@ class SprintIR:
         self.recording_duration = 0
         self.recording_rate = 0.2  # seconds per acquisition
         self.polling_task = self.event_loop.create_task(self.poll_sensor_loop())
-        self.allow_no_sample = True
 
         self.unified_db = UnifiedSampleDataAPI(self.base)
         asyncio.gather(self.unified_db.init_db())
-        self.allow_no_sample = self.config_dict.get("allow_no_sample", False)
+        self.allow_no_sample = self.config_dict.get("allow_no_sample", True)
 
         # for saving data localy
         self.FIFO_epoch = None
