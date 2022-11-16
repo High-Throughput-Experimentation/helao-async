@@ -21,11 +21,18 @@ config["servers"] = {
         "group": "orchestrator",
         "fast": "async_orch2",
     },
-    "syringe": {
+    "SYRINGE": {
         "host": hostip,
         "port": 8002,
         "group": "action",
         "fast": "legato_server.py",
         "params": {"port": "COM8", "pump_addrs": {"zero": 0, "one": 1}},
+    },
+    "SENSOR": {
+        "host": hostip,
+        "port": 8003,
+        "group": "action",
+        "fast": "sensor_server.py",
+        "params": {"port": "COM9"},
     },
 }
