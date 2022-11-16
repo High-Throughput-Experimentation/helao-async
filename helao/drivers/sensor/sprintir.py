@@ -73,7 +73,9 @@ class SprintIR:
         }
         self.fw = {}
         for k, v in fw_map.items():
-            self.fw[k] = int(self.send(v)[0].split()[-1])
+            fw_val = self.send(v)[0].split()[-1]
+            if fw_val != '?':
+                self.fw[k] = int(fw_val)
             time.sleep(0.1)
 
         self.action = None
