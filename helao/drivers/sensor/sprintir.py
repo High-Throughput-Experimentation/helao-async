@@ -218,7 +218,7 @@ class SprintIR:
         # first_print = True
         await asyncio.sleep(0.001)
 
-        if self.sio is None:
+        if self.com is None:
             self.IO_measuring = False
             return {"co2-measure": "not initialized"}
 
