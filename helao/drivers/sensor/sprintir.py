@@ -65,7 +65,6 @@ class SprintIR:
 
         fw_map = {
             "digital_filter_value": "a",
-            "digital_filter_value": "a",
             "zero-point_air": "G",
             "zero-point_n2": "U",
             "scaling_factor": ".",
