@@ -14,7 +14,7 @@ import serial
 from helaocore.error import ErrorCodes
 from helao.servers.base import Base
 from helaocore.models.data import DataModel
-from helaocore.models.file import FileConnParams
+from helaocore.models.file import FileConnParams, HloHeaderModel
 from helaocore.models.sample import SampleInheritance, SampleStatus
 from helaocore.models.hlostatus import HloStatus
 from helao.helpers.premodels import Action
@@ -62,6 +62,19 @@ class SprintIR:
         buf = self.com.read_all()
         while not buf == b"":
             buf = self.com.read_all()
+
+        fw_map = {
+            "digital_filter_value": "a",
+            "digital_filter_value": "a",
+            "zero-point_air": "G",
+            "zero-point_n2": "U",
+            "scaling_factor": ".",
+            "pc_compensation": "s"
+        }
+        self.fw = {}
+        for k, v in fw_map.items():
+            self.fw[k] = int(self.send(v)[0].split()[-1])
+            time.sleep(0.1)
 
         self.action = None
         self.active = None
@@ -207,7 +220,10 @@ class SprintIR:
             valid_rate = time.time() - self.last_check_time >= self.recording_rate
             if valid_time and valid_rate:
                 co2_reading, co2_ts = self.base.get_lbuf("co2_sensor")
-                datadict = {"epoch_s": co2_ts, "co2_level": co2_reading}
+                datadict = {
+                    "epoch_s": co2_ts,
+                    "co2_ppm": co2_reading * self.fw['scaling_factor'],
+                }
                 await self.active.enqueue_data(
                     datamodel=DataModel(
                         data={self.active.action.file_conn_keys[0]: datadict},
@@ -254,6 +270,7 @@ class SprintIR:
             self.samples_in = samples_in
             self.action = A
             # self.base.print_message("Writing initial spec_helao__file", info=True)
+            file_header = self.fw
             dflt_conn_key = self.base.dflt_file_conn_key()
             file_conn_params = FileConnParams(
                 file_conn_key=dflt_conn_key,
@@ -261,6 +278,7 @@ class SprintIR:
                     sample.get_global_label() for sample in samples_in
                 ],
                 file_type="co2-sense_helao__file",
+                hloheader=HloHeaderModel(optional=file_header)
             )
             active_params = ActiveParams(
                 action=self.action,
