@@ -25,14 +25,14 @@ config["servers"] = {
         "host": hostip,
         "port": 8002,
         "group": "action",
-        "fast": "legato_server.py",
+        "fast": "legato_server",
         "params": {"port": "COM8", "pump_addrs": {"zero": 0, "one": 1}},
     },
     "SENSOR": {
         "host": hostip,
         "port": 8003,
         "group": "action",
-        "fast": "sensor_server.py",
+        "fast": "sensor_server",
         "params": {"port": "COM9"},
     },
 }
