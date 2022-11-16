@@ -43,6 +43,13 @@ config["servers"] = {
         "fast": "pal_server",
         "params": {"positions": {"custom": {"cell1_we": "cell"}}},
     },
+    "VIS": {
+        "host": hostip,
+        "port": 5001,
+        "group": "visualizer",
+        "bokeh": "bokeh_modular_visualizer",
+        "params": {"doc_name": "ROS-DEV Visualizer"},
+    },
     # "DB": {
     #     "host": hostip,
     #     "port": 8010,
