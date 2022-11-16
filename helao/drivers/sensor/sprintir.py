@@ -83,6 +83,12 @@ class SprintIR:
             time.sleep(0.1)
         
         self.base.print_message(self.fw)
+        # set POLL and flush present buffer until empty
+        self.com.write(b"K 2\r\n")
+        self.com.flush()
+        buf = self.com.read_all()
+        while not buf == b"":
+            buf = self.com.read_all()
 
         self.action = None
         self.active = None
