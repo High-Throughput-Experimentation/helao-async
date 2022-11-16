@@ -43,7 +43,6 @@ class SprintIR:
         self.unified_db = UnifiedSampleDataAPI(self.base)
 
         self.bokehapp = None
-        self.pump_tasks = {k: None for k in self.config_dict["pump_addrs"].values()}
 
         # read pump addr and strings from config dict
         self.com = serial.Serial(
