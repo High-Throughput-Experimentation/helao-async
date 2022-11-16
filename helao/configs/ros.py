@@ -36,4 +36,24 @@ config["servers"] = {
         "fast": "sensor_server",
         "params": {"port": "COM9", "start_margin": 0},
     },
+    "PAL": {
+        "host": hostip,
+        "port": 8004,
+        "group": "action",
+        "fast": "pal_server",
+        "params": {"positions": {"custom": {"cell1_we": "cell"}}},
+    },
+    "DB": {
+        "host": hostip,
+        "port": 8010,
+        "group": "action",
+        "fast": "dbpack_server",
+        "params": {
+            "aws_config_path": "k:/users/hte/.credentials/aws_config.ini",
+            "aws_profile": "default",
+            "aws_bucket": "helao.data",
+            "api_host": "caltech-api.modelyst.com",
+            "testing": False,
+        }
+    }
 }
