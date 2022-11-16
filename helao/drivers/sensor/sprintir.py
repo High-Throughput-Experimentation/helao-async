@@ -180,7 +180,7 @@ class SprintIR:
         waittime = 1.0 / frequency
         while True:
             co2_level = self.send("Z")[0]
-            await self.base.put_lbuf({"co2_sensor": co2_level[0]})
+            await self.base.put_lbuf({"co2_sensor": co2_level.split()[-1]})
             await asyncio.sleep(waittime)
 
     async def continuous_record(self):
