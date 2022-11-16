@@ -20,6 +20,7 @@ config["servers"] = {
         "port": 8001,
         "group": "orchestrator",
         "fast": "async_orch2",
+        "params": {"enable_op": True, "bokeh_port": 5002}
     },
     "SYRINGE": {
         "host": hostip,
