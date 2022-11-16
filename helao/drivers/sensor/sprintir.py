@@ -204,9 +204,9 @@ class SprintIR:
     async def poll_sensor_loop(self, frequency: int = 20):
         waittime = 1.0 / frequency
         while True:
-            co2_level, _ = self.send("Z")[0]
+            co2_level, _ = self.send("Z")
             if co2_level:
-                await self.base.put_lbuf({"co2_sensor": co2_level.split()[-1]})
+                await self.base.put_lbuf({"co2_sensor": co2_level[0].split()[-1]})
             await asyncio.sleep(waittime)
 
     async def continuous_record(self):
