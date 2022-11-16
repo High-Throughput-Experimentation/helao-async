@@ -33,6 +33,6 @@ config["servers"] = {
         "port": 8003,
         "group": "action",
         "fast": "sensor_server",
-        "params": {"port": "COM9"},
+        "params": {"port": "COM9", "start_margin": 0},
     },
 }

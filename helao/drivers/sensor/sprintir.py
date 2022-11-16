@@ -65,7 +65,7 @@ class SprintIR:
 
         self.action = None
         self.active = None
-        self.start_margin = self.config_dict["start_margin"]
+        self.start_margin = self.config_dict.get("start_margin", 0)
         self.start_time = 0
         self.last_rec_time = 0
         self.last_check_time = time.time()
