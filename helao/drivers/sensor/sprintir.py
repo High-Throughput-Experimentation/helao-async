@@ -4,10 +4,8 @@
 
 __all__ = []
 
-import io
 import time
 import asyncio
-import traceback
 
 import serial
 
@@ -54,7 +52,6 @@ class SprintIR:
             xonxoff=False,
             rtscts=False,
         )
-        self.sio = io.TextIOWrapper(io.BufferedRWPair(self.com, self.com))
 
         # set POLL and flush present buffer until empty
         self.com.write(b"K 2\r\n")
@@ -173,13 +170,13 @@ class SprintIR:
     def send(self, command_str: str):
         if not command_str.endswith("\r\n"):
             command_str = command_str + "\r\n"
-        self.sio.write(command_str)
-        self.sio.flush()
-        lines = self.sio.readlines()
+        self.com.write(command_str.encode('utf8'))
+        self.com.flush()
+        lines = self.com.readlines()
         cmd_resp = []
         aux_resp = []
         for line in lines:
-            strip = line.strip()
+            strip = line.decode('utf8').strip()
             if strip.startswith(command_str[0]):
                 cmd_resp.append(strip)
             else:
@@ -188,8 +185,6 @@ class SprintIR:
             self.base.print_message(
                 f"Received auxiliary responses: {aux_resp}", warning=True
             )
-        while not cmd_resp:
-            cmd_resp += self.send(command_str)
         return cmd_resp
 
     async def poll_sensor_loop(self, frequency: int = 20):
