@@ -27,8 +27,17 @@ from helaocore.models.sample import SolidSample
 import serial
 import io
 
+""" Notes:
 
-class Legato:
+Setup polling task to populate base.live_buffer dictionary, record CO2 action will read
+from dictionary.
+
+TODO: send CO2 reading to bokeh visualizer w/o writing data
+
+"""
+
+
+class SprintIR:
     def __init__(self, action_serv: Base):
 
         self.base = action_serv
@@ -50,20 +59,40 @@ class Legato:
         )
         self.sio = io.TextIOWrapper(io.BufferedRWPair(self.com, self.com))
 
-        # set POLL to on for all pumps
-        # clear time and volume, issue stop for all pumps
-        # disable writes to NVRAM? faster response but no recovery
+        # set POLL and flush present buffer until empty
+        self.com.write(b"K 2\r\n")
+        self.com.flush()
+        buf = self.com.read_all()
+        while not buf == b"":
+            buf = self.com.read_all()
+            
+        myloop = asyncio.get_event_loop()
+        self.polling_task = myloop.create_task(self.poll_sensor_loop())
 
     def send(self, command_str: str):
         if not command_str.endswith("\r\n"):
             command_str = command_str + "\r\n"
         self.sio.write(command_str)
         self.sio.flush()
-        resp = [x.strip() for x in self.sio.readlines() if x.strip()]
-        # look for "\x11" end of response character when POLL is on
-        if resp:
-            while not resp[-1].endswith("\x11"):
-                time.sleep(0.1)  # wait 100 msec and re-read, response
-                newlines = [x.strip() for x in self.sio.readlines() if x.strip()]
-                resp += newlines
-        return resp
+        lines = self.sio.readlines()
+        cmd_resp = []
+        aux_resp = []
+        for line in lines:
+            strip = line.strip()
+            if strip.startswith(command_str[0]):
+                cmd_resp.append(strip)
+            else:
+                aux_resp.append(strip)
+        if aux_resp:
+            self.base.print_message(f"Received auxiliary responses: {aux_resp}", warning=True)
+        while not cmd_resp:
+            cmd_resp += self.send(command_str)
+        return cmd_resp
+    
+    async def poll_sensor_loop(self, frequency: int = 20):
+        waittime = 1.0 / frequency
+        while True:
+            co2_level = self.send("Z")[0]
+            await self.base.put_lbuf({'co2_sensor': co2_level[0]})
+            await asyncio.sleep(waittime)
+

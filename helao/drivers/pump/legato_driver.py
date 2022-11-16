@@ -68,6 +68,11 @@ General workflow:
 7. run inject | withdraw
 8. poll status flags or promp
 9. issue manual stop
+
+Try polling task for updating base.live_buffer dictionary
+
+TODO: if polling task works, send pump status (position?) to bokeh visualizer w/o write
+
 """
 
 STATES = {
