@@ -67,15 +67,22 @@ class SprintIR:
             "scaling_factor": ".",
             "pc_compensation": "s"
         }
+        ifw_map = {v: k for k,v in fw_map.items()}
         self.fw = {}
         for k, v in fw_map.items():
-            resp = self.send(v)
-            self.base.print_message(f"{k}: {resp}")
+            resp, aux = self.send(v)
             if resp:
                 fw_val = resp[0].split()[-1].replace(v, "").strip()
                 if fw_val not in ['?', '']:
                     self.fw[k] = int(fw_val)
+            for aresp in aux:
+                cmd = aresp[0]
+                if cmd in ifw_map.keys():
+                    fw_val = aresp.split()[-1].replace(cmd, "").strip()
+                    self.fw[cmd] = int(fw_val)
             time.sleep(0.1)
+        
+        self.base.print_message(self.fw)
 
         self.action = None
         self.active = None
@@ -180,19 +187,20 @@ class SprintIR:
             strip = line.decode('utf8').strip()
             if strip.startswith(command_str[0]):
                 cmd_resp.append(strip)
-            else:
+            elif strip:
                 aux_resp.append(strip)
         if aux_resp:
             self.base.print_message(
                 f"Received auxiliary responses: {aux_resp}", warning=True
             )
-        return cmd_resp
+        return cmd_resp, aux_resp
 
     async def poll_sensor_loop(self, frequency: int = 20):
         waittime = 1.0 / frequency
         while True:
-            co2_level = self.send("Z")[0]
-            await self.base.put_lbuf({"co2_sensor": co2_level.split()[-1]})
+            co2_level, _ = self.send("Z")[0]
+            if co2_level:
+                await self.base.put_lbuf({"co2_sensor": co2_level.split()[-1]})
             await asyncio.sleep(waittime)
 
     async def continuous_record(self):
