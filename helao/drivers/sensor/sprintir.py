@@ -204,7 +204,7 @@ class SprintIR:
             valid_time = (self.last_rec_time - self.start_time) < (
                 self.recording_duration + self.start_margin
             )
-            valid_rate = time.time() - self.last_check_time < self.recording_rate
+            valid_rate = time.time() - self.last_check_time >= self.recording_rate
             if valid_time and valid_rate:
                 co2_reading, co2_ts = self.base.get_lbuf("co2_sensor")
                 datadict = {"epoch_s": co2_ts, "co2_level": co2_reading}
