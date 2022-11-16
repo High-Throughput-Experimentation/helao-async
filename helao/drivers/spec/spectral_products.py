@@ -282,7 +282,7 @@ class SM303:
             samples_in = await self.unified_db.get_samples(A.samples_in)
             if not samples_in and not self.allow_no_sample:
                 self.base.print_message(
-                    "Gamry got no valid sample, cannot start measurement!", error=True
+                    "Spec server got no valid sample, cannot start measurement!", error=True
                 )
                 A.samples_in = []
                 A.error_code = ErrorCodes.no_sample
@@ -406,7 +406,7 @@ class SM303:
             if self.data:
                 self.data = [self._data[i] for i in range(1056)][10:1034]
                 # enqueue data
-                datadict = {"epoch_ns": self.spec_time}
+                datadict = {"epoch_s": self.spec_time}
                 datadict.update({f"ch_{i:04}": x for i, x in enumerate(self.data)})
                 # if first_print:
                 #     self.base.print_message("writing initial data")
