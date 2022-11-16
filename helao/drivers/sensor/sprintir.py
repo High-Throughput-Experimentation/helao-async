@@ -73,7 +73,7 @@ class SprintIR:
         self.fw = {}
         for k, v in fw_map.items():
             resp = self.send(v)
-            self.base.print_message(k, resp)
+            self.base.print_message(f"{k}: {resp}")
             fw_val = resp[0].split()[-1].replace("k", "").strip()
             if fw_val != '?':
                 self.fw[k] = int(fw_val)
