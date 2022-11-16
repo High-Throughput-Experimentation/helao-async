@@ -25,7 +25,7 @@ config["servers"] = {
         "host": hostip,
         "port": 8002,
         "group": "action",
-        "fast": "legato_server",
+        "fast": "syringe_server",
         "params": {"port": "COM8", "pump_addrs": {"zero": 0, "one": 1}},
     },
     "SENSOR": {
