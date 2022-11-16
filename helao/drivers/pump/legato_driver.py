@@ -84,7 +84,7 @@ STATES = {
 }
 
 
-class Legato:
+class KDS100:
     def __init__(self, action_serv: Base):
 
         self.base = action_serv
