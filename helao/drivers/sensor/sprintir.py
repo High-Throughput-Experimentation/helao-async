@@ -298,3 +298,6 @@ class SprintIR:
             activeDict = self.active.action.as_dict()
 
         return activeDict
+
+    def shutdown(self):
+        self.com.close()
