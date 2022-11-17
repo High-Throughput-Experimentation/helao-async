@@ -47,7 +47,7 @@ config["servers"] = {
         "host": hostip,
         "port": 5001,
         "group": "visualizer",
-        "bokeh": "bokeh_modular_visualizer",
+        "bokeh": "action_visualizer",
         "params": {"doc_name": "ROS-DEV Visualizer"},
     },
     # "DB": {
