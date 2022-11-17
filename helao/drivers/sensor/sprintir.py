@@ -48,7 +48,7 @@ class SprintIR:
             baudrate=9600,
             parity=serial.PARITY_NONE,
             stopbits=serial.STOPBITS_ONE,
-            timeout=0.1,
+            timeout=0.5,
             xonxoff=False,
             rtscts=False,
         )
@@ -81,14 +81,6 @@ class SprintIR:
                     fw_val = aresp.split()[-1].replace(cmd, "").strip()
                     self.fw[cmd] = int(fw_val)
             time.sleep(0.1)
-
-        self.base.print_message(self.fw)
-        # set POLL and flush present buffer until empty
-        self.com.write(b"K 2\r\n")
-        self.com.flush()
-        buf = self.com.read_all()
-        while not buf == b"":
-            buf = self.com.read_all()
 
         self.action = None
         self.active = None
@@ -186,11 +178,12 @@ class SprintIR:
             command_str = command_str + "\r\n"
         self.com.write(command_str.encode("utf8"))
         self.com.flush()
-        lines = self.com.readlines()
+        buf = self.com.read_until(b"\r\n")
+        lines = buf.decode('utf8').split('\n')
         cmd_resp = []
         aux_resp = []
         for line in lines:
-            strip = line.decode("utf8").strip()
+            strip = line.strip()
             if strip.startswith(command_str[0]):
                 cmd_resp.append(strip)
             elif strip:
