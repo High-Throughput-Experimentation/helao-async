@@ -225,12 +225,12 @@ class SprintIR:
             self.IO_continue = True
 
         self.start_time = time.time()
-        self.last_rec_time = time.time()
+        self.last_rec_time = 0
         while self.IO_do_meas:
             valid_time = (self.last_rec_time - self.start_time) < (
                 self.recording_duration + self.start_margin
             )
-            valid_rate = time.time() - self.last_check_time >= self.recording_rate
+            valid_rate = (time.time() - self.last_check_time) >= self.recording_rate
             if valid_time and valid_rate:
                 co2_reading, co2_ts = self.base.get_lbuf("co2_sensor")
                 datadict = {
