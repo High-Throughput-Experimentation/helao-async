@@ -211,7 +211,7 @@ class SprintIR:
         while True:
             co2_level, _ = self.send("Z")
             if co2_level:
-                await self.base.put_lbuf({"co2_sensor": co2_level[0].split()[-1]})
+                await self.base.put_lbuf({"co2_sensor": int(co2_level[0].split()[-1])})
             await asyncio.sleep(waittime)
 
     async def continuous_record(self):
@@ -231,6 +231,8 @@ class SprintIR:
             # active object is set so we can set the continue flag
             self.IO_continue = True
 
+        self.start_time = time.time()
+        self.last_rec_time = time.time()
         while self.IO_do_meas:
             valid_time = (self.last_rec_time - self.start_time) < (
                 self.recording_duration + self.start_margin
@@ -313,8 +315,6 @@ class SprintIR:
                 samples=[sample_in for sample_in in self.samples_in], IO="in"
             )
 
-            self.start_time = time.time()
-            self.last_rec_time = time.time()
             self.base.print_message(f"start_time: {self.start_time}")
             self.active.finish_hlo_header(
                 realtime=self.base.get_realtime_nowait(),
