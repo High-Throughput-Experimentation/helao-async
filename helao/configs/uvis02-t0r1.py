@@ -134,7 +134,7 @@ config["servers"] = dict(
         host=hostip,
         port=5001,
         group="visualizer",
-        bokeh="bokeh_modular_visualizer",
+        bokeh="action_visualizer",
         params=dict(
             doc_name="UVIS Visualizer",
         ),
