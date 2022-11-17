@@ -65,15 +65,15 @@ class SprintIR:
             "zero-point_air": "G",
             "zero-point_n2": "U",
             "scaling_factor": ".",
-            "pc_compensation": "s"
+            "pc_compensation": "s",
         }
-        ifw_map = {v: k for k,v in fw_map.items()}
+        ifw_map = {v: k for k, v in fw_map.items()}
         self.fw = {}
         for k, v in fw_map.items():
             resp, aux = self.send(v)
             if resp:
                 fw_val = resp[0].split()[-1].replace(v, "").strip()
-                if fw_val not in ['?', '']:
+                if fw_val not in ["?", ""]:
                     self.fw[k] = int(fw_val)
             for aresp in aux:
                 cmd = aresp[0]
@@ -81,7 +81,7 @@ class SprintIR:
                     fw_val = aresp.split()[-1].replace(cmd, "").strip()
                     self.fw[cmd] = int(fw_val)
             time.sleep(0.1)
-        
+
         self.base.print_message(self.fw)
         # set POLL and flush present buffer until empty
         self.com.write(b"K 2\r\n")
@@ -184,13 +184,13 @@ class SprintIR:
     def send(self, command_str: str):
         if not command_str.endswith("\r\n"):
             command_str = command_str + "\r\n"
-        self.com.write(command_str.encode('utf8'))
+        self.com.write(command_str.encode("utf8"))
         self.com.flush()
         lines = self.com.readlines()
         cmd_resp = []
         aux_resp = []
         for line in lines:
-            strip = line.decode('utf8').strip()
+            strip = line.decode("utf8").strip()
             if strip.startswith(command_str[0]):
                 cmd_resp.append(strip)
             elif strip:
@@ -199,6 +199,11 @@ class SprintIR:
             self.base.print_message(
                 f"Received auxiliary responses: {aux_resp}", warning=True
             )
+        while not cmd_resp:
+            repeats = self.send(command_str)
+            cmd_resp += repeats[0]
+            aux_resp += repeats[1]
+            time.sleep(0.1)
         return cmd_resp, aux_resp
 
     async def poll_sensor_loop(self, frequency: int = 20):
@@ -235,7 +240,7 @@ class SprintIR:
                 co2_reading, co2_ts = self.base.get_lbuf("co2_sensor")
                 datadict = {
                     "epoch_s": co2_ts,
-                    "co2_ppm": co2_reading * self.fw['scaling_factor'],
+                    "co2_ppm": co2_reading * self.fw["scaling_factor"],
                 }
                 await self.active.enqueue_data(
                     datamodel=DataModel(
@@ -291,7 +296,7 @@ class SprintIR:
                     sample.get_global_label() for sample in samples_in
                 ],
                 file_type="co2-sense_helao__file",
-                hloheader=HloHeaderModel(optional=file_header)
+                hloheader=HloHeaderModel(optional=file_header),
             )
             active_params = ActiveParams(
                 action=self.action,
