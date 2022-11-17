@@ -69,7 +69,7 @@ class Sequence(SequenceModel):
     def get_sequence_dir(self):
         HMS = self.sequence_timestamp.strftime("%H%M%S")
         year_week = self.sequence_timestamp.strftime("%y.%U")
-        sequence_date = self.sequence_timestamp.strftime("%Y%m%d.%H%M%S%f")
+        sequence_day = self.sequence_timestamp.strftime("%Y%m%d")
         plate = self.sequence_params.get("plate_id", "")
         if plate:
             serial = f"{plate}{str(sum([int(x) for x in str(plate)]) % 10)}"
@@ -79,7 +79,7 @@ class Sequence(SequenceModel):
 
         return os.path.join(
             year_week,
-            sequence_date,
+            sequence_day,
             f"{HMS}__{self.sequence_name}__{self.sequence_label}{append_plate}",
         )
 
