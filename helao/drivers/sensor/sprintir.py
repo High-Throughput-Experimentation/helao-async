@@ -79,7 +79,7 @@ class SprintIR:
                 cmd = aresp[0]
                 if cmd in ifw_map.keys():
                     fw_val = aresp.split()[-1].replace(cmd, "").strip()
-                    self.fw[cmd] = int(fw_val)
+                    self.fw[ifw_map[cmd]] = int(fw_val)
             time.sleep(0.1)
 
         self.action = None
@@ -225,7 +225,8 @@ class SprintIR:
             self.IO_continue = True
 
         self.start_time = time.time()
-        self.last_rec_time = 0
+        self.last_rec_time = self.start_time
+        self.last_check_time = self.start_time + self.recording_duration
         while self.IO_do_meas:
             valid_time = (self.last_rec_time - self.start_time) < (
                 self.recording_duration + self.start_margin
@@ -249,7 +250,6 @@ class SprintIR:
             await asyncio.sleep(0.001)
 
         self.base.print_message("polling loop duration complete, finishing")
-        self.recording_duration = 0
         if self.IO_measuring:
             self.IO_do_meas = False
             self.IO_measuring = False
