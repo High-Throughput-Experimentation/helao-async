@@ -123,7 +123,7 @@ class C_co2:
                 val = ''
             else:
                 val = self.data_dict[k][0]
-            self.table_dict[k] = val
+            self.table_dict[k] = str(val)
         self.datasource_table.data = self.table_dict
 
     def cleanup_session(self, session_context):
