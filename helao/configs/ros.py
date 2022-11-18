@@ -10,7 +10,7 @@ config["dummy"] = True
 # config["action_libraries"] = ["lisa_eche_demo"]
 # config["experiment_libraries"] = ["lisa_ANEC2"]
 config["run_type"] = "rosdev"
-config["root"] = r"C:\INST_dev2\RUNS"
+config["root"] = r"C:\INST_hlo\RUNS"
 
 
 # we define all the servers here so that the overview is a bit better
