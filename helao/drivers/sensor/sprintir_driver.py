@@ -54,29 +54,41 @@ class SprintIR:
         )
 
         # set POLL and flush present buffer until empty
-        self.com.write(b"K 2\r\n")
-        self.com.flush()
-        buf = self.com.read_all()
-        while not buf == b"":
-            buf = self.com.read_all()
+        self.send("K 2")
+        self.send("! 0")
+        self.send("Y")
+        self.send("! 0")
+        self.send("Y")
+        self.send("! 0")
+        self.send("Y")
 
-        fw_map = {
-            "digital_filter_value": "a",
-            "zero-point_air": "G",
-            "zero-point_n2": "U",
-            "scaling_factor": ".",
-            "pc_compensation": "s",
-            "pressure": "B",
-            "temperature": "T",
-            "humidity": "H",
-        }
-        ifw_map = {v: k for k, v in fw_map.items()}
+        # self.com.write(b"K 2\r\n")
+        # self.com.flush()
+        # buf = self.com.read_all()
+        # while not buf == b"":
+        #     buf = self.com.read_all()
+
+        fw_map =[
+            ("zero-point_air", "G"),
+            ("scaling_factor", "."),
+            ("temperature", "T"),
+            ("undocumented_t", "t"),
+            ("undocumented_y", "y"),
+            ("init_co2_filtered", "Z"),
+            ("pressure", "B"),
+            ("temperature", "T"),
+            ("humidity", "H"),
+            # ("zero-point_n2", "U"),
+            # ("pc_compensation", "s"),
+            # ("digital_filter_value", "a"),
+        ]
+        ifw_map = {v: k for k, v in fw_map}
         self.fw = {}
-        for k, v in list(fw_map.items()) + [("dummy", "! 0")] * 2:
+        for k, v in fw_map:
             resp, aux = self.send(v)
             if resp:
                 fw_val = resp[0].split()[-1].replace(v, "").strip()
-                if fw_val not in ["?", ""] and k != "dummy":
+                if fw_val not in ["?", ""]:
                     self.fw[k] = int(fw_val)
             for aresp in aux:
                 cmd = aresp[0]
