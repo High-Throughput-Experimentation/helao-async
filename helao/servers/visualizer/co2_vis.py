@@ -74,15 +74,16 @@ class C_co2:
         #     labels=self.data_dict_keys, active=[1, 3], width=500
         # )
 
-        self.plot = figure(
-            # title="",
-            height=300,
-            width=500,
-        )
+        self.plot = figure(height=300, width=500)
         self.plot.xaxis.axis_label = "Epoch (seconds)"
         self.plot.yaxis.axis_label = "CO2 (ppm)"
 
-        self.table = DataTable(source=self.datasource_table, columns=["name", "value"])
+        self.table = DataTable(
+            source=self.datasource_table,
+            columns=["name", "value"],
+            height=300,
+            width=500,
+            )
         # combine all sublayouts into a single one
         self.layout = layout(
             [
