@@ -189,7 +189,7 @@ class Pidd:
                     print_message(
                         {},
                         "launcher",
-                        f"waiting {twait}sec before killing server {server}",
+                        f"waiting {twait} seconds before killing server {server}",
                     )
                     time.sleep(twait)
                     print_message({}, "launcher", f"Killing {server}.")
