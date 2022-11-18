@@ -78,9 +78,9 @@ class C_co2:
             # title="",
             height=300,
             width=500,
-            xaxis=Axis(axis_label="Epoch (seconds)"),
-            yaxis=Axis(axis_label="CO2 (ppm)"),
         )
+        self.plot.xaxis.axis_label = "Epoch (seconds)"
+        self.plot.yaxis.axis_label = "CO2 (ppm)"
 
         self.table = DataTable(source=self.datasource_table)
         # combine all sublayouts into a single one
@@ -124,7 +124,7 @@ class C_co2:
             if self.data_dict[k] == []:
                 vals.append("")
             else:
-                vals.append(str(self.data_dict[k][0]))
+                vals.append(self.data_dict[k][0])
         self.table_dict["value"] = vals
         self.datasource_table.data = self.table_dict
 
