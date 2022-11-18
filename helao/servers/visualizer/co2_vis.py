@@ -13,8 +13,10 @@ from bokeh.models import (
 from bokeh.models.widgets import Paragraph
 from bokeh.plotting import figure
 from bokeh.models.widgets import Div
+from bokeh.models.widgets import DataTable
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
+from bokeh.models.axes import Axis
 
 from helao.servers.vis import Vis
 
@@ -46,10 +48,9 @@ class C_co2:
         self.data_dict = {key: [] for key in self.data_dict_keys}
 
         self.datasource = ColumnDataSource(data=self.data_dict)
-        self.datasource_prev = ColumnDataSource(data=deepcopy(self.data_dict))
-        self.cur_action_uuid = ""
-        self.prev_action_uuid = ""
-
+        self.datasource_table = ColumnDataSource(
+            data={k: self.data_dict.get(k, [""])[0] for k in self.data_dict_keys}
+        )
         # create visual elements
         self.layout = []
 
@@ -65,16 +66,22 @@ class C_co2:
             partial(self.callback_input_max_points, sender=self.input_max_points),
         )
 
-        self.xaxis_selector_group = RadioButtonGroup(
-            labels=self.data_dict_keys, active=0, width=500
-        )
-        self.yaxis_selector_group = CheckboxButtonGroup(
-            labels=self.data_dict_keys, active=[1, 3], width=500
+        # self.xaxis_selector_group = RadioButtonGroup(
+        #     labels=self.data_dict_keys, active=0, width=500
+        # )
+        # self.yaxis_selector_group = CheckboxButtonGroup(
+        #     labels=self.data_dict_keys, active=[1, 3], width=500
+        # )
+
+        self.plot = figure(
+            # title="",
+            height=300,
+            width=500,
+            xaxis=Axis(axis_label="Epoch (seconds)"),
+            yaxis=Axis(axis_label="CO2 (ppm)"),
         )
 
-        self.plot = figure(title="Title", height=300, width=500)
-
-        self.plot_prev = figure(title="Title", height=300, width=500)
+        self.table = DataTable(source=self.datasource_table)
         # combine all sublayouts into a single one
         self.layout = layout(
             [
@@ -87,13 +94,13 @@ class C_co2:
                     ),
                 ],
                 [self.input_max_points],
-                [
-                    Paragraph(text="""epoch (sec):""", width=500, height=15),
-                    Paragraph(text="""CO2 (ppm):""", width=500, height=15),
-                ],
-                [self.xaxis_selector_group, self.yaxis_selector_group],
+                # [
+                #     Paragraph(text="x-axis selectors", width=500, height=15),
+                #     Paragraph(text="y-axis selectors", width=500, height=15),
+                # ],
+                # [self.xaxis_selector_group, self.yaxis_selector_group],
                 Spacer(height=10),
-                [self.plot, Spacer(width=20), self.plot_prev],
+                [self.plot, Spacer(width=20), self.table],
                 Spacer(height=10),
             ],
             background="#C0C0C0",
@@ -101,8 +108,8 @@ class C_co2:
         )
 
         # to check if selection changed during ploting
-        self.xselect = self.xaxis_selector_group.active
-        self.yselect = self.yaxis_selector_group.active
+        # self.xselect = self.xaxis_selector_group.active
+        # self.yselect = self.yaxis_selector_group.active
 
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
@@ -161,6 +168,9 @@ class C_co2:
         self.data_dict["epoch_s"].append(latest_epoch)
 
         self.datasource.data = self.data_dict
+        self.datasource_table.data = {
+            k: self.data_dict.get(k, [""])[0] for k in self.data_dict_keys
+        }
         self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
@@ -199,21 +209,16 @@ class C_co2:
         if self.plot.renderers:
             self.plot.legend.items = []
 
-        if self.plot_prev.renderers:
-            self.plot_prev.legend.items = []
-
         # remove all old lines
         self.plot.renderers = []
-        self.plot_prev.renderers = []
 
         self.plot.line(
             x="epoch_s",
             y="co2_ppm",
             line_color="red",
             source=self.datasource,
-            name=self.cur_action_uuid,
         )
-        # self.plot_prev.line(
+        # self.table.line(
         #     x=xstr,
         #     y="t_s",
         #     line_color=colors[color_count],
