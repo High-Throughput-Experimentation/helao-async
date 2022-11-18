@@ -178,7 +178,7 @@ class SprintIR:
         self.com.write(command_str.encode("utf8"))
         self.com.flush()
         buf = self.com.read_until(b"\r\n")
-        lines = buf.decode('utf8').split('\n')
+        lines = buf.decode("utf8").split("\n")
         cmd_resp = []
         aux_resp = []
         for line in lines:
@@ -203,7 +203,12 @@ class SprintIR:
         while True:
             co2_level, _ = self.send("Z")
             if co2_level:
-                await self.base.put_lbuf({"co2_sensor": int(co2_level[0].split()[-1])})
+                await self.base.put_lbuf(
+                    {
+                        "co2_ppm": int(co2_level[0].split()[-1])
+                        * self.fw["scaling_factor"]
+                    }
+                )
             await asyncio.sleep(waittime)
 
     async def continuous_record(self):
@@ -230,10 +235,10 @@ class SprintIR:
             )
             valid_rate = (time.time() - self.last_rec_time) >= self.recording_rate
             if valid_time and valid_rate:
-                co2_reading, co2_ts = self.base.get_lbuf("co2_sensor")
+                co2_reading, co2_ts = self.base.get_lbuf("co2_ppm")
                 datadict = {
                     "epoch_s": co2_ts,
-                    "co2_ppm": co2_reading * self.fw["scaling_factor"],
+                    "co2_ppm": co2_reading,
                 }
                 await self.active.enqueue_data(
                     datamodel=DataModel(
