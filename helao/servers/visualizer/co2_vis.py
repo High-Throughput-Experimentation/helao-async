@@ -13,7 +13,7 @@ from bokeh.models import (
 from bokeh.models.widgets import Paragraph
 from bokeh.plotting import figure
 from bokeh.models.widgets import Div
-from bokeh.models.widgets import DataTable
+from bokeh.models.widgets import DataTable, TableColumn
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 from bokeh.models.axes import Axis
@@ -80,10 +80,13 @@ class C_co2:
 
         self.table = DataTable(
             source=self.datasource_table,
-            columns=["name", "value"],
+            columns=[
+                TableColumn(field="name", title="name"),
+                TableColumn(field="value", title="value"),
+            ],
             height=300,
             width=500,
-            )
+        )
         # combine all sublayouts into a single one
         self.layout = layout(
             [
