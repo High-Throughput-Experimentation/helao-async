@@ -124,7 +124,7 @@ class C_co2:
             if self.data_dict[k] == []:
                 vals.append("")
             else:
-                vals.append(self.data_dict[k][0])
+                vals.append(str(self.data_dict[k][0]))
         self.table_dict["value"] = vals
         self.datasource_table.data = self.table_dict
 
