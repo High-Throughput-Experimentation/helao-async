@@ -118,12 +118,14 @@ class C_co2:
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
     def update_table_data(self):
+        self.table_dict["name"] = self.data_dict_keys
+        vals = []
         for k in self.data_dict_keys:
             if self.data_dict[k] == []:
-                val = ''
+                vals.append("")
             else:
-                val = self.data_dict[k][0]
-            self.table_dict[k] = str(val)
+                vals.append(self.data_dict[k][0])
+        self.table_dict["value"] = vals
         self.datasource_table.data = self.table_dict
 
     def cleanup_session(self, session_context):
