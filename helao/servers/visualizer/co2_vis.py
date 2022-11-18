@@ -20,7 +20,7 @@ from helaocore.models.data import DataPackageModel
 from helao.servers.vis import Vis
 
 
-class C_potvis:
+class C_co2:
     """potentiostat visualizer module class"""
 
     def __init__(self, visServ: Vis, serv_key: str):
@@ -28,17 +28,17 @@ class C_potvis:
         self.config_dict = self.vis.server_cfg["params"]
         self.max_points = 500
 
-        self.potentiostat_key = serv_key
-        potserv_config = self.vis.world_cfg["servers"].get(self.potentiostat_key, None)
-        if potserv_config is None:
+        self.live_key = serv_key
+        co2serv_config = self.vis.world_cfg["servers"].get(self.live_key, None)
+        if co2serv_config is None:
             return
-        potserv_host = potserv_config.get("host", None)
-        potserv_port = potserv_config.get("port", None)
+        co2serv_host = co2serv_config.get("host", None)
+        co2serv_port = co2serv_config.get("port", None)
 
         self.data_url = (
-            f"ws://{potserv_config['host']}:{potserv_config['port']}/ws_data"
+            f"ws://{co2serv_config['host']}:{co2serv_config['port']}/ws_live"
         )
-        # self.stat_url = f"ws://{potserv_config["host"]}:{potserv_config["port"]}/ws_status"
+        # self.stat_url = f"ws://{co2serv_config["host"]}:{co2serv_config["port"]}/ws_status"
 
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
@@ -82,7 +82,7 @@ class C_potvis:
                 [
                     Spacer(width=20),
                     Div(
-                        text=f'<b>Potentiostat Visualizer module for server <a href="http://{potserv_host}:{potserv_port}/docs#/" target="_blank">\'{self.potentiostat_key}\'</a></b>',
+                        text=f'<b>CO2 Sensor module for server <a href="http://{co2serv_host}:{co2serv_port}/docs#/" target="_blank">\'{self.live_key}\'</a></b>',
                         width=1004,
                         height=15,
                     ),
@@ -114,7 +114,7 @@ class C_potvis:
 
     def cleanup_session(self, session_context):
         self.vis.print_message(
-            f"'{self.potentiostat_key}' Bokeh session closed", info=True
+            f"'{self.live_key}' Bokeh session closed", info=True
         )
         self.IOloop_data_run = False
         self.IOtask.cancel()
@@ -173,7 +173,7 @@ class C_potvis:
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
         self.vis.print_message(
-            f" ... potentiostat visualizer subscribing to: {self.data_url}"
+            f" ... CO2 sensor visualizer subscribing to: {self.data_url}"
         )
         retry_limit = 5
         for _ in range(retry_limit):
