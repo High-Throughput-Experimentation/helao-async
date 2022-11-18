@@ -82,7 +82,7 @@ class C_co2:
         self.plot.xaxis.axis_label = "Epoch (seconds)"
         self.plot.yaxis.axis_label = "CO2 (ppm)"
 
-        self.table = DataTable(source=self.datasource_table)
+        self.table = DataTable(source=self.datasource_table, columns=["name", "value"])
         # combine all sublayouts into a single one
         self.layout = layout(
             [
