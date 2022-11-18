@@ -161,6 +161,7 @@ class C_co2:
         self.data_dict["epoch_s"].append(latest_epoch)
 
         self.datasource.data = self.data_dict
+        self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
         self.vis.print_message(
