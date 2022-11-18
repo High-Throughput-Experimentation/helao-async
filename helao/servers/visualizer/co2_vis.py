@@ -16,7 +16,6 @@ from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 
-from helaocore.models.data import DataPackageModel
 from helao.servers.vis import Vis
 
 
@@ -43,7 +42,7 @@ class C_co2:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["t_s", "Ewe_V", "Ach_V", "I_A"]
+        self.data_dict_keys = ["epoch_s", "co2_ppm"]
         self.data_dict = {key: [] for key in self.data_dict_keys}
 
         self.datasource = ColumnDataSource(data=self.data_dict)
@@ -89,8 +88,8 @@ class C_co2:
                 ],
                 [self.input_max_points],
                 [
-                    Paragraph(text="""x-axis:""", width=500, height=15),
-                    Paragraph(text="""y-axis:""", width=500, height=15),
+                    Paragraph(text="""epoch (sec):""", width=500, height=15),
+                    Paragraph(text="""CO2 (ppm):""", width=500, height=15),
                 ],
                 [self.xaxis_selector_group, self.yaxis_selector_group],
                 Spacer(height=10),
@@ -105,17 +104,13 @@ class C_co2:
         self.xselect = self.xaxis_selector_group.active
         self.yselect = self.yaxis_selector_group.active
 
-        self.reset_plot(self.cur_action_uuid, forceupdate=True)
-
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
         self.IOtask = asyncio.create_task(self.IOloop_data())
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
     def cleanup_session(self, session_context):
-        self.vis.print_message(
-            f"'{self.live_key}' Bokeh session closed", info=True
-        )
+        self.vis.print_message(f"'{self.live_key}' Bokeh session closed", info=True)
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
@@ -151,23 +146,19 @@ class C_co2:
     def update_input_value(self, sender, value):
         sender.value = value
 
-    def add_points(self, datapackage: DataPackageModel):
-        def _add_helper(datadict, pointlist):
-            for pt in pointlist:
-                datadict.append(pt)
-
-        self.reset_plot(str(datapackage.action_uuid))
+    def add_points(self, datapackage: dict):
         if len(self.data_dict[self.data_dict_keys[0]]) > self.max_points:
             delpts = len(self.data_dict[self.data_dict_keys[0]]) - self.max_points
             for key in self.data_dict_keys:
                 del self.data_dict[key][:delpts]
-        for _, data_dict in datapackage.datamodel.data.items():
-            datalen = len(list(data_dict.values())[0])
-            for key in self.data_dict_keys:
-                _add_helper(
-                    datadict=self.data_dict[key],
-                    pointlist=data_dict.get(key, [0 for i in range(datalen)]),
-                )
+        latest_epoch = 0
+        for datalab, (dataval, epochsec) in datapackage.items():
+            if isinstance(dataval, list):
+                self.data_dict[datalab] += dataval
+            else:
+                self.data_dict[datalab].append(dataval)
+            latest_epoch = max([epochsec, latest_epoch])
+        self.data_dict["epoch_s"].append(latest_epoch)
 
         self.datasource.data = self.data_dict
 
@@ -182,25 +173,10 @@ class C_co2:
                     self.IOloop_data_run = True
                     while self.IOloop_data_run:
                         try:
-                            datapackage = DataPackageModel(
-                                **json.loads(await ws.recv())
+                            datapackage = json.loads(await ws.recv())
+                            self.vis.doc.add_next_tick_callback(
+                                partial(self.add_points, datapackage)
                             )
-                            datastatus = datapackage.datamodel.status
-                            if (
-                                datapackage.action_name
-                                in (
-                                    "run_LSV",
-                                    "run_CA",
-                                    "run_CP",
-                                    "run_CV",
-                                    "run_EIS",
-                                    "run_OCV",
-                                )
-                                and datastatus in valid_data_status
-                            ):
-                                self.vis.doc.add_next_tick_callback(
-                                    partial(self.add_points, datapackage)
-                                )
                         except Exception:
                             self.IOloop_data_run = False
                     await ws.close()
@@ -229,108 +205,23 @@ class C_co2:
         self.plot.renderers = []
         self.plot_prev.renderers = []
 
-        self.plot.title.text = f"active action_uuid: {self.cur_action_uuid}"
-        self.plot_prev.title.text = f"previous action_uuid: {self.prev_action_uuid}"
-        xstr = ""
-        if self.xaxis_selector_group.active == 0:
-            xstr = "t_s"
-        elif self.xaxis_selector_group.active == 1:
-            xstr = "Ewe_V"
-        elif self.xaxis_selector_group.active == 2:
-            xstr = "Ach_V"
-        else:
-            xstr = "I_A"
-        colors = ["red", "blue", "yellow", "green"]
-        color_count = 0
-        for i in self.yaxis_selector_group.active:
-            if i == 0:
-                self.plot.line(
-                    x=xstr,
-                    y="t_s",
-                    line_color=colors[color_count],
-                    source=self.datasource,
-                    name=self.cur_action_uuid,
-                    legend_label="t_s",
-                )
-                self.plot_prev.line(
-                    x=xstr,
-                    y="t_s",
-                    line_color=colors[color_count],
-                    source=self.datasource_prev,
-                    name=self.prev_action_uuid,
-                    legend_label="t_s",
-                )
-            elif i == 1:
-                self.plot.line(
-                    x=xstr,
-                    y="Ewe_V",
-                    line_color=colors[color_count],
-                    source=self.datasource,
-                    name=self.cur_action_uuid,
-                    legend_label="Ewe_V",
-                )
-                self.plot_prev.line(
-                    x=xstr,
-                    y="Ewe_V",
-                    line_color=colors[color_count],
-                    source=self.datasource_prev,
-                    name=self.prev_action_uuid,
-                    legend_label="Ewe_V",
-                )
-            elif i == 2:
-                self.plot.line(
-                    x=xstr,
-                    y="Ach_V",
-                    line_color=colors[color_count],
-                    source=self.datasource,
-                    name=self.cur_action_uuid,
-                    legend_label="Ach_V",
-                )
-                self.plot_prev.line(
-                    x=xstr,
-                    y="Ach_V",
-                    line_color=colors[color_count],
-                    source=self.datasource_prev,
-                    name=self.prev_action_uuid,
-                    legend_label="Ach_V",
-                )
-            else:
-                self.plot.line(
-                    x=xstr,
-                    y="I_A",
-                    line_color=colors[color_count],
-                    source=self.datasource,
-                    name=self.cur_action_uuid,
-                    legend_label="I_A",
-                )
-                self.plot_prev.line(
-                    x=xstr,
-                    y="I_A",
-                    line_color=colors[color_count],
-                    source=self.datasource_prev,
-                    name=self.prev_action_uuid,
-                    legend_label="I_A",
-                )
-            color_count += 1
+        self.plot.line(
+            x="epoch_s",
+            y="co2_ppm",
+            line_color="red",
+            source=self.datasource,
+            name=self.cur_action_uuid,
+        )
+        # self.plot_prev.line(
+        #     x=xstr,
+        #     y="t_s",
+        #     line_color=colors[color_count],
+        #     source=self.datasource_prev,
+        #     name=self.prev_action_uuid,
+        #     legend_label="t_s",
+        # )
 
     def reset_plot(self, new_action_uuid: UUID, forceupdate: bool = False):
-        if (new_action_uuid != self.cur_action_uuid) or forceupdate:
-            self.vis.print_message(" ... reseting Gamry graph")
-            self.prev_action_uuid = self.cur_action_uuid
-            self.cur_action_uuid = new_action_uuid
-
-            # copy old data to "prev" plot
-            self.datasource_prev.data = {
-                deepcopy(key): deepcopy(val)
-                for key, val in self.datasource.data.items()
-            }
-            self.data_dict = {key: [] for key in self.data_dict_keys}
-            self.datasource.data = self.data_dict
-            self._add_plots()
-
-        elif (self.xselect != self.xaxis_selector_group.active) or (
-            self.yselect != self.yaxis_selector_group.active
-        ):
-            self.xselect = self.xaxis_selector_group.active
-            self.yselect = self.yaxis_selector_group.active
-            self._add_plots()
+        self.xselect = self.xaxis_selector_group.active
+        self.yselect = self.yaxis_selector_group.active
+        self._add_plots()
