@@ -99,13 +99,12 @@ class C_co2:
                 TableColumn(field="value", title="value"),
             ],
             height=300,
-            width=300,
+            width=400,
         )
         # combine all sublayouts into a single one
         self.layout = layout(
             [
                 [
-                    Spacer(width=20),
                     Div(
                         text=f'<b>CO2 Sensor module for server <a href="http://{co2serv_host}:{co2serv_port}/docs#/" target="_blank">\'{self.live_key}\'</a></b>',
                         width=1004,
