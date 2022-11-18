@@ -1,3 +1,4 @@
+import time
 import websockets
 import asyncio
 import json
@@ -27,7 +28,9 @@ class C_co2:
     def __init__(self, visServ: Vis, serv_key: str):
         self.vis = visServ
         self.config_dict = self.vis.server_cfg["params"]
+        self.update_rate = self.config_dict.get("update_rate", 0.5)
         self.max_points = 500
+        self.last_update_time = time.time()
 
         self.live_key = serv_key
         co2serv_config = self.vis.world_cfg["servers"].get(self.live_key, None)
@@ -67,7 +70,17 @@ class C_co2:
             partial(self.callback_input_max_points, sender=self.input_max_points),
         )
 
-        partial(self.callback_input_max_points, sender=self.input_max_points)
+        self.input_update_rate = TextInput(
+            value=f"{self.update_rate}",
+            title="update sec",
+            disabled=False,
+            width=150,
+            height=40,
+        )
+        self.input_update_rate.on_change(
+            "value",
+            partial(self.callback_input_update_rate, sender=self.input_update_rate),
+        )
         # self.xaxis_selector_group = RadioButtonGroup(
         #     labels=self.data_dict_keys, active=0, width=500
         # )
@@ -99,7 +112,7 @@ class C_co2:
                         height=15,
                     ),
                 ],
-                [self.input_max_points],
+                [self.input_max_points, self.input_update_rate],
                 # [
                 #     Paragraph(text="x-axis selectors", width=500, height=15),
                 #     Paragraph(text="y-axis selectors", width=500, height=15),
@@ -170,6 +183,23 @@ class C_co2:
     def update_input_value(self, sender, value):
         sender.value = value
 
+    def callback_input_update_rate(self, attr, old, new, sender):
+        """callback for input_update_rate"""
+
+        def to_float(val):
+            try:
+                return to_float(val)
+            except ValueError:
+                return 0.5
+
+        newpts = to_float(new)
+
+        self.update_rate = newpts
+
+        self.vis.doc.add_next_tick_callback(
+            partial(self.update_input_value, sender, f"{self.update_rate}")
+        )
+
     def add_points(self, datapackage: dict):
         if len(self.data_dict[self.data_dict_keys[0]]) > self.max_points:
             delpts = len(self.data_dict[self.data_dict_keys[0]]) - self.max_points
@@ -200,9 +230,11 @@ class C_co2:
                     while self.IOloop_data_run:
                         try:
                             datapackage = json.loads(await ws.recv())
-                            self.vis.doc.add_next_tick_callback(
-                                partial(self.add_points, datapackage)
-                            )
+                            if time.time() - self.last_update_time >= self.update_rate:
+                                self.vis.doc.add_next_tick_callback(
+                                    partial(self.add_points, datapackage)
+                                )
+                                self.last_update_time = time.time()
                         except Exception:
                             self.IOloop_data_run = False
                     await ws.close()
