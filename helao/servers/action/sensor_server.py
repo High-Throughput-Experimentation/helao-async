@@ -11,7 +11,7 @@ from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base import makeActionServ
 from helaocore.models.sample import SampleUnion
-from helao.drivers.sensor.sprintir import SprintIR
+from helao.drivers.sensor.sprintir_driver import SprintIR
 from helao.helpers.config_loader import config_loader
 
 
