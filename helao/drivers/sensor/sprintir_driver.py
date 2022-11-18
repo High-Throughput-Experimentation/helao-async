@@ -180,8 +180,12 @@ class SprintIR:
             command_str = command_str + "\r\n"
         self.com.write(command_str.encode("utf8"))
         self.com.flush()
+        lines = []
         buf = self.com.read_until(b"\r\n")
-        lines = buf.decode("utf8").split("\n")
+        lines.append(buf.decode("utf8").split("\n"))
+        while buf != b"":
+            buf = self.com.read_until(b"\r\n")
+            lines.append(buf.decode("utf8").split("\n"))
         cmd_resp = []
         aux_resp = []
         for line in lines:
