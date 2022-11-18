@@ -182,10 +182,10 @@ class SprintIR:
         self.com.flush()
         lines = []
         buf = self.com.read_until(b"\r\n")
-        lines.append(buf.decode("utf8").split("\n"))
+        lines += buf.decode("utf8").split("\n")
         while buf != b"":
             buf = self.com.read_until(b"\r\n")
-            lines.append(buf.decode("utf8").split("\n"))
+            lines += buf.decode("utf8").split("\n")
         cmd_resp = []
         aux_resp = []
         for line in lines:
