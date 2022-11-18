@@ -72,11 +72,11 @@ class SprintIR:
         }
         ifw_map = {v: k for k, v in fw_map.items()}
         self.fw = {}
-        for k, v in fw_map.items():
+        for k, v in list(fw_map.items()) + [("dummy", "! 0")] * 2:
             resp, aux = self.send(v)
             if resp:
                 fw_val = resp[0].split()[-1].replace(v, "").strip()
-                if fw_val not in ["?", ""]:
+                if fw_val not in ["?", ""] and k != "dummy":
                     self.fw[k] = int(fw_val)
             for aresp in aux:
                 cmd = aresp[0]
