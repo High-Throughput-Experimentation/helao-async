@@ -48,9 +48,10 @@ class C_co2:
         self.data_dict = {key: [] for key in self.data_dict_keys}
 
         self.datasource = ColumnDataSource(data=self.data_dict)
-        self.datasource_table = ColumnDataSource(
-            data={k: self.data_dict.get(k, [""])[0] for k in self.data_dict_keys}
-        )
+        self.table_dict = {}
+        self.datasource_table = ColumnDataSource(data=self.table_dict)
+        self.update_table_data()
+
         # create visual elements
         self.layout = []
 
@@ -116,6 +117,15 @@ class C_co2:
         self.IOtask = asyncio.create_task(self.IOloop_data())
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
+    def update_table_data(self):
+        for k in self.data_dict_keys:
+            if self.data_dict[k] == []:
+                val = ''
+            else:
+                val = self.data_dict[k][0]
+            self.table_dict[k] = val
+        self.datasource_table.data = self.table_dict
+
     def cleanup_session(self, session_context):
         self.vis.print_message(f"'{self.live_key}' Bokeh session closed", info=True)
         self.IOloop_data_run = False
@@ -168,9 +178,7 @@ class C_co2:
         self.data_dict["epoch_s"].append(latest_epoch)
 
         self.datasource.data = self.data_dict
-        self.datasource_table.data = {
-            k: self.data_dict.get(k, [""])[0] for k in self.data_dict_keys
-        }
+        self.update_table_data()
         self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
@@ -218,16 +226,8 @@ class C_co2:
             line_color="red",
             source=self.datasource,
         )
-        # self.table.line(
-        #     x=xstr,
-        #     y="t_s",
-        #     line_color=colors[color_count],
-        #     source=self.datasource_prev,
-        #     name=self.prev_action_uuid,
-        #     legend_label="t_s",
-        # )
 
-    def reset_plot(self, new_action_uuid: UUID, forceupdate: bool = False):
-        self.xselect = self.xaxis_selector_group.active
-        self.yselect = self.yaxis_selector_group.active
+    def reset_plot(self, forceupdate: bool = False):
+        # self.xselect = self.xaxis_selector_group.active
+        # self.yselect = self.yaxis_selector_group.active
         self._add_plots()
