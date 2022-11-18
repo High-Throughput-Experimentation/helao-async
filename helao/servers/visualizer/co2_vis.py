@@ -85,7 +85,7 @@ class C_co2:
                 TableColumn(field="value", title="value"),
             ],
             height=300,
-            width=500,
+            width=300,
         )
         # combine all sublayouts into a single one
         self.layout = layout(
