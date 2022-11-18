@@ -67,6 +67,7 @@ class C_co2:
             partial(self.callback_input_max_points, sender=self.input_max_points),
         )
 
+        partial(self.callback_input_max_points, sender=self.input_max_points)
         # self.xaxis_selector_group = RadioButtonGroup(
         #     labels=self.data_dict_keys, active=0, width=500
         # )
