@@ -194,11 +194,11 @@ class SprintIR:
             self.base.print_message(
                 f"Received auxiliary responses: {aux_resp}", warning=True
             )
-        while not cmd_resp:
-            repeats = self.send(command_str)
-            cmd_resp += repeats[0]
-            aux_resp += repeats[1]
-            time.sleep(0.1)
+        # while not cmd_resp:
+        #     repeats = self.send(command_str)
+        #     cmd_resp += repeats[0]
+        #     aux_resp += repeats[1]
+        #     time.sleep(0.1)
         return cmd_resp, aux_resp
 
     async def poll_sensor_loop(self, frequency: int = 20):
