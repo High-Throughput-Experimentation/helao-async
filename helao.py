@@ -433,6 +433,7 @@ if __name__ == "__main__":
         python_paths = [
             x for x in python_paths if os.path.basename(x).startswith("helao-")
         ]
+        print(python_paths)
         branches = {
             os.path.basename(x): subprocess.getoutput(
                 f'git --git-dir={os.path.join(x, ".git")} branch --show-current'
