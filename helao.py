@@ -436,10 +436,11 @@ if __name__ == "__main__":
         print(python_paths)
         branches = {
             os.path.basename(x): subprocess.getoutput(
-                f'git --git-dir={os.path.join(x.replace(r"\\", r"\"), ".git")} branch --show-current'
+                f'git --git-dir={os.path.join(x, ".git")} branch --show-current'
             )
             for x in python_paths
         }
+        print(branches)
     if not len(set(branches.values())) == 1:
         print_message({}, "launcher", "", "Cannot start HELAO using mixed branches.")
         for k, v in branches.items():
