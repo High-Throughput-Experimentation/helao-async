@@ -188,7 +188,7 @@ class C_co2:
 
         def to_float(val):
             try:
-                return to_float(val)
+                return float(val)
             except ValueError:
                 return 0.5
 
