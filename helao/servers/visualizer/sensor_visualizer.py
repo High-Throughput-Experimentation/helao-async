@@ -10,10 +10,7 @@ from helaocore.models.hlostatus import HloStatus
 from helao.helpers.make_vis_serv import makeVisServ
 from helao.servers.vis import Vis
 from helao.helpers.config_loader import config_loader
-from helao.servers.visualizer.gamry_vis import C_potvis
-from helao.servers.visualizer.nidaqmx_vis import C_nidaqmxvis
-from helao.servers.visualizer.pal_vis import C_palvis
-from helao.servers.visualizer.spec_vis import C_specvis
+from helao.servers.visualizer.co2_vis import C_co2
 
 
 valid_data_status = (
@@ -54,7 +51,7 @@ def makeBokehApp(doc, confPrefix, servKey, helao_root):
         server_key=servKey,
         doc=doc,
         server_title=servKey,
-        description="Action Visualizer",
+        description="Sensor Visualizer",
         version=2.0,
         driver_class=None,
     )
@@ -64,7 +61,7 @@ def makeBokehApp(doc, confPrefix, servKey, helao_root):
             [
                 Spacer(width=20),
                 Div(
-                    text=f"<b>Visualizer on {gethostname()}</b>",
+                    text=f"<b>Sensors on {gethostname()}</b>",
                     width=1004,
                     height=32,
                     style={"font-size": "200%", "color": "red"},
@@ -77,12 +74,7 @@ def makeBokehApp(doc, confPrefix, servKey, helao_root):
     app.vis.doc.add_root(Spacer(height=10))
 
     # create visualizer objects for defined instruments
-    vis_map = {
-        "gamry_server": C_potvis,
-        "nidaqmx_server": C_nidaqmxvis,
-        "pal_server": C_palvis,
-        "spec_server": C_specvis,
-        }
+    vis_map = {"sensor_server": C_co2}
     vis_dict = {}
 
     for fkey, viscls in vis_map.items():

@@ -50,6 +50,13 @@ config["servers"] = {
         "bokeh": "action_visualizer",
         "params": {"doc_name": "ROS-DEV Visualizer"},
     },
+    "LIVE": {
+        "host": hostip,
+        "port": 5002,
+        "group": "visualizer",
+        "bokeh": "sensor_visualizer",
+        "params": {"doc_name": "Sensor Visualizer"},
+    },
     # "DB": {
     #     "host": hostip,
     #     "port": 8010,
