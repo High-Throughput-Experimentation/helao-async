@@ -66,6 +66,9 @@ class SprintIR:
             "zero-point_n2": "U",
             "scaling_factor": ".",
             "pc_compensation": "s",
+            "pressure": "B",
+            "temperature": "T",
+            "humidity": "H",
         }
         ifw_map = {v: k for k, v in fw_map.items()}
         self.fw = {}
