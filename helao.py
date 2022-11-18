@@ -437,7 +437,7 @@ if __name__ == "__main__":
         branches = {
             os.path.basename(x): subprocess.getoutput(
                 f'git --git-dir={os.path.join(x, ".git")} branch --show-current'
-            )
+            ).split("\n")[-1]
             for x in python_paths
         }
         print(branches)
