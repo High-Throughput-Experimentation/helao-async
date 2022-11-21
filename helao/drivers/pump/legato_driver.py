@@ -144,7 +144,7 @@ class KDS100:
         resp = self.send(command_str)
         return resp
 
-    def set_rate(self, pump_name: str, rate_val: int, direction: int):
+    def set_rate(self, pump_name: str, rate_val: float, direction: int):
         "Set infusion|withdraw rate in units TODO"
         if direction == 1:
             cmd = "irate"
@@ -159,6 +159,9 @@ class KDS100:
 
     def set_ramp(self, pump_name: str, start_rate: int, end_rate: int, direction: int):
         "Set infusion|withdraw ramp rate in units TODO"
+        pass
+
+    def set_volume(self, pump_name: str, vol_val: float, direction: int):
         pass
 
     def shutdown(self):
