@@ -1,6 +1,6 @@
 hostip = "127.0.0.1"
 config = {}
-config["dummy"] = False
+config["dummy"] = True
 config['simulation'] = False
 
 # action library provides generator functions which produce actions
@@ -104,23 +104,22 @@ config["servers"] = dict(
         group="action",
         fast="nidaqmx_server",
         params=dict(
-            dev_pump={
-                "PeriPump1": "cDAQ1Mod1/port0/line9",
-                "PeriPump2": "cDAQ1Mod1/port0/line7",
-                "Direction": "cDAQ1Mod1/port0/line8",
+            dev_valve={
+                "1A": "cDAQ1Mod1/port0/line1",
+                "1B": "cDAQ1Mod1/port0/line2",
+                "2": "cDAQ1Mod1/port0/line3",
+                "3A": "cDAQ1Mod1/port0/line4",
+                "4A": "cDAQ1Mod1/port0/line5",
+                "5A-cell": "cDAQ1Mod1/port0/line6",
+                "5B-waste": "cDAQ1Mod1/port0/line7",
+                "6A-waste": "cDAQ1Mod1/port0/line8",
+                "6B": "cDAQ1Mod1/port0/line9",
+                "blank": "cDAQ1Mod1/port0/line10",
             },
-            dev_gasvalve={
-                "CO2": "cDAQ1Mod1/port0/line0",
-                "Ar": "cDAQ1Mod1/port0/line2",
-                "atm": "cDAQ1Mod1/port0/line5",
-            },
-            dev_liquidvalve={
-                "liquid": "cDAQ1Mod1/port0/line1",
-                "up": "cDAQ1Mod1/port0/line4",
-                "down": "cDAQ1Mod1/port0/line3",
-            },
-            dev_led={
-                "led": "cDAQ1Mod1/port0/line11",
+            dev_triggers={
+                "pump1": "cDAQ1Mod1/port0/line16",
+                "pump2": "cDAQ1Mod1/port0/line17",
+                "pump3": "cDAQ1Mod1/port0/line18",
             },
         ),
     ),
@@ -130,44 +129,10 @@ config["servers"] = dict(
         group="action",
         fast="pal_server",
         params=dict(
-            host="localhost",
-            timeout=5 * 60,  # 30min timeout for waiting for TTL
-            dev_trigger="NImax",
-            trigger={  # TTL handshake via NImax
-                "start": "cDAQ1Mod2/port0/line1",  # TTL1
-                "continue": "cDAQ1Mod2/port0/line2",  # TTL2
-                "done": "cDAQ1Mod2/port0/line3",  # TTL3
-            },
-            cam_file_path=r"C:\Users\anec\Desktop\psc_methods\active_methods\HELAO",
-            # cams={
-            #     "deepclean": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
-            #     # "injection_custom_HPLC":"HELAO_HPLC_LiquidInjection_Custom_to_HPLCInjector_220215.cam",
-            #     "injection_tray_HPLC": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
-            #     "injection_custom_GC_gas_wait": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
-            #     "injection_custom_GC_gas_start": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
-            #     "injection_tray_GC_liquid_start": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
-            #     "archive": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
-            # },
-            cams={
-                "deepclean": "HELAO_LiquidSyringe_DeepClean_220215.cam",  #
-                # "injection_custom_HPLC":"HELAO_HPLC_LiquidInjection_Custom_to_HPLCInjector_220215.cam",
-                "injection_tray_HPLC": "HELAO_HPLC_LiquidInjection_Tray_to_HPLCInjector_220215.cam",  #
-                "injection_custom_GC_gas_wait": "HELAO_GCHeadspace_Injection1_220215.cam",  #
-                "injection_custom_GC_gas_start": "HELAO_GCHeadspace_Injection2_220215.cam",  #
-                "injection_tray_GC_liquid_start": "HELAO_GC_LiquidInjection_FromArchive_220215.cam",  #
-                "archive": "HELAO_GCHeadspace_Liquid_Archive_220215.cam",  #
-            },
+        
             positions={
-                "tray2": {
-                    "slot1": "VT54",
-                    "slot2": "VT54",
-                    "slot3": "VT15",
-                },
                 "custom": {
                     "cell1_we": "cell",
-                    "Injector 1": "injector",
-                    "Injector 2": "injector",
-                    "LCInjector1": "injector",
                 },
             },
         ),
@@ -181,7 +146,7 @@ config["servers"] = dict(
         group="visualizer",
         bokeh="action_visualizer",
         params=dict(
-            doc_name="ANEC Visualizer",
+            doc_name="CCSI Visualizer",
         ),
     ),
     # #########################################################################
