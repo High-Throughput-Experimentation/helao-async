@@ -104,7 +104,7 @@ config["servers"] = dict(
         group="action",
         fast="nidaqmx_server",
         params=dict(
-            dev_valve={
+            dev_liquidvalve={
                 "1A": "cDAQ1Mod1/port0/line1",
                 "1B": "cDAQ1Mod1/port0/line2",
                 "2": "cDAQ1Mod1/port0/line3",
