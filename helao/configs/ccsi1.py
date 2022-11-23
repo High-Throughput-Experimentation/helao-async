@@ -52,7 +52,7 @@ config["servers"] = dict(
                 B=1.0 / 6397.56,
                 C=1.0 / 6358.36,
             ),
-            galil_ip_str="192.168.99.222",
+            galil_ip_str="192.168.200.218",
             def_speed_count_sec=10000,
             max_speed_count_sec=25000,
             ipstr="192.168.200.23",
@@ -86,11 +86,12 @@ config["servers"] = dict(
         group="action",
         fast="galil_io",
         params=dict(
-            galil_ip_str="192.168.99.222",
+            galil_ip_str="192.168.200.218",
             dev_ai={},
             dev_ao={},
             dev_di={
-                "gamry_ttl0": 1,
+                "multichannel_valve_done": 1,
+                "multichannel_valve_error":2,
             },
             dev_do={
                 "gamry_aux": 1,
@@ -115,6 +116,10 @@ config["servers"] = dict(
                 "6A-waste": "cDAQ1Mod1/port0/line7",
                 "6B": "cDAQ1Mod1/port0/line8",
                 "blank": "cDAQ1Mod1/port0/line9",
+                "multi_CMD0": "cDAQ1Mod1/port0/line28",
+                "multi_CMD1": "cDAQ1Mod1/port0/line29",
+                "multi_CMD2": "cDAQ1Mod1/port0/line30",
+                "multi_CMD3": "cDAQ1Mod1/port0/line31",
             },
             dev_triggers={
                 "pump1": "cDAQ1Mod1/port0/line16",
