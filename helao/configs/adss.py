@@ -190,13 +190,13 @@ config["servers"] = dict(
                 'done':'PXI-6284/port2/line4',  #P2.4
                 'error':'PXI-6284/port2/line6'  #P2.6
                 },
-            dev_RSHTTLhandshake = {
-                'RSH1':'PXI-6284/port2/line5',  #P2.5
-                'RSH2':'PXI-6284/port2/line7',  #P2.7
-                'RSH3':'PXI-6284/port2/line3',  #P2.3
-                #'port':'PXI-6284/ctr0',
-                #'term':'/PXI-6284/PFI8' #P2.0
-                }
+            # dev_RSHTTLhandshake = {
+            #     'RSH1':'PXI-6284/port2/line5',  #P2.5
+            #     'RSH2':'PXI-6284/port2/line7',  #P2.7
+            #     'RSH3':'PXI-6284/port2/line3',  #P2.3
+            #     #'port':'PXI-6284/ctr0',
+            #     #'term':'/PXI-6284/PFI8' #P2.0
+            #     }
         )
     ),
     PAL=dict(
