@@ -123,8 +123,10 @@ class cNIMAX:
             "t_s",
             "Icell_A",
             "Ecell_V",
-            "Ttemp_type-K_C",
-            "Ttemp_type-T_C",            
+            "Ttemp_Ktc_in_cell_C",
+            "Ttemp_Ttc_in_reservoir_C",            
+            "Ttemp_Ktc_out_cell_C",
+            "Ttemp_Ktc_out_reservoir_C",
      ]
 
         # keeps track of the multi cell IV measurements in the background
@@ -204,9 +206,9 @@ class cNIMAX:
         )
 # #        self.task_6289cellcurrent = nidaqmx.Task()
 #         self.task_6289cellcurrent.ai_channels.add_ai_thrmcpl_chan(
-# #            physical_channel= 'type-K',
+# #            physical_channel= 'Ktc_in_cell',
 #             physical_channel= 'PXI-6289/ai0',
-#             name_to_assign_to_channel="Temp_typeK",
+#             name_to_assign_to_channel="cell_temp",
 #             min_val=0,
 #             max_val=150,
 #             units=TemperatureUnits.DEG_C,
@@ -215,9 +217,9 @@ class cNIMAX:
 #         )
 
 #         self.task_6284cellvoltage.ai_channels.add_ai_thrmcpl_chan(
-#  #           physical_channel= 'type-T',
+#  #           physical_channel= 'Ttc_in_reservoir',
 #             physical_channel= 'PXI-6284/ai0',
-#             name_to_assign_to_channel="Temp_typeT",
+#             name_to_assign_to_channel="reservoir_temp",
 #             min_val=0,
 #             max_val=150,
 #             units=TemperatureUnits.DEG_C,
@@ -252,9 +254,9 @@ class cNIMAX:
 #         """configures and starts a NImax task for nonexperiment temp measurements"""
 #         self.task_tempinst_S = nidaqmx.Task()
 #         self.task_tempinst_S.ai_channels.add_ai_thrmcpl_chan(
-# #           physical_channel= 'type-K',
+# #           physical_channel= 'Ktc_in_cell',
 #             physical_channel= 'PXI-6289/ai2', 
-#             name_to_assign_to_channel="Temp_typeK",
+#             name_to_assign_to_channel="cell_temp",
 #             min_val=0,
 #             max_val=150,
 #             units=TemperatureUnits.DEG_C,
@@ -277,9 +279,9 @@ class cNIMAX:
 #         )
 #         self.task_tempinst_T = nidaqmx.Task()
 #         self.task_tempinst_T.ai_channels.add_ai_thrmcpl_chan(
-#            # physical_channel= 'type-T',
+#            # physical_channel= 'Ttc_in_reservoir',
 #             physical_channel= 'PXI-6284/ai2',   #temporary  cjc source ai channel instead of 2
-#             name_to_assign_to_channel="Temp_typeT",
+#             name_to_assign_to_channel="reservoir_temp",
 #             min_val=0,
 #             max_val=150,
 #             units=TemperatureUnits.DEG_C,
@@ -324,9 +326,9 @@ class cNIMAX:
         self.task_monitors = nidaqmx.Task()
         for myname, mydev in self.config_dict["dev_monitor"].items():
             #can add if filter for different types of monitors (other than Temp)
-            if myname == 'type-K':
-                TCtype=ThermocoupleType.K
-            if myname == 'type-T':
+#            if myname == 'Ktc_in_cell':
+#                TCtype=ThermocoupleType.K
+            if myname == 'Ttc_in_reservoir':
                 TCtype=ThermocoupleType.T
             else:
                 TCtype=ThermocoupleType.K
@@ -528,13 +530,13 @@ class cNIMAX:
         except asyncio.CancelledError:
             self.base.print_message("IOloop task was cancelled")
 
-    async def Heatloop(self, duration_h, reservoir1_min, reservoir1_max, reservoir2_min, reservoir2_max,):
+    async def Heatloop(self, duration_h, celltemp_min, celltemp_max, reservoir2_min, reservoir2_max,):
         activeDict = {}
 
         # samplerate = A.action_params["SampleRate"]
         # duration = A.action_params["duration"] * 60 * 60  #time in hours
-        # reservoir1_min = A.action_params["r1min"]
-        # reservoir1_max = A.action_params["r1max"]
+        # celltemp_min = A.action_params["r1min"]
+        # celltemp_max = A.action_params["r1max"]
         # reservoir2_min = A.action_params["r2min"]
         # reservoir2_max = A.action_params["r2max"]
 
@@ -551,18 +553,18 @@ class cNIMAX:
             for i, myname in enumerate(self.config_dict["dev_monitor"]):
                 mdata[i], _ = self.base.get_lbuf(myname)
                 readtempdict[myname] = mdata[i]
-            temp_typeK = float(readtempdict['type-K'])
-            temp_typeT = float(readtempdict['type-T'])
+            cell_temp = float(readtempdict['Ktc_in_cell'])
+            reservoir_temp = float(readtempdict['Ttc_in_reservoir'])
             for myheat, myport in self.dev_heat.items():
-                if myheat == "heater1":
-                    if temp_typeK < reservoir1_min:
+                if myheat == "cellheater":
+                    if cell_temp < celltemp_min:
                         await self.set_digital_out(do_port=myport, do_name=myheat, on=True)
-                    if temp_typeK > reservoir1_max:
+                    if cell_temp > celltemp_max:
                         await self.set_digital_out(do_port=myport, do_name=myheat, on=False)
-                if myheat == 'heater2':
-                    if temp_typeT < reservoir2_min:
+                if myheat == 'res_heater':
+                    if reservoir_temp < reservoir2_min:
                         await self.set_digital_out(do_port=myport, do_name=myheat, on=True)
-                    if temp_typeT > reservoir2_max:
+                    if reservoir_temp > reservoir2_max:
                         await self.set_digital_out(do_port=myport, do_name=myheat, on=False)
             await asyncio.sleep(1)
         await self.set_digital_out(do_port=myport, do_name=myheat, on=False)

@@ -113,7 +113,7 @@ config["servers"] = dict(
                 '7':'PXI-6289/ai22',
                 '8':'PXI-6289/ai23',
                 #'9':'PXI-6289/ai0'
-                '9':'PXI-6289/ai1'  # after rewire for thermocouple connection
+                '9':'PXI-6289/ai3'  # after rewire for thermocouple connection
                 },
             dev_cellvoltage = {
                 '1':'PXI-6284/ai16',
@@ -128,12 +128,14 @@ config["servers"] = dict(
                 '9':'PXI-6284/ai1'  # after rewire for thermocouple connection
                 },
             dev_monitor ={
-                'type-K':'PXI-6289/ai6',
-                'type-T':'PXI-6289/ai7'
+                'Ktc_in_cell':'PXI-6289/ai6',
+                'Ttc_in_reservoir':'PXI-6289/ai7'
+                'Ktc_out_cell':'PXI-6289/ai1'
+                'Ktc_out_reservoir':'PXI-6289/ai2'
                 },   
             dev_heat = {
-                'heater1':'PXI-6289/port0/line0', #P0.0  #green    /black ground
-                'heater2':'PXI-6289/port0/line4'  #P0.4  #red     /black ground
+                'cellheater':'PXI-6289/port0/line0', #P0.0  #green    /black ground
+                'res_heater':'PXI-6289/port0/line4'  #P0.4  #red     /black ground
                 },
             # dev_activecell = {
             #     '1':'PXI-6289/port0/line23', #P0.23
