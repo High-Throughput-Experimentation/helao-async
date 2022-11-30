@@ -52,7 +52,7 @@ from helao.helpers.to_json import to_json
 from helao.helpers.unpack_samples import unpack_samples_helper
 from helao.helpers.yml_finisher import move_dir
 from helao.helpers.premodels import Sequence, Experiment, Action
-from helao.servers.base import Base
+from helao.servers.base import Base, Active
 from helao.servers.vis import Vis
 from helao.helpers.legacy_api import HTELegacyAPI
 from helao.helpers.gen_uuid import gen_uuid
@@ -1448,10 +1448,10 @@ class Orch(Base):
         if self.op_enabled and self.orch_op:
             await self.orch_op.update_q.put(msg)
 
-    def start_wait(self, active: Base.Active):
+    def start_wait(self, active: Active):
         self.wait_task = asyncio.create_task(self.dispatch_wait_task(active))
 
-    async def dispatch_wait_task(self, active: Base.Active, print_every_secs: int = 5):
+    async def dispatch_wait_task(self, active: Active, print_every_secs: int = 5):
         # handle long waits as a separate task so HTTP timeout doesn't occur
         waittime = active.action.action_params["waittime"]
         self.print_message(" ... wait action:", waittime)
