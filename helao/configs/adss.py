@@ -155,9 +155,9 @@ config["servers"] = dict(
             #     '4':'PXI-6284/port0/line3'  #P0.3
             #     },
             dev_gasvalve = {
-                'Aux_port':'PXI-6284/port1/line2', #P1.2
-                'PA_pump':'PXI-6284/port1/line3', #P1.3
-                'Waste':'PXI-6284/port1/line4', #P1.4
+                'O2':'PXI-6284/port1/line2', #P1.2
+                'reservoir':'PXI-6284/port1/line3', #P1.3
+                'waste':'PXI-6284/port1/line4', #P1.4
                # '1':'PXI-6284/port1/line2', #P1.2
                # '2':'PXI-6284/port1/line3', #P1.3
                # '3':'PXI-6284/port1/line4', #P1.4
@@ -190,13 +190,13 @@ config["servers"] = dict(
                 'done':'PXI-6284/port2/line4',  #P2.4
                 'error':'PXI-6284/port2/line6'  #P2.6
                 },
-            # dev_RSHTTLhandshake = {
-            #     'RSH1':'PXI-6284/port2/line5',  #P2.5
-            #     'RSH2':'PXI-6284/port2/line7',  #P2.7
-            #     'RSH3':'PXI-6284/port2/line3',  #P2.3
-            #     #'port':'PXI-6284/ctr0',
-            #     #'term':'/PXI-6284/PFI8' #P2.0
-            #     }
+            dev_RSHTTLhandshake = {
+                'RSH1':'PXI-6284/port2/line5',  #P2.5
+                'RSH2':'PXI-6284/port2/line7',  #P2.7
+                'RSH3':'PXI-6284/port2/line3',  #P2.3
+                #'port':'PXI-6284/ctr0',
+                #'term':'/PXI-6284/PFI8' #P2.0
+                }
         )
     ),
     PAL=dict(
