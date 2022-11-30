@@ -413,7 +413,7 @@ class cNIMAX:
                         f"{self.FIFO_column_headings[3]}": mdata[0],
                         f"{self.FIFO_column_headings[4]}": mdata[1],
                         f"{self.FIFO_column_headings[4]}": mdata[2],
-                       f"{self.FIFO_column_headings[4]}": mdata[3],
+                        f"{self.FIFO_column_headings[4]}": mdata[3],
                     }
 
                 # push data to datalogger queue
