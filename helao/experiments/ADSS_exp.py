@@ -1035,8 +1035,8 @@ def ADSS_sub_heat(
     experiment: Experiment,
     experiment_version: int = 1,
     duration_hrs: float = 2.0,
-    reservoir1_min_C: float = 74.5,
-    reservoir1_max_C: float = 75.5,
+    celltemp_min_C: float = 74.5,
+    celltemp_max_C: float = 75.5,
     reservoir2_min_C: float = 84.5,
     reservoir2_max_C: float = 85.5,
 ):
@@ -1053,8 +1053,8 @@ def ADSS_sub_heat(
         "heatloop",
         {
             "duration_hrs": apm.pars.duration_hrs,
-            "reservoir1_min_C": apm.pars.reservoir1_min_C,
-            "reservoir1_max_C": apm.pars.reservoir1_max_C,
+            "celltemp_min_C": apm.pars.celltemp_min_C,
+            "celltemp_max_C": apm.pars.celltemp_max_C,
             "reservoir2_min_C": apm.pars.reservoir2_min_C,
             "reservoir2_max_C": apm.pars.reservoir2_max_C,
         },
