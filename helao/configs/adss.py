@@ -155,9 +155,12 @@ config["servers"] = dict(
             #     '4':'PXI-6284/port0/line3'  #P0.3
             #     },
             dev_gasvalve = {
-                '1':'PXI-6284/port1/line2', #P1.2
-                '2':'PXI-6284/port1/line3', #P1.3
-                '3':'PXI-6284/port1/line4', #P1.4
+                'Aux_port':'PXI-6284/port1/line2', #P1.2
+                'PA_pump':'PXI-6284/port1/line3', #P1.3
+                'Waste':'PXI-6284/port1/line4', #P1.4
+               # '1':'PXI-6284/port1/line2', #P1.2
+               # '2':'PXI-6284/port1/line3', #P1.3
+               # '3':'PXI-6284/port1/line4', #P1.4
                 '4':'PXI-6284/port1/line5', #P1.5
                 '5':'PXI-6284/port1/line6', #P1.6
                 '6':'PXI-6284/port1/line7', #P1.7
