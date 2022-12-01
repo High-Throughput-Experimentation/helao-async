@@ -87,7 +87,9 @@ config["servers"] = dict(
         fast="galil_io",
         params=dict(
             galil_ip_str="192.168.200.218",
-            dev_ai={},
+            dev_ai={
+                "cell_pressure": 1,
+            },
             dev_ao={},
             dev_di={
                 "multichannel_valve_done": 1,
