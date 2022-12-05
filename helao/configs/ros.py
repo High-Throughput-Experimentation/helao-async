@@ -20,14 +20,21 @@ config["servers"] = {
         "port": 8001,
         "group": "orchestrator",
         "fast": "async_orch2",
-        "params": {"enable_op": True, "bokeh_port": 5002}
+        "params": {"enable_op": True, "bokeh_port": 5002},
     },
-    "SYRINGE": {
+    "SYRINGE0": {
         "host": hostip,
         "port": 8002,
         "group": "action",
         "fast": "syringe_server",
-        "params": {"port": "COM8", "pump_addrs": {"zero": 0, "one": 1}},
+        "params": {"port": "COM8", "pumps": {"zero": {"address": 0, "diameter": 40}}},
+    },
+    "SYRINGE1": {
+        "host": hostip,
+        "port": 8002,
+        "group": "action",
+        "fast": "syringe_server",
+        "params": {"port": "COM10", "pumps": {"one": {"address": 1, "diameter": 40}}},
     },
     "SENSOR": {
         "host": hostip,
