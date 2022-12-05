@@ -186,7 +186,7 @@ class KDS100:
                             "target_reached": target_reached,
                         }
                         await self.base.put_lbuf(status_dict)
-                        print(status_dict)
+                        self.base.print_message(status_dict)
             else:
                 await asyncio.sleep(0.05)
 
