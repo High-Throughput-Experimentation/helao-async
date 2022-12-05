@@ -48,4 +48,10 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    return app
+    @app.post(f"/start_polling")
+    async def start_polling():
+        await app.driver.start_polling()
+
+    @app.post(f"/stop_polling")
+    async def stop_polling():
+        await app.driver.stop_polling()
