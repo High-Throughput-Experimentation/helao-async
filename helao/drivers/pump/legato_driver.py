@@ -148,6 +148,7 @@ class KDS100:
         lastupdate = 0
         while True:
             if self.polling:
+                self.base.print_message("pump polling loop has started")
                 for plab, pdict in self.config_dict.get("pumps", {}).items():
                     checktime = time.time()
                     if checktime - lastupdate < waittime:
@@ -190,6 +191,8 @@ class KDS100:
                         }
                         await self.base.put_lbuf(status_dict)
                         self.base.print_message(status_dict)
+                    else:
+                        self.base.print_message("pump address does not match config")
             else:
                 await asyncio.sleep(0.05)
 
