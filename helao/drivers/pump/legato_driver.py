@@ -170,9 +170,11 @@ class KDS100:
                             for k, v in STATES.items()
                             if addrstate_rate[2:].startswith("k")
                         ][0]
+                        self.base.print_message(f"state: {state}")
                         rate = int(addrstate_rate.split(state)[-1])
                         pumptime = int(pumptime)
                         pumpvol = int(pumpvol)
+                        self.base.print_message(f"flags: {flags.lower()}")
                         (
                             motor_dir,
                             limit_status,
