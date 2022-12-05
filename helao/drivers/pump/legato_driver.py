@@ -16,7 +16,7 @@ import traceback
 from typing import Optional
 
 from bokeh.server.server import Server
-from helao.servers.base import Base
+from helao.servers.base import Base, Executor
 from helaocore.error import ErrorCodes
 from helao.helpers.premodels import Action
 from helao.helpers.make_vis_serv import makeVisServ
@@ -163,7 +163,9 @@ class KDS100:
                     self.base.print_message(f"current status: {status}")
                     addrstate_rate, pumptime, pumpvol, flags = status.split()
                     raddr = int(addrstate_rate[:2])
-                    self.base.print_message(f"received address: {raddr}, config address: {addr}")
+                    self.base.print_message(
+                        f"received address: {raddr}, config address: {addr}"
+                    )
                     if addr == raddr:
                         state = None
                         state_split = None
@@ -226,21 +228,29 @@ class KDS100:
         return resp
 
     def set_rate(self, pump_name: str, rate_val: float, direction: int):
-        "Set infusion|withdraw rate in units TODO"
+        "Set infusion|withdraw rate in uL/sec"
         if direction == 1:
             cmd = "irate"
         elif direction == -1:
             cmd = "wrate"
         else:
             return False
-        resp = self.send(pump_name, cmd)
+        resp = self.send(pump_name, f"{cmd} {rate_val} ul/sec")
+        return resp
+
+    def set_volume(self, pump_name: str, vol_val: float, direction: int):
+        "Set infusion|withdraw volume in uL"
+        if direction == 1:
+            cmd = "ivolume"
+        elif direction == -1:
+            cmd = "wvolume"
+        else:
+            return False
+        resp = self.send(pump_name, f"{cmd} {vol_val} ul")
         return resp
 
     def set_ramp(self, pump_name: str, start_rate: int, end_rate: int, direction: int):
         "Set infusion|withdraw ramp rate in units TODO"
-        pass
-
-    def set_volume(self, pump_name: str, vol_val: float, direction: int):
         pass
 
     def clear_time(self, pump_name: Optional[str] = None, direction: Optional[int] = 0):
@@ -315,3 +325,33 @@ class KDS100:
         self.base.print_message("shutting down syringe pump(s)")
         self.safe_state()
         self.com.close()
+
+
+class PumpExec(Executor):
+    def __init__(self, direction, active, **kwargs):
+        super().init__(self, active, **kwargs)
+        self.direction = direction
+
+    def _pre_exec(self):
+        "Set rate and volume params, then run."
+        # asyncio.run(self.active.base.driver.stop_polling())
+        self.active.base.driver.set_rate(
+            pump_name=list(self.active.base.server_params["pumps"].keys())[0],  # only 1
+            rate_val=self.active.action.action_params["rate_uL_sec"],
+            direction=self.direction,
+        )
+        self.active.base.driver.set_volume(
+            pump_name=list(self.active.base.server_params["pumps"].keys())[0],  # only 1
+            volume_val=self.active.action.action_params["volume_uL"],
+            direction=self.direction,
+        )
+        return {"error": ErrorCodes.none}
+    
+    def _exec(self):
+        self.active.base.driver.start_pump(
+            pump_name=list(self.active.base.server_params["pumps"].keys())[0],  # only 1
+            direction=self.direction,
+        )
+        return {"error": ErrorCodes.none}
+
+    
