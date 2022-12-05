@@ -165,13 +165,16 @@ class KDS100:
                     raddr = int(addrstate_rate[:2])
                     self.base.print_message(f"received address: {raddr}, config address: {addr}")
                     if addr == raddr:
-                        state = [
-                            v
-                            for k, v in STATES.items()
-                            if addrstate_rate[2:].startswith(k)
-                        ][0]
+                        state = None
+                        state_split = None
+                        for k, v in STATES.items():
+                            if addrstate_rate[2:].startswith(k):
+                                state = v
+                                state_split = k
+                            else:
+                                continue
                         self.base.print_message(f"state: {state}")
-                        rate = int(addrstate_rate.split(state)[-1])
+                        rate = int(addrstate_rate.split(state_split)[-1])
                         pumptime = int(pumptime)
                         pumpvol = int(pumpvol)
                         self.base.print_message(f"flags: {flags.lower()}")
