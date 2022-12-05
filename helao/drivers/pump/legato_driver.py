@@ -109,7 +109,7 @@ class KDS100:
         self.safe_state()
 
         self.aloop = asyncio.get_running_loop()
-        self.polling = True
+        self.polling = False
         self.poll_signalq = asyncio.Queue(1)
         self.poll_signal_task = self.aloop.create_task(self.poll_signal_loop())
         self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
@@ -192,8 +192,9 @@ class KDS100:
                             "direction_port": dir_port,
                             "target_reached": target_reached,
                         }
-                        await self.base.put_lbuf(status_dict)
                         self.base.print_message(status_dict)
+                        await self.base.put_lbuf(status_dict)
+                        self.base.print_message("status sent to live buffer")
                     else:
                         self.base.print_message("pump address does not match config")
                 await asyncio.sleep(0.01)
