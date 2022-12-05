@@ -55,3 +55,5 @@ def makeApp(confPrefix, servKey, helao_root):
     @app.post(f"/stop_polling")
     async def stop_polling():
         await app.driver.stop_polling()
+
+    return app
