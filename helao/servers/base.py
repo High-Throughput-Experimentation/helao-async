@@ -7,6 +7,7 @@ import sys
 from socket import gethostname
 from time import ctime, time, time_ns
 from typing import List, Optional, Dict
+from types import MethodType
 from uuid import UUID
 import hashlib
 from copy import deepcopy
@@ -196,19 +197,31 @@ class Executor(object):
         self.oneoff = oneoff
         self.ex_rate = ex_rate
 
-    def setup(self):
+    def _pre_exec(self):
         "Setup methods, return error state."
         self.setup_err = ErrorCodes.none
         return {"error": self.setup_err}
 
-    def execute(self):
-        "Perform device read/write.["
+    def set_pre_exec(self, pre_exec_func):
+        "Override the generic setup method."
+        self._pre_exec = MethodType(pre_exec_func, self)
+
+    def _exec(self):
+        "Perform device read/write."
         return {"data": {}, "error": ErrorCodes.none, "status": HloStatus.finished}
 
-    def cleanup(self):
+    def set_exec(self, exec_func):
+        "Override the generic execute method."
+        self._exec = MethodType(exec_func, self)
+
+    def _post_exec(self):
         "Cleanup methods, return error state."
         self.cleanup_err = ErrorCodes.none
         return {"error": self.cleanup_err}
+
+    def set_post_exec(self, post_exec_func):
+        "Override the generic cleanup method."
+        self._post_exec = MethodType(post_exec_func, self)
 
 
 class Base(object):
@@ -1013,6 +1026,7 @@ class Active(object):
     def start_executor(self, executor: Executor):
         self.executor = executor
         self.action_task = self.base.aloop.create_task(self.action_loop_task())
+        return self.action.as_dict()
 
     async def update_act_file(self):
         await self.base.write_act(self.action)
@@ -1868,7 +1882,7 @@ class Active(object):
 
 
         """
-        setup_state = self.executor.setup()
+        setup_state = self.executor._pre_exec()
         setup_error = setup_state.get("error", {})
 
         if setup_error == ErrorCodes.none:
@@ -1877,7 +1891,7 @@ class Active(object):
             self.base.print_message("Error encountered during executor setup.")
         # replicate IOloop
         while self.action_loop_running:
-            result = self.executor.execute()
+            result = self.executor._exec()
             error = result.get("error", {})
             status = result.get("status", {})
             data = result.get("data", {})
@@ -1892,7 +1906,7 @@ class Active(object):
             else:
                 await asyncio.sleep(self.executor.ex_rate)
 
-        cleanup_state = self.executor.cleanup()
+        cleanup_state = self.executor._post_exec()
         cleanup_error = cleanup_state.get("error", {})
 
         if cleanup_error == ErrorCodes.none:
