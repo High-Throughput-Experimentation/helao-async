@@ -115,14 +115,17 @@ class KDS100:
         self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
 
     async def start_polling(self):
+        self.base.print_message("got 'start_polling' request, raising signal")
         await self.poll_signalq.put(True)
 
     async def stop_polling(self):
+        self.base.print_message("got 'stop_polling' request, raising signal")
         await self.poll_signalq.put(False)
 
     async def poll_signal_loop(self):
         while True:
             self.polling = await self.poll_signalq.get()
+            self.base.print_message("polling signal received")
 
     def send(self, pump_name: str, cmd: str):
         if not cmd.endswith("\r"):
