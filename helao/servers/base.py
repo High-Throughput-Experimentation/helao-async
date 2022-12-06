@@ -1880,21 +1880,22 @@ class Active(object):
             await self.base.write_seq(exp, manual=True)
 
     async def action_loop_task(self, executor: Executor):
-        """Generic replacement for 'IOloop'.
-        """
+        """Generic replacement for 'IOloop'."""
 
         self.base.print_message("action_loop_task started")
         # pre-action operations
         setup_state = executor._pre_exec()
-        setup_error = setup_state.get("error", {})
+        setup_error = setup_state.get("error", ErrorCodes.none)
         if setup_error == ErrorCodes.none:
             self.action_loop_running = True
         else:
             self.base.print_message("Error encountered during executor setup.")
+            self.action.error_code = setup_error
+            return await self.finish()
 
         # action operations
         result = executor._exec()
-        error = result.get("error", {})
+        error = result.get("error", ErrorCodes.none)
         data = result.get("data", {})
         if data:
             datamodel = DataModel(
@@ -1919,8 +1920,6 @@ class Active(object):
                         status=HloStatus.active,
                     )
                     await self.enqueue_data(datamodel)  # write and broadcast
-                if error != ErrorCodes.none:
-                    self.action.error_code = error
 
                 if status == HloStatus.active:
                     await asyncio.sleep(executor.poll_rate)
@@ -1928,6 +1927,8 @@ class Active(object):
                     self.base.print_message("exiting executor polling loop")
                     break
 
+        if error != ErrorCodes.none:
+            self.action.error_code = error
         self.action_loop_running = False
 
         # in case of manual stop, perform driver operations
