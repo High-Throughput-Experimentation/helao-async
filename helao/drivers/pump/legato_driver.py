@@ -220,7 +220,7 @@ class KDS100:
         resp = self.send(pump_name, cmd)
         return resp
 
-    def set_rate(self, pump_name: str, rate_val: float, direction: int):
+    def set_rate(self, pump_name: str, rate_val: int, direction: int):
         "Set infusion|withdraw rate in uL/sec"
         if direction == 1:
             cmd = "irate"
@@ -231,15 +231,9 @@ class KDS100:
         resp = self.send(pump_name, f"{cmd} {rate_val} ul/sec")
         return resp
 
-    def set_volume(self, pump_name: str, vol_val: float, direction: int):
+    def set_volume(self, pump_name: str, vol_val: float):
         "Set infusion|withdraw volume in uL"
-        if direction == 1:
-            cmd = "ivolume"
-        elif direction == -1:
-            cmd = "wvolume"
-        else:
-            return False
-        resp = self.send(pump_name, f"{cmd} {vol_val} ul")
+        resp = self.send(pump_name, f"tvolume {vol_val} ul")
         return resp
 
     def set_diameter(self, pump_name: str, diameter_mm: float):
@@ -353,7 +347,6 @@ class PumpExec(Executor):
         vol_resp = self.active.base.driver.set_volume(
             pump_name=self.pump_name,
             volume_val=self.active.action.action_params["volume_uL"],
-            direction=self.direction,
         )
         self.active.base.print_message(f"set_volume returned: {vol_resp}")
         return {"error": ErrorCodes.none}
