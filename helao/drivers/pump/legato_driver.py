@@ -336,7 +336,7 @@ class PumpExec(Executor):
     async def _pre_exec(self):
         "Set rate and volume params, then run."
         self.active.base.print_message("PumpExec running setup methods.")
-        await self.active.base.driver.stop_polling()
+        # await self.active.base.driver.stop_polling()
 
         rate_resp = self.active.base.driver.set_rate(
             pump_name=self.pump_name,
@@ -358,7 +358,7 @@ class PumpExec(Executor):
         )
         self.active.base.print_message(f"start_pump returned: {start_resp}")
 
-        await self.active.base.driver.start_polling()
+        # await self.active.base.driver.start_polling()
         return {"error": ErrorCodes.none}
 
     async def _poll(self):
@@ -377,4 +377,14 @@ class PumpExec(Executor):
         await asyncio.sleep(0.001)
         stop_resp = self.active.base.driver.stop_pump(self.pump_name)
         self.active.base.print_message(f"stop_pump returned: {stop_resp}")
+        return {"error": ErrorCodes.none}
+
+    async def _post_exec(self):
+        self.active.base.print_message("PumpExec running cleanup methods.")
+
+        clear_resp = self.active.base.driver.clear_volume(
+            pump_name=self.pump_name,
+            direction=self.direction,
+        )
+        self.active.base.print_message(f"clear_volume returned: {clear_resp}")
         return {"error": ErrorCodes.none}
