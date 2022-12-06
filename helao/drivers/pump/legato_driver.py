@@ -303,33 +303,33 @@ class KDS100:
             poll_resp = self.send(plab, "poll on")
             if poll_resp[-1] != idle_resp:
                 self.base.print_message(f"Error setting pump '{plab}' to 'POLL on'.")
-                self.base.print_message(f"Server returned: {poll_resp[-2]}")
+                self.base.print_message(f"Server returned: {poll_resp[0]}")
             nvram_resp = self.send(plab, "nvram off")
             if nvram_resp[-1] != idle_resp:
                 self.base.print_message(f"Error setting pump '{plab}' to 'NVRAM off'.")
-                self.base.print_message(f"Server returned: {poll_resp[-2]}")
+                self.base.print_message(f"Server returned: {nvram_resp[0]}")
             stop_resp = self.stop_pump(plab)
             if stop_resp[-1] != idle_resp:
                 self.base.print_message(f"Error stopping pump '{plab}'.")
-                self.base.print_message(f"Server returned: {poll_resp[-2]}")
+                self.base.print_message(f"Server returned: {stop_resp[0]}")
             cleartime_resp = self.clear_time(plab)
             if cleartime_resp[-1] != idle_resp:
                 self.base.print_message(
                     f"Error clearing time params for pump '{plab}'."
                 )
-                self.base.print_message(f"Server returned: {poll_resp[-2]}")
+                self.base.print_message(f"Server returned: {cleartime_resp[0]}")
             clearvol_resp = self.clear_target_volume(plab)
             if clearvol_resp[-1] != idle_resp:
                 self.base.print_message(
                     f"Error clearing volume params for pump '{plab}'."
                 )
-                self.base.print_message(f"Server returned: {poll_resp[-2]}")
+                self.base.print_message(f"Server returned: {clearvol_resp[0]}")
             diameter_resp = self.set_diameter(plab, pdict["diameter"])
             if diameter_resp[-1] != idle_resp:
                 self.base.print_message(
                     f"Error setting syringe diameter on pump '{plab}'."
                 )
-                self.base.print_message(f"Server returned: {poll_resp[-2]}")
+                self.base.print_message(f"Server returned: {diameter_resp[0]}")
 
     def shutdown(self):
         # this gets called when the server is shut down
