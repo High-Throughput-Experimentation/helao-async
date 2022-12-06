@@ -338,13 +338,13 @@ class PumpExec(Executor):
         self.active.base.print_message("PumpExec running setup methods.")
         # await self.active.base.driver.stop_polling()
 
-        rate_resp = self.active.base.driver.set_rate(
+        rate_resp = self.active.base.fastapp.driver.set_rate(
             pump_name=self.pump_name,
             rate_val=self.active.action.action_params["rate_uL_sec"],
             direction=self.direction,
         )
         self.active.base.print_message(f"set_rate returned: {rate_resp}")
-        vol_resp = self.active.base.driver.set_volume(
+        vol_resp = self.active.base.fastapp.driver.set_volume(
             pump_name=self.pump_name,
             volume_val=self.active.action.action_params["volume_uL"],
         )
@@ -352,13 +352,13 @@ class PumpExec(Executor):
         return {"error": ErrorCodes.none}
 
     async def _exec(self):
-        start_resp = self.active.base.driver.start_pump(
+        start_resp = self.active.base.fastapp.driver.start_pump(
             pump_name=self.pump_name,
             direction=self.direction,
         )
         self.active.base.print_message(f"start_pump returned: {start_resp}")
 
-        # await self.active.base.driver.start_polling()
+        # await self.active.base.fastapp.driver.start_polling()
         return {"error": ErrorCodes.none}
 
     async def _poll(self):
@@ -375,14 +375,14 @@ class PumpExec(Executor):
 
     async def _manual_stop(self):
         await asyncio.sleep(0.001)
-        stop_resp = self.active.base.driver.stop_pump(self.pump_name)
+        stop_resp = self.active.base.fastapp.driver.stop_pump(self.pump_name)
         self.active.base.print_message(f"stop_pump returned: {stop_resp}")
         return {"error": ErrorCodes.none}
 
     async def _post_exec(self):
         self.active.base.print_message("PumpExec running cleanup methods.")
 
-        clear_resp = self.active.base.driver.clear_volume(
+        clear_resp = self.active.base.fastapp.driver.clear_volume(
             pump_name=self.pump_name,
             direction=self.direction,
         )
