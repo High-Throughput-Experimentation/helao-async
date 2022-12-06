@@ -179,23 +179,20 @@ class Executor(object):
 
     Hooks
     1. Device setup calls (optional)
-    2. Suspend live polling task (optional)
-    3. Execute function looping (w/frequency) or one-off
+        a. Suspend live polling task (optional)
+    2. Execute action start, return {"data": ..., "error": ...}
+    3. Polling (optional)
         a. Standard return dict has {"data": ..., "status": ..., "error": ...}
         b. Error handling
         c. Check for external stop if looping.
     4. Resume live polling task (optional)
-    5. Cleanup calls (optional)
-
-    Process flow
-    1.
-
+        a. Cleanup calls (optional)
     """
 
-    def __init__(self, active, ex_rate: float = 0.01, oneoff: bool = True):
+    def __init__(self, active, poll_rate: float = 0.01, oneoff: bool = True):
         self.active = active
         self.oneoff = oneoff
-        self.ex_rate = ex_rate
+        self.poll_rate = poll_rate
 
     def _pre_exec(self):
         "Setup methods, return error state."
@@ -208,11 +205,19 @@ class Executor(object):
 
     def _exec(self):
         "Perform device read/write."
-        return {"data": {}, "error": ErrorCodes.none, "status": HloStatus.finished}
+        return {"data": {}, "error": ErrorCodes.none}
 
     def set_exec(self, exec_func):
         "Override the generic execute method."
         self._exec = MethodType(exec_func, self)
+
+    def _poll(self):
+        "Perform one polling iteration."
+        return {"data": {}, "error": ErrorCodes.none, "status": HloStatus.finished}
+
+    def set_poll(self, poll_func):
+        "Override the generic execute method."
+        self._poll = MethodType(poll_func, self)
 
     def _post_exec(self):
         "Cleanup methods, return error state."
@@ -222,6 +227,15 @@ class Executor(object):
     def set_post_exec(self, post_exec_func):
         "Override the generic cleanup method."
         self._post_exec = MethodType(post_exec_func, self)
+
+    def _manual_stop(self):
+        "Perform device manual stop, return error state."
+        self.stop_err = ErrorCodes.none
+        return {"error": self.stop_err}
+
+    def set_manual_stop(self, manual_stop_func):
+        "Override the generic manual stop method."
+        self._manual_stop = MethodType(manual_stop_func, self)
 
 
 class Base(object):
@@ -1019,6 +1033,7 @@ class Active(object):
 
         self.data_logger = self.base.aloop.create_task(self.log_data_task())
 
+        self.manual_stop = False
         self.action_loop_running = False
         self.action_task = None
         self.executor = Executor(self)  # base executor class, replace in server
@@ -1879,36 +1894,64 @@ class Active(object):
         7. if no error, proceed with execute
         8. call executor cleanup
         9. when measurement loop or one-off call is complete, finish active
-
-
         """
+
+        # pre-action operations
         setup_state = self.executor._pre_exec()
         setup_error = setup_state.get("error", {})
-
         if setup_error == ErrorCodes.none:
             self.action_loop_running = True
         else:
             self.base.print_message("Error encountered during executor setup.")
-        # replicate IOloop
-        while self.action_loop_running:
-            result = self.executor._exec()
-            error = result.get("error", {})
-            status = result.get("status", {})
-            data = result.get("data", {})
-            if data:
-                await self.enqueue_data(data)  # write and broadcast
-            if (  # internal stop condition
-                self.executor.oneoff
-                or error != ErrorCodes.none
-                or status != HloStatus.active
-            ):
-                self.action_loop_running = False
-            else:
-                await asyncio.sleep(self.executor.ex_rate)
 
+        # action operations
+        result = self.executor._exec()
+        error = result.get("error", {})
+        data = result.get("data", {})
+        if data:
+            datamodel = DataModel(
+                data={self.action.file_conn_keys[0]: data},
+                errors=[],
+                status=HloStatus.active,
+            )
+            await self.enqueue_data(datamodel)  # write and broadcast
+
+        # polling loop for ongoing action
+        if not self.executor.oneoff:
+            self.base.print_message("entering executor polling loop")
+            while self.action_loop_running:
+                result = self.executor._poll()
+                error = result.get("error", ErrorCodes.none)
+                status = result.get("status", HloStatus.finished)
+                data = result.get("data", {})
+                if data:
+                    datamodel = DataModel(
+                        data={self.action.file_conn_keys[0]: data},
+                        errors=[],
+                        status=HloStatus.active,
+                    )
+                    await self.enqueue_data(datamodel)  # write and broadcast
+                if error != ErrorCodes.none:
+                    self.action.error_code = error
+
+                if status == HloStatus.active:
+                    await asyncio.sleep(self.executor.poll_rate)
+                else:
+                    self.base.print_message("exiting executor polling loop")
+                    break
+
+        self.action_loop_running = False
+
+        # in case of manual stop, perform driver operations
+        if self.manual_stop:
+            result = self.executor._manual_stop()
+            error = result.get("error", {})
+            if error:
+                self.base.print_message("Error encountered during manual stop.")
+
+        # post-action operations
         cleanup_state = self.executor._post_exec()
         cleanup_error = cleanup_state.get("error", {})
-
         if cleanup_error == ErrorCodes.none:
             pass
         else:
@@ -1918,4 +1961,6 @@ class Active(object):
 
     async def stop_action_task(self):
         "External method for stopping action_loop_task."
-        pass
+        self.base.print_message("Stop action request received. Stopping poll.")
+        self.manual_stop = True
+        self.action_loop_running = False
