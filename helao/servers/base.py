@@ -189,7 +189,7 @@ class Executor(object):
         a. Cleanup calls (optional)
     """
 
-    def __init__(self, active, poll_rate: float = 0.01, oneoff: bool = True, **kwargs):
+    def __init__(self, active, poll_rate: float = 0.01, oneoff: bool = True):
         self.active = active
         self.oneoff = oneoff
         self.poll_rate = poll_rate
