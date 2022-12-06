@@ -462,7 +462,6 @@ if __name__ == "__main__":
     )
     for x in python_paths:
         repo = os.path.basename(x)
-        print(x)
         cprint(
             f"\n\nlocal repo '{repo}' on branch: '{branches[repo]}'",
             "yellow" if config["dummy"] else "cyan",
@@ -470,6 +469,13 @@ if __name__ == "__main__":
         )
         git_stat = subprocess.getoutput(
             f'git --git-dir={os.path.join(x, ".git")} show --stat'
+        )
+        git_stat = "\n".join(
+            [
+                s
+                for s in git_stat.split("\n")
+                if not s.strip().startswith("The system cannot find the path specified.")
+            ]
         )
         cprint(git_stat, "yellow" if config["dummy"] else "cyan")
     cprint(
