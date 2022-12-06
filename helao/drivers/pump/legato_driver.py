@@ -341,7 +341,8 @@ class PumpExec(Executor):
 
     def _pre_exec(self):
         "Set rate and volume params, then run."
-        # asyncio.run(self.active.base.driver.stop_polling())
+        asyncio.run(self.active.base.driver.stop_polling())
+
         rate_resp = self.active.base.driver.set_rate(
             pump_name=self.pump_name,
             rate_val=self.active.action.action_params["rate_uL_sec"],
@@ -362,6 +363,8 @@ class PumpExec(Executor):
             direction=self.direction,
         )
         self.active.base.print_message(f"start_pump returned: {start_resp}")
+
+        asyncio.run(self.active.base.driver.start_polling())
         return {"error": ErrorCodes.none}
 
     def _poll(self):
