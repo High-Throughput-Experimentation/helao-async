@@ -277,6 +277,15 @@ class KDS100:
             resp = self.send(pump_name, cmd)
             return resp
 
+    def clear_target_volume(self, pump_name: Optional[str] = None):
+        if pump_name is None:
+            for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
+                _ = self.send(cpump_name, "ctvolume")
+            return []
+        else:
+            resp = self.send(pump_name, "ctvolume")
+            return resp
+
     def stop_pump(self, pump_name: Optional[str] = None):
         cmd = "stp"
         if pump_name is None:
@@ -309,7 +318,7 @@ class KDS100:
                     f"Error clearing time params for pump '{plab}'."
                 )
                 self.base.print_message(f"Server returned: {poll_resp[-2]}")
-            clearvol_resp = self.clear_volume(plab)
+            clearvol_resp = self.clear_target_volume(plab)
             if clearvol_resp[-1] != idle_resp:
                 self.base.print_message(
                     f"Error clearing volume params for pump '{plab}'."
@@ -385,9 +394,8 @@ class PumpExec(Executor):
     async def _post_exec(self):
         self.active.base.print_message("PumpExec running cleanup methods.")
 
-        clear_resp = self.active.base.fastapp.driver.clear_volume(
+        clear_resp = self.active.base.fastapp.driver.clear_target_volume(
             pump_name=self.pump_name,
-            direction=self.direction,
         )
-        self.active.base.print_message(f"clear_volume returned: {clear_resp}")
+        self.active.base.print_message(f"clear_target_volume returned: {clear_resp}")
         return {"error": ErrorCodes.none}
