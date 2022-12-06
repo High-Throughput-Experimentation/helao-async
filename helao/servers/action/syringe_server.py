@@ -81,4 +81,7 @@ def makeApp(confPrefix, servKey, helao_root):
     def clear_volume(pump_name: str):
         return app.driver.clear_volume(pump_name)
 
+    @app.post("/get_lbuf")
+    def get_lbuf():
+        return app.base.live_buffer
     return app
