@@ -86,7 +86,7 @@ def makeApp(confPrefix, servKey, helao_root):
         return app.driver.set_volume(pump_name, volume_uL)
 
     @app.post("/start_pump")
-    def start_pump(pump_name):
-        return app.driver.start_pump(pump_name)
+    def start_pump(pump_name: str, direction: int):
+        return app.driver.start_pump(pump_name, direction)
 
     return app
