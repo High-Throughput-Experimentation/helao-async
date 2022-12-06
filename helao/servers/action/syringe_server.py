@@ -6,15 +6,11 @@
 __all__ = ["makeApp"]
 
 
-from typing import Optional, List, Union
+from typing import Optional
 from fastapi import Body
-import numpy as np
-import asyncio
-
 
 from helao.drivers.pump.legato_driver import KDS100, PumpExec
 from helao.servers.base import makeActionServ
-from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
 from helaocore.error import ErrorCodes
 from helao.helpers.config_loader import config_loader

@@ -4,30 +4,23 @@
 
 __all__ = []
 
-import numpy as np
-import time
-import asyncio
-from functools import partial
-import json
-import os
-from socket import gethostname
-from copy import deepcopy
-import traceback
-from typing import Optional
-
-from bokeh.server.server import Server
-from helao.servers.base import Base, Executor
-from helaocore.error import ErrorCodes
-from helao.helpers.premodels import Action
-from helao.helpers.make_vis_serv import makeVisServ
-from helao.helpers.sample_api import UnifiedSampleDataAPI
-from helao.helpers.active_params import ActiveParams
-from helaocore.models.file import FileConnParams
-from helaocore.models.sample import SolidSample
-
 import serial
 import io
+import time
+import asyncio
+from typing import Optional
+# import traceback
 
+from helaocore.models.hlostatus import HloStatus
+from helaocore.error import ErrorCodes
+from helao.servers.base import Base, Executor
+from helao.helpers.sample_api import UnifiedSampleDataAPI
+
+
+# from functools import partial
+# from bokeh.server.server import Server
+# from helao.helpers.make_vis_serv import makeVisServ
+# from helao.helpers.active_params import ActiveParams
 
 """ Notes:
 
@@ -189,17 +182,19 @@ class KDS100:
                             target_reached,
                         ) = flags.lower()
                         status_dict = {
-                            "pump_address": addr,
-                            "status": state,
-                            "rate_fL": rate,
-                            "pump_time_ms": pumptime,
-                            "pump_volume_fL": pumpvol,
-                            "motor_direction": motor_dir,
-                            "limit_switch_state": limit_status,
-                            "stall_status": stall_status,
-                            "trigger_input_state": trig_input,
-                            "direction_port": dir_port,
-                            "target_reached": target_reached,
+                            addr:
+                                {
+                                    "status": state,
+                                    "rate_fL": rate,
+                                    "pump_time_ms": pumptime,
+                                    "pump_volume_fL": pumpvol,
+                                    "motor_direction": motor_dir,
+                                    "limit_switch_state": limit_status,
+                                    "stall_status": stall_status,
+                                    "trigger_input_state": trig_input,
+                                    "direction_port": dir_port,
+                                    "target_reached": target_reached,
+                                }
                         }
                         self.base.print_message(status_dict)
                         await self.base.put_lbuf(status_dict)
@@ -329,29 +324,47 @@ class KDS100:
 
 class PumpExec(Executor):
     def __init__(self, direction, active, **kwargs):
-        super().init__(self, active, **kwargs)
+        super().__init__(self, active, **kwargs)
         self.direction = direction
+        # current plan is 1 pump per COM
+        self.pump_name = list(self.active.base.server_params["pumps"].keys())[0]
 
     def _pre_exec(self):
         "Set rate and volume params, then run."
         # asyncio.run(self.active.base.driver.stop_polling())
-        self.active.base.driver.set_rate(
-            pump_name=list(self.active.base.server_params["pumps"].keys())[0],  # only 1
+        rate_resp = self.active.base.driver.set_rate(
+            pump_name=self.pump_name,
             rate_val=self.active.action.action_params["rate_uL_sec"],
             direction=self.direction,
         )
-        self.active.base.driver.set_volume(
-            pump_name=list(self.active.base.server_params["pumps"].keys())[0],  # only 1
+        self.active.base.print_message(f"set_rate returned: {rate_resp}")
+        vol_resp = self.active.base.driver.set_volume(
+            pump_name=self.pump_name,
             volume_val=self.active.action.action_params["volume_uL"],
             direction=self.direction,
         )
+        self.active.base.print_message(f"set_volume returned: {vol_resp}")
         return {"error": ErrorCodes.none}
     
     def _exec(self):
-        self.active.base.driver.start_pump(
-            pump_name=list(self.active.base.server_params["pumps"].keys())[0],  # only 1
+        start_resp = self.active.base.driver.start_pump(
+            pump_name=self.pump_name,
             direction=self.direction,
         )
+        self.active.base.print_message(f"start_pump returned: {start_resp}")
         return {"error": ErrorCodes.none}
 
+    def _poll(self):
+        pump_addr = self.active.base.server_params["pumps"][self.pump_name]
+        pump_status = self.active.base.live_buffer[pump_addr]["status"]
+        if pump_status in ("infusing", "withdrawing"):
+            return {"error": ErrorCodes.none, "status": HloStatus.active}
+        elif pump_status == "stalled":
+            return {"error": ErrorCodes.motor, "status": HloStatus.errored}
+        else:
+            return {"error": ErrorCodes.none, "status": HloStatus.finished}
     
+    def _manual_stop(self):
+        stop_resp = self.active.base.driver.stop_pump(self.pump_name)
+        self.active.base.print_message(f"stop_pump returned: {stop_resp}")
+        return {"error": ErrorCodes.none}
