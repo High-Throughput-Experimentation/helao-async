@@ -462,6 +462,7 @@ if __name__ == "__main__":
     )
     for x in python_paths:
         repo = os.path.basename(x)
+        print(x)
         cprint(
             f"\n\nlocal repo '{repo}' on branch: '{branches[repo]}'",
             "yellow" if config["dummy"] else "cyan",
