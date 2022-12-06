@@ -339,9 +339,9 @@ class PumpExec(Executor):
         self.pump_name = list(self.active.base.server_params["pumps"].keys())[0]
         self.active.base.print_message("PumpExec initialized.")
 
-    def _pre_exec(self):
+    async def _pre_exec(self):
         "Set rate and volume params, then run."
-        asyncio.run(self.active.base.driver.stop_polling())
+        await self.active.base.driver.stop_polling()
 
         rate_resp = self.active.base.driver.set_rate(
             pump_name=self.pump_name,
@@ -357,17 +357,18 @@ class PumpExec(Executor):
         self.active.base.print_message(f"set_volume returned: {vol_resp}")
         return {"error": ErrorCodes.none}
 
-    def _exec(self):
+    async def _exec(self):
         start_resp = self.active.base.driver.start_pump(
             pump_name=self.pump_name,
             direction=self.direction,
         )
         self.active.base.print_message(f"start_pump returned: {start_resp}")
 
-        asyncio.run(self.active.base.driver.start_polling())
+        await self.active.base.driver.start_polling()
         return {"error": ErrorCodes.none}
 
-    def _poll(self):
+    async def _poll(self):
+        await asyncio.sleep(0.001)
         pump_addr = self.active.base.server_params["pumps"][self.pump_name]
         pump_status = self.active.base.live_buffer[pump_addr]["status"]
         if pump_status in ("infusing", "withdrawing"):
@@ -377,7 +378,8 @@ class PumpExec(Executor):
         else:
             return {"error": ErrorCodes.none, "status": HloStatus.finished}
 
-    def _manual_stop(self):
+    async def _manual_stop(self):
+        await asyncio.sleep(0.001)
         stop_resp = self.active.base.driver.stop_pump(self.pump_name)
         self.active.base.print_message(f"stop_pump returned: {stop_resp}")
         return {"error": ErrorCodes.none}

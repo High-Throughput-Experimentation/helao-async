@@ -194,8 +194,9 @@ class Executor(object):
         self.oneoff = oneoff
         self.poll_rate = poll_rate
 
-    def _pre_exec(self):
+    async def _pre_exec(self):
         "Setup methods, return error state."
+        await asyncio.sleep(0.001)
         self.setup_err = ErrorCodes.none
         return {"error": self.setup_err}
 
@@ -203,33 +204,37 @@ class Executor(object):
         "Override the generic setup method."
         self._pre_exec = MethodType(pre_exec_func, self)
 
-    def _exec(self):
+    async def _exec(self):
         "Perform device read/write."
+        await asyncio.sleep(0.001)
         return {"data": {}, "error": ErrorCodes.none}
 
     def set_exec(self, exec_func):
         "Override the generic execute method."
         self._exec = MethodType(exec_func, self)
 
-    def _poll(self):
+    async def _poll(self):
         "Perform one polling iteration."
+        await asyncio.sleep(0.001)
         return {"data": {}, "error": ErrorCodes.none, "status": HloStatus.finished}
 
     def set_poll(self, poll_func):
         "Override the generic execute method."
         self._poll = MethodType(poll_func, self)
 
-    def _post_exec(self):
+    async def _post_exec(self):
         "Cleanup methods, return error state."
         self.cleanup_err = ErrorCodes.none
+        await asyncio.sleep(0.001)
         return {"error": self.cleanup_err}
 
     def set_post_exec(self, post_exec_func):
         "Override the generic cleanup method."
         self._post_exec = MethodType(post_exec_func, self)
 
-    def _manual_stop(self):
+    async def _manual_stop(self):
         "Perform device manual stop, return error state."
+        await asyncio.sleep(0.001)
         self.stop_err = ErrorCodes.none
         return {"error": self.stop_err}
 
@@ -1884,7 +1889,7 @@ class Active(object):
 
         self.base.print_message("action_loop_task started")
         # pre-action operations
-        setup_state = executor._pre_exec()
+        setup_state = await executor._pre_exec()
         setup_error = setup_state.get("error", ErrorCodes.none)
         if setup_error == ErrorCodes.none:
             self.action_loop_running = True
@@ -1894,7 +1899,7 @@ class Active(object):
             return await self.finish()
 
         # action operations
-        result = executor._exec()
+        result = await executor._exec()
         error = result.get("error", ErrorCodes.none)
         data = result.get("data", {})
         if data:
@@ -1909,7 +1914,7 @@ class Active(object):
         if not executor.oneoff:
             self.base.print_message("entering executor polling loop")
             while self.action_loop_running:
-                result = executor._poll()
+                result = await executor._poll()
                 error = result.get("error", ErrorCodes.none)
                 status = result.get("status", HloStatus.finished)
                 data = result.get("data", {})
@@ -1933,13 +1938,13 @@ class Active(object):
 
         # in case of manual stop, perform driver operations
         if self.manual_stop:
-            result = executor._manual_stop()
+            result = await executor._manual_stop()
             error = result.get("error", {})
             if error:
                 self.base.print_message("Error encountered during manual stop.")
 
         # post-action operations
-        cleanup_state = executor._post_exec()
+        cleanup_state = await executor._post_exec()
         cleanup_error = cleanup_state.get("error", {})
         if cleanup_error == ErrorCodes.none:
             pass
