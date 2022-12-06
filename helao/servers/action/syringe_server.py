@@ -77,4 +77,8 @@ def makeApp(confPrefix, servKey, helao_root):
     def stop_pump(pump_name: str):
         return app.driver.stop_pump(pump_name)
 
+    @app.post("/clear_volume")
+    def clear_volume(pump_name: str):
+        return app.driver.clear_volume(pump_name)
+
     return app
