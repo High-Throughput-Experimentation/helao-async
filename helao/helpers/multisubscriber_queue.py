@@ -7,7 +7,7 @@ from typing import Any
 
 # multisubscriber queue by Kyle Smith
 # https://github.com/smithk86/asyncio-multisubscriber-queue
-class MultisubscriberQueue(object):
+class MultisubscriberQueue:
     def __init__(self, **kwargs):
         """
         The constructor for MultisubscriberQueue class
@@ -91,7 +91,7 @@ class MultisubscriberQueue(object):
         await self.put(StopAsyncIteration)
 
 
-class _QueueContext(object):
+class _QueueContext:
     def __init__(self, parent):
         self.parent = parent
         self.queue = None

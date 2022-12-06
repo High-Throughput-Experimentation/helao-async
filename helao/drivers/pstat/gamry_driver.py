@@ -55,7 +55,7 @@ class GamryCOMError(Exception):
     pass
 
 
-class GamryDtaqEvents(object):
+class GamryDtaqEvents:
     def __init__(self, dtaq):
         self.dtaq = dtaq
         self.acquired_points = []

@@ -174,7 +174,7 @@ def makeActionServ(
     return app
 
 
-class Executor(object):
+class Executor:
     """Generic template for action executor (steps 5-6 of action_loop_task).
 
     Hooks
@@ -196,6 +196,7 @@ class Executor(object):
 
     async def _pre_exec(self):
         "Setup methods, return error state."
+        self.active.base.print_message("generic Executor running setup methods.")
         await asyncio.sleep(0.001)
         self.setup_err = ErrorCodes.none
         return {"error": self.setup_err}
@@ -243,7 +244,7 @@ class Executor(object):
         self._manual_stop = MethodType(manual_stop_func, self)
 
 
-class Base(object):
+class Base:
     """Base class for all HELAO servers.
 
     Base is a general class which implements message passing,
@@ -970,7 +971,7 @@ class Base(object):
         return ret_error
 
 
-class Active(object):
+class Active:
     """Active action holder which wraps data queing and exp writing."""
 
     def __init__(self, base, activeparams: ActiveParams):  # outer instance
