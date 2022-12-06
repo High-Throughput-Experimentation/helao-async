@@ -61,7 +61,7 @@ def makeApp(confPrefix, servKey, helao_root):
         volume_uL: int = 0,
     ):
         active = await app.base.setup_and_contain_action()
-        executor = PumpExec(1, active=active, oneoff=False, poll_rate=0.02)
+        executor = PumpExec(direction=1, active=active, oneoff=False, poll_rate=0.02)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
@@ -73,7 +73,7 @@ def makeApp(confPrefix, servKey, helao_root):
         volume_uL: int = 0,
     ):
         active = await app.base.setup_and_contain_action()
-        executor = PumpExec(0, active=active, oneoff=False, poll_rate=0.02)
+        executor = PumpExec(direction=0, active=active, oneoff=False, poll_rate=0.02)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
