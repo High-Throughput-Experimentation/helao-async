@@ -351,7 +351,10 @@ class PumpExec(Executor):
     async def _pre_exec(self):
         "Set rate and volume params, then run."
         self.active.base.print_message("PumpExec running setup methods.")
-
+        clear_resp = self.active.base.fastapp.driver.clear_target_volume(
+            pump_name=self.pump_name,
+        )
+        self.active.base.print_message(f"clear_target_volume returned: {clear_resp}")
         rate_resp = self.active.base.fastapp.driver.set_rate(
             pump_name=self.pump_name,
             rate_val=self.active.action.action_params["rate_uL_sec"],
@@ -393,7 +396,6 @@ class PumpExec(Executor):
 
     async def _post_exec(self):
         self.active.base.print_message("PumpExec running cleanup methods.")
-
         clear_resp = self.active.base.fastapp.driver.clear_target_volume(
             pump_name=self.pump_name,
         )
