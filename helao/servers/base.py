@@ -1931,7 +1931,7 @@ class Active:
                     await asyncio.sleep(executor.poll_rate)
                 else:
                     self.base.print_message("exiting executor polling loop")
-                    break
+                    self.action_loop_running = False
 
         if error != ErrorCodes.none:
             self.action.error_code = error
