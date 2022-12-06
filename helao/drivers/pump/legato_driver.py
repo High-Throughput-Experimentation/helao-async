@@ -370,7 +370,8 @@ class PumpExec(Executor):
     async def _poll(self):
         await asyncio.sleep(0.001)
         pump_addr = self.active.base.server_params["pumps"][self.pump_name]
-        pump_status = self.active.base.live_buffer[pump_addr]["status"]
+        live_buffer, _ = self.active.base.get_lbuf(pump_addr)
+        pump_status = live_buffer["status"]
         if pump_status in ("infusing", "withdrawing"):
             return {"error": ErrorCodes.none, "status": HloStatus.active}
         elif pump_status == "stalled":
