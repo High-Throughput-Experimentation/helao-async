@@ -16,7 +16,7 @@ colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redire
 # colorama.init()
 
 
-class Vis(object):
+class Vis:
     """Base class for all HELAO bokeh servers."""
 
     def __init__(self, bokehapp: HelaoBokehAPI):

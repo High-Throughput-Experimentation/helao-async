@@ -276,7 +276,7 @@ class Action(Experiment, ActionModel):
         )
 
 
-class ActionPlanMaker(object):
+class ActionPlanMaker:
     def __init__(self):
         frame = inspect.currentframe().f_back
         _args, _varargs, _keywords, _locals = inspect.getargvalues(frame)
@@ -398,7 +398,7 @@ class ActionPlanMaker(object):
         self.action_list.append(Action(**action_dict))
 
 
-class ExperimentPlanMaker(object):
+class ExperimentPlanMaker:
     def __init__(
         self,
     ):
