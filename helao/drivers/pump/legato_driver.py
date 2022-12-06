@@ -9,12 +9,14 @@ import io
 import time
 import asyncio
 from typing import Optional
+
 # import traceback
 
 from helaocore.models.hlostatus import HloStatus
 from helaocore.error import ErrorCodes
 from helao.servers.base import Base, Executor
-from helao.helpers.sample_api import UnifiedSampleDataAPI
+
+# from helao.helpers.sample_api import UnifiedSampleDataAPI
 
 
 # from functools import partial
@@ -83,10 +85,8 @@ class KDS100:
 
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
-        self.unified_db = UnifiedSampleDataAPI(self.base)
-
-        self.bokehapp = None
-        self.pump_tasks = {k: None for k in self.config_dict.get("pumps", {}).keys()}
+        # self.unified_db = UnifiedSampleDataAPI(self.base)
+        # self.bokehapp = None
 
         # read pump addr and strings from config dict
         self.com = serial.Serial(
@@ -182,19 +182,18 @@ class KDS100:
                             target_reached,
                         ) = flags.lower()
                         status_dict = {
-                            addr:
-                                {
-                                    "status": state,
-                                    "rate_fL": rate,
-                                    "pump_time_ms": pumptime,
-                                    "pump_volume_fL": pumpvol,
-                                    "motor_direction": motor_dir,
-                                    "limit_switch_state": limit_status,
-                                    "stall_status": stall_status,
-                                    "trigger_input_state": trig_input,
-                                    "direction_port": dir_port,
-                                    "target_reached": target_reached,
-                                }
+                            addr: {
+                                "status": state,
+                                "rate_fL": rate,
+                                "pump_time_ms": pumptime,
+                                "pump_volume_fL": pumpvol,
+                                "motor_direction": motor_dir,
+                                "limit_switch_state": limit_status,
+                                "stall_status": stall_status,
+                                "trigger_input_state": trig_input,
+                                "direction_port": dir_port,
+                                "target_reached": target_reached,
+                            }
                         }
                         self.base.print_message(status_dict)
                         await self.base.put_lbuf(status_dict)
@@ -244,6 +243,11 @@ class KDS100:
         resp = self.send(pump_name, f"{cmd} {vol_val} ul")
         return resp
 
+    def set_diameter(self, pump_name: str, diameter_mm: float):
+        "Set syringe diameter in mm"
+        resp = self.send(pump_name, f"diameter {diameter_mm:.4f}")
+        return resp
+
     def set_ramp(self, pump_name: str, start_rate: int, end_rate: int, direction: int):
         "Set infusion|withdraw ramp rate in units TODO"
         pass
@@ -291,7 +295,8 @@ class KDS100:
             return resp
 
     def safe_state(self):
-        for plab, addr in self.config_dict.get("pump_addrs", {}).items():
+        for plab, pdict in self.config_dict.get("pumps", {}).items():
+            addr = pdict["address"]
             idle_resp = f"{addr:02}:\x11"
             poll_resp = self.send(plab, "poll on")
             if poll_resp[-1] != idle_resp:
@@ -311,6 +316,11 @@ class KDS100:
             if clearvol_resp[-1] != idle_resp:
                 self.base.print_message(
                     f"Error clearing volume params for pump '{plab}'."
+                )
+            diameter_resp = self.set_diameter(plab, pdict["diameter"])
+            if diameter_resp[-1] != idle_resp:
+                self.base.print_message(
+                    f"Error setting syringe diameter on pump '{plab}'."
                 )
 
     def shutdown(self):
@@ -345,7 +355,7 @@ class PumpExec(Executor):
         )
         self.active.base.print_message(f"set_volume returned: {vol_resp}")
         return {"error": ErrorCodes.none}
-    
+
     def _exec(self):
         start_resp = self.active.base.driver.start_pump(
             pump_name=self.pump_name,
@@ -363,7 +373,7 @@ class PumpExec(Executor):
             return {"error": ErrorCodes.motor, "status": HloStatus.errored}
         else:
             return {"error": ErrorCodes.none, "status": HloStatus.finished}
-    
+
     def _manual_stop(self):
         stop_resp = self.active.base.driver.stop_pump(self.pump_name)
         self.active.base.print_message(f"stop_pump returned: {stop_resp}")
