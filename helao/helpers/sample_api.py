@@ -32,7 +32,7 @@ from helaocore.models.sample import (
 from helao.helpers.file_in_use import file_in_use
 
 
-class _BaseSampleAPI(object):
+class _BaseSampleAPI:
     def __init__(self, sampleclass, Serv_class, extra_columns: str):
 
         self.extra_columns = extra_columns
