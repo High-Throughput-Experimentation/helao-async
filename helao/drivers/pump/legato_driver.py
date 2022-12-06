@@ -102,7 +102,7 @@ class KDS100:
         self.safe_state()
 
         self.aloop = asyncio.get_running_loop()
-        self.polling = False
+        self.polling = True
         self.poll_signalq = asyncio.Queue(1)
         self.poll_signal_task = self.aloop.create_task(self.poll_signal_loop())
         self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
@@ -141,24 +141,24 @@ class KDS100:
         waittime = 1.0 / frequency
         lastupdate = 0
         while True:
+            self.base.print_message("pump polling loop has started")
             if self.polling:
-                self.base.print_message("pump polling loop has started")
                 for plab, pdict in self.config_dict.get("pumps", {}).items():
                     checktime = time.time()
                     if checktime - lastupdate < waittime:
-                        self.base.print_message("waiting for minimum update interval.")
+                        # self.base.print_message("waiting for minimum update interval.")
                         await asyncio.sleep(waittime - (checktime - lastupdate))
                     addr = pdict["address"]
                     status_resp = self.send(plab, "status")
-                    self.base.print_message(f"received status: {status_resp}")
+                    # self.base.print_message(f"received status: {status_resp}")
                     lastupdate = time.time()
                     status = status_resp[0]
-                    self.base.print_message(f"current status: {status}")
+                    # self.base.print_message(f"current status: {status}")
                     addrstate_rate, pumptime, pumpvol, flags = status.split()
                     raddr = int(addrstate_rate[:2])
-                    self.base.print_message(
-                        f"received address: {raddr}, config address: {addr}"
-                    )
+                    # self.base.print_message(
+                    #     f"received address: {raddr}, config address: {addr}"
+                    # )
                     if addr == raddr:
                         state = None
                         state_split = None
@@ -168,11 +168,11 @@ class KDS100:
                                 state_split = k
                             else:
                                 continue
-                        self.base.print_message(f"state: {state}")
+                        # self.base.print_message(f"state: {state}")
                         rate = int(addrstate_rate.split(state_split)[-1])
                         pumptime = int(pumptime)
                         pumpvol = int(pumpvol)
-                        self.base.print_message(f"flags: {flags.lower()}")
+                        # self.base.print_message(f"flags: {flags.lower()}")
                         (
                             motor_dir,
                             limit_status,
@@ -195,9 +195,9 @@ class KDS100:
                                 "target_reached": target_reached,
                             }
                         }
-                        self.base.print_message(status_dict)
+                        # self.base.print_message(status_dict)
                         await self.base.put_lbuf(status_dict)
-                        self.base.print_message("status sent to live buffer")
+                        # self.base.print_message("status sent to live buffer")
                     else:
                         self.base.print_message("pump address does not match config")
                 await asyncio.sleep(0.01)
