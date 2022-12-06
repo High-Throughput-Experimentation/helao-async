@@ -1881,19 +1881,9 @@ class Active(object):
 
     async def action_loop_task(self, executor: Executor):
         """Generic replacement for 'IOloop'.
-
-        Process flow
-        1. endpoint passes action_name and action_params to driver parse method
-        2. driver "contains" action and activates
-        3. driver creates action_loop_instance from action_name & action_params
-        4. driver returns active dict to endpoint request
-        5. instantiate executor
-        6. call executor setup
-        7. if no error, proceed with execute
-        8. call executor cleanup
-        9. when measurement loop or one-off call is complete, finish active
         """
 
+        self.base.print_message("action_loop_task started")
         # pre-action operations
         setup_state = executor._pre_exec()
         setup_error = setup_state.get("error", {})
