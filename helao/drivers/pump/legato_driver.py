@@ -346,7 +346,7 @@ class PumpExec(Executor):
         self.active.base.print_message(f"set_rate returned: {rate_resp}")
         vol_resp = self.active.base.fastapp.driver.set_volume(
             pump_name=self.pump_name,
-            volume_val=self.active.action.action_params["volume_uL"],
+            vol_val=self.active.action.action_params["volume_uL"],
         )
         self.active.base.print_message(f"set_volume returned: {vol_resp}")
         return {"error": ErrorCodes.none}
