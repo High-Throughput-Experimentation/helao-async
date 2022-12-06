@@ -137,11 +137,10 @@ class KDS100:
         return resp
 
     async def poll_sensor_loop(self, frequency: int = 5):
-        self.base.print_message("polling backgorund task has started")
+        self.base.print_message("polling background task has started")
         waittime = 1.0 / frequency
         lastupdate = 0
         while True:
-            self.base.print_message("pump polling loop has started")
             if self.polling:
                 for plab, pdict in self.config_dict.get("pumps", {}).items():
                     checktime = time.time()
