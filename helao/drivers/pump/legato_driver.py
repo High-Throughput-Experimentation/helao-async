@@ -341,6 +341,7 @@ class PumpExec(Executor):
 
     async def _pre_exec(self):
         "Set rate and volume params, then run."
+        self.active.base.print_message("PumpExec running setup methods.")
         await self.active.base.driver.stop_polling()
 
         rate_resp = self.active.base.driver.set_rate(
