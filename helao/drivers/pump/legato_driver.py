@@ -181,7 +181,7 @@ class KDS100:
                             target_reached,
                         ) = flags.lower()
                         status_dict = {
-                            addr: {
+                            plab: {
                                 "status": state,
                                 "rate_fL": rate,
                                 "pump_time_ms": pumptime,
@@ -336,7 +336,6 @@ class PumpExec(Executor):
     async def _pre_exec(self):
         "Set rate and volume params, then run."
         self.active.base.print_message("PumpExec running setup methods.")
-        # await self.active.base.driver.stop_polling()
 
         rate_resp = self.active.base.fastapp.driver.set_rate(
             pump_name=self.pump_name,
@@ -358,15 +357,13 @@ class PumpExec(Executor):
         )
         self.active.base.print_message(f"start_pump returned: {start_resp}")
 
-        # await self.active.base.fastapp.driver.start_polling()
         return {"error": ErrorCodes.none}
 
     async def _poll(self):
         await asyncio.sleep(0.001)
-        pump_addr = self.active.base.server_params["pumps"][self.pump_name]
-        live_buffer, _ = self.active.base.get_lbuf(pump_addr)
+        live_buffer, _ = self.active.base.get_lbuf(self.pump_name)
         pump_status = live_buffer["status"]
-        if pump_status in ("infusing", "withdrawing"):
+        if pump_status in ["infusing", "withdrawing"]:
             return {"error": ErrorCodes.none, "status": HloStatus.active}
         elif pump_status == "stalled":
             return {"error": ErrorCodes.motor, "status": HloStatus.errored}
