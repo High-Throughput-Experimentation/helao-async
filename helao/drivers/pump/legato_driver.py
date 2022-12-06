@@ -337,6 +337,7 @@ class PumpExec(Executor):
         self.direction = direction
         # current plan is 1 pump per COM
         self.pump_name = list(self.active.base.server_params["pumps"].keys())[0]
+        self.active.base.print_message("PumpExec initialized.")
 
     def _pre_exec(self):
         "Set rate and volume params, then run."

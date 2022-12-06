@@ -1036,11 +1036,9 @@ class Active(object):
         self.manual_stop = False
         self.action_loop_running = False
         self.action_task = None
-        self.executor = Executor(self)  # base executor class, replace in server
 
     def start_executor(self, executor: Executor):
-        self.executor = executor
-        self.action_task = self.base.aloop.create_task(self.action_loop_task())
+        self.action_task = self.base.aloop.create_task(self.action_loop_task(executor))
         return self.action.as_dict()
 
     async def update_act_file(self):
@@ -1881,7 +1879,7 @@ class Active(object):
             # create and write seq file for manual action
             await self.base.write_seq(exp, manual=True)
 
-    async def action_loop_task(self):
+    async def action_loop_task(self, executor: Executor):
         """Generic replacement for 'IOloop'.
 
         Process flow
@@ -1897,7 +1895,7 @@ class Active(object):
         """
 
         # pre-action operations
-        setup_state = self.executor._pre_exec()
+        setup_state = executor._pre_exec()
         setup_error = setup_state.get("error", {})
         if setup_error == ErrorCodes.none:
             self.action_loop_running = True
@@ -1905,7 +1903,7 @@ class Active(object):
             self.base.print_message("Error encountered during executor setup.")
 
         # action operations
-        result = self.executor._exec()
+        result = executor._exec()
         error = result.get("error", {})
         data = result.get("data", {})
         if data:
@@ -1917,10 +1915,10 @@ class Active(object):
             await self.enqueue_data(datamodel)  # write and broadcast
 
         # polling loop for ongoing action
-        if not self.executor.oneoff:
+        if not executor.oneoff:
             self.base.print_message("entering executor polling loop")
             while self.action_loop_running:
-                result = self.executor._poll()
+                result = executor._poll()
                 error = result.get("error", ErrorCodes.none)
                 status = result.get("status", HloStatus.finished)
                 data = result.get("data", {})
@@ -1935,7 +1933,7 @@ class Active(object):
                     self.action.error_code = error
 
                 if status == HloStatus.active:
-                    await asyncio.sleep(self.executor.poll_rate)
+                    await asyncio.sleep(executor.poll_rate)
                 else:
                     self.base.print_message("exiting executor polling loop")
                     break
@@ -1944,13 +1942,13 @@ class Active(object):
 
         # in case of manual stop, perform driver operations
         if self.manual_stop:
-            result = self.executor._manual_stop()
+            result = executor._manual_stop()
             error = result.get("error", {})
             if error:
                 self.base.print_message("Error encountered during manual stop.")
 
         # post-action operations
-        cleanup_state = self.executor._post_exec()
+        cleanup_state = executor._post_exec()
         cleanup_error = cleanup_state.get("error", {})
         if cleanup_error == ErrorCodes.none:
             pass
