@@ -29,22 +29,6 @@ def makeApp(confPrefix, servKey, helao_root):
         driver_class=KDS100,
     )
 
-    @app.post(f"/{servKey}/stop")
-    async def stop(
-        action: Optional[Action] = Body({}, embed=True),
-        action_version: int = 1,
-    ):
-        active = await app.base.setup_and_contain_action(action_abbr="stop")
-
-        datadict = await app.driver.stop()
-
-        active.action.error_code = app.base.get_main_error(
-            datadict.get("err_code", ErrorCodes.unspecified)
-        )
-        await active.enqueue_data_dflt(datadict=datadict)
-        finished_action = await active.finish()
-        return finished_action.as_dict()
-
     @app.post("/start_polling")
     async def start_polling():
         await app.driver.start_polling()
@@ -88,5 +72,9 @@ def makeApp(confPrefix, servKey, helao_root):
     @app.post("/start_pump")
     def start_pump(pump_name: str, direction: int):
         return app.driver.start_pump(pump_name, direction)
+
+    @app.post("/stop_pump")
+    def stop_pump(pump_name: str):
+        return app.driver.stop_pump(pump_name)
 
     return app
