@@ -378,7 +378,6 @@ class PumpExec(Executor):
         return {"error": ErrorCodes.none}
 
     async def _poll(self):
-        await asyncio.sleep(0.001)
         live_buffer, _ = self.active.base.get_lbuf(self.pump_name)
         pump_status = live_buffer["status"]
         if pump_status in ["infusing", "withdrawing"]:
@@ -396,7 +395,7 @@ class PumpExec(Executor):
 
     async def _post_exec(self):
         self.active.base.print_message("PumpExec running cleanup methods.")
-        clear_resp = self.active.base.fastapp.driver.clear_target_volume(
+        clear_resp = self.active.base.fastapp.driver.clear_volume(
             pump_name=self.pump_name,
         )
         self.active.base.print_message(f"clear_target_volume returned: {clear_resp}")
