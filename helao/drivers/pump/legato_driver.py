@@ -370,7 +370,7 @@ class KDS100:
         # or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
         self.base.print_message("shutting down syringe pump(s)")
-        asyncio.run(self.safe_state())
+        self.safe_state()
         self.com.close()
 
 
