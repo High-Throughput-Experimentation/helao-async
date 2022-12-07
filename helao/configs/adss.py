@@ -1,11 +1,10 @@
-
 __all__ = ["config"]
 
 
 hostip = "127.0.0.1"
 config = {}
-config['dummy'] = True
-config['simulation'] = False
+config["dummy"] = True
+config["simulation"] = False
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
@@ -29,14 +28,14 @@ config["servers"] = dict(
     # Orchestrator
     ##########################################################################
     ORCH=dict(
-        host=hostip, 
-        port=8001, 
-        group="orchestrator", 
+        host=hostip,
+        port=8001,
+        group="orchestrator",
         fast="async_orch2",
         params=dict(
-            enable_op = True,
-            bokeh_port = 5002,
-        )
+            enable_op=True,
+            bokeh_port=5002,
+        ),
     ),
     ##########################################################################
     # Instrument Servers
@@ -47,21 +46,16 @@ config["servers"] = dict(
         group="action",
         fast="galil_motion",
         params=dict(
-            enable_aligner = True,
-            bokeh_port = 5003,
+            enable_aligner=True,
+            bokeh_port=5003,
             # backup if f"{gethostname()}_instrument_calib.json" is not found
             # instrument specific calibration
-            M_instr = [
-                       [1,0,0,0],
-                       [0,1,0,0],
-                       [0,0,1,0],
-                       [0,0,0,1]
-                       ],
+            M_instr=[[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
             count_to_mm=dict(
-                A=1.0/15835.31275,#1.0/15690.3,
-                B=1.0/6398.771436,#1.0/6395.45,
-                C=1.0/6396.315722,#1.0/6395.45,
-                D=1.0/3154.787,#1.0/3154.787,
+                A=1.0 / 15835.31275,  # 1.0/15690.3,
+                B=1.0 / 6398.771436,  # 1.0/6395.45,
+                C=1.0 / 6396.315722,  # 1.0/6395.45,
+                D=1.0 / 3154.787,  # 1.0/3154.787,
             ),
             galil_ip_str="192.168.200.23",
             def_speed_count_sec=10000,
@@ -72,15 +66,15 @@ config["servers"] = dict(
                 y="B",
                 z="A",
                 Rz="D",
-                ),
+            ),
             axis_zero=dict(
-                A=0.0, #z
-                B=52.0, #y
-                C=77.0, #x
-                D=0.0, #Rz
-                ),
-            timeout = 10*60, # timeout for axis stop in sec
-        )
+                A=0.0,  # z
+                B=52.0,  # y
+                C=77.0,  # x
+                D=0.0,  # Rz
+            ),
+            timeout=10 * 60,  # timeout for axis stop in sec
+        ),
     ),
     PSTAT=dict(
         host=hostip,
@@ -88,7 +82,7 @@ config["servers"] = dict(
         group="action",
         fast="gamry_server",
         params=dict(
-            allow_no_sample = True,
+            allow_no_sample=True,
             dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
             filterfreq_hz=1000.0,
             grounded=True,
@@ -99,44 +93,44 @@ config["servers"] = dict(
         port=8006,
         group="action",
         fast="nidaqmx_server",
-        params = dict(
-            allow_no_sample = True,
-            dev_cellcurrent_trigger = 'PFI1', #P1.1
-            dev_cellvoltage_trigger = 'PFI1', #P1.1
-            dev_cellcurrent = {
-                '1':'PXI-6289/ai16',
-                '2':'PXI-6289/ai17',
-                '3':'PXI-6289/ai18',
-                '4':'PXI-6289/ai19',
-                '5':'PXI-6289/ai20',
-                '6':'PXI-6289/ai21',
-                '7':'PXI-6289/ai22',
-                '8':'PXI-6289/ai23',
+        params=dict(
+            allow_no_sample=True,
+            dev_cellcurrent_trigger="PFI1",  # P1.1
+            dev_cellvoltage_trigger="PFI1",  # P1.1
+            dev_cellcurrent={
+                "1": "PXI-6289/ai16",
+                "2": "PXI-6289/ai17",
+                "3": "PXI-6289/ai18",
+                "4": "PXI-6289/ai19",
+                "5": "PXI-6289/ai20",
+                "6": "PXI-6289/ai21",
+                "7": "PXI-6289/ai22",
+                "8": "PXI-6289/ai23",
                 #'9':'PXI-6289/ai0'
-                '9':'PXI-6289/ai3'  # after rewire for thermocouple connection
-                },
-            dev_cellvoltage = {
-                '1':'PXI-6284/ai16',
-                '2':'PXI-6284/ai17',
-                '3':'PXI-6284/ai18',
-                '4':'PXI-6284/ai19',
-                '5':'PXI-6284/ai20',
-                '6':'PXI-6284/ai21',
-                '7':'PXI-6284/ai22',
-                '8':'PXI-6284/ai23',
+                "9": "PXI-6289/ai3",  # after rewire for thermocouple connection
+            },
+            dev_cellvoltage={
+                "1": "PXI-6284/ai16",
+                "2": "PXI-6284/ai17",
+                "3": "PXI-6284/ai18",
+                "4": "PXI-6284/ai19",
+                "5": "PXI-6284/ai20",
+                "6": "PXI-6284/ai21",
+                "7": "PXI-6284/ai22",
+                "8": "PXI-6284/ai23",
                 #'9':'PXI-6284/ai0'
-                '9':'PXI-6284/ai1'  # after rewire for thermocouple connection
-                },
-            dev_monitor ={
-                'Ktc_in_cell':'PXI-6289/ai6',
-                'Ttc_in_reservoir':'PXI-6289/ai7'
-                'Ktc_out_cell':'PXI-6289/ai1'
-                'Ktc_out_reservoir':'PXI-6289/ai2'
-                },   
-            dev_heat = {
-                'cellheater':'PXI-6289/port0/line0', #P0.0  #green    /black ground
-                'res_heater':'PXI-6289/port0/line4'  #P0.4  #red     /black ground
-                },
+                "9": "PXI-6284/ai1",  # after rewire for thermocouple connection
+            },
+            dev_monitor={
+                "Ttemp_Ktc_in_cell_C": "PXI-6289/ai6",
+                "Ttemp_Ttc_in_reservoir_C": "PXI-6289/ai7",
+                "Ttemp_Ktc_out_cell_C": "PXI-6289/ai1",
+                "Ttemp_Ktc_out_reservoir_C": "PXI-6289/ai2",
+            },
+            dev_heat={
+                "cellheater": "PXI-6289/port0/line0",  # P0.0  #green    /black ground
+                "res_heater": "PXI-6289/port0/line4",  # P0.4  #red     /black ground
+            },
             # dev_activecell = {
             #     '1':'PXI-6289/port0/line23', #P0.23
             #     '2':'PXI-6289/port0/line24', #P0.24
@@ -154,21 +148,20 @@ config["servers"] = dict(
             #     '3':'PXI-6284/port0/line2', #P0.2
             #     '4':'PXI-6284/port0/line3'  #P0.3
             #     },
-            dev_gasvalve = {
-                'O2':'PXI-6284/port1/line2', #P1.2
-                'reservoir':'PXI-6284/port1/line3', #P1.3
-                'waste':'PXI-6284/port1/line4', #P1.4
-               # '1':'PXI-6284/port1/line2', #P1.2
-               # '2':'PXI-6284/port1/line3', #P1.3
-               # '3':'PXI-6284/port1/line4', #P1.4
-                '4':'PXI-6284/port1/line5', #P1.5
-                '5':'PXI-6284/port1/line6', #P1.6
-                '6':'PXI-6284/port1/line7', #P1.7
-                '7':'PXI-6284/port2/line0', #P2.0
-                '8':'PXI-6284/port2/line1', #P2.1 
-                '9':'PXI-6284/port2/line2'  #P2.2
-               
-                },
+            dev_gasvalve={
+                "O2": "PXI-6284/port1/line2",  # P1.2
+                "reservoir": "PXI-6284/port1/line3",  # P1.3
+                "waste": "PXI-6284/port1/line4",  # P1.4
+                # '1':'PXI-6284/port1/line2', #P1.2
+                # '2':'PXI-6284/port1/line3', #P1.3
+                # '3':'PXI-6284/port1/line4', #P1.4
+                "4": "PXI-6284/port1/line5",  # P1.5
+                "5": "PXI-6284/port1/line6",  # P1.6
+                "6": "PXI-6284/port1/line7",  # P1.7
+                "7": "PXI-6284/port2/line0",  # P2.0
+                "8": "PXI-6284/port2/line1",  # P2.1
+                "9": "PXI-6284/port2/line2",  # P2.2
+            },
             # dev_mastercell = {
             #     '1':'PXI-6284/port0/line23', #P0.23
             #     '2':'PXI-6284/port0/line24', #P0.24
@@ -181,15 +174,15 @@ config["servers"] = dict(
             #     '9':'PXI-6284/port0/line31', #P0.31
             #     'X':'PXI-6284/port0/line22'  #P0.22, two electrode
             #     },
-            dev_pump = {
-                'peripump':'PXI-6284/port0/line4	', #P0.4
+            dev_pump={
+                "peripump": "PXI-6284/port0/line4	",  # P0.4
                 # 'MultiPeriPump':'PXI-6284/port0/line0' #P0.0
-                'direction':'PXI-6284/port0/line0' #P0.0
-                },
-            dev_fsw = {
-                'done':'PXI-6284/port2/line4',  #P2.4
-                'error':'PXI-6284/port2/line6'  #P2.6
-                },
+                "direction": "PXI-6284/port0/line0",  # P0.0
+            },
+            dev_fsw={
+                "done": "PXI-6284/port2/line4",  # P2.4
+                "error": "PXI-6284/port2/line6",  # P2.6
+            },
             # dev_RSHTTLhandshake = {
             #     'RSH1':'PXI-6284/port2/line5',  #P2.5
             #     'RSH2':'PXI-6284/port2/line7',  #P2.7
@@ -197,57 +190,57 @@ config["servers"] = dict(
             #     #'port':'PXI-6284/ctr0',
             #     #'term':'/PXI-6284/PFI8' #P2.0
             #     }
-        )
+        ),
     ),
     PAL=dict(
         host=hostip,
         port=8007,
         group="action",
         fast="pal_server",
-        params = dict(
-            user = 'RSHS',
-            key = r'c:\helao\sshkeys\rshs_private3.ppk', # needs to be in new openssh file format
-            host = "10.231.100.169",#r'hte-rshs-01.htejcap.caltech.edu',
-            timeout = 30*60, # 30min timeout for waiting for TTL
-            dev_trigger = "NImax",
-            trigger = { # TTL handshake via NImax
-                'start':'PXI-6284/port2/line5',  #P2.5, #PFI13
-                'continue':'PXI-6284/port2/line7',  #P2.7 #PFI15
-                'done':'PXI-6284/port2/line3',  #P2.3 #PFI11
+        params=dict(
+            user="RSHS",
+            key=r"c:\helao\sshkeys\rshs_private3.ppk",  # needs to be in new openssh file format
+            host="10.231.100.169",  # r'hte-rshs-01.htejcap.caltech.edu',
+            timeout=30 * 60,  # 30min timeout for waiting for TTL
+            dev_trigger="NImax",
+            trigger={  # TTL handshake via NImax
+                "start": "PXI-6284/port2/line5",  # P2.5, #PFI13
+                "continue": "PXI-6284/port2/line7",  # P2.7 #PFI15
+                "done": "PXI-6284/port2/line3",  # P2.3 #PFI11
+            },
+            cam_file_path=r"C:\Users\rshs\Desktop\ADSS\adss_psc_methods\HELAO",
+            cams={
+                "archive_tray_tray": "tray_to_tray_220214.cam",
+                "archive_custom_tray": "custom_to_tray_220214.cam",
+                "archive_tray_custom": "tray_to_custom_220214.cam",
+                # "archive":"lcfc_archive.cam",
+                # "archive_liquid":"lcfc_archive.cam",
+                # "fillfixed":"lcfc_fill_hardcodedvolume.cam",
+                # "fill":"lcfc_fill.cam",
+                # "test":"relay_actuation_test2.cam",
+                # "dilute":"lcfc_dilute.cam",
+                # "autodilute":"lcfc_dilute.cam",
+                "deepclean": "deep_clean_220214.cam",
+            },
+            positions={
+                "tray1": {
+                    "slot1": None,
+                    "slot2": None,
+                    "slot3": None,
                 },
-            cam_file_path = r'C:\Users\rshs\Desktop\ADSS\adss_psc_methods\HELAO',
-            cams = {
-                    "archive_tray_tray":"tray_to_tray_220214.cam",
-                    "archive_custom_tray":"custom_to_tray_220214.cam",
-                    "archive_tray_custom":"tray_to_custom_220214.cam",
-                    # "archive":"lcfc_archive.cam",
-                    # "archive_liquid":"lcfc_archive.cam",
-                    # "fillfixed":"lcfc_fill_hardcodedvolume.cam",
-                    # "fill":"lcfc_fill.cam",
-                    # "test":"relay_actuation_test2.cam",
-                    # "dilute":"lcfc_dilute.cam",
-                    # "autodilute":"lcfc_dilute.cam",
-                    "deepclean":"deep_clean_220214.cam",
-                    },
-            positions = {
-                          "tray1":{
-                                  "slot1":None,
-                                  "slot2":None,
-                                  "slot3":None,
-                                  },
-                          "tray2":{
-                                  "slot1":"VT54",
-                                  "slot2":"VT54",
-                                  "slot3":"VT54",
-                                  },
-                          "custom":{
-                                    "elec_res1":"reservoir",
-                                    "elec_res2":"reservoir",
-                                    "cell1_we":"cell",
-                                    # "lcfc_res":"cell",
-                                  }
-                        },
-        )
+                "tray2": {
+                    "slot1": "VT54",
+                    "slot2": "VT54",
+                    "slot3": "VT54",
+                },
+                "custom": {
+                    "elec_res1": "reservoir",
+                    "elec_res2": "reservoir",
+                    "cell1_we": "cell",
+                    # "lcfc_res":"cell",
+                },
+            },
+        ),
     ),
     # #########################################################################
     # Visualizers (bokeh servers)
@@ -257,8 +250,7 @@ config["servers"] = dict(
         port=5001,
         group="visualizer",
         bokeh="action_visualizer",
-        params = dict(
-        )
+        params=dict(),
     ),
     #
     # #########################################################################
