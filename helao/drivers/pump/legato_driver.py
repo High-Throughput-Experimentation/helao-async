@@ -145,11 +145,11 @@ class KDS100:
                 for plab, pdict in self.config_dict.get("pumps", {}).items():
                     checktime = time.time()
                     if checktime - lastupdate < waittime:
-                        self.base.print_message("waiting for minimum update interval.")
+                        # self.base.print_message("waiting for minimum update interval.")
                         await asyncio.sleep(waittime - (checktime - lastupdate))
                     addr = pdict["address"]
                     status_resp = self.send(plab, "status")
-                    self.base.print_message(f"received status: {status_resp}")
+                    # self.base.print_message(f"received status: {status_resp}")
                     lastupdate = time.time()
                     status = status_resp[0]
                     # self.base.print_message(f"current status: {status}")
@@ -194,7 +194,7 @@ class KDS100:
                                 "target_reached": target_reached,
                             }
                         }
-                        self.base.print_message(status_dict[plab]["status"])
+                        # self.base.print_message(status_dict[plab]["status"])
                         await self.base.put_lbuf(status_dict)
                         # self.base.print_message("status sent to live buffer")
                     else:
@@ -213,6 +213,7 @@ class KDS100:
                 break
             else:
                 continue
+        self.base.print_message(f"command response returned status: {state}")
         return {"status": state}
 
     async def start_pump(self, pump_name: str, direction: int):
