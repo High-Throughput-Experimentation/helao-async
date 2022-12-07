@@ -226,7 +226,7 @@ class KDS100:
             return False
         resp = self.send(pump_name, cmd)
         status_dict = self.status_from_response(resp)
-        await self.put_lbuf({pump_name: status_dict})
+        await self.base.put_lbuf({pump_name: status_dict})
         return resp
 
     async def set_force(self, pump_name: str, force_val: int):
@@ -234,7 +234,7 @@ class KDS100:
         cmd = f"forc {force_val}"
         resp = self.send(pump_name, cmd)
         status_dict = self.status_from_response(resp)
-        await self.put_lbuf({pump_name: status_dict})
+        await self.base.put_lbuf({pump_name: status_dict})
         return resp
 
     async def set_rate(self, pump_name: str, rate_val: int, direction: int):
@@ -247,21 +247,21 @@ class KDS100:
             return False
         resp = self.send(pump_name, f"{cmd} {rate_val} ul/sec")
         status_dict = self.status_from_response(resp)
-        await self.put_lbuf({pump_name: status_dict})
+        await self.base.put_lbuf({pump_name: status_dict})
         return resp
 
     async def set_volume(self, pump_name: str, vol_val: float):
         "Set infusion|withdraw volume in uL"
         resp = self.send(pump_name, f"tvolume {vol_val} ul")
         status_dict = self.status_from_response(resp)
-        await self.put_lbuf({pump_name: status_dict})
+        await self.base.put_lbuf({pump_name: status_dict})
         return resp
 
     async def set_diameter(self, pump_name: str, diameter_mm: float):
         "Set syringe diameter in mm"
         resp = self.send(pump_name, f"diameter {diameter_mm:.4f}")
         status_dict = self.status_from_response(resp)
-        await self.put_lbuf({pump_name: status_dict})
+        await self.base.put_lbuf({pump_name: status_dict})
         return resp
 
     # def set_ramp(self, pump_name: str, start_rate: int, end_rate: int, direction: int):
@@ -281,12 +281,12 @@ class KDS100:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
                 _ = self.send(cpump_name, cmd)
                 status_dict = self.status_from_response(resp)
-                await self.put_lbuf({cpump_name: status_dict})
+                await self.base.put_lbuf({cpump_name: status_dict})
             return []
         else:
             resp = self.send(pump_name, cmd)
             status_dict = self.status_from_response(resp)
-            await self.put_lbuf({pump_name: status_dict})
+            await self.base.put_lbuf({pump_name: status_dict})
             return resp
 
     async def clear_volume(
@@ -302,12 +302,12 @@ class KDS100:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
                 resp = self.send(cpump_name, cmd)
                 status_dict = self.status_from_response(resp)
-                await self.put_lbuf({cpump_name: status_dict})
+                await self.base.put_lbuf({cpump_name: status_dict})
             return []
         else:
             resp = self.send(pump_name, cmd)
             status_dict = self.status_from_response(resp)
-            await self.put_lbuf({pump_name: status_dict})
+            await self.base.put_lbuf({pump_name: status_dict})
             return resp
 
     async def clear_target_volume(self, pump_name: Optional[str] = None):
@@ -315,12 +315,12 @@ class KDS100:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
                 resp = self.send(cpump_name, "ctvolume")
                 status_dict = self.status_from_response(resp)
-                await self.put_lbuf({cpump_name: status_dict})
+                await self.base.put_lbuf({cpump_name: status_dict})
             return []
         else:
             resp = self.send(pump_name, "ctvolume")
             status_dict = self.status_from_response(resp)
-            await self.put_lbuf({pump_name: status_dict})
+            await self.base.put_lbuf({pump_name: status_dict})
             return resp
 
     async def stop_pump(self, pump_name: Optional[str] = None):
@@ -329,12 +329,12 @@ class KDS100:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
                 resp = self.send(cpump_name, cmd)
                 status_dict = self.status_from_response(resp)
-                await self.put_lbuf({cpump_name: status_dict})
+                await self.base.put_lbuf({cpump_name: status_dict})
             return []
         else:
             resp = self.send(pump_name, cmd)
             status_dict = self.status_from_response(resp)
-            await self.put_lbuf({pump_name: status_dict})
+            await self.base.put_lbuf({pump_name: status_dict})
             return resp
 
     async def safe_state(self):
@@ -372,7 +372,7 @@ class KDS100:
                 )
                 self.base.print_message(f"Server returned: {diameter_resp[0]}")
             status_dict = self.status_from_response(diameter_resp)
-            await self.put_lbuf({plab: status_dict})
+            await self.base.put_lbuf({plab: status_dict})
 
     def shutdown(self):
         # this gets called when the server is shut down
