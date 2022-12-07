@@ -151,7 +151,7 @@ class KDS100:
                     status_resp = self.send(plab, "status")
                     self.base.print_message(f"received status: {status_resp}")
                     lastupdate = time.time()
-                    status = status_resp[0]
+                    status = status_resp[-1]
                     # self.base.print_message(f"current status: {status}")
                     addrstate_rate, pumptime, pumpvol, flags = status.split()
                     raddr = int(addrstate_rate[:2])
