@@ -194,10 +194,7 @@ class KDS100:
                                 "target_reached": target_reached,
                             }
                         }
-                        self.base.print_message(
-                            status_dict[plab]["status"], 
-                            status_dict[plab]["target_reached"], 
-                            )
+                        self.base.print_message(status_dict[plab]["status"])
                         await self.base.put_lbuf(status_dict)
                         # self.base.print_message("status sent to live buffer")
                     else:
@@ -205,6 +202,18 @@ class KDS100:
                 await asyncio.sleep(0.01)
             else:
                 await asyncio.sleep(0.05)
+
+    def status_from_response(self, response):
+        status = response[0]
+        addr_status = status.split()[0]
+        state = 'unknown'
+        for k, v in STATES.items():
+            if addr_status[2:].startswith(k):
+                state = v
+                break
+            else:
+                continue
+        return {"status": state}
 
     async def start_pump(self, pump_name: str, direction: int):
         "Start motion in direction forward/infuse (1) or reverse/withdraw (-1)"
@@ -215,25 +224,19 @@ class KDS100:
         else:
             return False
         resp = self.send(pump_name, cmd)
-        status = resp[0]
-        addr_status = status.split()[0]
-        state = None
-        for k, v in STATES.items():
-            if addr_status[2:].startswith(k):
-                state = v
-                state_split = k
-            else:
-                continue
-        await self.put_lbuf({pump_name: {"status": state}})
+        status_dict = self.status_from_response(resp)
+        await self.put_lbuf({pump_name: status_dict})
         return resp
 
-    def set_force(self, pump_name: str, force_val: int):
+    async def set_force(self, pump_name: str, force_val: int):
         "Set infusion force value in percentage"
         cmd = f"forc {force_val}"
         resp = self.send(pump_name, cmd)
+        status_dict = self.status_from_response(resp)
+        await self.put_lbuf({pump_name: status_dict})
         return resp
 
-    def set_rate(self, pump_name: str, rate_val: int, direction: int):
+    async def set_rate(self, pump_name: str, rate_val: int, direction: int):
         "Set infusion|withdraw rate in uL/sec"
         if direction == 1:
             cmd = "irate"
@@ -242,23 +245,29 @@ class KDS100:
         else:
             return False
         resp = self.send(pump_name, f"{cmd} {rate_val} ul/sec")
+        status_dict = self.status_from_response(resp)
+        await self.put_lbuf({pump_name: status_dict})
         return resp
 
-    def set_volume(self, pump_name: str, vol_val: float):
+    async def set_volume(self, pump_name: str, vol_val: float):
         "Set infusion|withdraw volume in uL"
         resp = self.send(pump_name, f"tvolume {vol_val} ul")
+        status_dict = self.status_from_response(resp)
+        await self.put_lbuf({pump_name: status_dict})
         return resp
 
-    def set_diameter(self, pump_name: str, diameter_mm: float):
+    async def set_diameter(self, pump_name: str, diameter_mm: float):
         "Set syringe diameter in mm"
         resp = self.send(pump_name, f"diameter {diameter_mm:.4f}")
+        status_dict = self.status_from_response(resp)
+        await self.put_lbuf({pump_name: status_dict})
         return resp
 
-    def set_ramp(self, pump_name: str, start_rate: int, end_rate: int, direction: int):
-        "Set infusion|withdraw ramp rate in units TODO"
-        pass
+    # def set_ramp(self, pump_name: str, start_rate: int, end_rate: int, direction: int):
+    #     "Set infusion|withdraw ramp rate in units TODO"
+    #     pass
 
-    def clear_time(self, pump_name: Optional[str] = None, direction: Optional[int] = 0):
+    async def clear_time(self, pump_name: Optional[str] = None, direction: Optional[int] = 0):
         if direction == 1:
             cmd = "citime"
         elif direction == -1:
@@ -268,12 +277,16 @@ class KDS100:
         if pump_name is None:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
                 _ = self.send(cpump_name, cmd)
+                status_dict = self.status_from_response(resp)
+                await self.put_lbuf({cpump_name: status_dict})
             return []
         else:
             resp = self.send(pump_name, cmd)
+            status_dict = self.status_from_response(resp)
+            await self.put_lbuf({pump_name: status_dict})
             return resp
 
-    def clear_volume(
+    async def clear_volume(
         self, pump_name: Optional[str] = None, direction: Optional[int] = 0
     ):
         if direction == 1:
@@ -285,31 +298,43 @@ class KDS100:
         if pump_name is None:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
                 _ = self.send(cpump_name, cmd)
+                status_dict = self.status_from_response(resp)
+                await self.put_lbuf({cpump_name: status_dict})
             return []
         else:
             resp = self.send(pump_name, cmd)
+            status_dict = self.status_from_response(resp)
+            await self.put_lbuf({pump_name: status_dict})
             return resp
 
-    def clear_target_volume(self, pump_name: Optional[str] = None):
+    async def clear_target_volume(self, pump_name: Optional[str] = None):
         if pump_name is None:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
                 _ = self.send(cpump_name, "ctvolume")
+                status_dict = self.status_from_response(resp)
+                await self.put_lbuf({cpump_name: status_dict})
             return []
         else:
             resp = self.send(pump_name, "ctvolume")
+            status_dict = self.status_from_response(resp)
+            await self.put_lbuf({pump_name: status_dict})
             return resp
 
-    def stop_pump(self, pump_name: Optional[str] = None):
+    async def stop_pump(self, pump_name: Optional[str] = None):
         cmd = "stp"
         if pump_name is None:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
                 _ = self.send(cpump_name, cmd)
+                status_dict = self.status_from_response(resp)
+                await self.put_lbuf({cpump_name: status_dict})
             return []
         else:
             resp = self.send(pump_name, cmd)
+            status_dict = self.status_from_response(resp)
+            await self.put_lbuf({pump_name: status_dict})
             return resp
 
-    def safe_state(self):
+    async def safe_state(self):
         for plab, pdict in self.config_dict.get("pumps", {}).items():
             addr = pdict["address"]
             idle_resp = f"{addr:02}:\x11"
@@ -343,6 +368,8 @@ class KDS100:
                     f"Error setting syringe diameter on pump '{plab}'."
                 )
                 self.base.print_message(f"Server returned: {diameter_resp[0]}")
+            status_dict = self.status_from_response(diameter_resp)
+            await self.put_lbuf({plab: status_dict})
 
     def shutdown(self):
         # this gets called when the server is shut down
@@ -364,17 +391,17 @@ class PumpExec(Executor):
     async def _pre_exec(self):
         "Set rate and volume params, then run."
         self.active.base.print_message("PumpExec running setup methods.")
-        clear_resp = self.active.base.fastapp.driver.clear_target_volume(
+        clear_resp = await self.active.base.fastapp.driver.clear_target_volume(
             pump_name=self.pump_name,
         )
         self.active.base.print_message(f"clear_target_volume returned: {clear_resp}")
-        rate_resp = self.active.base.fastapp.driver.set_rate(
+        rate_resp = await self.active.base.fastapp.driver.set_rate(
             pump_name=self.pump_name,
             rate_val=self.active.action.action_params["rate_uL_sec"],
             direction=self.direction,
         )
         self.active.base.print_message(f"set_rate returned: {rate_resp}")
-        vol_resp = self.active.base.fastapp.driver.set_volume(
+        vol_resp = await self.active.base.fastapp.driver.set_volume(
             pump_name=self.pump_name,
             vol_val=self.active.action.action_params["volume_uL"],
         )
@@ -400,13 +427,13 @@ class PumpExec(Executor):
             return {"error": ErrorCodes.none, "status": HloStatus.finished}
 
     async def _manual_stop(self):
-        stop_resp = self.active.base.fastapp.driver.stop_pump(self.pump_name)
+        stop_resp = await self.active.base.fastapp.driver.stop_pump(self.pump_name)
         self.active.base.print_message(f"stop_pump returned: {stop_resp}")
         return {"error": ErrorCodes.none}
 
     async def _post_exec(self):
         self.active.base.print_message("PumpExec running cleanup methods.")
-        clear_resp = self.active.base.fastapp.driver.clear_volume(
+        clear_resp = await self.active.base.fastapp.driver.clear_target_volume(
             pump_name=self.pump_name,
         )
         self.active.base.print_message(f"clear_target_volume returned: {clear_resp}")
