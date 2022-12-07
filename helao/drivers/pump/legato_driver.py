@@ -99,7 +99,6 @@ class KDS100:
             rtscts=False,
         )
         self.sio = io.TextIOWrapper(io.BufferedRWPair(self.com, self.com))
-        await self.safe_state()
 
         self.aloop = asyncio.get_running_loop()
         self.polling = True
@@ -116,6 +115,7 @@ class KDS100:
         await self.poll_signalq.put(False)
 
     async def poll_signal_loop(self):
+        await self.safe_state()
         while True:
             self.polling = await self.poll_signalq.get()
             self.base.print_message("polling signal received")
