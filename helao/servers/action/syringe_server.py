@@ -62,24 +62,24 @@ def makeApp(confPrefix, servKey, helao_root):
         return active_action_dict
 
     @app.post("/set_rate")
-    def set_rate(pump_name: str, rate_uL_sec: int, direction: int):
-        return app.driver.set_rate(pump_name, rate_uL_sec, direction)
+    async def set_rate(pump_name: str, rate_uL_sec: int, direction: int):
+        return await app.driver.set_rate(pump_name, rate_uL_sec, direction)
 
     @app.post("/set_volume")
-    def set_volume(pump_name: str, volume_uL: int):
-        return app.driver.set_volume(pump_name, volume_uL)
+    async def set_volume(pump_name: str, volume_uL: int):
+        return await app.driver.set_volume(pump_name, volume_uL)
 
     @app.post("/start_pump")
-    def start_pump(pump_name: str, direction: int):
-        return app.driver.start_pump(pump_name, direction)
+    async def start_pump(pump_name: str, direction: int):
+        return await app.driver.start_pump(pump_name, direction)
 
     @app.post("/stop_pump")
-    def stop_pump(pump_name: str):
-        return app.driver.stop_pump(pump_name)
+    async def stop_pump(pump_name: str):
+        return await app.driver.stop_pump(pump_name)
 
     @app.post("/clear_volume")
-    def clear_volume(pump_name: str):
-        return app.driver.clear_volume(pump_name)
+    async def clear_volume(pump_name: str):
+        return await app.driver.clear_volume(pump_name)
 
     @app.post("/get_lbuf")
     def get_lbuf():
