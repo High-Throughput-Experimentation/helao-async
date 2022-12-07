@@ -197,7 +197,6 @@ class Executor:
     async def _pre_exec(self):
         "Setup methods, return error state."
         self.active.base.print_message("generic Executor running setup methods.")
-        await asyncio.sleep(0.001)
         self.setup_err = ErrorCodes.none
         return {"error": self.setup_err}
 
@@ -207,7 +206,6 @@ class Executor:
 
     async def _exec(self):
         "Perform device read/write."
-        await asyncio.sleep(0.001)
         return {"data": {}, "error": ErrorCodes.none}
 
     def set_exec(self, exec_func):
@@ -216,7 +214,6 @@ class Executor:
 
     async def _poll(self):
         "Perform one polling iteration."
-        await asyncio.sleep(0.001)
         return {"data": {}, "error": ErrorCodes.none, "status": HloStatus.finished}
 
     def set_poll(self, poll_func):
@@ -226,7 +223,6 @@ class Executor:
     async def _post_exec(self):
         "Cleanup methods, return error state."
         self.cleanup_err = ErrorCodes.none
-        await asyncio.sleep(0.001)
         return {"error": self.cleanup_err}
 
     def set_post_exec(self, post_exec_func):
@@ -235,7 +231,6 @@ class Executor:
 
     async def _manual_stop(self):
         "Perform device manual stop, return error state."
-        await asyncio.sleep(0.001)
         self.stop_err = ErrorCodes.none
         return {"error": self.stop_err}
 

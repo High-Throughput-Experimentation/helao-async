@@ -206,7 +206,7 @@ class KDS100:
             else:
                 await asyncio.sleep(0.05)
 
-    def start_pump(self, pump_name: str, direction: int):
+    async def start_pump(self, pump_name: str, direction: int):
         "Start motion in direction forward/infuse (1) or reverse/withdraw (-1)"
         if direction == 1:
             cmd = "irun"
@@ -215,6 +215,16 @@ class KDS100:
         else:
             return False
         resp = self.send(pump_name, cmd)
+        status = resp[0]
+        addr_status = status.split()[0]
+        state = None
+        for k, v in STATES.items():
+            if addr_status[2:].startswith(k):
+                state = v
+                state_split = k
+            else:
+                continue
+        await self.put_lbuf({pump_name: {"status": state}})
         return resp
 
     def set_force(self, pump_name: str, force_val: int):
@@ -372,12 +382,11 @@ class PumpExec(Executor):
         return {"error": ErrorCodes.none}
 
     async def _exec(self):
-        start_resp = self.active.base.fastapp.driver.start_pump(
+        start_resp = await self.active.base.fastapp.driver.start_pump(
             pump_name=self.pump_name,
             direction=self.direction,
         )
         self.active.base.print_message(f"start_pump returned: {start_resp}")
-
         return {"error": ErrorCodes.none}
 
     async def _poll(self):
@@ -391,7 +400,6 @@ class PumpExec(Executor):
             return {"error": ErrorCodes.none, "status": HloStatus.finished}
 
     async def _manual_stop(self):
-        await asyncio.sleep(0.001)
         stop_resp = self.active.base.fastapp.driver.stop_pump(self.pump_name)
         self.active.base.print_message(f"stop_pump returned: {stop_resp}")
         return {"error": ErrorCodes.none}
