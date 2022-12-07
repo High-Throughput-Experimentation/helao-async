@@ -136,7 +136,7 @@ class KDS100:
                 resp += newlines
         return resp
 
-    async def poll_sensor_loop(self, frequency: int = 5):
+    async def poll_sensor_loop(self, frequency: int = 10):
         self.base.print_message("polling background task has started")
         waittime = 1.0 / frequency
         lastupdate = 0
@@ -342,7 +342,7 @@ class KDS100:
 
 class PumpExec(Executor):
     def __init__(self, direction: int, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(poll_rate=0.2, *args, **kwargs)
         self.direction = direction
         # current plan is 1 pump per COM
         self.pump_name = list(self.active.base.server_params["pumps"].keys())[0]
