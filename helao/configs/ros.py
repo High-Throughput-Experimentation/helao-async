@@ -29,13 +29,13 @@ config["servers"] = {
         "fast": "syringe_server",
         "params": {"port": "COM8", "pumps": {"zero": {"address": 0, "diameter": 26.7}}},
     },
-    "SYRINGE1": {
-        "host": hostip,
-        "port": 8006,
-        "group": "action",
-        "fast": "syringe_server",
-        "params": {"port": "COM10", "pumps": {"one": {"address": 1, "diameter": 26.7}}},
-    },
+    # "SYRINGE1": {
+    #     "host": hostip,
+    #     "port": 8006,
+    #     "group": "action",
+    #     "fast": "syringe_server",
+    #     "params": {"port": "COM10", "pumps": {"one": {"address": 1, "diameter": 26.7}}},
+    # },
     "SENSOR": {
         "host": hostip,
         "port": 8003,
