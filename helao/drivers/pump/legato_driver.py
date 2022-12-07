@@ -342,7 +342,7 @@ class KDS100:
 
 class PumpExec(Executor):
     def __init__(self, direction: int, *args, **kwargs):
-        super().__init__(poll_rate=0.2, *args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.direction = direction
         # current plan is 1 pump per COM
         self.pump_name = list(self.active.base.server_params["pumps"].keys())[0]
