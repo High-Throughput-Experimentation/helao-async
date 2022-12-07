@@ -149,7 +149,7 @@ class KDS100:
                         await asyncio.sleep(waittime - (checktime - lastupdate))
                     addr = pdict["address"]
                     status_resp = self.send(plab, "status")
-                    # self.base.print_message(f"received status: {status_resp}")
+                    self.base.print_message(f"received status: {status_resp}")
                     lastupdate = time.time()
                     status = status_resp[0]
                     # self.base.print_message(f"current status: {status}")
@@ -279,7 +279,7 @@ class KDS100:
             cmd = "ctime"
         if pump_name is None:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
-                _ = self.send(cpump_name, cmd)
+                resp = self.send(cpump_name, cmd)
                 self.update_status_from_response(resp)
             return []
         else:
