@@ -105,6 +105,7 @@ class KDS100:
         self.poll_signalq = asyncio.Queue(1)
         self.poll_signal_task = self.aloop.create_task(self.poll_signal_loop())
         self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
+        self.last_state = 'unknown'
 
     async def start_polling(self):
         self.base.print_message("got 'start_polling' request, raising signal")
@@ -149,7 +150,7 @@ class KDS100:
                         await asyncio.sleep(waittime - (checktime - lastupdate))
                     addr = pdict["address"]
                     status_resp = self.send(plab, "status")
-                    self.base.print_message(f"received status: {status_resp}")
+                    # self.base.print_message(f"received status: {status_resp}")
                     lastupdate = time.time()
                     status_prompt = status_resp[-1]
                     status = status_resp[0]
@@ -169,7 +170,9 @@ class KDS100:
                                 state = v
                             else:
                                 continue
-                        # self.base.print_message(f"state: {state}")
+                        if state != self.last_state:
+                            self.base.print_message(f"pump state changed from '{self.last_state}' to '{state}'")
+                            self.last_state = state
                         rate = int(addrstate_rate.split(state_split)[-1])
                         pumptime = int(pumptime)
                         pumpvol = int(pumpvol)
@@ -387,6 +390,10 @@ class PumpExec(Executor):
     async def _pre_exec(self):
         "Set rate and volume params, then run."
         self.active.base.print_message("PumpExec running setup methods.")
+        clear_resp = self.active.base.fastapp.driver.clear_volume(
+            pump_name=self.pump_name,
+        )
+        self.active.base.print_message(f"clear_volume returned: {clear_resp}")
         rate_resp = self.active.base.fastapp.driver.set_rate(
             pump_name=self.pump_name,
             rate_val=self.active.action.action_params["rate_uL_sec"],
@@ -398,10 +405,6 @@ class PumpExec(Executor):
             vol_val=self.active.action.action_params["volume_uL"],
         )
         self.active.base.print_message(f"set_volume returned: {vol_resp}")
-        clear_resp = self.active.base.fastapp.driver.clear_target_volume(
-            pump_name=self.pump_name,
-        )
-        self.active.base.print_message(f"clear_target_volume returned: {clear_resp}")
         return {"error": ErrorCodes.none}
 
     async def _exec(self):
@@ -415,7 +418,7 @@ class PumpExec(Executor):
     async def _poll(self):
         live_buffer, _ = self.active.base.get_lbuf(self.pump_name)
         pump_status = live_buffer["status"]
-        self.active.base.print_message(f"poll iter status: {pump_status}")
+        # self.active.base.print_message(f"poll iter status: {pump_status}")
         if pump_status in ["infusing", "withdrawing"]:
             return {"error": ErrorCodes.none, "status": HloStatus.active}
         elif pump_status == "stalled":
@@ -428,10 +431,10 @@ class PumpExec(Executor):
         self.active.base.print_message(f"stop_pump returned: {stop_resp}")
         return {"error": ErrorCodes.none}
 
-    # async def _post_exec(self):
-    #     self.active.base.print_message("PumpExec running cleanup methods.")
-    #     clear_resp = self.active.base.fastapp.driver.clear_volume(
-    #         pump_name=self.pump_name,
-    #     )
-    #     self.active.base.print_message(f"clear_volume returned: {clear_resp}")
-    #     return {"error": ErrorCodes.none}
+    async def _post_exec(self):
+        self.active.base.print_message("PumpExec running cleanup methods.")
+        clear_resp = self.active.base.fastapp.driver.clear_target_volume(
+            pump_name=self.pump_name,
+        )
+        self.active.base.print_message(f"clear_target_volume returned: {clear_resp}")
+        return {"error": ErrorCodes.none}
