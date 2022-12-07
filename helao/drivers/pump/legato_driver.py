@@ -151,7 +151,8 @@ class KDS100:
                     status_resp = self.send(plab, "status")
                     self.base.print_message(f"received status: {status_resp}")
                     lastupdate = time.time()
-                    status = status_resp[-1]
+                    status_prompt = status_resp[-1]
+                    status = status_resp[0]
                     # self.base.print_message(f"current status: {status}")
                     addrstate_rate, pumptime, pumpvol, flags = status.split()
                     raddr = int(addrstate_rate[:2])
@@ -163,8 +164,9 @@ class KDS100:
                         state_split = None
                         for k, v in STATES.items():
                             if addrstate_rate[2:].startswith(k):
-                                state = v
                                 state_split = k
+                            if status_prompt[2:].startswith(k):
+                                state = v
                             else:
                                 continue
                         # self.base.print_message(f"state: {state}")
