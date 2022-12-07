@@ -194,7 +194,10 @@ class KDS100:
                                 "target_reached": target_reached,
                             }
                         }
-                        # self.base.print_message(status_dict)
+                        self.base.print_message(
+                            status_dict[plab]["status"], 
+                            status_dict[plab]["target_reached"], 
+                            )
                         await self.base.put_lbuf(status_dict)
                         # self.base.print_message("status sent to live buffer")
                     else:
