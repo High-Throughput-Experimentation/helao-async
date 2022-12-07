@@ -99,7 +99,7 @@ class KDS100:
             rtscts=False,
         )
         self.sio = io.TextIOWrapper(io.BufferedRWPair(self.com, self.com))
-        self.safe_state()
+        await self.safe_state()
 
         self.aloop = asyncio.get_running_loop()
         self.polling = True
@@ -391,10 +391,6 @@ class PumpExec(Executor):
     async def _pre_exec(self):
         "Set rate and volume params, then run."
         self.active.base.print_message("PumpExec running setup methods.")
-        clear_resp = await self.active.base.fastapp.driver.clear_target_volume(
-            pump_name=self.pump_name,
-        )
-        self.active.base.print_message(f"clear_target_volume returned: {clear_resp}")
         rate_resp = await self.active.base.fastapp.driver.set_rate(
             pump_name=self.pump_name,
             rate_val=self.active.action.action_params["rate_uL_sec"],
@@ -406,6 +402,10 @@ class PumpExec(Executor):
             vol_val=self.active.action.action_params["volume_uL"],
         )
         self.active.base.print_message(f"set_volume returned: {vol_resp}")
+        clear_resp = await self.active.base.fastapp.driver.clear_target_volume(
+            pump_name=self.pump_name,
+        )
+        self.active.base.print_message(f"clear_target_volume returned: {clear_resp}")
         return {"error": ErrorCodes.none}
 
     async def _exec(self):
@@ -433,8 +433,8 @@ class PumpExec(Executor):
 
     async def _post_exec(self):
         self.active.base.print_message("PumpExec running cleanup methods.")
-        clear_resp = await self.active.base.fastapp.driver.clear_target_volume(
+        clear_resp = await self.active.base.fastapp.driver.clear_volume(
             pump_name=self.pump_name,
         )
-        self.active.base.print_message(f"clear_target_volume returned: {clear_resp}")
+        self.active.base.print_message(f"clear_volume returned: {clear_resp}")
         return {"error": ErrorCodes.none}
