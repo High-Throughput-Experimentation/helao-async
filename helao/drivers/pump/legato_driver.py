@@ -206,7 +206,7 @@ class KDS100:
     def status_from_response(self, response):
         status = response[0]
         addr_status = status.split()[0]
-        state = 'unknown'
+        state = "unknown"
         for k, v in STATES.items():
             if addr_status[2:].startswith(k):
                 state = v
@@ -268,7 +268,9 @@ class KDS100:
     #     "Set infusion|withdraw ramp rate in units TODO"
     #     pass
 
-    async def clear_time(self, pump_name: Optional[str] = None, direction: Optional[int] = 0):
+    async def clear_time(
+        self, pump_name: Optional[str] = None, direction: Optional[int] = 0
+    ):
         if direction == 1:
             cmd = "citime"
         elif direction == -1:
@@ -298,7 +300,7 @@ class KDS100:
             cmd = "cvolume"
         if pump_name is None:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
-                _ = self.send(cpump_name, cmd)
+                resp = self.send(cpump_name, cmd)
                 status_dict = self.status_from_response(resp)
                 await self.put_lbuf({cpump_name: status_dict})
             return []
@@ -311,7 +313,7 @@ class KDS100:
     async def clear_target_volume(self, pump_name: Optional[str] = None):
         if pump_name is None:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
-                _ = self.send(cpump_name, "ctvolume")
+                resp = self.send(cpump_name, "ctvolume")
                 status_dict = self.status_from_response(resp)
                 await self.put_lbuf({cpump_name: status_dict})
             return []
@@ -325,7 +327,7 @@ class KDS100:
         cmd = "stp"
         if pump_name is None:
             for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
-                _ = self.send(cpump_name, cmd)
+                resp = self.send(cpump_name, cmd)
                 status_dict = self.status_from_response(resp)
                 await self.put_lbuf({cpump_name: status_dict})
             return []
@@ -347,23 +349,23 @@ class KDS100:
             if nvram_resp[-1] != idle_resp:
                 self.base.print_message(f"Error setting pump '{plab}' to 'NVRAM off'.")
                 self.base.print_message(f"Server returned: {nvram_resp[0]}")
-            stop_resp = self.stop_pump(plab)
+            stop_resp = await self.stop_pump(plab)
             if stop_resp[-1] != idle_resp:
                 self.base.print_message(f"Error stopping pump '{plab}'.")
                 self.base.print_message(f"Server returned: {stop_resp[0]}")
-            cleartime_resp = self.clear_time(plab)
+            cleartime_resp = await self.clear_time(plab)
             if cleartime_resp[-1] != idle_resp:
                 self.base.print_message(
                     f"Error clearing time params for pump '{plab}'."
                 )
                 self.base.print_message(f"Server returned: {cleartime_resp[0]}")
-            clearvol_resp = self.clear_target_volume(plab)
+            clearvol_resp = await self.clear_target_volume(plab)
             if clearvol_resp[-1] != idle_resp:
                 self.base.print_message(
                     f"Error clearing volume params for pump '{plab}'."
                 )
                 self.base.print_message(f"Server returned: {clearvol_resp[0]}")
-            diameter_resp = self.set_diameter(plab, pdict["diameter"])
+            diameter_resp = await self.set_diameter(plab, pdict["diameter"])
             if diameter_resp[-1] != idle_resp:
                 self.base.print_message(
                     f"Error setting syringe diameter on pump '{plab}'."
@@ -377,7 +379,7 @@ class KDS100:
         # or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
         self.base.print_message("shutting down syringe pump(s)")
-        self.safe_state()
+        asyncio.run(self.safe_state())
         self.com.close()
 
 
