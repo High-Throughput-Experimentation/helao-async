@@ -50,13 +50,13 @@ config["servers"] = {
             "timeout": 600,
         },
     },
-    "PSTAT": {
-        "host": "127.0.0.1",
-        "port": 8004,
-        "group": "action",
-        "fast": "gamry_server",
-        "params": {"dev_id": 0, "filterfreq_hz": 1000.0, "grounded": True},
-    },
+    # "PSTAT": {
+    #     "host": "127.0.0.1",
+    #     "port": 8004,
+    #     "group": "action",
+    #     "fast": "gamry_server",
+    #     "params": {"dev_id": 0, "filterfreq_hz": 1000.0, "grounded": True},
+    # },
     "IO": {
         "host": "127.0.0.1",
         "port": 8005,
