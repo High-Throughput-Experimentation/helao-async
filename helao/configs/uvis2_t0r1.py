@@ -31,7 +31,7 @@ config["servers"] = {
         "group": "action",
         "fast": "spec_server",
         "params": {
-            "dev_num": 1,
+            "dev_num": 0,
             "lib_path": "C:\\Spectral Products\\SM32ProForUSB\\SDK Examples\\DLL\\x64\\stdcall\\SPdbUSBm.dll",
             "n_pixels": 1024,
             "start_margin": 5,
@@ -43,7 +43,7 @@ config["servers"] = {
         "group": "action",
         "fast": "spec_server",
         "params": {
-            "dev_num": 0,
+            "dev_num": 1,
             "lib_path": "C:\\Spectral Products\\SM32ProForUSB\\SDK Examples\\DLL\\x64\\stdcall\\SPdbUSBm.dll",
             "n_pixels": 1024,
             "start_margin": 5,
