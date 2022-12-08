@@ -122,7 +122,7 @@ class Galil:
                         status_dict = {ai_name: float(ai_resp["value"]) * scaling}
                         await self.base.put_lbuf(status_dict)
                     lastupdate = time.time()
-                    self.base.print_message(status_dict)
+                    self.base.print_message(ai_resp)
             await asyncio.sleep(0.01)
 
     async def reset(self):
