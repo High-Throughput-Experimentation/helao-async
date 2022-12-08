@@ -49,7 +49,7 @@ class Galil:
 
         self.monitor_ai = {
             ai_name: scaling
-            for ai_name, scaling in self.config_dict.get("monitor_ai", {})
+            for ai_name, scaling in self.config_dict.get("monitor_ai", {}).items()
             if ai_name in self.dev_ai.keys()
         }
 
