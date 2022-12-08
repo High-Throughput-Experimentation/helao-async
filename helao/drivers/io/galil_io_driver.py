@@ -11,9 +11,11 @@ __all__ = [
 ]
 
 
+import time
 import os
 import pathlib
 import traceback
+import asyncio
 from typing import Union, Optional, List
 
 from helao.servers.base import Base
@@ -44,6 +46,12 @@ class Galil:
 
         self.dev_ai = self.config_dict.get("dev_ai", {})
         self.dev_aiitems = make_str_enum("dev_ai", {key: key for key in self.dev_ai})
+
+        self.monitor_ai = {
+            ai_name: scaling
+            for ai_name, scaling in self.config_dict.get("monitor_ai", {})
+            if ai_name in self.dev_ai.items()
+        }
 
         self.dev_ao = self.config_dict.get("dev_ao", {})
         self.dev_aoitems = make_str_enum("dev_ao", {key: key for key in self.dev_ao})
@@ -88,8 +96,50 @@ class Galil:
 
         self.cycle_lights = False
 
+        self.aloop = asyncio.get_running_loop()
+        self.polling = True
+        self.poll_signalq = asyncio.Queue(1)
+        self.poll_signal_task = self.aloop.create_task(self.poll_signal_loop())
+        self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
+
+    async def poll_sensor_loop(self, frequency: int = 4):
+        self.base.print_message("polling background task has started")
+        waittime = 1.0 / frequency
+        lastupdate = 0
+        while True:
+            if self.polling:
+                for ai_name, scaling in self.monitor_ai.items():
+                    checktime = time.time()
+                    if checktime - lastupdate < waittime:
+                        # self.base.print_message("waiting for minimum update interval.")
+                        await asyncio.sleep(waittime - (checktime - lastupdate))
+                    ai_resp = await self.get_analog_in(ai_name)
+                    if (
+                        ai_resp.get("error", ErrorCodes.not_available)
+                        == ErrorCodes.none
+                    ):
+                        lastupdate = time.time()
+                        status_dict = {ai_name: float(ai_resp["value"]) * scaling}
+                        self.base.print_message(status_dict)
+                        await self.base.put_lbuf(status_dict)
+            else:
+                await asyncio.sleep(0.05)
+
     async def reset(self):
         pass
+
+    async def start_polling(self):
+        self.base.print_message("got 'start_polling' request, raising signal")
+        await self.poll_signalq.put(True)
+
+    async def stop_polling(self):
+        self.base.print_message("got 'stop_polling' request, raising signal")
+        await self.poll_signalq.put(False)
+
+    async def poll_signal_loop(self):
+        while True:
+            self.polling = await self.poll_signalq.get()
+            self.base.print_message("polling signal received")
 
     async def estop(self, switch: bool, *args, **kwargs):
         # this will estop the io
