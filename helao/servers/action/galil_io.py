@@ -19,13 +19,11 @@ async def galil_dyn_endpoints(app=None):
             @app.post(f"/{servKey}/get_analog_in")
             async def get_analog_in(
                 action: Optional[Action] = Body({}, embed=True),
-                action_version: int = 1,
+                action_version: int = 2,
                 ai_item: Optional[app.driver.dev_aiitems] = None,
             ):
                 active = await app.base.setup_and_contain_action(action_abbr="get_ai")
-                active.action.action_params["ai_port"] = app.driver.dev_do[
-                    active.action.action_params["ai_item"]
-                ]
+
                 active.action.action_params["ai_name"] = active.action.action_params[
                     "ai_item"
                 ]
@@ -42,14 +40,12 @@ async def galil_dyn_endpoints(app=None):
             @app.post(f"/{servKey}/set_analog_out")
             async def set_analog_out(
                 action: Optional[Action] = Body({}, embed=True),
-                action_version: int = 1,
+                action_version: int = 2,
                 ao_item: Optional[app.driver.dev_aoitems] = None,
                 value: Optional[float] = None,
             ):
                 active = await app.base.setup_and_contain_action(action_abbr="set_ao")
-                active.action.action_params["ao_port"] = app.driver.dev_do[
-                    active.action.action_params["ao_item"]
-                ]
+
                 active.action.action_params["ao_name"] = active.action.action_params[
                     "ao_item"
                 ]
@@ -68,13 +64,11 @@ async def galil_dyn_endpoints(app=None):
             @app.post(f"/{servKey}/get_digital_in")
             async def get_digital_in(
                 action: Optional[Action] = Body({}, embed=True),
-                action_version: int = 1,
+                action_version: int = 2,
                 di_item: Optional[app.driver.dev_diitems] = None,
             ):
                 active = await app.base.setup_and_contain_action(action_abbr="get_di")
-                active.action.action_params["di_port"] = app.driver.dev_do[
-                    active.action.action_params["di_item"]
-                ]
+
                 active.action.action_params["di_name"] = active.action.action_params[
                     "di_item"
                 ]
@@ -93,13 +87,11 @@ async def galil_dyn_endpoints(app=None):
             @app.post(f"/{servKey}/get_digital_out")
             async def get_digital_out(
                 action: Optional[Action] = Body({}, embed=True),
-                action_version: int = 1,
+                action_version: int = 2,
                 do_item: Optional[app.driver.dev_doitems] = None,
             ):
                 active = await app.base.setup_and_contain_action(action_abbr="get_do")
-                active.action.action_params["do_port"] = app.driver.dev_do[
-                    active.action.action_params["do_item"]
-                ]
+
                 active.action.action_params["do_name"] = active.action.action_params[
                     "do_item"
                 ]
@@ -118,14 +110,12 @@ async def galil_dyn_endpoints(app=None):
             @app.post(f"/{servKey}/set_digital_out")
             async def set_digital_out(
                 action: Optional[Action] = Body({}, embed=True),
-                action_version: int = 1,
+                action_version: int = 2,
                 do_item: Optional[app.driver.dev_doitems] = None,
                 on: Optional[bool] = False,
             ):
                 active = await app.base.setup_and_contain_action(action_abbr="set_do")
-                active.action.action_params["do_port"] = app.driver.dev_do[
-                    active.action.action_params["do_item"]
-                ]
+
                 active.action.action_params["do_name"] = active.action.action_params[
                     "do_item"
                 ]

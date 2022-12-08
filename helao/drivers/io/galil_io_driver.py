@@ -42,16 +42,16 @@ class Galil:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
 
-        self.dev_ai = self.config_dict.get("dev_ai",{})
+        self.dev_ai = self.config_dict.get("dev_ai", {})
         self.dev_aiitems = make_str_enum("dev_ai", {key: key for key in self.dev_ai})
 
-        self.dev_ao = self.config_dict.get("dev_ao",{})
+        self.dev_ao = self.config_dict.get("dev_ao", {})
         self.dev_aoitems = make_str_enum("dev_ao", {key: key for key in self.dev_ao})
 
-        self.dev_di = self.config_dict.get("dev_di",{})
+        self.dev_di = self.config_dict.get("dev_di", {})
         self.dev_diitems = make_str_enum("dev_di", {key: key for key in self.dev_di})
 
-        self.dev_do = self.config_dict.get("dev_do",{})
+        self.dev_do = self.config_dict.get("dev_do", {})
         self.dev_doitems = make_str_enum("dev_do", {key: key for key in self.dev_do})
 
         self.digital_cycle_out = None
@@ -96,16 +96,15 @@ class Galil:
         # set estop: switch=true
         # release estop: switch=false
         self.base.print_message("IO Estop")
-        if switch == True:
-            for ao_name, ao_port in self.dev_ao.items():
+        if switch:
+            for ao_name in self.dev_ao.keys():
                 await self.set_digital_out(
-                    ao_port=ao_port,
+                    on=False,
                     value=0.0,
                     ao_name=ao_name,
                 )
-            for do_name, do_port in self.dev_do.items():
+            for do_name in self.dev_do.keys():
                 await self.set_digital_out(
-                    do_port=do_port,
                     on=False,
                     do_name=do_name,
                 )
@@ -116,12 +115,12 @@ class Galil:
             self.base.actionservermodel.estop = False
         return switch
 
-    async def get_analog_in(
-        self, ai_port: str, ai_name: str = "analog_in", *args, **kwargs
-    ):
+    async def get_analog_in(self, ai_name: str = "analog_in", *args, **kwargs):
         err_code = ErrorCodes.none
         ret = None
-        if ai_name in self.dev_ai and self.dev_ai[ai_name] == ai_port:
+        ai_port = -1
+        if ai_name in self.dev_ai:
+            ai_port = self.dev_ai[ai_name]
             cmd = f"MG @AN[{int(ai_port)}]"
             # self.base.print_message(f"cmd: '{cmd}'", info=True)
             ret = self.galilcmd(cmd)
@@ -136,12 +135,12 @@ class Galil:
             "value": ret,
         }
 
-    async def get_digital_in(
-        self, di_port: str, di_name: str = "digital_in", *args, **kwargs
-    ):
+    async def get_digital_in(self, di_name: str = "digital_in", *args, **kwargs):
         err_code = ErrorCodes.none
         ret = None
-        if di_name in self.dev_di and self.dev_di[di_name] == di_port:
+        di_port = -1
+        if di_name in self.dev_di:
+            di_port = self.dev_di[di_name]
             cmd = f"MG @IN[{int(di_port)}]"
             # self.base.print_message(f"cmd: '{cmd}'", info=True)
             ret = self.galilcmd(cmd)
@@ -156,12 +155,12 @@ class Galil:
             "value": ret,
         }
 
-    async def get_digital_out(
-        self, do_port: str, do_name: str = "digital_out", *args, **kwargs
-    ):
+    async def get_digital_out(self, do_name: str = "digital_out", *args, **kwargs):
         err_code = ErrorCodes.none
         ret = None
-        if do_name in self.dev_do and self.dev_do[do_name] == do_port:
+        do_port = -1
+        if do_name in self.dev_do:
+            do_port = self.dev_do[do_name]
             cmd = f"MG @OUT[{int(do_port)}]"
             # self.base.print_message(f"cmd: '{cmd}'", info=True)
             ret = self.galilcmd(cmd)
@@ -178,9 +177,10 @@ class Galil:
 
     # def set_analog_out(self, ports, handle: int, module: int, bitnum: int, multi_value):
     async def set_analog_out(
-        self, ao_port: int, value: float, ao_name: str = "analog_out", *args, **kwargs
+        self, value: float, ao_name: str = "analog_out", *args, **kwargs
     ):
         err_code = ErrorCodes.not_available
+        ao_port = -1
         # this is essentially a placeholder for now since the DMC-4143 does not support
         # analog out but I believe it is worthwhile to have this in here for the RIO
         # Handle num is A-H and must be on port 502 for the modbus commons
@@ -197,13 +197,13 @@ class Galil:
             "value": None,
         }
 
-    async def set_digital_out(
-        self, do_port: str, on: bool, do_name: str = "", *args, **kwargs
-    ):
+    async def set_digital_out(self, on: bool, do_name: str = "", *args, **kwargs):
         err_code = ErrorCodes.none
         on = bool(on)
         ret = None
-        if do_name in self.dev_do and self.dev_do[do_name] == do_port:
+        do_port = -1
+        if do_name in self.dev_do:
+            do_port = self.dev_do[do_name]
             if on:
                 cmd = f"SB {int(do_port)}"
             else:
@@ -253,18 +253,12 @@ class Galil:
             else int(round(toggle_duration * 1e3))
         )
         t_on = (
-            [
-                int(round(x * y * 1e3))
-                for x, y in zip(toggle_period, toggle_duty)
-            ]
+            [int(round(x * y * 1e3)) for x, y in zip(toggle_period, toggle_duty)]
             if isinstance(toggle_period, list)
             else int(round(toggle_period * toggle_duty * 1e3))
         )
         t_off = (
-            [
-                int(round(x * (1 - y) * 1e3))
-                for x, y in zip(toggle_period, toggle_duty)
-            ]
+            [int(round(x * (1 - y) * 1e3)) for x, y in zip(toggle_period, toggle_duty)]
             if isinstance(toggle_period, list)
             else int(round(toggle_period * (1 - toggle_duty) * 1e3))
         )
@@ -347,9 +341,7 @@ class Galil:
             main_dmc = "galil_toggle_main.dmc"
         else:
             main_dmc = "galil_toggle_main_nostop.dmc"
-        mainprog = pathlib.Path(
-            os.path.join(driver_path, main_dmc)
-        ).read_text()
+        mainprog = pathlib.Path(os.path.join(driver_path, main_dmc)).read_text()
         if req_out_name is not None:
             req_port = self.dev_do[req_out_name]
             subprog_dmc = "galil_toggle_sub_req.dmc"
@@ -371,7 +363,11 @@ class Galil:
         mainlines.pop(haltindex)
         haltline = "    " + "".join([f"HX{i+1};" for i in range(len(out_ports))])
         mainlines.insert(haltindex, haltline)
-        prog_parts = ["\n".join(mainlines).format(p_trigger_on=trigger_port_on, p_trigger_off=trigger_port_off)] + [
+        prog_parts = [
+            "\n".join(mainlines).format(
+                p_trigger_on=trigger_port_on, p_trigger_off=trigger_port_off
+            )
+        ] + [
             subprog.format(
                 subthread=i + 1,
                 p_output=out_ports[i],
