@@ -4,7 +4,7 @@ __all__ = ["config"]
 hostip = "127.0.0.1"
 config = {}
 config["dummy"] = False
-config['simulation'] = False
+config["simulation"] = False
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
@@ -23,129 +23,83 @@ config["root"] = r"C:\INST_hlo"
 
 
 # we define all the servers here so that the overview is a bit better
-config["servers"] = dict(
-    ##########################################################################
-    # Orchestrator
-    ##########################################################################
-    ORCH=dict(
-        host=hostip,
-        port=8001,
-        group="orchestrator",
-        fast="async_orch2",
-        params=dict(
-            enable_op=True,
-            bokeh_port=5002,
-        ),
-    ),
-    ##########################################################################
-    # Instrument Servers
-    ##########################################################################
-    MOTOR=dict(
-        host=hostip,
-        port=8003,
-        group="action",
-        fast="galil_motion",
-        # cmd_print=False,
-        params=dict(
-            enable_aligner=True,
-            bokeh_port=5003,
-            # backup if f"{gethostname()}_instrument_calib.json" is not found
-            # instrument specific calibration
-            M_instr=[[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
-            count_to_mm=dict(
-                A=1.0 / 6399.69,
-                B=1.0 / 6402.54,
-            ),
-            galil_ip_str="192.168.200.234",
-            def_speed_count_sec=10000,
-            max_speed_count_sec=25000,
-            ipstr="192.168.200.234",
-            axis_id=dict(
-                x="B",
-                y="A",
-            ),
-            axis_zero=dict(
-                A=152.9,  # znot    y
-                B=102.1,  # ynot x
-            ),
-            timeout=10 * 60,  # timeout for axis stop in sec
-        ),
-    ),
-    PSTAT=dict(
-        host=hostip,
-        port=8004,
-        group="action",
-        fast="gamry_server",
-        params=dict(
-            allow_no_sample=True,
-            dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
-            filterfreq_hz=1000.0,
-            grounded=True,
-        ),
-    ),
-    IO=dict(
-        host=hostip,
-        port=8005,
-        group="action",
-        fast="galil_io",
-        params=dict(
-            galil_ip_str="192.168.200.234",
-            dev_ai={},
-            dev_ao={},
-            dev_di={
-                "gamry_ttl0": 1,
-            },
-            dev_do={
-                "gamry_aux": 1,
-                "led": 2,
-                "pump_ref_flush": 3,
-                # "doric_led1":4,
-                "unknown2": 5,
-                # "doric_led2":6,
-                #  "doric_led3":7,
-                # "doric_led4":8,
-            },
-        ),
-    ),
-    PAL=dict(
-        host=hostip,
-        port=8007,
-        group="action",
-        fast="pal_server",
-        params=dict(
-            positions={
-                "custom": {
-                    "cell1_we": "cell",
-                }
-            },
-        ),
-    ),
-    # #########################################################################
-    # Visualizers (bokeh servers)
-    # #########################################################################
-    VIS=dict(
-        host=hostip,
-        port=5001,
-        group="visualizer",
-        bokeh="action_visualizer",
-        params=dict(
-            doc_name="ECHE8 Visualizer",
-        ),
-    ),
-    # #########################################################################
-    # DB package server
-    # #########################################################################
-    DB=dict(
-        host=hostip,
-        port=8010,
-        group="action",
-        fast="dbpack_server",
-        params=dict(
-            aws_config_path="k:/users/hte/.credentials/aws_config.ini",
-            aws_profile="default",
-            aws_bucket="helao.data",
-            api_host="caltech-api.modelyst.com",
-            testing=False,
-        ),
-    ),
-)
+config["servers"] = {
+    "ORCH": {
+        "host": "127.0.0.1",
+        "port": 8001,
+        "group": "orchestrator",
+        "fast": "async_orch2",
+        "params": {"enable_op": True, "bokeh_port": 5002},
+    },
+    "MOTOR": {
+        "host": "127.0.0.1",
+        "port": 8003,
+        "group": "action",
+        "fast": "galil_motion",
+        "params": {
+            "enable_aligner": True,
+            "bokeh_port": 5003,
+            "M_instr": [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
+            "count_to_mm": {"A": 0.00015625756872598518, "B": 0.0001561880128823873},
+            "galil_ip_str": "192.168.200.234",
+            "def_speed_count_sec": 10000,
+            "max_speed_count_sec": 25000,
+            "ipstr": "192.168.200.234",
+            "axis_id": {"x": "B", "y": "A"},
+            "axis_zero": {"A": 152.9, "B": 102.1},
+            "timeout": 600,
+        },
+    },
+    "PSTAT": {
+        "host": "127.0.0.1",
+        "port": 8004,
+        "group": "action",
+        "fast": "gamry_server",
+        "params": {
+            "allow_no_sample": True,
+            "dev_id": 0,
+            "filterfreq_hz": 1000.0,
+            "grounded": True,
+        },
+    },
+    "IO": {
+        "host": "127.0.0.1",
+        "port": 8005,
+        "group": "action",
+        "fast": "galil_io",
+        "params": {
+            "galil_ip_str": "192.168.200.234",
+            "dev_ai": {},
+            "dev_ao": {},
+            "dev_di": {"gamry_ttl0": 1},
+            "dev_do": {"gamry_aux": 1, "led": 2, "pump_ref_flush": 3, "unknown2": 5},
+        },
+    },
+    "PAL": {
+        "host": "127.0.0.1",
+        "port": 8007,
+        "group": "action",
+        "fast": "pal_server",
+        "params": {"positions": {"custom": {"cell1_we": "cell"}}},
+    },
+    "VIS": {
+        "host": "127.0.0.1",
+        "port": 5001,
+        "group": "visualizer",
+        "bokeh": "action_visualizer",
+        "params": {"doc_name": "ECHE8 Visualizer"},
+    },
+    "DB": {
+        "host": "127.0.0.1",
+        "port": 8010,
+        "group": "action",
+        "fast": "dbpack_server",
+        "params": {
+            "aws_config_path": "k:/users/hte/.credentials/aws_config.ini",
+            "aws_profile": "default",
+            "aws_bucket": "helao.data",
+            "api_host": "caltech-api.modelyst.com",
+            "testing": False,
+        },
+    },
+}

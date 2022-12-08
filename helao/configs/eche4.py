@@ -4,15 +4,15 @@ __all__ = ["config"]
 hostip = "127.0.0.1"
 config = {}
 config["dummy"] = True
-config['simulation'] = False
+config["simulation"] = False
 
-config["builtin_ref_motorxy"] = [110, 12]    #absolute plate coords
+config["builtin_ref_motorxy"] = [110, 12]  # absolute plate coords
 config["experiment_libraries"] = ["samples_exp", "ECHE_exp", "ECHEUVIS_exp", "UVIS_exp"]
 config["experiment_params"] = {
     "toggle_is_shutter": False,
     "gamrychannelwait": -1,
     "gamrychannelsend": 0,
-    }
+}
 config["sequence_libraries"] = ["ECHE_seq", "ECHEUVIS_seq", "UVIS_T_seq"]
 config["sequence_params"] = {
     "led_wavelengths_nm": [-1],
@@ -36,79 +36,56 @@ config["root"] = r"C:\INST_hlo"
 
 
 # we define all the servers here so that the overview is a bit better
-config["servers"] = dict(
-    ##########################################################################
-    # Orchestrator
-    ##########################################################################
-    ORCH=dict(
-        host=hostip,
-        port=8001,
-        group="orchestrator",
-        fast="async_orch2",
-        params=dict(
-            enable_op=True,
-            bokeh_port=5002,
-        ),
-    ),
-    ##########################################################################
-    # Instrument Servers
-    ##########################################################################
-    MOTOR=dict(
-        host=hostip,
-        port=8003,
-        group="action",
-        fast="galil_motion",
-        # cmd_print=False,
-        params=dict(
-            enable_aligner=True,
-            bokeh_port=5003,
-            # backup if f"{gethostname()}_instrument_calib.json" is not found
-            # instrument specific calibration
-            M_instr=[[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
-            count_to_mm=dict(
-                A=1.0 / 6396.11,
-                B=1.0 / 6400.24,
-            ),
-            galil_ip_str="192.168.200.235",
-            def_speed_count_sec=10000,
-            max_speed_count_sec=25000,
-            ipstr="192.168.200.23",
-            axis_id=dict(
-                x="B",
-                y="A",
-            ),
-            axis_zero=dict(
-                A=127.8,  # z
-                B=76.7,  # y
-            ),
-            timeout=10 * 60,  # timeout for axis stop in sec
-        ),
-    ),
-    PSTAT=dict(
-        host=hostip,
-        port=8004,
-        group="action",
-        fast="gamry_server",
-        params=dict(
-            allow_no_sample=True,
-            dev_id=0,  # (default 0) Gamry device number in Gamry Instrument Manager (i-1)
-            filterfreq_hz=1000.0,
-            grounded=True,
-        ),
-    ),
-    IO=dict(
-        host=hostip,
-        port=8005,
-        group="action",
-        fast="galil_io",
-        params=dict(
-            galil_ip_str="192.168.200.235",
-            dev_ai={},
-            dev_ao={},
-            dev_di={
-                "gamry_ttl0": 1,
-            },
-            dev_do={
+config["servers"] = {
+    "ORCH": {
+        "host": "127.0.0.1",
+        "port": 8001,
+        "group": "orchestrator",
+        "fast": "async_orch2",
+        "params": {"enable_op": True, "bokeh_port": 5002},
+    },
+    "MOTOR": {
+        "host": "127.0.0.1",
+        "port": 8003,
+        "group": "action",
+        "fast": "galil_motion",
+        "params": {
+            "enable_aligner": True,
+            "bokeh_port": 5003,
+            "M_instr": [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
+            "count_to_mm": {"A": 0.00015634502846261243, "B": 0.00015624414084471834},
+            "galil_ip_str": "192.168.200.235",
+            "def_speed_count_sec": 10000,
+            "max_speed_count_sec": 25000,
+            "ipstr": "192.168.200.23",
+            "axis_id": {"x": "B", "y": "A"},
+            "axis_zero": {"A": 127.8, "B": 76.7},
+            "timeout": 600,
+        },
+    },
+    "PSTAT": {
+        "host": "127.0.0.1",
+        "port": 8004,
+        "group": "action",
+        "fast": "gamry_server",
+        "params": {
+            "allow_no_sample": True,
+            "dev_id": 0,
+            "filterfreq_hz": 1000.0,
+            "grounded": True,
+        },
+    },
+    "IO": {
+        "host": "127.0.0.1",
+        "port": 8005,
+        "group": "action",
+        "fast": "galil_io",
+        "params": {
+            "galil_ip_str": "192.168.200.235",
+            "dev_ai": {},
+            "dev_ao": {},
+            "dev_di": {"gamry_ttl0": 1},
+            "dev_do": {
                 "gamry_aux": 1,
                 "spec_trig": 1,
                 "led": 8,
@@ -120,71 +97,52 @@ config["servers"] = dict(
                 "doric_led3": 6,
                 "doric_led4": 7,
             },
-        ),
-    ),
-    PAL=dict(
-        host=hostip,
-        port=8007,
-        group="action",
-        fast="pal_server",
-        params=dict(
-            positions={
-                "custom": {
-                    "cell1_we": "cell",
-                }
-            },
-        ),
-    ),
-    SPEC_T=dict(
-        host=hostip,
-        port=8011,
-        group="action",
-        fast="spec_server",
-        params=dict(
-            dev_num=0,
-            lib_path=r"C:\Spectral Products\SM32ProForUSB\SDK Examples\DLL\x64\stdcall\SPdbUSBm.dll",
-            n_pixels=1024,
-            start_margin=5,
-            # wl_cal=[2537, 3132, 3650, 4047, 4358, 5461, 6965, 7635, 8115, 9123],
-            # px_cal=[173,  239,  299,  342,  376,  494,  652,  721,  769,  871],
-            ## px_cal=[269, 386, 488, 564, 624, 831, 1108, 1228, 1314, 1493],
-            # id_vendor = 0x0547,
-            # id_product = 0x0322,
-        ),
-    ),
-    CALC=dict(
-        host=hostip,
-        port=8012,
-        group="action",
-        fast="calc_server",
-        params={},
-    ),
-    # #########################################################################
-    # Visualizers (bokeh servers)
-    # #########################################################################
-    VIS=dict(
-        host=hostip,
-        port=5001,
-        group="visualizer",
-        bokeh="action_visualizer",
-        params=dict(
-            doc_name="ECHE4 Visualizer",
-        ),
-    ),
-    #########################################################################
-    # DB package server
-    #########################################################################
-    DB=dict(
-        host=hostip,
-        port=8010,
-        group="action",
-        fast="dbpack_server",
-        params=dict(
-            aws_config_path="k:/users/hte/.credentials/aws_config.ini",
-            aws_profile="default",
-            aws_bucket="helao.data",
-            api_host="caltech-api.modelyst.com",
-            testing=False,
-        ),
-    ),
-)
+        },
+    },
+    "PAL": {
+        "host": "127.0.0.1",
+        "port": 8007,
+        "group": "action",
+        "fast": "pal_server",
+        "params": {"positions": {"custom": {"cell1_we": "cell"}}},
+    },
+    "SPEC_T": {
+        "host": "127.0.0.1",
+        "port": 8011,
+        "group": "action",
+        "fast": "spec_server",
+        "params": {
+            "dev_num": 0,
+            "lib_path": "C:\\Spectral Products\\SM32ProForUSB\\SDK Examples\\DLL\\x64\\stdcall\\SPdbUSBm.dll",
+            "n_pixels": 1024,
+            "start_margin": 5,
+        },
+    },
+    "CALC": {
+        "host": "127.0.0.1",
+        "port": 8012,
+        "group": "action",
+        "fast": "calc_server",
+        "params": {},
+    },
+    "VIS": {
+        "host": "127.0.0.1",
+        "port": 5001,
+        "group": "visualizer",
+        "bokeh": "action_visualizer",
+        "params": {"doc_name": "ECHE4 Visualizer"},
+    },
+    "DB": {
+        "host": "127.0.0.1",
+        "port": 8010,
+        "group": "action",
+        "fast": "dbpack_server",
+        "params": {
+            "aws_config_path": "k:/users/hte/.credentials/aws_config.ini",
+            "aws_profile": "default",
+            "aws_bucket": "helao.data",
+            "api_host": "caltech-api.modelyst.com",
+            "testing": False,
+        },
+    },
+}
