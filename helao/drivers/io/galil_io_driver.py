@@ -109,6 +109,7 @@ class Galil:
         while True:
             if self.polling:
                 for ai_name, scaling in self.monitor_ai.items():
+                    status_dict = {}
                     checktime = time.time()
                     if checktime - lastupdate < waittime:
                         # self.base.print_message("waiting for minimum update interval.")
@@ -118,12 +119,11 @@ class Galil:
                         ai_resp.get("error", ErrorCodes.not_available)
                         == ErrorCodes.none
                     ):
-                        lastupdate = time.time()
                         status_dict = {ai_name: float(ai_resp["value"]) * scaling}
-                        self.base.print_message(status_dict)
                         await self.base.put_lbuf(status_dict)
-            else:
-                await asyncio.sleep(0.05)
+                    lastupdate = time.time()
+                    self.base.print_message(status_dict)
+            await asyncio.sleep(0.01)
 
     async def reset(self):
         pass
