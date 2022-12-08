@@ -116,13 +116,13 @@ class Galil:
                         await asyncio.sleep(waittime - (checktime - lastupdate))
                     ai_resp = await self.get_analog_in(ai_name)
                     if (
-                        ai_resp.get("error", ErrorCodes.not_available)
+                        ai_resp.get("error_code", ErrorCodes.not_available)
                         == ErrorCodes.none
                     ):
                         status_dict = {ai_name: float(ai_resp["value"]) * scaling}
                         await self.base.put_lbuf(status_dict)
                     lastupdate = time.time()
-                    self.base.print_message(ai_resp)
+                    # self.base.print_message(ai_resp)
             await asyncio.sleep(0.01)
 
     async def reset(self):
