@@ -64,10 +64,11 @@ config["servers"] = {
         "fast": "galil_io",
         "params": {
             "galil_ip_str": "192.168.200.218",
-            "dev_ai": {"cell_pressure": 1},
+            "dev_ai": {"cell_pressure_psi": 1},
             "dev_ao": {},
             "dev_di": {"multichannel_valve_done": 1, "multichannel_valve_error": 2},
             "dev_do": {"gamry_aux": 1, "Thorlab_led": 7},
+            "monitor_ai": {"cell_pressure_psi": 5.0},  # scaling factor 5.0 psi/V
         },
     },
     "NI": {
