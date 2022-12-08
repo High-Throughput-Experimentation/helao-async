@@ -41,7 +41,7 @@ config["servers"] = {
                 "B": 0.00015630959303234357,
                 "C": 0.00015727325914229457,
             },
-            "galil_ip_str": "192.168.200.218",
+            "galil_ip_str": "192.168.200.232",
             "def_speed_count_sec": 10000,
             "max_speed_count_sec": 25000,
             "ipstr": "192.168.200.23",
@@ -63,7 +63,7 @@ config["servers"] = {
         "group": "action",
         "fast": "galil_io",
         "params": {
-            "galil_ip_str": "192.168.200.218",
+            "galil_ip_str": "192.168.200.232",
             "dev_ai": {"cell_pressure_psi": 1},
             "dev_ao": {},
             "dev_di": {"multichannel_valve_done": 1, "multichannel_valve_error": 2},
