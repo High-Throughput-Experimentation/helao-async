@@ -321,7 +321,7 @@ class cNIMAX:
     def create_monitortask(self):
         """configures and starts a NImax task for nonexperiment temp measurements"""
         self.task_monitors = nidaqmx.Task()
-        self.task_monitor_keys = list(self.config_dict["dev_monitor"].keys())
+        self.task_monitor_keys = list(self.config_dict.get("dev_monitor", {}).keys())
         for myname in self.task_monitor_keys:
             mydev = self.config_dict["dev_monitor"][myname]
             # can add if filter for different types of monitors (other than Temp)
