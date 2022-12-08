@@ -322,50 +322,52 @@ class cNIMAX:
         """configures and starts a NImax task for nonexperiment temp measurements"""
         self.task_monitors = nidaqmx.Task()
         self.task_monitor_keys = list(self.config_dict.get("dev_monitor", {}).keys())
-        for myname in self.task_monitor_keys:
-            mydev = self.config_dict["dev_monitor"][myname]
-            # can add if filter for different types of monitors (other than Temp)
-            if "Ttc_" in myname:
-                TCtype = ThermocoupleType.T
-            else:
-                TCtype = ThermocoupleType.K
-            self.task_monitors.ai_channels.add_ai_thrmcpl_chan(
-                mydev,
-                name_to_assign_to_channel=myname,
-                min_val=0,
-                max_val=150,
-                units=TemperatureUnits.DEG_C,
-                thermocouple_type=TCtype,
-                # cjc_source=CJCSource.CONSTANT_USER_VALUE,
-                # cjc_val = 27,
-                # cjc_source=CJCSource.SCANNABLE_CHANNEL,
-                # cjc_channel= 'CJCtemp',
+        if self.task_monitor_keys:
+            for myname in self.task_monitor_keys:
+                mydev = self.config_dict["dev_monitor"][myname]
+                # can add if filter for different types of monitors (other than Temp)
+                if "Ttc_" in myname:
+                    TCtype = ThermocoupleType.T
+                else:
+                    TCtype = ThermocoupleType.K
+                self.task_monitors.ai_channels.add_ai_thrmcpl_chan(
+                    mydev,
+                    name_to_assign_to_channel=myname,
+                    min_val=0,
+                    max_val=150,
+                    units=TemperatureUnits.DEG_C,
+                    thermocouple_type=TCtype,
+                    # cjc_source=CJCSource.CONSTANT_USER_VALUE,
+                    # cjc_val = 27,
+                    # cjc_source=CJCSource.SCANNABLE_CHANNEL,
+                    # cjc_channel= 'CJCtemp',
+                )
+            self.task_monitors.ai_channels.all.ai_lowpass_enable = True
+            self.task_monitors.timing.cfg_samp_clk_timing(
+                rate=1,
+                source="",
+                active_edge=Edge.RISING,
+                sample_mode=AcquisitionType.CONTINUOUS,
+                samps_per_chan=self.buffersize,
             )
-        self.task_monitors.ai_channels.all.ai_lowpass_enable = True
-        self.task_monitors.timing.cfg_samp_clk_timing(
-            rate=1,
-            source="",
-            active_edge=Edge.RISING,
-            sample_mode=AcquisitionType.CONTINUOUS,
-            samps_per_chan=self.buffersize,
-        )
 
-    #        self.task_monitors.start()
+        #        self.task_monitors.start()
 
     async def monitorloop(self):
         self.create_monitortask()
-        self.task_monitors.start()
-        while self.monitorloop_run:
-            mvalues = self.task_monitors.read()
-            #            print(mvalues)
-            for myname, mvalue in zip(self.task_monitor_keys, mvalues):
-                #                print(myname)
-                datastore = {myname: mvalue}
-                #                print(datastore)
-                await self.base.put_lbuf(datastore)
-            await asyncio.sleep(1)
-            # self.monitorloop_run = False   #so it only runs once
-        self.task_monitors.close()
+        if self.task_monitor_keys:
+            self.task_monitors.start()
+            while self.monitorloop_run:
+                mvalues = self.task_monitors.read()
+                #            print(mvalues)
+                for myname, mvalue in zip(self.task_monitor_keys, mvalues):
+                    #                print(myname)
+                    datastore = {myname: mvalue}
+                    #                print(datastore)
+                    await self.base.put_lbuf(datastore)
+                await asyncio.sleep(1)
+                # self.monitorloop_run = False   #so it only runs once
+            self.task_monitors.close()
 
     def streamIV_callback(
         self, task_handle, every_n_samples_event_type, number_of_samples, callback_data
