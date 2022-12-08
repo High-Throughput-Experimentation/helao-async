@@ -153,6 +153,10 @@ def makeActionServ(
         finished_action = await active.finish()
         return finished_action.as_dict()
 
+    @app.post("/get_lbuf", tags=["private"])
+    def get_lbuf():
+        return app.base.live_buffer
+
     @app.post("/shutdown", tags=["private"])
     async def post_shutdown():
         await shutdown_event()
