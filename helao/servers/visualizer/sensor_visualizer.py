@@ -11,6 +11,8 @@ from helao.helpers.make_vis_serv import makeVisServ
 from helao.servers.vis import Vis
 from helao.helpers.config_loader import config_loader
 from helao.servers.visualizer.co2_vis import C_co2
+from helao.servers.visualizer.pressure_vis import C_pressure
+from helao.servers.visualizer.temp_vis import C_temperature
 
 
 valid_data_status = (
@@ -76,6 +78,7 @@ def makeBokehApp(doc, confPrefix, servKey, helao_root):
     # create visualizer objects for defined instruments
     vis_map = {"sensor_server": C_co2,
         "sensor_server": C_pressure,
+        "sensor_server": C_temperature,
         }
     vis_dict = {}
 
