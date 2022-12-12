@@ -3,8 +3,6 @@ import websockets
 import asyncio
 import json
 from functools import partial
-from uuid import UUID
-from copy import deepcopy
 
 from bokeh.models import (
     CheckboxButtonGroup,
@@ -265,6 +263,7 @@ class C_pressure:
                 y=pres_key,
                 line_color=color,
                 source=self.datasource,
+                legend_label=pres_key,
             )
 
     def reset_plot(self, forceupdate: bool = False):
