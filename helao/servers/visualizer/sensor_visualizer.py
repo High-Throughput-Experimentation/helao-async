@@ -76,10 +76,11 @@ def makeBokehApp(doc, confPrefix, servKey, helao_root):
     app.vis.doc.add_root(Spacer(height=10))
 
     # create visualizer objects for defined instruments
-    vis_map = {"sensor_server": C_co2,
-        "sensor_server": C_pressure,
-        "sensor_server": C_temperature,
-        }
+    vis_map = {
+        "sensor_server": C_co2,
+        "galil_io": C_pressure,
+        "nidaqmx_server": C_temperature,
+    }
     vis_dict = {}
 
     for fkey, viscls in vis_map.items():
