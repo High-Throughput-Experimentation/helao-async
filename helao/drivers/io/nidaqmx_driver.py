@@ -359,13 +359,12 @@ class cNIMAX:
             self.task_monitors.start()
             while self.monitorloop_run:
                 mvalues = self.task_monitors.read()
-                #            print(mvalues)
-                for myname, mvalue in zip(self.task_monitor_keys, mvalues):
-                    #                print(myname)
-                    datastore = {myname: mvalue}
-                    #                print(datastore)
-                    await self.base.put_lbuf(datastore)
-                await asyncio.sleep(1)
+                datastore = {
+                    myname: mvalue
+                    for myname, mvalue in zip(self.task_monitor_keys, mvalues)
+                }
+                await self.base.put_lbuf(datastore)
+                await asyncio.sleep(0.5)
                 # self.monitorloop_run = False   #so it only runs once
             self.task_monitors.close()
 
