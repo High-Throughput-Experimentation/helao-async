@@ -4,17 +4,17 @@ config["dummy"] = True
 config["simulation"] = False
 
 # action library provides generator functions which produce actions
-config["experiment_libraries"] = ["ANEC_exp", "samples_exp"]
+config["experiment_libraries"] = ["CCSI_exp", "samples_exp"]
 config["experiment_params"] = {
     "gamrychannelwait": -1,
     "gamrychannelsend": 1,
 }
-config["sequence_libraries"] = ["ANEC_seq"]
+config["sequence_libraries"] = ["CCSI_seq"]
 config["sequence_params"] = {
     "gamrychannelwait": -1,
     "gamrychannelsend": 1,
 }
-config["run_type"] = "ANEC"
+config["run_type"] = "CCSI"
 config["root"] = r"C:\INST_hlo"
 
 
@@ -77,26 +77,31 @@ config["servers"] = {
         "group": "action",
         "fast": "nidaqmx_server",
         "params": {
-            "dev_liquidvalve": {
+            "dev_gasvalve": {
                 "1A": "cDAQ1Mod1/port0/line0",
                 "1B": "cDAQ1Mod1/port0/line1",
-                "2": "cDAQ1Mod1/port0/line2",
-                "3A": "cDAQ1Mod1/port0/line3",
-                "4A": "cDAQ1Mod1/port0/line4",
-                "5A-cell": "cDAQ1Mod1/port0/line5",
-                "5B-waste": "cDAQ1Mod1/port0/line6",
-                "6A-waste": "cDAQ1Mod1/port0/line7",
-                "6B": "cDAQ1Mod1/port0/line8",
-                "blank": "cDAQ1Mod1/port0/line9",
+                "7": "cDAQ1Mod1/port0/line9",
                 "multi_CMD0": "cDAQ1Mod1/port0/line28",
                 "multi_CMD1": "cDAQ1Mod1/port0/line29",
                 "multi_CMD2": "cDAQ1Mod1/port0/line30",
                 "multi_CMD3": "cDAQ1Mod1/port0/line31",
             },
-            "dev_triggers": {
-                "pump1": "cDAQ1Mod1/port0/line16",
-                "pump2": "cDAQ1Mod1/port0/line17",
-                "pump3": "cDAQ1Mod1/port0/line18",
+            "dev_liquidvalve": {
+                "2": "cDAQ1Mod1/port0/line2",
+                "3": "cDAQ1Mod1/port0/line3",
+                "4": "cDAQ1Mod1/port0/line4",
+                "5A-cell": "cDAQ1Mod1/port0/line5",
+                "5B-waste": "cDAQ1Mod1/port0/line6",
+                "6A-waste": "cDAQ1Mod1/port0/line7",
+                "6B": "cDAQ1Mod1/port0/line8",
+                "8": "cDAQ1Mod1/port0/line10",
+                "9": "cDAQ1Mod1/port0/line11",
+
+            },
+            "dev_pump": {
+                "PeriPump1": "cDAQ1Mod1/port0/line12",
+               # "pump2": "cDAQ1Mod1/port0/line17",
+               # "pump3": "cDAQ1Mod1/port0/line18",
             },
         },
     },
@@ -114,6 +119,19 @@ config["servers"] = {
         "bokeh": "action_visualizer",
         "params": {"doc_name": "CCSI Visualizer"},
     },
+    "SENSOR": {
+        "host": "127.0.0.1",
+        "port": 8012,
+        "group": "action",
+        "fast": "sensor_server",
+        "params": {
+         #   "dev_num": 0,
+         #   "lib_path": ,
+        },
+
+
+    },
+
     "DB": {
         "host": "127.0.0.1",
         "port": 8010,
