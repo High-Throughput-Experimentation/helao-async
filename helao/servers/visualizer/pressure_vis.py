@@ -33,21 +33,20 @@ class C_pressure:
         self.last_update_time = time.time()
 
         self.live_key = serv_key
-        pressserv_config = self.vis.world_cfg["servers"].get(self.live_key, None)
-        if pressserv_config is None:
+        psrv_config = self.vis.world_cfg["servers"].get(self.live_key, None)
+        if psrv_config is None:
             return
-        pressserv_host = pressserv_config.get("host", None)
-        pressserv_port = pressserv_config.get("port", None)
+        psrv_host = psrv_config.get("host", None)
+        psrv_port = psrv_config.get("port", None)
 
-        self.data_url = (
-            f"ws://{pressserv_config['host']}:{pressserv_config['port']}/ws_live"
-        )
-        # self.stat_url = f"ws://{co2serv_config["host"]}:{co2serv_config["port"]}/ws_status"
+        self.data_url = f"ws://{psrv_config['host']}:{psrv_config['port']}/ws_live"
 
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["epoch_s", "pressure_psi"]
+        self.data_dict_keys = ["epoch_s"] + sorted(
+            psrv_config.get("params", {}).get("dev_ai", {}).keys()
+        )
         self.data_dict = {key: [] for key in self.data_dict_keys}
 
         self.datasource = ColumnDataSource(data=self.data_dict)
@@ -106,7 +105,7 @@ class C_pressure:
             [
                 [
                     Div(
-                        text=f'<b>Pressure Sensor module for server <a href="http://{pressserv_host}:{pressserv_port}/docs#/" target="_blank">\'{self.live_key}\'</a></b>',
+                        text=f'<b>Pressure Sensor module for server <a href="http://{psrv_host}:{psrv_port}/docs#/" target="_blank">\'{self.live_key}\'</a></b>',
                         width=1004,
                         height=15,
                     ),
@@ -258,12 +257,15 @@ class C_pressure:
         # remove all old lines
         self.plot.renderers = []
 
-        self.plot.line(
-            x="epoch_s",
-            y="pressure_psi",
-            line_color="red",
-            source=self.datasource,
-        )
+        colors = ["red", "blue", "green", "orange"]
+        non_epoch_keys = [x for x in self.data_dict.keys if x != "epoch_s"]
+        for pres_key, color in zip(non_epoch_keys, colors):
+            self.plot.line(
+                x="epoch_s",
+                y=pres_key,
+                line_color=color,
+                source=self.datasource,
+            )
 
     def reset_plot(self, forceupdate: bool = False):
         # self.xselect = self.xaxis_selector_group.active

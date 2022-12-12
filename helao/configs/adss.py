@@ -100,9 +100,9 @@ config["servers"] = {
             },
             "dev_monitor": {
                 "Ttemp_Ktc_in_cell_C": "PXI-6289/ai6",
-                "Ttemp_Ttc_in_reservoir_C": "PXI-6289/ai7",
-                "Ttemp_Ktc_out_cell_C": "PXI-6289/ai1",
-                "Ttemp_Ktc_out_reservoir_C": "PXI-6289/ai2",
+                # "Ttemp_Ttc_in_reservoir_C": "PXI-6289/ai7",
+                # "Ttemp_Ktc_out_cell_C": "PXI-6289/ai1",
+                # "Ttemp_Ktc_out_reservoir_C": "PXI-6289/ai2",
             },
             "dev_heat": {
                 "cellheater": "PXI-6289/port0/line0",

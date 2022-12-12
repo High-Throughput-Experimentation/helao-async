@@ -33,21 +33,20 @@ class C_temperature:
         self.last_update_time = time.time()
 
         self.live_key = serv_key
-        temperatureserv_config = self.vis.world_cfg["servers"].get(self.live_key, None)
-        if temperatureserv_config is None:
+        tserv_config = self.vis.world_cfg["servers"].get(self.live_key, None)
+        if tserv_config is None:
             return
-        temperatureserv_host = temperatureserv_config.get("host", None)
-        temperatureserv_port = temperatureserv_config.get("port", None)
+        tserv_host = tserv_config.get("host", None)
+        tserv_port = tserv_config.get("port", None)
 
-        self.data_url = (
-            f"ws://{temperatureserv_config['host']}:{temperatureserv_config['port']}/ws_live"
-        )
-        # self.stat_url = f"ws://{temperatureserv_config["host"]}:{temperatureserv_config["port"]}/ws_status"
+        self.data_url = f"ws://{tserv_config['host']}:{tserv_config['port']}/ws_live"
 
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["epoch_s", "temperature_C"]
+        self.data_dict_keys = ["epoch_s"] + sorted(
+            tserv_config.get("params", {}).get("dev_monitor", {}).keys()
+        )
         self.data_dict = {key: [] for key in self.data_dict_keys}
 
         self.datasource = ColumnDataSource(data=self.data_dict)
@@ -106,7 +105,7 @@ class C_temperature:
             [
                 [
                     Div(
-                        text=f'<b>Temperature Sensor module for server <a href="http://{temperatureserv_host}:{temperatureserv_port}/docs#/" target="_blank">\'{self.live_key}\'</a></b>',
+                        text=f'<b>Temperature Sensor module for server <a href="http://{tserv_host}:{tserv_port}/docs#/" target="_blank">\'{self.live_key}\'</a></b>',
                         width=1004,
                         height=15,
                     ),
@@ -258,12 +257,14 @@ class C_temperature:
         # remove all old lines
         self.plot.renderers = []
 
-        self.plot.line(
-            x="epoch_s",
-            y="temperature_C",
-            line_color="red",
-            source=self.datasource,
-        )
+        colors = ["red", "blue", "green", "orange"]
+        for temp_key, color in zip(self.data_dict_keys, colors):
+            self.plot.line(
+                x="epoch_s",
+                y=temp_key,
+                line_color=color,
+                source=self.datasource,
+            )
 
     def reset_plot(self, forceupdate: bool = False):
         # self.xselect = self.xaxis_selector_group.active
