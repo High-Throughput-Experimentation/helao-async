@@ -258,7 +258,8 @@ class C_temperature:
         self.plot.renderers = []
 
         colors = ["red", "blue", "green", "orange"]
-        for temp_key, color in zip(self.data_dict_keys, colors):
+        non_epoch_keys = [x for x in self.data_dict.keys if x != "epoch_s"]
+        for temp_key, color in zip(non_epoch_keys, colors):
             self.plot.line(
                 x="epoch_s",
                 y=temp_key,
