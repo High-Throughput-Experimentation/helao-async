@@ -114,6 +114,13 @@ config["servers"] = {
         "bokeh": "action_visualizer",
         "params": {"doc_name": "CCSI Visualizer"},
     },
+    "LIVE": {
+        "host": hostip,
+        "port": 5003,
+        "group": "visualizer",
+        "bokeh": "sensor_visualizer",
+        "params": {"doc_name": "Sensor Visualizer"},
+    },
     "DB": {
         "host": "127.0.0.1",
         "port": 8010,
