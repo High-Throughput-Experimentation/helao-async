@@ -359,6 +359,8 @@ class cNIMAX:
             self.task_monitors.start()
             while self.monitorloop_run:
                 mvalues = self.task_monitors.read()
+                if not isinstance(mvalues, list):
+                    mvalues = [mvalues]
                 datastore = {
                     myname: mvalue
                     for myname, mvalue in zip(self.task_monitor_keys, mvalues)
