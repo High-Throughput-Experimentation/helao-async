@@ -172,7 +172,7 @@ config["servers"] = {
     },
     "LIVE": {
         "host": hostip,
-        "port": 5003,
+        "port": 5004,
         "group": "visualizer",
         "bokeh": "sensor_visualizer",
         "params": {"doc_name": "Sensor Visualizer"},
