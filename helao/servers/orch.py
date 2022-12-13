@@ -3,7 +3,7 @@ __all__ = ["Orch", "makeOrchServ"]
 import asyncio
 import sys
 from copy import deepcopy
-from typing import Optional, List
+from typing import Optional, List, Union
 from uuid import UUID
 from socket import gethostname
 import inspect
@@ -561,15 +561,14 @@ class Orch(Base):
             return []
 
     async def seq_unpacker(self):
-        for i, experimenttemplate in enumerate(
+        for i, (experimenttemplate, kwargs) in enumerate(
             self.active_sequence.experiment_plan_list
         ):
             # self.print_message(
             #     f"unpack experiment {experimenttemplate.experiment_name}"
             # )
             await self.add_experiment(
-                seq=self.seq_file,
-                experimenttemplate=experimenttemplate,
+                seq=self.seq_file, experimenttemplate=experimenttemplate, **kwargs
             )
             if i == 0:
                 self.orchstatusmodel.loop_state = OrchStatus.started
@@ -1206,10 +1205,16 @@ class Orch(Base):
         # access: str = "hte",
         prepend: Optional[bool] = False,
         at_index: Optional[int] = None,
+        from_globalseq_params: Optional[dict] = {},
+        to_globalseq_params: Optional[Union[list, dict]] = [],
     ):
         Ddict = experimenttemplate.dict()
         Ddict.update(seq.dict())
-        D = Experiment(**Ddict)
+        D = Experiment(
+            **Ddict,
+            from_globalseq_params=from_globalseq_params,
+            to_globalseq_params=to_globalseq_params,
+        )
 
         # init uuid now for tracking later
         D.experiment_uuid = gen_uuid()
@@ -1219,7 +1224,7 @@ class Orch(Base):
             D.orchestrator = self.server
 
         await asyncio.sleep(0.0001)
-        if at_index:
+        if at_index is not None:
             self.experiment_dq.insert(i=at_index, x=D)
         elif prepend:
             self.experiment_dq.appendleft(D)
@@ -2088,7 +2093,9 @@ class Operator:
             )
 
         self.sequence_source.data = self.sequence_list
-        self.vis.print_message(f"current queued sequences: ({len(self.orch.sequence_dq)})")
+        self.vis.print_message(
+            f"current queued sequences: ({len(self.orch.sequence_dq)})"
+        )
 
     async def get_experiments(self):
         """get experiment list from orch"""
