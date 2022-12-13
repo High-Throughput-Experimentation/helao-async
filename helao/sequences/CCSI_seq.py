@@ -1,6 +1,6 @@
 """Sequence library for CCSI"""
 
-__all__ = ["ANEC_sample_ready",
+__all__ = ["CCSI_initialization",
 
 ]
 
