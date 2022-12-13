@@ -229,10 +229,13 @@ def CCSI_sub_delta_purge(
 
     return apm.action_list
 
-def CCSI_sub_headspace_purge(
+def CCSI_sub_headspace_purge_and_measure(
     experiment: Experiment,
     experiment_version: int = 1,
     HSpurge_duration: float = 20, #set before determining actual
+    HSmeasure1_duration: float = 60, #set before determining actual
+    CO2measure_duration: float = 1,
+    CO2measure_acqrate: float = 0.1,    
 ):
 # recirculation loop
 # only 1B 6A opened 1A closed pump off//differ from delta purge
@@ -253,19 +256,9 @@ def CCSI_sub_headspace_purge(
 #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server,"wait",{"waittime": apm.pars.HSpurge_duration})
 
-    return apm.action_list
-
-def CCSI_sub_measure_headspace_frompurge(
-    experiment: Experiment,
-    experiment_version: int = 1,
-    HSmeasure1_duration: float = 60, #set before determining actual
-    CO2measure_duration: float = 1,
-    CO2measure_acqrate: float = 0.1,
-):
 # recirculation loop
-# only 1A 6A opened 1B closed pump on//differ from delta purge
+# only 1A 6A opened 1B closed pump on//differ from purge
 
-    apm = ActionPlanMaker()
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0})

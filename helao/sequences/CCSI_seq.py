@@ -24,6 +24,7 @@ def CCSI_initialization(
     HSmeasure1_duration: float = 60,
     CO2measure_duration: float = 1,
     CO2measure_acqrate: float = 0.1,
+    CO2threshold: float = 1  # value and units????
 ):
 
     epm = ExperimentPlanMaker()
@@ -39,8 +40,6 @@ def CCSI_initialization(
     epm.add_experiment("CCSI_sub_sensor_purge", {"Sensorpurge1_duration": Sensorpurge1_duration})
     epm.add_experiment("CCSI_sub_delta_purge", {"Deltapurge1_duration": Deltapurge1_duration})
     for _ in range(headspace_purge_cycles):
-        epm.add_experiment("CCSI_sub_headspace_purge", {"HSpurge_duration": HSpurge_duration})
-        epm.add_experiment("CCSI_sub_measure_headspace_frompurge",{"HSmeasure1_duration":HSmeasure1_duration, "CO2measure_duration": CO2measure_duration, "CO2measure_acqrate": CO2measure_acqrate})
-
+        epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {"HSpurge_duration": HSpurge_duration, "HSmeasure1_duration":HSmeasure1_duration, "CO2measure_duration": CO2measure_duration, "CO2measure_acqrate": CO2measure_acqrate})
 
     return epm.experiment_plan_list
