@@ -99,7 +99,7 @@ config["servers"] = {
 
             },
             "dev_pump": {
-                "PeriPump1": "cDAQ1Mod1/port0/line12",
+                "RecirculatingPeriPump1": "cDAQ1Mod1/port0/line12",
                # "pump2": "cDAQ1Mod1/port0/line17",
                # "pump3": "cDAQ1Mod1/port0/line18",
             },
