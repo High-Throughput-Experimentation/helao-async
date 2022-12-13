@@ -232,7 +232,7 @@ def CCSI_sub_delta_purge(
 def CCSI_sub_headspace_purge(
     experiment: Experiment,
     experiment_version: int = 1,
-    HSpurge1_duration: float = 20, #set before determining actual
+    HSpurge_duration: float = 20, #set before determining actual
 ):
 # recirculation loop
 # only 1B 6A opened 1A closed pump off//differ from delta purge
@@ -251,7 +251,7 @@ def CCSI_sub_headspace_purge(
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A", "on": 1})
 #   apm.add(MFC---stuff Flow ON)
-    apm.add(ORCH_server,"wait",{"waittime": apm.pars.HSpurge1_duration})
+    apm.add(ORCH_server,"wait",{"waittime": apm.pars.HSpurge_duration})
 
     return apm.action_list
 
@@ -259,6 +259,8 @@ def CCSI_sub_measure_headspace_frompurge(
     experiment: Experiment,
     experiment_version: int = 1,
     HSmeasure1_duration: float = 60, #set before determining actual
+    CO2measure_duration: float = 1,
+    CO2measure_acqrate: float = 0.1,
 ):
 # recirculation loop
 # only 1A 6A opened 1B closed pump on//differ from delta purge
@@ -278,5 +280,5 @@ def CCSI_sub_measure_headspace_frompurge(
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
 #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server,"wait",{"waittime": apm.pars.HSmeasure1_duration})
-    apm.add(CO2S_server,"acquire_co2", {"duration": 1, "acquisition_rate": 0.1})
+    apm.add(CO2S_server,"acquire_co2", {"duration": apm.pars.CO2measure_duration, "acquisition_rate": apm.pars.CO2measure_acqrate})
     return apm.action_list
