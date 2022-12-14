@@ -122,13 +122,13 @@ config["servers"] = {
         "host": hostip,
         "port": 5004,
         "group": "visualizer",
-        "bokeh": "sensor_visualizer",
+        "bokeh": "live_visualizer",
         "params": {"doc_name": "Sensor Visualizer"},
-    "SENSOR": {
+    "CO2SENSOR": {
         "host": "127.0.0.1",
         "port": 8012,
         "group": "action",
-        "fast": "sensor_server",
+        "fast": "co2sensor_server",
         "params": {},
         # "params": {"port": "COM9", "start_margin": 0},
     },

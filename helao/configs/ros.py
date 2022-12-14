@@ -40,7 +40,7 @@ config["servers"] = {
         "host": hostip,
         "port": 8003,
         "group": "action",
-        "fast": "sensor_server",
+        "fast": "co2sensor_server",
         "params": {"port": "COM9", "start_margin": 0},
     },
     "PAL": {
@@ -61,7 +61,7 @@ config["servers"] = {
         "host": hostip,
         "port": 5004,
         "group": "visualizer",
-        "bokeh": "sensor_visualizer",
+        "bokeh": "live_visualizer",
         "params": {"doc_name": "Sensor Visualizer"},
     },
     # "DB": {
