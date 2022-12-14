@@ -77,7 +77,7 @@ def makeBokehApp(doc, confPrefix, servKey, helao_root):
 
     # create visualizer objects for defined instruments
     vis_map = {
-        "sensor_server": C_co2,
+        "co2sensor_server": C_co2,
         "galil_io": C_pressure,
         "nidaqmx_server": C_temperature,
     }
