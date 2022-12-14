@@ -91,9 +91,6 @@ class Experiment(Sequence, ExperimentModel):
     globalexp_params: Optional[dict] = Field(default_factory=dict)
     actionmodel_list: List[ActionModel] = Field(default_factory=list)
 
-    from_globalseq_params: Optional[dict] = Field(default_factory=dict)
-    to_globalseq_params: Optional[Union[list, dict]] = Field(default_factory=list)
-
     def __repr__(self):
         return f"<experiment_name:{self.experiment_name}>"
 
@@ -410,7 +407,7 @@ class ExperimentPlanMaker:
                 ExperimentTemplate(
                     experiment_name=selected_experiment,
                     experiment_params=experiment_params,
+                    **kwargs,
                 ),
-                kwargs,
             )
         )
