@@ -16,8 +16,7 @@ __all__ = [
     "CCSI_sub_probe_purge",
     "CCSI_sub_sensor_purge",
     "CCSI_sub_delta_purge",
-    "CCSI_sub_headspace_purge",
-    "CCSI_sub_measure_headspace_frompurge",
+    "CCSI_sub_headspace_purge_and_measure",
 ]
 
 ###
