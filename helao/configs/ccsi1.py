@@ -96,12 +96,11 @@ config["servers"] = {
                 "6B": "cDAQ1Mod1/port0/line8",
                 "8": "cDAQ1Mod1/port0/line10",
                 "9": "cDAQ1Mod1/port0/line11",
-
             },
             "dev_pump": {
                 "RecirculatingPeriPump1": "cDAQ1Mod1/port0/line12",
-               # "pump2": "cDAQ1Mod1/port0/line17",
-               # "pump3": "cDAQ1Mod1/port0/line18",
+                # "pump2": "cDAQ1Mod1/port0/line17",
+                # "pump3": "cDAQ1Mod1/port0/line18",
             },
         },
     },
@@ -119,19 +118,14 @@ config["servers"] = {
         "bokeh": "action_visualizer",
         "params": {"doc_name": "CCSI Visualizer"},
     },
-    "SENSOR": {
+    "CO2SENS": {
         "host": "127.0.0.1",
         "port": 8012,
         "group": "action",
-        "fast": "sensor_server",
-    #     "params": {
-    #      #   "dev_num": 0,
-    #      #   "lib_path": ,
-    #     },
-    #
-    #
+        "fast": "co2sensor_server",
+        "params": {},
+        # "params": {"port": "COM9", "start_margin": 0},
     },
-
     "DB": {
         "host": "127.0.0.1",
         "port": 8010,
