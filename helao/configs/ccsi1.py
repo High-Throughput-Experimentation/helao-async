@@ -119,18 +119,18 @@ config["servers"] = {
         "bokeh": "action_visualizer",
         "params": {"doc_name": "CCSI Visualizer"},
     },
-    # "SENSOR": {
-    #     "host": "127.0.0.1",
-    #     "port": 8012,
-    #     "group": "action",
-    #     "fast": "sensor_server",
+    "SENSOR": {
+        "host": "127.0.0.1",
+        "port": 8012,
+        "group": "action",
+        "fast": "sensor_server",
     #     "params": {
     #      #   "dev_num": 0,
     #      #   "lib_path": ,
     #     },
     #
     #
-    # },
+    },
 
     "DB": {
         "host": "127.0.0.1",

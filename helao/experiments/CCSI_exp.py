@@ -5,6 +5,11 @@ server_key must be a FastAPI action server defined in config
 """
 
 __all__ = [
+    "CCSI_sub_unload_cell",
+    "CCSI_sub_load_solid",
+
+
+
     "CCSI_sub_alloff",
     "CCSI_sub_headspace_purge_from_start",
     "CCSI_sub_solvent_purge",
@@ -22,7 +27,7 @@ from typing import Optional
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.drivers.robot.pal_driver import PALtools
-from helaocore.models.sample import SolidSample, LiquidSample
+from helaocore.models.sample import SolidSample, LiquidSample, GasSample
 from helaocore.models.machine import MachineModel
 from helaocore.models.action_start_condition import ActionStartCondition
 from helaocore.models.process_contrib import ProcessContrib
@@ -44,12 +49,122 @@ CO2S_server = MachineModel(server_name="SENSOR", machine_name=ORCH_HOST).json_di
 toggle_triggertype = TriggerType.fallingedge
 
 
-# z positions for ADSS cell
+# z positions for  cell
 z_home = 0.0
 # touches the bottom of cell
 z_engage = 2.5
 # moves it up to put pressure on seal
 z_seal = 4.5
+
+def CCSI_sub_unload_cell(experiment: Experiment, experiment_version: int = 1):
+    """Unload Sample at 'cell1_we' position."""
+
+    apm = ActionPlanMaker()
+    apm.add(PAL_server, "archive_custom_unloadall", {})
+    return apm.action_list
+
+
+# def ANEC_sub_unload_liquid(
+#     experiment: Experiment,
+#     experiment_version: int = 1,
+# ):
+#     """Unload liquid sample at 'cell1_we' position and reload solid sample."""
+
+#     apm = ActionPlanMaker()
+#     apm.add(
+#         PAL_server,
+#         "archive_custom_unloadall",
+#         {},
+#         to_globalexp_params=["_unloaded_solid"],
+#     )
+#     apm.add(
+#         PAL_server,
+#         "archive_custom_load",
+#         {"custom": "cell1_we"},
+#         from_globalexp_params={"_unloaded_solid": "load_sample_in"},
+#     )
+#     return apm.action_list
+
+def CCSI_sub_load_solid(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    solid_plate_id: Optional[int] = 4534,
+    solid_sample_no: Optional[int] = 1,
+):
+    apm = ActionPlanMaker()
+
+    apm.add(
+        PAL_server,
+        "archive_custom_load",
+        {
+            "custom": "cell1_we",
+            "load_sample_in": SolidSample(
+                **{
+                    "sample_no": apm.pars.solid_sample_no,
+                    "plate_id": apm.pars.solid_plate_id,
+                    "machine_name": "legacy",
+                }
+            ).dict(),
+        },
+    )
+
+    return apm.action_list
+
+def CCSI_sub_load_liquid(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    reservoir_liquid_sample_no: Optional[int] = 1,
+    volume_ul_cell_liquid: Optional[int] = 1000,
+):
+    """Add liquid volume to cell position.
+
+    (1) create liquid sample using volume_ul_cell and liquid_sample_no
+    """
+
+    apm = ActionPlanMaker()
+
+
+    # (3) Create liquid sample and add to assembly
+    apm.add(
+        PAL_server,
+        "archive_custom_add_liquid",
+        {
+            "custom": "cell1_we",
+            "source_liquid_in": LiquidSample(
+                sample_no=apm.pars.reservoir_liquid_sample_no, machine_name=ORCH_HOST
+            ).dict(),
+            "volume_ml": apm.pars.volume_ul_cell_liquid,
+            #"combine_liquids": True,
+            #"dilute_liquids": True,
+        },
+    )
+    return apm.action_list
+
+def CCSI_sub_load_gas(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    reservoir_gas_sample_no: Optional[int] = 1,
+    volume_ul_cell_gas: Optional[int] = 1000,
+):
+    """Add gas volume to cell position.
+    """
+
+    apm = ActionPlanMaker()
+    apm.add(
+        PAL_server,
+        "archive_custom_add_liquid", # not sure there is a server function for gas
+        {
+            "custom": "cell1_we",
+            "source_liquid_in": GasSample(
+                sample_no=apm.pars.reservoir_gas_sample_no, machine_name=ORCH_HOST
+            ).dict(),
+            "volume_ml": apm.pars.volume_ul_cell_gas,
+            #"combine_liquids": True,
+            #"dilute_liquids": True,
+        },
+    )
+    return apm.action_list
+
 
 def CCSI_sub_alloff(
     experiment: Experiment,
