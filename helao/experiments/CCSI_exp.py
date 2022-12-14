@@ -292,7 +292,7 @@ def CCSI_sub_probe_purge(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 1})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0})
