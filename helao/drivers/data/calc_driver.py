@@ -6,7 +6,9 @@ from scipy.signal import savgol_filter
 from ruamel.yaml import YAML
 
 from helao.servers.base import Base
+from helao.helpers.premodels import Experiment
 from helao.helpers.file_mapper import FileMapper
+from helao.helpers.dispatcher import async_private_dispatcher
 
 
 def handlenan_savgol_filter(
@@ -610,12 +612,13 @@ class Calc:
 
         return datadict, arraydict
 
-    def check_co2_purge_level(
+    async def check_co2_purge_level(
         self,
         activeobj,
         co2_ppm_thresh=600,
         repeat_experiment_name="CCSI_sub_headspace_purge_and_measure",
         repeat_experiment_params={},
+        **kwargs,
     ):
         seq_reldir = activeobj.action.get_sequence_dir()
         hlo_dict = self.gather_seq_data(seq_reldir, "acquire_co2")
@@ -623,9 +626,22 @@ class Calc:
 
         mean_co2_ppm = np.mean(latest["data"]["co2_ppm"])
         if mean_co2_ppm < co2_ppm_thresh:
-            # TODO: enqueue purge and measure experiments to current seq
-            # get current experiment params, pass to repeat_exp
-            # global_cfg = self.base.fastapp.helao_cfg
+            world_config = self.base.fastapp.helao_cfg
+            orch_name = [
+                k for k, d in world_config.items() if d["group"] == "orchestrator"
+            ][0]
+            rep_exp = Experiment(
+                experiment_name=repeat_experiment_name,
+                experiment_params=repeat_experiment_params,
+                **kwargs
+            )
+            await async_private_dispatcher(
+                world_config,
+                orch_name,
+                "append_experiment",
+                params_dict={"experiment": rep_exp},
+            )
+
             return {}
         else:
             return {}
