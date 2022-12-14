@@ -225,25 +225,36 @@ def makeOrchServ(
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    # @app.post("/append_experiment")
-    # async def append_experiment(
-    #     orchestrator: str = None,
-    #     experiment_name: str = None,
-    #     experiment_params: dict = {},
-    #     result_dict: dict = {},
-    #     access: str = "hte",
-    # ):
-    #     """Add a experiment object to the end of the experiment queue.
+    @app.post("/append_experiment", tags=["private"])
+    async def append_experiment(
+        experiment: Optional[Experiment] = Body({}, embed=True)
+    ):
+        """Add a experiment object to the end of the experiment queue."""
+        exp_uuid = await app.orch.add_experiment(
+            seq=app.orch.seq_file, experimenttemplate=experiment
+        )
+        return {"experiment_uuid": exp_uuid}
 
-    # @app.post("/prepend_experiment")
-    # async def prepend_experiment(
-    # ):
-    #     """Add a experiment object to the start of the experiment queue.
+    @app.post("/prepend_experiment")
+    async def prepend_experiment(
+        experiment: Optional[Experiment] = Body({}, embed=True)
+    ):
+        """Add a experiment object to the start of the experiment queue."""
+        exp_uuid = await app.orch.add_experiment(
+            seq=app.orch.seq_file, experimenttemplate=experiment, prepend=True
+        )
+        return {"experiment_uuid": exp_uuid}
 
-    # @app.post("/insert_experiment")
-    # async def insert_experiment(
-    # ):
-    #     """Insert a experiment object at experiment queue index.
+    @app.post("/insert_experiment")
+    async def insert_experiment(
+        experiment: Optional[Experiment] = Body({}, embed=True),
+        index: Optional[int] = 0,
+    ):
+        """Insert a experiment object at experiment queue index."""
+        exp_uuid = await app.orch.add_experiment(
+            seq=app.orch.seq_file, experimenttemplate=experiment, at_index=index
+        )
+        return {"experiment_uuid": exp_uuid}
 
     @app.post("/list_sequences", tags=["private"])
     def list_sequences():
@@ -1198,11 +1209,7 @@ class Orch(Base):
     async def add_experiment(
         self,
         seq: SequenceModel,
-        experimenttemplate: ExperimentTemplate,
-        # orchestrator: str = None,
-        # experiment_name: str = None,
-        # experiment_params: dict = {},
-        # access: str = "hte",
+        experimenttemplate: Union[ExperimentTemplate, Experiment],
         prepend: Optional[bool] = False,
         at_index: Optional[int] = None,
         from_globalseq_params: Optional[dict] = {},
@@ -1210,11 +1217,11 @@ class Orch(Base):
     ):
         Ddict = experimenttemplate.dict()
         Ddict.update(seq.dict())
-        D = Experiment(
-            **Ddict,
-            from_globalseq_params=from_globalseq_params,
-            to_globalseq_params=to_globalseq_params,
-        )
+        if from_globalseq_params:
+            Ddict.update({"from_globalseq_params": from_globalseq_params})
+        if to_globalseq_params:
+            Ddict.update({"to_globalseq_params": to_globalseq_params})
+        D = Experiment(**Ddict)
 
         # init uuid now for tracking later
         D.experiment_uuid = gen_uuid()
@@ -1232,6 +1239,7 @@ class Orch(Base):
         else:
             self.experiment_dq.append(D)
             # self.print_message(f"experiment {D.experiment_name} appended to queue")
+        return D.experiment_uuid
 
     def list_sequences(self, limit=10):
         """Return the current queue of sequence_dq."""
