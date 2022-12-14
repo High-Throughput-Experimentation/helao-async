@@ -83,4 +83,25 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
+    @app.post(f"/{servKey}/check_co2_purge")
+    async def check_co2_purge(
+        action: Optional[Action] = Body({}, embed=True),
+        action_version: int = 2,
+        co2_ppm_thresh: float = 600,
+        repeat_experiment_name: str = "CCSI_sub_headspace_purge_and_measure",
+        repeat_experiment_params: dict = {},
+        repeat_experiment_kwargs: dict = {},
+    ):
+        active = await app.base.setup_and_contain_action(action_abbr="checkCO2")
+        result = app.driver.check_co2_purge_level(
+            active,
+            co2_ppm_thresh,
+            repeat_experiment_name,
+            repeat_experiment_params,
+            **repeat_experiment_kwargs,
+        )
+        await active.enqueue_data_dflt(datadict=result)
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
     return app
