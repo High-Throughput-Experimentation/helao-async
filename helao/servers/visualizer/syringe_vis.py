@@ -22,8 +22,8 @@ from bokeh.models.axes import Axis
 from helao.servers.vis import Vis
 
 
-class C_co2:
-    """CO2 sensor visualizer module class"""
+class C_syringe:
+    """syringe pump visualizer module class"""
 
     def __init__(self, visServ: Vis, serv_key: str):
         self.vis = visServ
