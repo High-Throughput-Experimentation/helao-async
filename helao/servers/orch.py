@@ -572,14 +572,14 @@ class Orch(Base):
             return []
 
     async def seq_unpacker(self):
-        for i, (experimenttemplate, kwargs) in enumerate(
+        for i, experimenttemplate in enumerate(
             self.active_sequence.experiment_plan_list
         ):
             # self.print_message(
             #     f"unpack experiment {experimenttemplate.experiment_name}"
             # )
             await self.add_experiment(
-                seq=self.seq_file, experimenttemplate=experimenttemplate, **kwargs
+                seq=self.seq_file, experimenttemplate=experimenttemplate
             )
             if i == 0:
                 self.orchstatusmodel.loop_state = OrchStatus.started
@@ -1209,18 +1209,12 @@ class Orch(Base):
     async def add_experiment(
         self,
         seq: SequenceModel,
-        experimenttemplate: Union[ExperimentTemplate, Experiment],
+        experimenttemplate: ExperimentTemplate,
         prepend: Optional[bool] = False,
         at_index: Optional[int] = None,
-        from_globalseq_params: Optional[dict] = {},
-        to_globalseq_params: Optional[Union[list, dict]] = [],
     ):
         Ddict = experimenttemplate.dict()
         Ddict.update(seq.dict())
-        if from_globalseq_params:
-            Ddict.update({"from_globalseq_params": from_globalseq_params})
-        if to_globalseq_params:
-            Ddict.update({"to_globalseq_params": to_globalseq_params})
         D = Experiment(**Ddict)
 
         # init uuid now for tracking later
@@ -2922,7 +2916,7 @@ class Operator:
         for key in self.experiment_plan_list:
             self.experiment_plan_list[key] = []
         if self.sequence is not None:
-            for D, _ in self.sequence.experiment_plan_list:
+            for D in self.sequence.experiment_plan_list:
                 self.experiment_plan_list["sequence_name"].append(
                     self.sequence.sequence_name
                 )
