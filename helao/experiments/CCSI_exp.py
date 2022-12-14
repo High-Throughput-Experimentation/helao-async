@@ -181,7 +181,7 @@ def CCSI_sub_alloff(
         NI_server,
         "pump",
         {
-            "pump": "RecirculatingPeriPump1tingPeriPump1tingPeriPump1tingPeriPump1tingPeriPump1",
+            "pump": "RecirculatingPeriPump1",
             "on": 0,
         },
     )
