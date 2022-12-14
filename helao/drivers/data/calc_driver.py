@@ -63,7 +63,7 @@ class Calc:
         self.config_dict = action_serv.server_cfg["params"]
         self.yaml = YAML(typ="safe")
 
-    def gather_seq_data(self, seq_reldir: str, action_name: str)
+    def gather_seq_data(self, seq_reldir: str, action_name: str):
         """Get all files using FileMapper to traverse ACTIVE/FINISHED/SYNCED."""
         # get all files from current sequence directory
         # produce tuples, (run_type, technique_name, run_use, hlo_path)
@@ -105,7 +105,6 @@ class Calc:
 
         return hlo_dict
 
-
     def calc_uvis_abs(self, activeobj):
         """Figure of merit calculator for UVIS TR, DR, and T techniques."""
         seq_reldir = activeobj.action.get_sequence_dir()
@@ -122,7 +121,7 @@ class Calc:
         #     "wlarr": mean wavelength array over samples with shape (num_wavlengths,)
         #     "technique": technique_name from experiment yaml
         # }
-        refd = defaultdict(dict) 
+        refd = defaultdict(dict)
         # refd holds raw ref_dark and ref_light spectra
         for spec in spec_types:
             # run_use dict 'rud' holds per-sample averaged signals
@@ -581,11 +580,7 @@ class Calc:
             "smooth_refadj": "interlen_smoothrefadj",
             "smooth_refadj_scl": "interlen_smoothrefadjscl",
         }
-        keymap = {
-            "omTR": "one_minus_T_minus_R",
-            "omT": "one_minus_T",
-            "abs": "abs"
-        }
+        keymap = {"omTR": "one_minus_T_minus_R", "omT": "one_minus_T", "abs": "abs"}
         for sk, sd in pred.items():
             for bk, bd in sd.items():
                 if not isinstance(bd, dict):
@@ -615,12 +610,18 @@ class Calc:
 
         return datadict, arraydict
 
-    def check_co2_purge_level(self, activeobj, co2_ppm_thresh=600, repeat_exp="CCSI_sub_headspace_purge_and_measure"):
+    def check_co2_purge_level(
+        self,
+        activeobj,
+        co2_ppm_thresh=600,
+        repeat_experiment_name="CCSI_sub_headspace_purge_and_measure",
+        repeat_experiment_params={},
+    ):
         seq_reldir = activeobj.action.get_sequence_dir()
         hlo_dict = self.gather_seq_data(seq_reldir, "acquire_co2")
         latest = sorted(hlo_dict.keys())[-1]
 
-        mean_co2_ppm = np.mean(latest['data']['co2_ppm'])
+        mean_co2_ppm = np.mean(latest["data"]["co2_ppm"])
         if mean_co2_ppm < co2_ppm_thresh:
             # TODO: enqueue purge and measure experiments to current seq
             # get current experiment params, pass to repeat_exp
