@@ -403,11 +403,9 @@ class ExperimentPlanMaker:
 
     def add_experiment(self, selected_experiment, experiment_params, **kwargs):
         self.experiment_plan_list.append(
-            (
-                ExperimentTemplate(
-                    experiment_name=selected_experiment,
-                    experiment_params=experiment_params,
-                    **kwargs,
-                ),
-            )
+            ExperimentTemplate(
+                experiment_name=selected_experiment,
+                experiment_params=experiment_params,
+                **kwargs,
+            ),
         )
