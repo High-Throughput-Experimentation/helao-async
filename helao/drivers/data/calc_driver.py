@@ -639,7 +639,7 @@ class Calc:
                 world_config,
                 orch_name,
                 "append_experiment",
-                params_dict={"experiment": rep_exp},
+                params_dict={"experiment": rep_exp.as_dict()},
             )
 
             return {}
