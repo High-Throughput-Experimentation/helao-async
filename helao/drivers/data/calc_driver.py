@@ -63,26 +63,26 @@ class Calc:
         self.config_dict = action_serv.server_cfg["params"]
         self.yaml = YAML(typ="safe")
 
-    def gather_spec_data(self, seq_reldir: str):
-        """Get all spectrum files using FileMapper to traverse ACTIVE/FINISHED/SYNCED."""
+    def gather_seq_data(self, seq_reldir: str, action_name: str)
+        """Get all files using FileMapper to traverse ACTIVE/FINISHED/SYNCED."""
         # get all files from current sequence directory
         # produce tuples, (run_type, technique_name, run_use, hlo_path)
         active_save_dir = self.base.helaodirs.save_root.__str__()
         seq_absdir = os.path.join(active_save_dir, seq_reldir)
         FM = FileMapper(seq_absdir)
-        aspec_paths = [x for x in FM.relstrs if "acquire_spec" in x]
-        aspec_hlos = sorted([x for x in aspec_paths if x.endswith(".hlo")])
-        aspec_ymls = sorted([x for x in aspec_paths if x.endswith(".yml")])
+        paths = [x for x in FM.relstrs if action_name in x]
+        hlos = sorted([x for x in paths if x.endswith(".hlo")])
+        ymls = sorted([x for x in paths if x.endswith(".yml")])
 
-        if len(aspec_hlos) != len(aspec_ymls):
+        if len(hlos) != len(ymls):
             self.base.print_message(
-                f"mismatch number of data files ({len(aspec_hlos)}), metadata files ({len(aspec_ymls)})",
+                f"mismatch number of data files ({len(hlos)}), metadata files ({len(ymls)})",
                 error=True,
             )
             return {}
 
         hlo_dict = {}
-        for hp, yp in zip(aspec_hlos, aspec_ymls):
+        for hp, yp in zip(hlos, ymls):
             meta, data = FM.read_hlo(hp)
             actd = FM.read_yml(yp)
 
@@ -105,10 +105,11 @@ class Calc:
 
         return hlo_dict
 
+
     def calc_uvis_abs(self, activeobj):
         """Figure of merit calculator for UVIS TR, DR, and T techniques."""
         seq_reldir = activeobj.action.get_sequence_dir()
-        hlo_dict = self.gather_spec_data(seq_reldir)
+        hlo_dict = self.gather_seq_data(seq_reldir, "acquire_spec")
 
         spec_types = ["T", "R"]
         ru_keys = ("ref_dark", "ref_light", "data")
@@ -613,6 +614,20 @@ class Calc:
         }
 
         return datadict, arraydict
+
+    def check_co2_purge_level(self, activeobj, co2_ppm_thresh=600, repeat_exp="CCSI_sub_headspace_purge_and_measure"):
+        seq_reldir = activeobj.action.get_sequence_dir()
+        hlo_dict = self.gather_seq_data(seq_reldir, "acquire_co2")
+        latest = sorted(hlo_dict.keys())[-1]
+
+        mean_co2_ppm = np.mean(latest['data']['co2_ppm'])
+        if mean_co2_ppm < co2_ppm_thresh:
+            # TODO: enqueue purge and measure experiments to current seq
+            # get current experiment params, pass to repeat_exp
+            # global_cfg = self.base.fastapp.helao_cfg
+            return {}
+        else:
+            return {}
 
     def shutdown(self):
         pass
