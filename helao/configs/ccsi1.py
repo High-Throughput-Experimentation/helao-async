@@ -124,6 +124,7 @@ config["servers"] = {
         "group": "visualizer",
         "bokeh": "live_visualizer",
         "params": {"doc_name": "Sensor Visualizer"},
+    },
     "CO2SENSOR": {
         "host": "127.0.0.1",
         "port": 8012,
