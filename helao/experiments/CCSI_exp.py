@@ -192,9 +192,9 @@ def CCSI_sub_alloff(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "9", "on": 0})
@@ -207,7 +207,7 @@ def CCSI_sub_headspace_purge_from_start(
     experiment_version: int = 1,
     HSpurge1_duration: float = 20,  # set before determining actual
 ):
-    # only valve 1B and 6A turned on//differ from power on state
+    # only valve 1B and 6A-waste turned on//differ from power on state
 
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
@@ -216,9 +216,9 @@ def CCSI_sub_headspace_purge_from_start(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
@@ -240,9 +240,9 @@ def CCSI_sub_solvent_purge(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
@@ -259,7 +259,7 @@ def CCSI_sub_alpha_purge(
     experiment_version: int = 1,
     Alphapurge1_duration: float = 15,  # set before determining actual
 ):
-    # only valve 1B 5AB 7 opened, and 2 6A closed//differ from solvent purge
+    # only valve 1B 5A-cellB 7 opened, and 2 6A-waste closed//differ from solvent purge
 
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
@@ -267,9 +267,9 @@ def CCSI_sub_alpha_purge(
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 1})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     #   apm.add(MFC---stuff Flow ON)
@@ -285,7 +285,7 @@ def CCSI_sub_probe_purge(
     experiment_version: int = 1,
     Probepurge1_duration: float = 60,  # set before determining actual
 ):
-    # only valve 3 4 opened, and 5A closed, pump on//differ from alpha purge
+    # only valve 3 4 opened, and 5A-cell closed, pump on//differ from alpha purge
 
     apm = ActionPlanMaker()
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
@@ -294,8 +294,8 @@ def CCSI_sub_probe_purge(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
@@ -320,9 +320,9 @@ def CCSI_sub_sensor_purge(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 1})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0})
     #    apm.add(ORCH_server,"wait",{"waittime": .25})
@@ -338,7 +338,7 @@ def CCSI_sub_delta_purge(
     Deltapurge1_duration: float = 120,  # set before determining actual
 ):
     # recirculation loop
-    # only valve 1B, 4, 5B closed 1A opened//differ from sensor purge
+    # only valve 1B, 4, 5B-waste closed 1A opened//differ from sensor purge
 
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
@@ -347,9 +347,9 @@ def CCSI_sub_delta_purge(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0})
     #    apm.add(ORCH_server,"wait",{"waittime": .25})
@@ -368,35 +368,35 @@ def CCSI_sub_headspace_purge_and_measure(
     CO2measure_acqrate: float = 0.1,
 ):
     # recirculation loop
-    # only 1B 6A opened 1A closed pump off//differ from delta purge
+    # only 1B 6A-waste opened 1A closed pump off//differ from delta purge
 
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A", "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1})
     #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
 
     # recirculation loop
-    # only 1A 6A opened 1B closed pump on//differ from purge
+    # only 1A 6A-waste opened 1B closed pump on//differ from purge
 
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
