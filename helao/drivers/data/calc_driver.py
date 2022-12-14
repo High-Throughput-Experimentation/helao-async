@@ -1,3 +1,4 @@
+import time
 import os
 import numpy as np
 from collections import defaultdict
@@ -625,7 +626,8 @@ class Calc:
         latest = sorted(hlo_dict.keys())[-1]
 
         mean_co2_ppm = np.mean(latest["data"]["co2_ppm"])
-        if mean_co2_ppm < co2_ppm_thresh:
+        loop_condition = mean_co2_ppm > co2_ppm_thresh
+        if loop_condition:
             world_config = self.base.fastapp.helao_cfg
             orch_name = [
                 k for k, d in world_config.items() if d["group"] == "orchestrator"
@@ -633,7 +635,7 @@ class Calc:
             rep_exp = Experiment(
                 experiment_name=repeat_experiment_name,
                 experiment_params=repeat_experiment_params,
-                **kwargs
+                **kwargs,
             )
             await async_private_dispatcher(
                 world_config,
@@ -641,10 +643,11 @@ class Calc:
                 "append_experiment",
                 params_dict={"experiment": rep_exp.as_dict()},
             )
-
-            return {}
-        else:
-            return {}
+        return {
+            "epoch": time.time(),
+            "mean_co2_ppm": mean_co2_ppm,
+            "above_threshold": loop_condition,
+        }
 
     def shutdown(self):
         pass
