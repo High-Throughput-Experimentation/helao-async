@@ -3,7 +3,7 @@ __all__ = ["Orch", "makeOrchServ"]
 import asyncio
 import sys
 from copy import deepcopy
-from typing import Optional, List
+from typing import Optional, List, Union
 from uuid import UUID
 from socket import gethostname
 import inspect
@@ -225,25 +225,36 @@ def makeOrchServ(
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    # @app.post("/append_experiment")
-    # async def append_experiment(
-    #     orchestrator: str = None,
-    #     experiment_name: str = None,
-    #     experiment_params: dict = {},
-    #     result_dict: dict = {},
-    #     access: str = "hte",
-    # ):
-    #     """Add a experiment object to the end of the experiment queue.
+    @app.post("/append_experiment", tags=["private"])
+    async def append_experiment(
+        experiment: Optional[Experiment] = Body({}, embed=True)
+    ):
+        """Add a experiment object to the end of the experiment queue."""
+        exp_uuid = await app.orch.add_experiment(
+            seq=app.orch.seq_file, experimenttemplate=experiment
+        )
+        return {"experiment_uuid": exp_uuid}
 
-    # @app.post("/prepend_experiment")
-    # async def prepend_experiment(
-    # ):
-    #     """Add a experiment object to the start of the experiment queue.
+    @app.post("/prepend_experiment")
+    async def prepend_experiment(
+        experiment: Optional[Experiment] = Body({}, embed=True)
+    ):
+        """Add a experiment object to the start of the experiment queue."""
+        exp_uuid = await app.orch.add_experiment(
+            seq=app.orch.seq_file, experimenttemplate=experiment, prepend=True
+        )
+        return {"experiment_uuid": exp_uuid}
 
-    # @app.post("/insert_experiment")
-    # async def insert_experiment(
-    # ):
-    #     """Insert a experiment object at experiment queue index.
+    @app.post("/insert_experiment")
+    async def insert_experiment(
+        experiment: Optional[Experiment] = Body({}, embed=True),
+        index: Optional[int] = 0,
+    ):
+        """Insert a experiment object at experiment queue index."""
+        exp_uuid = await app.orch.add_experiment(
+            seq=app.orch.seq_file, experimenttemplate=experiment, at_index=index
+        )
+        return {"experiment_uuid": exp_uuid}
 
     @app.post("/list_sequences", tags=["private"])
     def list_sequences():
@@ -561,15 +572,14 @@ class Orch(Base):
             return []
 
     async def seq_unpacker(self):
-        for i, experimenttemplate in enumerate(
+        for i, (experimenttemplate, kwargs) in enumerate(
             self.active_sequence.experiment_plan_list
         ):
             # self.print_message(
             #     f"unpack experiment {experimenttemplate.experiment_name}"
             # )
             await self.add_experiment(
-                seq=self.seq_file,
-                experimenttemplate=experimenttemplate,
+                seq=self.seq_file, experimenttemplate=experimenttemplate, **kwargs
             )
             if i == 0:
                 self.orchstatusmodel.loop_state = OrchStatus.started
@@ -1199,16 +1209,18 @@ class Orch(Base):
     async def add_experiment(
         self,
         seq: SequenceModel,
-        experimenttemplate: ExperimentTemplate,
-        # orchestrator: str = None,
-        # experiment_name: str = None,
-        # experiment_params: dict = {},
-        # access: str = "hte",
+        experimenttemplate: Union[ExperimentTemplate, Experiment],
         prepend: Optional[bool] = False,
         at_index: Optional[int] = None,
+        from_globalseq_params: Optional[dict] = {},
+        to_globalseq_params: Optional[Union[list, dict]] = [],
     ):
         Ddict = experimenttemplate.dict()
         Ddict.update(seq.dict())
+        if from_globalseq_params:
+            Ddict.update({"from_globalseq_params": from_globalseq_params})
+        if to_globalseq_params:
+            Ddict.update({"to_globalseq_params": to_globalseq_params})
         D = Experiment(**Ddict)
 
         # init uuid now for tracking later
@@ -1219,7 +1231,7 @@ class Orch(Base):
             D.orchestrator = self.server
 
         await asyncio.sleep(0.0001)
-        if at_index:
+        if at_index is not None:
             self.experiment_dq.insert(i=at_index, x=D)
         elif prepend:
             self.experiment_dq.appendleft(D)
@@ -1227,6 +1239,7 @@ class Orch(Base):
         else:
             self.experiment_dq.append(D)
             # self.print_message(f"experiment {D.experiment_name} appended to queue")
+        return D.experiment_uuid
 
     def list_sequences(self, limit=10):
         """Return the current queue of sequence_dq."""
@@ -2088,7 +2101,9 @@ class Operator:
             )
 
         self.sequence_source.data = self.sequence_list
-        self.vis.print_message(f"current queued sequences: ({len(self.orch.sequence_dq)})")
+        self.vis.print_message(
+            f"current queued sequences: ({len(self.orch.sequence_dq)})"
+        )
 
     async def get_experiments(self):
         """get experiment list from orch"""
