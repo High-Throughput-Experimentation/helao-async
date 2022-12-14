@@ -2922,7 +2922,7 @@ class Operator:
         for key in self.experiment_plan_list:
             self.experiment_plan_list[key] = []
         if self.sequence is not None:
-            for D in self.sequence.experiment_plan_list:
+            for D,_ in self.sequence.experiment_plan_list:
                 self.experiment_plan_list["sequence_name"].append(
                     self.sequence.sequence_name
                 )
