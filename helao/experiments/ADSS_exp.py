@@ -109,7 +109,7 @@ def debug(
         {
             "custom": "cell1_we",
         },
-        to_globalexp_params=[
+        _to_globalexp_params=[
             "_fast_samples_in"
         ],  # save new liquid_sample_no of eche cell to globals
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -126,7 +126,7 @@ def debug(
             "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": "auto",
         },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        _from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
 
@@ -612,7 +612,7 @@ def ADSS_sub_CA(
         {
             "custom": "cell1_we",
         },
-        to_globalexp_params=[
+        _to_globalexp_params=[
             "_fast_samples_in"
         ],  # save new liquid_sample_no of eche cell to globals
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -637,7 +637,7 @@ def ADSS_sub_CA(
             "AcqInterval__s": apm.pars.samplerate_sec,
             "IErange": apm.pars.gamry_i_range,
         },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        _from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="CA",
         process_finish=True,
@@ -746,7 +746,7 @@ def ADSS_sub_CV(
         {
             "custom": "cell1_we",
         },
-        to_globalexp_params=[
+        _to_globalexp_params=[
             "_fast_samples_in"
         ],  # save new liquid_sample_no of eche cell to globals
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -778,7 +778,7 @@ def ADSS_sub_CV(
             "Cycles": apm.pars.cycles,
             "IErange": apm.pars.gamry_i_range,
         },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        _from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="CV",
         process_finish=True,
@@ -857,7 +857,7 @@ def ADSS_sub_OCV(
         {
             "custom": "cell1_we",
         },
-        to_globalexp_params=[
+        _to_globalexp_params=[
             "_fast_samples_in"
         ],  # save new liquid_sample_no of eche cell to globals
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -872,7 +872,7 @@ def ADSS_sub_OCV(
             "SampleRate": 0.05,
             "IErange": apm.pars.gamry_i_range,
         },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        _from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
         technique_name="OCV",
         process_finish=True,
@@ -1024,7 +1024,7 @@ def ADSS_sub_rel_move(
             "mode": MoveModes.relative,
             "transformation": TransformationModes.platexy,
         },
-        #            "from_globalexp_params": {"_platexy": "d_mm"},
+        #            "_from_globalexp_params": {"_platexy": "d_mm"},
         start_condition=ActionStartCondition.wait_for_all,
     )
 
@@ -1117,7 +1117,7 @@ def ADSS_sub_stopheat(
 #         {
 #             "custom": "cell1_we",
 #         },
-#         to_globalexp_params=[
+#         _to_globalexp_params=[
 #             "_fast_samples_in"
 #         ],  # save new liquid_sample_no of eche cell to globals
 #         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1132,7 +1132,7 @@ def ADSS_sub_stopheat(
 #             "SampleRate": apm.pars.samplerate_sec,
 #             "IErange": apm.pars.gamry_i_range,
 #         },
-#         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+#         _from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
 #         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
 #     )
 
@@ -1162,7 +1162,7 @@ def ADSS_sub_stopheat(
 #         {
 #             "custom": "cell1_we",
 #         },
-#         to_globalexp_params=[
+#         _to_globalexp_params=[
 #             "_fast_samples_in"
 #         ],  # save new liquid_sample_no of eche cell to globals
 #         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1185,7 +1185,7 @@ def ADSS_sub_stopheat(
 #             "SampleRate": apm.pars.samplerate_sec,
 #             "IErange": "auto",
 #         },
-#         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+#         _from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
 #         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
 #     )
 
@@ -1254,7 +1254,7 @@ def ADSS_sub_stopheat(
 #         {
 #             "custom": "cell1_we",
 #         },
-#         to_globalexp_params=[
+#         _to_globalexp_params=[
 #             "_fast_samples_in"
 #         ],  # save new liquid_sample_no of eche cell to globals
 #         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1275,7 +1275,7 @@ def ADSS_sub_stopheat(
 #             "SampleRate": apm.pars.samplerate_sec,
 #             "IErange": apm.pars.gamry_i_range,
 #         },
-#         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+#         _from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
 #         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
 #         technique_name="CA",
 #         process_finish=True,
@@ -1313,7 +1313,7 @@ def ADSS_sub_stopheat(
 #         {
 #             "custom": "cell1_we",
 #         },
-#         to_globalexp_params=[
+#         _to_globalexp_params=[
 #             "_fast_samples_in"
 #         ],  # save new liquid_sample_no of eche cell to globals
 #         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1328,7 +1328,7 @@ def ADSS_sub_stopheat(
 #             "SampleRate": apm.pars.samplerate_sec,
 #             "IErange": apm.pars.gamry_i_range,
 #         },
-#         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+#         _from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
 #         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
 #         process_finish=False,
 #         process_contrib=[
@@ -1344,7 +1344,7 @@ def ADSS_sub_stopheat(
 #         {
 #             "custom": "cell1_we",
 #         },
-#         to_globalexp_params=[
+#         _to_globalexp_params=[
 #             "_fast_samples_in"
 #         ],  # save new liquid_sample_no of eche cell to globals
 #         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1367,7 +1367,7 @@ def ADSS_sub_stopheat(
 #             "SampleRate": apm.pars.samplerate_sec,
 #             "IErange": "auto",
 #         },
-#         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+#         _from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
 #         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
 #         technique_name="CA",
 #         process_finish=True,
@@ -1428,7 +1428,7 @@ def ADSS_sub_stopheat(
 #         {
 #             "custom": "cell1_we",
 #         },
-#         to_globalexp_params=[
+#         _to_globalexp_params=[
 #             "_fast_samples_in"
 #         ],  # save new liquid_sample_no of eche cell to globals
 #         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
@@ -1461,7 +1461,7 @@ def ADSS_sub_stopheat(
 #             "Cycles": apm.pars.cycles,
 #             "IErange": apm.pars.gamry_i_range,
 #         },
-#         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+#         _from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
 #         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
 #         technique_name="CV",
 #         process_finish=True,
