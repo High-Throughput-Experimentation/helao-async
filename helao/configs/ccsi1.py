@@ -130,8 +130,7 @@ config["servers"] = {
         "port": 8012,
         "group": "action",
         "fast": "co2sensor_server",
-        "params": {},
-        # "params": {"port": "COM9", "start_margin": 0},
+        "params": {"port": "COM3", "start_margin": 0},
     },
     "DB": {
         "host": "127.0.0.1",
