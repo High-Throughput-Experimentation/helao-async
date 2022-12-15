@@ -107,7 +107,7 @@ def UVIS_sub_startup(
             "plate_id": apm.pars.solid_plate_id,
             "sample_no": apm.pars.solid_sample_no,
         },
-        to_globalexp_params=[
+        _to_globalexp_params=[
             "_platexy"
         ],  # save new liquid_sample_no of cell to globals
     )
@@ -120,7 +120,7 @@ def UVIS_sub_startup(
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
-        from_globalexp_params={"_platexy": "d_mm"},
+        _from_globalexp_params={"_platexy": "d_mm"},
     )
     return apm.action_list  # returns complete action list to orch
 
@@ -146,7 +146,7 @@ def UVIS_sub_movetosample(
             "plate_id": apm.pars.solid_plate_id,
             "sample_no": apm.pars.solid_sample_no,
         },
-        to_globalexp_params=[
+        _to_globalexp_params=[
             "_platexy"
         ],  # save new liquid_sample_no of eche cell to globals
     )
@@ -159,7 +159,7 @@ def UVIS_sub_movetosample(
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
-        from_globalexp_params={"_platexy": "d_mm"},
+        _from_globalexp_params={"_platexy": "d_mm"},
     )
     return apm.action_list  # returns complete action list to orch
 
@@ -209,7 +209,7 @@ def UVIS_sub_measure(
         PAL_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
-        to_globalexp_params=["_fast_samples_in"],
+        _to_globalexp_params=["_fast_samples_in"],
     )
 
     # set illumination state before measurement
@@ -235,7 +235,7 @@ def UVIS_sub_measure(
             "n_avg": apm.pars.spec_n_avg,
             "duration_sec": apm.pars.duration_sec,
         },
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        _from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         run_use=apm.pars.run_use,
         technique_name=apm.pars.technique_name,
         process_finish=True,
@@ -288,7 +288,7 @@ def UVIS_sub_setup_ref(
                 "sample_no": apm.pars.solid_sample_no,
                 "specref_code": apm.pars.specref_code,
             },
-            to_globalexp_params=["_refno", "_refxy"],
+            _to_globalexp_params=["_refno", "_refxy"],
         )
         apm.add(
             PAL_server,
@@ -297,14 +297,14 @@ def UVIS_sub_setup_ref(
                 "custom": apm.pars.solid_custom_position,
                 "plate_id": apm.pars.solid_plate_id,
             },
-            from_globalexp_params={"_refno": "sample_no"},
+            _from_globalexp_params={"_refno": "sample_no"},
         )
     elif apm.pars.reference_mode == "builtin":
         apm.add(
             MOTOR_server,
             "solid_get_builtin_specref",
             {},
-            to_globalexp_params=["_refxy"],
+            _to_globalexp_params=["_refxy"],
         )
         apm.add(
             PAL_server,
@@ -340,7 +340,7 @@ def UVIS_sub_setup_ref(
                 "plate_id": apm.pars.solid_plate_id,
                 "sample_no": apm.pars.solid_sample_no,
             },
-            to_globalexp_params={"_platexy": "_refxy"},
+            _to_globalexp_params={"_platexy": "_refxy"},
         )
     # move to position
     apm.add(
@@ -351,7 +351,7 @@ def UVIS_sub_setup_ref(
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
-        from_globalexp_params={"_refxy": "d_mm"},
+        _from_globalexp_params={"_refxy": "d_mm"},
     )
     return apm.action_list  # returns complete action list to orch
 
