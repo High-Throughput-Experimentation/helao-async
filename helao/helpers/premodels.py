@@ -221,8 +221,8 @@ class Action(Experiment, ActionModel):
     # moved to ActionModel
     # error_code: Optional[ErrorCodes] = ErrorCodes.none
 
-    from_globalexp_params: Optional[dict] = Field(default_factory=dict)
-    to_globalexp_params: Optional[Union[list, dict]] = Field(default_factory=list)
+    _from_globalexp_params: Optional[dict] = Field(default_factory=dict)
+    _to_globalexp_params: Optional[Union[list, dict]] = Field(default_factory=list)
 
     # internal
     file_conn_keys: Optional[List[UUID]] = Field(default_factory=list)
