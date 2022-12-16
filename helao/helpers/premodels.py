@@ -35,8 +35,8 @@ class Sequence(SequenceModel):
     "Experiment grouping class."
 
     # not in SequenceModel:
-    _globalseq_params: Optional[dict] = Field(default_factory=dict)
-    experimentmodel_list: List[ExperimentModel] = Field(default_factory=list)
+    _globalseq_params: Optional[dict] = {}
+    experimentmodel_list: List[ExperimentModel] = []
 
     def __repr__(self):
         return f"<sequence_name:{self.sequence_name}>"
@@ -88,8 +88,8 @@ class Experiment(Sequence, ExperimentModel):
     "Sample-action grouping class."
 
     # not in ExperimentModel:
-    globalexp_params: Optional[dict] = Field(default_factory=dict)
-    actionmodel_list: List[ActionModel] = Field(default_factory=list)
+    _globalexp_params: Optional[dict] = {}
+    actionmodel_list: List[ActionModel] = []
 
     def __repr__(self):
         return f"<experiment_name:{self.experiment_name}>"
