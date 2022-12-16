@@ -14,9 +14,15 @@ from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 
-
+from helaocore.models.hlostatus import HloStatus
 from helaocore.models.data import DataPackageModel
 from helao.servers.vis import Vis
+
+
+valid_data_status = (
+    None,
+    HloStatus.active,
+)
 
 
 class C_specvis:
