@@ -16,8 +16,8 @@ class ActiveParams(BaseModel, HelaoDict):
     action: Action
     # a dict keyed by file_conn_key of FileConnParams
     # for all files of active
-    file_conn_params_dict: Dict[UUID, FileConnParams] = Field(default_factory=dict)
-    aux_listen_uuids: List[UUID] = Field(default_factory=list)
+    file_conn_params_dict: Dict[UUID, FileConnParams] = Field(default={})
+    aux_listen_uuids: List[UUID] = Field(default=[])
 
     class Config:
         arbitrary_types_allowed = True

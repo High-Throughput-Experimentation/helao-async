@@ -112,9 +112,9 @@ class _VT_template(BaseModel, HelaoDict):
     max_vol_ml: float
     VTtype: str
     positions: int  # = positions
-    vials: List[bool] = Field(default_factory=list)
-    blocked: List[bool] = Field(default_factory=list)
-    samples: List[SampleUnion] = Field(default_factory=list)
+    vials: List[bool] = Field(default=[])
+    blocked: List[bool] = Field(default=[])
+    samples: List[SampleUnion] = Field(default=[])
     # reset_tray()
 
     @root_validator(skip_on_failure=True)
@@ -215,8 +215,8 @@ class VT70(_VT_template):
 
 class Positions(BaseModel, HelaoDict):
     # a dict keyed by tray_num, then slot_num and then the VT as value
-    trays_dict: Dict[int, Dict[int, Union[VTUnion, None]]] = Field(default_factory=dict)
-    customs_dict: Dict[str, Custom] = Field(default_factory=dict)
+    trays_dict: Dict[int, Dict[int, Union[VTUnion, None]]] = Field(default={})
+    customs_dict: Dict[str, Custom] = Field(default={})
 
 
 VTUnion = Union[
