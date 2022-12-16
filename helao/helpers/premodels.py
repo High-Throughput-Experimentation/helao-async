@@ -22,7 +22,6 @@ from helaocore.models.action import ActionModel, ShortActionModel
 from helaocore.models.experiment import (
     ExperimentModel,
     ShortExperimentModel,
-    ExperimentTemplate,
 )
 from helaocore.models.sequence import SequenceModel
 from helaocore.models.hlostatus import HloStatus
@@ -406,7 +405,7 @@ class ExperimentPlanMaker:
 
     def add_experiment(self, selected_experiment, experiment_params, **kwargs):
         self.experiment_plan_list.append(
-            ExperimentTemplate(
+            Experiment(
                 experiment_name=selected_experiment,
                 experiment_params=experiment_params,
                 **kwargs,
