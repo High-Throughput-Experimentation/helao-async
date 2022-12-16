@@ -775,9 +775,9 @@ class Orch(Base):
             # copy requested global param to action params
             for k, v in A._from_globalexp_params.items():
                 self.print_message(f"{k}:{v}")
-                if k in self.active_experiment.globalexp_params:
+                if k in self.active_experiment._globalexp_params:
                     A.action_params.update(
-                        {v: self.active_experiment.globalexp_params[k]}
+                        {v: self.active_experiment._globalexp_params[k]}
                     )
 
             self.print_message(
@@ -875,13 +875,13 @@ class Orch(Base):
                         if k in result_action.action_params:
                             if (
                                 result_action.action_params[k] is None
-                                and k in self.active_experiment.globalexp_params
+                                and k in self.active_experiment._globalexp_params
                             ):
                                 self.print_message(f"clearing {k} in global vars")
-                                self.active_experiment.globalexp_params.pop(k)
+                                self.active_experiment._globalexp_params.pop(k)
                             else:
                                 self.print_message(f"updating {k} in global vars")
-                                self.active_experiment.globalexp_params.update(
+                                self.active_experiment._globalexp_params.update(
                                     {k: result_action.action_params[k]}
                                 )
                 elif isinstance(result_action._to_globalexp_params, dict):
@@ -892,13 +892,13 @@ class Orch(Base):
                         if k1 in result_action.action_params:
                             if (
                                 result_action.action_params[k1] is None
-                                and k2 in self.active_experiment.globalexp_params
+                                and k2 in self.active_experiment._globalexp_params
                             ):
                                 self.print_message(f"clearing {k2} in global vars")
-                                self.active_experiment.globalexp_params.pop(k2)
+                                self.active_experiment._globalexp_params.pop(k2)
                             else:
                                 self.print_message(f"updating {k2} in global vars")
-                                self.active_experiment.globalexp_params.update(
+                                self.active_experiment._globalexp_params.update(
                                     {k2: result_action.action_params[k1]}
                                 )
 
