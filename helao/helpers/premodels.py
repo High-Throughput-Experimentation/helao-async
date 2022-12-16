@@ -35,7 +35,7 @@ class Sequence(SequenceModel):
     "Experiment grouping class."
 
     # not in SequenceModel:
-    globalseq_params: Optional[dict] = Field(default_factory=dict)
+    _globalseq_params: Optional[dict] = Field(default_factory=dict)
     experimentmodel_list: List[ExperimentModel] = Field(default_factory=list)
 
     def __repr__(self):
