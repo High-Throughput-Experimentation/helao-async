@@ -646,9 +646,9 @@ class Orch(Base):
         # copy requested global param to experiment params
         for k, v in self.active_experiment._from_globalseq_params.items():
             self.print_message(f"{k}:{v}")
-            if k in self.active_sequence.globalseq_params:
+            if k in self.active_sequence._globalseq_params:
                 self.active_experiment.experiment_params.update(
-                    {v: self.active_sequence.globalseq_params[k]}
+                    {v: self.active_sequence._globalseq_params[k]}
                 )
 
         self.print_message(
