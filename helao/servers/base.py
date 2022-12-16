@@ -21,7 +21,7 @@ import numpy as np
 import pyaml
 
 from fastapi import Body, WebSocket
-from fastapi.openapi.utils import get_flat_params
+from fastapi.dependencies.utils import get_flat_params
 
 
 from helao.helpers.server_api import HelaoFastAPI
