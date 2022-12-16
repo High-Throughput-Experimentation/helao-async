@@ -3,7 +3,7 @@ __all__ = ["Orch", "makeOrchServ"]
 import asyncio
 import sys
 from copy import deepcopy
-from typing import Optional, List, Union
+from typing import Optional, List
 from uuid import UUID
 from socket import gethostname
 import inspect
@@ -36,7 +36,7 @@ from bokeh.models.widgets import FileInput, Toggle
 
 from helaocore.models.action_start_condition import ActionStartCondition
 from helaocore.models.sequence import SequenceModel
-from helaocore.models.experiment import ExperimentTemplate
+from helaocore.models.experiment import ExperimentModel
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.server import ActionServerModel, GlobalStatusModel
 from helaocore.models.orchstatus import OrchStatus
@@ -565,21 +565,21 @@ class Orch(Base):
 
     def unpack_sequence(
         self, sequence_name, sequence_params
-    ) -> List[ExperimentTemplate]:
+    ) -> List[ExperimentModel]:
         if sequence_name in self.sequence_lib:
             return self.sequence_lib[sequence_name](**sequence_params)
         else:
             return []
 
     async def seq_unpacker(self):
-        for i, experimenttemplate in enumerate(
+        for i, experimentmodel in enumerate(
             self.active_sequence.experiment_plan_list
         ):
             # self.print_message(
             #     f"unpack experiment {experimenttemplate.experiment_name}"
             # )
             await self.add_experiment(
-                seq=self.seq_file, experimenttemplate=experimenttemplate
+                seq=self.seq_file, experimentmodel=experimentmodel
             )
             if i == 0:
                 self.orchstatusmodel.loop_state = OrchStatus.started
@@ -1209,11 +1209,11 @@ class Orch(Base):
     async def add_experiment(
         self,
         seq: SequenceModel,
-        experimenttemplate: ExperimentTemplate,
+        experimentmodel: ExperimentModel,
         prepend: Optional[bool] = False,
         at_index: Optional[int] = None,
     ):
-        Ddict = experimenttemplate.dict()
+        Ddict = experimentmodel.dict()
         Ddict.update(seq.dict())
         D = Experiment(**Ddict)
 
@@ -1422,6 +1422,43 @@ class Orch(Base):
             self.active_sequence.experimentmodel_list.append(
                 deepcopy(self.active_experiment.get_exp())
             )
+
+            if self.active_experiment.to_globalseq_params:
+                if isinstance(self.active_experiment.to_globalseq_params, list):
+                    # self.print_message(
+                    #     f"copying global vars {', '.join(self.active_experiment.to_globalseq_params)} back to sequence"
+                    # )
+                    for k in self.active_experiment.to_globalseq_params:
+                        if k in self.active_experiment.experiment_params:
+                            if (
+                                self.active_experiment.experiment_params[k] is None
+                                and k in self.active_sequence.globalseq_params
+                            ):
+                                self.print_message(f"clearing {k} in global vars")
+                                self.active_sequence.globalseq_params.pop(k)
+                            else:
+                                self.print_message(f"updating {k} in global vars")
+                                self.active_sequence.globalseq_params.update(
+                                    {k: self.active_experiment.experiment_params[k]}
+                                )
+                elif isinstance(self.active_experiment.to_globalseq_params, dict):
+                    # self.print_message(
+                    #     f"copying global vars {', '.join(self.active_experiment.to_globalseq_params.keys())} back to sequence"
+                    # )
+                    for k1, k2 in self.active_experiment.to_globalseq_params.items():
+                        if k1 in self.active_experiment.experiment_params:
+                            if (
+                                self.active_experiment.experiment_params[k1] is None
+                                and k2 in self.active_sequence.globalseq_params
+                            ):
+                                self.print_message(f"clearing {k2} in global vars")
+                                self.active_sequence.globalseq_params.pop(k2)
+                            else:
+                                self.print_message(f"updating {k2} in global vars")
+                                self.active_sequence.globalseq_params.update(
+                                    {k2: self.active_experiment.experiment_params[k1]}
+                                )
+                # self.print_message("done copying global vars back to sequence")
 
             # write new updated seq
             await self.write_active_sequence_seq()
@@ -2364,21 +2401,21 @@ class Operator:
 
         return sequence
 
-    def populate_experimenttemplate(self) -> ExperimentTemplate:
+    def populate_experimentmodel(self) -> ExperimentModel:
         selected_experiment = self.experiment_dropdown.value
         self.vis.print_message(f"selected experiment from list: {selected_experiment}")
         experiment_params = {
             paraminput.title: to_json(paraminput.value)
             for paraminput in self.exp_param_input
         }
-        experimenttemplate = ExperimentTemplate(
+        experimentmodel = ExperimentModel(
             experiment_name=selected_experiment, experiment_params=experiment_params
         )
         if self.sequence is None:
             self.sequence = Sequence()
         self.sequence.sequence_name = "manual_orch_seq"
         self.sequence.sequence_label = self.input_sequence_label.value
-        return experimenttemplate
+        return experimentmodel
 
     def refresh_inputs(self, param_input, private_input):
         input_plate_id = self.find_input(param_input, "solid_plate_id")
