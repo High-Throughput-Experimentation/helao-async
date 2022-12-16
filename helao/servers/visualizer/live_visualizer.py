@@ -6,29 +6,12 @@ from socket import gethostname
 from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
 
-from helaocore.models.hlostatus import HloStatus
 from helao.helpers.make_vis_serv import makeVisServ
 from helao.servers.vis import Vis
 from helao.helpers.config_loader import config_loader
 from helao.servers.visualizer.co2_vis import C_co2
 from helao.servers.visualizer.pressure_vis import C_pressure
 from helao.servers.visualizer.temp_vis import C_temperature
-
-
-valid_data_status = (
-    None,
-    HloStatus.active,
-)
-
-
-def async_partial(f, *args):
-    async def f2(*args2):
-        result = f(*args, *args2)
-        if asyncio.iscoroutinefunction(f):
-            result = await result
-        return result
-
-    return f2
 
 
 def find_server_names(vis: Vis, fast_key: str) -> list:

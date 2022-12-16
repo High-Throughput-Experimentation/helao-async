@@ -13,11 +13,27 @@ from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 from bokeh.models import DataTable, TableColumn
 
-
+from helaocore.models.hlostatus import HloStatus
 from helaocore.models.data import DataPackageModel
 from helao.servers.vis import Vis
 from helao.helpers.dispatcher import async_private_dispatcher
 from helaocore.error import ErrorCodes
+
+
+valid_data_status = (
+    None,
+    HloStatus.active,
+)
+
+
+def async_partial(f, *args):
+    async def f2(*args2):
+        result = f(*args, *args2)
+        if asyncio.iscoroutinefunction(f):
+            result = await result
+        return result
+
+    return f2
 
 
 class C_palvis:
