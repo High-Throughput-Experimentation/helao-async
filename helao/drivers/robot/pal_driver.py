@@ -50,9 +50,9 @@ class _palcmd(BaseModel):
 
 class PALposition(BaseModel, HelaoDict):
     position: Optional[str]  # dest can be cust. or tray
-    samples_initial: List[SampleUnion] = Field(default_factory=list)
-    samples_final: List[SampleUnion] = Field(default_factory=list)
-    # sample: List[SampleUnion] = Field(default_factory=list)  # holds dest/source position
+    samples_initial: List[SampleUnion] = Field(default=[])
+    samples_final: List[SampleUnion] = Field(default=[])
+    # sample: List[SampleUnion] = Field(default=[])  # holds dest/source position
     # will be also added to
     # sample in/out
     # depending on cam
@@ -63,22 +63,22 @@ class PALposition(BaseModel, HelaoDict):
 
 
 class PalAction(BaseModel, HelaoDict):
-    samples_in: List[SampleUnion] = Field(default_factory=list)
+    samples_in: List[SampleUnion] = Field(default=[])
     # this initially always holds
     # references which need to be
     # converted to
     # to a real sample later
-    samples_out: List[SampleUnion] = Field(default_factory=list)
+    samples_out: List[SampleUnion] = Field(default=[])
 
     # this holds the runtime list for excution of the PAL cam
     # a microcam could run 'repeat' times
     dest: Optional[PALposition]
     source: Optional[PALposition]
 
-    dilute: List[bool] = Field(default_factory=list)
-    dilute_type: List[Union[str, None]] = Field(default_factory=list)
+    dilute: List[bool] = Field(default=[])
+    dilute_type: List[Union[str, None]] = Field(default=[])
     samples_in_delta_vol_ml: List[float] = Field(
-        default_factory=list
+        default=[]
     )  # contains a list of
     # delta volumes
     # for samples_in
@@ -110,23 +110,23 @@ class PalMicroCam(BaseModel, HelaoDict):
     repeat: int = 0
 
     # for each microcam repetition we save a list of results
-    run: List[PalAction] = Field(default_factory=list)
+    run: List[PalAction] = Field(default=[])
 
 
 class PalCam(BaseModel, HelaoDict):
-    samples_in: List[SampleUnion] = Field(default_factory=list)
-    samples_out: List[SampleUnion] = Field(default_factory=list)
+    samples_in: List[SampleUnion] = Field(default=[])
+    samples_out: List[SampleUnion] = Field(default=[])
 
-    microcams: List[PalMicroCam] = Field(default_factory=list)
+    microcams: List[PalMicroCam] = Field(default=[])
 
     totalruns: int = 1
-    sampleperiod: List[float] = Field(default_factory=list)
+    sampleperiod: List[float] = Field(default=[])
     spacingmethod: Spacingmethod = "linear"
     spacingfactor: float = 1.0
     timeoffset: float = 0.0  # sec
     cur_run: int = 0
 
-    joblist: list = Field(default_factory=list)
+    joblist: list = Field(default=[])
     joblist_time: int = None
     aux_output_filepath: str = None
 
