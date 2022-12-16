@@ -76,13 +76,13 @@ def CCSI_sub_unload_cell(experiment: Experiment, experiment_version: int = 1):
 #         PAL_server,
 #         "archive_custom_unloadall",
 #         {},
-#         _to_globalexp_params=["_unloaded_solid"],
+#         to_globalexp_params=["_unloaded_solid"],
 #     )
 #     apm.add(
 #         PAL_server,
 #         "archive_custom_load",
 #         {"custom": "cell1_we"},
-#         _from_globalexp_params={"_unloaded_solid": "load_sample_in"},
+#         from_globalexp_params={"_unloaded_solid": "load_sample_in"},
 #     )
 #     return apm.action_list
 

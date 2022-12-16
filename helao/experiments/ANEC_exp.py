@@ -98,7 +98,7 @@ def ANEC_sub_startup(
             "plate_id": apm.pars.solid_plate_id,
             "sample_no": apm.pars.solid_sample_no,
         },
-        _to_globalexp_params=[
+        to_globalexp_params=[
             "_platexy"
         ],  # save new liquid_sample_no of eche cell to globals
         start_condition=ActionStartCondition.wait_for_all,
@@ -114,7 +114,7 @@ def ANEC_sub_startup(
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
-        _from_globalexp_params={"_platexy": "d_mm"},
+        from_globalexp_params={"_platexy": "d_mm"},
         start_condition=ActionStartCondition.wait_for_all,
     )
 
@@ -308,13 +308,13 @@ def ANEC_sub_unload_liquid(
         PAL_server,
         "archive_custom_unloadall",
         {},
-        _to_globalexp_params=["_unloaded_solid"],
+        to_globalexp_params=["_unloaded_solid"],
     )
     apm.add(
         PAL_server,
         "archive_custom_load",
         {"custom": "cell1_we"},
-        _from_globalexp_params={"_unloaded_solid": "load_sample_in"},
+        from_globalexp_params={"_unloaded_solid": "load_sample_in"},
     )
     return apm.action_list
 
@@ -572,7 +572,7 @@ def ANEC_sub_CA(
         PAL_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
-        _to_globalexp_params=["_fast_samples_in"],
+        to_globalexp_params=["_fast_samples_in"],
     )
     apm.add(
         PSTAT_server,
@@ -583,7 +583,7 @@ def ANEC_sub_CA(
             "AcqInterval__s": apm.pars.SampleRate,
             "IErange": apm.pars.IErange,
         },
-        _from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name="CA",
         process_contrib=[
@@ -638,7 +638,7 @@ def ANEC_sub_photo_CA(
         PAL_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
-        _to_globalexp_params=["_fast_samples_in"],
+        to_globalexp_params=["_fast_samples_in"],
     )
     #    apm.add(NI_server, "led", {"led":"led", "on": 1})
     # adding IO server for Galil LED toggle control instead of NI
@@ -672,7 +672,7 @@ def ANEC_sub_photo_CA(
             "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
         },
-        _from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name="CA",
         process_contrib=[
@@ -753,7 +753,7 @@ def ANEC_sub_CV(
         PAL_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
-        _to_globalexp_params=["_fast_samples_in"],
+        to_globalexp_params=["_fast_samples_in"],
     )
 
     apm.add(
@@ -769,7 +769,7 @@ def ANEC_sub_CV(
             "AcqInterval__s": apm.pars.SampleRate,
             "IErange": apm.pars.IErange,
         },
-        _from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name=["CV"],
         process_contrib=[
@@ -878,7 +878,7 @@ def ANEC_sub_photo_CV(
         PAL_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
-        _to_globalexp_params=["_fast_samples_in"],
+        to_globalexp_params=["_fast_samples_in"],
     )
 
     #    apm.add(NI_server, "led", {"led":"led", "on": 1})
@@ -918,7 +918,7 @@ def ANEC_sub_photo_CV(
             "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
         },
-        _from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name="CV",
         process_contrib=[
@@ -1105,7 +1105,7 @@ def ANEC_sub_photo_LSV(
         PAL_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
-        _to_globalexp_params=["_fast_samples_in"],
+        to_globalexp_params=["_fast_samples_in"],
     )
 
     #    apm.add(NI_server, "led", {"led":"led", "on": 1})
@@ -1141,7 +1141,7 @@ def ANEC_sub_photo_LSV(
             "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
         },
-        _from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
         technique_name=["LSV"],
         process_contrib=[
@@ -1196,7 +1196,7 @@ def ANEC_sub_photo_CP(
         PAL_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
-        _to_globalexp_params=["_fast_samples_in"],
+        to_globalexp_params=["_fast_samples_in"],
     )
 
     apm.add(
@@ -1229,7 +1229,7 @@ def ANEC_sub_photo_CP(
             "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
             "IErange": apm.pars.IErange,
         },
-        _from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="CP",
         process_finish=True,
         process_contrib=[

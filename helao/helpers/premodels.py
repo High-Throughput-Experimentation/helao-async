@@ -35,7 +35,7 @@ class Sequence(SequenceModel):
     "Experiment grouping class."
 
     # not in SequenceModel:
-    _globalseq_params: Optional[dict] = {}
+    globalseq_params: Optional[dict] = {}
     experimentmodel_list: List[ExperimentModel] = []
 
     def __repr__(self):
@@ -88,8 +88,11 @@ class Experiment(Sequence, ExperimentModel):
     "Sample-action grouping class."
 
     # not in ExperimentModel:
-    _globalexp_params: Optional[dict] = {}
+    globalexp_params: Optional[dict] = {}
     actionmodel_list: List[ActionModel] = []
+
+    from_globalseq_params: dict = {}
+    to_globalseq_params: Union[list, dict] = []
 
     def __repr__(self):
         return f"<experiment_name:{self.experiment_name}>"
@@ -216,16 +219,16 @@ class Action(Experiment, ActionModel):
     start_condition: Optional[ActionStartCondition] = ActionStartCondition.wait_for_all
     save_act: Optional[bool] = True  # default should be true
     save_data: Optional[bool] = True  # default should be true
-    AUX_file_paths: Optional[List[Path]] = Field(default_factory=list)
+    AUX_file_paths: Optional[List[Path]] = Field(default=[])
 
     # moved to ActionModel
     # error_code: Optional[ErrorCodes] = ErrorCodes.none
 
-    _from_globalexp_params: Optional[dict] = Field(default_factory=dict)
-    _to_globalexp_params: Optional[Union[list, dict]] = Field(default_factory=list)
+    from_globalexp_params: Optional[dict] = {}
+    to_globalexp_params: Optional[Union[list, dict]] = []
 
     # internal
-    file_conn_keys: Optional[List[UUID]] = Field(default_factory=list)
+    file_conn_keys: Optional[List[UUID]] = Field(default=[])
 
     # flag for datalogger
     # None will signal default behaviour as before
