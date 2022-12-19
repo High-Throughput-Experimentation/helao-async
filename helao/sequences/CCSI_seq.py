@@ -1,7 +1,7 @@
 """Sequence library for CCSI"""
 
 __all__ = ["CCSI_initialization",
-
+    "CCSI_initialization_faster",
 ]
 
 from typing import List
