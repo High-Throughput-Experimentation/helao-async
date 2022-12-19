@@ -132,6 +132,21 @@ config["servers"] = {
         "fast": "co2sensor_server",
         "params": {"port": "COM3", "start_margin": 0},
     },
+    "SYRINGE0": {
+        "host": hostip,
+        "port": 8013,
+        "group": "action",
+        "fast": "syringe_server",
+        "params": {"port": "COM5", "pumps": {"zero": {"address": 0, "diameter": 26.7}}},
+    },
+    "SYRINGE1": {
+        "host": hostip,
+        "port": 8014,
+        "group": "action",
+        "fast": "syringe_server",
+        "params": {"port": "COM6", "pumps": {"zero": {"address": 0, "diameter": 26.7}}},
+    },
+
     "DB": {
         "host": "127.0.0.1",
         "port": 8010,
