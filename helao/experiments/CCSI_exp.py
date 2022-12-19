@@ -18,6 +18,7 @@ __all__ = [
     "CCSI_sub_delta_purge",
     "CCSI_sub_headspace_purge_and_measure",
     "CCSI_sub_initialization_end_state",
+   "CCSI_sub_initialization_firstpart",
 ]
 
 ###
