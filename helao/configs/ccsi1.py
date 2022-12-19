@@ -144,7 +144,7 @@ config["servers"] = {
         "port": 8014,
         "group": "action",
         "fast": "syringe_server",
-        "params": {"port": "COM6", "pumps": {"zero": {"address": 0, "diameter": 26.7}}},
+        "params": {"port": "COM6", "pumps": {"one": {"address": 1, "diameter": 26.7}}},
     },
 
     "DB": {
