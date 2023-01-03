@@ -66,6 +66,15 @@ hlotags_metadata = [
     {"name": "private", "description": "private action server endpoints"},
 ]
 
+# TODO: major refactor, move makeActionServ & makeVisServ methods under Base
+# 1. input confPrefix, servKey, helao_root to Base init
+# 2. initialize driver and app in Base
+# 3. Base method returns app for server templates
+# 4. need to revise drivers that directly reference Base (almost all use printmsg),
+#    better to remove Base dependency and use Executor as shim, and all external calls
+#    to driver should return dict: {"response": ..., "data": ..., "error": ...}
+# 5. Executors can be stored alongside driver module, but better to put in server
+
 
 def makeActionServ(
     config,
