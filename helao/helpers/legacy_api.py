@@ -29,6 +29,7 @@ class HTELegacyAPI:
         self.map_cache = {}
         self.infopath_cache = {}
         self.pmpath_pid_cache = {}
+        self.els_cache = {}
 
     def get_rcp_plateid(self, plateid: int):
         self.base.print_message(f" ... get rcp for plateid: {plateid}")
