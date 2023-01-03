@@ -2367,11 +2367,11 @@ class Operator:
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def append_experiment(self):
-        experimenttemplate = self.populate_experimenttemplate()
+        experimenttemplate = self.populate_experimentmodel()
         self.sequence.experiment_plan_list.append(experimenttemplate)
 
     def prepend_experiment(self):
-        experimenttemplate = self.populate_experimenttemplate()
+        experimenttemplate = self.populate_experimentmodel()
         self.sequence.experiment_plan_list.insert(0, experimenttemplate)
 
     def populate_sequence(self):
