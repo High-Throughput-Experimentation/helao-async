@@ -60,6 +60,7 @@ def print_message(server_cfg, server_name, *args, **kwargs):
                 print(f"\n{precolor}{msg_part1}{Style.RESET_ALL} {style}{arg}{Style.RESET_ALL}\r")
 
     output_path = kwargs.get("log_dir", None)
-    if output_path is not None and ('error' in kwargs or 'warning' in kwargs):
+    # if output_path is not None and ('error' in kwargs or 'warning' in kwargs):
+    if output_path is not None:
         write_log_file(server_name=server_name, output_path=output_path, msg_part1=msg_part1, msg_part2=args)
         write_log_file(server_name="_MASTER_", output_path=output_path, msg_part1=msg_part1, msg_part2=args)
