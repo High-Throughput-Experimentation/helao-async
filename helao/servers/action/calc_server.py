@@ -7,7 +7,7 @@ Calc server is used for in-sequence data processing.
 __all__ = ["makeApp"]
 
 import json
-from typing import Optional
+from typing import Optional, Union
 from fastapi import Body
 
 from helaocore.models.file import HloHeaderModel, HloFileGroup
@@ -88,6 +88,7 @@ def makeApp(confPrefix, servKey, helao_root):
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 2,
         co2_ppm_thresh: float = 600,
+        purge_if: Union[str, float] = "above",
         repeat_experiment_name: str = "CCSI_sub_headspace_purge_and_measure",
         repeat_experiment_params: dict = {},
         repeat_experiment_kwargs: dict = {},
@@ -96,6 +97,7 @@ def makeApp(confPrefix, servKey, helao_root):
         result = app.driver.check_co2_purge_level(
             active,
             co2_ppm_thresh,
+            purge_if,
             repeat_experiment_name,
             repeat_experiment_params,
             **repeat_experiment_kwargs,
