@@ -33,16 +33,16 @@ class C_syringe:
         self.last_update_time = time.time()
 
         self.live_key = serv_key
-        co2serv_config = self.vis.world_cfg["servers"].get(self.live_key, None)
-        if co2serv_config is None:
+        syringeserv_config = self.vis.world_cfg["servers"].get(self.live_key, None)
+        if syringeserv_config is None:
             return
-        co2serv_host = co2serv_config.get("host", None)
-        co2serv_port = co2serv_config.get("port", None)
+        syringeserv_host = syringeserv_config.get("host", None)
+        syringeserv_port = syringeserv_config.get("port", None)
 
         self.data_url = (
-            f"ws://{co2serv_config['host']}:{co2serv_config['port']}/ws_live"
+            f"ws://{syringeserv_config['host']}:{syringeserv_config['port']}/ws_live"
         )
-        # self.stat_url = f"ws://{co2serv_config["host"]}:{co2serv_config["port"]}/ws_status"
+        # self.stat_url = f"ws://{syringeserv_config["host"]}:{syringeserv_config["port"]}/ws_status"
 
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
@@ -106,7 +106,7 @@ class C_syringe:
             [
                 [
                     Div(
-                        text=f'<b>CO2 Sensor module for server <a href="http://{co2serv_host}:{co2serv_port}/docs#/" target="_blank">\'{self.live_key}\'</a></b>',
+                        text=f'<b>Syringe pump module for server <a href="http://{syringeserv_host}:{syringeserv_port}/docs#/" target="_blank">\'{self.live_key}\'</a></b>',
                         width=1004,
                         height=15,
                     ),
