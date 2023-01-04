@@ -617,6 +617,7 @@ class Calc:
         self,
         activeobj,
         co2_ppm_thresh=600,
+        purge_if="above",
         repeat_experiment_name="CCSI_sub_headspace_purge_and_measure",
         repeat_experiment_params={},
         **kwargs,
@@ -626,7 +627,30 @@ class Calc:
         latest = sorted(hlo_dict.keys())[-1]
 
         mean_co2_ppm = np.mean(latest["data"]["co2_ppm"])
-        loop_condition = mean_co2_ppm > co2_ppm_thresh
+        if isinstance(purge_if, str):
+            if purge_if == "below":
+                loop_condition = mean_co2_ppm < co2_ppm_thresh
+            elif purge_if == "above":
+                loop_condition = mean_co2_ppm > co2_ppm_thresh
+            else:
+                self.base.print_message(
+                    "'purge_if' parameter was an unsupported string, using value 'above'"
+                )
+                loop_condition = mean_co2_ppm > co2_ppm_thresh
+        else:
+            purge_if = float(purge_if)
+            if purge_if >= 1.0:
+                self.base.print_message(
+                    "'purge_if' parameter is numerical and > 1.0, treating as percentage of threshold"
+                )
+                purge_if = purge_if / 100
+            else:
+                self.base.print_messge(
+                    "'purge_if' parameter is numerical and < 1.0, treating as fraction of threshold"
+                )
+            loop_condition = (
+                abs(mean_co2_ppm - co2_ppm_thresh) / co2_ppm_thresh > purge_if
+            )
         if loop_condition:
             world_config = self.base.fastapp.helao_cfg
             orch_name = [
@@ -640,8 +664,11 @@ class Calc:
             await async_private_dispatcher(
                 world_config,
                 orch_name,
-                "append_experiment",
-                params_dict={"experiment": rep_exp.as_dict()},
+                "insert_experiment",
+                params_dict={
+                    "experiment": rep_exp.as_dict(),
+                    "index": 0,
+                },
             )
         return {
             "epoch": time.time(),
