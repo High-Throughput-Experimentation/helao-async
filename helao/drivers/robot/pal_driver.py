@@ -2960,7 +2960,7 @@ class PAL:
                 time.sleep(0.5)
                 if not psutil.pid_exists(p.pid):
                     self.base.print_message("Successfully terminated PAL.", info=True)
-                    return True
+                    break
             if psutil.pid_exists(p.pid):
                 self.base.print_message(
                     "Failed to terminate server PAL after 3 retries.", error=True
