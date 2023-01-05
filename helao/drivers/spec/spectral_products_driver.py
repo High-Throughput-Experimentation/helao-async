@@ -239,7 +239,7 @@ class SM303:
             result = self.read_data()
             if result == 1:
                 # self.data = [self._data[i] for i in range(1056)][10:1034]
-                retdict = {"epoch_ns": self.base.get_realtime_nowait()}
+                retdict = {"epoch_s": time.time()}
                 retdict.update({f"ch_{i:04}": x for i, x in enumerate(self.data)})
                 retdict["error_code"] = ErrorCodes.none
                 return retdict
