@@ -214,7 +214,7 @@ class C_specvis:
         # update self.data_dict with incoming data package
         for _, data_dict in datapackage.datamodel.data.items():
             # unpack and sort epoch and channels
-            epoch = data_dict["epoch_ns"]
+            epoch = data_dict["epoch_s"]
             dtstr = datetime.fromtimestamp(epoch / 1e9).strftime("%Y-%m-%d %H:%M:%S.%f")
             ch_keys = sorted(
                 [k for k in data_dict.keys() if k.startswith("ch_")],
