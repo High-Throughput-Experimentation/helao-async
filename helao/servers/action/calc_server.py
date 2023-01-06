@@ -87,8 +87,8 @@ def makeApp(confPrefix, servKey, helao_root):
     async def check_co2_purge(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 2,
-        co2_ppm_thresh: float = 600,
-        purge_if: Union[str, float] = "above",
+        co2_ppm_thresh: float = 95000,
+        purge_if: Union[str, float] = "below",
         repeat_experiment_name: str = "CCSI_sub_headspace_purge_and_measure",
         repeat_experiment_params: dict = {},
         repeat_experiment_kwargs: dict = {},
