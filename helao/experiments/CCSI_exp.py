@@ -215,6 +215,7 @@ def CCSI_sub_headspace_purge_from_start(
 
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0},start_condition=ActionStartCondition.no_wait)
@@ -222,7 +223,6 @@ def CCSI_sub_headspace_purge_from_start(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 0},start_condition=ActionStartCondition.no_wait)
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
@@ -387,8 +387,8 @@ def CCSI_sub_headspace_purge_and_measure(
 #    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1},start_condition=ActionStartCondition.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1},start_condition=ActionStartCondition.no_wait)
     #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
 
@@ -433,8 +433,8 @@ def CCSI_sub_headspace_purge(
 #    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1},start_condition=ActionStartCondition.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1},start_condition=ActionStartCondition.no_wait)
     #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
     #  MFC off
@@ -508,8 +508,8 @@ def CCSI_sub_initialization_firstpart(
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
     # only valve 1B and 6A-waste turned on//differ from power on state
-    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1},start_condition=ActionStartCondition.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1},start_condition=ActionStartCondition.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge1_duration})
@@ -646,8 +646,8 @@ def CCSI_drain_and_clean(
 #    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1},start_condition=ActionStartCondition.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1},start_condition=ActionStartCondition.no_wait)
     #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
     #  MFC off
