@@ -369,8 +369,8 @@ def CCSI_sub_headspace_purge_and_measure(
     HSpurge_duration: float = 20,  # set before determining actual
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.1,
-    co2_ppm_thresh: float = 95000,
-    purge_if: Union[str, float] = "below",
+    # co2_ppm_thresh: float = 95000,
+    # purge_if: Union[str, float] = "below",
 #    HSmeasure1_duration: float = 20,  # set before determining actual
 ):
     # recirculation loop
@@ -410,7 +410,7 @@ def CCSI_sub_headspace_purge_and_measure(
 #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSmeasure1_duration})
 
     apm.add(CO2S_server, "acquire_co2", {"duration": apm.pars.co2measure_duration, "acquisition_rate": apm.pars.co2measure_acqrate})
-    apm.add(CALC_server, "check_co2_purge", {"co2_ppm_thresh": apm.pars.co2_ppm_thresh, "purge_if": apm.pars.purge_if, "repeat_experiment_name": "CCSI_sub_headspace_purge_and_measure", "repeat_experiment_params": {"HSpurge_duration": 20} })
+#    apm.add(CALC_server, "check_co2_purge", {"co2_ppm_thresh": apm.pars.co2_ppm_thresh, "purge_if": apm.pars.purge_if, "repeat_experiment_name": "CCSI_sub_headspace_purge_and_measure", "repeat_experiment_params": {"HSpurge_duration": 20} })
 
     return apm.action_list
 
@@ -683,17 +683,17 @@ def CCSI_drain_and_clean(
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
 
     apm.add(CO2S_server, "acquire_co2", {"duration": apm.pars.co2measure_duration, "acquisition_rate": apm.pars.co2measure_acqrate})
-    apm.add(CALC_server, "check_co2_purge", {"co2_ppm_thresh": apm.pars.co2_ppm_thresh, "purge_if": apm.pars.purge_if, "repeat_experiment_name": "CCSI_drain_and_clean", "repeat_experiment_params":  
-    {"Waterclean_volume_ul": 5000,
-    "Syringe_retraction_ul": 500,
-    "Syringe_rate_ulsec": 500,
-    "LiquidFillWait_s": 15,
-    "co2measure_duration": 20,
-    "co2measure_acqrate": 0.1,
-    "co2_ppm_thresh": 90000,
-    "purge_if": "below",
-    "HSpurge_duration": 20} 
-    })
+    # apm.add(CALC_server, "check_co2_purge", {"co2_ppm_thresh": apm.pars.co2_ppm_thresh, "purge_if": apm.pars.purge_if, "repeat_experiment_name": "CCSI_drain_and_clean", "repeat_experiment_params":  
+    # {"Waterclean_volume_ul": 5000,
+    # "Syringe_retraction_ul": 500,
+    # "Syringe_rate_ulsec": 500,
+    # "LiquidFillWait_s": 15,
+    # "co2measure_duration": 20,
+    # "co2measure_acqrate": 0.1,
+    # "co2_ppm_thresh": 90000,
+    # "purge_if": "below",
+    # "HSpurge_duration": 20} 
+    # })
 
     return apm.action_list
 
