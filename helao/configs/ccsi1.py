@@ -146,6 +146,13 @@ config["servers"] = {
         "fast": "syringe_server",
         "params": {"port": "COM6", "pumps": {"one": {"address": 1, "diameter": 26.7}}},
     },
+    "CALC": {
+        "host": "127.0.0.1",
+        "port": 8011,
+        "group": "action",
+        "fast": "calc_server",
+        "params": {},
+    },
 
     "DB": {
         "host": "127.0.0.1",
