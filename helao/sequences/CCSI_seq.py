@@ -3,6 +3,7 @@
 __all__ = [
     #"CCSI_initialization_bysteps",
     "CCSI_initialization",
+    "CCSI_validation_KOH_procedure",
 ]
 
 from typing import List
