@@ -68,16 +68,14 @@ class SprintIR:
         # while not buf == b"":
         #     buf = self.com.read_all()
 
-        fw_map =[
-            ("zero-point_air", "G"),
+        fw_map = [
             ("scaling_factor", "."),
-            ("temperature", "T"),
-            ("undocumented_t", "t"),
-            ("undocumented_y", "y"),
             ("init_co2_filtered", "Z"),
-            ("pressure", "B"),
-            ("temperature", "T"),
-            ("humidity", "H"),
+            # ("zero-point_air", "G"),
+            # ("undocumented_t", "t"),
+            # ("undocumented_y", "y"),
+            # ("pressure", "B"),
+            # ("humidity", "H"),
             # ("zero-point_n2", "U"),
             # ("pc_compensation", "s"),
             # ("digital_filter_value", "a"),
