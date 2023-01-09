@@ -588,10 +588,10 @@ def CCSI_sub_liquidfill_syringes(
 ### CO2 acquisition that matters
     if co2measure_True_False:
         apm.add(CO2S_server, "acquire_co2", {"duration": apm.pars.co2measure_duration, "acquisition_rate": apm.pars.co2measure_acqrate})
-    if apm.Solution_volume_ul != 0:
+    if Solution_volume_ul != 0:
         apm.add(SOLUTIONPUMP_server, "infuse", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec , "volume_uL": apm.pars.Solution_volume_ul + apm.pars.Syringe_retraction_ul})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    if apm.Waterclean_volume_ul != 0:
+    if Waterclean_volume_ul != 0:
         apm.add(WATERCLEANPUMP_server, "infuse", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.Waterclean_volume_ul + apm.pars.Syringe_retraction_ul})    
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
@@ -600,10 +600,10 @@ def CCSI_sub_liquidfill_syringes(
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1})
 #mfc stuff add here
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.LiquidFillWait_s})
-    if apm.Solution_volume_ul != 0:
+    if Solution_volume_ul != 0:
         apm.add(SOLUTIONPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec , "volume_uL": apm.pars.Syringe_retraction_ul})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    if apm.Waterclean_volume_ul != 0:
+    if Waterclean_volume_ul != 0:
         apm.add(WATERCLEANPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.Syringe_retraction_ul})    
 
     #mfc off, v2, v1ab v7 close    
