@@ -103,6 +103,9 @@ def CCSI_validation_KOH_procedure(
     # purge_co2threshhold: float = 95000,
     
 ):
+
+    epm = ExperimentPlanMaker()
+
     epm.add_experiment("CCSI_sub_liquidfill_syringes", {
         "Solution_volume_ul": KOH_volume_ul,
         "Waterclean_volume_ul": water_volume_ul,
