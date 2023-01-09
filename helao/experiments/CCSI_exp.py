@@ -208,7 +208,7 @@ def CCSI_sub_alloff(
 
 def CCSI_sub_headspace_purge_from_start(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     HSpurge1_duration: float = 30,  # set before determining actual
 ):
     # only valve 1B and 6A-waste turned on//differ from power on state
@@ -365,7 +365,7 @@ def CCSI_sub_delta_purge(
 
 def CCSI_sub_headspace_purge_and_measure(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     HSpurge_duration: float = 20,  # set before determining actual
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.1,
@@ -621,7 +621,7 @@ def CCSI_sub_liquidfill_syringes(
 
 def CCSI_drain_and_clean(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     Waterclean_volume_ul: float = 5000,
     Syringe_retraction_ul: float = 500,
     Syringe_rate_ulsec: float = 500,
