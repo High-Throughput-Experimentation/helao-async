@@ -112,7 +112,6 @@ def CCSI_validation_KOH_procedure(
         "Syringe_retraction_ul": retraction_volume_ul,
         "Syringe_rate_ulsec": syringe_rate_ulsec,
         "LiquidFillWait_s": LiquidFillWait_s,
-        "co2measure_True_False": co2measure_True_False,
         "co2measure_duration": co2measure_duration,
         "co2measure_acqrate": co2measure_acqrate,
     })
