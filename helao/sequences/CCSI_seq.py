@@ -48,7 +48,7 @@ SEQUENCES = __all__
 #     return epm.experiment_plan_list
 
 def CCSI_initialization(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     headspace_purge_cycles: int = 5,
     HSpurge1_duration: float = 30,
     Manpurge1_duration: float = 10,
@@ -83,7 +83,7 @@ def CCSI_initialization(
 
 
 def CCSI_validation_KOH_procedure(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     KOH_volume_ul: float = 5000,
     water_volume_ul: float = 5000,
     retraction_volume_ul: float =500,
