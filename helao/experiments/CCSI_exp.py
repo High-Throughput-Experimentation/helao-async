@@ -619,7 +619,7 @@ def CCSI_sub_liquidfill_syringes(
 
     return apm.action_list
 
-def CCSI_drain_and_clean(
+def CCSI_sub_drain_and_clean(
     experiment: Experiment,
     experiment_version: int = 2,
     Waterclean_volume_ul: float = 5000,
