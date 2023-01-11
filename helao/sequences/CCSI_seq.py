@@ -83,13 +83,12 @@ def CCSI_initialization(
 
 
 def CCSI_validation_KOH_procedure(
-    sequence_version: int = 3,
+    sequence_version: int = 2,
     KOH_volume_ul: float = 500,
     water_volume_ul: float = 2500,
     retraction_volume_ul: float =150,
     syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 15,
-    LiquidCleanWait_s: float = 30,
     co2measure_duration: float = 120,
     co2measure_acqrate: float = 1,
     drainclean_volume_ul: float = 9000,
@@ -98,7 +97,7 @@ def CCSI_validation_KOH_procedure(
     clean_co2measure_duration: float = 120,
     clean_co2_ppm_thresh: float = 90000,
     purge_if: Union[str, float] = "below",
-    HSpurge_duration: float = 20,
+    HSpurge_duration: float = 30,
     purge_co2measure_duration: float = 20,
     purge_co2threshhold: float = 95000,
     
@@ -121,7 +120,7 @@ def CCSI_validation_KOH_procedure(
         "Waterclean_volume_ul": drainclean_volume_ul,
         "Syringe_retraction_ul": retraction_volume_ul,
         "Syringe_rate_ulsec": syringe_rate_ulsec,
-        "LiquidFillWait_s": LiquidCleanWait_s,
+        "LiquidFillWait_s": LiquidFillWait_s,
         "co2measure_duration": clean_co2measure_duration,
         "co2measure_acqrate": co2measure_acqrate,
         "co2_ppm_thresh": clean_co2_ppm_thresh,
