@@ -457,7 +457,8 @@ def CCSI_sub_initialization_end_state(
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0},start_condition=ActionStartCondition.no_wait)
@@ -466,10 +467,10 @@ def CCSI_sub_initialization_end_state(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0},start_condition=ActionStartCondition.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0},start_condition=ActionStartCondition.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0},start_condition=ActionStartCondition.no_wait)
     #   apm.add(MFC---stuff Flow ON)
     return apm.action_list
 
