@@ -16,6 +16,8 @@ dependencies:
   - git
   - fastapi
   - ipykernel
+  - jupyterlab
+  - matplotlib
   - munch
   - nidaqmx-python
   - ntplib
@@ -32,6 +34,7 @@ dependencies:
   - python=3.8
   - requests
   - ruamel.yaml
+  - scikit-learn
   - scipy
   - shortuuid
   - sqlalchemy
