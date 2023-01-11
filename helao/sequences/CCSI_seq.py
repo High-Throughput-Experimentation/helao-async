@@ -130,6 +130,6 @@ def CCSI_validation_KOH_procedure(
     for _ in range(headspace_purge_cycles):
         epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {"HSpurge_duration": HSpurge_duration, "co2measure_duration": purge_co2measure_duration, "co2measure_acqrate": co2measure_acqrate, "co2_ppm_thresh": purge_co2threshhold, "purge_if": purge_if})
 
-    epm.add_experiment("CCSI_sub_atm_equilibrate", {})
+    epm.add_experiment("CCSI_sub_peripumpoff", {})
 
     return epm.experiment_plan_list
