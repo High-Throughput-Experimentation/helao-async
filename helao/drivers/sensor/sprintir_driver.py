@@ -237,7 +237,7 @@ class SprintIR:
         The 'while self.IO_do_meas' loop is exited by IOloop
         """
         # first_print = True
-        await asyncio.sleep(0.001)
+        # await asyncio.sleep(0.001)
 
         if self.com is None:
             self.IO_measuring = False
