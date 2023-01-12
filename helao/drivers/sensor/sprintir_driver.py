@@ -272,7 +272,7 @@ class SprintIR:
         if self.IO_measuring:
             self.IO_do_meas = False
             self.IO_measuring = False
-            self.base.print("signaling IOloop to stop")
+            self.base.print_message("signaling IOloop to stop")
             self.set_IO_signalq_nowait(False)
         else:
             pass
