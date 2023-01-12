@@ -247,10 +247,11 @@ class SprintIR:
 
         self.start_time = time.time()
         while self.IO_do_meas:
-            valid_time = (time.time() - self.start_time) < (
+            now = time.time()
+            valid_time = (now - self.start_time) < (
                 self.recording_duration + self.start_margin
             )
-            valid_rate = (time.time() - self.last_rec_time) >= self.recording_rate
+            valid_rate = (now - self.last_rec_time) >= self.recording_rate
             if valid_time and valid_rate:
                 co2_reading, co2_ts = self.base.get_lbuf("co2_ppm")
                 datadict = {
@@ -264,7 +265,7 @@ class SprintIR:
                         status=HloStatus.active,
                     )
                 )
-                self.last_rec_time = time.time()
+                self.last_rec_time = now
             await asyncio.sleep(0.001)
 
         self.base.print_message("polling loop duration complete, finishing")
