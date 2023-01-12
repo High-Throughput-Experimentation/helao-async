@@ -48,7 +48,7 @@ class SprintIR:
             baudrate=9600,
             parity=serial.PARITY_NONE,
             stopbits=serial.STOPBITS_ONE,
-            timeout=0.2,
+            timeout=0.1,
             xonxoff=False,
             rtscts=False,
         )
@@ -106,7 +106,7 @@ class SprintIR:
         self.event_loop = asyncio.get_event_loop()
         self.recording_task = self.event_loop.create_task(self.IOloop())
         self.recording_duration = 0
-        self.recording_rate = 0.2  # seconds per acquisition
+        self.recording_rate = 0.1  # seconds per acquisition
         self.polling_task = self.event_loop.create_task(self.poll_sensor_loop())
 
         self.unified_db = UnifiedSampleDataAPI(self.base)
@@ -215,7 +215,7 @@ class SprintIR:
         #     time.sleep(0.1)
         return cmd_resp, aux_resp
 
-    async def poll_sensor_loop(self, frequency: int = 5):
+    async def poll_sensor_loop(self, frequency: int = 10):
         waittime = 1.0 / frequency
         while True:
             co2_level, _ = self.send("Z")
@@ -249,13 +249,13 @@ class SprintIR:
 
         self.start_time = time.time()
         while self.IO_do_meas:
-            # now = time.time()
-            # valid_time = (now - self.start_time) < (
-            #     self.recording_duration + self.start_margin
-            # )
-            # valid_rate = (now - self.last_rec_time) >= self.recording_rate
-            # if valid_time and valid_rate:
-            if 1:
+            now = time.time()
+            valid_time = (now - self.start_time) < (
+                self.recording_duration + self.start_margin
+            )
+            valid_rate = (now - self.last_rec_time) >= self.recording_rate
+            if valid_time and valid_rate:
+            # if 1:
                 co2_reading, co2_ts = self.base.get_lbuf("co2_ppm")
                 datadict = {
                     "epoch_s": co2_ts,
@@ -269,9 +269,9 @@ class SprintIR:
                         status=HloStatus.active,
                     )
                 )
-                # self.last_rec_time = now
-            # await asyncio.sleep(0.001)
-            await asyncio.sleep(self.recording_rate)
+                self.last_rec_time = now
+            await asyncio.sleep(0.001)
+            # await asyncio.sleep(self.recording_rate)
 
         self.base.print_message("polling loop duration complete, finishing")
         if self.IO_measuring:
