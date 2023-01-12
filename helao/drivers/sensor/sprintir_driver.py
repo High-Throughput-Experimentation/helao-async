@@ -215,7 +215,7 @@ class SprintIR:
         #     time.sleep(0.1)
         return cmd_resp, aux_resp
 
-    async def poll_sensor_loop(self, frequency: int = 20):
+    async def poll_sensor_loop(self, frequency: int = 5):
         waittime = 1.0 / frequency
         while True:
             co2_level, _ = self.send("Z")
