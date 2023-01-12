@@ -48,7 +48,7 @@ class SprintIR:
             baudrate=9600,
             parity=serial.PARITY_NONE,
             stopbits=serial.STOPBITS_ONE,
-            timeout=0.5,
+            timeout=0.2,
             xonxoff=False,
             rtscts=False,
         )
@@ -233,6 +233,8 @@ class SprintIR:
 
         'start_margin' is the number of seconds to extend the trigger acquisition window
         to account for the time delay between SPEC and PSTAT actions
+
+        The 'while self.IO_do_meas' loop is exited by IOloop
         """
         # first_print = True
         await asyncio.sleep(0.001)
@@ -247,26 +249,29 @@ class SprintIR:
 
         self.start_time = time.time()
         while self.IO_do_meas:
-            now = time.time()
-            valid_time = (now - self.start_time) < (
-                self.recording_duration + self.start_margin
-            )
-            valid_rate = (now - self.last_rec_time) >= self.recording_rate
-            if valid_time and valid_rate:
+            # now = time.time()
+            # valid_time = (now - self.start_time) < (
+            #     self.recording_duration + self.start_margin
+            # )
+            # valid_rate = (now - self.last_rec_time) >= self.recording_rate
+            # if valid_time and valid_rate:
+            if 1:
                 co2_reading, co2_ts = self.base.get_lbuf("co2_ppm")
                 datadict = {
                     "epoch_s": co2_ts,
                     "co2_ppm": co2_reading,
                 }
-                await self.active.enqueue_data(
+                # await self.active.enqueue_data(
+                self.active.enqueue_data_nowait(
                     datamodel=DataModel(
                         data={self.active.action.file_conn_keys[0]: datadict},
                         errors=[],
                         status=HloStatus.active,
                     )
                 )
-                self.last_rec_time = now
-            await asyncio.sleep(0.001)
+                # self.last_rec_time = now
+            # await asyncio.sleep(0.001)
+            await asyncio.sleep(self.recording_rate)
 
         self.base.print_message("polling loop duration complete, finishing")
         if self.IO_measuring:
