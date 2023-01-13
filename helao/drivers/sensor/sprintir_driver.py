@@ -222,8 +222,7 @@ class SprintIR:
 
     def read_stream(self):
         self.base.print_message("Reading sensor stream.")
-        # buf = self.com.read_until(b"\r\n")
-        buf = self.com.read()
+        buf = self.com.readlines()
         lines = buf.decode("utf8").split("\n")
         self.base.print_message(f"Stream returned {lines}")
         for line in lines:
