@@ -61,13 +61,22 @@ def makeApp(confPrefix, servKey, helao_root):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
+    @app.post(f"/set_present_volume")
+    async def set_present_volume(volume_uL: float = 0):
+        app.driver.present_volume_ul = volume_uL
+        return {"present_volume_ul": volume_uL}
+
+    @app.post(f"/get_present_volume")
+    async def get_present_volume():
+        return {"present_volume_ul": app.driver.present_volume_ul}
+
     @app.post("/set_rate")
     async def set_rate(pump_name: str, rate_uL_sec: int, direction: int):
         return app.driver.set_rate(pump_name, rate_uL_sec, direction)
 
-    @app.post("/set_volume")
-    async def set_volume(pump_name: str, volume_uL: int):
-        return app.driver.set_volume(pump_name, volume_uL)
+    @app.post("/set_target_volume")
+    async def set_target_volume(pump_name: str, volume_uL: int):
+        return app.driver.set_target_volume(pump_name, volume_uL)
 
     @app.post("/start_pump")
     async def start_pump(pump_name: str, direction: int):

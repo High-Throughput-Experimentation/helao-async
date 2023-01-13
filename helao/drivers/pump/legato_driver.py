@@ -79,6 +79,12 @@ STATES = {
     "T*": "target reached",
 }
 
+ulmap = {
+    "pl": 0.000001,
+    "nl": 0.001,
+    "ul": 1.0,
+    "ml": 1000.0,
+}
 
 class KDS100:
     def __init__(self, action_serv: Base):
@@ -105,7 +111,8 @@ class KDS100:
         self.poll_signalq = asyncio.Queue(1)
         self.poll_signal_task = self.aloop.create_task(self.poll_signal_loop())
         self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
-        self.last_state = 'unknown'
+        self.present_volume_ul = 0.0
+        self.last_state = "unknown"
 
     async def start_polling(self):
         self.base.print_message("got 'start_polling' request, raising signal")
@@ -171,7 +178,9 @@ class KDS100:
                             else:
                                 continue
                         if state != self.last_state:
-                            self.base.print_message(f"pump state changed from '{self.last_state}' to '{state}'")
+                            self.base.print_message(
+                                f"pump state changed from '{self.last_state}' to '{state}'"
+                            )
                             self.last_state = state
                         rate = int(addrstate_rate.split(state_split)[-1])
                         pumptime = int(pumptime)
@@ -257,7 +266,7 @@ class KDS100:
         self.update_status_from_response(resp)
         return resp
 
-    def set_volume(self, pump_name: str, vol_val: float):
+    def set_target_volume(self, pump_name: str, vol_val: float):
         "Set infusion|withdraw volume in uL"
         resp = self.send(pump_name, f"tvolume {vol_val} ul")
         self.update_status_from_response(resp)
@@ -273,9 +282,7 @@ class KDS100:
     #     "Set infusion|withdraw ramp rate in units TODO"
     #     pass
 
-    def clear_time(
-        self, pump_name: Optional[str] = None, direction: Optional[int] = 0
-    ):
+    def clear_time(self, pump_name: Optional[str] = None, direction: Optional[int] = 0):
         if direction == 1:
             cmd = "citime"
         elif direction == -1:
@@ -307,6 +314,12 @@ class KDS100:
                 self.update_status_from_response(resp)
             return []
         else:
+            if direction != 0 and direction is not None:
+                vol_resp = self.send(pump_name, cmd[1:])[0].split(":")[-1]
+                vol_val, vol_units = vol_resp.lower().split()
+                vol_val = float(vol_val)
+                direct_vol_ul = vol_val * ulmap[vol_units] * direction * -1
+                self.present_volume_ul += direct_vol_ul
             resp = self.send(pump_name, cmd)
             self.update_status_from_response(resp)
             return resp
@@ -390,21 +403,17 @@ class PumpExec(Executor):
     async def _pre_exec(self):
         "Set rate and volume params, then run."
         self.active.base.print_message("PumpExec running setup methods.")
-        clear_resp = self.active.base.fastapp.driver.clear_volume(
-            pump_name=self.pump_name,
-        )
-        self.active.base.print_message(f"clear_volume returned: {clear_resp}")
         rate_resp = self.active.base.fastapp.driver.set_rate(
             pump_name=self.pump_name,
             rate_val=self.active.action.action_params["rate_uL_sec"],
             direction=self.direction,
         )
         self.active.base.print_message(f"set_rate returned: {rate_resp}")
-        vol_resp = self.active.base.fastapp.driver.set_volume(
+        vol_resp = self.active.base.fastapp.driver.set_target_volume(
             pump_name=self.pump_name,
             vol_val=self.active.action.action_params["volume_uL"],
         )
-        self.active.base.print_message(f"set_volume returned: {vol_resp}")
+        self.active.base.print_message(f"set_target_volume returned: {vol_resp}")
         return {"error": ErrorCodes.none}
 
     async def _exec(self):
@@ -433,8 +442,20 @@ class PumpExec(Executor):
 
     async def _post_exec(self):
         self.active.base.print_message("PumpExec running cleanup methods.")
-        clear_resp = self.active.base.fastapp.driver.clear_target_volume(
+        clearvol_resp = self.active.base.fastapp.driver.clear_volume(
+            pump_name=self.pump_name,
+            direction=self.direction,
+        )
+        self.active.base.print_message(f"clear_volume returned: {clearvol_resp}")
+        cleartar_resp = self.active.base.fastapp.driver.clear_target_volume(
             pump_name=self.pump_name,
         )
-        self.active.base.print_message(f"clear_target_volume returned: {clear_resp}")
+        self.active.base.print_message(f"clear_target_volume returned: {cleartar_resp}")
         return {"error": ErrorCodes.none}
+
+
+# volume tracking notes
+# 1. init volume at 0, need endpoint for user to tell initial volume
+# 2. clear target vol is not necessary, but clear infused/withdrawn volume is needed before starting next syringe action
+# 3. withdraw will add to volume tracker
+# 4. infuse will remove from volume tracker
