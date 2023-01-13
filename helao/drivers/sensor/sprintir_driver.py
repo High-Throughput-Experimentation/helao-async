@@ -55,12 +55,12 @@ class SprintIR:
 
         # set POLL and flush present buffer until empty
         self.send("K 2")
-        self.send("! 0")
-        self.send("Y")
-        self.send("! 0")
-        self.send("Y")
-        self.send("! 0")
-        self.send("Y")
+        # self.send("! 0")
+        # self.send("Y")
+        # self.send("! 0")
+        # self.send("Y")
+        # self.send("! 0")
+        # self.send("Y")
 
         # self.com.write(b"K 2\r\n")
         # self.com.flush()
@@ -99,12 +99,12 @@ class SprintIR:
         self.base.print_message("Setting sensor to streaming mode.")
         stream_resp, _ = self.send("K 1")
         self.base.print_message(stream_resp)
-        self.send("! 0")
-        self.send("Y")
-        self.send("! 0")
-        self.send("Y")
-        self.send("! 0")
-        self.send("Y")
+        # self.send("! 0")
+        # self.send("Y")
+        # self.send("! 0")
+        # self.send("Y")
+        # self.send("! 0")
+        # self.send("Y")
 
         self.action = None
         self.active = None
