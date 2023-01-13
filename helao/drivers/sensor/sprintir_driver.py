@@ -115,10 +115,8 @@ class SprintIR:
         self.IO_do_meas = False  # signal flag for intent (start/stop)
         self.IO_measuring = False  # status flag of measurement
         self.event_loop = asyncio.get_event_loop()
-        self.recording_task = self.event_loop.create_task(self.IOloop())
         self.recording_duration = 0
         self.recording_rate = 0.1  # seconds per acquisition
-        self.polling_task = self.event_loop.create_task(self.poll_sensor_loop())
 
         self.unified_db = UnifiedSampleDataAPI(self.base)
         asyncio.gather(self.unified_db.init_db())
@@ -133,6 +131,9 @@ class SprintIR:
         # signals return to endpoint after active was created
         self.IO_continue = False
         self.IOloop_run = False
+
+        self.polling_task = self.event_loop.create_task(self.poll_sensor_loop())
+        self.recording_task = self.event_loop.create_task(self.IOloop())
 
     def set_IO_signalq_nowait(self, val: bool) -> None:
         if self.IO_signalq.full():
