@@ -94,6 +94,10 @@ class SprintIR:
                     fw_val = aresp.split()[-1].replace(cmd, "").strip()
                     self.fw[ifw_map[cmd]] = int(fw_val)
             time.sleep(0.1)
+        
+        # set streaming mode before starting async task
+        self.send("K 1")
+        self.base.print_message("Setting sensor to streaming mode.")
 
         self.action = None
         self.active = None
@@ -228,8 +232,6 @@ class SprintIR:
 
     async def poll_sensor_loop(self, frequency: int = 20):
         waittime = 1.0 / frequency
-        self.send("K 1")
-        self.base.print_message("Setting sensor to streaming mode.")
         while True:
             # co2_level, _ = self.send("Z")
             co2_level, co2_level_unfilt = self.read_stream()
