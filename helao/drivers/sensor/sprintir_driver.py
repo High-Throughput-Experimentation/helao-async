@@ -227,8 +227,10 @@ class SprintIR:
         return cmd_resp, aux_resp
 
     def read_stream(self):
+        self.base.print_message("Reading sensor stream.")
         buf = self.com.read_until(b"\r\n")
         lines = buf.decode("utf8").split("\n")
+        self.base.print_message(f"Stream returned {lines}")
         for line in lines:
             strip = line.strip()
             if strip.startswith("Z ") and " z " in strip:
@@ -238,6 +240,7 @@ class SprintIR:
 
     async def poll_sensor_loop(self, frequency: int = 20):
         waittime = 1.0 / frequency
+        self.base.print_message("Starting polling loop")
         while True:
             # co2_level, _ = self.send("Z")
             co2_level, co2_level_unfilt = self.read_stream()
