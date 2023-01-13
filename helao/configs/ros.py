@@ -36,13 +36,13 @@ config["servers"] = {
         "fast": "syringe_server",
         "params": {"port": "COM10", "pumps": {"one": {"address": 1, "diameter": 26.7}}},
     },
-    "SENSOR": {
-        "host": hostip,
-        "port": 8003,
-        "group": "action",
-        "fast": "co2sensor_server",
-        "params": {"port": "COM9", "start_margin": 0},
-    },
+    # "SENSOR": {
+    #     "host": hostip,
+    #     "port": 8003,
+    #     "group": "action",
+    #     "fast": "co2sensor_server",
+    #     "params": {"port": "COM9", "start_margin": 0},
+    # },
     "PAL": {
         "host": hostip,
         "port": 8004,
