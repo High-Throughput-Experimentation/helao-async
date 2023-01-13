@@ -48,7 +48,7 @@ class SprintIR:
             baudrate=9600,
             parity=serial.PARITY_NONE,
             stopbits=serial.STOPBITS_ONE,
-            timeout=0.1,
+            timeout=0.5,
             xonxoff=False,
             rtscts=False,
         )
@@ -215,17 +215,34 @@ class SprintIR:
         #     time.sleep(0.1)
         return cmd_resp, aux_resp
 
-    async def poll_sensor_loop(self, frequency: int = 10):
+    def read_stream(self):
+        lines = []
+        buf = self.com.read_until(b"\r\n")
+        lines += buf.decode("utf8").split("\n")
+        while buf != b"":
+            buf = self.com.read_until(b"\r\n")
+            lines += buf.decode("utf8").split("\n")
+        for line in lines:
+            strip = line.strip()
+            if strip.startswith("Z ") and " z " in strip:
+                filt, unfilt = strip.replace("Z ", "").split(" z ")
+                return filt, unfilt
+
+    async def poll_sensor_loop(self, frequency: int = 20):
         waittime = 1.0 / frequency
+        self.send("K 2")
         while True:
-            co2_level, _ = self.send("Z")
+            # co2_level, _ = self.send("Z")
+            co2_level, co2_level_unfilt = self.read_stream()
             if co2_level:
-                await self.base.put_lbuf(
-                    {
-                        "co2_ppm": int(co2_level[0].split()[-1])
-                        * self.fw["scaling_factor"]
-                    }
-                )
+                # msg_dict = {"co2_ppm": int(co2_level[0].split()[-1])}
+                msg_dict = {
+                    "co2_ppm": [
+                        int(co2_level) * self.fw["scaling_factor"],
+                        int(co2_level_unfilt) * self.fw["scaling_factor"],
+                    ]
+                }
+                await self.base.put_lbuf(msg_dict)
             await asyncio.sleep(waittime)
 
     async def continuous_record(self):
@@ -255,11 +272,12 @@ class SprintIR:
             )
             valid_rate = (now - self.last_rec_time) >= self.recording_rate
             if valid_time and valid_rate:
-            # if 1:
-                co2_reading, co2_ts = self.base.get_lbuf("co2_ppm")
+                # if 1:
+                (co2_flt, co2_unflt), co2_ts = self.base.get_lbuf("co2_ppm")
                 datadict = {
                     "epoch_s": co2_ts,
-                    "co2_ppm": co2_reading,
+                    "co2_ppm": co2_flt,
+                    "co2_ppm_unfiltered": co2_unflt,
                 }
                 # await self.active.enqueue_data(
                 self.active.enqueue_data_nowait(
