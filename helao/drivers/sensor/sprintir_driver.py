@@ -219,12 +219,8 @@ class SprintIR:
         lines = []
         buf = self.com.read_until(b"\r\n")
         lines += buf.decode("utf8").split("\n")
-        while buf != b"":
-            buf = self.com.read_until(b"\r\n")
-            lines += buf.decode("utf8").split("\n")
         for line in lines:
             strip = line.strip()
-            self.base.print_message(strip)
             if strip.startswith("Z ") and " z " in strip:
                 filt, unfilt = strip.replace("Z ", "").split(" z ")
                 return filt, unfilt
