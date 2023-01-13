@@ -48,7 +48,7 @@ class SprintIR:
             baudrate=9600,
             parity=serial.PARITY_NONE,
             stopbits=serial.STOPBITS_ONE,
-            timeout=0.2,
+            timeout=0.5,
             xonxoff=False,
             rtscts=False,
         )
