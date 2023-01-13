@@ -232,7 +232,7 @@ class SprintIR:
 
     async def poll_sensor_loop(self, frequency: int = 20):
         waittime = 1.0 / frequency
-        self.send("K 2")
+        self.send("K 1")
         self.base.print_message("Setting sensor to streaming mode.")
         while True:
             # co2_level, _ = self.send("Z")
