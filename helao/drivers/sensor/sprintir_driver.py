@@ -53,8 +53,11 @@ class SprintIR:
             rtscts=False,
         )
 
+        self.base.print_message("Setting sensor to streaming mode.")
+        stream_resp, _ = self.send("K 1")
+        self.base.print_message(stream_resp)
         # set POLL and flush present buffer until empty
-        self.send("K 2")
+        # self.send("K 2")
         # self.send("! 0")
         # self.send("Y")
         # self.send("! 0")
@@ -96,9 +99,6 @@ class SprintIR:
             time.sleep(0.1)
         
         # set streaming mode before starting async task
-        self.base.print_message("Setting sensor to streaming mode.")
-        stream_resp, _ = self.send("K 1")
-        self.base.print_message(stream_resp)
         # self.send("! 0")
         # self.send("Y")
         # self.send("! 0")
