@@ -8,7 +8,7 @@ from socket import gethostname
 from time import ctime, time, time_ns
 from typing import List, Optional, Dict
 from types import MethodType
-from uuid import UUID
+from uuid import UUID, uuid1
 import hashlib
 from copy import deepcopy
 import inspect
@@ -1967,3 +1967,25 @@ class Active:
         self.base.print_message("Stop action request received. Stopping poll.")
         self.manual_stop = True
         self.action_loop_running = False
+
+
+class DummyBase:
+    def __init__(self) -> None:
+        self.live_buffer = {}
+        self.actionservermodel = ActionServerModel(
+            action_server = MachineModel(server_name="DUMMY", machine_name="dummyhost"),
+            last_action_uuid=uuid1()
+            )
+        pass
+
+    def print_message(self, message: str) -> None:
+        pass
+
+    async def put_lbuf(self, message: dict) -> None:
+        now = time.time()
+        for k, v in message:
+            self.live_buffer[k] = (v, now)
+
+    async def get_lbuf(self, buf_key: str) -> tuple:
+        buf_val, buf_ts = self.live_buffer[buf_key]
+        return buf_val, buf_ts
