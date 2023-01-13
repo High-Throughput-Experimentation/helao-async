@@ -47,7 +47,7 @@ class C_co2:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["epoch_s", "co2_ppm", "co2_ppm_unflt"]
+        self.data_dict_keys = ["epoch_s", "co2_ppm", "co2_ppm_unflt","time_now"]
         self.data_dict = {key: [] for key in self.data_dict_keys}
 
         self.datasource = ColumnDataSource(data=self.data_dict)
@@ -89,7 +89,7 @@ class C_co2:
         # )
 
         self.plot = figure(height=300, width=500)
-        self.plot.xaxis.axis_label = "Epoch (seconds)"
+        self.plot.xaxis.axis_label = "Time (seconds)" #"Epoch (seconds)"
         self.plot.yaxis.axis_label = "CO2 (ppm)"
 
         self.table = DataTable(
@@ -212,6 +212,7 @@ class C_co2:
                 self.data_dict[datalab].append(dataval)
             latest_epoch = max([epochsec, latest_epoch])
         self.data_dict["epoch_s"].append(latest_epoch)
+        self.data_dict["time_now"] = self.data_dict["epoch_s"] - latest_epoch
 
         self.datasource.data = self.data_dict
         self.update_table_data()
@@ -259,20 +260,20 @@ class C_co2:
         self.plot.renderers = []
 
         self.plot.line(
-            x="epoch_s",
+            x="time_now",#"epoch_s",
             y="co2_ppm",
             line_color="red",
             legend_label="CO2 ppm (filtered)",
             source=self.datasource,
         )
 
-        self.plot.line(
-            x="epoch_s",
-            y="co2_ppm_unflt",
-            line_color="blue",
-            legend_label="CO2 ppm (unfiltered)",
-            source=self.datasource,
-        )
+        # self.plot.line(
+        #     x="epoch_s",
+        #     y="co2_ppm_unflt",
+        #     line_color="blue",
+        #     legend_label="CO2 ppm (unfiltered)",
+        #     source=self.datasource,
+        # )
 
     def reset_plot(self, forceupdate: bool = False):
         # self.xselect = self.xaxis_selector_group.active
