@@ -224,7 +224,6 @@ class SprintIR:
         self.base.print_message("Reading sensor stream.")
         buf = self.com.readline()
         lines = buf.decode("utf8").split("\n")
-        self.base.print_message(f"Stream returned {lines}")
         for line in lines:
             strip = line.strip()
             if strip.startswith("Z ") and " z " in strip:
@@ -241,10 +240,8 @@ class SprintIR:
             if co2_level:
                 # msg_dict = {"co2_ppm": int(co2_level[0].split()[-1])}
                 msg_dict = {
-                    "co2_ppm": [
-                        int(co2_level) * self.fw["scaling_factor"],
-                        int(co2_level_unfilt) * self.fw["scaling_factor"],
-                    ]
+                    "co2_ppm": int(co2_level) * self.fw["scaling_factor"],
+                    "co2_ppm_unflt": int(co2_level_unfilt) * self.fw["scaling_factor"],
                 }
                 await self.base.put_lbuf(msg_dict)
             await asyncio.sleep(waittime)
@@ -277,11 +274,12 @@ class SprintIR:
             valid_rate = (now - self.last_rec_time) >= self.recording_rate
             if valid_time and valid_rate:
                 # if 1:
-                (co2_flt, co2_unflt), co2_ts = self.base.get_lbuf("co2_ppm")
+                co2_ppm, co2_ts = self.base.get_lbuf("co2_ppm")
+                co2_ppm_unflt, co2_ts = self.base.get_lbuf("co2_ppm_unflt")
                 datadict = {
                     "epoch_s": co2_ts,
-                    "co2_ppm": co2_flt,
-                    "co2_ppm_unfiltered": co2_unflt,
+                    "co2_ppm": co2_ppm,
+                    "co2_ppm_raw": co2_ppm_unflt,
                 }
                 # await self.active.enqueue_data(
                 self.active.enqueue_data_nowait(
