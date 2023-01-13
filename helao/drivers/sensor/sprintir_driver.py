@@ -221,7 +221,6 @@ class SprintIR:
         return cmd_resp, aux_resp
 
     def read_stream(self):
-        self.base.print_message("Reading sensor stream.")
         buf = self.com.readline()
         lines = buf.decode("utf8").split("\n")
         for line in lines:
@@ -279,7 +278,7 @@ class SprintIR:
                 datadict = {
                     "epoch_s": co2_ts,
                     "co2_ppm": co2_ppm,
-                    "co2_ppm_raw": co2_ppm_unflt,
+                    "co2_ppm_unflt": co2_ppm_unflt,
                 }
                 # await self.active.enqueue_data(
                 self.active.enqueue_data_nowait(
