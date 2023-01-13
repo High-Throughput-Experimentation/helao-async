@@ -1973,9 +1973,9 @@ class DummyBase:
     def __init__(self) -> None:
         self.live_buffer = {}
         self.actionservermodel = ActionServerModel(
-            action_server = MachineModel(server_name="DUMMY", machine_name="dummyhost"),
-            last_action_uuid=uuid1()
-            )
+            action_server=MachineModel(server_name="DUMMY", machine_name="dummyhost"),
+            last_action_uuid=uuid1(),
+        )
         pass
 
     def print_message(self, message: str) -> None:
