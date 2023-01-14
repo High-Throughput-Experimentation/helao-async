@@ -257,7 +257,7 @@ class C_pressure:
         self.plot.renderers = []
 
         colors = ["red", "blue", "green", "orange"]
-        non_epoch_keys = [x for x in self.data_dict.keys() if x != "epoch_s"]
+        non_epoch_keys = [x for x in self.data_dict.keys() if x not in ["epoch_s","time_now"]]
         for pres_key, color in zip(non_epoch_keys, colors):
             self.plot.line(
                 x="time_now",
