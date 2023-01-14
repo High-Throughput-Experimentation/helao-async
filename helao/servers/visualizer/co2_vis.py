@@ -212,7 +212,7 @@ class C_co2:
                 self.data_dict[datalab].append(dataval)
             latest_epoch = max([epochsec, latest_epoch])
         self.data_dict["epoch_s"].append(latest_epoch)
-        self.data_dict["time_now"] = self.data_dict["epoch_s"] - latest_epoch
+        self.data_dict["time_now"] = [s- latest_epoch for s in self.data_dict["epoch_s"]]
 
         self.datasource.data = self.data_dict
         self.update_table_data()
