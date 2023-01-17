@@ -128,6 +128,7 @@ def CCSI_sub_load_liquid(
     experiment_version: int = 1,
     reservoir_liquid_sample_no: Optional[int] = 1,
     volume_ul_cell_liquid: Optional[int] = 1000,
+    water_True_False: bool = False,
 ):
     """Add liquid volume to cell position.
 
@@ -145,9 +146,9 @@ def CCSI_sub_load_liquid(
             "source_liquid_in": LiquidSample(
                 sample_no=apm.pars.reservoir_liquid_sample_no, machine_name=ORCH_HOST
             ).dict(),
-            "volume_ml": apm.pars.volume_ul_cell_liquid,
-            # "combine_liquids": True,
-            # "dilute_liquids": True,
+            "volume_ml": apm.pars.volume_ul_cell_liquid/1000,
+            "combine_liquids": apm.pars.water_True_False,
+            "dilute_liquids": apm.pars.water_True_False,
         },
     )
     return apm.action_list
@@ -170,7 +171,7 @@ def CCSI_sub_load_gas(
             "source_liquid_in": GasSample(
                 sample_no=apm.pars.reservoir_gas_sample_no, machine_name=ORCH_HOST
             ).dict(),
-            "volume_ml": apm.pars.volume_ul_cell_gas,
+            "volume_ml": apm.pars.volume_ul_cell_gas/1000,
             # "combine_liquids": True,
             # "dilute_liquids": True,
         },
@@ -410,7 +411,13 @@ def CCSI_sub_headspace_purge_and_measure(
 #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    apm.add(CO2S_server, "acquire_co2", {"duration": apm.pars.co2measure_duration, "acquisition_rate": apm.pars.co2measure_acqrate})
+    apm.add(CO2S_server, "acquire_co2", {"duration": apm.pars.co2measure_duration, "acquisition_rate": apm.pars.co2measure_acqrate},
+        technique_name="gas_purge",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+        ],
+    )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1},start_condition=ActionStartCondition.no_wait)
 #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSmeasure1_duration})
 
@@ -579,19 +586,29 @@ def CCSI_sub_initialization_firstpart(
 
 def CCSI_sub_liquidfill_syringes(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
+    Solution_description: str = "KOH",
+    Solution_reservoir_sample_no: int = 2,
     Solution_volume_ul: float = 500,
+    Waterclean_reservoir_sample_no: int = 1,
     Waterclean_volume_ul: float = 2500,
     Syringe_retraction_ul: float = 150,
     Syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 15,
     co2measure_duration: float = 20,
-    co2measure_acqrate: float = 0.1,
+    co2measure_acqrate: float = 0.5,
 
 ):
     # v2 v1ab open, sol inject clean inject
 
     apm = ActionPlanMaker()
+    apm.add(PAL_server, "archive_custom_query_sample", {"custom": "cell1_we",},
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+    
+    )
+
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 1},start_condition=ActionStartCondition.no_wait)
@@ -638,7 +655,16 @@ def CCSI_sub_liquidfill_syringes(
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    apm.add(CO2S_server, "acquire_co2", {"duration": apm.pars.co2measure_duration, "acquisition_rate": apm.pars.co2measure_acqrate})
+    apm.add(CO2S_server, "acquire_co2", {"duration": apm.pars.co2measure_duration, "acquisition_rate": apm.pars.co2measure_acqrate},
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        technique_name="Recirculate_headspace",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1},start_condition=ActionStartCondition.no_wait)
 
     return apm.action_list
@@ -705,7 +731,13 @@ def CCSI_sub_drain_and_clean(
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0},start_condition=ActionStartCondition.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    apm.add(CO2S_server, "acquire_co2", {"duration": apm.pars.co2measure_duration, "acquisition_rate": apm.pars.co2measure_acqrate})
+    apm.add(CO2S_server, "acquire_co2", {"duration": apm.pars.co2measure_duration, "acquisition_rate": apm.pars.co2measure_acqrate},
+        technique_name="liquid_purge",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+        ],
+    )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1},start_condition=ActionStartCondition.no_wait)
 
     # apm.add(CALC_server, "check_co2_purge", {"co2_ppm_thresh": apm.pars.co2_ppm_thresh, "purge_if": apm.pars.purge_if, "repeat_experiment_name": "CCSI_drain_and_clean", "repeat_experiment_params":  

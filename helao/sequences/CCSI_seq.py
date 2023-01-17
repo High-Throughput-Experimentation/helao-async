@@ -84,8 +84,11 @@ def CCSI_initialization(
 
 def CCSI_validation_KOH_procedure(
     sequence_version: int = 2,
+    gas_sample_no: int = 1,
     KOH_volume_ul: float = 500,
+    KOH_reservoir_sample_no: int = 2,
     water_volume_ul: float = 2500,
+    Waterclean_reservoir_sample_no: int = 1,
     retraction_volume_ul: float =150,
     syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 15,
@@ -104,6 +107,22 @@ def CCSI_validation_KOH_procedure(
 ):
 
     epm = ExperimentPlanMaker()
+
+    epm.add_experiment("CCSI_sub_unload_cell")
+    epm.add_experiment("CCSI_sub_load_gas", {
+        "reservoir_gas_sample_no": gas_sample_no,
+    })
+    epm.add_experiment("CCSI_sub_load_liquid", {
+        "reservoir_liquid_sample_no": KOH_reservoir_sample_no,
+        "volume_ul_cell_liquid": KOH_volume_ul,
+        "water_True_False": False,
+    })
+
+    epm.add_experiment("CCSI_sub_load_liquid", {
+        "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+        "volume_ul_cell_liquid": water_volume_ul,
+        "water_True_False": True,
+    })
 
     epm.add_experiment("CCSI_sub_liquidfill_syringes", {
         "Solution_volume_ul": KOH_volume_ul,
@@ -131,5 +150,6 @@ def CCSI_validation_KOH_procedure(
         epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {"HSpurge_duration": HSpurge_duration, "co2measure_duration": purge_co2measure_duration, "co2measure_acqrate": co2measure_acqrate, "co2_ppm_thresh": purge_co2threshhold, "purge_if": purge_if})
 
     epm.add_experiment("CCSI_sub_peripumpoff", {})
+    epm.add_experiment("CCSI_sub_unload_cell")
 
     return epm.experiment_plan_list
