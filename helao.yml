@@ -5,6 +5,7 @@ channels:
 dependencies:
   - pip:
     - aioshutil
+    - git+https://github.com/numat/alicat
   - aiofiles
   - aiohttp
   - bokeh=2
