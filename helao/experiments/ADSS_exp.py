@@ -580,7 +580,7 @@ def ADSS_sub_fill(
 
 def ADSS_sub_CA(
     experiment: Experiment,
-    experiment_version: int = 4,
+    experiment_version: int = 5,
     CA_potential: Optional[float] = 0.0,
     ph: Optional[float] = 9.53,
     potential_versus: Optional[str] = "rhe",
@@ -589,7 +589,8 @@ def ADSS_sub_CA(
     gamry_i_range: Optional[str] = "auto",
     samplerate_sec: Optional[float] = 0.05,
     CA_duration_sec: Optional[float] = 1800,
-    aliquot_intervals_sec: Optional[List[float]] = [],
+    aliquot_volume_ul: Optional [int] = 200,
+    aliquot_times_sec: Optional[List[float]] = [],
     aliquot_insitu: Optional[bool] = False,
 ):
     """Primary CA experiment with optional PAL sampling.
@@ -673,7 +674,7 @@ def ADSS_sub_CA(
                 {
                     "tool": PALtools.LS3,
                     "source": "cell1_we",
-                    "volume_ul": 200,
+                    "volume_ul": apm.pars.aliquot_volume_ul,
                     "sampleperiod": [0.0],
                     "spacingmethod": Spacingmethod.custom,
                     "spacingfactor": 1.0,
@@ -700,7 +701,7 @@ def ADSS_sub_CA(
 
 def ADSS_sub_CV(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 4,
     Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
@@ -715,7 +716,8 @@ def ADSS_sub_CV(
     potential_versus: Optional[str] = "rhe",
     ref_type: Optional[str] = "inhouse",
     ref_offset__V: Optional[float] = 0.0,
-    aliquot_intervals_sec: Optional[List[float]] = [],
+    aliquot_volume_ul: Optional [int] = 200,
+    aliquot_times_sec: Optional[List[float]] = [],
     aliquot_insitu: Optional[bool] = False,
 ):
 
@@ -814,7 +816,7 @@ def ADSS_sub_CV(
                 {
                     "tool": PALtools.LS3,
                     "source": "cell1_we",
-                    "volume_ul": 200,
+                    "volume_ul": apm.pars.aliquot_volume_ul,
                     "sampleperiod": [0.0],
                     "spacingmethod": Spacingmethod.custom,
                     "spacingfactor": 1.0,

@@ -87,7 +87,7 @@ def ADSS_CV(
 
 
 def ADSS_CA(
-    sequence_version: int = 4,
+    sequence_version: int = 5,
     solid_custom_position: str = "cell1_we",
     plate_id: int = 4534,
     plate_sample_no_list: list = [1],  # list instead of map select
@@ -98,8 +98,11 @@ def ADSS_CA(
     ref_type: str = "inhouse",
     ref_offset__V: float = 0.0,
     CA_duration_sec: float = 1320,
+    aliquot_times_sec: List[float] = [60, 600, 1140],
+    aliquot_volume_ul: int = 200,
     OCV_duration: float = 1,
     samplerate_sec: float = 0.05,
+    filltime_sec: float = 10.0,
 ):
 
     """tbd
@@ -140,6 +143,8 @@ def ADSS_CA(
                     "ref_offset__V": ref_offset__V,
                     "samplerate_sec": samplerate_sec,
                     "CA_duration_sec": CA_duration_sec,
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "aliquot_times_sec": aliquot_times_sec,
                 },
             )
 
