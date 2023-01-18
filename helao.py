@@ -441,11 +441,11 @@ if __name__ == "__main__":
             for x in python_paths
         }
         print(branches)
-    if not len(set(branches.values())) == 1:
-        print_message({}, "launcher", "", "Cannot start HELAO using mixed branches.")
-        for k, v in branches.items():
-            print_message({}, "launcher", "", f"local repo '{k}' on branch '{v}'")
-        quit()
+    # if not len(set(branches.values())) == 1:
+    #     print_message({}, "launcher", "", "Cannot start HELAO using mixed branches.")
+    #     for k, v in branches.items():
+    #         print_message({}, "launcher", "", f"local repo '{k}' on branch '{v}'")
+    #     quit()
     helao_root = os.path.dirname(os.path.realpath(__file__))
     confArg = sys.argv[1]
     config = config_loader(confArg, helao_root)
