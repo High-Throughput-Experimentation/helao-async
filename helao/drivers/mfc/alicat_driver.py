@@ -37,17 +37,15 @@ class AliCatMFC:
         self.config_dict = action_serv.server_cfg["params"]
         self.unified_db = UnifiedSampleDataAPI(self.base)
 
-        self.mfc = FlowContoller(port=self.config_dict['port'])
+        self.mfc = FlowContoller(port=self.config_dict["port"])
         # query status with self.mfc.get()
         # query pid settings with self.mfc.get_pid()
-
 
         self.aloop = asyncio.get_running_loop()
         self.polling = True
         self.poll_signalq = asyncio.Queue(1)
         self.poll_signal_task = self.aloop.create_task(self.poll_signal_loop())
         self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
-        self.present_volume_ul = 0.0
         self.last_state = "unknown"
 
     async def start_polling(self):
@@ -59,12 +57,11 @@ class AliCatMFC:
         await self.poll_signalq.put(False)
 
     async def poll_signal_loop(self):
-        await self.safe_state()
         while True:
             self.polling = await self.poll_signalq.get()
             self.base.print_message("polling signal received")
 
-    async def poll_sensor_loop(self, waittime = 0.05):
+    async def poll_sensor_loop(self, waittime: float = 0.05):
         self.base.print_message("MFC background task has started")
         lastupdate = 0
         while True:
@@ -73,94 +70,19 @@ class AliCatMFC:
                 if checktime - lastupdate < waittime:
                     # self.base.print_message("waiting for minimum update interval.")
                     await asyncio.sleep(waittime - (checktime - lastupdate))
-                addr = pdict["address"]
-                status_resp = self.send(plab, "status")
-                # self.base.print_message(f"received status: {status_resp}")
+                status_dict = self.mfc.get()
                 lastupdate = time.time()
-                status_prompt = status_resp[-1]
-                status = status_resp[0]
-                # self.base.print_message(f"current status: {status}")
-                addrstate_rate, pumptime, pumpvol, flags = status.split()
-                raddr = int(addrstate_rate[:2])
-                # self.base.print_message(
-                #     f"received address: {raddr}, config address: {addr}"
-                # )
-                if addr == raddr:
-                    state = None
-                    state_split = None
-                    for k, v in STATES.items():
-                        if addrstate_rate[2:].startswith(k):
-                            state_split = k
-                        if status_prompt[2:].startswith(k):
-                            state = v
-                        else:
-                            continue
-                    if state != self.last_state:
-                        self.base.print_message(
-                            f"pump state changed from '{self.last_state}' to '{state}'"
-                        )
-                        self.last_state = state
-                    rate = int(addrstate_rate.split(state_split)[-1])
-                    pumptime = int(pumptime)
-                    pumpvol = int(pumpvol)
-                    # self.base.print_message(f"flags: {flags.lower()}")
-                    (
-                        motor_dir,
-                        limit_status,
-                        stall_status,
-                        trig_input,
-                        dir_port,
-                        target_reached,
-                    ) = flags.lower()
-                    status_dict = {
-                        plab: {
-                            "status": state,
-                            "rate_fL": rate,
-                            "pump_time_ms": pumptime,
-                            "pump_volume_fL": pumpvol,
-                            "motor_direction": motor_dir,
-                            "limit_switch_state": limit_status,
-                            "stall_status": stall_status,
-                            "trigger_input_state": trig_input,
-                            "direction_port": dir_port,
-                            "target_reached": target_reached,
-                        }
-                    }
-                    # self.base.print_message(status_dict[plab]["status"])
-                    await self.base.put_lbuf(status_dict)
-                    # self.base.print_message("status sent to live buffer")
-                else:
-                    self.base.print_message("pump address does not match config")
-                # await asyncio.sleep(0.01)
-            else:
-                await asyncio.sleep(0.05)
-
-    def update_status_from_response(self, response):
-        status = response[0]
-        addr_status = status.split()[0]
-        addr = int(addr_status[:2])
-        pump_name = [
-            k for k, d in self.config_dict["pumps"].items() if int(d["address"]) == addr
-        ][0]
-        state = "unknown"
-        for k, v in STATES.items():
-            if addr_status[2:].startswith(k):
-                state = v
-                break
-            else:
-                continue
-        self.base.print_message(f"command response returned status: {state}")
-        status_dict = {"status": state}
-        self.base.live_buffer[pump_name][0].update(status_dict)
+                await self.base.put_lbuf(status_dict)
+                # self.base.print_message("status sent to live buffer")
+            await asyncio.sleep(0.01)
 
     def shutdown(self):
-        # this gets called when the server is shut down
-        # or reloaded to ensure a clean
+        # this gets called when the server is shut down or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
-        self.base.print_message("shutting down syringe pump(s)")
-        self.safe_state()
-        self.com.close()
-        
+        self.base.print_message("closing MFC connection")
+        self.mfc.close()
+
+
 """Notes:
 
 Register diffs at G16,25,26
