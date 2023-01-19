@@ -1,4 +1,4 @@
-__all__ = ["Base", "ActiveParams", "makeActionServ", "Active", "Executor"]
+__all__ = ["Base", "ActiveParams", "makeActionServ", "Active", "Executor", "DummyBase"]
 
 import asyncio
 import json
@@ -1976,10 +1976,9 @@ class DummyBase:
             action_server=MachineModel(server_name="DUMMY", machine_name="dummyhost"),
             last_action_uuid=uuid1(),
         )
-        pass
 
     def print_message(self, message: str) -> None:
-        pass
+        print_message({}, "DUMMY", message)
 
     async def put_lbuf(self, message: dict) -> None:
         now = time.time()
