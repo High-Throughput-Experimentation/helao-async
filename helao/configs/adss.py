@@ -109,10 +109,10 @@ config["servers"] = {
                 "res_heater": "PXI-6289/port0/line4",
             },
             "dev_gasvalve": {
-                "O2": "PXI-6284/port1/line2",
-                "reservoir": "PXI-6284/port1/line3",
-                "waste": "PXI-6284/port1/line4",
-                "4": "PXI-6284/port1/line5",
+                "V1": "PXI-6284/port1/line2", #1-6 white ground
+                "V2": "PXI-6284/port1/line3", #7-9 grey ground
+                "V3": "PXI-6284/port1/line4",
+                "V4": "PXI-6284/port1/line5",
                 "5": "PXI-6284/port1/line6",
                 "6": "PXI-6284/port1/line7",
                 "7": "PXI-6284/port2/line0",
@@ -175,14 +175,14 @@ config["servers"] = {
         "port": 8013,
         "group": "action",
         "fast": "syringe_server",
-        "params": {"port": "COM6", "pumps": {"zero": {"address": 0, "diameter": 26.7}}},
+        "params": {"port": "COM7", "pumps": {"zero": {"address": 0, "diameter": 26.7}}},
     },
     "SYRINGE1": {
         "host": hostip,
         "port": 8014,
         "group": "action",
         "fast": "syringe_server",
-        "params": {"port": "COM7", "pumps": {"one": {"address": 1, "diameter": 26.7}}},
+        "params": {"port": "COM6", "pumps": {"one": {"address": 1, "diameter": 26.7}}},
     },
     "LIVE": {
         "host": hostip,
