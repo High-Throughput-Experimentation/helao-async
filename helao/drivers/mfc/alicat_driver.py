@@ -12,10 +12,10 @@ __all__ = []
 import time
 import asyncio
 import serial
-from typing import Union
+from typing import Union, Optional
 
 from helaocore.error import ErrorCodes
-from helao.servers.base import Base
+from helao.servers.base import Base, DummyBase
 from helaocore.models.data import DataModel
 from helaocore.models.file import FileConnParams, HloHeaderModel
 from helaocore.models.sample import SampleInheritance, SampleStatus
@@ -23,44 +23,44 @@ from helaocore.models.hlostatus import HloStatus
 from helao.helpers.premodels import Action
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.sample_api import UnifiedSampleDataAPI
-from helao.servers.base import Base
 
 from alicat import FlowController
 
 
 class AliCatMFC:
-    def __init__(self, action_serv: Base):
+    def __init__(self, action_serv: Optional[Base] = None):
 
-        self.base = action_serv
+        if action_serv is None:
+            self.base = DummyBase()
+        else:
+            self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
+
         self.unified_db = UnifiedSampleDataAPI(self.base)
 
-        # use Serial to query info not exposed by NuMat alicat module
-        com = serial.Serial(
-            port=self.config_dict["port"],
-            baudrate=19200,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            timeout=0.5,
-            xonxoff=False,
-            rtscts=False,
-        )
-        # list gases in register
-        com.write(b"A??g*\r")
-        gas_resp = com.readlines()[0].decode("utf8")
-        # table of mfc status and units
-        com.write(b"A??d*\r")
-        tbl_resp = com.readlines()[0].decode("utf8")
-        # device information (model, serial, calib date...)
-        com.write(b"A??m*\r")
-        mfg_resp = com.readlines()[0].decode("utf8")
-        
-        com.close()
+        self.mfc = FlowContoller(port=self.config_dict["port"], address=self.config_dict["unit_id"])
 
-        gas_list = [x.replace("A G", "").strip() for x in gas_resp.split("\r")]
+        # setpoint control mode: serial
+        self._send(f"{self.config_dict['unit_id']}LSSS")
+        # close valves and hold
+        self._send(f"{self.config_dict['unit_id']}HC")
+        # retrieve gas list
+        gas_resp = self._send("{self.config_dict['unit_id']}??g*")
+        # device information (model, serial, calib date...)
+        mfg_resp = self._send("{self.config_dict['unit_id']}??m*")
+        # cancel volve hold
+        self._send("{self.config_dict['unit_id']}")
+
+        gas_list = [x.replace("A", "").replace("G", "").strip() for x in gas_resp]
         self.gas_dict = {int(x): y for gas in gas_list for x, y in gas.split()}
 
-        self.mfc = FlowContoller(port=self.config_dict["port"])
+        mfg_list = [x.replace("A", "").replace("M", "").strip() for x in mfg_resp]
+        self.mfg_dict = {
+            " ".join(parts[1:-1]): parts[-1]
+            for line in mfg_list
+            for parts in line.split()
+        }
+
         # query status with self.mfc.get()
         # query pid settings with self.mfc.get_pid()
 
@@ -70,6 +70,17 @@ class AliCatMFC:
         self.poll_signal_task = self.aloop.create_task(self.poll_signal_loop())
         self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
         self.last_state = "unknown"
+
+    def _send(self, command: str):
+        if not command.endswith("\r"):
+            command += "\r"
+        lines = []
+        lines.append(self.mfc._write_and_read(command))
+        next_line = self.mfc.readline()
+        while next_line.strip() != "":
+            lines.append(next_line)
+            next_line = self.mfc.readline()
+        return lines
 
     async def start_polling(self):
         self.base.print_message("got 'start_polling' request, raising signal")
@@ -106,7 +117,7 @@ class AliCatMFC:
         pass
 
     def set_flowrate(self, flowrate: float):
-        pass
+        self.mfc.set_flow_rate(flowrate)
 
     def set_gas(self, gas: Union[int, str]):
         "Set MFC to pure gas"
@@ -145,7 +156,7 @@ class AliCatMFC:
         return resp
 
     def tare_volume(self):
-        """Tare volumetric flow. Ensure """
+        """Tare volumetric flow. Ensure"""
         resp = self.mfc.tare_volumetric()
         return resp
 
