@@ -266,6 +266,8 @@ class C_co2:
             legend_label="CO2 ppm (filtered)",
             source=self.datasource,
         )
+        self.plot.legend.border_line_alpha = 0.2
+        self.plot.legend.background_fill_alpha = 0.2
 
         # self.plot.line(
         #     x="epoch_s",
