@@ -100,9 +100,9 @@ config["servers"] = {
             },
             "dev_monitor": {
                 "Ttemp_Ktc_in_cell_C": "PXI-6289/ai6",
-                # "Ttemp_Ttc_in_reservoir_C": "PXI-6289/ai7",
-                # "Ttemp_Ktc_out_cell_C": "PXI-6289/ai1",
-                # "Ttemp_Ktc_out_reservoir_C": "PXI-6289/ai2",
+                "Ttemp_Ttc_in_reservoir_C": "PXI-6289/ai7",
+                "Ttemp_Ktc_out_cell_C": "PXI-6289/ai1",
+                "Ttemp_Ktc_out_reservoir_C": "PXI-6289/ai2",
             },
             "dev_heat": {
                 "cellheater": "PXI-6289/port0/line0",
@@ -169,6 +169,20 @@ config["servers"] = {
         "group": "visualizer",
         "bokeh": "action_visualizer",
         "params": {},
+    },
+    "SYRINGE0": {
+        "host": hostip,
+        "port": 8013,
+        "group": "action",
+        "fast": "syringe_server",
+        "params": {"port": "COM6", "pumps": {"zero": {"address": 0, "diameter": 26.7}}},
+    },
+    "SYRINGE1": {
+        "host": hostip,
+        "port": 8014,
+        "group": "action",
+        "fast": "syringe_server",
+        "params": {"port": "COM7", "pumps": {"one": {"address": 1, "diameter": 26.7}}},
     },
     "LIVE": {
         "host": hostip,
