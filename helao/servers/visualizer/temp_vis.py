@@ -42,7 +42,7 @@ class C_temperature:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["epoch_s"] + sorted(
+        self.data_dict_keys = ["epoch_s","time_now"] + sorted(
             tserv_config.get("params", {}).get("dev_monitor", {}).keys()
         )
         self.data_dict = {key: [] for key in self.data_dict_keys}
@@ -86,7 +86,7 @@ class C_temperature:
         # )
 
         self.plot = figure(height=300, width=500)
-        self.plot.xaxis.axis_label = "Epoch (seconds)"
+        self.plot.xaxis.axis_label = "Time (seconds)" #"Epoch (seconds)"
         self.plot.yaxis.axis_label = "Temperature (C)"
 
         self.table = DataTable(
@@ -209,6 +209,7 @@ class C_temperature:
                 self.data_dict[datalab].append(dataval)
             latest_epoch = max([epochsec, latest_epoch])
         self.data_dict["epoch_s"].append(latest_epoch)
+        self.data_dict["time_now"] = [s- latest_epoch for s in self.data_dict["epoch_s"]]
 
         self.datasource.data = self.data_dict
         self.update_table_data()
@@ -259,12 +260,14 @@ class C_temperature:
         non_epoch_keys = [x for x in self.data_dict.keys() if x != "epoch_s"]
         for temp_key, color in zip(non_epoch_keys, colors):
             self.plot.line(
-                x="epoch_s",
+                x="time_now",#"epoch_s",
                 y=temp_key,
                 line_color=color,
                 source=self.datasource,
                 legend_label=temp_key,
             )
+            self.plot.legend.border_line_alpha = 0.2
+            self.plot.legend.background_fill_alpha = 0.2
 
     def reset_plot(self, forceupdate: bool = False):
         # self.xselect = self.xaxis_selector_group.active
