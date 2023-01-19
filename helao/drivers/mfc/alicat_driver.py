@@ -38,23 +38,25 @@ class AliCatMFC:
 
         self.unified_db = UnifiedSampleDataAPI(self.base)
 
-        self.mfc = FlowContoller(port=self.config_dict["port"], address=self.config_dict["unit_id"])
+        self.mfc = FlowContoller(
+            port=self.config_dict["port"], address=self.config_dict["unit_id"]
+        )
 
         # setpoint control mode: serial
         self._send(f"{self.config_dict['unit_id']}LSSS")
         # close valves and hold
         self._send(f"{self.config_dict['unit_id']}HC")
         # retrieve gas list
-        gas_resp = self._send("{self.config_dict['unit_id']}??g*")
+        gas_resp = self._send(f"{self.config_dict['unit_id']}??g*")
         # device information (model, serial, calib date...)
-        mfg_resp = self._send("{self.config_dict['unit_id']}??m*")
+        mfg_resp = self._send(f"{self.config_dict['unit_id']}??m*")
         # cancel volve hold
-        self._send("{self.config_dict['unit_id']}")
+        self._send(f"{self.config_dict['unit_id']}")
 
-        gas_list = [x.replace("A", "").replace("G", "").strip() for x in gas_resp]
-        self.gas_dict = {int(x): y for gas in gas_list for x, y in gas.split()}
+        gas_list = [x.replace(f"{self.config_dict['unit_id']} ", " ").strip() for x in gas_resp]
+        self.gas_dict = {int(x[1:]): y for gas in gas_list for x, y in gas.split()}
 
-        mfg_list = [x.replace("A", "").replace("M", "").strip() for x in mfg_resp]
+        mfg_list = [x.replace(f"{self.config_dict['unit_id']} ", " ").strip() for x in mfg_resp]
         self.mfg_dict = {
             " ".join(parts[1:-1]): parts[-1]
             for line in mfg_list
@@ -114,10 +116,10 @@ class AliCatMFC:
         return self.gas_dict
 
     def set_pressure(self, pressure_psia: float):
-        pass
+        self.mfc.set_pressure(pressure_psia)
 
-    def set_flowrate(self, flowrate: float):
-        self.mfc.set_flow_rate(flowrate)
+    def set_flowrate(self, flowrate_sccm: float):
+        self.mfc.set_flow_rate(flowrate_sccm)
 
     def set_gas(self, gas: Union[int, str]):
         "Set MFC to pure gas"
@@ -156,12 +158,12 @@ class AliCatMFC:
         return resp
 
     def tare_volume(self):
-        """Tare volumetric flow. Ensure"""
+        """Tare volumetric flow. Ensure mfc is isolated."""
         resp = self.mfc.tare_volumetric()
         return resp
 
     def tare_pressure(self):
-        """Tare pressure."""
+        """Tare absolute pressure."""
         resp = self.mfc.tare_pressure()
         return resp
 
