@@ -11,7 +11,8 @@ __all__ = []
 
 import time
 import asyncio
-
+import serial
+from typing import Union
 
 from helaocore.error import ErrorCodes
 from helao.servers.base import Base
@@ -24,9 +25,6 @@ from helao.helpers.active_params import ActiveParams
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 from helao.servers.base import Base
 
-from functools import partial
-from bokeh.server.server import Server
-
 from alicat import FlowController
 
 
@@ -36,6 +34,31 @@ class AliCatMFC:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
         self.unified_db = UnifiedSampleDataAPI(self.base)
+
+        # use Serial to query info not exposed by NuMat alicat module
+        com = serial.Serial(
+            port=self.config_dict["port"],
+            baudrate=19200,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=0.5,
+            xonxoff=False,
+            rtscts=False,
+        )
+        # list gases in register
+        com.write(b"A??g*\r")
+        gas_resp = com.readlines()[0].decode("utf8")
+        # table of mfc status and units
+        com.write(b"A??d*\r")
+        tbl_resp = com.readlines()[0].decode("utf8")
+        # device information (model, serial, calib date...)
+        com.write(b"A??m*\r")
+        mfg_resp = com.readlines()[0].decode("utf8")
+        
+        com.close()
+
+        gas_list = [x.replace("A G", "").strip() for x in gas_resp.split("\r")]
+        self.gas_dict = {int(x): y for gas in gas_list for x, y in gas.split()}
 
         self.mfc = FlowContoller(port=self.config_dict["port"])
         # query status with self.mfc.get()
@@ -75,6 +98,66 @@ class AliCatMFC:
                 await self.base.put_lbuf(status_dict)
                 # self.base.print_message("status sent to live buffer")
             await asyncio.sleep(0.01)
+
+    def list_gases(self):
+        return self.gas_dict
+
+    def set_pressure(self, pressure_psia: float):
+        pass
+
+    def set_flowrate(self, flowrate: float):
+        pass
+
+    def set_gas(self, gas: Union[int, str]):
+        "Set MFC to pure gas"
+        resp = self.mfc.set_gas(gas)
+        return resp
+
+    def set_gas_mixture(self, gas_dict: dict):
+        "Set MFC to gas mixture defined in gas_dict {gasname: integer_pct}"
+        if sum(gas_dict.values()) != 100:
+            self.base.print_message("Gas mixture percentages do not add to 100.")
+            return {}
+        else:
+            self.mfc.delete_mix(236)
+            self.mfc.create_mix(mix_no=236, name="HELAO_mix", gases=gas_dict)
+            resp = self.mfc.set_gas(236)
+            return resp
+
+    def lock_display(self):
+        """Lock the front display."""
+        resp = self.mfc.lock()
+        return resp
+
+    def unlock_display(self):
+        """Unlock the front display."""
+        resp = self.mfc.unlock()
+        return resp
+
+    def hold_valve(self):
+        """Hold the valve in its current position."""
+        resp = self.mfc.hold()
+        return resp
+
+    def hold_cancel(self):
+        """Cancel the valve hold."""
+        resp = self.mfc.cancel_hold()
+        return resp
+
+    def tare_volume(self):
+        """Tare volumetric flow. Ensure """
+        resp = self.mfc.tare_volumetric()
+        return resp
+
+    def tare_pressure(self):
+        """Tare pressure."""
+        resp = self.mfc.tare_pressure()
+        return resp
+
+    def reset_totalizer(self):
+        """Reset totalizer, if totalizer functionality included."""
+        resp = self.mfc.reset_totalizer()
+        return resp
 
     def shutdown(self):
         # this gets called when the server is shut down or reloaded to ensure a clean
