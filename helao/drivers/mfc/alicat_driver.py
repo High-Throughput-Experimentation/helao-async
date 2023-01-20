@@ -275,6 +275,7 @@ class MfcExec(Executor):
         """Read flow from live buffer."""
         live_dict, epoch_s = self.active.base.get_lbuf(self.device_name)
         live_dict["epoch_s"] = epoch_s
+        live_dict["device_name"] = self.device_name
         iter_time = time.time()
         if self.duration < 0 or iter_time - self.start_time < self.duration:
             status = HloStatus.active
