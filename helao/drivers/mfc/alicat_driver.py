@@ -7,61 +7,60 @@ Update the gas list registers in case any of the 3 gases are used.
 
 """
 
-__all__ = []
+__all__ = ["AliCatMFC", "MfcExec"]
 
 import time
 import asyncio
-import serial
 from typing import Union, Optional
 
 from helaocore.error import ErrorCodes
-from helao.servers.base import Base, DummyBase
-from helaocore.models.data import DataModel
-from helaocore.models.file import FileConnParams, HloHeaderModel
-from helaocore.models.sample import SampleInheritance, SampleStatus
+from helao.servers.base import Base, Executor
 from helaocore.models.hlostatus import HloStatus
-from helao.helpers.premodels import Action
-from helao.helpers.active_params import ActiveParams
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 
 from alicat import FlowController
 
 
 class AliCatMFC:
-    def __init__(self, action_serv: Optional[Base] = None):
+    def __init__(self, action_serv: Base):
 
-        if action_serv is None:
-            self.base = DummyBase()
-        else:
-            self.base = action_serv
+        self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
 
         self.unified_db = UnifiedSampleDataAPI(self.base)
 
-        self.mfc = FlowContoller(
-            port=self.config_dict["port"], address=self.config_dict["unit_id"]
-        )
+        self.fcs = {}
+        self.fcinfo = {}
 
-        # setpoint control mode: serial
-        self._send(f"{self.config_dict['unit_id']}LSSS")
-        # close valves and hold
-        self._send(f"{self.config_dict['unit_id']}HC")
-        # retrieve gas list
-        gas_resp = self._send(f"{self.config_dict['unit_id']}??g*")
-        # device information (model, serial, calib date...)
-        mfg_resp = self._send(f"{self.config_dict['unit_id']}??m*")
-        # cancel volve hold
-        self._send(f"{self.config_dict['unit_id']}")
+        for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
 
-        gas_list = [x.replace(f"{self.config_dict['unit_id']} ", " ").strip() for x in gas_resp]
-        self.gas_dict = {int(x[1:]): y for gas in gas_list for x, y in gas.split()}
+            self.fcs[dev_name] = FlowContoller(
+                port=dev_dict["port"], address=dev_dict["unit_id"]
+            )
+            # setpoint control mode: serial
+            self._send(dev_name, "lsss")
+            # close valves and hold
+            self._send(dev_name, "hc")
+            # retrieve gas list
+            gas_resp = self._send(dev_name, "??g*")
+            # device information (model, serial, calib date...)
+            mfg_resp = self._send(dev_name, "??m*")
 
-        mfg_list = [x.replace(f"{self.config_dict['unit_id']} ", " ").strip() for x in mfg_resp]
-        self.mfg_dict = {
-            " ".join(parts[1:-1]): parts[-1]
-            for line in mfg_list
-            for parts in line.split()
-        }
+            gas_list = [
+                x.replace(f"{dev_dict['unit_id']} ", " ").strip() for x in gas_resp
+            ]
+            gas_dict = {int(x[1:]): y for gas in gas_list for x, y in gas.split()}
+
+            mfg_list = [
+                x.replace(f"{dev_dict['unit_id']} ", " ").strip() for x in mfg_resp
+            ]
+            mfg_dict = {
+                " ".join(parts[1:-1]): parts[-1]
+                for line in mfg_list
+                for parts in line.split()
+            }
+
+            self.fcinfo[dev_name] = {"gases": gas_dict, "info": mfg_dict}
 
         # query status with self.mfc.get()
         # query pid settings with self.mfc.get_pid()
@@ -73,15 +72,16 @@ class AliCatMFC:
         self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
         self.last_state = "unknown"
 
-    def _send(self, command: str):
+    def _send(self, device_name: str, command: str):
+        unit_id = self.config_dict["devices"]["device_name"]["unit_id"]
         if not command.endswith("\r"):
             command += "\r"
         lines = []
-        lines.append(self.mfc._write_and_read(command))
-        next_line = self.mfc.readline()
+        lines.append(self.fcs[device_name]._write_and_read(f"{unit_id.upper()}command"))
+        next_line = self.fcs[device_name].readline()
         while next_line.strip() != "":
             lines.append(next_line)
-            next_line = self.mfc.readline()
+            next_line = self.fcs[device_name].readline()
         return lines
 
     async def start_polling(self):
@@ -102,81 +102,206 @@ class AliCatMFC:
         lastupdate = 0
         while True:
             if self.polling:
-                checktime = time.time()
-                if checktime - lastupdate < waittime:
-                    # self.base.print_message("waiting for minimum update interval.")
-                    await asyncio.sleep(waittime - (checktime - lastupdate))
-                status_dict = self.mfc.get()
-                lastupdate = time.time()
-                await self.base.put_lbuf(status_dict)
-                # self.base.print_message("status sent to live buffer")
+                for dev_name, fc in self.fcs.items():
+                    checktime = time.time()
+                    if checktime - lastupdate < waittime:
+                        # self.base.print_message("waiting for minimum update interval.")
+                        await asyncio.sleep(waittime - (checktime - lastupdate))
+                    resp_dict = fc.get()
+                    status_dict = {dev_name: resp_dict}
+                    lastupdate = time.time()
+                    await self.base.put_lbuf(status_dict)
+                    # self.base.print_message("status sent to live buffer")
+                await asyncio.sleep(0.01)
             await asyncio.sleep(0.01)
 
-    def list_gases(self):
-        return self.gas_dict
+    def list_devices(self):
+        return self.fcinfo.keys()
 
-    def set_pressure(self, pressure_psia: float):
-        self.mfc.set_pressure(pressure_psia)
+    def list_gases(self, device_name: str):
+        return self.fcinfo.get(device_name, {}).get("gases", {})
 
-    def set_flowrate(self, flowrate_sccm: float):
-        self.mfc.set_flow_rate(flowrate_sccm)
-
-    def set_gas(self, gas: Union[int, str]):
-        "Set MFC to pure gas"
-        resp = self.mfc.set_gas(gas)
+    def set_pressure(self, device_name: str, pressure_psia: float):
+        resp = self.fcs[device_name].set_pressure(pressure_psia)
         return resp
 
-    def set_gas_mixture(self, gas_dict: dict):
+    def set_flowrate(self, device_name: str, flowrate_sccm: float):
+        resp = self.fcs[device_name].set_flow_rate(flowrate_sccm)
+        return resp
+
+    def set_gas(self, device_name: str, gas: Union[int, str]):
+        "Set MFC to pure gas"
+        resp = self.fcs[device_name].set_gas(gas)
+        return resp
+
+    def set_gas_mixture(self, device_name: str, gas_dict: dict):
         "Set MFC to gas mixture defined in gas_dict {gasname: integer_pct}"
         if sum(gas_dict.values()) != 100:
             self.base.print_message("Gas mixture percentages do not add to 100.")
             return {}
         else:
-            self.mfc.delete_mix(236)
-            self.mfc.create_mix(mix_no=236, name="HELAO_mix", gases=gas_dict)
-            resp = self.mfc.set_gas(236)
+            self.fcs[device_name].delete_mix(236)
+            self.fcs[device_name].create_mix(
+                mix_no=236, name="HELAO_mix", gases=gas_dict
+            )
+            resp = self.fcs[device_name].set_gas(236)
             return resp
 
-    def lock_display(self):
+    def lock_display(self, device_name: Optional[str] = None):
         """Lock the front display."""
-        resp = self.mfc.lock()
+        if device_name is None:
+            resp = []
+            for dev_name, fc in self.fcs.items():
+                lock_resp = fc.lock()
+                resp.append({dev_name: lock_resp})
+        else:
+            resp = self.fcs[device_name].lock()
         return resp
 
-    def unlock_display(self):
+    def unlock_display(self, device_name: Optional[str] = None):
         """Unlock the front display."""
-        resp = self.mfc.unlock()
+        if device_name is None:
+            resp = []
+            for dev_name, fc in self.fcs.items():
+                unlock_resp = fc.unlock()
+                resp.append({dev_name: unlock_resp})
+        else:
+            resp = self.fcs[device_name].unlock()
         return resp
 
-    def hold_valve(self):
+    def hold_valve(self, device_name: Optional[str] = None):
         """Hold the valve in its current position."""
-        resp = self.mfc.hold()
+        if device_name is None:
+            resp = []
+            for dev_name, fc in self.fcs.items():
+                hold_resp = fc.hold()
+                resp.append({dev_name: hold_resp})
+        else:
+            resp = self.fcs[device_name].hold()
         return resp
 
-    def hold_cancel(self):
+    def hold_valve_closed(self, device_name: Optional[str] = None):
+        """Close valve and hold."""
+        if device_name is None:
+            resp = []
+            for dev_name, _ in self.fcs.items():
+                chold_resp = self._send(dev_name, "c")
+                resp.append({dev_name: chold_resp})
+        else:
+            resp = self._send(device_name, "c")
+        return resp
+
+    def hold_cancel(self, device_name: Optional[str] = None):
         """Cancel the valve hold."""
-        resp = self.mfc.cancel_hold()
+        if device_name is None:
+            resp = []
+            for dev_name, fc in self.fcs.items():
+                cancel_resp = fc.cancel_hold()
+                resp.append({dev_name: cancel_resp})
+        else:
+            resp = self.fcs[device_name].cancel_hold()
         return resp
 
-    def tare_volume(self):
+    def tare_volume(self, device_name: Optional[str] = None):
         """Tare volumetric flow. Ensure mfc is isolated."""
-        resp = self.mfc.tare_volumetric()
+        if device_name is None:
+            resp = []
+            for dev_name, fc in self.fcs.items():
+                tarev_resp = fc.tare_pressure()
+                resp.append({dev_name: tarev_resp})
+        else:
+            resp = self.fcs[device_name].tare_volumetric()
         return resp
 
-    def tare_pressure(self):
+    def tare_pressure(self, device_name: Optional[str] = None):
         """Tare absolute pressure."""
-        resp = self.mfc.tare_pressure()
+        if device_name is None:
+            resp = []
+            for dev_name, fc in self.fcs.items():
+                tarep_resp = fc.tare_pressure()
+                resp.append({dev_name: tarep_resp})
+        else:
+            resp = self.fcs[device_name].tare_pressure()
         return resp
 
-    def reset_totalizer(self):
+    def reset_totalizer(self, device_name: Optional[str] = None):
         """Reset totalizer, if totalizer functionality included."""
-        resp = self.mfc.reset_totalizer()
+        if device_name is None:
+            resp = []
+            for dev_name, fc in self.fcs.items():
+                reset_resp = fc.reset_totalizer()
+                resp.append({dev_name: reset_resp})
+        else:
+            resp = self.fcs[device_name].reset_totalizer()
         return resp
 
     def shutdown(self):
         # this gets called when the server is shut down or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
-        self.base.print_message("closing MFC connection")
-        self.mfc.close()
+        self.base.print_message("closing MFC connections")
+        for fc in self.fcs.values():
+            fc.close()
+
+
+class MfcExec(Executor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # current plan is 1 flow controller per COM
+        self.device_name = list(self.active.base.server_params["devices"].keys())[0]
+        self.active.base.print_message("MFCExec initialized.")
+        self.start_time = time.time()
+        self.duration = kwargs.get("duration", -1)
+        self.exid = self.device_name
+
+    async def _pre_exec(self):
+        "Set flow rate."
+        self.active.base.print_message("MFCExec running setup methods.")
+        flowrate_sccm = self.active.action.action_params.get("flowrate_sccm", None)
+        if flowrate_sccm is not None:
+            rate_resp = self.active.base.fastapp.driver.set_flowrate(
+                device_name=self.device_name,
+                flowrate_sccm=flowrate_sccm,
+            )
+            self.active.base.print_message(f"set_flowrate returned: {rate_resp}")
+        return {"error": ErrorCodes.none}
+
+    async def _exec(self):
+        "Cancel valve hold."
+        self.start_time = time.time()
+        openvlv_resp = self.active.base.fastapp.driver.hold_cancel(
+            device_name=self.device_name,
+        )
+        self.active.base.print_message(f"hold_cancel returned: {openvlv_resp}")
+        return {"error": ErrorCodes.none}
+
+    async def _poll(self):
+        """Read flow from live buffer."""
+        live_dict, epoch_s = self.active.base.get_lbuf(self.device_name)
+        live_dict["epoch_s"] = epoch_s
+        iter_time = time.time()
+        if self.duration < 0 or iter_time - self.start_time < self.duration:
+            status = HloStatus.active
+        else:
+            status = HloStatus.finished
+        return {
+            "error": ErrorCodes.none,
+            "status": status,
+            "data": live_dict,
+        }
+
+    async def _manual_stop(self):
+        stop_resp = self.active.base.fastapp.driver.stop_pump(self.device_name)
+        self.active.base.print_message(f"stop_pump returned: {stop_resp}")
+        return {"error": ErrorCodes.none}
+
+    async def _post_exec(self):
+        "Restore valve hold."
+        self.active.base.print_message("MFCExec running cleanup methods.")
+        closevlv_resp = self.active.base.fastapp.driver.hold_valve_closed(
+            device_name=self.device_name,
+        )
+        self.active.base.print_message(f"hold_valve_closed returned: {closevlv_resp}")
+        return {"error": ErrorCodes.none}
 
 
 """Notes:
