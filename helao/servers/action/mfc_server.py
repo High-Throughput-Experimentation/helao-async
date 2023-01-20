@@ -89,7 +89,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     @app.post("/list_devices")
     def list_devices():
-        return app.driver.list_devices()
+        return app.driver.fcinfo
 
     @app.post("/list_gases")
     def list_gases(device_name: str = dev_name):

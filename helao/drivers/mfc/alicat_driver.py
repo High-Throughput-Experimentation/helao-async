@@ -115,9 +115,6 @@ class AliCatMFC:
                 await asyncio.sleep(0.01)
             await asyncio.sleep(0.01)
 
-    def list_devices(self):
-        return self.fcinfo.keys()
-
     def list_gases(self, device_name: str):
         return self.fcinfo.get(device_name, {}).get("gases", {})
 
