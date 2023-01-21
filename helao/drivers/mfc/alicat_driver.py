@@ -73,7 +73,7 @@ class AliCatMFC:
         self.last_state = "unknown"
 
     def _send(self, device_name: str, command: str):
-        unit_id = self.config_dict["devices"]["device_name"]["unit_id"]
+        unit_id = self.config_dict["devices"][device_name]["unit_id"]
         if not command.endswith("\r"):
             command += "\r"
         lines = []
