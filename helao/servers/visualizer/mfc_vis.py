@@ -20,11 +20,12 @@ from bokeh.models.axes import Axis
 from helao.servers.vis import Vis
 
 
-class C_flowcontroller:
+class C_mfc:
     """mass flow controller visualizer module class"""
 
     def __init__(self, visServ: Vis, serv_key: str):
         self.vis = visServ
+        self.actsrv_cfg = self.vis.world_cfg["servers"][serv_key]["params"]
         self.config_dict = self.vis.server_cfg["params"]
         self.update_rate = self.config_dict.get("update_rate", 0.5)
         self.max_points = 500
@@ -42,9 +43,8 @@ class C_flowcontroller:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = [
+        self.data_suffices = [
             "epoch_s",
-            "device_name",
             "setpoint",
             "control_point",
             "gas",
@@ -53,7 +53,14 @@ class C_flowcontroller:
             "temperature",
             "total_flow",
             "volumetric_flow",
+            "time_now",
         ]
+
+        self.data_dict_keys = []
+        self.devices = sorted(self.actsrv_cfg["devices"].keys())
+        for device_name in self.devices:
+            for suffix in self.data_suffices:
+                self.data_dict_keys.append(f"{device_name}__{suffix}")
         self.data_dict = {key: [] for key in self.data_dict_keys}
 
         self.datasource = ColumnDataSource(data=self.data_dict)
@@ -211,13 +218,14 @@ class C_flowcontroller:
             for key in self.data_dict_keys:
                 del self.data_dict[key][:delpts]
         latest_epoch = 0
-        for datalab, (dataval, epochsec) in datapackage.items():
-            if isinstance(dataval, list):
-                self.data_dict[datalab] += dataval
-            else:
-                self.data_dict[datalab].append(dataval)
+        for dev_name, (dev_dict, epochsec) in datapackage.items():
+            for datakey, dataval in dev_dict.items():
+                self.data_dict[f"{dev_name}__{datakey}"].append(dataval)
             latest_epoch = max([epochsec, latest_epoch])
-        self.data_dict["epoch_s"].append(latest_epoch)
+            self.data_dict[f"{dev_name}__epoch_s"].append(latest_epoch)
+            self.data_dict[f"{dev_name}__time_now"] = [
+                s - latest_epoch for s in self.data_dict[f"{dev_name}__epoch_s"]
+            ]
 
         self.datasource.data = self.data_dict
         self.update_table_data()
@@ -265,14 +273,22 @@ class C_flowcontroller:
         self.plot.renderers = []
 
         colors = ["red", "blue", "green", "orange"]
-        non_epoch_keys = [x for x in self.data_dict.keys() if x != "epoch_s"]
-        for temp_key, color in zip(non_epoch_keys, colors):
+        for dev_name, color in zip(self.devices, colors[: len(self.devices)]):
             self.plot.line(
-                x="epoch_s",
-                y=temp_key,
+                x=f"{dev_name}__time_now",
+                y=f"{dev_name}__mass_flow",
                 line_color=color,
+                line_dash="solid",
                 source=self.datasource,
-                legend_label=temp_key,
+                legend_label=f"{dev_name} actual",
+            )
+            self.plot.line(
+                x=f"{dev_name}__time_now",
+                y=f"{dev_name}__setpoint",
+                line_color=color,
+                line_dash="dotted",
+                source=self.datasource,
+                legend_label=f"{dev_name} setpoint",
             )
 
     def reset_plot(self, forceupdate: bool = False):
