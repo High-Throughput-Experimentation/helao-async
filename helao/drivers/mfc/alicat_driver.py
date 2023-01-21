@@ -34,7 +34,7 @@ class AliCatMFC:
 
         for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
 
-            self.fcs[dev_name] = FlowContoller(
+            self.fcs[dev_name] = FlowController(
                 port=dev_dict["port"], address=dev_dict["unit_id"]
             )
             # setpoint control mode: serial
