@@ -43,13 +43,12 @@ from helao.drivers.robot.pal_driver import Spacingmethod, PALtools
 
 EXPERIMENTS = __all__
 
-PSTAT_server = MachineModel(server_name="PSTAT", machine_name=gethostname()).json_dict()
-
-MOTOR_server = MachineModel(server_name="MOTOR", machine_name=gethostname()).json_dict()
-
-NI_server = MachineModel(server_name="NI", machine_name=gethostname()).json_dict()
-ORCH_server = MachineModel(server_name="ORCH", machine_name=gethostname()).json_dict()
-PAL_server = MachineModel(server_name="PAL", machine_name=gethostname()).json_dict()
+ORCH_HOST = gethostname()
+PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).json_dict()
+MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).json_dict()
+NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).json_dict()
+ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).json_dict()
+PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).json_dict()
 SOLUTIONPUMP_server = MachineModel(server_name="SYRINGE0", machine_name=ORCH_HOST).json_dict()
 WATERCLEANPUMP_server = MachineModel(server_name="SYRINGE1", machine_name=ORCH_HOST).json_dict()
 
