@@ -460,7 +460,7 @@ class FlowMeter(object):
             self.connection = serial.Serial(port, 19200, timeout=1.0)
             FlowMeter.open_ports[port] = (self.connection, 1)
 
-        self.keys = [
+        self.status_keys = [
             "pressure",
             "temperature",
             "volumetric_flow",
@@ -519,9 +519,9 @@ class FlowMeter(object):
             try:
                 c = device.get_status()
                 if cls.__name__ == "FlowMeter":
-                    assert c and "setpoint" not in device.keys
+                    assert c and "setpoint" not in device.status_keys
                 elif cls.__name__ == "FlowController":
-                    assert c and "setpoint" in device.keys
+                    assert c and "setpoint" in device.status_keys
                 else:
                     raise NotImplementedError("Must be meter or controller.")
                 is_device = True
@@ -576,15 +576,15 @@ class FlowMeter(object):
             del values[-1]
         if address != self.address:
             raise ValueError("Flow controller address mismatch.")
-        if len(values) == 5 and len(self.keys) == 6:
-            del self.keys[-2]
-        elif len(values) == 7 and len(self.keys) == 6:
-            self.keys.insert(5, "total flow")
-        elif len(values) == 2 and len(self.keys) == 6:
-            self.keys.insert(1, "setpoint")
+        if len(values) == 5 and len(self.status_keys) == 6:
+            del self.status_keys[-2]
+        elif len(values) == 7 and len(self.status_keys) == 6:
+            self.status_keys.insert(5, "total flow")
+        elif len(values) == 2 and len(self.status_keys) == 6:
+            self.status_keys.insert(1, "setpoint")
         return {
-            k: (v if k == self.keys[-1] else float(v))
-            for k, v in zip(self.keys, values)
+            k: (v if k == self.status_keys[-1] else float(v))
+            for k, v in zip(self.status_keys, values)
         }
 
     def set_gas(self, gas, retries=2):
@@ -1021,14 +1021,14 @@ def command_line(args):
     state = flow_controller.get_status()
     if args.stream:
         try:
-            print("time\t" + "\t".join(flow_controller.keys))
+            print("time\t" + "\t".join(flow_controller.status_keys))
             t0 = time()
             while True:
                 state = flow_controller.get_status()
                 print(
                     "{:.2f}\t".format(time() - t0)
                     + "\t\t".join(
-                        "{:.2f}".format(state[key]) for key in flow_controller.keys[:-1]
+                        "{:.2f}".format(state[key]) for key in flow_controller.status_keys[:-1]
                     )
                     + "\t\t"
                     + state["gas"]
