@@ -227,11 +227,9 @@ class C_mfc:
             self.data_dict[f"{dev_name}__time_now"] = [
                 s - latest_epoch for s in self.data_dict[f"{dev_name}__epoch_s"]
             ]
-
         longest_data = max([len(x) for x in self.data_dict.values()])
-        self.data_dict = {k: v for k,v in self.data_dict.items() if len(v)==longest_data}
 
-        self.datasource.data = self.data_dict
+        self.datasource.data = {k: v for k,v in self.data_dict.items() if len(v)==longest_data}
         self.update_table_data()
         self._add_plots()
 
