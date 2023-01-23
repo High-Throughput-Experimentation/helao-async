@@ -23,12 +23,14 @@ from alicat import FlowController
 
 # setup pressure control and ramping
 
+
 class HelaoFlowController(FlowController):
     def __init__(self, *args, **kwargs):
-        super().init(*args, **kwargs)
-            
+        super().__init__(*args, **kwargs)
+
     def get_status(self):
         return super().get()
+
 
 class AliCatMFC:
     def __init__(self, action_serv: Base):
@@ -124,7 +126,9 @@ class AliCatMFC:
                         await asyncio.sleep(waittime - (checktime - lastupdate))
                     self.base.print_message(f"Retrieving {dev_name} MFC status")
                     resp_dict = fc.get()
-                    self.base.print_message(f"Received {dev_name} MFC status:\n{resp_dict}")
+                    self.base.print_message(
+                        f"Received {dev_name} MFC status:\n{resp_dict}"
+                    )
                     status_dict = {dev_name: resp_dict}
                     lastupdate = time.time()
                     self.base.print_message(f"Live buffer updated at {checktime}")
