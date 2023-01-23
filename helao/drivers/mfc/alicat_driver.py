@@ -21,6 +21,8 @@ from helao.helpers.sample_api import UnifiedSampleDataAPI
 from alicat import FlowController
 
 
+# setup pressure control and ramping
+
 class AliCatMFC:
     def __init__(self, action_serv: Base):
 
@@ -49,19 +51,13 @@ class AliCatMFC:
             gas_list = [
                 x.replace(f"{dev_dict['unit_id']} G", "").strip() for x in gas_resp
             ]
-            gas_dict = {
-                int(parts[0]): parts[-1]
-                for gas in gas_list
-                for parts in gas.partition(" ")
-            }
+            gas_dict = {int(gas.split()[0]): gas.split()[-1] for gas in gas_list}
 
             mfg_list = [
                 x.replace(f"{dev_dict['unit_id']} M", "").strip() for x in mfg_resp
             ]
             mfg_dict = {
-                " ".join(parts[:-1]): parts[-1]
-                for line in mfg_list
-                for parts in line.split()
+                " ".join(line.split()[:-1]): line.split()[-1] for line in mfg_list
             }
 
             self.fcinfo[dev_name] = {"gases": gas_dict, "info": mfg_dict}
