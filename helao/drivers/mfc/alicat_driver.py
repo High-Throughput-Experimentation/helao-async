@@ -85,6 +85,7 @@ class AliCatMFC:
         while next_line.strip() != "":
             lines.append(next_line)
             next_line = self.fcs[device_name]._readline()
+        self.fcs[device_name].flush()
         return lines
 
     async def start_polling(self):
