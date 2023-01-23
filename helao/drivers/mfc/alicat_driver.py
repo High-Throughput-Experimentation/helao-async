@@ -261,7 +261,7 @@ class MfcExec(Executor):
         self.device_name = list(self.active.base.server_params["devices"].keys())[0]
         self.active.base.print_message("MFCExec initialized.")
         self.start_time = time.time()
-        self.duration = kwargs.get("duration", -1)
+        self.duration = self.active.action_params.get("duration", -1)
         self.exid = self.device_name
 
     async def _pre_exec(self):
