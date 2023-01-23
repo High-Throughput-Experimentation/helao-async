@@ -229,7 +229,7 @@ class C_mfc:
             ]
 
         longest_data = max([len(x) for x in self.data_dict.values()])
-        self.data_dict = {k: v for k,v in self.data_dict if len(v)==longest_data}
+        self.data_dict = {k: v for k,v in self.data_dict.items() if len(v)==longest_data}
 
         self.datasource.data = self.data_dict
         self.update_table_data()
