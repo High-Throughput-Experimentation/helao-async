@@ -140,7 +140,7 @@ def makeApp(confPrefix, servKey, helao_root):
         return app.driver.reset_totalizer(device_name)
 
     @app.post("/manual_query_state")
-    async def manual_query_state(device_name: str = dev_name):
-        return await app.driver.manual_query_status(device_name)
+    def manual_query_state(device_name: str = dev_name):
+        return app.driver.manual_query_status(device_name)
 
     return app

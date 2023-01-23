@@ -243,8 +243,8 @@ class AliCatMFC:
             resp = self.fcs[device_name].reset_totalizer()
         return resp
 
-    async def manual_query_status(self, device_name: str):
-        return await self.base.get_lbuf(device_name)
+    def manual_query_status(self, device_name: str):
+        return self.base.get_lbuf(device_name)
 
     def shutdown(self):
         # this gets called when the server is shut down or reloaded to ensure a clean
@@ -290,7 +290,8 @@ class MfcExec(Executor):
         live_dict, epoch_s = self.active.base.get_lbuf(self.device_name)
         live_dict["epoch_s"] = epoch_s
         iter_time = time.time()
-        if self.duration < 0 or iter_time - self.start_time < self.duration:
+        elapsed_time = iter_time - self.start_time
+        if (self.duration < 0) or (elapsed_time < self.duration):
             status = HloStatus.active
         else:
             status = HloStatus.finished
