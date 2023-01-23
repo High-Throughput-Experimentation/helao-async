@@ -106,24 +106,24 @@ class AliCatMFC:
         lastupdate = 0
         while True:
             for dev_name, fc in self.fcs.items():
-                self.base.print_message(f"Refreshing {dev_name} MFC")
+                # self.base.print_message(f"Refreshing {dev_name} MFC")
                 fc.flush()
                 if self.polling:
                     checktime = time.time()
-                    self.base.print_message(f"{dev_name} MFC checked at {checktime}")
+                    # self.base.print_message(f"{dev_name} MFC checked at {checktime}")
                     if checktime - lastupdate < waittime:
-                        self.base.print_message("waiting for minimum update interval.")
+                        # self.base.print_message("waiting for minimum update interval.")
                         await asyncio.sleep(waittime - (checktime - lastupdate))
-                    self.base.print_message(f"Retrieving {dev_name} MFC status")
+                    # self.base.print_message(f"Retrieving {dev_name} MFC status")
                     resp_dict = fc.get_status()
-                    self.base.print_message(
-                        f"Received {dev_name} MFC status:\n{resp_dict}"
-                    )
+                    # self.base.print_message(
+                    #     f"Received {dev_name} MFC status:\n{resp_dict}"
+                    # )
                     status_dict = {dev_name: resp_dict}
                     lastupdate = time.time()
-                    self.base.print_message(f"Live buffer updated at {checktime}")
+                    # self.base.print_message(f"Live buffer updated at {checktime}")
                     await self.base.put_lbuf(status_dict)
-                    self.base.print_message("status sent to live buffer")
+                    # self.base.print_message("status sent to live buffer")
                 await asyncio.sleep(waittime)
 
     def list_gases(self, device_name: str):
@@ -243,8 +243,8 @@ class AliCatMFC:
             resp = self.fcs[device_name].reset_totalizer()
         return resp
 
-    def manual_query_status(self, device_name: str):
-        return self.fcs[device_name].get_status()
+    async def manual_query_status(self, device_name: str):
+        return await self.base.get_lbuf(device_name)
 
     def shutdown(self):
         # this gets called when the server is shut down or reloaded to ensure a clean
@@ -580,7 +580,7 @@ class FlowMeter(object):
             del values[-1]
         else:
             hold = False
-        
+
         if address != self.address:
             raise ValueError("Flow controller address mismatch.")
         if len(values) == 5 and len(self.status_keys) == 6:
@@ -594,8 +594,9 @@ class FlowMeter(object):
             for k, v in zip(self.status_keys, values)
         }
         return_dict["hold_valve"] = hold
-        
+
         return return_dict
+
     def set_gas(self, gas, retries=2):
         """Set the gas type.
 
@@ -1037,7 +1038,8 @@ def command_line(args):
                 print(
                     "{:.2f}\t".format(time() - t0)
                     + "\t\t".join(
-                        "{:.2f}".format(state[key]) for key in flow_controller.status_keys[:-1]
+                        "{:.2f}".format(state[key])
+                        for key in flow_controller.status_keys[:-1]
                     )
                     + "\t\t"
                     + state["gas"]
