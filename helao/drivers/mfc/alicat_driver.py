@@ -62,6 +62,7 @@ class AliCatMFC:
 
             self.fcinfo[dev_name] = {"gases": gas_dict, "info": mfg_dict}
 
+        self.base.print_message(f"Managing {len(self.fcs)} devices:\n{self.fcs.keys()}")
         # query status with self.mfc.get()
         # query pid settings with self.mfc.get_pid()
 
@@ -114,8 +115,7 @@ class AliCatMFC:
                     lastupdate = time.time()
                     await self.base.put_lbuf(status_dict)
                     # self.base.print_message("status sent to live buffer")
-                await asyncio.sleep(0.01)
-            await asyncio.sleep(0.01)
+                await asyncio.sleep(waittime)
 
     def list_gases(self, device_name: str):
         return self.fcinfo.get(device_name, {}).get("gases", {})
