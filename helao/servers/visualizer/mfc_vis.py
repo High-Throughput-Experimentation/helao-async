@@ -53,6 +53,7 @@ class C_mfc:
             "temperature",
             "total_flow",
             "volumetric_flow",
+            "hold_valve",
             "time_now",
         ]
 
