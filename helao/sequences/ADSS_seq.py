@@ -3,9 +3,10 @@ Sequence library for ADSS
 """
 
 __all__ = [
-    "ADSS_CV",
-    "ADSS_CA",
+    "ADSS_CV_nomove",
+    "ADSS_CA_nomove",
     "ADSS_CombineEche",
+    "ADSS_CA_NaOH_validation",
 ]
 
 from typing import List
@@ -15,7 +16,7 @@ from helao.helpers.premodels import ExperimentPlanMaker
 SEQUENCES = __all__
 
 
-def ADSS_CV(
+def ADSS_CV_nomove(
     sequence_version: int = 4,
     solid_custom_position: str = "cell1_we",
     plate_id: int = 4534,
@@ -86,7 +87,7 @@ def ADSS_CV(
     return epm.experiment_plan_list  # returns complete experiment list
 
 
-def ADSS_CA(
+def ADSS_CA_nomove(
     sequence_version: int = 5,
     solid_custom_position: str = "cell1_we",
     plate_id: int = 4534,
@@ -519,3 +520,165 @@ def ADSS_CombineEche(
 #     epm.add_experiment("ADSS_sub_shutdown", {})
 
 #     return epm.experiment_plan_list  # returns complete experiment list
+
+def ADSS_CA_NaOH_validation(
+    sequence_version: int = 5,
+    solid_custom_position: str = "cell1_we",
+    plate_id: int = 4534,
+    plate_sample_no_list: list = [1],  # list instead of map select
+    liquid_custom_position: str = "elec_res1",
+    liquid_sample_no: int = 1,
+    liquid_sample_volume_ul: float = 3000,
+    EquilibrationTime_s: float = 30,
+    CA_potentials_vsRHE: List[float] = [-0.2, 0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+    ph: float = 9.53,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
+    CA_duration_sec: float = 1320,
+    aliquot_times_sec: List[float] = [60, 600, 1140],
+    aliquot_volume_ul: int = 200,
+    OCV_duration: float = 1,
+    samplerate_sec: float = 0.05,
+    Syringe_rate_ulsec: float = 300,
+    Cell_draintime_s: float = 60,
+    Cell_reversepurgetime_s: float = 20,
+    flush_volume_ul: float = 3000,
+    clean_xposition: float = 80,
+    clean_yposition: float = 50,
+    PAL_Injector: str = "PALtools.LS3"
+):
+
+    """tbd
+
+    last functionality test: tbd"""
+
+    epm = ExperimentPlanMaker()
+
+    epm.add_experiment("ADSS_sub_unloadall_customs",{})
+
+    for solid_sample_no in plate_sample_no_list[:1]:  # have to indent add expts if used
+
+        epm.add_experiment(
+            "ADSS_sub_sample_start",
+            {
+                "solid_custom_position": solid_custom_position,
+                "solid_plate_id": plate_id,
+                "solid_sample_no": solid_sample_no,
+                "liquid_custom_position": liquid_custom_position,
+                "liquid_sample_no": liquid_sample_no,
+            },
+        )
+        epm.add_experiment(
+            "ADSS_sub_cellfill",
+            {
+                "Solution_volume_ul": flush_volume_ul,
+                "Syringe_rate_ulsec": Syringe_rate_ulsec,
+            }
+        )
+        epm.add_experiment(
+            "ADSS_sub_drain_cell",
+            {
+                "DrainWait_s": Cell_draintime_s,
+            }
+        )
+        epm.add_experiment(
+            "ADSS_sub_cellfill",
+            {
+                "Solution_volume_ul": liquid_sample_volume_ul,
+                "Syringe_rate_ulsec": Syringe_rate_ulsec,
+            }
+        )
+        epm.add_experiment(
+            "ADSS_sub_sample_aliquot",
+            {
+                "EquilibrationTime_s": EquilibrationTime_s,
+                "aliquot_volume_ul": aliquot_volume_ul,
+                "PAL_Injector": PAL_Injector,
+            }
+        )
+
+        epm.add_experiment(
+            "ADSS_sub_OCV",
+            {
+                "Tval__s": OCV_duration,
+                "SampleRate": 0.05,
+            },
+        )
+
+        for CA_potential_vsRHE in CA_potentials_vsRHE:
+
+            epm.add_experiment(
+                "ADSS_sub_CA",
+                {
+                    "CA_potential": CA_potential_vsRHE,
+                    "ph": ph,
+                    "ref_type": ref_type,
+                    "ref_offset__V": ref_offset__V,
+                    "samplerate_sec": samplerate_sec,
+                    "CA_duration_sec": CA_duration_sec,
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "aliquot_times_sec": aliquot_times_sec,
+                    "aliquot_insitu": True,
+                },
+            )
+
+        epm.add_experiment(
+            "ADSS_sub_drain_cell",
+            {
+                "DrainWait_s": Cell_draintime_s,
+            }
+        )
+        epm.add_experiment(
+            "ADSS_sub_cellfill",
+            {
+                "Solution_volume_ul": flush_volume_ul,
+                "Syringe_rate_ulsec": Syringe_rate_ulsec,
+            }
+        )
+        epm.add_experiment(
+            "ADSS_sub_drain_cell",
+            {
+                "DrainWait_s": Cell_draintime_s,
+            }
+        )
+        epm.add_experiment(
+            "ADSS_sub_empty_cell",
+            {
+                "ReversePurgeWait_s": Cell_reversepurgetime_s,
+            }
+        )
+        epm.add_experiment("ADSS_sub_disengage",{})
+        epm.add_experiment("ADSS_sub_abs_move",
+            {
+                "x_mm":clean_xposition,
+                "y_mm":clean_yposition,
+            }
+        )
+        epm.add_experiment("ADSS_sub_engage",{})
+
+        epm.add_experiment(
+            "ADSS_sub_clean_cell",
+            {
+                "Clean_volume_ul": clean_volume_ul,
+                "Syringe_rate_ulsec": Syringe_rate_ulsec,
+            }
+        )
+        epm.add_experiment(
+            "ADSS_sub_drain_cell",
+            {
+                "DrainWait_s": Cell_draintime_s,
+            }
+        )
+        epm.add_experiment(
+            "ADSS_sub_empty_cell",
+            {
+                "ReversePurgeWait_s": Cell_reversepurgetime_s,
+            }
+        )
+        epm.add_experiment("ADSS_sub_disengage",{})
+
+
+        # epm.add_experiment("ADSS_sub_shutdown", {})
+
+    return epm.experiment_plan_list  # returns complete experiment list
+

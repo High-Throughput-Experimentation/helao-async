@@ -5,7 +5,7 @@ server_key must be a FastAPI action server defined in config
 
 __all__ = [
     "debug",
-    "ADSS_sub_startup",
+    "ADSS_sub_sample_start",
     "ADSS_sub_shutdown",
     "ADSS_sub_engage",
     "ADSS_sub_disengage",
@@ -25,6 +25,11 @@ __all__ = [
     "ADSS_sub_heat",
     "ADSS_sub_stopheat",
     "ADSS_sub_cellfill",
+    "ADSS_sub_drain_cell",
+    "ADSS_sub_empty_cell",
+    "ADSS_sub_clean_cell",
+    "ADSS_sub_sample_aliquot",
+    "ADSS_sub_abs_move",
 ]
 
 
@@ -219,8 +224,8 @@ def ADSS_sub_load(
 ):
     apm = ActionPlanMaker()
 
-    # unload all samples from custom positions
-    apm.add_action_list(ADSS_sub_unloadall_customs(experiment=experiment))
+#    # unload all samples from custom positions
+#    apm.add_action_list(ADSS_sub_unloadall_customs(experiment=experiment))
 
     # load new requested samples
     apm.add_action_list(
@@ -243,19 +248,19 @@ def ADSS_sub_load(
     return apm.action_list
 
 
-def ADSS_sub_startup(
+def ADSS_sub_sample_start(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     solid_custom_position: Optional[str] = "cell1_we",
     solid_plate_id: Optional[int] = 4534,
     solid_sample_no: Optional[int] = 1,
-    x_mm: Optional[float] = 0.0,
-    y_mm: Optional[float] = 0.0,
+#    x_mm: Optional[float] = 0.0,
+#    y_mm: Optional[float] = 0.0,
     liquid_custom_position: Optional[str] = "elec_res1",
     liquid_sample_no: Optional[int] = 1,
 ):
     """Sub experiment
-    (1) Unload all custom position samples
+    NOT anymore (1) Unload all custom position samples
     (2) Load solid sample to cell
     (3) Load liquid sample to reservoir
     (4) Move to position
@@ -304,13 +309,26 @@ def ADSS_sub_startup(
     # move to position
     apm.add(
         MOTOR_server,
+        "solid_get_samples_xy",
+        {
+            "plate_id": apm.pars.solid_plate_id,
+            "sample_no": apm.pars.solid_sample_no,
+        },
+        to_globalexp_params=[
+            "_platexy"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,
+    )
+
+    apm.add(
+        MOTOR_server,
         "move",
         {
-            "d_mm": [apm.pars.x_mm, apm.pars.y_mm],
             "axis": ["x", "y"],
             "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
+        from_globalexp_params={"_platexy": "d_mm"},
         save_act=debug_save_act,
         save_data=debug_save_data,
         start_condition=ActionStartCondition.wait_for_all,
@@ -500,6 +518,7 @@ def ADSS_sub_fillfixed(
     experiment_version: int = 1,
     fill_vol_ul: Optional[int] = 10000,
     filltime_sec: Optional[float] = 10.0,
+    PAL_Injector: Optional[str] = "PALtools.LS3",
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -508,7 +527,7 @@ def ADSS_sub_fillfixed(
         PAL_server,
         "PAL_fillfixed",
         {
-            "tool": PALtools.LS3,
+            "tool": apm.pars.PAL_Injector,
             "source": "elec_res1",
             "dest": "cell1_we",
             "volume_ul": apm.pars.fill_vol_ul,
@@ -559,6 +578,7 @@ def ADSS_sub_fill(
     experiment: Experiment,
     experiment_version: int = 1,
     fill_vol_ul: Optional[int] = 1000,
+    PAL_Injector: Optional[str] = "PALtools.LS3",
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -567,7 +587,7 @@ def ADSS_sub_fill(
         PAL_server,
         "PAL_fill",
         {
-            "tool": PALtools.LS3,
+            "tool": apm.pars.PAL_Injector,
             "source": "elec_res1",
             "dest": "cell1_we",
             "volume_ul": apm.pars.fill_vol_ul,
@@ -596,6 +616,7 @@ def ADSS_sub_CA(
     aliquot_volume_ul: Optional [int] = 200,
     aliquot_times_sec: Optional[List[float]] = [],
     aliquot_insitu: Optional[bool] = False,
+    PAL_Injector: Optional[str] = "PALtools.LS3",
 ):
     """Primary CA experiment with optional PAL sampling.
 
@@ -676,7 +697,7 @@ def ADSS_sub_CA(
                 PAL_server,
                 "PAL_archive",
                 {
-                    "tool": PALtools.LS3,
+                    "tool": apm.pars.PAL_Injector,
                     "source": "cell1_we",
                     "volume_ul": apm.pars.aliquot_volume_ul,
                     "sampleperiod": [0.0],
@@ -723,6 +744,7 @@ def ADSS_sub_CV(
     aliquot_volume_ul: Optional [int] = 200,
     aliquot_times_sec: Optional[List[float]] = [],
     aliquot_insitu: Optional[bool] = False,
+    PAL_Injector: Optional[str] = "PALtools.LS3",
 ):
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -818,7 +840,7 @@ def ADSS_sub_CV(
                 PAL_server,
                 "PAL_archive",
                 {
-                    "tool": PALtools.LS3,
+                    "tool": apm.pars.PAL_Injector,
                     "source": "cell1_we",
                     "volume_ul": apm.pars.aliquot_volume_ul,
                     "sampleperiod": [0.0],
@@ -853,6 +875,7 @@ def ADSS_sub_OCV(
     aliquot_volume_ul: Optional [int] = 200,
     aliquot_intervals_sec: Optional[List[float]] = [],
     aliquot_insitu: Optional[bool] = False,
+    PAL_Injector: Optional[str] = "PALtools.LS3",
 ):
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -913,7 +936,7 @@ def ADSS_sub_OCV(
                 PAL_server,
                 "PAL_archive",
                 {
-                    "tool": PALtools.LS3,
+                    "tool": apm.pars.PAL_Injector,
                     "source": "cell1_we",
                     "volume_ul": apm.pars.aliquot_volume_ul,
                     "sampleperiod": [0.0],
@@ -1029,6 +1052,34 @@ def ADSS_sub_rel_move(
             "d_mm": [apm.pars.offset_x_mm, apm.pars.offset_y_mm, apm.pars.offset_z_mm],
             "axis": ["x", "y", "z"],
             "mode": MoveModes.relative,
+            "transformation": TransformationModes.platexy,
+        },
+        #            "from_globalexp_params": {"_platexy": "d_mm"},
+        start_condition=ActionStartCondition.wait_for_all,
+    )
+
+    return apm.action_list  # returns complete action list to orch
+
+def ADSS_sub_abs_move(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    x_mm: float = 80.0,
+    y_mm: float = 50.0,
+#    offset_z_mm: float = 0.0,
+):
+    """Sub experiment
+    last functionality test: -"""
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    # move to position
+    apm.add(
+        MOTOR_server,
+        "move",
+        {
+            "d_mm": [apm.pars.x_mm, apm.pars.y_mm],
+            "axis": ["x", "y"],
+            "mode": MoveModes.absolute,
             "transformation": TransformationModes.platexy,
         },
         #            "from_globalexp_params": {"_platexy": "d_mm"},
@@ -1501,9 +1552,9 @@ def ADSS_sub_cellfill(
     experiment_version: int = 1,
     Solution_volume_ul: float = 3000,
     Syringe_rate_ulsec: float = 300,
-    deadvolume_ul: int = 50,
+    deadvolume_ul: int = 0,
     SyringeFillWait_s: float = 15,
-    PurgeWait_s: float = 5,
+    PurgeWait_s: float = 2,
     PressureEquibWait_s: float = 2,
 ):
 
@@ -1542,7 +1593,7 @@ def ADSS_sub_cellfill(
 def ADSS_sub_drain_cell(
     experiment: Experiment,
     experiment_version: int = 1,
-    FillLinePurgeWait_s: float = 10,
+    FillLinePurgeWait_s: float = 2,
     DrainWait_s: float = 60,
 ):
 
@@ -1581,8 +1632,8 @@ def ADSS_sub_clean_cell(
     experiment_version: int = 1,
     Clean_volume_ul: float = 3000,
     Syringe_rate_ulsec: float = 300,
-    deadvolume_ul: int = 50,
-    PurgeWait_s: float = 5,
+    deadvolume_ul: int = 0,
+    PurgeWait_s: float = 2,
     PressureEquibWait_s: float = 2,
 ):
 
@@ -1601,6 +1652,7 @@ def ADSS_sub_sample_aliquot(
     experiment_version: int = 1,
     aliquot_volume_ul: Optional [int] = 200,
     EquilibrationTime_s: float = 30,
+    PAL_Injector: str = "PALtools.LS3"
 ):
 
     apm = ActionPlanMaker()
@@ -1616,7 +1668,7 @@ def ADSS_sub_sample_aliquot(
         PAL_server,
         "PAL_archive",
         {
-            "tool": PALtools.LS3,
+            "tool": apm.pars.PAL_Injector,
             "source": "cell1_we",
             "volume_ul": apm.pars.aliquot_volume_ul,
             "sampleperiod": [0.0],
