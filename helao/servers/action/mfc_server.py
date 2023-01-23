@@ -141,6 +141,6 @@ def makeApp(confPrefix, servKey, helao_root):
 
     @app.post("/manual_query_state")
     def manual_query_state(device_name: str = dev_name):
-        return app.driver.get_status(device_name)
+        return app.driver.manual_query_status(device_name)
 
     return app
