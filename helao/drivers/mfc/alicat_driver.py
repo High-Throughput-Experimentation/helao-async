@@ -112,7 +112,9 @@ class AliCatMFC:
                     if checktime - lastupdate < waittime:
                         self.base.print_message("waiting for minimum update interval.")
                         await asyncio.sleep(waittime - (checktime - lastupdate))
+                    self.base.print_message(f"Retrieving {dev_name} MFC status")
                     resp_dict = fc.get()
+                    self.base.print_message(f"Received {dev_name} MFC status:\n{resp_dict}")
                     status_dict = {dev_name: resp_dict}
                     lastupdate = time.time()
                     self.base.print_message(f"Live buffer updated at {checktime}")
