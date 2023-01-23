@@ -18,18 +18,41 @@ from helao.servers.base import Base, Executor
 from helaocore.models.hlostatus import HloStatus
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 
-from alicat import FlowController
+from alicat import FlowController, FlowMeter
 
 
 # setup pressure control and ramping
 
 
-class HelaoFlowController(FlowController):
+class HelaoFlowMeter(FlowMeter):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def get_status(self):
-        return super().get()
+        self._test_controller_open()
+        command = "{addr}\r".format(addr=self.address)
+        line = self._write_and_read(command, retries)
+        spl = line.split()
+        address, values = spl[0], spl[1:]
+        while values[-1].upper() in ["MOV", "VOV", "POV"]:
+            del values[-1]
+        if address != self.address:
+            raise ValueError("Flow controller address mismatch.")
+        if len(values) == 5 and len(self.keys) == 6:
+            del self.keys[-2]
+        elif len(values) == 7 and len(self.keys) == 6:
+            self.keys.insert(5, "total flow")
+        elif len(values) == 2 and len(self.keys) == 6:
+            self.keys.insert(1, "setpoint")
+        return {
+            k: (v if k == self.keys[-1] else float(v))
+            for k, v in zip(self.keys, values)
+        }
+
+
+class HelaoFlowController(FlowController, HelaoFlowMeter):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 
 class AliCatMFC:
@@ -135,10 +158,6 @@ class AliCatMFC:
                     await self.base.put_lbuf(status_dict)
                     self.base.print_message("status sent to live buffer")
                 await asyncio.sleep(waittime)
-
-    def _get(self, dev_name: str):
-        self.fcs[dev_name].flush()
-        return self.fcs[dev_name].get_status()
 
     def list_gases(self, device_name: str):
         return self.fcinfo.get(device_name, {}).get("gases", {})
@@ -256,6 +275,9 @@ class AliCatMFC:
         else:
             resp = self.fcs[device_name].reset_totalizer()
         return resp
+
+    def manual_query_status(self, device_name: str):
+        return self.fcs[device_name].get_status()
 
     def shutdown(self):
         # this gets called when the server is shut down or reloaded to ensure a clean
