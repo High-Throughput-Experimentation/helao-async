@@ -574,6 +574,13 @@ class FlowMeter(object):
         # Explicitly silenced because I find it redundant.
         while values[-1].upper() in ["MOV", "VOV", "POV"]:
             del values[-1]
+
+        if values[-1].upper() == "HLD":
+            hold = True
+            del values[-1]
+        else:
+            hold = False
+        
         if address != self.address:
             raise ValueError("Flow controller address mismatch.")
         if len(values) == 5 and len(self.status_keys) == 6:
@@ -582,11 +589,13 @@ class FlowMeter(object):
             self.status_keys.insert(5, "total flow")
         elif len(values) == 2 and len(self.status_keys) == 6:
             self.status_keys.insert(1, "setpoint")
-        return {
+        return_dict = {
             k: (v if k == self.status_keys[-1] else float(v))
             for k, v in zip(self.status_keys, values)
         }
-
+        return_dict["hold_valve"] = hold
+        
+        return return_dict
     def set_gas(self, gas, retries=2):
         """Set the gas type.
 
