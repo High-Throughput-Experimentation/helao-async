@@ -517,7 +517,7 @@ class FlowMeter(object):
         try:
             device = cls(port, address)
             try:
-                c = device.get()
+                c = device.get_status()
                 if cls.__name__ == "FlowMeter":
                     assert c and "setpoint" not in device.keys
                 elif cls.__name__ == "FlowController":
@@ -843,7 +843,7 @@ class FlowController(FlowMeter):
             The state of the flow controller, as a dictionary.
 
         """
-        state = FlowMeter.get(self, retries)
+        state = FlowMeter.get_status(self, retries)
         if state is None:
             return None
         state["control_point"] = self.control_point
@@ -1018,13 +1018,13 @@ def command_line(args):
         flow_controller.cancel_hold()
     if args.reset_totalizer:
         flow_controller.reset_totalizer()
-    state = flow_controller.get()
+    state = flow_controller.get_status()
     if args.stream:
         try:
             print("time\t" + "\t".join(flow_controller.keys))
             t0 = time()
             while True:
-                state = flow_controller.get()
+                state = flow_controller.get_status()
                 print(
                     "{:.2f}\t".format(time() - t0)
                     + "\t\t".join(
