@@ -345,6 +345,10 @@ class Base:
         if self.ntp_last_sync is None:
             asyncio.gather(self.get_ntp_time())
 
+        self.sync_ntp_task_run = False
+        self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
+        self.bufferer = self.aloop.create_task(self.live_buffer_task())
+
         if driver_class is not None:
             self.fastapp.driver = driver_class(self)
 
@@ -356,9 +360,6 @@ class Base:
 
         self.fast_urls = self.get_endpoint_urls()
         self.status_logger = self.aloop.create_task(self.log_status_task())
-        self.sync_ntp_task_run = False
-        self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
-        self.bufferer = self.aloop.create_task(self.live_buffer_task())
 
     def print_message(self, *args, **kwargs):
         print_message(
