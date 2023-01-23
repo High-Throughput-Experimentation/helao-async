@@ -23,6 +23,13 @@ from alicat import FlowController
 
 # setup pressure control and ramping
 
+class HelaoFlowController(FlowController):
+    def __init__(self, *args, **kwargs):
+        super().init(*args, **kwargs):
+            
+    def get_status(self):
+        return super().get()
+
 class AliCatMFC:
     def __init__(self, action_serv: Base):
 
@@ -36,7 +43,7 @@ class AliCatMFC:
 
         for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
 
-            self.fcs[dev_name] = FlowController(
+            self.fcs[dev_name] = HelaoFlowController(
                 port=dev_dict["port"], address=dev_dict["unit_id"]
             )
             # setpoint control mode: serial
