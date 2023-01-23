@@ -193,10 +193,10 @@ class AliCatMFC:
         if device_name is None:
             resp = []
             for dev_name, _ in self.fcs.items():
-                chold_resp = self._send(dev_name, "c")
+                chold_resp = self._send(dev_name, "hc")
                 resp.append({dev_name: chold_resp})
         else:
-            resp = self._send(device_name, "c")
+            resp = self._send(device_name, "hc")
         return resp
 
     def hold_cancel(self, device_name: Optional[str] = None):
