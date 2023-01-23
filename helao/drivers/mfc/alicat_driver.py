@@ -47,15 +47,19 @@ class AliCatMFC:
             mfg_resp = self._send(dev_name, "??m*")
 
             gas_list = [
-                x.replace(f"{dev_dict['unit_id']} ", " ").strip() for x in gas_resp
+                x.replace(f"{dev_dict['unit_id']} G", "").strip() for x in gas_resp
             ]
-            gas_dict = {int(x[1:]): y for gas in gas_list for x, y in gas.split()}
+            gas_dict = {
+                int(parts[0]): parts[-1]
+                for gas in gas_list
+                for parts in gas.partition(" ")
+            }
 
             mfg_list = [
-                x.replace(f"{dev_dict['unit_id']} ", " ").strip() for x in mfg_resp
+                x.replace(f"{dev_dict['unit_id']} M", "").strip() for x in mfg_resp
             ]
             mfg_dict = {
-                " ".join(parts[1:-1]): parts[-1]
+                " ".join(parts[:-1]): parts[-1]
                 for line in mfg_list
                 for parts in line.split()
             }
@@ -77,11 +81,13 @@ class AliCatMFC:
         if not command.endswith("\r"):
             command += "\r"
         lines = []
-        lines.append(self.fcs[device_name]._write_and_read(f"{unit_id.upper()}command"))
-        next_line = self.fcs[device_name].readline()
+        lines.append(
+            self.fcs[device_name]._write_and_read(f"{unit_id.upper()}{command}")
+        )
+        next_line = self.fcs[device_name]._readline()
         while next_line.strip() != "":
             lines.append(next_line)
-            next_line = self.fcs[device_name].readline()
+            next_line = self.fcs[device_name]._readline()
         return lines
 
     async def start_polling(self):
