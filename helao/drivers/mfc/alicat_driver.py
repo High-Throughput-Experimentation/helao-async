@@ -67,7 +67,7 @@ class AliCatMFC:
         # query pid settings with self.mfc.get_pid()
 
         self.aloop = asyncio.get_running_loop()
-        self.polling = True
+        self.polling = False
         self.poll_signalq = asyncio.Queue(1)
         self.poll_signal_task = self.aloop.create_task(self.poll_signal_loop())
         self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
@@ -101,6 +101,7 @@ class AliCatMFC:
             self.base.print_message("polling signal received")
 
     async def poll_sensor_loop(self, waittime: float = 0.05):
+        self.polling = True
         self.base.print_message("MFC background task has started")
         lastupdate = 0
         while True:
@@ -121,6 +122,9 @@ class AliCatMFC:
                     await self.base.put_lbuf(status_dict)
                     self.base.print_message("status sent to live buffer")
                 await asyncio.sleep(waittime)
+
+    def _get(self, dev_name: str):
+        return self.fcs[dev_name].get()
 
     def list_gases(self, device_name: str):
         return self.fcinfo.get(device_name, {}).get("gases", {})
