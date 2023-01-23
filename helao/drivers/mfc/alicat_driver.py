@@ -108,14 +108,14 @@ class AliCatMFC:
                 for dev_name, fc in self.fcs.items():
                     checktime = time.time()
                     if checktime - lastupdate < waittime:
-                        # self.base.print_message("waiting for minimum update interval.")
+                        self.base.print_message("waiting for minimum update interval.")
                         await asyncio.sleep(waittime - (checktime - lastupdate))
                     resp_dict = fc.get()
                     status_dict = {dev_name: resp_dict}
                     lastupdate = time.time()
                     await self.base.put_lbuf(status_dict)
-                    # self.base.print_message("status sent to live buffer")
-                await asyncio.sleep(waittime)
+                    self.base.print_message("status sent to live buffer")
+            await asyncio.sleep(waittime)
 
     def list_gases(self, device_name: str):
         return self.fcinfo.get(device_name, {}).get("gases", {})
