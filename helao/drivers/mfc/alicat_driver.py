@@ -25,7 +25,7 @@ from alicat import FlowController
 
 class HelaoFlowController(FlowController):
     def __init__(self, *args, **kwargs):
-        super().init(*args, **kwargs):
+        super().init(*args, **kwargs)
             
     def get_status(self):
         return super().get()
