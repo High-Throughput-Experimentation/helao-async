@@ -107,6 +107,7 @@ class AliCatMFC:
         while True:
             for dev_name, fc in self.fcs.items():
                 self.base.print_message(f"Refreshing {dev_name} MFC")
+                fc.flush()
                 if self.polling:
                     checktime = time.time()
                     self.base.print_message(f"{dev_name} MFC checked at {checktime}")
@@ -124,6 +125,7 @@ class AliCatMFC:
                 await asyncio.sleep(waittime)
 
     def _get(self, dev_name: str):
+        self.fcs[dev_name].flush()
         return self.fcs[dev_name].get()
 
     def list_gases(self, device_name: str):
