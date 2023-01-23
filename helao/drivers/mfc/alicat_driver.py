@@ -125,7 +125,7 @@ class AliCatMFC:
                         self.base.print_message("waiting for minimum update interval.")
                         await asyncio.sleep(waittime - (checktime - lastupdate))
                     self.base.print_message(f"Retrieving {dev_name} MFC status")
-                    resp_dict = fc.get()
+                    resp_dict = fc.get_status()
                     self.base.print_message(
                         f"Received {dev_name} MFC status:\n{resp_dict}"
                     )
@@ -138,7 +138,7 @@ class AliCatMFC:
 
     def _get(self, dev_name: str):
         self.fcs[dev_name].flush()
-        return self.fcs[dev_name].get()
+        return self.fcs[dev_name].get_status()
 
     def list_gases(self, device_name: str):
         return self.fcinfo.get(device_name, {}).get("gases", {})
