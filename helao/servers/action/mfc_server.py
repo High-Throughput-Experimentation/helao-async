@@ -110,7 +110,7 @@ def makeApp(confPrefix, servKey, helao_root):
         ramp_psi_sec: Optional[float] = 0,
     ):
         active = await app.base.setup_and_contain_action(action_abbr="set_flow")
-        app.driver.set_pressure_psia(**active.action.action_params)
+        app.driver.set_pressure(**active.action.action_params)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
