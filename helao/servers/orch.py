@@ -33,6 +33,7 @@ from helao.servers.operator.bokeh_operator import Operator
 from helaocore.models.action_start_condition import ActionStartCondition
 from helaocore.models.sequence import SequenceModel
 from helaocore.models.experiment import ExperimentModel
+from helaocore.models.Action import ActionModel
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.server import ActionServerModel, GlobalStatusModel
 from helaocore.models.orchstatus import OrchStatus
@@ -338,6 +339,7 @@ class Orch(Base):
         self.sequence_dq = zdeque([])
         self.experiment_dq = zdeque([])
         self.action_dq = zdeque([])
+        self.noblock_actions = {}
 
         # holder for tracking dispatched action in status
         self.last_dispatched_action_uuid = None
@@ -495,6 +497,9 @@ class Orch(Base):
                 "Orchestrator cannot action experiment_dq unless "
                 "all FastAPI servers in config file are accessible."
             )
+
+    async def update_nonblocking(self, action_model: ActionModel):
+        pass
 
     async def update_status(
         self, actionservermodel: Optional[ActionServerModel] = None
@@ -1256,14 +1261,14 @@ class Orch(Base):
     def list_active_actions(self):
         """Return the current queue running actions."""
         return [
-            statusmodel.act
+            statusmodel
             for uuid, statusmodel in self.orchstatusmodel.active_dict.items()
         ]
 
     def list_actions(self, limit=10):
         """Return the current queue of action_dq."""
         return [
-            self.action_dq[i].get_act() for i in range(min(len(self.action_dq), limit))
+            self.action_dq[i].get_actmodel() for i in range(min(len(self.action_dq), limit))
         ]
 
     def supplement_error_action(self, check_uuid: UUID, sup_action: Action):

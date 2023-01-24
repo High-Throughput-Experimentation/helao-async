@@ -44,7 +44,8 @@ from helaocore.models.sample import (
 )
 from helaocore.models.data import DataModel, DataPackageModel
 from helaocore.models.machine import MachineModel
-from helaocore.models.server import StatusModel, ActionServerModel, EndpointModel
+from helaocore.models.server import ActionServerModel, EndpointModel
+form helaocore.models.action import ActionModel
 from helao.helpers.active_params import ActiveParams
 from helaocore.models.file import (
     FileConn,
@@ -713,30 +714,30 @@ class Base:
         self.print_message(f"{self.server.server_name} status log task created.")
 
         try:
-            # get the new "StatusModel" from the queue
+            # get the new ActionModel (status) from the queue
             async for status_msg in self.status_q.subscribe():
                 # add it to the correct "EndpointModel"
                 # in the "ActionServerModel"
-                if status_msg.act.action_name not in self.actionservermodel.endpoints:
+                if status_msg.action_name not in self.actionservermodel.endpoints:
                     # a new endpoints became available
                     self.actionservermodel.endpoints[
-                        status_msg.act.action_name
-                    ] = EndpointModel(endpoint_name=status_msg.act.action_name)
+                        status_msg.action_name
+                    ] = EndpointModel(endpoint_name=status_msg.action_name)
                 self.actionservermodel.endpoints[
-                    status_msg.act.action_name
-                ].active_dict.update({status_msg.act.action_uuid: status_msg})
-                self.actionservermodel.last_action_uuid = status_msg.act.action_uuid
+                    status_msg.action_name
+                ].active_dict.update({status_msg.action_uuid: status_msg})
+                self.actionservermodel.last_action_uuid = status_msg.action_uuid
 
                 # sort the status (nonactive_dict is empty at this point)
                 self.actionservermodel.endpoints[
-                    status_msg.act.action_name
+                    status_msg.action_name
                 ].sort_status()
                 self.print_message(
                     f"log_status_task sending status "
-                    f"{status_msg.act.action_status} for action "
-                    f"{status_msg.act.action_name} "
-                    f"with uuid {status_msg.act.action_uuid} on "
-                    f"{status_msg.act.action_server.disp_name()} "
+                    f"{status_msg.action_status} for action "
+                    f"{status_msg.action_name} "
+                    f"with uuid {status_msg.action_uuid} on "
+                    f"{status_msg.action_server.disp_name()} "
                     f"to subscribers ({self.status_clients})."
                 )
                 for client_servkey in self.status_clients:
@@ -746,7 +747,7 @@ class Base:
                     success = False
                     for _ in range(retry_limit):
                         response, error_code = await self.send_statuspackage(
-                            action_name=status_msg.act.action_name,
+                            action_name=status_msg.action_name,
                             client_servkey=client_servkey,
                         )
 
@@ -767,7 +768,7 @@ class Base:
                 # now delete the errored and finsihed statuses after
                 # all are send to the subscribers
                 self.actionservermodel.endpoints[
-                    status_msg.act.action_name
+                    status_msg.action_name
                 ].clear_finished()
                 # TODO:write to log if save_root exists
                 self.print_message("all log_status_task messages send.")
@@ -851,7 +852,7 @@ class Base:
     async def write_act(self, action):
         "Create new exp if it doesn't exist."
         if action.save_act:
-            act_dict = action.get_act().clean_dict()
+            act_dict = action.get_actmodel().clean_dict()
             output_path = os.path.join(
                 self.helaodirs.save_root, action.action_output_dir
             )
@@ -1176,7 +1177,10 @@ class Active:
             f"Adding {str(action.action_uuid)} to {action.action_name} status list."
         )
 
-        await self.base.status_q.put(StatusModel(act=action.get_act().as_dict()))
+        if action.nonblocking:
+            pass  # TODO: populate Base.nonblocking dict,
+        else:
+            await self.base.status_q.put(action.get_actmodel())
 
     async def set_estop(self, action: Optional[Action] = None):
         if action is None:
@@ -1883,7 +1887,7 @@ class Active:
 
             # add actions to experiment
             for action in self.action_list:
-                exp.actionmodel_list.append(action.get_act())
+                exp.actionmodel_list.append(action.get_actmodel())
 
             # add experiment to sequence
             exp.experimentmodel_list.append(action.get_exp())
