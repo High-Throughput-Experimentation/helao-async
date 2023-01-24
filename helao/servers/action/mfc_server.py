@@ -10,7 +10,7 @@ from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base import makeActionServ
 from helaocore.models.sample import SampleUnion
-from helao.drivers.mfc.alicat_driver import AliCatMFC, MfcExec
+from helao.drivers.mfc.alicat_driver import AliCatMFC, MfcExec, PfcExec
 from helao.helpers.config_loader import config_loader
 
 
@@ -36,6 +36,7 @@ def makeApp(confPrefix, servKey, helao_root):
         action_version: int = 1,
         device_name: str = dev_name,
         flowrate_sccm: Optional[float] = None,
+        ramp_sccm_sec: Optional[float] = 0,
         duration: Optional[float] = -1,
         acquisition_rate: Optional[float] = 0.2,
         fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
@@ -51,19 +52,29 @@ def makeApp(confPrefix, servKey, helao_root):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{servKey}/set_flowrate")
-    async def set_flowrate(
+    @app.post(f"/{servKey}/acquire_pressure")
+    async def acquire_pressure(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
         device_name: str = dev_name,
-        flowrate_sccm: Optional[float] = None,
+        pressure_psia: Optional[float] = None,
+        ramp_psi_sec: Optional[float] = 0,
+        duration: Optional[float] = -1,
+        acquisition_rate: Optional[float] = 0.2,
+        fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
     ):
-        active = await app.base.setup_and_contain_action(action_abbr="set_flow")
-        app.driver.set_flowrate(**active.action.action_params)
-        finished_action = await active.finish()
-        return finished_action.as_dict()
+        """Acquire spectra based on external trigger."""
+        active = await app.base.setup_and_contain_action()
+        active.action.action_abbr = "acq_pres"
+        executor = PfcExec(
+            active=active,
+            oneoff=False,
+            poll_rate=active.action.action_params["acquisition_rate"],
+        )
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
 
-    @app.post(f"/{servKey}/cancel_acquire_flowrate")
+    @app.post(f"/{servKey}/cancel_acquire")
     async def cancel_acquire_flowrate(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -74,6 +85,32 @@ def makeApp(confPrefix, servKey, helao_root):
         await app.base.executors[
             active.action.action_params["device_name"]
         ].stop_action_task()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+    @app.post(f"/{servKey}/set_flowrate")
+    async def set_flowrate(
+        action: Optional[Action] = Body({}, embed=True),
+        action_version: int = 1,
+        device_name: str = dev_name,
+        flowrate_sccm: Optional[float] = None,
+        ramp_sccm_sec: Optional[float] = 0,
+    ):
+        active = await app.base.setup_and_contain_action(action_abbr="set_flow")
+        app.driver.set_flowrate(**active.action.action_params)
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+    @app.post(f"/{servKey}/set_pressure")
+    async def set_pressure(
+        action: Optional[Action] = Body({}, embed=True),
+        action_version: int = 1,
+        device_name: str = dev_name,
+        pressure_psia: Optional[float] = None,
+        ramp_psi_sec: Optional[float] = 0,
+    ):
+        active = await app.base.setup_and_contain_action(action_abbr="set_flow")
+        app.driver.set_pressure_psia(**active.action.action_params)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -94,10 +131,6 @@ def makeApp(confPrefix, servKey, helao_root):
     @app.post("/list_gases")
     def list_gases(device_name: str = dev_name):
         return app.driver.list_gases(device_name)
-
-    @app.post("/set_pressure")
-    def set_pressure(device_name: str = dev_name, pressure_psia: float = 15.00):
-        return app.driver.set_pressure(device_name, pressure_psia)
 
     @app.post("/set_gas")
     def set_gas(device_name: str = dev_name, gas: Union[int, str] = "N2"):
@@ -135,9 +168,9 @@ def makeApp(confPrefix, servKey, helao_root):
     def tare_pressure(device_name: str = dev_name):
         return app.driver.tare_pressure(device_name)
 
-    @app.post("/reset_totalizer")
-    def reset_totalizer(device_name: str = dev_name):
-        return app.driver.reset_totalizer(device_name)
+    # @app.post("/reset_totalizer")
+    # def reset_totalizer(device_name: str = dev_name):
+    #     return app.driver.reset_totalizer(device_name)
 
     @app.post("/manual_query_state")
     def manual_query_state(device_name: str = dev_name):

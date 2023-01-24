@@ -7,7 +7,7 @@ Update the gas list registers in case any of the 3 gases are used.
 
 """
 
-__all__ = ["AliCatMFC", "MfcExec"]
+__all__ = ["AliCatMFC", "MfcExec", "PfcExec"]
 
 import time
 import asyncio
@@ -129,12 +129,22 @@ class AliCatMFC:
     def list_gases(self, device_name: str):
         return self.fcinfo.get(device_name, {}).get("gases", {})
 
-    def set_pressure(self, device_name: str, pressure_psia: float):
-        resp = self.fcs[device_name].set_pressure(pressure_psia)
+    def set_pressure(
+        self, device_name: str, pressure_psia: float, ramp_psi_sec: Optional[float] = 0
+    ):
+        """Set control mode to pressure, set point = pressure_psi, ramping psi/sec or zero to disable."""
+        resp = []
+        resp.append(self._send(device_name, f"SR {ramp_psi_sec} 4"))
+        resp.append(self.fcs[device_name].set_pressure(pressure_psia))
         return resp
 
-    def set_flowrate(self, device_name: str, flowrate_sccm: float):
-        resp = self.fcs[device_name].set_flow_rate(flowrate_sccm)
+    def set_flowrate(
+        self, device_name: str, flowrate_sccm: float, ramp_sccm_sec: Optional[float] = 0
+    ):
+        """Set control mode to mass flow, set point = flowrate_scc, ramping flowrate_sccm or zero to disable."""
+        resp = []
+        resp.append(self._send(device_name, f"SR {ramp_sccm_sec} 4"))
+        resp.append(self.fcs[device_name].set_flow_rate(flowrate_sccm))
         return resp
 
     def set_gas(self, device_name: str, gas: Union[int, str]):
@@ -232,16 +242,16 @@ class AliCatMFC:
             resp = self.fcs[device_name].tare_pressure()
         return resp
 
-    def reset_totalizer(self, device_name: Optional[str] = None):
-        """Reset totalizer, if totalizer functionality included."""
-        if device_name is None:
-            resp = []
-            for dev_name, fc in self.fcs.items():
-                reset_resp = fc.reset_totalizer()
-                resp.append({dev_name: reset_resp})
-        else:
-            resp = self.fcs[device_name].reset_totalizer()
-        return resp
+    # def reset_totalizer(self, device_name: Optional[str] = None):
+    #     """Reset totalizer, if totalizer functionality included."""
+    #     if device_name is None:
+    #         resp = []
+    #         for dev_name, fc in self.fcs.items():
+    #             reset_resp = fc.reset_totalizer()
+    #             resp.append({dev_name: reset_resp})
+    #     else:
+    #         resp = self.fcs[device_name].reset_totalizer()
+    #     return resp
 
     def manual_query_status(self, device_name: str):
         return self.base.get_lbuf(device_name)
@@ -268,10 +278,12 @@ class MfcExec(Executor):
         "Set flow rate."
         self.active.base.print_message("MFCExec running setup methods.")
         flowrate_sccm = self.active.action.action_params.get("flowrate_sccm", None)
+        ramp_sccm_sec = self.active.action.action_params.get("ramp_sccm_sec", 0)
         if flowrate_sccm is not None:
             rate_resp = self.active.base.fastapp.driver.set_flowrate(
                 device_name=self.device_name,
                 flowrate_sccm=flowrate_sccm,
+                ramp_sccm_sec=ramp_sccm_sec,
             )
             self.active.base.print_message(f"set_flowrate returned: {rate_resp}")
         return {"error": ErrorCodes.none}
@@ -301,11 +313,6 @@ class MfcExec(Executor):
             "data": live_dict,
         }
 
-    async def _manual_stop(self):
-        stop_resp = self.active.base.fastapp.driver.stop_pump(self.device_name)
-        self.active.base.print_message(f"stop_pump returned: {stop_resp}")
-        return {"error": ErrorCodes.none}
-
     async def _post_exec(self):
         "Restore valve hold."
         self.active.base.print_message("MFCExec running cleanup methods.")
@@ -313,6 +320,22 @@ class MfcExec(Executor):
             device_name=self.device_name,
         )
         self.active.base.print_message(f"hold_valve_closed returned: {closevlv_resp}")
+        return {"error": ErrorCodes.none}
+
+
+class PfcExec(MfcExec):
+    async def _pre_exec(self):
+        "Set pressure."
+        self.active.base.print_message("MFCExec running setup methods.")
+        pressure_psia = self.active.action.action_params.get("pressure_psia", None)
+        ramp_psi_sec = self.active.action.action_params.get("ramp_psi_sec", 0)
+        if pressure_psia is not None:
+            rate_resp = self.active.base.fastapp.driver.set_pressure(
+                device_name=self.device_name,
+                pressure_psia=pressure_psia,
+                ramp_psi_sec=ramp_psi_sec,
+            )
+            self.active.base.print_message(f"set_pressure returned: {rate_resp}")
         return {"error": ErrorCodes.none}
 
 

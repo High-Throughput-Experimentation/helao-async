@@ -229,7 +229,9 @@ class C_mfc:
             ]
         longest_data = max([len(x) for x in self.data_dict.values()])
 
-        self.datasource.data = {k: v for k,v in self.data_dict.items() if len(v)==longest_data}
+        self.datasource.data = {
+            k: v for k, v in self.data_dict.items() if len(v) == longest_data
+        }
         self.update_table_data()
         self._add_plots()
 
@@ -276,9 +278,16 @@ class C_mfc:
 
         colors = ["red", "blue", "green", "orange"]
         for dev_name, color in zip(self.devices, colors[: len(self.devices)]):
+            if self.data_dict[f"{dev_name}__control_point"] == "mass flow":
+                self.plot.yaxis.axis_label = "Flow rate (sccm)"
+                yvar = "mass_flow"
+            else:
+                self.plot.yaxis.axis_label = "Pressure (psia)"
+                yvar = "pressure"
+
             self.plot.line(
                 x=f"{dev_name}__time_now",
-                y=f"{dev_name}__mass_flow",
+                y=f"{dev_name}__{yvar}",
                 line_color=color,
                 line_dash="solid",
                 source=self.datasource,
