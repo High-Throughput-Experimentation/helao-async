@@ -1,9 +1,10 @@
 """ A device class for the AliCat mass flow controller.
 
 This device class uses the python implementation from https://github.com/numat/alicat
-which has been added to the 'helao' conda environment. The default gas list included in
-the module code differs from our MFC at G16 (i-C4H10), G25 (He-25), and G26 (He-75).
-Update the gas list registers in case any of the 3 gases are used.
+and additional methods from https://documents.alicat.com/Alicat-Serial-Primer.pdf. The 
+default gas list included in the module code differs from our MFC at G16 (i-C4H10),
+G25 (He-25), and G26 (He-75). Update the gas list registers in case any of the 3 gases 
+are used.
 
 """
 
