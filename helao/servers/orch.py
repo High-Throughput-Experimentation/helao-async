@@ -58,7 +58,7 @@ colorama.init(strip=not sys.stdout.isatty())
 # colorama.init()
 
 hlotags_metadata = [
-    {"name": "public", "description": "prublic orchestrator endpoints"},
+    {"name": "public", "description": "public orchestrator endpoints"},
     {"name": "private", "description": "private orchestrator endpoints"},
 ]
 
