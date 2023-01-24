@@ -123,7 +123,7 @@ class KDS100:
         await self.poll_signalq.put(False)
 
     async def poll_signal_loop(self):
-        await self.safe_state()
+        self.safe_state()
         while True:
             self.polling = await self.poll_signalq.get()
             self.base.print_message("polling signal received")
