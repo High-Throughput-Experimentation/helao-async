@@ -1,3 +1,16 @@
+"""Orchestrator class and FastAPI server templating function
+
+    TODO:
+    1. Create an additional "non-blocking" action queue for Executor-based actions which
+    will be ignored during ActionStartCondition checks and will be terminated after the
+    final action in an experiment using Executor's stop method. Orch will track non-blocking
+    Executor tasks in a dict of lists, keyed by server name, list values are active
+    executor identifiers.
+    2. Update Base class and server templating function with common endpoint to expose
+    Executor stopping method.
+
+"""
+
 __all__ = ["Orch", "makeOrchServ"]
 
 import asyncio
