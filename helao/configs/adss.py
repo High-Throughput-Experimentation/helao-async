@@ -8,6 +8,7 @@ config["simulation"] = False
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
+config["builtin_ref_motorxy"] = [110, 12]  # absolute plate coords
 config["experiment_libraries"] = ["ADSS_exp", "samples_exp"]
 config["experiment_params"] = {
     "gamrychannelwait": -1,
@@ -113,7 +114,7 @@ config["servers"] = {
                 "V2": "PXI-6284/port1/line3", #7-9 grey ground
                 "V3": "PXI-6284/port1/line4",
                 "V4": "PXI-6284/port1/line5",
-                "5": "PXI-6284/port1/line6",
+                "V5": "PXI-6284/port1/line6",
                 "6": "PXI-6284/port1/line7",
                 "7": "PXI-6284/port2/line0",
                 "8": "PXI-6284/port2/line1",
