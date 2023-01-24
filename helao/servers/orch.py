@@ -33,7 +33,7 @@ from helao.servers.operator.bokeh_operator import Operator
 from helaocore.models.action_start_condition import ActionStartCondition
 from helaocore.models.sequence import SequenceModel
 from helaocore.models.experiment import ExperimentModel
-from helaocore.models.Action import ActionModel
+from helaocore.models.action import ActionModel
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.server import ActionServerModel, GlobalStatusModel
 from helaocore.models.orchstatus import OrchStatus
