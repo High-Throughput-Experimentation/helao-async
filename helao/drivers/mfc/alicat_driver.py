@@ -1005,7 +1005,8 @@ class FlowController(FlowMeter):
         except IndexError:
             current = None
         if current is not None and abs(current - setpoint) > 0.01:
-            raise IOError("Could not set setpoint.")
+            # raise IOError("Could not set setpoint.")
+            print("Could not set setpoint. Possibly ramping.")
 
     def _get_control_point(self, retries=2):
         """Get the control point, and save to internal variable."""
