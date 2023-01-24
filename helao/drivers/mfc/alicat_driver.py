@@ -130,7 +130,12 @@ class AliCatMFC:
         return self.fcinfo.get(device_name, {}).get("gases", {})
 
     def set_pressure(
-        self, device_name: str, pressure_psia: float, ramp_psi_sec: Optional[float] = 0
+        self,
+        device_name: str,
+        pressure_psia: float,
+        ramp_psi_sec: Optional[float] = 0,
+        *args,
+        **kwargs,
     ):
         """Set control mode to pressure, set point = pressure_psi, ramping psi/sec or zero to disable."""
         resp = []
@@ -139,7 +144,12 @@ class AliCatMFC:
         return resp
 
     def set_flowrate(
-        self, device_name: str, flowrate_sccm: float, ramp_sccm_sec: Optional[float] = 0
+        self,
+        device_name: str,
+        flowrate_sccm: float,
+        ramp_sccm_sec: Optional[float] = 0,
+        *args,
+        **kwargs,
     ):
         """Set control mode to mass flow, set point = flowrate_scc, ramping flowrate_sccm or zero to disable."""
         resp = []
