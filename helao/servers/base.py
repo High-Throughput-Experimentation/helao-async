@@ -206,6 +206,7 @@ class Executor:
         self.active = active
         self.oneoff = oneoff
         self.poll_rate = poll_rate
+        self.exid = f"{active.action.action_name} {active.action.action_uuid}"
 
     async def _pre_exec(self):
         "Setup methods, return error state."
@@ -314,6 +315,7 @@ class Base:
             )
 
         self.actives: Dict[UUID, object] = {}
+        self.executors = {}  # shortcut to running Executors
         # basemodel to describe the full action server
         self.actionservermodel = ActionServerModel(action_server=self.server)
         self.actionservermodel.init_endpoints()
@@ -343,6 +345,10 @@ class Base:
         if self.ntp_last_sync is None:
             asyncio.gather(self.get_ntp_time())
 
+        self.sync_ntp_task_run = False
+        self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
+        self.bufferer = self.aloop.create_task(self.live_buffer_task())
+
         if driver_class is not None:
             self.fastapp.driver = driver_class(self)
 
@@ -354,9 +360,6 @@ class Base:
 
         self.fast_urls = self.get_endpoint_urls()
         self.status_logger = self.aloop.create_task(self.log_status_task())
-        self.sync_ntp_task_run = False
-        self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
-        self.bufferer = self.aloop.create_task(self.live_buffer_task())
 
     def print_message(self, *args, **kwargs):
         print_message(
@@ -573,7 +576,7 @@ class Base:
         self,
         client_servkey: str,
         action_name: Optional[str] = None,
-    ) -> bool:
+    ):
         # needs private dispatcher
         json_dict = {
             "actionservermodel": self.actionservermodel.get_fastapi_json(
@@ -741,7 +744,7 @@ class Base:
                         f"log_status_task trying to send status to {client_servkey}."
                     )
                     success = False
-                    for idx in range(retry_limit):
+                    for _ in range(retry_limit):
                         response, error_code = await self.send_statuspackage(
                             action_name=status_msg.act.action_name,
                             client_servkey=client_servkey,
@@ -1907,6 +1910,9 @@ class Active:
             self.action.error_code = setup_error
             return await self.finish()
 
+        # shortcut to active exectuors
+        self.base.executors[executor.exid] = self
+
         # action operations
         result = await executor._exec()
         error = result.get("error", ErrorCodes.none)
@@ -1959,6 +1965,8 @@ class Active:
             pass
         else:
             self.base.print_message("Error encountered during executor cleanup.")
+
+        _ = self.base.executors.pop(executor.exid)
 
         await self.finish()
 
