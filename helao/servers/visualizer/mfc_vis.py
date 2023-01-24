@@ -278,7 +278,7 @@ class C_mfc:
 
         colors = ["red", "blue", "green", "orange"]
         for dev_name, color in zip(self.devices, colors[: len(self.devices)]):
-            if self.data_dict[f"{dev_name}__control_point"] == "mass flow":
+            if self.data_dict[f"{dev_name}__control_point"][-1].strip() == "mass flow":
                 self.plot.yaxis.axis_label = "Flow rate (sccm)"
                 yvar = "mass_flow"
             else:
