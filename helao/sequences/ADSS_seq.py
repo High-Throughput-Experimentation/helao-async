@@ -541,7 +541,9 @@ def ADSS_CA_NaOH_validation(
     samplerate_sec: float = 0.05,
     Syringe_rate_ulsec: float = 300,
     Cell_draintime_s: float = 60,
-    Cell_reversepurgetime_s: float = 20,
+    ReturnLineWait_s: float = 30,
+    ReturnLineReverseWait_s: float = 5,
+    ResidualWait_s: float = 15,
     flush_volume_ul: float = 3000,
     clean_xposition: float = 80,
     clean_yposition: float = 50,
@@ -573,12 +575,15 @@ def ADSS_CA_NaOH_validation(
             {
                 "Solution_volume_ul": flush_volume_ul,
                 "Syringe_rate_ulsec": Syringe_rate_ulsec,
+                "ReturnLineWait_s": ReturnLineWait_s,
             }
         )
         epm.add_experiment(
             "ADSS_sub_drain_cell",
             {
                 "DrainWait_s": Cell_draintime_s,
+                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+                "ResidualWait_s": ResidualWait_s,
             }
         )
         epm.add_experiment(
@@ -626,6 +631,8 @@ def ADSS_CA_NaOH_validation(
             "ADSS_sub_drain_cell",
             {
                 "DrainWait_s": Cell_draintime_s,
+                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+                "ResidualWait_s": ResidualWait_s,
             }
         )
         epm.add_experiment(
@@ -633,18 +640,15 @@ def ADSS_CA_NaOH_validation(
             {
                 "Solution_volume_ul": flush_volume_ul,
                 "Syringe_rate_ulsec": Syringe_rate_ulsec,
+                "ReturnLineWait_s": ReturnLineWait_s,
             }
         )
         epm.add_experiment(
             "ADSS_sub_drain_cell",
             {
                 "DrainWait_s": Cell_draintime_s,
-            }
-        )
-        epm.add_experiment(
-            "ADSS_sub_empty_cell",
-            {
-                "ReversePurgeWait_s": Cell_reversepurgetime_s,
+                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+                "ResidualWait_s": ResidualWait_s,
             }
         )
         epm.add_experiment("ADSS_sub_disengage",{})
@@ -661,18 +665,15 @@ def ADSS_CA_NaOH_validation(
             {
                 "Clean_volume_ul": clean_volume_ul,
                 "Syringe_rate_ulsec": Syringe_rate_ulsec,
-            }
+                "ReturnLineWait_s": ReturnLineWait_s,
+        }
         )
         epm.add_experiment(
             "ADSS_sub_drain_cell",
             {
                 "DrainWait_s": Cell_draintime_s,
-            }
-        )
-        epm.add_experiment(
-            "ADSS_sub_empty_cell",
-            {
-                "ReversePurgeWait_s": Cell_reversepurgetime_s,
+                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+                "ResidualWait_s": ResidualWait_s,
             }
         )
         epm.add_experiment("ADSS_sub_disengage",{})
