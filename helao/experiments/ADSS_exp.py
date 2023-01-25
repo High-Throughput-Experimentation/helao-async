@@ -15,6 +15,7 @@ __all__ = [
     "ADSS_sub_CV",  # latest
     "ADSS_sub_OCV",  # at beginning of all sequences
     "ADSS_sub_unloadall_customs",
+    "ADSS_sub_unload_liquid",
     "ADSS_sub_load",
     "ADSS_sub_load_solid",
     "ADSS_sub_load_liquid",
@@ -158,6 +159,28 @@ def ADSS_sub_unloadall_customs(experiment: Experiment):
 
     return apm.action_list  # returns complete action list to orch
 
+def ADSS_sub_unload_liquid(
+    experiment: Experiment,
+    experiment_version: int = 1,
+):
+    """Unload liquid sample at 'cell1_we' position and reload solid sample."""
+
+    apm = ActionPlanMaker()
+    apm.add(
+        PAL_server,
+        "archive_custom_unloadall",
+        {},
+        to_globalexp_params=["_unloaded_solid"],
+    )
+    apm.add(
+        PAL_server,
+        "archive_custom_load",
+        {"custom": "cell1_we"},
+        from_globalexp_params={"_unloaded_solid": "load_sample_in"},
+    )
+    return apm.action_list
+
+
 
 def ADSS_sub_load_solid(
     experiment: Experiment,
@@ -225,7 +248,7 @@ def ADSS_sub_load(
     apm = ActionPlanMaker()
 
 #    # unload all samples from custom positions
-#    apm.add_action_list(ADSS_sub_unloadall_customs(experiment=experiment))
+    apm.add_action_list(ADSS_sub_unloadall_customs(experiment=experiment))
 
     # load new requested samples
     apm.add_action_list(
@@ -260,7 +283,7 @@ def ADSS_sub_sample_start(
     liquid_sample_no: Optional[int] = 1,
 ):
     """Sub experiment
-    NOT anymore (1) Unload all custom position samples
+    (1) Unload all custom position samples
     (2) Load solid sample to cell
     (3) Load liquid sample to reservoir
     (4) Move to position

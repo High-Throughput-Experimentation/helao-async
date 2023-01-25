@@ -556,7 +556,6 @@ def ADSS_CA_NaOH_validation(
 
     epm = ExperimentPlanMaker()
 
-    epm.add_experiment("ADSS_sub_unloadall_customs",{})
 
     for solid_sample_no in plate_sample_no_list[:1]:  # have to indent add expts if used
 
@@ -586,31 +585,38 @@ def ADSS_CA_NaOH_validation(
                 "ResidualWait_s": ResidualWait_s,
             }
         )
-        epm.add_experiment(
-            "ADSS_sub_cellfill",
-            {
-                "Solution_volume_ul": liquid_sample_volume_ul,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-            }
-        )
-        epm.add_experiment(
-            "ADSS_sub_sample_aliquot",
-            {
-                "EquilibrationTime_s": EquilibrationTime_s,
-                "aliquot_volume_ul": aliquot_volume_ul,
-                "PAL_Injector": PAL_Injector,
-            }
-        )
-
-        epm.add_experiment(
-            "ADSS_sub_OCV",
-            {
-                "Tval__s": OCV_duration,
-                "SampleRate": 0.05,
-            },
-        )
-
         for CA_potential_vsRHE in CA_potentials_vsRHE:
+
+            epm.add_experiment(
+                "ADSS_sub_cellfill",
+                {
+                    "Solution_volume_ul": liquid_sample_volume_ul,
+                    "Syringe_rate_ulsec": Syringe_rate_ulsec,
+                }
+            )
+            epm.add_experiment(
+                "ADSS_sub_load_liquid",
+                {
+                    "liquid_custom_position": liquid_custom_position,
+                    "liquid_sample_no": liquid_sample_no,
+                }
+            )
+            epm.add_experiment(
+                "ADSS_sub_sample_aliquot",
+                {
+                    "EquilibrationTime_s": EquilibrationTime_s,
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "PAL_Injector": PAL_Injector,
+                }
+            )
+
+            epm.add_experiment(
+                "ADSS_sub_OCV",
+                {
+                    "Tval__s": OCV_duration,
+                    "SampleRate": 0.05,
+                },
+            )
 
             epm.add_experiment(
                 "ADSS_sub_CA",
@@ -627,30 +633,32 @@ def ADSS_CA_NaOH_validation(
                 },
             )
 
-        epm.add_experiment(
-            "ADSS_sub_drain_cell",
-            {
-                "DrainWait_s": Cell_draintime_s,
-                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                "ResidualWait_s": ResidualWait_s,
-            }
-        )
-        epm.add_experiment(
-            "ADSS_sub_cellfill",
-            {
-                "Solution_volume_ul": flush_volume_ul,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-                "ReturnLineWait_s": ReturnLineWait_s,
-            }
-        )
-        epm.add_experiment(
-            "ADSS_sub_drain_cell",
-            {
-                "DrainWait_s": Cell_draintime_s,
-                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                "ResidualWait_s": ResidualWait_s,
-            }
-        )
+            epm.add_experiment(
+                "ADSS_sub_drain_cell",
+                {
+                    "DrainWait_s": Cell_draintime_s,
+                    "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+                    "ResidualWait_s": ResidualWait_s,
+                }
+            )
+            epm.add_experiment(
+                "ADSS_sub_cellfill",
+                {
+                    "Solution_volume_ul": flush_volume_ul,
+                    "Syringe_rate_ulsec": Syringe_rate_ulsec,
+                    "ReturnLineWait_s": ReturnLineWait_s,
+                }
+            )
+            epm.add_experiment(
+                "ADSS_sub_drain_cell",
+                {
+                    "DrainWait_s": Cell_draintime_s,
+                    "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+                    "ResidualWait_s": ResidualWait_s,
+                }
+            )
+            epm.add_experiment("ADSS_sub_unload_liquid",{})
+
         epm.add_experiment("ADSS_sub_disengage",{})
         epm.add_experiment("ADSS_sub_abs_move",
             {
@@ -677,6 +685,8 @@ def ADSS_CA_NaOH_validation(
             }
         )
         epm.add_experiment("ADSS_sub_disengage",{})
+
+#    epm.add_experiment("ADSS_sub_tray_unload",{})
 
 
         # epm.add_experiment("ADSS_sub_shutdown", {})
