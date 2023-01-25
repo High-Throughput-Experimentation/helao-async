@@ -17,7 +17,7 @@ async def galil_dyn_endpoints(app=None):
 
         if app.driver.dev_ai:
 
-            @app.post(f"/{servKey}/get_analog_in"
+            @app.post(f"/{servKey}/get_analog_in")
             async def get_analog_in(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 2,
