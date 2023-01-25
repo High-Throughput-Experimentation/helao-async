@@ -18,9 +18,10 @@ import traceback
 import asyncio
 from typing import Union, Optional, List
 
-from helao.servers.base import Base
+from helao.servers.base import Base, Executor
 from helaocore.error import ErrorCodes
 from helao.helpers.make_str_enum import make_str_enum
+from helaocore.models.hlostatus import HloStatus
 
 from helao.drivers.io.enum import TriggerType
 
@@ -431,7 +432,7 @@ class Galil:
         ]
         dmc_prog = "\n".join(prog_parts)
         await self.upload_DMC(dmc_prog)
-        self.galilcmd(f"XQ #main,0")  # excecute main routine
+        self.galilcmd("XQ #main,0")  # excecute main routine
 
         return {"error_code": err_code}
 
@@ -467,3 +468,32 @@ class Galil:
                 f"could not close galil connection: {repr(e), tb,}", error=True
             )
         return {"shutdown"}
+
+
+class AiMonExec(Executor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.active.base.print_message("AiMonExec initialized.")
+        self.start_time = time.time()
+        self.duration = self.active.action.action_params.get("duration", -1)
+
+    async def _poll(self):
+        """Read analog inputs from live buffer."""
+        data_dict = {}
+        times = []
+        for ai_name in self.active.base.fastapp.driver.monitor_ai.keys():
+            val, epoch_s = self.active.base.get_lbuf(ai_name)
+            data_dict[ai_name] = val
+            times.append(epoch_s)
+        data_dict["epoch_s"] = max(times)
+        iter_time = time.time()
+        elapsed_time = iter_time - self.start_time
+        if (self.duration < 0) or (elapsed_time < self.duration):
+            status = HloStatus.active
+        else:
+            status = HloStatus.finished
+        return {
+            "error": ErrorCodes.none,
+            "status": status,
+            "data": data_dict,
+        }

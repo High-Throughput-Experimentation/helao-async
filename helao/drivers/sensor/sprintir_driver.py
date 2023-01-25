@@ -10,7 +10,7 @@ import asyncio
 import serial
 
 from helaocore.error import ErrorCodes
-from helao.servers.base import Base
+from helao.servers.base import Base, Executor
 from helaocore.models.data import DataModel
 from helaocore.models.file import FileConnParams, HloHeaderModel
 from helaocore.models.sample import SampleInheritance, SampleStatus
@@ -18,10 +18,7 @@ from helaocore.models.hlostatus import HloStatus
 from helao.helpers.premodels import Action
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.sample_api import UnifiedSampleDataAPI
-from helao.servers.base import Base
 
-from functools import partial
-from bokeh.server.server import Server
 
 """ Notes:
 
@@ -94,10 +91,10 @@ class SprintIR:
                     fw_val = aresp.split()[-1].replace(cmd, "").strip()
                     self.fw[ifw_map[cmd]] = int(fw_val)
             time.sleep(0.1)
-        
+
         # set streaming mode before starting async task
         self.base.print_message("Setting sensor to streaming mode.")
-        self.com.write("K 1\r\n".encode('utf8'))
+        self.com.write("K 1\r\n".encode("utf8"))
 
         self.action = None
         self.active = None
@@ -373,3 +370,28 @@ class SprintIR:
 
     def shutdown(self):
         self.com.close()
+
+
+class CO2MonExec(Executor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.active.base.print_message("AiMonExec initialized.")
+        self.start_time = time.time()
+        self.duration = self.active.action.action_params.get("duration", -1)
+
+    async def _poll(self):
+        """Read CO2 ppm from live buffer."""
+        live_dict, epoch_s = self.active.base.get_lbuf("co2_ppm")
+        live_dict["epoch_s"] = epoch_s
+        iter_time = time.time()
+        elapsed_time = iter_time - self.start_time
+        if (self.duration < 0) or (elapsed_time < self.duration):
+            status = HloStatus.active
+        else:
+            status = HloStatus.finished
+        return {
+            "error": ErrorCodes.none,
+            "status": status,
+            "data": live_dict,
+        }
+

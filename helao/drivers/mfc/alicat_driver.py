@@ -277,13 +277,12 @@ class AliCatMFC:
 
 class MfcExec(Executor):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # current plan is 1 flow controller per COM
         self.device_name = list(self.active.base.server_params["devices"].keys())[0]
+        super().__init__(*args, **kwargs, exid=self.device_name)
+        # current plan is 1 flow controller per COM
         self.active.base.print_message("MFCExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
-        self.exid = self.device_name
 
     async def _pre_exec(self):
         "Set flow rate."

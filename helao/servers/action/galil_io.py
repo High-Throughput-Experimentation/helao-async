@@ -3,8 +3,9 @@ __all__ = ["makeApp"]
 from typing import Optional, Union, List
 from fastapi import Body, Query
 from helao.servers.base import makeActionServ
-from helao.drivers.io.galil_io_driver import Galil, TriggerType
+from helao.drivers.io.galil_io_driver import Galil, TriggerType, AiMonExec
 from helao.helpers.premodels import Action
+from helaocore.models.sample import LiquidSample, SampleUnion
 from helaocore.error import ErrorCodes
 from helao.helpers.config_loader import config_loader
 
@@ -16,7 +17,7 @@ async def galil_dyn_endpoints(app=None):
 
         if app.driver.dev_ai:
 
-            @app.post(f"/{servKey}/get_analog_in")
+            @app.post(f"/{servKey}/get_analog_in"
             async def get_analog_in(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 2,
@@ -32,6 +33,38 @@ async def galil_dyn_endpoints(app=None):
                     "error_code", ErrorCodes.unspecified
                 )
                 await active.enqueue_data_dflt(datadict=datadict)
+                finished_action = await active.finish()
+                return finished_action.as_dict()
+
+            @app.post(f"/{servKey}/acquire_analog_in")
+            async def acquire_analog_in(
+                action: Optional[Action] = Body({}, embed=True),
+                action_version: int = 1,
+                duration: Optional[float] = -1,
+                acquisition_rate: Optional[float] = 0.2,
+                fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
+            ):
+                """Record galil analog inputs (monitor_ai)."""
+                active = await app.base.setup_and_contain_action()
+                active.action.action_abbr = "galil_ai"
+                executor = AiMonExec(
+                    active=active,
+                    oneoff=False,
+                    poll_rate=active.action.action_params["acquisition_rate"],
+                )
+                active_action_dict = active.start_executor(executor)
+                return active_action_dict
+
+            @app.post(f"/{servKey}/cancel_acquire_analog_in")
+            async def cancel_acquire_analog_in(
+                action: Optional[Action] = Body({}, embed=True),
+                action_version: int = 1,
+            ):
+                """Stop galil analog input acquisition."""
+                active = await app.base.setup_and_contain_action()
+                for exid, executor in app.base.executors.items():
+                    if exid.split()[0] == "acquire_analog_in":
+                        await executor.stop_action_task()
                 finished_action = await active.finish()
                 return finished_action.as_dict()
 

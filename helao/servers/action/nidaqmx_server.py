@@ -22,7 +22,7 @@ from socket import gethostname
 
 
 from helao.servers.base import makeActionServ
-from helao.drivers.io.nidaqmx_driver import cNIMAX
+from helao.drivers.io.nidaqmx_driver import cNIMAX, DevMonExec
 from helaocore.models.sample import LiquidSample, SampleUnion
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
@@ -42,44 +42,43 @@ def makeApp(confPrefix, servKey, helao_root):
         version=2.0,
         driver_class=cNIMAX,
     )
-    dev_monitor = app.server_params.get("dev_monitor",{})
+    dev_monitor = app.server_params.get("dev_monitor", {})
     dev_monitoritems = make_str_enum("dev_monitor", {key: key for key in dev_monitor})
 
-    dev_heat = app.server_params.get("dev_heat",{})
+    dev_heat = app.server_params.get("dev_heat", {})
     dev_heatitems = make_str_enum("dev_heat", {key: key for key in dev_heat})
 
-
-    dev_pump = app.server_params.get("dev_pump",{})
+    dev_pump = app.server_params.get("dev_pump", {})
     dev_pumpitems = make_str_enum("dev_pump", {key: key for key in dev_pump})
 
-    dev_gasvalve = app.server_params.get("dev_gasvalve",{})
+    dev_gasvalve = app.server_params.get("dev_gasvalve", {})
     dev_gasvalveitems = make_str_enum(
         "dev_gasvalve", {key: key for key in dev_gasvalve}
     )
 
-    dev_liquidvalve = app.server_params.get("dev_liquidvalve",{})
+    dev_liquidvalve = app.server_params.get("dev_liquidvalve", {})
     dev_liquidvalveitems = make_str_enum(
         "dev_liquidvalve", {key: key for key in dev_liquidvalve}
     )
 
-    dev_led = app.server_params.get("dev_led",{})
+    dev_led = app.server_params.get("dev_led", {})
     dev_leditems = make_str_enum("dev_led", {key: key for key in dev_led})
 
-    dev_fswbcd = app.server_params.get("dev_fswbcd",{})
+    dev_fswbcd = app.server_params.get("dev_fswbcd", {})
     dev_fswbcditems = make_str_enum("dev_fswbcd", {key: key for key in dev_fswbcd})
-    dev_cellcurrent = app.server_params.get("dev_cellcurrent",{})
+    dev_cellcurrent = app.server_params.get("dev_cellcurrent", {})
     # dev_cellcurrentitems = make_str_enum("dev_cellcurrent",{key:key for key in dev_cellcurrent})
-    dev_cellvoltage = app.server_params.get("dev_cellvoltage",{})
+    dev_cellvoltage = app.server_params.get("dev_cellvoltage", {})
     # dev_cellvoltageitems = make_str_enum("dev_cellvoltage",{key:key for key in dev_cellvoltage})
-    dev_activecell = app.server_params.get("dev_activecell",{})
+    dev_activecell = app.server_params.get("dev_activecell", {})
     dev_activecellitems = make_str_enum(
         "dev_activecell", {key: key for key in dev_activecell}
     )
-    dev_mastercell = app.server_params.get("dev_mastercell",{})
+    dev_mastercell = app.server_params.get("dev_mastercell", {})
     dev_mastercellitems = make_str_enum(
         "dev_mastercell", {key: key for key in dev_mastercell}
     )
-    dev_fsw = app.server_params.get("dev_fsw",{})
+    dev_fsw = app.server_params.get("dev_fsw", {})
     dev_fswitems = make_str_enum("dev_fsw", {key: key for key in dev_fsw})
     # dev_RSHTTLhandshake = app.server_params.get("dev_RSHTTLhandshake",dict())
 
@@ -303,12 +302,43 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if dev_monitor:
 
-        @app.post(f"/readtemp", tags=["public"])
-        async def readtemp(
+        @app.post(f"/{servKey}/acquire_monitors")
+        async def acquire_monitors(
+            action: Optional[Action] = Body({}, embed=True),
+            action_version: int = 1,
+            duration: Optional[float] = -1,
+            acquisition_rate: Optional[float] = 0.2,
+            fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
         ):
+            """Record NIMax monitor device channels."""
+            active = await app.base.setup_and_contain_action()
+            active.action.action_abbr = "ni_monitor"
+            executor = DevMonExec(
+                active=active,
+                oneoff=False,
+                poll_rate=active.action.action_params["acquisition_rate"],
+            )
+            active_action_dict = active.start_executor(executor)
+            return active_action_dict
+
+        @app.post(f"/{servKey}/cancel_acquire_monitors")
+        async def cancel_acquire_monitors(
+            action: Optional[Action] = Body({}, embed=True),
+            action_version: int = 1,
+        ):
+            """Stop NIMax monitor acquisition."""
+            active = await app.base.setup_and_contain_action()
+            for exid, executor in app.base.executors.items():
+                if exid.split()[0] == "acquire_monitors":
+                    await executor.stop_action_task()
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+        @app.post("/readtemp", tags=["private"])
+        async def readtemp():
             """Runs temp measurement.  T and S thermocouples"""
             tempread = {}
-            tempread= await app.driver.read_T()
+            tempread = await app.driver.read_T()
             print(tempread)
             return tempread
 
@@ -338,23 +368,17 @@ def makeApp(confPrefix, servKey, helao_root):
             finished_act = await active.finish()
             return finished_act.as_dict()
 
-
     if dev_monitor:
 
-        @app.post(f"/monloop", tags=["public"])
-        async def monloop(
-        
-        ):
+        @app.post("/monloop", tags=["private"])
+        async def monloop():
             # A = await app.base.setup_action()
-            A = await app.driver.monitorloop(
-            )
-
+            A = await app.driver.monitorloop()
 
         @app.post(f"/{servKey}/heatloop", tags=["public"])
         async def heatloop(
             # action: Optional[Action] = Body({}, embed=True),
             # action_version: int = 1,
-
             duration_hrs: float = 2,
             celltemp_min_C: float = 74.5,
             celltemp_max_C: float = 75.5,
@@ -363,43 +387,44 @@ def makeApp(confPrefix, servKey, helao_root):
         ):
             # A = await app.base.setup_action()
             A = await app.driver.Heatloop(
-                duration_h = duration_hrs,
-                celltemp_min = celltemp_min_C,
-                celltemp_max = celltemp_max_C,
-                reservoir2_min = reservoir2_min_C,
-                reservoir2_max = reservoir2_max_C,
+                duration_h=duration_hrs,
+                celltemp_min=celltemp_min_C,
+                celltemp_max=celltemp_max_C,
+                reservoir2_min=reservoir2_min_C,
+                reservoir2_max=reservoir2_max_C,
             )
-    #        temp_dict = {}
-    #        #app.driver.create_Ttask()
-    #        starttime=time.time()
-    #        duration = duration_hrs * 60 * 60
-    #        heatloop_run = True
-    #        while heatloop_run and ( time.time() - starttime < duration):
-    #            #need to insert pause. also verify if values are actually being evaluated
-    #            time.sleep(1)
-    #            temp_dict = await readtemp()
-    #            for k,v in temp_dict.items():
-    #                temp_dict[k] = float(v)
-    #            print(type(temp_dict['Ktc_in_cell']))
-    #            print(type(temp_dict['Ttc_in_reservoir']))
-    #            if temp_dict['Ktc_in_cell'] < celltemp_min_C:
-    #                print("heat1on")
-    #                heater(heater="cellheater", on = True)
-    #            if temp_dict['Ktc_in_cell'] > celltemp_max_C:
-    #                print("heat1off")
-    #                heater(heater="cellheater", on = False)
-    #            if temp_dict['Ttc_in_reservoir'] < reservoir2_min_C:
-    #                print("heat2on")
-    #                heater(heater="res_heater", on = True)
-    #            if temp_dict['Ttc_in_reservoir'] > reservoir2_max_C:
-    #                print("heat2off")
-    #                heater(heater="res_heater", on = False)
-                #need way to monitor and break loop
-                #ie, heatloop_run = False
 
-    #        await stop_temp()
-    #        heater(heater="cellheater", on = False)
-    #        heater(heater="res_heater", on = False)
+        #        temp_dict = {}
+        #        #app.driver.create_Ttask()
+        #        starttime=time.time()
+        #        duration = duration_hrs * 60 * 60
+        #        heatloop_run = True
+        #        while heatloop_run and ( time.time() - starttime < duration):
+        #            #need to insert pause. also verify if values are actually being evaluated
+        #            time.sleep(1)
+        #            temp_dict = await readtemp()
+        #            for k,v in temp_dict.items():
+        #                temp_dict[k] = float(v)
+        #            print(type(temp_dict['Ktc_in_cell']))
+        #            print(type(temp_dict['Ttc_in_reservoir']))
+        #            if temp_dict['Ktc_in_cell'] < celltemp_min_C:
+        #                print("heat1on")
+        #                heater(heater="cellheater", on = True)
+        #            if temp_dict['Ktc_in_cell'] > celltemp_max_C:
+        #                print("heat1off")
+        #                heater(heater="cellheater", on = False)
+        #            if temp_dict['Ttc_in_reservoir'] < reservoir2_min_C:
+        #                print("heat2on")
+        #                heater(heater="res_heater", on = True)
+        #            if temp_dict['Ttc_in_reservoir'] > reservoir2_max_C:
+        #                print("heat2off")
+        #                heater(heater="res_heater", on = False)
+        # need way to monitor and break loop
+        # ie, heatloop_run = False
+
+        #        await stop_temp()
+        #        heater(heater="cellheater", on = False)
+        #        heater(heater="res_heater", on = False)
 
         # @app.post(f"/stoptemp", tags=["public"])
         # async def stop_temp():
@@ -409,16 +434,12 @@ def makeApp(confPrefix, servKey, helao_root):
         # async def start_temp():
         #     app.driver.create_Ttask()
 
-
-
-        @app.post(f"/stopmonloop", tags=["public"])
-        async def monloopstop(
-        
-        ):
+        @app.post("/stopmonloop", tags=["private"])
+        async def monloopstop():
             app.driver.stop_monitor()
 
-        @app.post(f"/stopheatloop", tags=["public"])
-        async def heatloopstop( ):
+        @app.post("/stopheatloop", tags=["private"])
+        async def heatloopstop():
             app.driver.stop_heatloop()
 
     @app.post(f"/{servKey}/stop", tags=["public"])
