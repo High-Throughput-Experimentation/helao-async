@@ -619,7 +619,14 @@ def CCSI_sub_liquidfill_syringes(
 #    apm.add(CO2S_server, "acquire_co2", {"duration": inf1_acqtime, "acquisition_rate": apm.pars.co2measure_acqrate})
 
 #    if Solution_volume_ul != 0:
-    apm.add(SOLUTIONPUMP_server, "infuse", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec , "volume_uL": apm.pars.Solution_volume_ul + apm.pars.Syringe_retraction_ul},start_condition=ActionStartCondition.no_wait)
+    apm.add(SOLUTIONPUMP_server, "infuse", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec , "volume_uL": apm.pars.Solution_volume_ul + apm.pars.Syringe_retraction_ul},start_condition=ActionStartCondition.no_wait,
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.samples_in,
+        ],
+)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
 #    if Waterclean_volume_ul != 0:
@@ -627,7 +634,14 @@ def CCSI_sub_liquidfill_syringes(
 #        inf2_acqtime = Waterclean_volume_ul/Syringe_rate_ulsec + .25
 #        apm.add(CO2S_server, "acquire_co2", {"duration": inf2_acqtime, "acquisition_rate": apm.pars.co2measure_acqrate})
 
-    apm.add(WATERCLEANPUMP_server, "infuse", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.Waterclean_volume_ul + apm.pars.Syringe_retraction_ul},start_condition=ActionStartCondition.no_wait)    
+    apm.add(WATERCLEANPUMP_server, "infuse", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.Waterclean_volume_ul + apm.pars.Syringe_retraction_ul},start_condition=ActionStartCondition.no_wait,
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.samples_in,
+        ],
+)    
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
     #v7  open, mfc flow, wait, syringes retract
