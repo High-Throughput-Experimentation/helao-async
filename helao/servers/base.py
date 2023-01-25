@@ -45,7 +45,7 @@ from helaocore.models.sample import (
 from helaocore.models.data import DataModel, DataPackageModel
 from helaocore.models.machine import MachineModel
 from helaocore.models.server import ActionServerModel, EndpointModel
-form helaocore.models.action import ActionModel
+from helaocore.models.action import ActionModel
 from helao.helpers.active_params import ActiveParams
 from helaocore.models.file import (
     FileConn,
@@ -135,6 +135,10 @@ def makeActionServ(
     async def attach_client(client_servkey: str):
         return await app.base.attach_client(client_servkey)
 
+    @app.post("/stop_executor", tags=["private"])
+    def stop_executor(executor_id: str):
+        return app.base.stop_executor(executor_id)
+
     @app.post("/endpoints", tags=["private"])
     def get_all_urls():
         """Return a list of all endpoints on this server."""
@@ -203,11 +207,21 @@ class Executor:
         a. Cleanup calls (optional)
     """
 
-    def __init__(self, active, poll_rate: float = 0.2, oneoff: bool = True):
+    def __init__(
+        self,
+        active,
+        poll_rate: float = 0.2,
+        oneoff: bool = True,
+        exid: Optional[str] = None,
+    ):
         self.active = active
         self.oneoff = oneoff
         self.poll_rate = poll_rate
-        self.exid = f"{active.action.action_name} {active.action.action_uuid}"
+        if exid is None:
+            self.exid = f"{active.action.action_name} {active.action.action_uuid}"
+        else:
+            self.exid = exid
+        self.active.action.exid = self.exid
 
     async def _pre_exec(self):
         "Setup methods, return error state."
@@ -593,6 +607,22 @@ class Base:
         )
         return response, error_code
 
+    async def send_nbstatuspackage(
+        self,
+        client_servkey: str,
+        actionmodel: ActionModel,
+    ):
+        # needs private dispatcher
+        json_dict = {"actionmodel": actionmodel}
+        response, error_code = await async_private_dispatcher(
+            world_config_dict=self.world_cfg,
+            server=client_servkey,
+            private_action="update_nonblocking",
+            params_dict={},
+            json_dict=json_dict,
+        )
+        return response, error_code
+
     async def attach_client(self, client_servkey: str, retry_limit=5):
         """Add client for pushing status updates via HTTP POST."""
         success = False
@@ -628,11 +658,11 @@ class Base:
 
             if success:
                 self.print_message(
-                    f"Attched {client_servkey} to status ws on {self.server.server_name}."
+                    f"Attached {client_servkey} to status ws on {self.server.server_name}."
                 )
             else:
                 self.print_message(
-                    f"failed to attch {client_servkey} to status ws "
+                    f"failed to attach {client_servkey} to status ws "
                     f"on {self.server.server_name} "
                     f"after {retry_limit} attempts.",
                     error=True,
@@ -729,9 +759,7 @@ class Base:
                 self.actionservermodel.last_action_uuid = status_msg.action_uuid
 
                 # sort the status (nonactive_dict is empty at this point)
-                self.actionservermodel.endpoints[
-                    status_msg.action_name
-                ].sort_status()
+                self.actionservermodel.endpoints[status_msg.action_name].sort_status()
                 self.print_message(
                     f"log_status_task sending status "
                     f"{status_msg.action_status} for action "
@@ -982,6 +1010,17 @@ class Base:
 
         return ret_error
 
+    def stop_executor(self, executor_id: str):
+        try:
+            self.executors[executor_id].stop_action_task()
+            self.print_message(
+                f"Signaling executor task {executor_id} to end polling loop."
+            )
+            return {"signal_stop": True}
+        except KeyError:
+            self.print_message(f"Could not find {executor_id} among active executors.")
+            return {"signal_stop": False}
+
 
 class Active:
     """Active action holder which wraps data queing and exp writing."""
@@ -1177,9 +1216,9 @@ class Active:
             f"Adding {str(action.action_uuid)} to {action.action_name} status list."
         )
 
-        if action.nonblocking:
-            pass  # TODO: populate Base.nonblocking dict,
-        else:
+        if (
+            not action.nonblocking
+        ):  # skip non-blocking actions which send status via action_task
             await self.base.status_q.put(action.get_actmodel())
 
     async def set_estop(self, action: Optional[Action] = None):
@@ -1900,10 +1939,40 @@ class Active:
             # create and write seq file for manual action
             await self.base.write_seq(exp, manual=True)
 
+    async def send_nonblocking_status(self, retry_limit: int = 3):
+        for client_servkey in self.base.status_clients:
+            self.base.print_message(
+                f"log_status_task trying to send status to {client_servkey}."
+            )
+            success = False
+            for _ in range(retry_limit):
+                response, error_code = await self.base.send_nbstatuspackage(
+                    client_servkey=client_servkey,
+                    actionmodel=ActionModel(**self.action.get_actmodel().clean_dict()),
+                )
+
+                if response and error_code == ErrorCodes.none:
+                    success = True
+                    break
+
+            if success:
+                self.base.print_message(
+                    f"Attached {client_servkey} to status ws on {self.base.server.server_name}."
+                )
+            else:
+                self.base.print_message(
+                    f"failed to attach {client_servkey} to status ws "
+                    f"on {self.base.server.server_name} "
+                    f"after {retry_limit} attempts.",
+                    error=True,
+                )
+
     async def action_loop_task(self, executor: Executor):
         """Generic replacement for 'IOloop'."""
 
         self.base.print_message("action_loop_task started")
+        if self.action.nonblocking:
+            await self.send_nonblocking_status()
         # pre-action operations
         setup_state = await executor._pre_exec()
         setup_error = setup_state.get("error", ErrorCodes.none)
@@ -1974,7 +2043,7 @@ class Active:
 
         await self.finish()
 
-    async def stop_action_task(self):
+    def stop_action_task(self):
         "External method for stopping action_loop_task."
         self.base.print_message("Stop action request received. Stopping poll.")
         self.manual_stop = True

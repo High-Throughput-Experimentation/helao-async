@@ -108,6 +108,18 @@ def makeOrchServ(
         )
         return await app.orch.update_status(actionservermodel=actionservermodel)
 
+    @app.post("/update_nonblocking", tags=["private"])
+    async def update_nonblocking(
+        actionmodel: ActionModel,
+    ):
+        app.orch.print_message(
+            f"orch '{app.orch.server.server_name}' "
+            f"got nonblocking status from "
+            f"'{actionmodel.action_server.server_name}': "
+            f"exid: {actionmodel.exid} -- status: {actionmodel.action_status}"
+        )
+        return await app.orch.update_nonblocking()
+
     @app.post("/attach_client", tags=["private"])
     async def attach_client(client_servkey: str):
         return await app.orch.attach_client(client_servkey)
@@ -339,7 +351,7 @@ class Orch(Base):
         self.sequence_dq = zdeque([])
         self.experiment_dq = zdeque([])
         self.action_dq = zdeque([])
-        self.noblock_actions = {}
+        self.nonblocking = []
 
         # holder for tracking dispatched action in status
         self.last_dispatched_action_uuid = None
@@ -498,8 +510,28 @@ class Orch(Base):
                 "all FastAPI servers in config file are accessible."
             )
 
-    async def update_nonblocking(self, action_model: ActionModel):
-        pass
+    def update_nonblocking(self, actionmodel: ActionModel):
+        """Update method for action server to push non-blocking action ids."""
+        server_key = actionmodel.action_server.server_name
+        server_exid = (server_key, actionmodel.exid)
+        if "active" in actionmodel.action_status:
+            self.nonblocking.append(server_exid)
+        else:
+            self.nonblocking.remove(server_exid)
+
+    async def clear_nonblocking(self):
+        """Clear method for orch to purge non-blocking action ids."""
+        resp_tups = []
+        for server_key, exid in self.nonblocking:
+            response, error_code = await async_private_dispatcher(
+                world_config_dict=self.world_cfg,
+                server=server_key,
+                private_action="stop_executor",
+                params_dict={"executor_id": exid},
+                json_dict={},
+            )
+            resp_tups.append((response, error_code))
+        return resp_tups
 
     async def update_status(
         self, actionservermodel: Optional[ActionServerModel] = None
@@ -561,18 +593,14 @@ class Orch(Base):
         async for _ in self.globstat_q.subscribe():
             await asyncio.sleep(0.01)
 
-    def unpack_sequence(
-        self, sequence_name, sequence_params
-    ) -> List[ExperimentModel]:
+    def unpack_sequence(self, sequence_name, sequence_params) -> List[ExperimentModel]:
         if sequence_name in self.sequence_lib:
             return self.sequence_lib[sequence_name](**sequence_params)
         else:
             return []
 
     async def seq_unpacker(self):
-        for i, experimentmodel in enumerate(
-            self.active_sequence.experiment_plan_list
-        ):
+        for i, experimentmodel in enumerate(self.active_sequence.experiment_plan_list):
             # self.print_message(
             #     f"unpack experiment {experimenttemplate.experiment_name}"
             # )
@@ -793,14 +821,6 @@ class Orch(Base):
             result_actiondict, error_code = await async_action_dispatcher(
                 self.world_cfg, A
             )
-            # endpoint_status = deepcopy(
-            #     self.orchstatusmodel.server_dict[A.action_server.as_key()].endpoints[
-            #         A.action_name
-            #     ]
-            # )
-            # endpoint_uuids = [str(k) for k in endpoint_status.active_dict.keys()] + [
-            #     str(k) for k in endpoint_status.nonactive_dict["finished"].keys()
-            # ]
             endpoint_uuids = [
                 str(k) for k in self.orchstatusmodel.active_dict.keys()
             ] + [
@@ -815,31 +835,26 @@ class Orch(Base):
             self.print_message(
                 f"Action {A.action_name} dispatched with uuid: {result_uuid}"
             )
-            while result_uuid not in endpoint_uuids:
-                self.print_message(
-                    f"Waiting for dispatched {A.action_name}, {A.action_uuid} request to register in global status."
-                )
-                try:
-                    await asyncio.wait_for(self.wait_for_interrupt(), timeout=5.0)
-                except asyncio.TimeoutError:
-                    print("!!! Did not receive interrupt after 5 sec, retrying. !!!")
-                # endpoint_status = deepcopy(
-                #     self.orchstatusmodel.server_dict[
-                #         A.action_server.as_key()
-                #     ].endpoints[A.action_name]
-                # )
-                # endpoint_uuids = [
-                #     str(k) for k in endpoint_status.active_dict.keys()
-                # ] + [str(k) for k in endpoint_status.nonactive_dict["finished"].keys()]
-                endpoint_uuids = [
-                    str(k) for k in self.orchstatusmodel.active_dict.keys()
-                ] + [
-                    str(k)
-                    for k in self.orchstatusmodel.nonactive_dict.get(
-                        "finished", {}
-                    ).keys()
-                ]
-            self.print_message(f"New status registered on {A.action_name}.")
+            if not A.nonblocking:
+                while result_uuid not in endpoint_uuids:
+                    self.print_message(
+                        f"Waiting for dispatched {A.action_name}, {A.action_uuid} request to register in global status."
+                    )
+                    try:
+                        await asyncio.wait_for(self.wait_for_interrupt(), timeout=5.0)
+                    except asyncio.TimeoutError:
+                        print(
+                            "!!! Did not receive interrupt after 5 sec, retrying. !!!"
+                        )
+                    endpoint_uuids = [
+                        str(k) for k in self.orchstatusmodel.active_dict.keys()
+                    ] + [
+                        str(k)
+                        for k in self.orchstatusmodel.nonactive_dict.get(
+                            "finished", {}
+                        ).keys()
+                    ]
+                self.print_message(f"New status registered on {A.action_name}.")
             if error_code is not ErrorCodes.none:
                 return error_code
 
@@ -1268,7 +1283,8 @@ class Orch(Base):
     def list_actions(self, limit=10):
         """Return the current queue of action_dq."""
         return [
-            self.action_dq[i].get_actmodel() for i in range(min(len(self.action_dq), limit))
+            self.action_dq[i].get_actmodel()
+            for i in range(min(len(self.action_dq), limit))
         ]
 
     def supplement_error_action(self, check_uuid: UUID, sup_action: Action):
@@ -1392,6 +1408,12 @@ class Orch(Base):
     async def finish_active_experiment(self):
         # we need to wait for all actions to finish first
         await self.orch_wait_for_all_actions()
+        while len(self.nonblocking) > 0:
+            self.print_message(
+                f"Stopping non-blocking action executors ({len(self.nonblocking)})"
+            )
+            await self.clear_nonblocking()
+            await asyncio.sleep(1)
         if self.active_experiment is not None:
             self.print_message(
                 f"finished exp uuid is: "
@@ -1512,4 +1534,3 @@ class Orch(Base):
         finished_action = await active.finish()
         self.last_wait_ts = check_time
         return finished_action
-
