@@ -51,8 +51,8 @@ config["servers"] = {
             "z_height_mm": {
                 "contact": 17.0,
                 "seal": 20.0,
-                "contact_si": 18.5,
-                "seal_si": 21.5,
+    #            "contact_si": 18.5,
+    #            "seal_si": 21.5,
                 "load": 10.0,
             },
             "galil_ip_str": "192.168.200.23",
