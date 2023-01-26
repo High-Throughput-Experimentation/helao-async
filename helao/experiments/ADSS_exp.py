@@ -61,11 +61,11 @@ WATERCLEANPUMP_server = MachineModel(server_name="SYRINGE1", machine_name=ORCH_H
 
 
 # z positions for ADSS cell
-z_home = 0.0
+z_home = 10.0
 # touches the bottom of cell
-z_engage = 2.5
+z_engage = 17
 # moves it up to put pressure on seal
-z_seal = 4.5
+z_seal = 20
 
 # cannot save data without exp
 debug_save_act = True
