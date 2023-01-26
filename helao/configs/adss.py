@@ -8,6 +8,12 @@ config["simulation"] = False
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
+config["z_heights"] = {
+    "z_seal": [20],  
+    "z_contact": [17],
+    "z_load": [10],
+}
+  
 config["builtin_ref_motorxy"] = [110, 12]  # absolute plate coords
 config["experiment_libraries"] = ["ADSS_exp", "samples_exp"]
 config["experiment_params"] = {
