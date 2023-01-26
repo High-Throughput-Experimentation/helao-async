@@ -8,11 +8,6 @@ config["simulation"] = False
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
-config["z_heights"] = {
-    "z_seal": [20],  
-    "z_contact": [17],
-    "z_load": [10],
-}
   
 config["builtin_ref_motorxy"] = [110, 12]  # absolute plate coords
 config["experiment_libraries"] = ["ADSS_exp", "samples_exp"]
@@ -52,6 +47,13 @@ config["servers"] = {
                 "B": 0.00015627999999717445,
                 "C": 0.00015634000000352077,
                 "D": 0.0003169786106003353,
+            },
+            "z_height_mm": {
+                "contact": 17.0,
+                "seal": 20.0,
+                "contact_si": 18.5,
+                "seal_si": 21.5,
+                "load": 10.0,
             },
             "galil_ip_str": "192.168.200.23",
             "def_speed_count_sec": 10000,
