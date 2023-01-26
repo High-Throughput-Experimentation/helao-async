@@ -659,14 +659,12 @@ def ADSS_CA_NaOH_validation(
             )
             epm.add_experiment("ADSS_sub_unload_liquid",{})
 
-        epm.add_experiment("ADSS_sub_disengage",{})
         epm.add_experiment("ADSS_sub_abs_move",
             {
                 "x_mm":clean_xposition,
                 "y_mm":clean_yposition,
             }
         )
-        epm.add_experiment("ADSS_sub_engage",{})
 
         epm.add_experiment(
             "ADSS_sub_clean_cell",
@@ -684,7 +682,6 @@ def ADSS_CA_NaOH_validation(
                 "ResidualWait_s": ResidualWait_s,
             }
         )
-        epm.add_experiment("ADSS_sub_disengage",{})
 
 #    epm.add_experiment("ADSS_sub_tray_unload",{})
 

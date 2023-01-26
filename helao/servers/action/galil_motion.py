@@ -11,7 +11,7 @@ driver code, and hard-coded to use 'galil' class (see "__main__").
 
 __all__ = ["makeApp"]
 
-
+from enum import StrEnum
 from typing import Optional, List, Union
 from fastapi import Body
 import numpy as np
@@ -425,6 +425,45 @@ async def galil_dyn_endpoints(app=None):
             await active.enqueue_data_dflt(datadict={"reset": await app.driver.reset()})
             finished_action = await active.finish()
             return finished_action.as_dict()
+
+        if dev_axis:
+
+            zpos_dict = app.driver.config_dict.get(["z_height_mm"], {})
+            zpos_dict["NA"] = None
+            Zpos = StrEnum("Zpos", {k: k for k in zpos_dict.keys()})
+
+            @app.post(f"/{servKey}/z_move")
+            async def z_move(
+                action: Optional[Action] = Body({}, embed=True),
+                action_version: int = 1,
+                z_position: Zpos = Zpos.NA,
+            ):
+                """Move a apecified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
+                Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.
+                No z, Rx, Ry, Rz when platexy selected."""
+                z_value = zpos_dict.get(action.action_params["z_position"], "NA")
+                if action.action_params["z_position"] != "NA":
+                    action.action_params.update(
+                        {
+                            "d_mm": [z_value],
+                            "axis": ["z"],
+                            "mode": MoveModes.absolute,
+                            "transofmration": TransformationModes.instrxy,
+                        }
+                    )
+                    active = await app.base.setup_and_contain_action(
+                        action_abbr="z_move"
+                    )
+                    datadict = await app.driver.motor_move(active)
+                    active.action.error_code = app.base.get_main_error(
+                        datadict.get("err_code", ErrorCodes.unspecified)
+                    )
+                    await active.enqueue_data_dflt(datadict=datadict)
+                    finished_action = await active.finish()
+                    return finished_action.as_dict()
+                else:
+                    action.action_error_code = ErrorCodes.not_available
+                    return action.clean_dict()
 
 
 def makeApp(confPrefix, servKey, helao_root):
