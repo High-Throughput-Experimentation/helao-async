@@ -11,7 +11,7 @@ driver code, and hard-coded to use 'galil' class (see "__main__").
 
 __all__ = ["makeApp"]
 
-from enum import StrEnum
+from enum import Enum
 from typing import Optional, List, Union
 from fastapi import Body
 import numpy as np
@@ -430,7 +430,7 @@ async def galil_dyn_endpoints(app=None):
 
             zpos_dict = app.driver.config_dict.get(["z_height_mm"], {})
             zpos_dict["NA"] = None
-            Zpos = StrEnum("Zpos", {k: k for k in zpos_dict.keys()})
+            Zpos = Enum("Zpos", {k: k for k in zpos_dict.keys()})
 
             @app.post(f"/{servKey}/z_move")
             async def z_move(
