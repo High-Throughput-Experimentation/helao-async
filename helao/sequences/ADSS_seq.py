@@ -522,7 +522,7 @@ def ADSS_CombineEche(
 #     return epm.experiment_plan_list  # returns complete experiment list
 
 def ADSS_CA_NaOH_validation(
-    sequence_version: int = 5,
+    sequence_version: int = 2,
     solid_custom_position: str = "cell1_we",
     plate_id: int = 4534,
     plate_sample_no_list: list = [1],  # list instead of map select
@@ -545,9 +545,10 @@ def ADSS_CA_NaOH_validation(
     ReturnLineReverseWait_s: float = 5,
     ResidualWait_s: float = 15,
     flush_volume_ul: float = 3000,
+    clean_volume_ul: float = 3000,
     clean_xposition: float = 80,
     clean_yposition: float = 50,
-    PAL_Injector: str = "PALtools.LS3"
+    PAL_Injector: str = "PALtools.LS4"
 ):
 
     """tbd
@@ -569,26 +570,26 @@ def ADSS_CA_NaOH_validation(
                 "liquid_sample_no": liquid_sample_no,
             },
         )
-        epm.add_experiment(
-            "ADSS_sub_cellfill",
-            {
-                "Solution_volume_ul": flush_volume_ul,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-                "ReturnLineWait_s": ReturnLineWait_s,
-            }
-        )
-        epm.add_experiment(
-            "ADSS_sub_drain_cell",
-            {
-                "DrainWait_s": Cell_draintime_s,
-                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                "ResidualWait_s": ResidualWait_s,
-            }
-        )
+        # epm.add_experiment(
+        #     "ADSS_sub_cellfill",
+        #     {
+        #         "Solution_volume_ul": flush_volume_ul,
+        #         "Syringe_rate_ulsec": Syringe_rate_ulsec,
+        #         "ReturnLineWait_s": ReturnLineWait_s,
+        #     }
+        # )
+        # epm.add_experiment(
+        #     "ADSS_sub_drain_cell",
+        #     {
+        #         "DrainWait_s": Cell_draintime_s,
+        #         "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+        #         "ResidualWait_s": ResidualWait_s,
+        #     }
+        # )
         for CA_potential_vsRHE in CA_potentials_vsRHE:
 
             epm.add_experiment(
-                "ADSS_sub_cellfill",
+                "ADSS_sub_cellfill_prefilled",
                 {
                     "Solution_volume_ul": liquid_sample_volume_ul,
                     "Syringe_rate_ulsec": Syringe_rate_ulsec,
@@ -642,7 +643,7 @@ def ADSS_CA_NaOH_validation(
                 }
             )
             epm.add_experiment(
-                "ADSS_sub_cellfill",
+                "ADSS_sub_cellfill_prefilled",
                 {
                     "Solution_volume_ul": flush_volume_ul,
                     "Syringe_rate_ulsec": Syringe_rate_ulsec,
@@ -658,13 +659,6 @@ def ADSS_CA_NaOH_validation(
                 }
             )
             epm.add_experiment("ADSS_sub_unload_liquid",{})
-
-        epm.add_experiment("ADSS_sub_abs_move",
-            {
-                "x_mm":clean_xposition,
-                "y_mm":clean_yposition,
-            }
-        )
 
         epm.add_experiment(
             "ADSS_sub_clean_cell",

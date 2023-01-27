@@ -23,7 +23,7 @@ __all__ = [
     "ADSS_sub_rel_move",
     "ADSS_sub_heat",
     "ADSS_sub_stopheat",
-    "ADSS_sub_cellfill",
+    "ADSS_sub_cellfill_prefilled",
     "ADSS_sub_drain_cell",
     #    "ADSS_sub_empty_cell",
     "ADSS_sub_clean_cell",
@@ -1499,7 +1499,7 @@ def ADSS_sub_stopheat(
 # apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
 
-def ADSS_sub_cellfill(
+def ADSS_sub_cellfill_prefilled(
     experiment: Experiment,
     experiment_version: int = 1,
     Solution_volume_ul: float = 3000,
@@ -1521,16 +1521,16 @@ def ADSS_sub_cellfill(
         ],  # save new liquid_sample_no of eche cell to globals
     )
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
-    apm.add(
-        SOLUTIONPUMP_server,
-        "withdraw",
-        {
-            "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-            "volume_uL": apm.pars.Solution_volume_ul,
-        },
-    )
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
+    # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
+    # apm.add(
+    #     SOLUTIONPUMP_server,
+    #     "withdraw",
+    #     {
+    #         "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+    #         "volume_uL": apm.pars.Solution_volume_ul,
+    #     },
+    # )
+    # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
     apm.add(
         SOLUTIONPUMP_server,
         "infuse",
@@ -1616,6 +1616,21 @@ def ADSS_sub_clean_cell(
 ):
 
     apm = ActionPlanMaker()
+    apm.add(MOTOR_server, "z_move", {"z_position": "load"})
+    apm.add(MOTOR_server, "solid_get_builtin_specref", {},
+        to_globalexp_params=["_refxy"],
+    )
+    apm.add(
+        MOTOR_server,
+        "move",
+        {
+            "axis": ["x", "y"],
+            "mode": MoveModes.absolute,
+            "transformation": TransformationModes.platexy,
+        },
+        from_globalexp_params={"_refxy": "d_mm"},
+    )
+
     apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
     apm.add(
         WATERCLEANPUMP_server,
@@ -1655,6 +1670,7 @@ def ADSS_sub_sample_aliquot(
             "_fast_samples_in"
         ],  # save new liquid_sample_no of eche cell to globals
     )
+    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.EquilibrationTime_s})
