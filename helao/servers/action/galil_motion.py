@@ -170,7 +170,7 @@ async def galil_dyn_endpoints(app=None):
                     TransformationModes
                 ] = "motorxy",  # default, nothing to do
             ):
-                """Move a apecified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
+                """Move a specified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
                 Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.
                 No z, Rx, Ry, Rz when platexy selected."""
                 active = await app.base.setup_and_contain_action(action_abbr="move")
@@ -196,7 +196,7 @@ async def galil_dyn_endpoints(app=None):
                     TransformationModes
                 ] = "motorxy",  # default, nothing to do
             ):
-                """Move a apecified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
+                """Move a specified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
                 Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.
                 No z, Rx, Ry, Rz when platexy selected."""
                 active = await app.base.setup_and_contain_action(action_abbr="move")
@@ -438,9 +438,7 @@ async def galil_dyn_endpoints(app=None):
                 action_version: int = 1,
                 z_position: Zpos = Zpos.NA,
             ):
-                """Move a apecified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
-                Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.
-                No z, Rx, Ry, Rz when platexy selected."""
+                """Move the z-axis motor to cell positions predefined in the config."""
                 z_value = zpos_dict.get(action.action_params["z_position"], "NA")
                 if action.action_params["z_position"] != "NA":
                     action.action_params.update(
