@@ -428,7 +428,7 @@ async def galil_dyn_endpoints(app=None):
 
         if dev_axis:
 
-            zpos_dict = app.driver.config_dict.get(["z_height_mm"], {})
+            zpos_dict = app.driver.config_dict.get("z_height_mm", {})
             zpos_dict["NA"] = None
             Zpos = Enum("Zpos", {k: k for k in zpos_dict.keys()})
 
