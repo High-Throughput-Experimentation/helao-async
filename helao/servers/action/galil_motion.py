@@ -430,7 +430,6 @@ async def galil_dyn_endpoints(app=None):
 
             zpos_dict = app.base.server_params.get("z_height_mm", {})
             zpos_dict["NA"] = None
-            print("zpos_dict", zpos_dict)
             Zpos = Enum("Zpos", {k: k for k in zpos_dict.keys()})
 
             @app.post(f"/{servKey}/z_move")
@@ -442,9 +441,7 @@ async def galil_dyn_endpoints(app=None):
                 """Move the z-axis motor to cell positions predefined in the config."""
                 active = await app.base.setup_and_contain_action(action_abbr="z_move")
                 z_key = active.action.action_params["z_position"].value
-                print("z_key is,", z_key)
                 z_value = zpos_dict.get(z_key, "NA")
-                print("z_value is,", z_value)
                 if z_key != "NA":
                     active.action.action_params.update(
                         {
