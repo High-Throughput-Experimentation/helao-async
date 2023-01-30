@@ -645,7 +645,7 @@ def ADSS_sub_CA(
                 apm.add(ORCH_server, "wait", {"waittime": aliquot_time}, startcond)
             apm.add(
                 PAL_server,
-                "PAL_archive",
+                "PAL_transfer_custom_tray",
                 {
                     "tool": apm.pars.PAL_Injector,
                     "source": "cell1_we",
