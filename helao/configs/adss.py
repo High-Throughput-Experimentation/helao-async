@@ -156,9 +156,9 @@ config["servers"] = {
             },
             "cam_file_path": "C:\\Users\\rshs\\Desktop\\ADSS\\adss_psc_methods\\HELAO",
             "cams": {
-                "archive_tray_tray": "tray_to_tray_220214.cam",
-                "archive_custom_tray": "custom_to_tray_220214.cam",
-                "archive_tray_custom": "tray_to_custom_220214.cam",
+                "transfer_tray_tray": "tray_to_tray_220214.cam",
+                "transfer_custom_tray": "custom_to_tray_220214.cam",
+                "transfer_tray_custom": "tray_to_custom_220214.cam",
                 "deepclean": "deep_clean_220214.cam",
             },
             "positions": {

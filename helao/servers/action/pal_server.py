@@ -307,7 +307,7 @@ def makeApp(confPrefix, servKey, helao_root):
             return active_dict
 
 #    if "transfer_tray_tray" in _cams:
-    if "archive_tray_tray" in _cams:
+    if "transfer_tray_tray" in _cams:
 
         @app.post(f"/{servKey}/PAL_transfer_tray_tray", tags=["PAL_transfer"])
         async def PAL_transfer_tray_tray(
@@ -336,7 +336,7 @@ def makeApp(confPrefix, servKey, helao_root):
             return active_dict
 
 #    if "transfer_tray_custom" in _cams:
-    if "archive_tray_custom" in _cams:
+    if "transfer_tray_custom" in _cams:
 
         @app.post(f"/{servKey}/PAL_transfer_tray_custom", tags=["PAL_transfer"])
         async def PAL_transfer_tray_custom(
@@ -363,7 +363,7 @@ def makeApp(confPrefix, servKey, helao_root):
             return active_dict
 
 #    if "transfer_custom_tray" in _cams:
-    if "archive_custom_tray" in _cams:
+    if "transfer_custom_tray" in _cams:
 
         @app.post(f"/{servKey}/PAL_transfer_custom_tray", tags=["PAL_transfer"])
         async def PAL_transfer_custom_tray(
