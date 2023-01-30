@@ -645,7 +645,7 @@ def ADSS_sub_CA(
                 apm.add(ORCH_server, "wait", {"waittime": aliquot_time}, startcond)
             apm.add(
                 PAL_server,
-                "PAL_transfer_custom_tray",
+                "PAL_archive",
                 {
                     "tool": apm.pars.PAL_Injector,
                     "source": "cell1_we",
@@ -1676,7 +1676,7 @@ def ADSS_sub_sample_aliquot(
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.EquilibrationTime_s})
     apm.add(
         PAL_server,
-        "PAL_transfer_custom_tray",
+        "PAL_archive",
         {
             "tool": apm.pars.PAL_Injector,
             "source": "cell1_we",
