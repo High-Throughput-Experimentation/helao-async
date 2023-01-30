@@ -48,7 +48,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     _cams = app.server_params.get("cams", {})
     # _camsitems = make_str_enum("cams",{key:key for key in _cams.keys()})
-    app.base.print_message(_cams)
+    #app.base.print_message(_cams)
 
     if "positions" in app.server_params:
         dev_custom = app.server_params["positions"].get("custom", {})
