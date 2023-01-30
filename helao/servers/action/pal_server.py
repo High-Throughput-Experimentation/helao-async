@@ -48,6 +48,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     _cams = app.server_params.get("cams", {})
     # _camsitems = make_str_enum("cams",{key:key for key in _cams.keys()})
+    app.base.print_message(_cams)
 
     if "positions" in app.server_params:
         dev_custom = app.server_params["positions"].get("custom", {})
@@ -305,7 +306,8 @@ def makeApp(confPrefix, servKey, helao_root):
             active_dict = await app.driver.method_injection_tray_HPLC(A)
             return active_dict
 
-    if "transfer_tray_tray" in _cams:
+#    if "transfer_tray_tray" in _cams:
+    if "archive_tray_tray" in _cams:
 
         @app.post(f"/{servKey}/PAL_transfer_tray_tray", tags=["PAL_transfer"])
         async def PAL_transfer_tray_tray(
@@ -333,7 +335,8 @@ def makeApp(confPrefix, servKey, helao_root):
             active_dict = await app.driver.method_transfer_tray_tray(A)
             return active_dict
 
-    if "transfer_tray_custom" in _cams:
+#    if "transfer_tray_custom" in _cams:
+    if "archive_tray_custom" in _cams:
 
         @app.post(f"/{servKey}/PAL_transfer_tray_custom", tags=["PAL_transfer"])
         async def PAL_transfer_tray_custom(
@@ -359,7 +362,8 @@ def makeApp(confPrefix, servKey, helao_root):
             active_dict = await app.driver.method_transfer_tray_custom(A)
             return active_dict
 
-    if "transfer_custom_tray" in _cams:
+#    if "transfer_custom_tray" in _cams:
+    if "archive_custom_tray" in _cams:
 
         @app.post(f"/{servKey}/PAL_transfer_custom_tray", tags=["PAL_transfer"])
         async def PAL_transfer_custom_tray(
