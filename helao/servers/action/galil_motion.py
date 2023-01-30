@@ -439,18 +439,17 @@ async def galil_dyn_endpoints(app=None):
                 z_position: Zpos = Zpos.NA,
             ):
                 """Move the z-axis motor to cell positions predefined in the config."""
-                z_value = zpos_dict.get(action.action_params["z_position"], "NA")
-                if action.action_params["z_position"] != "NA":
-                    action.action_params.update(
+                active = await app.base.setup_and_contain_action(action_abbr="z_move")
+                z_key = active.action.action_params["z_position"]
+                z_value = zpos_dict.get(z_key, "NA")
+                if z_key != "NA":
+                    active.action.action_params.update(
                         {
                             "d_mm": [z_value],
                             "axis": ["z"],
                             "mode": MoveModes.absolute,
                             "transofmration": TransformationModes.instrxy,
                         }
-                    )
-                    active = await app.base.setup_and_contain_action(
-                        action_abbr="z_move"
                     )
                     datadict = await app.driver.motor_move(active)
                     active.action.error_code = app.base.get_main_error(
@@ -460,8 +459,8 @@ async def galil_dyn_endpoints(app=None):
                     finished_action = await active.finish()
                     return finished_action.as_dict()
                 else:
-                    action.action_error_code = ErrorCodes.not_available
-                    return action.clean_dict()
+                    active.action.action_error_code = ErrorCodes.not_available
+                    return active.action.clean_dict()
 
 
 def makeApp(confPrefix, servKey, helao_root):
