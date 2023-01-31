@@ -433,7 +433,7 @@ def makeApp(confPrefix, servKey, helao_root):
         ):
             A = await app.base.setup_action()
             A.action_abbr = "archive"
-            active_dict = await app.driver.method_transfer_custom_tray(A)
+            active_dict = await app.driver.method_archive(A)
             return active_dict
 
     # if "fill" in _cams:
