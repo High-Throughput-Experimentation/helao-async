@@ -41,7 +41,7 @@ def makeApp(confPrefix, servKey, helao_root):
         acquisition_rate: Optional[float] = 0.2,
         fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
     ):
-        """Acquire spectra based on external trigger."""
+        """Set flow rate and record."""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "acq_flow"
         executor = MfcExec(
@@ -49,7 +49,7 @@ def makeApp(confPrefix, servKey, helao_root):
             oneoff=False,
             poll_rate=active.action.action_params["acquisition_rate"],
         )
-        active_action_dict = active.start_executor(executor)
+        active_action_dict = await active.start_executor(executor)
         return active_action_dict
 
     @app.post(f"/{servKey}/acquire_pressure")
@@ -63,7 +63,7 @@ def makeApp(confPrefix, servKey, helao_root):
         acquisition_rate: Optional[float] = 0.2,
         fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
     ):
-        """Acquire spectra based on external trigger."""
+        """Set pressure and record."""
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "acq_pres"
         executor = PfcExec(
@@ -71,7 +71,7 @@ def makeApp(confPrefix, servKey, helao_root):
             oneoff=False,
             poll_rate=active.action.action_params["acquisition_rate"],
         )
-        active_action_dict = active.start_executor(executor)
+        active_action_dict = await active.start_executor(executor)
         return active_action_dict
 
     @app.post(f"/{servKey}/cancel_acquire")

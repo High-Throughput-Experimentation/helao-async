@@ -11,7 +11,7 @@ from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base import makeActionServ
 from helaocore.models.sample import SampleUnion
-from helao.drivers.sensor.sprintir_driver import SprintIR
+from helao.drivers.sensor.sprintir_driver import SprintIR, CO2MonExec
 from helao.helpers.config_loader import config_loader
 
 
@@ -36,10 +36,28 @@ def makeApp(confPrefix, servKey, helao_root):
         acquisition_rate: Optional[float] = 0.2,
         fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
     ):
-        """Acquire spectra based on external trigger."""
-        A = await app.base.setup_action()
-        A.action_abbr = "CO2"
-        active_dict = await app.driver.acquire_co2(A)
-        return active_dict
+        """Record CO2 ppm level."""
+        active = await app.base.setup_and_contain_action()
+        active.action.action_abbr = "CO2"
+        executor = CO2MonExec(
+            active=active,
+            oneoff=False,
+            poll_rate=active.action.action_params["acquisition_rate"],
+        )
+        active_action_dict = await active.start_executor(executor)
+        return active_action_dict
+
+    @app.post(f"/{servKey}/cancel_acquire_co2")
+    async def cancel_acquire_co2(
+        action: Optional[Action] = Body({}, embed=True),
+        action_version: int = 1,
+    ):
+        """Stop running CO2 acquisition."""
+        active = await app.base.setup_and_contain_action()
+        for exid, executor in app.base.executors.items():
+            if exid.split()[0] == "acquire_co2":
+                await executor.stop_action_task()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
     return app

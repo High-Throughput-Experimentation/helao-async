@@ -376,7 +376,7 @@ def launcher(confArg, confDict, helao_root):
                         cmd = ["python", "bokeh_launcher.py", confArg, server]
                         p = subprocess.Popen(cmd, cwd=helao_root)
                         try:
-                            time.sleep(3)
+                            time.sleep(5)
                             ppid = pidd.find_bokeh(servHost, servPort)
                         except:
                             print_message(
