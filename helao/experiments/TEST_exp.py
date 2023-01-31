@@ -3,7 +3,7 @@ Experiment library for Orchestrator testing
 server_key must be a FastAPI action server defined in config
 """
 
-__all__ = []
+__all__ = ["TEST_sub_noblocking"]
 
 
 from typing import Optional

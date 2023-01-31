@@ -2,7 +2,7 @@
 Sequence library for Orchestrator testing
 """
 
-__all__ = []
+__all__ = ["TEST_consecutive_noblocking"]
 
 
 from helao.helpers.premodels import ExperimentPlanMaker
