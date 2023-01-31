@@ -548,7 +548,7 @@ def ADSS_CA_NaOH_validation(
     clean_volume_ul: float = 3000,
     clean_xposition: float = 80,
     clean_yposition: float = 50,
-    PAL_Injector: str = "PALtools.LS4"
+    PAL_Injector: str = "LS 4"
 ):
 
     """tbd
