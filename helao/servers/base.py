@@ -1954,7 +1954,7 @@ class Active:
             for _ in range(retry_limit):
                 response, error_code = await self.base.send_nbstatuspackage(
                     client_servkey=client_servkey,
-                    actionmodel_dict=self.action.get_actmodel(),
+                    actionmodel_dict=self.action.get_actmodel().clean_dict(),
                 )
 
                 if response.get("success", False) and error_code == ErrorCodes.none:
