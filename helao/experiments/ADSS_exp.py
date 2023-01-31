@@ -635,6 +635,8 @@ def ADSS_sub_CA(
 
     if apm.pars.aliquot_times_sec:
         for i, aliquot_time in enumerate(apm.pars.aliquot_times_sec):
+            print(f"i_in_enumerate: {i}")
+            print(f"aliquot_time_in_enumerate: {aliquot_time}")
             if i == 0 and not apm.pars.aliquot_insitu:
                 apm.add(
                     ORCH_server,
@@ -654,7 +656,7 @@ def ADSS_sub_CA(
                     "sampleperiod": [0.0],
                     "spacingmethod": Spacingmethod.custom,
                     "spacingfactor": 1.0,
-                    "timeoffset": 60.0,
+                    "timeoffset": 0.0,
                     "wash1": 0,
                     "wash2": 0,
                     "wash3": 0,
@@ -893,7 +895,7 @@ def ADSS_sub_OCV(
                     "sampleperiod": [0.0],
                     "spacingmethod": Spacingmethod.custom,
                     "spacingfactor": 1.0,
-                    "timeoffset": 60.0,
+                    "timeoffset": 0.0,
                     "wash1": 0,
                     "wash2": 0,
                     "wash3": 0,
