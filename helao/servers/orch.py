@@ -232,10 +232,10 @@ def makeOrchServ(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
     ):
-        """Stop galil analog input acquisition."""
+        """Stop sleep action."""
         active = await app.orch.setup_and_contain_action()
         for exid, executor in app.orch.executors.items():
-            if exid.split()[0] == "acquire_analog_in":
+            if exid.split()[0] == "wait":
                 await executor.stop_action_task()
         finished_action = await active.finish()
         return finished_action.as_dict()
