@@ -559,6 +559,7 @@ class Orch(Base):
         """Clear method for orch to purge non-blocking action ids."""
         resp_tups = []
         for server_key, exid in self.nonblocking:
+            print(server_key, exid)
             response, error_code = await async_private_dispatcher(
                 world_config_dict=self.world_cfg,
                 server=server_key,
