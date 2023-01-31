@@ -1,3 +1,13 @@
+"""Archive class handles local sample DB and legacy DB lookup
+
+    TODO:
+    1. consolidate tray_export_json, tray_export_csv, tray_export_icpms, and make 
+    tray_unloadall call the export function
+    2. write tray_import function to consume exported json or csv and ingest into local
+    sqlite database, import needs to check for existing global_sample_labels
+
+"""
+
 __all__ = [
     "Archive",
 ]
