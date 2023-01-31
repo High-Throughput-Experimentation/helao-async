@@ -171,6 +171,10 @@ def makeActionServ(
     def get_lbuf():
         return app.base.live_buffer
 
+    @app.post("/get_executors", tags=["private"])
+    def get_executors():
+        return list(app.base.executors.keys())
+
     @app.post("/shutdown", tags=["private"])
     async def post_shutdown():
         await shutdown_event()

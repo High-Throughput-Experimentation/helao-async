@@ -492,6 +492,7 @@ class AiMonExec(Executor):
             status = HloStatus.active
         else:
             status = HloStatus.finished
+        await asyncio.sleep(0.001)
         return {
             "error": ErrorCodes.none,
             "status": status,
