@@ -546,6 +546,7 @@ class Orch(Base):
 
     def update_nonblocking(self, actionmodel: ActionModel):
         """Update method for action server to push non-blocking action ids."""
+        print(actionmodel.clean_dict())
         server_key = actionmodel.action_server.server_name
         server_exid = (server_key, actionmodel.exid)
         if "active" in actionmodel.action_status:
@@ -562,8 +563,8 @@ class Orch(Base):
                 world_config_dict=self.world_cfg,
                 server=server_key,
                 private_action="stop_executor",
-                params_dict={"executor_id": exid},
-                json_dict={},
+                params_dict={},
+                json_dict={"executor_id": exid},
             )
             resp_tups.append((response, error_code))
         return resp_tups
