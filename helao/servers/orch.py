@@ -1564,35 +1564,28 @@ class WaitExec(Executor):
         self.poll_rate = 0.01
         self.duration = self.active.action.action_params.get("waittime", -1)
         self.print_every_secs = kwargs.get("print_every_secs", 5)
+        self.start_time = time.time()
 
     async def _exec(self):
-        self.active.base.print_message(" ... wait action:", self.duration)
-        self.start_time = time.time()
+        self.active.base.print_message(f" ... wait action: {self.duration}")
         self.last_print_time = self.start_time
-        return {
-            "data": {},
-            "error": ErrorCodes.none,
-        }
+        return {"data": {}, "error": ErrorCodes.none}
 
     async def _poll(self):
         """Read analog inputs from live buffer."""
         check_time = time.time()
+        elapsed_time = check_time - self.start_time
         if check_time - self.last_print_time > self.print_every_secs - 0.01:
             self.active.base.print_message(
-                f" ... orch waited {(check_time-self.start_time):.1f} sec / {self.duration:.1f} sec"
+                f" ... orch waited {elapsed_time:.1f} sec / {self.duration:.1f} sec"
             )
             self.last_print_time = check_time
-        if (self.duration < 0) or (check_time < self.duration):
+        if (self.duration < 0) or (elapsed_time < self.duration):
             status = HloStatus.active
         else:
             status = HloStatus.finished
-        return {
-            "error": ErrorCodes.none,
-            "status": status,
-        }
-    
+        return {"error": ErrorCodes.none, "status": status}
+
     async def _post_exec(self):
         self.active.base.print_message(" ... wait action done")
-        return {
-            "error": ErrorCodes.none,
-        }
+        return {"error": ErrorCodes.none}
