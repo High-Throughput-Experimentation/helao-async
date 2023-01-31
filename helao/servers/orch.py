@@ -563,8 +563,8 @@ class Orch(Base):
                 world_config_dict=self.world_cfg,
                 server=server_key,
                 private_action="stop_executor",
-                params_dict={},
-                json_dict={"executor_id": exid},
+                params_dict={"executor_id": exid},
+                json_dict={},
             )
             resp_tups.append((response, error_code))
         return resp_tups
