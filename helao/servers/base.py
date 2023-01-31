@@ -1101,8 +1101,6 @@ class Active:
         self.action_task = None
 
     async def start_executor(self, executor: Executor):
-        if executor.active.action.nonblocking:
-            await self.send_nonblocking_status()
         self.action_task = self.base.aloop.create_task(self.action_loop_task(executor))
         return self.action.as_dict()
 
@@ -1224,7 +1222,9 @@ class Active:
             f"Adding {str(action.action_uuid)} to {action.action_name} status list."
         )
 
-        if not action.nonblocking:  # skip non-blocking actions which send status via action_task
+        if action.nonblocking:
+            await self.send_nonblocking_status()
+        else:
             await self.base.status_q.put(action.get_actmodel())
 
     async def set_estop(self, action: Optional[Action] = None):
@@ -2032,20 +2032,20 @@ class Active:
         if self.manual_stop:
             result = await executor._manual_stop()
             error = result.get("error", {})
-            if error:
+            if error != ErrorCodes.none:
                 self.base.print_message("Error encountered during manual stop.")
 
         # post-action operations
         cleanup_state = await executor._post_exec()
         cleanup_error = cleanup_state.get("error", {})
-        if cleanup_error == ErrorCodes.none:
-            pass
-        else:
+        if cleanup_error != ErrorCodes.none:
             self.base.print_message("Error encountered during executor cleanup.")
 
         _ = self.base.executors.pop(executor.exid)
 
         await self.finish()
+        if self.action.nonblocking:
+            await self.send_nonblocking_status()
 
     def stop_action_task(self):
         "External method for stopping action_loop_task."
