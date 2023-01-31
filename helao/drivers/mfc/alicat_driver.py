@@ -1,9 +1,10 @@
 """ A device class for the AliCat mass flow controller.
 
 This device class uses the python implementation from https://github.com/numat/alicat
-which has been added to the 'helao' conda environment. The default gas list included in
-the module code differs from our MFC at G16 (i-C4H10), G25 (He-25), and G26 (He-75).
-Update the gas list registers in case any of the 3 gases are used.
+and additional methods from https://documents.alicat.com/Alicat-Serial-Primer.pdf. The 
+default gas list included in the module code differs from our MFC at G16 (i-C4H10),
+G25 (He-25), and G26 (He-75). Update the gas list registers in case any of the 3 gases 
+are used.
 
 """
 
@@ -276,13 +277,12 @@ class AliCatMFC:
 
 class MfcExec(Executor):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # current plan is 1 flow controller per COM
         self.device_name = list(self.active.base.server_params["devices"].keys())[0]
+        super().__init__(*args, **kwargs, exid=self.device_name)
+        # current plan is 1 flow controller per COM
         self.active.base.print_message("MFCExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
-        self.exid = self.device_name
 
     async def _pre_exec(self):
         "Set flow rate."
@@ -317,6 +317,7 @@ class MfcExec(Executor):
             status = HloStatus.active
         else:
             status = HloStatus.finished
+        await asyncio.sleep(0.001)
         return {
             "error": ErrorCodes.none,
             "status": status,

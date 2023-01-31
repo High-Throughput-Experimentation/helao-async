@@ -44,7 +44,8 @@ from helaocore.models.sample import (
 )
 from helaocore.models.data import DataModel, DataPackageModel
 from helaocore.models.machine import MachineModel
-from helaocore.models.server import StatusModel, ActionServerModel, EndpointModel
+from helaocore.models.server import ActionServerModel, EndpointModel
+from helaocore.models.action import ActionModel
 from helao.helpers.active_params import ActiveParams
 from helaocore.models.file import (
     FileConn,
@@ -134,6 +135,10 @@ def makeActionServ(
     async def attach_client(client_servkey: str):
         return await app.base.attach_client(client_servkey)
 
+    @app.post("/stop_executor", tags=["private"])
+    def stop_executor(executor_id: str):
+        return app.base.stop_executor(executor_id)
+
     @app.post("/endpoints", tags=["private"])
     def get_all_urls():
         """Return a list of all endpoints on this server."""
@@ -165,6 +170,10 @@ def makeActionServ(
     @app.post("/get_lbuf", tags=["private"])
     def get_lbuf():
         return app.base.live_buffer
+
+    @app.post("/list_executors", tags=["private"])
+    def list_executors():
+        return list(app.base.executors.keys())
 
     @app.post("/shutdown", tags=["private"])
     async def post_shutdown():
@@ -202,11 +211,21 @@ class Executor:
         a. Cleanup calls (optional)
     """
 
-    def __init__(self, active, poll_rate: float = 0.2, oneoff: bool = True):
+    def __init__(
+        self,
+        active,
+        poll_rate: float = 0.2,
+        oneoff: bool = True,
+        exid: Optional[str] = None,
+    ):
         self.active = active
         self.oneoff = oneoff
         self.poll_rate = poll_rate
-        self.exid = f"{active.action.action_name} {active.action.action_uuid}"
+        if exid is None:
+            self.exid = f"{active.action.action_name} {active.action.action_uuid}"
+        else:
+            self.exid = exid
+        self.active.action.exid = self.exid
 
     async def _pre_exec(self):
         "Setup methods, return error state."
@@ -592,6 +611,24 @@ class Base:
         )
         return response, error_code
 
+    async def send_nbstatuspackage(
+        self,
+        client_servkey: str,
+        actionmodel: ActionModel,
+    ):
+        # needs private dispatcher
+        json_dict = {"actionmodel": actionmodel.json_dict()}
+        self.print_message(f"sending non-blocking status: {json_dict}")
+        response, error_code = await async_private_dispatcher(
+            world_config_dict=self.world_cfg,
+            server=client_servkey,
+            private_action="update_nonblocking",
+            params_dict={},
+            json_dict=json_dict,
+        )
+        self.print_message(f"update_nonblocking request got response: {response}")
+        return response, error_code
+
     async def attach_client(self, client_servkey: str, retry_limit=5):
         """Add client for pushing status updates via HTTP POST."""
         success = False
@@ -627,11 +664,11 @@ class Base:
 
             if success:
                 self.print_message(
-                    f"Attched {client_servkey} to status ws on {self.server.server_name}."
+                    f"Attached {client_servkey} to status ws on {self.server.server_name}."
                 )
             else:
                 self.print_message(
-                    f"failed to attch {client_servkey} to status ws "
+                    f"failed to attach {client_servkey} to status ws "
                     f"on {self.server.server_name} "
                     f"after {retry_limit} attempts.",
                     error=True,
@@ -713,30 +750,28 @@ class Base:
         self.print_message(f"{self.server.server_name} status log task created.")
 
         try:
-            # get the new "StatusModel" from the queue
+            # get the new ActionModel (status) from the queue
             async for status_msg in self.status_q.subscribe():
                 # add it to the correct "EndpointModel"
                 # in the "ActionServerModel"
-                if status_msg.act.action_name not in self.actionservermodel.endpoints:
+                if status_msg.action_name not in self.actionservermodel.endpoints:
                     # a new endpoints became available
                     self.actionservermodel.endpoints[
-                        status_msg.act.action_name
-                    ] = EndpointModel(endpoint_name=status_msg.act.action_name)
+                        status_msg.action_name
+                    ] = EndpointModel(endpoint_name=status_msg.action_name)
                 self.actionservermodel.endpoints[
-                    status_msg.act.action_name
-                ].active_dict.update({status_msg.act.action_uuid: status_msg})
-                self.actionservermodel.last_action_uuid = status_msg.act.action_uuid
+                    status_msg.action_name
+                ].active_dict.update({status_msg.action_uuid: status_msg})
+                self.actionservermodel.last_action_uuid = status_msg.action_uuid
 
                 # sort the status (nonactive_dict is empty at this point)
-                self.actionservermodel.endpoints[
-                    status_msg.act.action_name
-                ].sort_status()
+                self.actionservermodel.endpoints[status_msg.action_name].sort_status()
                 self.print_message(
                     f"log_status_task sending status "
-                    f"{status_msg.act.action_status} for action "
-                    f"{status_msg.act.action_name} "
-                    f"with uuid {status_msg.act.action_uuid} on "
-                    f"{status_msg.act.action_server.disp_name()} "
+                    f"{status_msg.action_status} for action "
+                    f"{status_msg.action_name} "
+                    f"with uuid {status_msg.action_uuid} on "
+                    f"{status_msg.action_server.disp_name()} "
                     f"to subscribers ({self.status_clients})."
                 )
                 for client_servkey in self.status_clients:
@@ -746,7 +781,7 @@ class Base:
                     success = False
                     for _ in range(retry_limit):
                         response, error_code = await self.send_statuspackage(
-                            action_name=status_msg.act.action_name,
+                            action_name=status_msg.action_name,
                             client_servkey=client_servkey,
                         )
 
@@ -767,7 +802,7 @@ class Base:
                 # now delete the errored and finsihed statuses after
                 # all are send to the subscribers
                 self.actionservermodel.endpoints[
-                    status_msg.act.action_name
+                    status_msg.action_name
                 ].clear_finished()
                 # TODO:write to log if save_root exists
                 self.print_message("all log_status_task messages send.")
@@ -851,7 +886,7 @@ class Base:
     async def write_act(self, action):
         "Create new exp if it doesn't exist."
         if action.save_act:
-            act_dict = action.get_act().clean_dict()
+            act_dict = action.get_actmodel().clean_dict()
             output_path = os.path.join(
                 self.helaodirs.save_root, action.action_output_dir
             )
@@ -981,6 +1016,17 @@ class Base:
 
         return ret_error
 
+    def stop_executor(self, executor_id: str):
+        try:
+            self.executors[executor_id].stop_action_task()
+            self.print_message(
+                f"Signaling executor task {executor_id} to end polling loop."
+            )
+            return {"signal_stop": True}
+        except KeyError:
+            self.print_message(f"Could not find {executor_id} among active executors.")
+            return {"signal_stop": False}
+
 
 class Active:
     """Active action holder which wraps data queing and exp writing."""
@@ -1054,7 +1100,7 @@ class Active:
         self.action_loop_running = False
         self.action_task = None
 
-    def start_executor(self, executor: Executor):
+    async def start_executor(self, executor: Executor):
         self.action_task = self.base.aloop.create_task(self.action_loop_task(executor))
         return self.action.as_dict()
 
@@ -1176,7 +1222,8 @@ class Active:
             f"Adding {str(action.action_uuid)} to {action.action_name} status list."
         )
 
-        await self.base.status_q.put(StatusModel(act=action.get_act().as_dict()))
+        if not action.nonblocking:
+            await self.base.status_q.put(action.get_actmodel())
 
     async def set_estop(self, action: Optional[Action] = None):
         if action is None:
@@ -1883,7 +1930,7 @@ class Active:
 
             # add actions to experiment
             for action in self.action_list:
-                exp.actionmodel_list.append(action.get_act())
+                exp.actionmodel_list.append(action.get_actmodel())
 
             # add experiment to sequence
             exp.experimentmodel_list.append(action.get_exp())
@@ -1896,9 +1943,39 @@ class Active:
             # create and write seq file for manual action
             await self.base.write_seq(exp, manual=True)
 
+    async def send_nonblocking_status(self, retry_limit: int = 3):
+        for client_servkey in self.base.status_clients:
+            self.base.print_message(
+                f"executor trying to send non-blocking status to {client_servkey}."
+            )
+            success = False
+            for _ in range(retry_limit):
+                response, error_code = await self.base.send_nbstatuspackage(
+                    client_servkey=client_servkey,
+                    actionmodel=self.action.get_actmodel(),
+                )
+
+                if response.get("success", False) and error_code == ErrorCodes.none:
+                    success = True
+                    break
+
+            if success:
+                self.base.print_message(
+                    f"Attached {client_servkey} to status ws on {self.base.server.server_name}."
+                )
+            else:
+                self.base.print_message(
+                    f"failed to attach {client_servkey} to status ws "
+                    f"on {self.base.server.server_name} "
+                    f"after {retry_limit} attempts.",
+                    error=True,
+                )
+
     async def action_loop_task(self, executor: Executor):
         """Generic replacement for 'IOloop'."""
 
+        if self.action.nonblocking:
+            await self.send_nonblocking_status()
         self.base.print_message("action_loop_task started")
         # pre-action operations
         setup_state = await executor._pre_exec()
@@ -1955,22 +2032,21 @@ class Active:
         if self.manual_stop:
             result = await executor._manual_stop()
             error = result.get("error", {})
-            if error:
+            if error != ErrorCodes.none:
                 self.base.print_message("Error encountered during manual stop.")
 
         # post-action operations
         cleanup_state = await executor._post_exec()
         cleanup_error = cleanup_state.get("error", {})
-        if cleanup_error == ErrorCodes.none:
-            pass
-        else:
+        if cleanup_error != ErrorCodes.none:
             self.base.print_message("Error encountered during executor cleanup.")
 
         _ = self.base.executors.pop(executor.exid)
-
         await self.finish()
+        if self.action.nonblocking:
+            await self.send_nonblocking_status()
 
-    async def stop_action_task(self):
+    def stop_action_task(self):
         "External method for stopping action_loop_task."
         self.base.print_message("Stop action request received. Stopping poll.")
         self.manual_stop = True
