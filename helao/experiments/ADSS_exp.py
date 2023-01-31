@@ -633,7 +633,7 @@ def ADSS_sub_CA(
     else:
         startcond = ActionStartCondition.wait_for_orch
 
-    if apm.pars.aliquot_times_sec:
+    if apm.pars.aliquot_intervals_sec:
         for i, aliquot_time in enumerate(apm.pars.aliquot_intervals_sec):
             if not apm.pars.aliquot_insitu:
 #            if i == 0 and not apm.pars.aliquot_insitu:
