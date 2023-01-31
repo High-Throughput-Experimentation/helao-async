@@ -113,7 +113,7 @@ def makeOrchServ(
         actionmodel: ActionModel,
     ):
         app.orch.print_message(
-            f"orch '{app.orch.server.server_name}' "
+            f"'{app.orch.server.server_name.upper()}' "
             f"got nonblocking status from "
             f"'{actionmodel.action_server.server_name}': "
             f"exid: {actionmodel.exid} -- status: {actionmodel.action_status}"
