@@ -2263,7 +2263,7 @@ class PAL:
             microcams=[
                 PalMicroCam(
                     **{
-                        "method": "transfer_tray_tray",
+                        "method": "transfer_custom_tray",
                         "tool": A.action_params.get("tool", None),
                         "volume_ul": A.action_params.get("volume_ul", 0),
                         "requested_source": PALposition(
@@ -2303,7 +2303,7 @@ class PAL:
             microcams=[
                 PalMicroCam(
                     **{
-                        "method": "transfer_tray_tray",
+                        "method": "transfer_tray_custom",
                         "tool": A.action_params.get("tool", None),
                         "volume_ul": A.action_params.get("volume_ul", 0),
                         "requested_source": PALposition(
@@ -2343,7 +2343,7 @@ class PAL:
             microcams=[
                 PalMicroCam(
                     **{
-                        "method": "transfer_tray_tray",
+                        "method": "transfer_custom_custom",
                         "tool": A.action_params.get("tool", None),
                         "volume_ul": A.action_params.get("volume_ul", 0),
                         "requested_source": PALposition(
