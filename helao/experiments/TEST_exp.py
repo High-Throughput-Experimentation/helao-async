@@ -27,9 +27,9 @@ CALC_server = MM(server_name="CALC", machine_name=gethostname()).json_dict()
 def TEST_sub_noblocking(
     experiment: Experiment,
     experiment_version: int = 1,
-    wait_time: float = 10.0,
-    reason: str = "wait",
+    wait_time: float = 3.0,
 ):
     apm = ActionPlanMaker()
-    apm.add(ORCH_server, "interrupt", {"reason": apm.pars.reason})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.wait_time*10}, nonblocking=True)
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.wait_time})
     return apm.action_list
