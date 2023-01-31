@@ -543,6 +543,7 @@ class Orch(Base):
             self.nonblocking.append(server_exid)
         else:
             self.nonblocking.remove(server_exid)
+        return True
 
     async def clear_nonblocking(self):
         """Clear method for orch to purge non-blocking action ids."""

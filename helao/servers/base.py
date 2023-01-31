@@ -1220,9 +1220,7 @@ class Active:
             f"Adding {str(action.action_uuid)} to {action.action_name} status list."
         )
 
-        if (
-            not action.nonblocking
-        ):  # skip non-blocking actions which send status via action_task
+        if not action.nonblocking:  # skip non-blocking actions which send status via action_task
             await self.base.status_q.put(action.get_actmodel())
 
     async def set_estop(self, action: Optional[Action] = None):
