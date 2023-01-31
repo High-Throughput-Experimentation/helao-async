@@ -331,6 +331,10 @@ def makeOrchServ(
         # emergencyStop = True
         time.sleep(0.75)
 
+    @app.post("/get_executors", tags=["private"])
+    def get_executors():
+        return list(app.orch.executors.keys())
+
     return app
 
 
