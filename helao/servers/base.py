@@ -1222,9 +1222,7 @@ class Active:
             f"Adding {str(action.action_uuid)} to {action.action_name} status list."
         )
 
-        if action.nonblocking:
-            await self.send_nonblocking_status()
-        else:
+        if not action.nonblocking:
             await self.base.status_q.put(action.get_actmodel())
 
     async def set_estop(self, action: Optional[Action] = None):
@@ -1976,6 +1974,8 @@ class Active:
     async def action_loop_task(self, executor: Executor):
         """Generic replacement for 'IOloop'."""
 
+        if self.action.nonblocking:
+            await self.send_nonblocking_status()
         self.base.print_message("action_loop_task started")
         # pre-action operations
         setup_state = await executor._pre_exec()
@@ -2042,7 +2042,6 @@ class Active:
             self.base.print_message("Error encountered during executor cleanup.")
 
         _ = self.base.executors.pop(executor.exid)
-
         await self.finish()
         if self.action.nonblocking:
             await self.send_nonblocking_status()
