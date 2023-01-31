@@ -48,7 +48,7 @@ from helao.helpers.dispatcher import async_private_dispatcher, async_action_disp
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.yml_finisher import move_dir
 from helao.helpers.premodels import Sequence, Experiment, Action
-from helao.servers.base import Base, Active
+from helao.servers.base import Base, Active, Executor
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.zdeque import zdeque
 
@@ -213,11 +213,32 @@ def makeOrchServ(
     ):
         """Sleep action"""
         active = await app.orch.setup_and_contain_action()
-        partial_action = active.action.as_dict()
-        app.orch.start_wait(active)
-        while app.orch.last_wait_ts == app.orch.current_wait_ts:
-            await asyncio.sleep(0.01)
-        return partial_action
+        active.action.action_abbr = "wait"
+        executor = WaitExec(
+            active=active,
+            oneoff=False,
+        )
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
+        # active = await app.orch.setup_and_contain_action()
+        # partial_action = active.action.as_dict()
+        # app.orch.start_wait(active)
+        # while app.orch.last_wait_ts == app.orch.current_wait_ts:
+        #     await asyncio.sleep(0.01)
+        # return partial_action
+
+    @app.post(f"/{server_key}/cancel_wait")
+    async def cancel_wait(
+        action: Optional[Action] = Body({}, embed=True),
+        action_version: int = 1,
+    ):
+        """Stop galil analog input acquisition."""
+        active = await app.orch.setup_and_contain_action()
+        for exid, executor in app.orch.executors.items():
+            if exid.split()[0] == "acquire_analog_in":
+                await executor.stop_action_task()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
 
     @app.post(f"/{server_key}/interrupt")
     async def interrupt(
@@ -1534,3 +1555,44 @@ class Orch(Base):
         finished_action = await active.finish()
         self.last_wait_ts = check_time
         return finished_action
+
+
+class WaitExec(Executor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.active.base.print_message("WaitExec initialized.")
+        self.poll_rate = 0.01
+        self.duration = self.active.action.action_params.get("waittime", -1)
+        self.print_every_secs = kwargs.get("print_every_secs", 5)
+
+    async def _exec(self):
+        self.active.base.print_message(" ... wait action:", self.duration)
+        self.start_time = time.time()
+        self.last_print_time = self.start_time
+        return {
+            "data": {},
+            "error": ErrorCodes.none,
+        }
+
+    async def _poll(self):
+        """Read analog inputs from live buffer."""
+        check_time = time.time()
+        if check_time - self.last_print_time > self.print_every_secs - 0.01:
+            self.active.base.print_message(
+                f" ... orch waited {(check_time-self.start_time):.1f} sec / {self.duration:.1f} sec"
+            )
+            self.last_print_time = check_time
+        if (self.duration < 0) or (check_time < self.duration):
+            status = HloStatus.active
+        else:
+            status = HloStatus.finished
+        return {
+            "error": ErrorCodes.none,
+            "status": status,
+        }
+    
+    async def _post_exec(self):
+        self.active.base.print_message(" ... wait action done")
+        return {
+            "error": ErrorCodes.none,
+        }
