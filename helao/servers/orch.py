@@ -118,7 +118,7 @@ def makeOrchServ(
             f"'{actionmodel.action_server.server_name}': "
             f"exid: {actionmodel.exid} -- status: {actionmodel.action_status}"
         )
-        result_dict = await app.orch.update_nonblocking()
+        result_dict = await app.orch.update_nonblocking(actionmodel)
         return result_dict
 
     @app.post("/attach_client", tags=["private"])
