@@ -566,7 +566,7 @@ def ADSS_sub_CA(
     aliquot_volume_ul: Optional[int] = 200,
     aliquot_times_sec: Optional[List[float]] = [],
     aliquot_insitu: Optional[bool] = False,
-    PAL_Injector: Optional[str] = "PALtools.LS3",
+    PAL_Injector: Optional[str] = "LS 4",
 ):
     """Primary CA experiment with optional PAL sampling.
 
@@ -820,13 +820,13 @@ def ADSS_sub_CV(
 
 def ADSS_sub_OCV(
     experiment: Experiment,
-    experiment_version: int = 4,
+    experiment_version: int = 2,
     Tval__s: Optional[float] = 60.0,
     gamry_i_range: Optional[str] = "auto",
     aliquot_volume_ul: Optional[int] = 200,
-    aliquot_intervals_sec: Optional[List[float]] = [],
+    aliquot_times_sec: Optional[List[float]] = [],
     aliquot_insitu: Optional[bool] = False,
-    PAL_Injector: Optional[str] = "PALtools.LS3",
+    PAL_Injector: Optional[str] = "LS 4",
 ):
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -1657,7 +1657,7 @@ def ADSS_sub_sample_aliquot(
     experiment_version: int = 1,
     aliquot_volume_ul: Optional[int] = 200,
     EquilibrationTime_s: float = 30,
-    PAL_Injector: str = "PALtools.LS3",
+    PAL_Injector: str = "LS 4",
 ):
 
     apm = ActionPlanMaker()
