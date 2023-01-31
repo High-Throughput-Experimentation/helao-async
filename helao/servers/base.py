@@ -171,8 +171,8 @@ def makeActionServ(
     def get_lbuf():
         return app.base.live_buffer
 
-    @app.post("/get_executors", tags=["private"])
-    def get_executors():
+    @app.post("/list_executors", tags=["private"])
+    def list_executors():
         return list(app.base.executors.keys())
 
     @app.post("/shutdown", tags=["private"])
