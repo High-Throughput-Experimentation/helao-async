@@ -319,6 +319,10 @@ def makeOrchServ(
         """Return a list of all endpoints on this server."""
         return app.orch.get_endpoint_urls()
 
+    @app.post("/stop_executor", tags=["private"])
+    def stop_executor(executor_id: str):
+        return app.orch.stop_executor(executor_id)
+
     @app.post("/shutdown", tags=["private"])
     def post_shutdown():
         shutdown_event()
