@@ -617,7 +617,8 @@ class Base:
         actionmodel: ActionModel,
     ):
         # needs private dispatcher
-        json_dict = {"actionmodel": actionmodel}
+        json_dict = {"actionmodel": actionmodel.clean_dict()}
+        self.print_message(f"sending non-blocking status: {json_dict}")
         response, error_code = await async_private_dispatcher(
             world_config_dict=self.world_cfg,
             server=client_servkey,
@@ -625,6 +626,7 @@ class Base:
             params_dict={},
             json_dict=json_dict,
         )
+        self.print_message(f"update_nonblocking request got response: {response}")
         return response, error_code
 
     async def attach_client(self, client_servkey: str, retry_limit=5):
@@ -1944,7 +1946,7 @@ class Active:
     async def send_nonblocking_status(self, retry_limit: int = 3):
         for client_servkey in self.base.status_clients:
             self.base.print_message(
-                f"log_status_task trying to send status to {client_servkey}."
+                f"executor trying to send non-blocking status to {client_servkey}."
             )
             success = False
             for _ in range(retry_limit):
@@ -1953,7 +1955,7 @@ class Active:
                     actionmodel=ActionModel(**self.action.get_actmodel().clean_dict()),
                 )
 
-                if response and error_code == ErrorCodes.none:
+                if response.get("success", False) and error_code == ErrorCodes.none:
                     success = True
                     break
 

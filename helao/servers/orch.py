@@ -118,7 +118,8 @@ def makeOrchServ(
             f"'{actionmodel.action_server.server_name}': "
             f"exid: {actionmodel.exid} -- status: {actionmodel.action_status}"
         )
-        return await app.orch.update_nonblocking()
+        result_dict = await app.orch.update_nonblocking()
+        return result_dict
 
     @app.post("/attach_client", tags=["private"])
     async def attach_client(client_servkey: str):
@@ -547,7 +548,7 @@ class Orch(Base):
             self.nonblocking.append(server_exid)
         else:
             self.nonblocking.remove(server_exid)
-        return True
+        return {"success": True}
 
     async def clear_nonblocking(self):
         """Clear method for orch to purge non-blocking action ids."""
