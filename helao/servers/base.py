@@ -617,7 +617,7 @@ class Base:
         actionmodel: ActionModel,
     ):
         # needs private dispatcher
-        json_dict = {"actionmodel": actionmodel.clean_dict()}
+        json_dict = {"actionmodel": actionmodel}
         self.print_message(f"sending non-blocking status: {json_dict}")
         response, error_code = await async_private_dispatcher(
             world_config_dict=self.world_cfg,
