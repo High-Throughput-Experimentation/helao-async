@@ -614,10 +614,10 @@ class Base:
     async def send_nbstatuspackage(
         self,
         client_servkey: str,
-        actionmodel_dict: dict,
+        actionmodel: ActionModel,
     ):
         # needs private dispatcher
-        json_dict = {"actionmodel": actionmodel_dict}
+        json_dict = {"actionmodel": actionmodel.json_dict()}
         self.print_message(f"sending non-blocking status: {json_dict}")
         response, error_code = await async_private_dispatcher(
             world_config_dict=self.world_cfg,
@@ -1954,7 +1954,7 @@ class Active:
             for _ in range(retry_limit):
                 response, error_code = await self.base.send_nbstatuspackage(
                     client_servkey=client_servkey,
-                    actionmodel_dict=self.action.get_actmodel().clean_dict(),
+                    actionmodel=self.action.get_actmodel(),
                 )
 
                 if response.get("success", False) and error_code == ErrorCodes.none:

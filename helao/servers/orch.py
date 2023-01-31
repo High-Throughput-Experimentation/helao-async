@@ -110,16 +110,15 @@ def makeOrchServ(
 
     @app.post("/update_nonblocking", tags=["private"])
     async def update_nonblocking(
-        actionmodel: dict,
+        actionmodel: Optional[ActionModel] = Body({}, embed=True)
     ):
-        actmodel = ActionModel(**actionmodel)
         app.orch.print_message(
             f"'{app.orch.server.server_name.upper()}' "
             f"got nonblocking status from "
-            f"'{actmodel.action_server.server_name}': "
-            f"exid: {actmodel.exid} -- status: {actmodel.action_status}"
+            f"'{actionmodel.action_server.server_name}': "
+            f"exid: {actionmodel.exid} -- status: {actionmodel.action_status}"
         )
-        result_dict = await app.orch.update_nonblocking(actmodel)
+        result_dict = await app.orch.update_nonblocking(actionmodel)
         return result_dict
 
     @app.post("/attach_client", tags=["private"])
