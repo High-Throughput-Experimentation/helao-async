@@ -8,6 +8,8 @@ config["simulation"] = False
 
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
+  
+config["builtin_ref_motorxy"] = [110, 12]  # absolute plate coords
 config["experiment_libraries"] = ["ADSS_exp", "samples_exp"]
 config["experiment_params"] = {
     "gamrychannelwait": -1,
@@ -41,10 +43,17 @@ config["servers"] = {
             "bokeh_port": 5003,
             "M_instr": [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
             "count_to_mm": {
-                "A": 6.314999998973812e-05,
+                "A": 0.00006314999998973812,
                 "B": 0.00015627999999717445,
                 "C": 0.00015634000000352077,
                 "D": 0.0003169786106003353,
+            },
+            "z_height_mm": {
+                "contact": 11.0,
+                "seal": 13.0,
+    #            "contact_si": 18.5,
+    #            "seal_si": 21.5,
+                "load": 5.0,
             },
             "galil_ip_str": "192.168.200.23",
             "def_speed_count_sec": 10000,
@@ -100,20 +109,20 @@ config["servers"] = {
             },
             "dev_monitor": {
                 "Ttemp_Ktc_in_cell_C": "PXI-6289/ai6",
-                # "Ttemp_Ttc_in_reservoir_C": "PXI-6289/ai7",
-                # "Ttemp_Ktc_out_cell_C": "PXI-6289/ai1",
-                # "Ttemp_Ktc_out_reservoir_C": "PXI-6289/ai2",
+                "Ttemp_Ttc_in_reservoir_C": "PXI-6289/ai7",
+                "Ttemp_Ktc_out_cell_C": "PXI-6289/ai1",
+                "Ttemp_Ktc_out_reservoir_C": "PXI-6289/ai2",
             },
             "dev_heat": {
                 "cellheater": "PXI-6289/port0/line0",
                 "res_heater": "PXI-6289/port0/line4",
             },
             "dev_gasvalve": {
-                "O2": "PXI-6284/port1/line2",
-                "reservoir": "PXI-6284/port1/line3",
-                "waste": "PXI-6284/port1/line4",
-                "4": "PXI-6284/port1/line5",
-                "5": "PXI-6284/port1/line6",
+                "V1": "PXI-6284/port1/line2", #1-6 white ground
+                "V2": "PXI-6284/port1/line3", #7-9 grey ground
+                "V3": "PXI-6284/port1/line4",
+                "V4": "PXI-6284/port1/line5",
+                "V5": "PXI-6284/port1/line6",
                 "6": "PXI-6284/port1/line7",
                 "7": "PXI-6284/port2/line0",
                 "8": "PXI-6284/port2/line1",
@@ -147,9 +156,10 @@ config["servers"] = {
             },
             "cam_file_path": "C:\\Users\\rshs\\Desktop\\ADSS\\adss_psc_methods\\HELAO",
             "cams": {
-                "archive_tray_tray": "tray_to_tray_220214.cam",
-                "archive_custom_tray": "custom_to_tray_220214.cam",
-                "archive_tray_custom": "tray_to_custom_220214.cam",
+                "transfer_tray_tray": "tray_to_tray_220214.cam",
+                "transfer_custom_tray": "custom_to_tray_220214.cam",
+                "archive": "custom_to_tray_220214.cam",
+                "transfer_tray_custom": "tray_to_custom_220214.cam",
                 "deepclean": "deep_clean_220214.cam",
             },
             "positions": {
@@ -169,6 +179,20 @@ config["servers"] = {
         "group": "visualizer",
         "bokeh": "action_visualizer",
         "params": {},
+    },
+    "SYRINGE0": {
+        "host": hostip,
+        "port": 8013,
+        "group": "action",
+        "fast": "syringe_server",
+        "params": {"port": "COM7", "pumps": {"zero": {"address": 0, "diameter": 26.7}}},
+    },
+    "SYRINGE1": {
+        "host": hostip,
+        "port": 8014,
+        "group": "action",
+        "fast": "syringe_server",
+        "params": {"port": "COM6", "pumps": {"one": {"address": 1, "diameter": 26.7}}},
     },
     "LIVE": {
         "host": hostip,
