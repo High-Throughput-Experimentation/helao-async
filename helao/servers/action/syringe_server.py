@@ -46,7 +46,7 @@ def makeApp(confPrefix, servKey, helao_root):
     ):
         active = await app.base.setup_and_contain_action()
         executor = PumpExec(direction=1, active=active, oneoff=False, poll_rate=0.2)
-        active_action_dict = active.start_executor(executor)
+        active_action_dict = await active.start_executor(executor)
         return active_action_dict
 
     @app.post(f"/{servKey}/withdraw")
@@ -58,7 +58,7 @@ def makeApp(confPrefix, servKey, helao_root):
     ):
         active = await app.base.setup_and_contain_action()
         executor = PumpExec(direction=-1, active=active, oneoff=False, poll_rate=0.2)
-        active_action_dict = active.start_executor(executor)
+        active_action_dict = await active.start_executor(executor)
         return active_action_dict
 
     @app.post(f"/set_present_volume")

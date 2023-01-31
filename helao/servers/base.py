@@ -1100,7 +1100,9 @@ class Active:
         self.action_loop_running = False
         self.action_task = None
 
-    def start_executor(self, executor: Executor):
+    async def start_executor(self, executor: Executor):
+        if executor.active.action.nonblocking:
+            await self.send_nonblocking_status()
         self.action_task = self.base.aloop.create_task(self.action_loop_task(executor))
         return self.action.as_dict()
 
@@ -1975,8 +1977,6 @@ class Active:
         """Generic replacement for 'IOloop'."""
 
         self.base.print_message("action_loop_task started")
-        if self.action.nonblocking:
-            await self.send_nonblocking_status()
         # pre-action operations
         setup_state = await executor._pre_exec()
         setup_error = setup_state.get("error", ErrorCodes.none)

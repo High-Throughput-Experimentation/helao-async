@@ -219,7 +219,7 @@ def makeOrchServ(
             active=active,
             oneoff=False,
         )
-        active_action_dict = active.start_executor(executor)
+        active_action_dict = await active.start_executor(executor)
         return active_action_dict
         # active = await app.orch.setup_and_contain_action()
         # partial_action = active.action.as_dict()
