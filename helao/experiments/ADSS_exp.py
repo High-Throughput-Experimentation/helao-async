@@ -554,7 +554,7 @@ def ADSS_sub_fill(
 
 def ADSS_sub_CA(
     experiment: Experiment,
-    experiment_version: int = 5,
+    experiment_version: int = 6,
     CA_potential: Optional[float] = 0.0,
     ph: Optional[float] = 9.53,
     potential_versus: Optional[str] = "rhe",
@@ -564,7 +564,7 @@ def ADSS_sub_CA(
     samplerate_sec: Optional[float] = 0.05,
     CA_duration_sec: Optional[float] = 1800,
     aliquot_volume_ul: Optional[int] = 200,
-    aliquot_times_sec: Optional[List[float]] = [],
+    aliquot_intervals_sec: Optional[List[float]] = [],
     aliquot_insitu: Optional[bool] = False,
     PAL_Injector: Optional[str] = "LS 4",
 ):
@@ -634,10 +634,9 @@ def ADSS_sub_CA(
         startcond = ActionStartCondition.wait_for_orch
 
     if apm.pars.aliquot_times_sec:
-        for i, aliquot_time in enumerate(apm.pars.aliquot_times_sec):
-            print(f"i_in_enumerate: {i}")
-            print(f"aliquot_time_in_enumerate: {aliquot_time}")
-            if i == 0 and not apm.pars.aliquot_insitu:
+        for i, aliquot_time in enumerate(apm.pars.aliquot_intervals_sec):
+            if not apm.pars.aliquot_insitu:
+#            if i == 0 and not apm.pars.aliquot_insitu:
                 apm.add(
                     ORCH_server,
                     "wait",
@@ -653,10 +652,10 @@ def ADSS_sub_CA(
                     "tool": apm.pars.PAL_Injector,
                     "source": "cell1_we",
                     "volume_ul": apm.pars.aliquot_volume_ul,
-                    "sampleperiod": apm.pars.aliquot_times_sec,
+                    "sampleperiod":[0.0],
                     "spacingmethod": Spacingmethod.custom,
                     "spacingfactor": 1.0,
-                    "timeoffset": 0.0,
+                    "timeoffset": 10.0,
                     "wash1": 0,
                     "wash2": 0,
                     "wash3": 0,

@@ -522,7 +522,7 @@ def ADSS_CombineEche(
 #     return epm.experiment_plan_list  # returns complete experiment list
 
 def ADSS_CA_NaOH_validation(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     solid_custom_position: str = "cell1_we",
     plate_id: int = 4534,
     plate_sample_no_list: list = [1],  # list instead of map select
@@ -535,7 +535,7 @@ def ADSS_CA_NaOH_validation(
     ref_type: str = "inhouse",
     ref_offset__V: float = 0.0,
     CA_duration_sec: float = 1320,
-    aliquot_times_sec: List[float] = [60, 600, 1140],
+    aliquot_intervals_sec: List[float] = [60, 600, 1140],
     aliquot_volume_ul: int = 200,
     OCV_duration: float = 1,
     samplerate_sec: float = 0.05,
@@ -546,8 +546,6 @@ def ADSS_CA_NaOH_validation(
     ResidualWait_s: float = 15,
     flush_volume_ul: float = 3000,
     clean_volume_ul: float = 3000,
-    clean_xposition: float = 80,
-    clean_yposition: float = 50,
     PAL_Injector: str = "LS 4"
 ):
 
@@ -629,7 +627,7 @@ def ADSS_CA_NaOH_validation(
                     "samplerate_sec": samplerate_sec,
                     "CA_duration_sec": CA_duration_sec,
                     "aliquot_volume_ul": aliquot_volume_ul,
-                    "aliquot_times_sec": aliquot_times_sec,
+                    "aliquot_intervals_sec": aliquot_intervals_sec,
                     "aliquot_insitu": True,
                 },
             )
