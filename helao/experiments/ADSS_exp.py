@@ -570,7 +570,8 @@ def ADSS_sub_CA(
 ):
     """Primary CA experiment with optional PAL sampling.
 
-    aliquot_intervals_sec is an optional list of intervals after which an aliquot
+    aliquot_intervals_sec is an optional list of intervals aftedf
+    r which an aliquot
     is sampled from the cell, e.g. [600, 600, 600] will take 3 aliquots at 10-minute
     intervals; note due to PAL overhead, intervals must be longer than 4 minutes
 
