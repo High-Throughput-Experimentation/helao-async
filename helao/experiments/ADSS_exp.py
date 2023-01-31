@@ -653,7 +653,7 @@ def ADSS_sub_CA(
                     "tool": apm.pars.PAL_Injector,
                     "source": "cell1_we",
                     "volume_ul": apm.pars.aliquot_volume_ul,
-                    "sampleperiod": [0.0],
+                    "sampleperiod": apm.pars.aliquot_times_sec,
                     "spacingmethod": Spacingmethod.custom,
                     "spacingfactor": 1.0,
                     "timeoffset": 0.0,
