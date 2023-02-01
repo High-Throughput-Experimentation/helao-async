@@ -522,10 +522,10 @@ def ADSS_CombineEche(
 #     return epm.experiment_plan_list  # returns complete experiment list
 
 def ADSS_CA_NaOH_validation(
-    sequence_version: int = 3,
+    sequence_version: int = 4,
     solid_custom_position: str = "cell1_we",
-    plate_id: int = 4534,
-    plate_sample_no_list: list = [1],  # list instead of map select
+    plate_id: int = 5917,
+    plate_sample_no_list: list = [14050],  # list instead of map select
     liquid_custom_position: str = "elec_res1",
     liquid_sample_no: int = 1,
     liquid_sample_volume_ul: float = 3000,
@@ -598,6 +598,14 @@ def ADSS_CA_NaOH_validation(
                 {
                     "liquid_custom_position": liquid_custom_position,
                     "liquid_sample_no": liquid_sample_no,
+                }
+            )
+            epm.add_experiment(
+                "ADSS_sub_load_solid",
+                {
+                    "solid_custom_position": solid_custom_position,
+                    "solid_plate_id": plate_id,
+                    "solid_sample_no": solid_sample_no,
                 }
             )
             epm.add_experiment(
