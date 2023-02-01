@@ -542,9 +542,9 @@ def ADSS_CA_NaOH_validation(
     Syringe_rate_ulsec: float = 300,
     Cell_draintime_s: float = 60,
     ReturnLineWait_s: float = 30,
-    ReturnLineReverseWait_s: float = 5,
+    ReturnLineReverseWait_s: float = 3,
     ResidualWait_s: float = 15,
-    flush_volume_ul: float = 3000,
+    flush_volume_ul: float = 2000,
     clean_volume_ul: float = 3000,
     PAL_Injector: str = "LS 4"
 ):
@@ -556,7 +556,7 @@ def ADSS_CA_NaOH_validation(
     epm = ExperimentPlanMaker()
 
 
-    for solid_sample_no in plate_sample_no_list[:1]:  # have to indent add expts if used
+    for solid_sample_no in plate_sample_no_list:  # have to indent add expts if used
 
         epm.add_experiment(
             "ADSS_sub_sample_start",
