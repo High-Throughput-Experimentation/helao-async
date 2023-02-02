@@ -77,9 +77,7 @@ class PalAction(BaseModel, HelaoDict):
 
     dilute: List[bool] = Field(default=[])
     dilute_type: List[Union[str, None]] = Field(default=[])
-    samples_in_delta_vol_ml: List[float] = Field(
-        default=[]
-    )  # contains a list of
+    samples_in_delta_vol_ml: List[float] = Field(default=[])  # contains a list of
     # delta volumes
     # for samples_in
     # for each repeat
@@ -2059,9 +2057,9 @@ class PAL:
                     else:
                         sampleperiod = self.IO_palcam.sampleperiod[run]
 
+                    cur_time = time.time()
                     if self.IO_palcam.spacingmethod == Spacingmethod.linear:
                         self.base.print_message("PAL linear scheduling")
-                        cur_time = time.time()
                         self.base.print_message(
                             f"time since last PAL run {(cur_time-last_run_time)}",
                             info=True,
@@ -2098,7 +2096,6 @@ class PAL:
                         prev_timepoint = timepoint  # todo: consider time lag
                     elif self.IO_palcam.spacingmethod == Spacingmethod.custom:
                         self.base.print_message("PAL custom scheduling")
-                        cur_time = time.time()
                         self.base.print_message(
                             f"time since PAL start {(cur_time-start_time)}",
                             info=True,
@@ -2119,16 +2116,18 @@ class PAL:
                     self.base.print_message(
                         f"PAL waits {diff_time} for sending next command", info=True
                     )
-                    if diff_time > 0:
-                        for ii in range(round(diff_time)):
-                            await asyncio.sleep(0.1)
-                            if not self.IO_signalq.empty():
-                                self.IO_measuring = await self.IO_signalq.get()
-                                if not self.IO_measuring:
-                                    break
+                    await asyncio.sleep(diff_time)
 
+                    # if PAL is still busy, enter a wait loop for non-busy status
                     if not self.IO_measuring:
-                        break
+                        self.base.print_message(
+                            "PAL still busy after sleep interval, wait for release.",
+                            info=True,
+                        )
+                        while True:
+                            self.IO_measuring = await self.IO_signalq.get()
+                            if not self.IO_measuring:
+                                break
 
                     # finally submit a single PAL run
                     last_run_time = time.time()
