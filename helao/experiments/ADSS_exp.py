@@ -679,7 +679,7 @@ def ADSS_sub_CA(
 
 def ADSS_sub_CA_multi_aliquot_M(
     experiment: Experiment,
-    experiment_version: int = 6,
+    experiment_version: int = 2,
     CA_potential: Optional[float] = 0.0,
     ph: Optional[float] = 9.53,
     potential_versus: Optional[str] = "rhe",
@@ -690,7 +690,10 @@ def ADSS_sub_CA_multi_aliquot_M(
     CA_duration_sec: Optional[float] = 1800,
     aliquot_volume_ul: Optional[int] = 200,
     aliquot_intervals_sec: Optional[List[float]] = [],
-    aliquot_insitu: Optional[bool] = False,
+    aliquot_insitu: Optional[bool] = True,
+    spacingmethod: Optional[Spacingmethod] = "custom",
+    spacingfactor: Optional[float] = 1.0,
+    timeoffset: Optional[float] = 60.0,
     PAL_Injector: Optional[str] = "LS 4",
 ):
     """Primary CA experiment with optional PAL sampling.
@@ -776,9 +779,9 @@ def ADSS_sub_CA_multi_aliquot_M(
                 "source": "cell1_we",
                 "volume_ul": apm.pars.aliquot_volume_ul,
                 "sampleperiod":apm.pars.aliquot_intervals_sec,
-                "spacingmethod": Spacingmethod.custom,
-                "spacingfactor": 1.0,
-                "timeoffset": 60.0,
+                "spacingmethod": apm.pars.spacingmethod,
+                "spacingfactor": apm.pars.spacingfactor,
+                "timeoffset": apm.pars.timeoffset,
                 "wash1": 0,
                 "wash2": 0,
                 "wash3": 0,
