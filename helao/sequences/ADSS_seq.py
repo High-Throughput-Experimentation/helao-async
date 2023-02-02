@@ -535,7 +535,7 @@ def ADSS_CA_NaOH_validation(
     ref_type: str = "inhouse",
     ref_offset__V: float = 0.0,
     CA_duration_sec: float = 1320,
-    aliquot_intervals_sec: List[float] = [60, 600, 1140],
+    aliquot_intervals_sec: List[float] = [60, 470, 530, 500],
     aliquot_volume_ul: int = 200,
     OCV_duration: float = 1,
     samplerate_sec: float = 0.05,
