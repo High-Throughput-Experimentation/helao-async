@@ -639,18 +639,24 @@ class Calc:
                 loop_condition = mean_co2_ppm > co2_ppm_thresh
         else:
             purge_if = float(purge_if)
-            if purge_if >= 1.0:
+            if abs(purge_if) >= 1.0:
                 self.base.print_message(
-                    "'purge_if' parameter is numerical and > 1.0, treating as percentage of threshold"
+                    "'purge_if' parameter is numerical and > abs(1.0), treating as percentage of threshold"
                 )
                 purge_if = purge_if / 100
             else:
-                self.base.print_messge(
-                    "'purge_if' parameter is numerical and < 1.0, treating as fraction of threshold"
+                self.base.print_message(
+                    "'purge_if' parameter is numerical and < abs(1.0), treating as fraction of threshold"
                 )
+            # purge_if<0 means purge if current ppm is below pct diff
+            # purge_if>0 means purge if current ppm is above pct diff
             loop_condition = (
-                abs(mean_co2_ppm - co2_ppm_thresh) / co2_ppm_thresh > purge_if
+                np.sign(purge_if) * (mean_co2_ppm - co2_ppm_thresh) / co2_ppm_thresh
+                > np.sign(purge_if) * purge_if
             )
+            # adjust next loop params in case loop condition is met
+            repeat_experiment_params["co2_ppm_thresh"] = co2_ppm_thresh * (1 + purge_if)
+
         if loop_condition:
             world_config = self.base.fastapp.helao_cfg
             orch_name = [
@@ -666,8 +672,10 @@ class Calc:
                 orch_name,
                 "insert_experiment",
                 params_dict={
-                    "experiment": rep_exp.as_dict(),
                     "index": 0,
+                },
+                json_dict={
+                    "experiment": rep_exp.as_dict(),
                 },
             )
         return {
