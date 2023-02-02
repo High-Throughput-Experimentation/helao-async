@@ -778,7 +778,7 @@ def ADSS_sub_CA_multi_aliquot_M(
                 "sampleperiod":apm.pars.aliquot_intervals_sec,
                 "spacingmethod": Spacingmethod.custom,
                 "spacingfactor": 1.0,
-                "timeoffset": 10.0,
+                "timeoffset": 60.0,
                 "wash1": 0,
                 "wash2": 0,
                 "wash3": 0,
