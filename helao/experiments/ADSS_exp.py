@@ -556,7 +556,7 @@ def ADSS_sub_fill(
 
 def ADSS_sub_CA(
     experiment: Experiment,
-    experiment_version: int = 6,
+    experiment_version: int = 7,
     CA_potential: Optional[float] = 0.0,
     ph: Optional[float] = 9.53,
     potential_versus: Optional[str] = "rhe",
@@ -566,7 +566,7 @@ def ADSS_sub_CA(
     samplerate_sec: Optional[float] = 0.05,
     CA_duration_sec: Optional[float] = 1800,
     aliquot_volume_ul: Optional[int] = 200,
-    aliquot_intervals_sec: Optional[List[float]] = [],
+    aliquot_times_sec: Optional[List[float]] = [],
     aliquot_insitu: Optional[bool] = False,
     PAL_Injector: Optional[str] = "LS 4",
 ):
@@ -629,24 +629,19 @@ def ADSS_sub_CA(
         ],
     )
 
-    # check if aliquot sample should happen in-situ or after PSTAT action
-    if apm.pars.aliquot_insitu:
-        startcond = ActionStartCondition.no_wait
-    else:
-        startcond = ActionStartCondition.wait_for_orch
+    atimes = apm.pars.aliquot_times_sec
+    if atimes:
+        intervals = [atimes[0]] + [
+            x - y for x, y in zip(atimes[1:], atimes[:-1])
+        ]
 
-    if apm.pars.aliquot_intervals_sec:
-        for i, aliquot_time in enumerate(apm.pars.aliquot_intervals_sec):
-            if not apm.pars.aliquot_insitu:
-#            if i == 0 and not apm.pars.aliquot_insitu:
-                apm.add(
-                    ORCH_server,
-                    "wait",
-                    {"waittime": aliquot_time},
-                    ActionStartCondition.wait_for_all,
-                )
-            else:
-                apm.add(ORCH_server, "wait", {"waittime": aliquot_time}, startcond)
+        if apm.pars.aliquot_insitu:
+            waitcond = ActionStartCondition.no_wait
+        else:
+            waitcond = ActionstartCondition.wait_for_all
+
+        for interval in intervals:
+            apm.add(ORCH_server, "wait", {"waittime": interval}, waitcond)
             apm.add(
                 PAL_server,
                 "PAL_archive",
@@ -654,10 +649,10 @@ def ADSS_sub_CA(
                     "tool": apm.pars.PAL_Injector,
                     "source": "cell1_we",
                     "volume_ul": apm.pars.aliquot_volume_ul,
-                    "sampleperiod":[0.0],
-                    "spacingmethod": Spacingmethod.custom,
+                    "sampleperiod": [],
+                    "spacingmethod": Spacingmethod.linear,
                     "spacingfactor": 1.0,
-                    "timeoffset": 10.0,
+                    "timeoffset": 0.0,
                     "wash1": 0,
                     "wash2": 0,
                     "wash3": 0,
@@ -676,6 +671,7 @@ def ADSS_sub_CA(
             )
 
     return apm.action_list  # returns complete action list to orch
+
 
 def ADSS_sub_CA_multi_aliquot_M(
     experiment: Experiment,
@@ -763,14 +759,14 @@ def ADSS_sub_CA_multi_aliquot_M(
 
     if apm.pars.aliquot_intervals_sec:
         if not apm.pars.aliquot_insitu:
-#            if i == 0 and not apm.pars.aliquot_insitu:
+            #            if i == 0 and not apm.pars.aliquot_insitu:
             apm.add(
                 ORCH_server,
                 "wait",
                 {"waittime": apm.pars.aliquot_intervals_sec[0]},
                 ActionStartCondition.wait_for_all,
             )
-    
+
         apm.add(
             PAL_server,
             "PAL_archive",
@@ -778,7 +774,7 @@ def ADSS_sub_CA_multi_aliquot_M(
                 "tool": apm.pars.PAL_Injector,
                 "source": "cell1_we",
                 "volume_ul": apm.pars.aliquot_volume_ul,
-                "sampleperiod":apm.pars.aliquot_intervals_sec,
+                "sampleperiod": apm.pars.aliquot_intervals_sec,
                 "spacingmethod": apm.pars.spacingmethod,
                 "spacingfactor": apm.pars.spacingfactor,
                 "timeoffset": apm.pars.timeoffset,
@@ -1745,7 +1741,10 @@ def ADSS_sub_clean_cell(
 
     apm = ActionPlanMaker()
     apm.add(MOTOR_server, "z_move", {"z_position": "load"})
-    apm.add(MOTOR_server, "solid_get_builtin_specref", {},
+    apm.add(
+        MOTOR_server,
+        "solid_get_builtin_specref",
+        {},
         to_globalexp_params=["_refxy"],
     )
     apm.add(
