@@ -2116,7 +2116,8 @@ class PAL:
                     self.base.print_message(
                         f"PAL waits {diff_time} for sending next command", info=True
                     )
-                    await asyncio.sleep(diff_time)
+                    if diff_time > 0:
+                        await asyncio.sleep(diff_time)
 
                     # if PAL is still busy, enter a wait loop for non-busy status
                     if not self.IO_measuring:
