@@ -422,7 +422,7 @@ def makeApp(confPrefix, servKey, helao_root):
             tool: Optional[PALtools] = None,
             source: Optional[dev_customitems] = None,
             volume_ul: Optional[int] = 200,
-            sampleperiod: Optional[List[float]] = Body([], embed=True),
+            sampleperiod: Optional[List[float]] = Body([0], embed=True),
             spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
             spacingfactor: Optional[float] = 1.0,
             timeoffset: Optional[float] = 0.0,
