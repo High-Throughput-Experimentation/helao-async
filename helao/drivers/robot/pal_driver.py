@@ -1976,11 +1976,10 @@ class PAL:
                 self.IO_continue = False
                 await self.set_IO_signalq(True)
                 # wait for first continue trigger
-                self.base.print_message("waiting for first continue", info=True)
-                while not self.IO_continue:
-                    await asyncio.sleep(0.01)
-                self.base.print_message("got first continue", info=True)
-                A.error_code = self.IO_error
+                # self.base.print_message("waiting for first continue", info=True)
+                # while not self.IO_continue:
+                #     await asyncio.sleep(0.01)
+                # self.base.print_message("got first continue", info=True)
             else:
                 self.base.print_message("Error during PAL IOloop init", error=True)
 
@@ -2009,7 +2008,7 @@ class PAL:
         and works on the current content of self.IO_palcam."""
         self.IOloop_run = True
         while self.IOloop_run:
-            await asyncio.sleep(0.01)
+            # await asyncio.sleep(0.01)
             self.IO_do_meas = await self.IO_signalq.get()
             if self.IO_do_meas:
                 self.IO_measuring = True
