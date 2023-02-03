@@ -605,8 +605,8 @@ class Orch(Base):
 
         # now push it to the interrupt_q
         await self.interrupt_q.put(self.orchstatusmodel)
-        await self.globstat_q.put(self.orchstatusmodel.as_json())
         await self.update_operator(True)
+        await self.globstat_q.put(self.orchstatusmodel.as_json())
 
         return True
 
@@ -627,7 +627,7 @@ class Orch(Base):
     async def globstat_broadcast_task(self):
         """Consume globstat_q. Does nothing for now."""
         async for _ in self.globstat_q.subscribe():
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.001)
 
     def unpack_sequence(self, sequence_name, sequence_params) -> List[ExperimentModel]:
         if sequence_name in self.sequence_lib:
