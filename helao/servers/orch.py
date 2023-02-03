@@ -603,11 +603,10 @@ class Orch(Base):
             self.orchstatusmodel.orch_state = OrchStatus.busy
             self.print_message(f"running_states: {self.orchstatusmodel.active_dict}")
 
-        await self.update_operator(True)
-
         # now push it to the interrupt_q
         await self.interrupt_q.put(self.orchstatusmodel)
         await self.globstat_q.put(self.orchstatusmodel.as_json())
+        await self.update_operator(True)
 
         return True
 
