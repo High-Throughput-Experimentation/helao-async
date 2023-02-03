@@ -638,7 +638,7 @@ def ADSS_sub_CA(
         if apm.pars.aliquot_insitu:
             waitcond = ActionStartCondition.no_wait
         else:
-            waitcond = ActionstartCondition.wait_for_all
+            waitcond = ActionStartCondition.wait_for_all
 
         for interval in intervals:
             apm.add(ORCH_server, "wait", {"waittime": interval}, waitcond)
@@ -649,7 +649,7 @@ def ADSS_sub_CA(
                     "tool": apm.pars.PAL_Injector,
                     "source": "cell1_we",
                     "volume_ul": apm.pars.aliquot_volume_ul,
-                    "sampleperiod": [],
+                    "sampleperiod": [0.0],
                     "spacingmethod": Spacingmethod.linear,
                     "spacingfactor": 1.0,
                     "timeoffset": 0.0,
