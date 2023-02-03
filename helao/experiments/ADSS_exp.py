@@ -640,7 +640,7 @@ def ADSS_sub_CA(
         else:
             waitcond = ActionStartCondition.wait_for_all
 
-        for interval in intervals:
+        for interval in intervals[1:]:
             apm.add(ORCH_server, "wait", {"waittime": interval}, waitcond)
             apm.add(
                 PAL_server,
