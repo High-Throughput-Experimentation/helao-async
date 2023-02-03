@@ -792,7 +792,6 @@ class Orch(Base):
             A = self.action_dq.popleft()
 
             # see async_action_dispatcher for unpacking
-
             if A.start_condition == ActionStartCondition.no_wait:
                 self.print_message("orch is dispatching an unconditional action")
             else:
@@ -871,6 +870,13 @@ class Orch(Base):
             self.print_message(
                 f"Action {A.action_name} dispatched with uuid: {result_uuid}"
             )
+
+            # this will recursively call the next no_wait action in queue, and return its error
+            if self.action_dq:
+                nextA = self.action_dq[0]
+                if nextA.start_condition == ActionStartCondition.no_wait:
+                    error_code = await self.loop_task_dispatch_action()
+            
             if not A.nonblocking:
                 while result_uuid not in endpoint_uuids:
                     self.print_message(
