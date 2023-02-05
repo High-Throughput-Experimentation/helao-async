@@ -704,7 +704,7 @@ def CCSI_sub_drain_and_clean(
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.1,
     co2_ppm_thresh: float = 90000,
-    purge_if: Union[str, float] = "below",
+    purge_if: Union[str, float] = -0.05,
     HSpurge_duration: float = 20,  # set before determining actual
 ):
     # recirculation loop
@@ -764,6 +764,19 @@ def CCSI_sub_drain_and_clean(
         ],
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1},start_condition=ActionStartCondition.no_wait)
+
+    apm.add(
+        CALC_server,
+        "check_co2_purge",
+        {
+            "co2_ppm_thresh": apm.pars.co2_ppm_thresh,
+            "purge_if": apm.pars.purge_if,
+            "repeat_experiment_name": "CCSI_sub_drain_and_clean",
+            "repeat_experiment_params": {
+                k: v for k, v in vars(apm.pars) if not k.startswith('experiment')
+            }
+        }
+    )
 
     # apm.add(CALC_server, "check_co2_purge", {"co2_ppm_thresh": apm.pars.co2_ppm_thresh, "purge_if": apm.pars.purge_if, "repeat_experiment_name": "CCSI_drain_and_clean", "repeat_experiment_params":  
     # {"Waterclean_volume_ul": 5000,
