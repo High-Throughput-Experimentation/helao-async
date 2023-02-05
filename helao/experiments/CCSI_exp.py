@@ -421,18 +421,18 @@ def CCSI_sub_headspace_purge_and_measure(
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1},start_condition=ActionStartCondition.no_wait)
 #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSmeasure1_duration})
 
-    apm.add(
-        CALC_server,
-        "check_co2_purge",
-        {
-            "co2_ppm_thresh": apm.pars.co2_ppm_thresh,
-            "purge_if": apm.pars.purge_if,
-            "repeat_experiment_name": "CCSI_sub_headspace_purge_and_measure",
-            "repeat_experiment_params": {
-                k: v for k, v in vars(apm.pars) if not k.startswith('experiment')
-            }
-        }
-    )
+    # apm.add(
+    #     CALC_server,
+    #     "check_co2_purge",
+    #     {
+    #         "co2_ppm_thresh": apm.pars.co2_ppm_thresh,
+    #         "purge_if": apm.pars.purge_if,
+    #         "repeat_experiment_name": "CCSI_sub_headspace_purge_and_measure",
+    #         "repeat_experiment_params": {
+    #             k: v for k, v in vars(apm.pars) if not k.startswith('experiment')
+    #         }
+    #     }
+    # )
 
     return apm.action_list
 
@@ -773,7 +773,16 @@ def CCSI_sub_drain_and_clean(
             "purge_if": apm.pars.purge_if,
             "repeat_experiment_name": "CCSI_sub_drain_and_clean",
             "repeat_experiment_params": {
-                k: v for k, v in vars(apm.pars) if not k.startswith('experiment')
+#                k: v for k, v in vars(apm.pars) if not k.startswith('experiment')
+                "Waterclean_volume_ul": 5000,
+                "Syringe_retraction_ul": 500,
+                "Syringe_rate_ulsec": 500,
+                "LiquidFillWait_s": 15,
+                "co2measure_duration": 20,
+                "co2measure_acqrate": 0.1,
+                "co2_ppm_thresh": 90000,
+                "purge_if": -0.05,
+                "HSpurge_duration": 20 
             }
         }
     )
