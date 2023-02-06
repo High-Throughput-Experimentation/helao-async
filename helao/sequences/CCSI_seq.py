@@ -109,6 +109,8 @@ def CCSI_validation_KOH_procedure(
     epm = ExperimentPlanMaker()
 
     epm.add_experiment("CCSI_sub_unload_cell",{})
+    epm.add_experiment("CCSI_sub_load_solid", {})
+
     epm.add_experiment("CCSI_sub_load_gas", {
         "reservoir_gas_sample_no": gas_sample_no,
     })
