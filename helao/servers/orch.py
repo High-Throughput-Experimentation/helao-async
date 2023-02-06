@@ -67,7 +67,6 @@ hlotags_metadata = [
 def makeOrchServ(
     config, server_key, server_title, description, version, driver_class=None
 ):
-
     app = HelaoFastAPI(
         helao_cfg=config,
         helao_srv=server_key,
@@ -871,12 +870,36 @@ class Orch(Base):
                 f"Action {A.action_name} dispatched with uuid: {result_uuid}"
             )
 
+            # orch gets back an active action dict, we can self-register the dispatched action in global status
+            resmod = ActionModel(**result_actiondict)
+            srvname = resmod.action_server.server_name
+            actname = resmod.action_name
+            resuuid = resmod.action_uuid
+            actstat = resmod.action_status
+            self.orchstatusmodel.active_dict[resuuid] = resmod
+            srvkey = [
+                k for k in self.orchstatusmodel.server_dict.keys() if k[0] == srvname
+            ][0]
+
+            if actstat == HloStatus.active:
+                self.orchstatusmodel.server_dict[srvkey].endpoints[actname].active_dict[
+                    resuuid
+                ] = resmod
+            else:
+                self.orchstatusmodel.server_dict[srvkey].endpoints[
+                    actname
+                ].nonactive_dict[actstat][resuuid] = resmod
+
+            await self.interrupt_q.put(self.orchstatusmodel)
+            await self.update_operator(True)
+            await self.globstat_q.put(self.orchstatusmodel.as_json())
+
             # this will recursively call the next no_wait action in queue, and return its error
             if self.action_dq:
                 nextA = self.action_dq[0]
                 if nextA.start_condition == ActionStartCondition.no_wait:
                     error_code = await self.loop_task_dispatch_action()
-            
+
             if not A.nonblocking:
                 while result_uuid not in endpoint_uuids:
                     self.print_message(
