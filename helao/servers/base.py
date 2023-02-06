@@ -2011,6 +2011,7 @@ class Active:
                 status = result.get("status", HloStatus.finished)
                 data = result.get("data", {})
                 if data:
+                    self.base.print_message(f"got data from poll iter: {data}")
                     datamodel = DataModel(
                         data={self.action.file_conn_keys[0]: data},
                         errors=[],

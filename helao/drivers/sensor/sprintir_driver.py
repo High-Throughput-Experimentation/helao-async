@@ -406,6 +406,8 @@ class CO2MonExec(Executor):
         else:
             status = HloStatus.finished
         await asyncio.sleep(0.001)
+        self.active.base.print_message(f"sending status: {status}")
+        self.active.base.print_message(f"sending data: {live_dict}")
         return {
             "error": ErrorCodes.none,
             "status": status,
