@@ -419,20 +419,20 @@ def CCSI_sub_headspace_purge_and_measure(
         ],
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1},start_condition=ActionStartCondition.no_wait)
-#    apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSmeasure1_duration})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
 
-    # apm.add(
-    #     CALC_server,
-    #     "check_co2_purge",
-    #     {
-    #         "co2_ppm_thresh": apm.pars.co2_ppm_thresh,
-    #         "purge_if": apm.pars.purge_if,
-    #         "repeat_experiment_name": "CCSI_sub_headspace_purge_and_measure",
-    #         "repeat_experiment_params": {
-    #             k: v for k, v in vars(apm.pars) if not k.startswith('experiment')
-    #         }
-    #     }
-    # )
+    apm.add(
+        CALC_server,
+        "check_co2_purge",
+        {
+            "co2_ppm_thresh": apm.pars.co2_ppm_thresh,
+            "purge_if": apm.pars.purge_if,
+            "repeat_experiment_name": "CCSI_sub_headspace_purge_and_measure",
+            "repeat_experiment_params": {
+                k: v for k, v in vars(apm.pars) if not k.startswith('experiment')
+            }
+        }
+    )
 
     return apm.action_list
 
