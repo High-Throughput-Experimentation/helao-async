@@ -460,11 +460,10 @@ async def galil_dyn_endpoints(app=None):
                         datadict.get("err_code", ErrorCodes.unspecified)
                     )
                     await active.enqueue_data_dflt(datadict=datadict)
-                    finished_action = await active.finish()
-                    return finished_action.as_dict()
                 else:
                     active.action.error_code = ErrorCodes.not_available
-                    return active.action.clean_dict()
+                finished_action = await active.finish()
+                return finished_action.as_dict()
 
 
 def makeApp(confPrefix, servKey, helao_root):
