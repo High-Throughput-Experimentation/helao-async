@@ -2000,7 +2000,7 @@ class Active:
                 errors=[],
                 status=HloStatus.active,
             )
-            await self.enqueue_data(datamodel)  # write and broadcast
+            self.enqueue_data_nowait(datamodel)  # write and broadcast
 
         # polling loop for ongoing action
         if not executor.oneoff:
@@ -2018,7 +2018,7 @@ class Active:
                         errors=[],
                         status=HloStatus.active,
                     )
-                    await self.enqueue_data(datamodel)  # write and broadcast
+                    self.enqueue_data_nowait(datamodel)  # write and broadcast
 
                 if status == HloStatus.active:
                     await asyncio.sleep(executor.poll_rate)
