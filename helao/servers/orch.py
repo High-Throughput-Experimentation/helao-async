@@ -877,9 +877,8 @@ class Orch(Base):
             resuuid = resmod.action_uuid
             actstat = resmod.action_status
             self.orchstatusmodel.active_dict[resuuid] = resmod
-            srvkey = tuple([
-                k for k in self.orchstatusmodel.server_dict.keys() if k[0] == srvname
-            ][0])
+            srvkeys = self.orchstatusmodel.server_dict.keys()
+            srvkey = [k for k in srvkeys if k[0] == srvname][0]
             if HloStatus.active in actstat:
                 self.orchstatusmodel.server_dict[srvkey].endpoints[actname].active_dict[
                     resuuid
