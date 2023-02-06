@@ -4,6 +4,7 @@
 
 __all__ = []
 
+import re
 import time
 import asyncio
 
@@ -220,10 +221,13 @@ class SprintIR:
         buf = self.com.readline()
         lines = buf.decode("utf8").split("\n")
         for line in lines:
-            strip = line.strip()
-            self.base.print_message(strip)
-            if strip.startswith("Z ") and " z " in strip:
-                filt, unfilt = strip.replace("Z ", "").split(" z ")
+            stripped = line.strip()
+            # self.base.print_message(strip)
+            filts = re.findall("Z\s[0-9]+", stripped)
+            unfilts = re.findall("z\s[0-9]+", stripped)
+            filt = filts[-1].split()[-1] if filts else False
+            unfilt = unfilts[-1].split()[-1] if unfilts else False
+            if filt and unfilt:
                 return filt, unfilt
         return False, False
 
