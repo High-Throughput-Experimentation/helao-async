@@ -243,7 +243,10 @@ class SprintIR:
                 )
                 self.send("K 2")
                 blanks = 0
-            co2_level, co2_level_unfilt = self.read_stream()
+            try:
+                co2_level, co2_level_unfilt = self.read_stream()
+            except:
+                continue
             if co2_level:
                 msg_dict = {
                     "co2_ppm": int(co2_level) * self.fw["scaling_factor"],
