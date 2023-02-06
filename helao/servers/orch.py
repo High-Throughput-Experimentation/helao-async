@@ -880,7 +880,11 @@ class Orch(Base):
             srvkey = tuple([
                 k for k in self.orchstatusmodel.server_dict.keys() if k[0] == srvname
             ][0])
-
+            print("srvname", srvname)
+            print("actname", actname)
+            print("resuuid", resuuid)
+            print("actstat", actstat)
+            print("srvkey", srvkey)
             if actstat == HloStatus.active:
                 self.orchstatusmodel.server_dict[srvkey].endpoints[actname].active_dict[
                     resuuid
