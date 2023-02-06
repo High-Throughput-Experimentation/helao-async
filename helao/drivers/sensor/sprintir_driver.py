@@ -207,7 +207,7 @@ class SprintIR:
                 aux_resp.append(strip)
         if aux_resp:
             self.base.print_message(
-                f"Received auxiliary responses: {aux_resp}", warning=True
+                f"Received auxiliary responses: {aux_resp}", info=True
             )
         # while not cmd_resp:
         #     repeats = self.send(command_str)
@@ -226,19 +226,28 @@ class SprintIR:
                 return filt, unfilt
         return False, False
 
-    async def poll_sensor_loop(self, frequency: int = 20):
+    async def poll_sensor_loop(self, frequency: int = 20, reset_after: int = 10):
         waittime = 1.0 / frequency
         self.base.print_message("Starting polling loop")
+        blanks = 0
         while True:
-            # co2_level, _ = self.send("Z")
+            if blanks == reset_after:
+                self.base.print_message(
+                    f"Did not receive a co2 message from sensor after {reset_after} checks, resetting polling mode.",
+                    warning=True,
+                )
+                self.send("K 2")
+                blanks = 0
             co2_level, co2_level_unfilt = self.read_stream()
             if co2_level:
-                # msg_dict = {"co2_ppm": int(co2_level[0].split()[-1])}
                 msg_dict = {
                     "co2_ppm": int(co2_level) * self.fw["scaling_factor"],
                     "co2_ppm_unflt": int(co2_level_unfilt) * self.fw["scaling_factor"],
                 }
                 await self.base.put_lbuf(msg_dict)
+                blanks = 0
+            else:
+                blanks += 1
             await asyncio.sleep(waittime)
 
     async def continuous_record(self):
