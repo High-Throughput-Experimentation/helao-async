@@ -2007,6 +2007,7 @@ class Active:
             self.base.print_message("entering executor polling loop")
             while self.action_loop_running:
                 result = await executor._poll()
+                self.base.print_message(f"got result: {result}")
                 error = result.get("error", ErrorCodes.none)
                 status = result.get("status", HloStatus.finished)
                 data = result.get("data", {})
