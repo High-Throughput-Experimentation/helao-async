@@ -855,20 +855,6 @@ class Orch(Base):
             result_actiondict, error_code = await async_action_dispatcher(
                 self.world_cfg, A
             )
-            endpoint_uuids = [
-                str(k) for k in self.orchstatusmodel.active_dict.keys()
-            ] + [
-                str(k)
-                for k in self.orchstatusmodel.nonactive_dict.get("finished", {}).keys()
-            ]
-            self.print_message(
-                f"Current {A.action_name} received uuids: {endpoint_uuids}"
-            )
-            result_uuid = result_actiondict["action_uuid"]
-            self.track_action_uuid(UUID(result_uuid))
-            self.print_message(
-                f"Action {A.action_name} dispatched with uuid: {result_uuid}"
-            )
 
             # orch gets back an active action dict, we can self-register the dispatched action in global status
             resmod = ActionModel(**result_actiondict)
@@ -887,10 +873,24 @@ class Orch(Base):
                 self.orchstatusmodel.server_dict[srvkey].endpoints[
                     actname
                 ].nonactive_dict[actstat[0]][resuuid] = resmod
-
             await self.interrupt_q.put(self.orchstatusmodel)
             await self.update_operator(True)
             await self.globstat_q.put(self.orchstatusmodel.as_json())
+
+            endpoint_uuids = [
+                str(k) for k in self.orchstatusmodel.active_dict.keys()
+            ] + [
+                str(k)
+                for k in self.orchstatusmodel.nonactive_dict.get("finished", {}).keys()
+            ]
+            self.print_message(
+                f"Current {A.action_name} received uuids: {endpoint_uuids}"
+            )
+            result_uuid = result_actiondict["action_uuid"]
+            self.track_action_uuid(UUID(result_uuid))
+            self.print_message(
+                f"Action {A.action_name} dispatched with uuid: {result_uuid}"
+            )
 
             # this will recursively call the next no_wait action in queue, and return its error
             if self.action_dq:
