@@ -124,6 +124,7 @@ config["servers"] = {
         "group": "visualizer",
         "bokeh": "live_visualizer",
         "params": {"doc_name": "Sensor Visualizer"},
+        "verbose": True,
     },
     "CO2SENSOR": {
         "host": "127.0.0.1",
@@ -131,6 +132,7 @@ config["servers"] = {
         "group": "action",
         "fast": "co2sensor_server",
         "params": {"port": "COM3", "start_margin": 0},
+        "verbose": True,
     },
     "SYRINGE0": {
         "host": hostip,
@@ -152,6 +154,8 @@ config["servers"] = {
         "group": "action",
         "fast": "mfc_server",
         "params": {"devices": {"N2": {"port": "COM7", "unit_id": "A"}}},
+        "verbose": True,
+
     },
     "CALC": {
         "host": "127.0.0.1",
