@@ -880,19 +880,14 @@ class Orch(Base):
             srvkey = tuple([
                 k for k in self.orchstatusmodel.server_dict.keys() if k[0] == srvname
             ][0])
-            print("srvname", srvname)
-            print("actname", actname)
-            print("resuuid", resuuid)
-            print("actstat", actstat)
-            print("srvkey", srvkey)
-            if actstat == HloStatus.active:
+            if HloStatus.active in actstat:
                 self.orchstatusmodel.server_dict[srvkey].endpoints[actname].active_dict[
                     resuuid
                 ] = resmod
             else:
                 self.orchstatusmodel.server_dict[srvkey].endpoints[
                     actname
-                ].nonactive_dict[actstat][resuuid] = resmod
+                ].nonactive_dict[actstat[0]][resuuid] = resmod
 
             await self.interrupt_q.put(self.orchstatusmodel)
             await self.update_operator(True)
