@@ -245,7 +245,7 @@ class SprintIR:
                 blanks = 0
             try:
                 co2_level, co2_level_unfilt = self.read_stream()
-            except:
+            except Exception:
                 continue
             if co2_level:
                 msg_dict = {
