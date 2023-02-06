@@ -436,7 +436,7 @@ async def galil_dyn_endpoints(app=None):
             async def z_move(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 1,
-                z_position: Union[Zpos, str] = Zpos.NA,
+                z_position: Optional[Zpos] = "NA",
             ):
                 """Move the z-axis motor to cell positions predefined in the config."""
                 active = await app.base.setup_and_contain_action(action_abbr="z_move")
