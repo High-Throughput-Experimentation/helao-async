@@ -397,8 +397,10 @@ class CO2MonExec(Executor):
 
     async def _poll(self):
         """Read CO2 ppm from live buffer."""
-        live_dict, epoch_s = self.active.base.get_lbuf("co2_ppm")
-        self.active.base.print_message(f"got from live buffer: {live_dict}")
+        live_dict = {}
+        co2_ppm, epoch_s = self.active.base.get_lbuf("co2_ppm")
+        self.active.base.print_message(f"got from live buffer: {co2_ppm}")
+        live_dict["co2_ppm"] = co2_ppm
         live_dict["epoch_s"] = epoch_s
         iter_time = time.time()
         elapsed_time = iter_time - self.start_time
