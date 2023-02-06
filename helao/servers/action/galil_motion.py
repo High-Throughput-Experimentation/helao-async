@@ -463,7 +463,7 @@ async def galil_dyn_endpoints(app=None):
                     finished_action = await active.finish()
                     return finished_action.as_dict()
                 else:
-                    active.action.action_error_code = ErrorCodes.not_available
+                    active.action.error_code = ErrorCodes.not_available
                     return active.action.clean_dict()
 
 
