@@ -111,9 +111,9 @@ def CCSI_validation_KOH_procedure(
     epm.add_experiment("CCSI_sub_unload_cell",{})
     epm.add_experiment("CCSI_sub_load_solid", {})
 
-    epm.add_experiment("CCSI_sub_load_gas", {
-        "reservoir_gas_sample_no": gas_sample_no,
-    })
+#    epm.add_experiment("CCSI_sub_load_gas", {
+#        "reservoir_gas_sample_no": gas_sample_no,
+#    })
     epm.add_experiment("CCSI_sub_load_liquid", {
         "reservoir_liquid_sample_no": KOH_reservoir_sample_no,
         "volume_ul_cell_liquid": KOH_volume_ul,
