@@ -873,9 +873,9 @@ class Orch(Base):
                 self.orchstatusmodel.server_dict[srvkey].endpoints[
                     actname
                 ].nonactive_dict[actstat[0]][resuuid] = resmod
-            await self.interrupt_q.put(self.orchstatusmodel)
-            await self.update_operator(True)
-            await self.globstat_q.put(self.orchstatusmodel.as_json())
+            # await self.interrupt_q.put(self.orchstatusmodel)
+            # await self.update_operator(True)
+            # await self.globstat_q.put(self.orchstatusmodel.as_json())
 
             endpoint_uuids = [
                 str(k) for k in self.orchstatusmodel.active_dict.keys()
