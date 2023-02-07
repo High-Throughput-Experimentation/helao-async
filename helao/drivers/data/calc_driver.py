@@ -6,7 +6,7 @@ from copy import copy
 from scipy.signal import savgol_filter
 from ruamel.yaml import YAML
 
-from helao.servers.base import Base
+from helao.servers.base import Base, Active
 from helao.helpers.premodels import Experiment
 from helao.helpers.file_mapper import FileMapper
 from helao.helpers.dispatcher import async_private_dispatcher
@@ -108,7 +108,7 @@ class Calc:
 
         return hlo_dict
 
-    def calc_uvis_abs(self, activeobj):
+    def calc_uvis_abs(self, activeobj: Active):
         """Figure of merit calculator for UVIS TR, DR, and T techniques."""
         seq_reldir = activeobj.action.get_sequence_dir()
         hlo_dict = self.gather_seq_data(seq_reldir, "acquire_spec")
@@ -613,18 +613,16 @@ class Calc:
 
         return datadict, arraydict
 
-    async def check_co2_purge_level(
-        self,
-        activeobj,
-        co2_ppm_thresh=600,
-        purge_if="above",
-        repeat_experiment_name="CCSI_sub_headspace_purge_and_measure",
-        repeat_experiment_params={},
-        **kwargs,
-    ):
+    async def check_co2_purge_level(self, activeobj: Active):
+        params = activeobj.action.action_params
+        co2_ppm_thresh = params["co2_ppm_thresh"]
+        purge_if = params["purge_if"]
+        repeat_experiment_name = params["repeat_experiment_name"]
+        repeat_experiment_params = params["repeat_experiment_params"]
+        kwargs = params["repeat_experiment_kwargs"]
         seq_reldir = activeobj.action.get_sequence_dir()
         hlo_dict = self.gather_seq_data(seq_reldir, "acquire_co2")
-        latest = sorted(hlo_dict.keys())[-1]
+        latest = hlo_dict[sorted(hlo_dict.keys())[-1]]
 
         mean_co2_ppm = np.mean(latest["data"]["co2_ppm"])
         if isinstance(purge_if, str):
@@ -639,42 +637,63 @@ class Calc:
                 loop_condition = mean_co2_ppm > co2_ppm_thresh
         else:
             purge_if = float(purge_if)
-            if purge_if >= 1.0:
+            if abs(purge_if) >= 1.0:
                 self.base.print_message(
-                    "'purge_if' parameter is numerical and > 1.0, treating as percentage of threshold"
+                    "'purge_if' parameter is numerical and > abs(1.0), treating as percentage of threshold"
                 )
                 purge_if = purge_if / 100
             else:
-                self.base.print_messge(
-                    "'purge_if' parameter is numerical and < 1.0, treating as fraction of threshold"
+                self.base.print_message(
+                    "'purge_if' parameter is numerical and < abs(1.0), treating as fraction of threshold"
                 )
+            # purge_if<0 means purge if current ppm is below pct diff
+            # purge_if>0 means purge if current ppm is above pct diff
             loop_condition = (
-                abs(mean_co2_ppm - co2_ppm_thresh) / co2_ppm_thresh > purge_if
+                np.sign(purge_if) * (mean_co2_ppm - co2_ppm_thresh) / co2_ppm_thresh
+                > np.sign(purge_if) * purge_if
             )
+            # adjust next loop params in case loop condition is met
+            repeat_experiment_params["co2_ppm_thresh"] = co2_ppm_thresh * (1 + purge_if)
+
         if loop_condition:
+            self.base.print_message(
+                f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition. Looping."
+            )
             world_config = self.base.fastapp.helao_cfg
             orch_name = [
-                k for k, d in world_config.items() if d["group"] == "orchestrator"
+                k
+                for k, d in world_config.get("servers", {}).items()
+                if d["group"] == "orchestrator"
             ][0]
             rep_exp = Experiment(
                 experiment_name=repeat_experiment_name,
                 experiment_params=repeat_experiment_params,
                 **kwargs,
             )
-            await async_private_dispatcher(
+            self.base.print_message("queueing repeat experiment request on Orch")
+            resp, error = await async_private_dispatcher(
                 world_config,
                 orch_name,
                 "insert_experiment",
-                params_dict={
-                    "experiment": rep_exp.as_dict(),
-                    "index": 0,
+                params_dict={},
+                json_dict={
+                    "idx": 0,
+                    "experiment": rep_exp.json_dict(),
                 },
             )
-        return {
-            "epoch": time.time(),
-            "mean_co2_ppm": mean_co2_ppm,
-            "above_threshold": loop_condition,
+            self.base.print_message(f"insert_experiment got response: {resp}")
+            self.base.print_message(f"insert_experiment returned error: {error}")
+        else:
+            self.base.print_message(
+                f"mean_co2_ppm: {mean_co2_ppm} meets threshold condition. Exiting."
+            )
+
+        return_dict = {
+            "epoch": float(time.time()),
+            "mean_co2_ppm": float(mean_co2_ppm),
+            "redo_purge": bool(loop_condition),
         }
+        return return_dict
 
     def shutdown(self):
         pass

@@ -23,8 +23,7 @@ __all__ = [
     "CCSI_sub_initialization_firstpart",
     "CCSI_sub_liquidfill_syringes",
     "CCSI_sub_drain_and_clean",
-
-
+    "CCSI_debug_co2purge",
 ]
 
 ###
@@ -370,9 +369,9 @@ def CCSI_sub_headspace_purge_and_measure(
     HSpurge_duration: float = 20,  # set before determining actual
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.1,
-    # co2_ppm_thresh: float = 95000,
-    # purge_if: Union[str, float] = "below",
-#    HSmeasure1_duration: float = 20,  # set before determining actual
+    co2_ppm_thresh: float = 95000,
+    purge_if: Union[str, float] = "below",
+    # HSmeasure1_duration: float = 20,  # set before determining actual
 ):
     # recirculation loop
     # only 1B 6A-waste opened 1A closed pump off//differ from delta purge
@@ -419,9 +418,20 @@ def CCSI_sub_headspace_purge_and_measure(
         ],
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1},start_condition=ActionStartCondition.no_wait)
-#    apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSmeasure1_duration})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
 
-#    apm.add(CALC_server, "check_co2_purge", {"co2_ppm_thresh": apm.pars.co2_ppm_thresh, "purge_if": apm.pars.purge_if, "repeat_experiment_name": "CCSI_sub_headspace_purge_and_measure", "repeat_experiment_params": {"HSpurge_duration": 20} })
+    apm.add(
+        CALC_server,
+        "check_co2_purge",
+        {
+            "co2_ppm_thresh": apm.pars.co2_ppm_thresh,
+            "purge_if": apm.pars.purge_if,
+            "repeat_experiment_name": "CCSI_sub_headspace_purge_and_measure",
+            "repeat_experiment_params": {
+                k: v for k, v in vars(apm.pars).items() if not k.startswith('experiment')
+            }
+        }
+    )
 
     return apm.action_list
 
@@ -693,7 +703,7 @@ def CCSI_sub_drain_and_clean(
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.1,
     co2_ppm_thresh: float = 90000,
-    purge_if: Union[str, float] = "below",
+    purge_if: Union[str, float] = -0.05,
     HSpurge_duration: float = 20,  # set before determining actual
 ):
     # recirculation loop
@@ -754,6 +764,28 @@ def CCSI_sub_drain_and_clean(
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1},start_condition=ActionStartCondition.no_wait)
 
+    apm.add(
+        CALC_server,
+        "check_co2_purge",
+        {
+            "co2_ppm_thresh": apm.pars.co2_ppm_thresh,
+            "purge_if": apm.pars.purge_if,
+            "repeat_experiment_name": "CCSI_sub_drain_and_clean",
+            "repeat_experiment_params": {
+#                k: v for k, v in vars(apm.pars).items() if not k.startswith('experiment')
+                "Waterclean_volume_ul": 5000,
+                "Syringe_retraction_ul": 500,
+                "Syringe_rate_ulsec": 500,
+                "LiquidFillWait_s": 15,
+                "co2measure_duration": 20,
+                "co2measure_acqrate": 0.1,
+                "co2_ppm_thresh": 90000,
+                "purge_if": -0.05,
+                "HSpurge_duration": 20 
+            }
+        }
+    )
+
     # apm.add(CALC_server, "check_co2_purge", {"co2_ppm_thresh": apm.pars.co2_ppm_thresh, "purge_if": apm.pars.purge_if, "repeat_experiment_name": "CCSI_drain_and_clean", "repeat_experiment_params":  
     # {"Waterclean_volume_ul": 5000,
     # "Syringe_retraction_ul": 500,
@@ -767,5 +799,37 @@ def CCSI_sub_drain_and_clean(
     # })
 
     return apm.action_list
+
+
+def CCSI_debug_co2purge(
+    experiment: Experiment,
+    experiment_version: int = 3,
+    co2measure_duration: float = 10,
+    co2measure_acqrate: float = 0.1,
+    co2_ppm_thresh: float = 90000,
+    purge_if: Union[str, float] = -0.05,
+):
+    apm = ActionPlanMaker()
+    apm.add(CO2S_server, "acquire_co2", {"duration": apm.pars.co2measure_duration, "acquisition_rate": apm.pars.co2measure_acqrate},
+        technique_name="liquid_purge",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+        ],
+    )
+    apm.add(
+        CALC_server,
+        "check_co2_purge",
+        {
+            "co2_ppm_thresh": apm.pars.co2_ppm_thresh,
+            "purge_if": apm.pars.purge_if,
+            "repeat_experiment_name": "CCSI_debug_co2purge",
+            "repeat_experiment_params": {
+               k: v for k, v in vars(apm.pars).items() if not k.startswith('experiment')
+            }
+        }
+    )
+    return apm.action_list
+
 
 

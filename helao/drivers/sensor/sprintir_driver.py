@@ -4,6 +4,7 @@
 
 __all__ = []
 
+import re
 import time
 import asyncio
 
@@ -32,7 +33,6 @@ TODO: send CO2 reading to bokeh visualizer w/o writing data
 
 class SprintIR:
     def __init__(self, action_serv: Base):
-
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
         self.unified_db = UnifiedSampleDataAPI(self.base)
@@ -208,7 +208,7 @@ class SprintIR:
                 aux_resp.append(strip)
         if aux_resp:
             self.base.print_message(
-                f"Received auxiliary responses: {aux_resp}", warning=True
+                f"Received auxiliary responses: {aux_resp}", info=True
             )
         # while not cmd_resp:
         #     repeats = self.send(command_str)
@@ -221,25 +221,41 @@ class SprintIR:
         buf = self.com.readline()
         lines = buf.decode("utf8").split("\n")
         for line in lines:
-            strip = line.strip()
-            if strip.startswith("Z ") and " z " in strip:
-                filt, unfilt = strip.replace("Z ", "").split(" z ")
+            stripped = line.strip()
+            # self.base.print_message(strip)
+            filts = re.findall("Z\s[0-9]+", stripped)
+            unfilts = re.findall("z\s[0-9]+", stripped)
+            filt = filts[-1].split()[-1] if filts else False
+            unfilt = unfilts[-1].split()[-1] if unfilts else False
+            if filt and unfilt:
                 return filt, unfilt
         return False, False
 
-    async def poll_sensor_loop(self, frequency: int = 20):
+    async def poll_sensor_loop(self, frequency: int = 20, reset_after: int = 10):
         waittime = 1.0 / frequency
         self.base.print_message("Starting polling loop")
+        blanks = 0
         while True:
-            # co2_level, _ = self.send("Z")
-            co2_level, co2_level_unfilt = self.read_stream()
+            if blanks == reset_after:
+                self.base.print_message(
+                    f"Did not receive a co2 message from sensor after {reset_after} checks, resetting polling mode.",
+                    warning=True,
+                )
+                self.send("K 2")
+                blanks = 0
+            try:
+                co2_level, co2_level_unfilt = self.read_stream()
+            except Exception:
+                continue
             if co2_level:
-                # msg_dict = {"co2_ppm": int(co2_level[0].split()[-1])}
                 msg_dict = {
                     "co2_ppm": int(co2_level) * self.fw["scaling_factor"],
                     "co2_ppm_unflt": int(co2_level_unfilt) * self.fw["scaling_factor"],
                 }
                 await self.base.put_lbuf(msg_dict)
+                blanks = 0
+            else:
+                blanks += 1
             await asyncio.sleep(waittime)
 
     async def continuous_record(self):
@@ -375,13 +391,16 @@ class SprintIR:
 class CO2MonExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.active.base.print_message("AiMonExec initialized.")
+        self.active.base.print_message("CO2MonExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
 
     async def _poll(self):
         """Read CO2 ppm from live buffer."""
-        live_dict, epoch_s = self.active.base.get_lbuf("co2_ppm")
+        live_dict = {}
+        co2_ppm, epoch_s = self.active.base.get_lbuf("co2_ppm")
+        # self.active.base.print_message(f"got from live buffer: {co2_ppm}")
+        live_dict["co2_ppm"] = co2_ppm
         live_dict["epoch_s"] = epoch_s
         iter_time = time.time()
         elapsed_time = iter_time - self.start_time
@@ -390,9 +409,10 @@ class CO2MonExec(Executor):
         else:
             status = HloStatus.finished
         await asyncio.sleep(0.001)
+        # self.active.base.print_message(f"sending status: {status}")
+        # self.active.base.print_message(f"sending data: {live_dict}")
         return {
             "error": ErrorCodes.none,
             "status": status,
             "data": live_dict,
         }
-

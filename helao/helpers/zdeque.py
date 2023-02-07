@@ -24,7 +24,7 @@ class zdeque(deque):
         return pickle.loads(zlib.decompress(x))
 
     def insert(self, i, x):
-        super().insert(i=i, x=zlib.compress(pickle.dumps(x)))
+        super().insert(i, zlib.compress(pickle.dumps(x)))
 
     def append(self, x):
         super().append(zlib.compress(pickle.dumps(x)))

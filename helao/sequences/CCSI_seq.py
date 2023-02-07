@@ -108,10 +108,12 @@ def CCSI_validation_KOH_procedure(
 
     epm = ExperimentPlanMaker()
 
-    epm.add_experiment("CCSI_sub_unload_cell")
-    epm.add_experiment("CCSI_sub_load_gas", {
-        "reservoir_gas_sample_no": gas_sample_no,
-    })
+    epm.add_experiment("CCSI_sub_unload_cell",{})
+    epm.add_experiment("CCSI_sub_load_solid", {})
+
+#    epm.add_experiment("CCSI_sub_load_gas", {
+#        "reservoir_gas_sample_no": gas_sample_no,
+#    })
     epm.add_experiment("CCSI_sub_load_liquid", {
         "reservoir_liquid_sample_no": KOH_reservoir_sample_no,
         "volume_ul_cell_liquid": KOH_volume_ul,
@@ -134,22 +136,22 @@ def CCSI_validation_KOH_procedure(
         "co2measure_acqrate": co2measure_acqrate,
     })
 
-    for _ in range(liquid_purge_cycles):
-        epm.add_experiment("CCSI_sub_drain_and_clean", {
-        "Waterclean_volume_ul": drainclean_volume_ul,
-        "Syringe_retraction_ul": retraction_volume_ul,
-        "Syringe_rate_ulsec": syringe_rate_ulsec,
-        "LiquidFillWait_s": LiquidFillWait_s,
-        "co2measure_duration": clean_co2measure_duration,
-        "co2measure_acqrate": co2measure_acqrate,
-        "co2_ppm_thresh": clean_co2_ppm_thresh,
-        "purge_if": purge_if,
-        "HSpurge_duration": HSpurge_duration,
-    })
-    for _ in range(headspace_purge_cycles):
-        epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {"HSpurge_duration": HSpurge_duration, "co2measure_duration": purge_co2measure_duration, "co2measure_acqrate": co2measure_acqrate, "co2_ppm_thresh": purge_co2threshhold, "purge_if": purge_if})
+ #   for _ in range(liquid_purge_cycles):
+    epm.add_experiment("CCSI_sub_drain_and_clean", {
+    "Waterclean_volume_ul": drainclean_volume_ul,
+    "Syringe_retraction_ul": retraction_volume_ul,
+    "Syringe_rate_ulsec": syringe_rate_ulsec,
+    "LiquidFillWait_s": LiquidFillWait_s,
+    "co2measure_duration": clean_co2measure_duration,
+    "co2measure_acqrate": co2measure_acqrate,
+    "co2_ppm_thresh": clean_co2_ppm_thresh,
+    "purge_if": purge_if,
+    "HSpurge_duration": HSpurge_duration,
+})
+#    for _ in range(headspace_purge_cycles):
+    epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {"HSpurge_duration": HSpurge_duration, "co2measure_duration": purge_co2measure_duration, "co2measure_acqrate": co2measure_acqrate, "co2_ppm_thresh": purge_co2threshhold, "purge_if": purge_if})
 
     epm.add_experiment("CCSI_sub_peripumpoff", {})
-    epm.add_experiment("CCSI_sub_unload_cell")
+    epm.add_experiment("CCSI_sub_unload_cell",{})
 
     return epm.experiment_plan_list
