@@ -259,7 +259,7 @@ def makeOrchServ(
     ):
         """Add a experiment object to the end of the experiment queue."""
         exp_uuid = await app.orch.add_experiment(
-            seq=app.orch.seq_file, experimenttemplate=experiment
+            seq=app.orch.seq_file, experimenttemplate=experiment.get_exp()
         )
         return {"experiment_uuid": exp_uuid}
 
@@ -269,18 +269,18 @@ def makeOrchServ(
     ):
         """Add a experiment object to the start of the experiment queue."""
         exp_uuid = await app.orch.add_experiment(
-            seq=app.orch.seq_file, experimenttemplate=experiment, prepend=True
+            seq=app.orch.seq_file, experimenttemplate=experiment.get_exp(), prepend=True
         )
         return {"experiment_uuid": exp_uuid}
 
     @app.post("/insert_experiment")
     async def insert_experiment(
         experiment: Optional[Experiment] = Body({}, embed=True),
-        index: Optional[int] = 0,
+        idx: Optional[int] = 0,
     ):
         """Insert a experiment object at experiment queue index."""
         exp_uuid = await app.orch.add_experiment(
-            seq=app.orch.seq_file, experimenttemplate=experiment, at_index=index
+            seq=app.orch.seq_file, experimenttemplate=experiment.get_exp(), at_index=idx
         )
         return {"experiment_uuid": exp_uuid}
 
