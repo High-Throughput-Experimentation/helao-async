@@ -164,6 +164,7 @@ config["servers"] = {
         "group": "action",
         "fast": "calc_server",
         "params": {},
+        "verbose": True,
     },
 
     "DB": {

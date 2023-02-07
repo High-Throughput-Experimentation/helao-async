@@ -823,7 +823,7 @@ def CCSI_debug_co2purge(
         {
             "co2_ppm_thresh": apm.pars.co2_ppm_thresh,
             "purge_if": apm.pars.purge_if,
-            "repeat_experiment_name": "CCSI_sub_drain_and_clean",
+            "repeat_experiment_name": "CCSI_debug_co2purge",
             "repeat_experiment_params": {
                k: v for k, v in vars(apm.pars).items() if not k.startswith('experiment')
             }
