@@ -1502,7 +1502,7 @@ class Active:
 
                         if type(sample_data) is dict:
                             try:
-                                output_str = json.dumps(sample_data)
+                                output_str = json.dumps(dict(sample_data))
                             except TypeError:
                                 self.base.print_message(
                                     "Data is not json serializable.",
