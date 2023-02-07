@@ -652,8 +652,8 @@ class Calc:
                 np.sign(purge_if) * (mean_co2_ppm - co2_ppm_thresh) / co2_ppm_thresh
                 > np.sign(purge_if) * purge_if
             )
-            # adjust next loop params in case loop condition is met
-            repeat_experiment_params["co2_ppm_thresh"] = co2_ppm_thresh * (1 + purge_if)
+            # adjust next loop params in case loop condition is met (double purge_if every 2 loops)
+            repeat_experiment_params["purge_if"] = abs(purge_if) * 2**0.5 * np.sign(purge_if)
 
         if loop_condition:
             self.base.print_message(
