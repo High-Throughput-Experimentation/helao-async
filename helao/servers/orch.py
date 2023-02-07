@@ -67,7 +67,6 @@ hlotags_metadata = [
 def makeOrchServ(
     config, server_key, server_title, description, version, driver_class=None
 ):
-
     app = HelaoFastAPI(
         helao_cfg=config,
         helao_srv=server_key,
@@ -603,10 +602,9 @@ class Orch(Base):
             self.orchstatusmodel.orch_state = OrchStatus.busy
             self.print_message(f"running_states: {self.orchstatusmodel.active_dict}")
 
-        await self.update_operator(True)
-
         # now push it to the interrupt_q
         await self.interrupt_q.put(self.orchstatusmodel)
+        await self.update_operator(True)
         await self.globstat_q.put(self.orchstatusmodel.as_json())
 
         return True
@@ -628,7 +626,7 @@ class Orch(Base):
     async def globstat_broadcast_task(self):
         """Consume globstat_q. Does nothing for now."""
         async for _ in self.globstat_q.subscribe():
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.001)
 
     def unpack_sequence(self, sequence_name, sequence_params) -> List[ExperimentModel]:
         if sequence_name in self.sequence_lib:
@@ -793,7 +791,6 @@ class Orch(Base):
             A = self.action_dq.popleft()
 
             # see async_action_dispatcher for unpacking
-
             if A.start_condition == ActionStartCondition.no_wait:
                 self.print_message("orch is dispatching an unconditional action")
             else:
@@ -858,6 +855,29 @@ class Orch(Base):
             result_actiondict, error_code = await async_action_dispatcher(
                 self.world_cfg, A
             )
+
+            # orch gets back an active action dict, we can self-register the dispatched action in global status
+            resmod = ActionModel(**result_actiondict)
+            srvname = resmod.action_server.server_name
+            actname = resmod.action_name
+            resuuid = resmod.action_uuid
+            actstat = resmod.action_status
+            srvkeys = self.orchstatusmodel.server_dict.keys()
+            srvkey = [k for k in srvkeys if k[0] == srvname][0]
+            if HloStatus.active in actstat:
+                self.orchstatusmodel.active_dict[resuuid] = resmod
+                self.orchstatusmodel.server_dict[srvkey].endpoints[actname].active_dict[
+                    resuuid
+                ] = resmod
+            else:
+                self.orchstatusmodel.nonactive_dict[actstat[0]][resuuid] = resmod
+                self.orchstatusmodel.server_dict[srvkey].endpoints[
+                    actname
+                ].nonactive_dict[actstat[0]][resuuid] = resmod
+            # await self.interrupt_q.put(self.orchstatusmodel)
+            # await self.update_operator(True)
+            # await self.globstat_q.put(self.orchstatusmodel.as_json())
+
             endpoint_uuids = [
                 str(k) for k in self.orchstatusmodel.active_dict.keys()
             ] + [
@@ -872,6 +892,13 @@ class Orch(Base):
             self.print_message(
                 f"Action {A.action_name} dispatched with uuid: {result_uuid}"
             )
+
+            # this will recursively call the next no_wait action in queue, and return its error
+            if self.action_dq:
+                nextA = self.action_dq[0]
+                if nextA.start_condition == ActionStartCondition.no_wait:
+                    error_code = await self.loop_task_dispatch_action()
+
             if not A.nonblocking:
                 while result_uuid not in endpoint_uuids:
                     self.print_message(

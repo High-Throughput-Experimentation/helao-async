@@ -436,7 +436,7 @@ async def galil_dyn_endpoints(app=None):
             async def z_move(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 1,
-                z_position: Union[Zpos, str] = Zpos.NA,
+                z_position: Optional[Zpos] = "NA",
             ):
                 """Move the z-axis motor to cell positions predefined in the config."""
                 active = await app.base.setup_and_contain_action(action_abbr="z_move")
@@ -460,11 +460,10 @@ async def galil_dyn_endpoints(app=None):
                         datadict.get("err_code", ErrorCodes.unspecified)
                     )
                     await active.enqueue_data_dflt(datadict=datadict)
-                    finished_action = await active.finish()
-                    return finished_action.as_dict()
                 else:
-                    active.action.action_error_code = ErrorCodes.not_available
-                    return active.action.clean_dict()
+                    active.action.error_code = ErrorCodes.not_available
+                finished_action = await active.finish()
+                return finished_action.as_dict()
 
 
 def makeApp(confPrefix, servKey, helao_root):

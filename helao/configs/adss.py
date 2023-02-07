@@ -9,7 +9,7 @@ config["simulation"] = False
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
   
-config["builtin_ref_motorxy"] = [110, 12]  # absolute plate coords
+config["builtin_ref_motorxy"] = [0, 20]  # absolute plate coords
 config["experiment_libraries"] = ["ADSS_exp", "samples_exp"]
 config["experiment_params"] = {
     "gamrychannelwait": -1,
@@ -32,6 +32,7 @@ config["servers"] = {
         "group": "orchestrator",
         "fast": "async_orch2",
         "params": {"enable_op": True, "bokeh_port": 5002},
+        "verbose": True,
     },
     "MOTOR": {
         "host": "127.0.0.1",
@@ -142,6 +143,7 @@ config["servers"] = {
         "host": "127.0.0.1",
         "port": 8007,
         "group": "action",
+        "verbose": True,
         "fast": "pal_server",
         "params": {
             "user": "RSHS",
