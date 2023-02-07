@@ -36,7 +36,7 @@ The `helao.py` script is used to validate configuration, launch, and shutdown al
 
 The following example will validate and launch servers with parameters defined in `helao/config/adss_dev.py`, while also writing all monitored process IDs to `pids_world.pck` in the root directory:
 ```
-python helao.py adss_dev
+helao adss_dev
 ```
 
 Exercise caution when running multiple server groups as there is currently no check for ports that are currently in-use between different config files.
