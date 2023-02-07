@@ -657,7 +657,7 @@ class Calc:
 
         if loop_condition:
             self.base.print_message(
-                f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition, looping."
+                f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition. Looping."
             )
             world_config = self.base.fastapp.helao_cfg
             orch_name = [
@@ -668,18 +668,25 @@ class Calc:
                 experiment_params=repeat_experiment_params,
                 **kwargs,
             )
-            await async_private_dispatcher(
+            self.base.print_message("queueing repeat experiment request on Orch")
+            resp, error = await async_private_dispatcher(
                 world_config,
                 orch_name,
                 "insert_experiment",
                 params_dict={
-                    "index": 0,
+                    "idx": 0,
                 },
                 json_dict={
                     "experiment": rep_exp.as_dict(),
                 },
             )
-        
+            self.base.print_message(f"insert_experiment got response: {resp}")
+            self.base.print_message(f"insert_experiment returned error: {error}")
+        else:
+            self.base.print_message(
+                f"mean_co2_ppm: {mean_co2_ppm} meets threshold condition. Exiting."
+            )
+
         return_dict = {
             "epoch": time.time(),
             "mean_co2_ppm": mean_co2_ppm,
