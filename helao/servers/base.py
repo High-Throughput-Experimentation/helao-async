@@ -86,7 +86,6 @@ def makeActionServ(
     driver_class=None,
     dyn_endpoints=None,
 ):
-
     app = HelaoFastAPI(
         helao_cfg=config,
         helao_srv=server_key,
@@ -634,7 +633,6 @@ class Base:
         success = False
 
         if client_servkey in self.world_cfg["servers"]:
-
             if client_servkey in self.status_clients:
                 self.print_message(
                     f"Client {client_servkey} is already subscribed to "
@@ -1108,7 +1106,6 @@ class Active:
         await self.base.write_act(self.action)
 
     async def myinit(self):
-
         if self.action.save_act:
             os.makedirs(
                 os.path.join(
@@ -1276,7 +1273,11 @@ class Active:
         push data to a single file using a default data conn key
         """
         await self.enqueue_data(
-            datamodel=DataModel(data={self.base.dflt_file_conn_key(): datadict})
+            datamodel=DataModel(
+                data={self.base.dflt_file_conn_key(): datadict},
+                errors=[],
+                status=HloStatus.active,
+            )
         )
 
     async def enqueue_data(self, datamodel: DataModel, action: Optional[Action] = None):
@@ -1436,7 +1437,6 @@ class Active:
                     continue
 
                 for file_conn_key, sample_data in data_dict.items():
-
                     output_action = self._get_action_for_file_conn_key(
                         file_conn_key=file_conn_key
                     )
@@ -1635,7 +1635,6 @@ class Active:
             return
 
         for sample in samples:
-
             # skip NoneSamples
             if isinstance(sample, NoneSample):
                 continue
@@ -1809,7 +1808,6 @@ class Active:
 
         # now finish all the actions in the list
         for finish_action in finish_action_list:
-
             # set status to finish
             # (replace active with finish)
             self.base.replace_status(
@@ -2000,23 +1998,25 @@ class Active:
                 errors=[],
                 status=HloStatus.active,
             )
-            await self.enqueue_data(datamodel)  # write and broadcast
+            self.enqueue_data_nowait(datamodel)  # write and broadcast
 
         # polling loop for ongoing action
         if not executor.oneoff:
             self.base.print_message("entering executor polling loop")
             while self.action_loop_running:
                 result = await executor._poll()
+                # self.base.print_message(f"got result: {result}")
                 error = result.get("error", ErrorCodes.none)
                 status = result.get("status", HloStatus.finished)
                 data = result.get("data", {})
                 if data:
+                    # self.base.print_message(f"got data from poll iter: {data}")
                     datamodel = DataModel(
                         data={self.action.file_conn_keys[0]: data},
                         errors=[],
                         status=HloStatus.active,
                     )
-                    await self.enqueue_data(datamodel)  # write and broadcast
+                    self.enqueue_data_nowait(datamodel)  # write and broadcast
 
                 if status == HloStatus.active:
                     await asyncio.sleep(executor.poll_rate)

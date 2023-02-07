@@ -1,4 +1,3 @@
-
 # shell: uvicorn motion_server:app --reload
 """ Serial sensor server
 
@@ -16,7 +15,6 @@ from helao.helpers.config_loader import config_loader
 
 
 def makeApp(confPrefix, servKey, helao_root):
-
     config = config_loader(confPrefix, helao_root)
 
     app = makeActionServ(
@@ -56,7 +54,7 @@ def makeApp(confPrefix, servKey, helao_root):
         active = await app.base.setup_and_contain_action()
         for exid, executor in app.base.executors.items():
             if exid.split()[0] == "acquire_co2":
-                await executor.stop_action_task()
+                executor.stop_action_task()
         finished_action = await active.finish()
         return finished_action.as_dict()
 

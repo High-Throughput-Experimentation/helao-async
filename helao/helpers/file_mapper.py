@@ -40,12 +40,21 @@ class FileMapper:
                 return testp
         return None
 
-    def read_hlo(self, p: str):
+    def read_hlo(self, p: str, retries: int = 3):
         lp = self.locate(p)
         if lp is None:
             raise FileNotFoundError
         else:
-            return read_hlo(lp.__str__())
+            retry_counter = 0
+            read_success = False
+            while (not read_success) or (retry_counter <= retries):
+                try:
+                    hlo_tup = read_hlo(lp.__str__())
+                    read_success = True
+                    return hlo_tup
+                except ValueError:  # retry read_hlo in case file not fully written
+                    retry_counter += 1
+            return None
 
     def read_yml(self, p: str):
         lp = self.locate(p)
