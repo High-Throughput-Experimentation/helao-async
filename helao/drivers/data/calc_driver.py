@@ -679,11 +679,13 @@ class Calc:
                     "experiment": rep_exp.as_dict(),
                 },
             )
-        return {
+        
+        return_dict = {
             "epoch": time.time(),
             "mean_co2_ppm": mean_co2_ppm,
-            "above_threshold": loop_condition,
+            "redo_purge": loop_condition,
         }
+        return return_dict
 
     def shutdown(self):
         pass
