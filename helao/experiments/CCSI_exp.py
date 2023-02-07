@@ -371,6 +371,7 @@ def CCSI_sub_headspace_purge_and_measure(
     co2measure_acqrate: float = 0.1,
     co2_ppm_thresh: float = 95000,
     purge_if: Union[str, float] = "below",
+    max_purge_iters: int = 5,
     # HSmeasure1_duration: float = 20,  # set before determining actual
 ):
     # recirculation loop
@@ -704,6 +705,7 @@ def CCSI_sub_drain_and_clean(
     co2measure_acqrate: float = 0.1,
     co2_ppm_thresh: float = 90000,
     purge_if: Union[str, float] = -0.05,
+    max_purge_iters: int = 5,
     HSpurge_duration: float = 20,  # set before determining actual
 ):
     # recirculation loop
