@@ -108,6 +108,21 @@ class Calc:
 
         return hlo_dict
 
+    def gather_seq_exps(self, seq_reldir: str, exp_name: str):
+        """Get all files using FileMapper to traverse ACTIVE/FINISHED/SYNCED."""
+        # get all files from current sequence directory
+        # produce tuples, (run_type, technique_name, run_use, hlo_path)
+        active_save_dir = self.base.helaodirs.save_root.__str__()
+        seq_absdir = os.path.join(active_save_dir, seq_reldir)
+        FM = FileMapper(seq_absdir)
+        paths = [x for x in FM.relstrs if exp_name in x]
+        ymls = sorted([x for x in paths if x.endswith("exp.yml")])
+        yml_dict = {}
+        for ep in ymls:
+            expd = FM.read_yml(ep)
+            yml_dict[ep] = expd
+        return yml_dict
+
     def calc_uvis_abs(self, activeobj: Active):
         """Figure of merit calculator for UVIS TR, DR, and T techniques."""
         seq_reldir = activeobj.action.get_sequence_dir()
@@ -621,6 +636,12 @@ class Calc:
         repeat_experiment_params = params["repeat_experiment_params"]
         kwargs = params["repeat_experiment_kwargs"]
         seq_reldir = activeobj.action.get_sequence_dir()
+
+        exp_dict = self.gather_seq_exps(seq_reldir, repeat_experiment_name)
+        max_loops = (
+            repeat_experiment_params.get("max_purge_iters", 5) + 1
+        )  # add original purge
+
         hlo_dict = self.gather_seq_data(seq_reldir, "acquire_co2")
         latest = hlo_dict[sorted(hlo_dict.keys())[-1]]
 
@@ -639,12 +660,12 @@ class Calc:
             purge_if = float(purge_if)
             if abs(purge_if) >= 1.0:
                 self.base.print_message(
-                    "'purge_if' parameter is numerical and > abs(1.0), treating as percentage of threshold"
+                    "abs('purge_if') parameter is numerical and > 1.0, treating as percentage of threshold"
                 )
                 purge_if = purge_if / 100
             else:
                 self.base.print_message(
-                    "'purge_if' parameter is numerical and < abs(1.0), treating as fraction of threshold"
+                    "abs('purge_if') parameter is numerical and < 1.0, treating as fraction of threshold"
                 )
             # purge_if<0 means purge if current ppm is below pct diff
             # purge_if>0 means purge if current ppm is above pct diff
@@ -653,9 +674,15 @@ class Calc:
                 > np.sign(purge_if) * purge_if
             )
             # adjust next loop params in case loop condition is met (double purge_if every 2 loops)
-            repeat_experiment_params["purge_if"] = abs(purge_if) * 2**0.5 * np.sign(purge_if)
+            repeat_experiment_params["purge_if"] = (
+                abs(purge_if) * 2**0.5 * np.sign(purge_if)
+            )
 
-        if loop_condition:
+        if loop_condition and len(exp_dict) == max_loops:
+            self.base.print_message(
+                f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition but max_purge_iters ({max_loops}) reached. Exiting."
+            )
+        elif loop_condition:
             self.base.print_message(
                 f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition. Looping."
             )
