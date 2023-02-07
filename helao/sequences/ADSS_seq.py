@@ -522,10 +522,10 @@ def ADSS_CombineEche(
 #     return epm.experiment_plan_list  # returns complete experiment list
 
 def ADSS_CA_NaOH_validation(
-    sequence_version: int = 3,
+    sequence_version: int = 5,
     solid_custom_position: str = "cell1_we",
-    plate_id: int = 4534,
-    plate_sample_no_list: list = [1],  # list instead of map select
+    plate_id: int = 5917,
+    plate_sample_no_list: list = [14050],  # list instead of map select
     liquid_custom_position: str = "elec_res1",
     liquid_sample_no: int = 1,
     liquid_sample_volume_ul: float = 3000,
@@ -535,16 +535,16 @@ def ADSS_CA_NaOH_validation(
     ref_type: str = "inhouse",
     ref_offset__V: float = 0.0,
     CA_duration_sec: float = 1320,
-    aliquot_intervals_sec: List[float] = [60, 600, 1140],
+    aliquot_times_sec: List[float] = [60, 530, 1060, 1560],
     aliquot_volume_ul: int = 200,
     OCV_duration: float = 1,
     samplerate_sec: float = 0.05,
     Syringe_rate_ulsec: float = 300,
     Cell_draintime_s: float = 60,
     ReturnLineWait_s: float = 30,
-    ReturnLineReverseWait_s: float = 5,
+    ReturnLineReverseWait_s: float = 3,
     ResidualWait_s: float = 15,
-    flush_volume_ul: float = 3000,
+    flush_volume_ul: float = 2000,
     clean_volume_ul: float = 3000,
     PAL_Injector: str = "LS 4"
 ):
@@ -556,7 +556,7 @@ def ADSS_CA_NaOH_validation(
     epm = ExperimentPlanMaker()
 
 
-    for solid_sample_no in plate_sample_no_list[:1]:  # have to indent add expts if used
+    for solid_sample_no in plate_sample_no_list:  # have to indent add expts if used
 
         epm.add_experiment(
             "ADSS_sub_sample_start",
@@ -601,6 +601,14 @@ def ADSS_CA_NaOH_validation(
                 }
             )
             epm.add_experiment(
+                "ADSS_sub_load_solid",
+                {
+                    "solid_custom_position": solid_custom_position,
+                    "solid_plate_id": plate_id,
+                    "solid_sample_no": solid_sample_no,
+                }
+            )
+            epm.add_experiment(
                 "ADSS_sub_sample_aliquot",
                 {
                     "EquilibrationTime_s": EquilibrationTime_s,
@@ -627,7 +635,7 @@ def ADSS_CA_NaOH_validation(
                     "samplerate_sec": samplerate_sec,
                     "CA_duration_sec": CA_duration_sec,
                     "aliquot_volume_ul": aliquot_volume_ul,
-                    "aliquot_intervals_sec": aliquot_intervals_sec,
+                    "aliquot_times_sec": aliquot_times_sec,
                     "aliquot_insitu": True,
                 },
             )
