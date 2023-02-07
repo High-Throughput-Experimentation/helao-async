@@ -689,9 +689,9 @@ class Calc:
             )
 
         return_dict = {
-            "epoch": time.time(),
-            "mean_co2_ppm": mean_co2_ppm,
-            "redo_purge": loop_condition,
+            "epoch": float(time.time()),
+            "mean_co2_ppm": float(mean_co2_ppm),
+            "redo_purge": bool(loop_condition),
         }
         return return_dict
 
