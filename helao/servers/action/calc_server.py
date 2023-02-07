@@ -95,6 +95,7 @@ def makeApp(confPrefix, servKey, helao_root):
     ):
         active = await app.base.setup_and_contain_action(action_abbr="checkCO2")
         result = app.driver.check_co2_purge_level(active)
+        app.base.print_message(f"result dict was: {result}")
         await active.enqueue_data_dflt(datadict=result)
         finished_action = await active.finish()
         return finished_action.as_dict()
