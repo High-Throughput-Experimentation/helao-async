@@ -661,7 +661,9 @@ class Calc:
             )
             world_config = self.base.fastapp.helao_cfg
             orch_name = [
-                k for k, d in world_config.items() if d["group"] == "orchestrator"
+                k
+                for k, d in world_config.get("servers", {}).items()
+                if d["group"] == "orchestrator"
             ][0]
             rep_exp = Experiment(
                 experiment_name=repeat_experiment_name,
