@@ -864,16 +864,9 @@ def CCSI_sub_drain_and_clean(
             "purge_if": apm.pars.purge_if,
             "repeat_experiment_name": "CCSI_sub_drain_and_clean",
             "repeat_experiment_params": {
-                #                k: v for k, v in vars(apm.pars).items() if not k.startswith('experiment')
-                "Waterclean_volume_ul": 5000,
-                "Syringe_retraction_ul": 500,
-                "Syringe_rate_ulsec": 500,
-                "LiquidFillWait_s": 15,
-                "co2measure_duration": 20,
-                "co2measure_acqrate": 0.1,
-                "co2_ppm_thresh": 90000,
-                "purge_if": -0.05,
-                "HSpurge_duration": 20,
+                k: v
+                for k, v in vars(apm.pars).items()
+                if not k.startswith("experiment")
             },
         },
     )
