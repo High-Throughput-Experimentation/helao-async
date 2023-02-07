@@ -675,11 +675,10 @@ class Calc:
                 world_config,
                 orch_name,
                 "insert_experiment",
-                params_dict={
-                    "idx": 0,
-                },
+                params_dict={},
                 json_dict={
-                    "experiment": rep_exp.as_dict(),
+                    "idx": 0,
+                    "experiment": rep_exp.json_dict(),
                 },
             )
             self.base.print_message(f"insert_experiment got response: {resp}")
