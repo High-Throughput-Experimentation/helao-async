@@ -6,7 +6,7 @@ from copy import copy
 from scipy.signal import savgol_filter
 from ruamel.yaml import YAML
 
-from helao.servers.base import Base
+from helao.servers.base import Base, Active
 from helao.helpers.premodels import Experiment
 from helao.helpers.file_mapper import FileMapper
 from helao.helpers.dispatcher import async_private_dispatcher
@@ -108,7 +108,7 @@ class Calc:
 
         return hlo_dict
 
-    def calc_uvis_abs(self, activeobj):
+    def calc_uvis_abs(self, activeobj: Active):
         """Figure of merit calculator for UVIS TR, DR, and T techniques."""
         seq_reldir = activeobj.action.get_sequence_dir()
         hlo_dict = self.gather_seq_data(seq_reldir, "acquire_spec")
@@ -613,15 +613,13 @@ class Calc:
 
         return datadict, arraydict
 
-    async def check_co2_purge_level(
-        self,
-        activeobj,
-        co2_ppm_thresh=600,
-        purge_if="above",
-        repeat_experiment_name="CCSI_sub_headspace_purge_and_measure",
-        repeat_experiment_params={},
-        **kwargs,
-    ):
+    async def check_co2_purge_level(self, activeobj: Active):
+        params = activeobj.action.action_params
+        co2_ppm_thresh = params["co2_ppm_thresh"]
+        purge_if = params["purge_if"]
+        repeat_experiment_name = params["repeat_experiment_name"]
+        repeat_experiment_params = params["repeat_experiment_params"]
+        kwargs = params["repeat_experiment_kwargs"]
         seq_reldir = activeobj.action.get_sequence_dir()
         hlo_dict = self.gather_seq_data(seq_reldir, "acquire_co2")
         latest = sorted(hlo_dict.keys())[-1]
@@ -658,7 +656,9 @@ class Calc:
             repeat_experiment_params["co2_ppm_thresh"] = co2_ppm_thresh * (1 + purge_if)
 
         if loop_condition:
-            self.base.print_message(f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition, looping.")
+            self.base.print_message(
+                f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition, looping."
+            )
             world_config = self.base.fastapp.helao_cfg
             orch_name = [
                 k for k, d in world_config.items() if d["group"] == "orchestrator"
