@@ -658,6 +658,7 @@ class Calc:
             repeat_experiment_params["co2_ppm_thresh"] = co2_ppm_thresh * (1 + purge_if)
 
         if loop_condition:
+            self.base.print_message(f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition, looping.")
             world_config = self.base.fastapp.helao_cfg
             orch_name = [
                 k for k, d in world_config.items() if d["group"] == "orchestrator"
