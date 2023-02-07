@@ -67,7 +67,6 @@ hlotags_metadata = [
 def makeOrchServ(
     config, server_key, server_title, description, version, driver_class=None
 ):
-
     app = HelaoFastAPI(
         helao_cfg=config,
         helao_srv=server_key,
@@ -259,7 +258,7 @@ def makeOrchServ(
     ):
         """Add a experiment object to the end of the experiment queue."""
         exp_uuid = await app.orch.add_experiment(
-            seq=app.orch.seq_file, experimenttemplate=experiment.get_exp()
+            seq=app.orch.seq_file, experimentmodel=experiment.get_exp()
         )
         return {"experiment_uuid": exp_uuid}
 
@@ -269,7 +268,7 @@ def makeOrchServ(
     ):
         """Add a experiment object to the start of the experiment queue."""
         exp_uuid = await app.orch.add_experiment(
-            seq=app.orch.seq_file, experimenttemplate=experiment.get_exp(), prepend=True
+            seq=app.orch.seq_file, experimentmodel=experiment.get_exp(), prepend=True
         )
         return {"experiment_uuid": exp_uuid}
 
@@ -280,7 +279,7 @@ def makeOrchServ(
     ):
         """Insert a experiment object at experiment queue index."""
         exp_uuid = await app.orch.add_experiment(
-            seq=app.orch.seq_file, experimenttemplate=experiment.get_exp(), at_index=idx
+            seq=app.orch.seq_file, experimentmodel=experiment.get_exp(), at_index=idx
         )
         return {"experiment_uuid": exp_uuid}
 
@@ -639,7 +638,7 @@ class Orch(Base):
     async def seq_unpacker(self):
         for i, experimentmodel in enumerate(self.active_sequence.experiment_plan_list):
             # self.print_message(
-            #     f"unpack experiment {experimenttemplate.experiment_name}"
+            #     f"unpack experiment {experimentmodel.experiment_name}"
             # )
             await self.add_experiment(
                 seq=self.seq_file, experimentmodel=experimentmodel
