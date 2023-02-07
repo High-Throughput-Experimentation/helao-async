@@ -622,7 +622,7 @@ class Calc:
         kwargs = params["repeat_experiment_kwargs"]
         seq_reldir = activeobj.action.get_sequence_dir()
         hlo_dict = self.gather_seq_data(seq_reldir, "acquire_co2")
-        latest = sorted(hlo_dict.keys())[-1]
+        latest = hlo_dict[sorted(hlo_dict.keys())[-1]]
 
         mean_co2_ppm = np.mean(latest["data"]["co2_ppm"])
         if isinstance(purge_if, str):
