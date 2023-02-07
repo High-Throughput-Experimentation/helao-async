@@ -26,6 +26,7 @@ config["servers"] = {
         "group": "orchestrator",
         "fast": "async_orch2",
         "params": {"enable_op": True, "bokeh_port": 5002},
+        "verbose": True,
     },
     "MOTOR": {
         "host": "127.0.0.1",
