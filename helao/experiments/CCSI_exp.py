@@ -23,8 +23,7 @@ __all__ = [
     "CCSI_sub_initialization_firstpart",
     "CCSI_sub_liquidfill_syringes",
     "CCSI_sub_drain_and_clean",
-
-
+    "CCSI_debug_co2purge",
 ]
 
 ###
@@ -800,5 +799,37 @@ def CCSI_sub_drain_and_clean(
     # })
 
     return apm.action_list
+
+
+def CCSI_debug_co2purge(
+    experiment: Experiment,
+    experiment_version: int = 3,
+    co2measure_duration: float = 10,
+    co2measure_acqrate: float = 0.1,
+    co2_ppm_thresh: float = 90000,
+    purge_if: Union[str, float] = -0.05,
+):
+    apm = ActionPlanMaker()
+    apm.add(CO2S_server, "acquire_co2", {"duration": apm.pars.co2measure_duration, "acquisition_rate": apm.pars.co2measure_acqrate},
+        technique_name="liquid_purge",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+        ],
+    )
+    apm.add(
+        CALC_server,
+        "check_co2_purge",
+        {
+            "co2_ppm_thresh": apm.pars.co2_ppm_thresh,
+            "purge_if": apm.pars.purge_if,
+            "repeat_experiment_name": "CCSI_sub_drain_and_clean",
+            "repeat_experiment_params": {
+               k: v for k, v in vars(apm.pars).items() if not k.startswith('experiment')
+            }
+        }
+    )
+    return apm.action_list
+
 
 
