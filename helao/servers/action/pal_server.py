@@ -883,7 +883,7 @@ def makeApp(confPrefix, servKey, helao_root):
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
         custom: Optional[dev_customitems] = None,
-        source_liquid_in: Optional[SampleUnion] = Body(
+        source_liquid_in: Optional[LiquidSample] = Body(
             LiquidSample(**{"sample_no": 1, "machine_name": gethostname()}), embed=True
         ),
         volume_ml: float = 0.0,
