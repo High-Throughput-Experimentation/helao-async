@@ -40,13 +40,13 @@ from helao.servers.orch import HelaoOrch
 from helao.helpers.config_loader import config_loader
 
 
-def makeApp(confPrefix, servKey, helao_root):
+def makeApp(confPrefix, server_key, helao_root):
     config = config_loader(confPrefix, helao_root)
 
     app = HelaoOrch(
         config,
-        servKey,
-        servKey,
+        server_key,
+        server_key,
         "Orchestrator",
         version=3.0,
         driver_class=None,

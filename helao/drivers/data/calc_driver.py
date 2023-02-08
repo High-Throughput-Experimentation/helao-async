@@ -19,7 +19,7 @@ def handlenan_savgol_filter(
     nans = np.isnan(d_arr)
     xarr = np.arange(len(d_arr))
     if len(nans) > 1 and len(nans) < len(d_arr):
-        d_arr[nans] = np.interp(xarr[nans], xarr[~nans], d_arr[~nans])
+        d_arr[nans] = interp(xarr[nans], xarr[~nans], d_arr[~nans])
         naninds = np.where(np.isnan(d_arr))[0]
         if len(naninds) > 1:
             d_arr[naninds] = np.array(

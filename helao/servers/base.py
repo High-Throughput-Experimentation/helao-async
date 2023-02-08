@@ -164,7 +164,7 @@ class HelaoBase(HelaoFastAPI):
                 retval = {"shutdown"}
             return retval
 
-        @self.post(f"/{server_key}/estop", tags=["public"])
+        @self.post(f"/{server_key}/estop", tags=["action"])
         async def estop(
             action: Optional[Action] = Body({}, embed=True),
             switch: Optional[bool] = True,
@@ -470,11 +470,11 @@ class Base:
 
         # action name should be the last one
         action_name = urlname.strip("/").split("/")[-1]
-        # use the already known servKey, not the one from the url
-        servKey = self.server.server_name
+        # use the already known server_key, not the one from the url
+        server_key = self.server.server_name
 
         action.action_server = MachineModel(
-            server_name=servKey, machine_name=gethostname()
+            server_name=server_key, machine_name=gethostname()
         )
         action.action_name = action_name
 
