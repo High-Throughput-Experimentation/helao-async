@@ -414,6 +414,14 @@ class Orch(Base):
         self.current_stop_message = ""
 
     def myinit(self):
+        self.aloop = asyncio.get_running_loop()
+        if self.ntp_last_sync is None:
+            asyncio.gather(self.get_ntp_time())
+
+        self.sync_ntp_task_run = False
+        self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
+        self.bufferer = self.aloop.create_task(self.live_buffer_task())
+
         if self.op_enabled:
             self.start_operator()
         self.status_subscriber = asyncio.create_task(self.subscribe_all())
