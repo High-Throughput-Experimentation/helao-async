@@ -23,7 +23,7 @@ from bokeh.server.server import Server
 from helao.servers.base import Base
 from helaocore.error import ErrorCodes
 from helao.helpers.premodels import Action
-from helao.helpers.make_vis_serv import makeVisServ
+from helao.servers.vis import HelaoVis
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 from helao.helpers.active_params import ActiveParams
 from helaocore.models.file import FileConnParams
@@ -215,14 +215,10 @@ class Galil:
         # self.bokehapp.io_loop.add_callback(self.bokehapp.show, f"/{servPy}")
 
     def makeBokehApp(self, doc, motor):
-        app = makeVisServ(
+        app = HelaoVis(
             config=self.base.world_cfg,
             server_key=self.base.server.server_name,
             doc=doc,
-            server_title=self.base.server.server_name,
-            description=f"{self.base.run_type} Aligner",
-            version=2.0,
-            driver_class=None,
         )
 
         doc.aligner = Aligner(app.vis, motor)

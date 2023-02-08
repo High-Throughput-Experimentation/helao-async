@@ -7,7 +7,7 @@ Finished actions which do not contribute process information are pushed to
 
 __all__ = ["makeApp"]
 
-from helao.servers.base import makeActionServ
+from helao.servers.base import HelaoBase
 from helao.drivers.data.dbpack_driver import DBPack
 from helao.helpers.config_loader import config_loader
 
@@ -16,7 +16,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     config = config_loader(confPrefix, helao_root)
 
-    app = makeActionServ(
+    app = HelaoBase(
         config=config,
         server_key=servKey,
         server_title=servKey,

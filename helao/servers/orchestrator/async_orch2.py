@@ -36,27 +36,20 @@ a OrchHandler class object, the core functionality of an async orchestrator.
 
 __all__ = ["makeApp"]
 
-from importlib import import_module
-from typing import Optional
-import asyncio
-import time
-from fastapi import Body
-
-from helao.servers.orch import makeOrchServ
-from helao.helpers.premodels import Action
+from helao.servers.orch import HelaoOrch
 from helao.helpers.config_loader import config_loader
+
 
 def makeApp(confPrefix, servKey, helao_root):
     config = config_loader(confPrefix, helao_root)
 
-    app = makeOrchServ(
+    app = HelaoOrch(
         config,
         servKey,
         servKey,
-        "Gamry instrument/action server",
-        version=2.0,
-        driver_class=None
+        "Orchestrator",
+        version=3.0,
+        driver_class=None,
     )
-
 
     return app

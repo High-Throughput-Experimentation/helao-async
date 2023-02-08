@@ -8,7 +8,7 @@ __all__ = ["makeApp"]
 from typing import Optional, List
 from fastapi import Body
 from helao.helpers.premodels import Action
-from helao.servers.base import makeActionServ
+from helao.servers.base import HelaoBase
 from helaocore.models.sample import SampleUnion
 from helao.drivers.sensor.sprintir_driver import SprintIR, CO2MonExec
 from helao.helpers.config_loader import config_loader
@@ -17,7 +17,7 @@ from helao.helpers.config_loader import config_loader
 def makeApp(confPrefix, servKey, helao_root):
     config = config_loader(confPrefix, helao_root)
 
-    app = makeActionServ(
+    app = HelaoBase(
         config=config,
         server_key=servKey,
         server_title=servKey,

@@ -5,7 +5,7 @@ from socket import gethostname
 from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
 
-from helao.helpers.make_vis_serv import makeVisServ
+from helao.servers.vis import HelaoVis
 from helao.servers.vis import Vis
 from helao.helpers.config_loader import config_loader
 from helao.servers.visualizer.gamry_vis import C_potvis
@@ -31,14 +31,10 @@ def makeBokehApp(doc, confPrefix, servKey, helao_root):
 
     config = config_loader(confPrefix, helao_root)
 
-    app = makeVisServ(
+    app = HelaoVis(
         config=config,
         server_key=servKey,
         doc=doc,
-        server_title=servKey,
-        description="Action Visualizer",
-        version=2.0,
-        driver_class=None,
     )
 
     app.vis.doc.add_root(

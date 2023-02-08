@@ -215,10 +215,10 @@ class Experiment(Sequence, ExperimentModel):
 class Action(Experiment, ActionModel):
     "Sample-action identifier class."
     # not in ActionModel:
-    start_condition: Optional[ActionStartCondition] = ActionStartCondition.wait_for_all
-    save_act: Optional[bool] = True  # default should be true
-    save_data: Optional[bool] = True  # default should be true
-    AUX_file_paths: Optional[List[Path]] = Field(default=[])
+    start_condition: ActionStartCondition = ActionStartCondition.wait_for_all
+    save_act: bool = True  # default should be true
+    save_data: bool = True  # default should be true
+    AUX_file_paths: List[Path] = Field(default=[])
 
     # moved to ActionModel
     # error_code: Optional[ErrorCodes] = ErrorCodes.none
@@ -227,7 +227,7 @@ class Action(Experiment, ActionModel):
     to_globalexp_params: Optional[Union[list, dict]] = []
 
     # internal
-    file_conn_keys: Optional[List[UUID]] = Field(default=[])
+    file_conn_keys: List[UUID] = Field(default=[])
 
     # flag for datalogger
     # None will signal default behaviour as before

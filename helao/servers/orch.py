@@ -11,7 +11,7 @@
 
 """
 
-__all__ = ["Orch", "makeOrchServ"]
+__all__ = ["Orch", "HelaoOrch"]
 
 import asyncio
 import sys
@@ -41,7 +41,7 @@ from helaocore.error import ErrorCodes
 
 
 from helao.helpers.server_api import HelaoFastAPI
-from helao.helpers.make_vis_serv import makeVisServ
+from helao.servers.vis import HelaoVis
 from helao.helpers.import_experiments import import_experiments
 from helao.helpers.import_sequences import import_sequences
 from helao.helpers.dispatcher import async_private_dispatcher, async_action_dispatcher
@@ -56,7 +56,6 @@ from helao.helpers.zdeque import zdeque
 # ANSI color codes converted to the Windows versions
 # strip colors if stdout is redirected
 colorama.init(strip=not sys.stdout.isatty())
-# colorama.init()
 
 hlotags_metadata = [
     {"name": "public", "description": "public orchestrator endpoints"},
@@ -64,286 +63,334 @@ hlotags_metadata = [
 ]
 
 
-def makeOrchServ(
-    config, server_key, server_title, description, version, driver_class=None
-):
-    app = HelaoFastAPI(
-        helao_cfg=config,
-        helao_srv=server_key,
-        title=server_title,
-        description=description,
-        version=version,
-    )
-
-    @app.on_event("startup")
-    async def startup_event():
-        """Run startup actions.
-
-        When FastAPI server starts, create a global OrchHandler object,
-        initiate the monitor_states coroutine which runs forever,
-        and append dummy experiments to the
-        experiment queue for testing.
-        """
-        app.orch = Orch(app)
-        if driver_class:
-            app.driver = driver_class(app.orch)
-
-    @app.post("/get_status", tags=["private"])
-    def get_status():
-        # print(app.orch.orchstatusmodel.as_json())
-        return app.orch.orchstatusmodel.as_json()
-
-    @app.post("/update_status", tags=["private"])
-    async def update_status(
-        actionservermodel: Optional[ActionServerModel] = Body({}, embed=True)
+class HelaoOrch(HelaoFastAPI):
+    def __init__(
+        self,
+        config,
+        server_key,
+        server_title,
+        description,
+        version,
+        driver_class=None,
     ):
-        if actionservermodel is None:
-            return False
-        app.orch.print_message(
-            f"orch '{app.orch.server.server_name}' "
-            f"got status from "
-            f"'{actionservermodel.action_server.server_name}': "
-            f"{actionservermodel.endpoints}"
+        super().__init__(
+            helao_cfg=config,
+            helao_srv=server_key,
+            title=server_title,
+            description=description,
+            version=version,
+            openapi_tags=hlotags_metadata,
         )
-        return await app.orch.update_status(actionservermodel=actionservermodel)
+        self.driver = None
 
-    @app.post("/update_nonblocking", tags=["private"])
-    async def update_nonblocking(
-        actionmodel: Optional[ActionModel] = Body({}, embed=True)
-    ):
-        app.orch.print_message(
-            f"'{app.orch.server.server_name.upper()}' "
-            f"got nonblocking status from "
-            f"'{actionmodel.action_server.server_name}': "
-            f"exid: {actionmodel.exid} -- status: {actionmodel.action_status}"
-        )
-        result_dict = app.orch.update_nonblocking(actionmodel)
-        return result_dict
+        @self.on_event("startup")
+        async def startup_event():
+            """Run startup actions.
 
-    @app.post("/attach_client", tags=["private"])
-    async def attach_client(client_servkey: str):
-        return await app.orch.attach_client(client_servkey)
+            When FastAPI server starts, create a global OrchHandler object,
+            initiate the monitor_states coroutine which runs forever,
+            and append dummy experiments to the
+            experiment queue for testing.
+            """
+            self.orch = Orch(fastapp=self)
+            self.orch.myinit()
+            if driver_class:
+                self.driver = driver_class(self.orch)
 
-    @app.websocket("/ws_status")
-    async def websocket_status(websocket: WebSocket):
-        """Subscribe to orchestrator status messages.
+        # --- BASE endpoints ---
+        @self.websocket("/ws_status")
+        async def websocket_status(websocket: WebSocket):
+            """Subscribe to orchestrator status messages.
 
-        Args:
-        websocket: a fastapi.WebSocket object
-        """
-        await app.orch.ws_status(websocket)
+            Args:
+            websocket: a fastapi.WebSocket object
+            """
+            await self.orch.ws_status(websocket)
 
-    @app.websocket("/ws_data")
-    async def websocket_data(websocket: WebSocket):
-        """Subscribe to action server status dicts.
+        @self.websocket("/ws_data")
+        async def websocket_data(websocket: WebSocket):
+            """Subscribe to action server status dicts.
 
-        Args:
-        websocket: a fastapi.WebSocket object
-        """
-        await app.orch.ws_data(websocket)
+            Args:
+            websocket: a fastapi.WebSocket object
+            """
+            await self.orch.ws_data(websocket)
 
-    @app.post("/start", tags=["private"])
-    async def start():
-        """Begin experimenting experiment and action queues."""
-        await app.orch.start()
-        return {}
+        @self.websocket("/ws_live")
+        async def websocket_live(websocket: WebSocket):
+            """Broadcast live buffer dicts.
 
-    @app.post("/estop", tags=["private"])
-    async def estop():
-        """Emergency stop experiment and action queues, interrupt running actions."""
-        if app.orch.orchstatusmodel.loop_state == OrchStatus.started:
-            await app.orch.estop_loop()
-        elif app.orch.orchstatusmodel.loop_state == OrchStatus.estop:
-            app.orch.print_message("orchestrator E-STOP flag already raised")
-        else:
-            app.orch.print_message("orchestrator is not running")
-        return {}
+            Args:
+            websocket: a fastapi.WebSocket object
+            """
+            await self.orch.ws_live(websocket)
 
-    @app.post("/stop", tags=["private"])
-    async def stop():
-        """Stop experimenting experiment and action queues after current actions finish."""
-        await app.orch.stop()
-        return {}
+        @self.post("/get_status", tags=["private"])
+        def get_status():
+            return self.orch.actionservermodel
 
-    @app.post("/clear_estop", tags=["private"])
-    async def clear_estop():
-        """Remove emergency stop condition."""
-        if app.orch.orchstatusmodel.loop_state != OrchStatus.estop:
-            app.orch.print_message("orchestrator is not currently in E-STOP")
-        else:
-            await app.orch.clear_estop()
+        @self.post("/attach_client", tags=["private"])
+        async def attach_client(client_servkey: str):
+            return await self.orch.attach_client(client_servkey)
 
-    @app.post("/clear_error", tags=["private"])
-    async def clear_error():
-        """Remove error condition."""
-        if app.orch.orchstatusmodel.loop_state != OrchStatus.error:
-            app.orch.print_message("orchestrator is not currently in ERROR")
-        else:
-            await app.orch.clear_error()
+        @self.post("/stop_executor", tags=["private"])
+        def stop_executor(executor_id: str):
+            return self.orch.stop_executor(executor_id)
 
-    @app.post("/skip_experiment", tags=["private"])
-    async def skip_experiment():
-        """Clear the present action queue while running."""
-        await app.orch.skip()
-        return {}
+        @self.post("/endpoints", tags=["private"])
+        def get_all_urls():
+            """Return a list of all endpoints on this server."""
+            return self.orch.get_endpoint_urls()
 
-    @app.post("/clear_actions", tags=["private"])
-    async def clear_actions():
-        """Clear the present action queue while stopped."""
-        await app.orch.clear_actions()
-        return {}
+        @self.post("/get_lbuf", tags=["private"])
+        def get_lbuf():
+            return self.orch.live_buffer
 
-    @app.post("/clear_experiments", tags=["private"])
-    async def clear_experiments():
-        """Clear the present experiment queue while stopped."""
-        await app.orch.clear_experiments()
-        return {}
+        @self.post("/list_executors", tags=["private"])
+        def list_executors():
+            return list(self.orch.executors.keys())
 
-    @app.post("/append_sequence", tags=["private"])
-    async def append_sequence(
-        sequence: Optional[Sequence] = Body({}, embed=True),
-    ):
-        seq_uuid = await app.orch.add_sequence(sequence=sequence)
-        return {"sequence_uuid": seq_uuid}
+        @self.post("/shutdown", tags=["private"])
+        def post_shutdown():
+            shutdown_event()
 
-    @app.post(f"/{server_key}/wait")
-    async def wait(
-        action: Optional[Action] = Body({}, embed=True),
-        waittime: Optional[float] = 10.0,
-    ):
-        """Sleep action"""
-        active = await app.orch.setup_and_contain_action()
-        active.action.action_abbr = "wait"
-        executor = WaitExec(
-            active=active,
-            oneoff=False,
-        )
-        active_action_dict = await active.start_executor(executor)
-        return active_action_dict
-        # active = await app.orch.setup_and_contain_action()
-        # partial_action = active.action.as_dict()
-        # app.orch.start_wait(active)
-        # while app.orch.last_wait_ts == app.orch.current_wait_ts:
-        #     await asyncio.sleep(0.01)
-        # return partial_action
+        @self.on_event("shutdown")
+        def shutdown_event():
+            """Run shutdown actions."""
+            self.orch.print_message("Stopping operator", info=True)
+            self.orch.bokehapp.stop()
+            self.orch.print_message("orch shutdown", info=True)
+            time.sleep(0.75)
 
-    @app.post(f"/{server_key}/cancel_wait")
-    async def cancel_wait(
-        action: Optional[Action] = Body({}, embed=True),
-        action_version: int = 1,
-    ):
-        """Stop sleep action."""
-        active = await app.orch.setup_and_contain_action()
-        for exid, executor in app.orch.executors.items():
-            if exid.split()[0] == "wait":
-                await executor.stop_action_task()
-        finished_action = await active.finish()
-        return finished_action.as_dict()
+        # --- ORCH-specific endpoints ---
+        @self.post("/global_status", tags=["private"])
+        def global_status():
+            return self.orch.orchstatusmodel.as_json()
 
-    @app.post(f"/{server_key}/interrupt")
-    async def interrupt(
-        action: Optional[Action] = Body({}, embed=True), reason: Optional[str] = "wait"
-    ):
-        """Stop dispatch loop for planned manual intervention."""
-        active = await app.orch.setup_and_contain_action()
-        app.orch.current_stop_message = active.action.action_params["reason"]
-        await app.orch.stop()
-        await app.orch.update_operator(True)
-        finished_action = await active.finish()
-        return finished_action.as_dict()
+        @self.post("/update_status", tags=["private"])
+        async def update_status(
+            actionservermodel: Optional[ActionServerModel] = Body({}, embed=True)
+        ):
+            if actionservermodel is None:
+                return False
+            self.orch.print_message(
+                f"orch '{self.orch.server.server_name}' "
+                f"got status from "
+                f"'{actionservermodel.action_server.server_name}': "
+                f"{actionservermodel.endpoints}"
+            )
+            return await self.orch.update_status(actionservermodel=actionservermodel)
 
-    @app.post("/append_experiment", tags=["private"])
-    async def append_experiment(
-        experiment: Optional[Experiment] = Body({}, embed=True)
-    ):
-        """Add a experiment object to the end of the experiment queue."""
-        exp_uuid = await app.orch.add_experiment(
-            seq=app.orch.seq_file, experimentmodel=experiment.get_exp()
-        )
-        return {"experiment_uuid": exp_uuid}
+        @self.post("/update_nonblocking", tags=["private"])
+        async def update_nonblocking(
+            actionmodel: Optional[ActionModel] = Body({}, embed=True)
+        ):
+            self.orch.print_message(
+                f"'{self.orch.server.server_name.upper()}' "
+                f"got nonblocking status from "
+                f"'{actionmodel.action_server.server_name}': "
+                f"exid: {actionmodel.exid} -- status: {actionmodel.action_status}"
+            )
+            result_dict = self.orch.update_nonblocking(actionmodel)
+            return result_dict
 
-    @app.post("/prepend_experiment")
-    async def prepend_experiment(
-        experiment: Optional[Experiment] = Body({}, embed=True)
-    ):
-        """Add a experiment object to the start of the experiment queue."""
-        exp_uuid = await app.orch.add_experiment(
-            seq=app.orch.seq_file, experimentmodel=experiment.get_exp(), prepend=True
-        )
-        return {"experiment_uuid": exp_uuid}
+        @self.post("/start", tags=["private"])
+        async def start():
+            """Begin experimenting experiment and action queues."""
+            await self.orch.start()
+            return {}
 
-    @app.post("/insert_experiment")
-    async def insert_experiment(
-        experiment: Optional[Experiment] = Body({}, embed=True),
-        idx: Optional[int] = 0,
-    ):
-        """Insert a experiment object at experiment queue index."""
-        exp_uuid = await app.orch.add_experiment(
-            seq=app.orch.seq_file, experimentmodel=experiment.get_exp(), at_index=idx
-        )
-        return {"experiment_uuid": exp_uuid}
+        @self.post("/estop", tags=["private"])
+        async def estop():
+            """Emergency stop experiment and action queues, interrupt running actions."""
+            if self.orch.orchstatusmodel.loop_state == OrchStatus.started:
+                await self.orch.estop_loop()
+            elif self.orch.orchstatusmodel.loop_state == OrchStatus.estop:
+                self.orch.print_message("orchestrator E-STOP flag already raised")
+            else:
+                self.orch.print_message("orchestrator is not running")
+            return {}
 
-    @app.post("/list_sequences", tags=["private"])
-    def list_sequences():
-        """Return the current list of sequences."""
-        return app.orch.list_sequences()
+        @self.post("/stop", tags=["private"])
+        async def stop():
+            """Stop experimenting experiment and action queues after current actions finish."""
+            await self.orch.stop()
+            return {}
 
-    @app.post("/list_experiments", tags=["private"])
-    def list_experiments():
-        """Return the current list of experiments."""
-        return app.orch.list_experiments()
+        @self.post("/clear_estop", tags=["private"])
+        async def clear_estop():
+            """Remove emergency stop condition."""
+            if self.orch.orchstatusmodel.loop_state != OrchStatus.estop:
+                self.orch.print_message("orchestrator is not currently in E-STOP")
+            else:
+                await self.orch.clear_estop()
 
-    @app.post("/active_experiment", tags=["private"])
-    def active_experiment():
-        """Return the active experiment."""
-        return app.orch.get_experiment(last=False)
+        @self.post("/clear_error", tags=["private"])
+        async def clear_error():
+            """Remove error condition."""
+            if self.orch.orchstatusmodel.loop_state != OrchStatus.error:
+                self.orch.print_message("orchestrator is not currently in ERROR")
+            else:
+                await self.orch.clear_error()
 
-    @app.post("/last_experiment", tags=["private"])
-    def last_experiment():
-        """Return the last experiment."""
-        return app.orch.get_experiment(last=True)
+        @self.post("/skip_experiment", tags=["private"])
+        async def skip_experiment():
+            """Clear the present action queue while running."""
+            await self.orch.skip()
+            return {}
 
-    @app.post("/list_actions", tags=["private"])
-    def list_actions():
-        """Return the current list of actions."""
-        return app.orch.list_actions()
+        @self.post("/clear_actions", tags=["private"])
+        async def clear_actions():
+            """Clear the present action queue while stopped."""
+            await self.orch.clear_actions()
+            return {}
 
-    @app.post("/list_active_actions", tags=["private"])
-    def list_active_actions():
-        """Return the current list of actions."""
-        return app.orch.list_active_actions()
+        @self.post("/clear_experiments", tags=["private"])
+        async def clear_experiments():
+            """Clear the present experiment queue while stopped."""
+            await self.orch.clear_experiments()
+            return {}
 
-    @app.post("/endpoints", tags=["private"])
-    def get_all_urls():
-        """Return a list of all endpoints on this server."""
-        return app.orch.get_endpoint_urls()
+        @self.post("/append_sequence", tags=["private"])
+        async def append_sequence(
+            sequence: Optional[Sequence] = Body({}, embed=True),
+        ):
+            seq_uuid = await self.orch.add_sequence(sequence=sequence)
+            return {"sequence_uuid": seq_uuid}
 
-    @app.post("/stop_executor", tags=["private"])
-    def stop_executor(executor_id: str):
-        return app.orch.stop_executor(executor_id)
+        @self.post("/append_experiment", tags=["private"])
+        async def append_experiment(
+            experiment: Optional[Experiment] = Body({}, embed=True)
+        ):
+            """Add a experiment object to the end of the experiment queue."""
+            exp_uuid = await self.orch.add_experiment(
+                seq=self.orch.seq_file, experimentmodel=experiment.get_exp()
+            )
+            return {"experiment_uuid": exp_uuid}
 
-    @app.post("/shutdown", tags=["private"])
-    def post_shutdown():
-        shutdown_event()
+        @self.post("/prepend_experiment")
+        async def prepend_experiment(
+            experiment: Optional[Experiment] = Body({}, embed=True)
+        ):
+            """Add a experiment object to the start of the experiment queue."""
+            exp_uuid = await self.orch.add_experiment(
+                seq=self.orch.seq_file,
+                experimentmodel=experiment.get_exp(),
+                prepend=True,
+            )
+            return {"experiment_uuid": exp_uuid}
 
-    @app.on_event("shutdown")
-    def shutdown_event():
-        """Run shutdown actions."""
-        app.orch.print_message("Stopping operator", info=True)
-        app.orch.bokehapp.stop()
-        app.orch.print_message("orch shutdown", info=True)
-        # emergencyStop = True
-        time.sleep(0.75)
+        @self.post("/insert_experiment")
+        async def insert_experiment(
+            experiment: Optional[Experiment] = Body({}, embed=True),
+            idx: Optional[int] = 0,
+        ):
+            """Insert a experiment object at experiment queue index."""
+            exp_uuid = await self.orch.add_experiment(
+                seq=self.orch.seq_file,
+                experimentmodel=experiment.get_exp(),
+                at_index=idx,
+            )
+            return {"experiment_uuid": exp_uuid}
 
-    @app.post("/list_executors", tags=["private"])
-    def list_executors():
-        return list(app.orch.executors.keys())
+        @self.post("/list_sequences", tags=["private"])
+        def list_sequences():
+            """Return the current list of sequences."""
+            return self.orch.list_sequences()
 
-    @app.post("/list_nonblocking", tags=["private"])
-    def list_non_blocking():
-        return app.orch.nonblocking
+        @self.post("/list_experiments", tags=["private"])
+        def list_experiments():
+            """Return the current list of experiments."""
+            return self.orch.list_experiments()
 
-    return app
+        @self.post("/active_experiment", tags=["private"])
+        def active_experiment():
+            """Return the active experiment."""
+            return self.orch.get_experiment(last=False)
+
+        @self.post("/last_experiment", tags=["private"])
+        def last_experiment():
+            """Return the last experiment."""
+            return self.orch.get_experiment(last=True)
+
+        @self.post("/list_actions", tags=["private"])
+        def list_actions():
+            """Return the current list of actions."""
+            return self.orch.list_actions()
+
+        @self.post("/list_active_actions", tags=["private"])
+        def list_active_actions():
+            """Return the current list of actions."""
+            return self.orch.list_active_actions()
+
+        @self.post("/list_nonblocking", tags=["private"])
+        def list_non_blocking():
+            return self.orch.nonblocking
+
+        @self.post(f"/{server_key}/wait")
+        async def wait(
+            action: Optional[Action] = Body({}, embed=True),
+            waittime: Optional[float] = 10.0,
+        ):
+            """Sleep action"""
+            active = await self.orch.setup_and_contain_action()
+            active.action.action_abbr = "wait"
+            executor = WaitExec(
+                active=active,
+                oneoff=False,
+            )
+            active_action_dict = await active.start_executor(executor)
+            return active_action_dict
+
+        @self.post(f"/{server_key}/cancel_wait")
+        async def cancel_wait(
+            action: Optional[Action] = Body({}, embed=True),
+            action_version: int = 1,
+        ):
+            """Stop sleep action."""
+            active = await self.orch.setup_and_contain_action()
+            for exid, executor in self.orch.executors.items():
+                if exid.split()[0] == "wait":
+                    await executor.stop_action_task()
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+        @self.post(f"/{server_key}/interrupt")
+        async def interrupt(
+            action: Optional[Action] = Body({}, embed=True),
+            reason: Optional[str] = "wait",
+        ):
+            """Stop dispatch loop for planned manual intervention."""
+            active = await self.orch.setup_and_contain_action()
+            self.orch.current_stop_message = active.action.action_params["reason"]
+            await self.orch.stop()
+            await self.orch.update_operator(True)
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+        @self.post(f"/{server_key}/estop", tags=["public"])
+        async def act_estop(
+            action: Optional[Action] = Body({}, embed=True),
+            switch: Optional[bool] = True,
+        ):
+            active = await self.orch.setup_and_contain_action(
+                json_data_keys=["estop"], action_abbr="estop"
+            )
+            has_estop = getattr(self.driver, "estop", None)
+            if has_estop is not None and callable(has_estop):
+                self.orch.print_message("driver has estop function", info=True)
+                await active.enqueue_data_dflt(
+                    datadict={
+                        "estop": await self.driver.estop(**active.action.action_params)
+                    }
+                )
+            else:
+                self.orch.print_message("driver has NO estop function", info=True)
+                self.orch.actionservermodel.estop = switch
+            if switch:
+                active.action.action_status.selfend(HloStatus.estopped)
+            finished_action = await active.finish()
+            return finished_action.as_dict()
 
 
 class Orch(Base):
@@ -365,7 +412,7 @@ class Orch(Base):
     by a self-subscriber task to update the action server status dict and log changes.
     """
 
-    def __init__(self, fastapp: HelaoFastAPI):
+    def __init__(self, fastapp: HelaoOrch):
         super().__init__(fastapp)
         self.experiment_lib = import_experiments(
             world_config_dict=self.world_cfg,
@@ -398,9 +445,6 @@ class Orch(Base):
         self.bokehapp = None
         self.orch_op = None
         self.op_enabled = self.server_params.get("enable_op", False)
-        if self.op_enabled:
-            # asyncio.gather(self.init_Gamry(self.Gamry_devid))
-            self.start_operator()
         # basemodel which holds all information for orch
         self.orchstatusmodel = GlobalStatusModel(orchestrator=self.server)
         self.orchstatusmodel._sort_status()
@@ -420,12 +464,27 @@ class Orch(Base):
         self.current_wait_ts = 0
         self.last_wait_ts = 0
 
-        self.status_subscriber = asyncio.create_task(self.subscribe_all())
-
         self.globstat_q = MultisubscriberQueue()
         self.globstat_clients = set()
-        self.globstat_broadcaster = asyncio.create_task(self.globstat_broadcast_task())
         self.current_stop_message = ""
+
+    def myinit(self):
+        self.aloop = asyncio.get_running_loop()
+        if self.ntp_last_sync is None:
+            asyncio.gather(self.get_ntp_time())
+
+        self.sync_ntp_task_run = False
+        self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
+        self.bufferer = self.aloop.create_task(self.live_buffer_task())
+        asyncio.gather(self.init_endpoint_status())
+
+        self.fast_urls = self.get_endpoint_urls()
+        self.status_logger = self.aloop.create_task(self.log_status_task())
+
+        if self.op_enabled:
+            self.start_operator()
+        self.status_subscriber = asyncio.create_task(self.subscribe_all())
+        self.globstat_broadcaster = asyncio.create_task(self.globstat_broadcast_task())
 
     def register_action_uuid(self, action_uuid):
         if len(self.last_10_action_uuids) == 10:
@@ -452,14 +511,10 @@ class Orch(Base):
         # bokehapp.io_loop.start()
 
     def makeBokehApp(self, doc, orch):
-        app = makeVisServ(
+        app = HelaoVis(
             config=self.world_cfg,
             server_key=self.server.server_name,
             doc=doc,
-            server_title=self.server.server_name,
-            description=f"{self.run_type} Operator",
-            version=2.0,
-            driver_class=None,
         )
 
         # _ = Operator(app.vis)
@@ -856,37 +911,6 @@ class Orch(Base):
                 self.world_cfg, A
             )
 
-            # orch gets back an active action dict, we can self-register the dispatched action in global status
-            resmod = ActionModel(**result_actiondict)
-            srvname = resmod.action_server.server_name
-            actname = resmod.action_name
-            resuuid = resmod.action_uuid
-            actstat = resmod.action_status
-            srvkeys = self.orchstatusmodel.server_dict.keys()
-            srvkey = [k for k in srvkeys if k[0] == srvname][0]
-            if HloStatus.active in actstat:
-                self.orchstatusmodel.active_dict[resuuid] = resmod
-                self.orchstatusmodel.server_dict[srvkey].endpoints[actname].active_dict[
-                    resuuid
-                ] = resmod
-            else:
-                self.orchstatusmodel.nonactive_dict[actstat[0]][resuuid] = resmod
-                self.orchstatusmodel.server_dict[srvkey].endpoints[
-                    actname
-                ].nonactive_dict[actstat[0]][resuuid] = resmod
-            # await self.interrupt_q.put(self.orchstatusmodel)
-            # await self.update_operator(True)
-            # await self.globstat_q.put(self.orchstatusmodel.as_json())
-
-            endpoint_uuids = [
-                str(k) for k in self.orchstatusmodel.active_dict.keys()
-            ] + [
-                str(k)
-                for k in self.orchstatusmodel.nonactive_dict.get("finished", {}).keys()
-            ]
-            self.print_message(
-                f"Current {A.action_name} received uuids: {endpoint_uuids}"
-            )
             result_uuid = result_actiondict["action_uuid"]
             self.track_action_uuid(UUID(result_uuid))
             self.print_message(
@@ -900,6 +924,37 @@ class Orch(Base):
                     error_code = await self.loop_task_dispatch_action()
 
             if not A.nonblocking:
+                # orch gets back an active action dict, we can self-register the dispatched action in global status
+                resmod = ActionModel(**result_actiondict)
+                srvname = resmod.action_server.server_name
+                actname = resmod.action_name
+                resuuid = resmod.action_uuid
+                actstat = resmod.action_status
+                srvkeys = self.orchstatusmodel.server_dict.keys()
+                srvkey = [k for k in srvkeys if k[0] == srvname][0]
+                if HloStatus.active in actstat:
+                    self.orchstatusmodel.active_dict[resuuid] = resmod
+                    self.orchstatusmodel.server_dict[srvkey].endpoints[actname].active_dict[
+                        resuuid
+                    ] = resmod
+                else:
+                    self.orchstatusmodel.nonactive_dict[actstat[0]][resuuid] = resmod
+                    self.orchstatusmodel.server_dict[srvkey].endpoints[
+                        actname
+                    ].nonactive_dict[actstat[0]][resuuid] = resmod
+                # await self.interrupt_q.put(self.orchstatusmodel)
+                # await self.update_operator(True)
+                # await self.globstat_q.put(self.orchstatusmodel.as_json())
+
+                endpoint_uuids = [
+                    str(k) for k in self.orchstatusmodel.active_dict.keys()
+                ] + [
+                    str(k)
+                    for k in self.orchstatusmodel.nonactive_dict.get("finished", {}).keys()
+                ]
+                self.print_message(
+                    f"Current {A.action_name} received uuids: {endpoint_uuids}"
+                )
                 while result_uuid not in endpoint_uuids:
                     self.print_message(
                         f"Waiting for dispatched {A.action_name}, {A.action_uuid} request to register in global status."

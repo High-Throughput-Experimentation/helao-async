@@ -7,7 +7,7 @@ from time import strftime
 from fastapi import Body, Query
 from typing import Optional, List  # , Tuple
 
-from helao.servers.base import makeActionServ
+from helao.servers.base import HelaoBase
 from helao.drivers.robot.pal_driver import (
     PAL,
     Spacingmethod,
@@ -37,7 +37,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     config = config_loader(confPrefix, helao_root)
 
-    app = makeActionServ(
+    app = HelaoBase(
         config,
         servKey,
         servKey,
