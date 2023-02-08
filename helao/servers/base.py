@@ -20,12 +20,10 @@ import ntplib
 import numpy as np
 import pyaml
 
-from fastapi import FastAPI
 from fastapi import Body, WebSocket
 from fastapi.dependencies.utils import get_flat_params
 
-
-# from helao.helpers.server_api import HelaoFastAPI
+from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.dispatcher import async_private_dispatcher
 
 from helao.helpers.helao_dirs import helao_dirs
@@ -61,32 +59,11 @@ from helaocore.error import ErrorCodes
 # ANSI color codes converted to the Windows versions
 # strip colors if stdout is redirected
 colorama.init(strip=not sys.stdout.isatty())
-# colorama.init()
 
 hlotags_metadata = [
     {"name": "public", "description": "public action server endpoints"},
     {"name": "private", "description": "private action server endpoints"},
 ]
-
-# TODO: major refactor, move makeActionServ & makeVisServ methods under Base
-# 1. input confPrefix, servKey, helao_root to Base init
-# 2. initialize driver and app in Base
-# 3. Base method returns app for server templates
-# 4. need to revise drivers that directly reference Base (almost all use printmsg),
-#    better to remove Base dependency and use Executor as shim, and all external calls
-#    to driver should return dict: {"response": ..., "data": ..., "error": ...}
-# 5. Executors can be stored alongside driver module, but better to put in server
-
-
-class HelaoFastAPI(FastAPI):
-    """Standard FastAPI class with HELAO config attached for simpler import."""
-
-    def __init__(self, helao_cfg: dict, helao_srv: str, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helao_cfg = helao_cfg
-        self.helao_srv = helao_srv
-        self.server_cfg = self.helao_cfg["servers"][self.helao_srv]
-        self.server_params = self.server_cfg.get("params", {})
 
 
 class HelaoBase(HelaoFastAPI):
@@ -99,8 +76,6 @@ class HelaoBase(HelaoFastAPI):
         version,
         driver_class=None,
         dyn_endpoints=None,
-        *args,
-        **kwargs,
     ):
         super().__init__(
             helao_cfg=config,
@@ -180,9 +155,7 @@ class HelaoBase(HelaoFastAPI):
                     }
                 )
             else:
-                self.base.print_message(
-                    "driver has NO estop function", info=True
-                )
+                self.base.print_message("driver has NO estop function", info=True)
                 self.base.actionservermodel.estop = switch
             if switch:
                 active.action.action_status.selfend(HloStatus.estopped)
@@ -208,14 +181,10 @@ class HelaoBase(HelaoFastAPI):
 
             shutdown = getattr(self.driver, "shutdown", None)
             if shutdown is not None and callable(shutdown):
-                self.base.print_message(
-                    "driver has shutdown function", info=True
-                )
+                self.base.print_message("driver has shutdown function", info=True)
                 retval = shutdown()
             else:
-                self.base.print_message(
-                    "driver has NO shutdown function", error=True
-                )
+                self.base.print_message("driver has NO shutdown function", error=True)
                 retval = {"shutdown"}
             return retval
 
