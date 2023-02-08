@@ -12,7 +12,7 @@ import time
 from typing import Optional, List
 from fastapi import Body
 from helao.helpers.premodels import Action
-from helao.servers.base import makeActionServ
+from helao.servers.base import HelaoBase
 from helaocore.models.sample import SampleUnion
 from helaocore.models.file import HloHeaderModel
 from helao.drivers.spec.spectral_products_driver import SM303
@@ -25,7 +25,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     config = config_loader(confPrefix, helao_root)
 
-    app = makeActionServ(
+    app = HelaoBase(
         config=config,
         server_key=servKey,
         server_title=servKey,

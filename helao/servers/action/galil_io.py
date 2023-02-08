@@ -2,7 +2,7 @@ __all__ = ["makeApp"]
 
 from typing import Optional, Union, List
 from fastapi import Body, Query
-from helao.servers.base import makeActionServ
+from helao.servers.base import HelaoBase
 from helao.drivers.io.galil_io_driver import Galil, TriggerType, AiMonExec
 from helao.helpers.premodels import Action
 from helaocore.models.sample import LiquidSample, SampleUnion
@@ -241,7 +241,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     config = config_loader(confPrefix, helao_root)
 
-    app = makeActionServ(
+    app = HelaoBase(
         config=config,
         server_key=servKey,
         server_title=servKey,

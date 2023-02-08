@@ -5,7 +5,7 @@ __all__ = ["makeApp"]
 from typing import Optional
 from fastapi import Body
 from importlib import import_module
-from helao.servers.base import makeActionServ
+from helao.servers.base import HelaoBase
 from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
 
@@ -33,7 +33,7 @@ def makeApp(confPrefix, servKey, helao_root):
     # print("Unknown data mode")
     #    from HTEdata_dummy import HTEdata
 
-    app = makeActionServ(
+    app = HelaoBase(
         config=config,
         server_key=servKey,
         server_title=servKey,
