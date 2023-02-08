@@ -40,7 +40,6 @@ from helaocore.models.orchstatus import OrchStatus
 from helaocore.error import ErrorCodes
 
 
-from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.make_vis_serv import makeVisServ
 from helao.helpers.import_experiments import import_experiments
 from helao.helpers.import_sequences import import_sequences
@@ -48,7 +47,7 @@ from helao.helpers.dispatcher import async_private_dispatcher, async_action_disp
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.yml_finisher import move_dir
 from helao.helpers.premodels import Sequence, Experiment, Action
-from helao.servers.base import Base, Active, Executor
+from helao.servers.base import Base, Active, Executor, HelaoBase
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.zdeque import zdeque
 
@@ -67,12 +66,12 @@ hlotags_metadata = [
 def makeOrchServ(
     config, server_key, server_title, description, version, driver_class=None
 ):
-    app = HelaoFastAPI(
-        helao_cfg=config,
-        helao_srv=server_key,
-        title=server_title,
-        description=description,
-        version=version,
+    app = HelaoBase(
+        config,
+        server_key,
+        server_title,
+        description,
+        version,
     )
 
     @app.on_event("startup")
