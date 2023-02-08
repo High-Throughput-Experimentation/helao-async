@@ -147,7 +147,7 @@ class HelaoBase(HelaoFastAPI):
             await self.base.ws_live(websocket)
 
         @self.post("/get_status", tags=["private"])
-        def status_wrselfer():
+        def get_status():
             return self.base.actionservermodel
 
         @self.post("/attach_client", tags=["private"])

@@ -87,8 +87,8 @@ def makeOrchServ(
         if driver_class:
             app.driver = driver_class(app.orch)
 
-    @app.post("/get_status", tags=["private"])
-    def get_status():
+    @app.post("/global_status", tags=["private"])
+    def global_status():
         # print(app.orch.orchstatusmodel.as_json())
         return app.orch.orchstatusmodel.as_json()
 
@@ -312,15 +312,6 @@ def makeOrchServ(
         """Return the current list of actions."""
         return app.orch.list_active_actions()
 
-    @app.post("/endpoints", tags=["private"])
-    def get_all_urls():
-        """Return a list of all endpoints on this server."""
-        return app.orch.get_endpoint_urls()
-
-    @app.post("/stop_executor", tags=["private"])
-    def stop_executor(executor_id: str):
-        return app.orch.stop_executor(executor_id)
-
     @app.post("/shutdown", tags=["private"])
     def post_shutdown():
         shutdown_event()
@@ -333,10 +324,6 @@ def makeOrchServ(
         app.orch.print_message("orch shutdown", info=True)
         # emergencyStop = True
         time.sleep(0.75)
-
-    @app.post("/list_executors", tags=["private"])
-    def list_executors():
-        return list(app.orch.executors.keys())
 
     @app.post("/list_nonblocking", tags=["private"])
     def list_non_blocking():
