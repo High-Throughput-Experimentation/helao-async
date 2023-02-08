@@ -41,7 +41,7 @@ from helaocore.error import ErrorCodes
 
 
 from helao.helpers.server_api import HelaoFastAPI
-from helao.helpers.make_vis_serv import makeVisServ
+from helao.servers.vis import HelaoVis
 from helao.helpers.import_experiments import import_experiments
 from helao.helpers.import_sequences import import_sequences
 from helao.helpers.dispatcher import async_private_dispatcher, async_action_dispatcher
@@ -444,7 +444,7 @@ class Orch(Base):
         # bokehapp.io_loop.start()
 
     def makeBokehApp(self, doc, orch):
-        app = makeVisServ(
+        app = HelaoVis(
             config=self.world_cfg,
             server_key=self.server.server_name,
             doc=doc,
