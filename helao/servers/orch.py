@@ -97,6 +97,72 @@ class HelaoOrch(HelaoFastAPI):
             if driver_class:
                 self.driver = driver_class(self.orch)
 
+        # --- BASE endpoints ---
+        @self.websocket("/ws_status")
+        async def websocket_status(websocket: WebSocket):
+            """Subscribe to orchestrator status messages.
+
+            Args:
+            websocket: a fastapi.WebSocket object
+            """
+            await self.orch.ws_status(websocket)
+
+        @self.websocket("/ws_data")
+        async def websocket_data(websocket: WebSocket):
+            """Subscribe to action server status dicts.
+
+            Args:
+            websocket: a fastapi.WebSocket object
+            """
+            await self.orch.ws_data(websocket)
+
+        @self.websocket("/ws_live")
+        async def websocket_live(websocket: WebSocket):
+            """Broadcast live buffer dicts.
+
+            Args:
+            websocket: a fastapi.WebSocket object
+            """
+            await self.orch.ws_live(websocket)
+
+        @self.post("/get_status", tags=["private"])
+        def get_status():
+            return self.orch.actionservermodel
+
+        @self.post("/attach_client", tags=["private"])
+        async def attach_client(client_servkey: str):
+            return await self.orch.attach_client(client_servkey)
+
+        @self.post("/stop_executor", tags=["private"])
+        def stop_executor(executor_id: str):
+            return self.orch.stop_executor(executor_id)
+
+        @self.post("/endpoints", tags=["private"])
+        def get_all_urls():
+            """Return a list of all endpoints on this server."""
+            return self.orch.get_endpoint_urls()
+
+        @self.post("/get_lbuf", tags=["private"])
+        def get_lbuf():
+            return self.orch.live_buffer
+
+        @self.post("/list_executors", tags=["private"])
+        def list_executors():
+            return list(self.orch.executors.keys())
+
+        @self.post("/shutdown", tags=["private"])
+        def post_shutdown():
+            shutdown_event()
+
+        @self.on_event("shutdown")
+        def shutdown_event():
+            """Run shutdown actions."""
+            self.orch.print_message("Stopping operator", info=True)
+            self.orch.bokehapp.stop()
+            self.orch.print_message("orch shutdown", info=True)
+            time.sleep(0.75)
+
+        # --- ORCH-specific endpoints ---
         @self.post("/global_status", tags=["private"])
         def global_status():
             return self.orch.orchstatusmodel.as_json()
@@ -127,28 +193,6 @@ class HelaoOrch(HelaoFastAPI):
             )
             result_dict = self.orch.update_nonblocking(actionmodel)
             return result_dict
-
-        @self.post("/attach_client", tags=["private"])
-        async def attach_client(client_servkey: str):
-            return await self.orch.attach_client(client_servkey)
-
-        @self.websocket("/ws_status")
-        async def websocket_status(websocket: WebSocket):
-            """Subscribe to orchestrator status messages.
-
-            Args:
-            websocket: a fastapi.WebSocket object
-            """
-            await self.orch.ws_status(websocket)
-
-        @self.websocket("/ws_data")
-        async def websocket_data(websocket: WebSocket):
-            """Subscribe to action server status dicts.
-
-            Args:
-            websocket: a fastapi.WebSocket object
-            """
-            await self.orch.ws_data(websocket)
 
         @self.post("/start", tags=["private"])
         async def start():
@@ -213,47 +257,6 @@ class HelaoOrch(HelaoFastAPI):
         ):
             seq_uuid = await self.orch.add_sequence(sequence=sequence)
             return {"sequence_uuid": seq_uuid}
-
-        @self.post(f"/{server_key}/wait")
-        async def wait(
-            action: Optional[Action] = Body({}, embed=True),
-            waittime: Optional[float] = 10.0,
-        ):
-            """Sleep action"""
-            active = await self.orch.setup_and_contain_action()
-            active.action.action_abbr = "wait"
-            executor = WaitExec(
-                active=active,
-                oneoff=False,
-            )
-            active_action_dict = await active.start_executor(executor)
-            return active_action_dict
-
-        @self.post(f"/{server_key}/cancel_wait")
-        async def cancel_wait(
-            action: Optional[Action] = Body({}, embed=True),
-            action_version: int = 1,
-        ):
-            """Stop sleep action."""
-            active = await self.orch.setup_and_contain_action()
-            for exid, executor in self.orch.executors.items():
-                if exid.split()[0] == "wait":
-                    await executor.stop_action_task()
-            finished_action = await active.finish()
-            return finished_action.as_dict()
-
-        @self.post(f"/{server_key}/interrupt")
-        async def interrupt(
-            action: Optional[Action] = Body({}, embed=True),
-            reason: Optional[str] = "wait",
-        ):
-            """Stop dispatch loop for planned manual intervention."""
-            active = await self.orch.setup_and_contain_action()
-            self.orch.current_stop_message = active.action.action_params["reason"]
-            await self.orch.stop()
-            await self.orch.update_operator(True)
-            finished_action = await active.finish()
-            return finished_action.as_dict()
 
         @self.post("/append_experiment", tags=["private"])
         async def append_experiment(
@@ -324,18 +327,70 @@ class HelaoOrch(HelaoFastAPI):
         def list_non_blocking():
             return self.orch.nonblocking
 
-        @self.post("/shutdown", tags=["private"])
-        def post_shutdown():
-            shutdown_event()
+        @self.post(f"/{server_key}/wait")
+        async def wait(
+            action: Optional[Action] = Body({}, embed=True),
+            waittime: Optional[float] = 10.0,
+        ):
+            """Sleep action"""
+            active = await self.orch.setup_and_contain_action()
+            active.action.action_abbr = "wait"
+            executor = WaitExec(
+                active=active,
+                oneoff=False,
+            )
+            active_action_dict = await active.start_executor(executor)
+            return active_action_dict
 
-        @self.on_event("shutdown")
-        def shutdown_event():
-            """Run shutdown actions."""
-            self.orch.print_message("Stopping operator", info=True)
-            self.orch.bokehapp.stop()
-            self.orch.print_message("orch shutdown", info=True)
-            # emergencyStop = True
-            time.sleep(0.75)
+        @self.post(f"/{server_key}/cancel_wait")
+        async def cancel_wait(
+            action: Optional[Action] = Body({}, embed=True),
+            action_version: int = 1,
+        ):
+            """Stop sleep action."""
+            active = await self.orch.setup_and_contain_action()
+            for exid, executor in self.orch.executors.items():
+                if exid.split()[0] == "wait":
+                    await executor.stop_action_task()
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+        @self.post(f"/{server_key}/interrupt")
+        async def interrupt(
+            action: Optional[Action] = Body({}, embed=True),
+            reason: Optional[str] = "wait",
+        ):
+            """Stop dispatch loop for planned manual intervention."""
+            active = await self.orch.setup_and_contain_action()
+            self.orch.current_stop_message = active.action.action_params["reason"]
+            await self.orch.stop()
+            await self.orch.update_operator(True)
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+        @self.post(f"/{server_key}/estop", tags=["public"])
+        async def act_estop(
+            action: Optional[Action] = Body({}, embed=True),
+            switch: Optional[bool] = True,
+        ):
+            active = await self.orch.setup_and_contain_action(
+                json_data_keys=["estop"], action_abbr="estop"
+            )
+            has_estop = getattr(self.driver, "estop", None)
+            if has_estop is not None and callable(has_estop):
+                self.orch.print_message("driver has estop function", info=True)
+                await active.enqueue_data_dflt(
+                    datadict={
+                        "estop": await self.driver.estop(**active.action.action_params)
+                    }
+                )
+            else:
+                self.orch.print_message("driver has NO estop function", info=True)
+                self.orch.actionservermodel.estop = switch
+            if switch:
+                active.action.action_status.selfend(HloStatus.estopped)
+            finished_action = await active.finish()
+            return finished_action.as_dict()
 
 
 class Orch(Base):
@@ -421,6 +476,10 @@ class Orch(Base):
         self.sync_ntp_task_run = False
         self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
         self.bufferer = self.aloop.create_task(self.live_buffer_task())
+        asyncio.gather(self.init_endpoint_status())
+
+        self.fast_urls = self.get_endpoint_urls()
+        self.status_logger = self.aloop.create_task(self.log_status_task())
 
         if self.op_enabled:
             self.start_operator()

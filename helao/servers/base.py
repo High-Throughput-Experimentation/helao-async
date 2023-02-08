@@ -138,30 +138,6 @@ class HelaoBase(HelaoFastAPI):
             """Return a list of all endpoints on this server."""
             return self.base.get_endpoint_urls()
 
-        @self.post(f"/{server_key}/estop", tags=["public"])
-        async def estop(
-            action: Optional[Action] = Body({}, embed=True),
-            switch: Optional[bool] = True,
-        ):
-            active = await self.base.setup_and_contain_action(
-                json_data_keys=["estop"], action_abbr="estop"
-            )
-            has_estop = getattr(self.driver, "estop", None)
-            if has_estop is not None and callable(has_estop):
-                self.base.print_message("driver has estop function", info=True)
-                await active.enqueue_data_dflt(
-                    datadict={
-                        "estop": await self.driver.estop(**active.action.action_params)
-                    }
-                )
-            else:
-                self.base.print_message("driver has NO estop function", info=True)
-                self.base.actionservermodel.estop = switch
-            if switch:
-                active.action.action_status.selfend(HloStatus.estopped)
-            finished_action = await active.finish()
-            return finished_action.as_dict()
-
         @self.post("/get_lbuf", tags=["private"])
         def get_lbuf():
             return self.base.live_buffer
@@ -187,6 +163,30 @@ class HelaoBase(HelaoFastAPI):
                 self.base.print_message("driver has NO shutdown function", error=True)
                 retval = {"shutdown"}
             return retval
+
+        @self.post(f"/{server_key}/estop", tags=["public"])
+        async def estop(
+            action: Optional[Action] = Body({}, embed=True),
+            switch: Optional[bool] = True,
+        ):
+            active = await self.base.setup_and_contain_action(
+                json_data_keys=["estop"], action_abbr="estop"
+            )
+            has_estop = getattr(self.driver, "estop", None)
+            if has_estop is not None and callable(has_estop):
+                self.base.print_message("driver has estop function", info=True)
+                await active.enqueue_data_dflt(
+                    datadict={
+                        "estop": await self.driver.estop(**active.action.action_params)
+                    }
+                )
+            else:
+                self.base.print_message("driver has NO estop function", info=True)
+                self.base.actionservermodel.estop = switch
+            if switch:
+                active.action.action_status.selfend(HloStatus.estopped)
+            finished_action = await active.finish()
+            return finished_action.as_dict()
 
 
 class Executor:
