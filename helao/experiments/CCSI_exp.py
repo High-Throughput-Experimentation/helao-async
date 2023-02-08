@@ -202,7 +202,8 @@ def CCSI_sub_alloff(
     )
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0}, asc.no_wait)
@@ -234,8 +235,10 @@ def CCSI_sub_headspace_purge_from_start(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 1}, asc.no_wait)
     #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge1_duration})
 
@@ -244,7 +247,7 @@ def CCSI_sub_headspace_purge_from_start(
 
 def CCSI_sub_solvent_purge(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     Manpurge1_duration: float = 10,  # set before determining actual
 ):
     #  valve 2 and 7 opened, 1B closed//differ from headspace purge
@@ -258,7 +261,7 @@ def CCSI_sub_solvent_purge(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     #   apm.add(MFC---stuff Flow ON)
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
@@ -270,7 +273,7 @@ def CCSI_sub_solvent_purge(
 
 def CCSI_sub_alpha_purge(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     Alphapurge1_duration: float = 10,  # set before determining actual
 ):
     # only valve 1B 5A-cellB opened, and 2 6A-waste 7 closed//differ from solvent purge
@@ -288,7 +291,8 @@ def CCSI_sub_alpha_purge(
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     #   apm.add(MFC---stuff Flow ON)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 1}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.Alphapurge1_duration})
 
     return apm.action_list
@@ -296,7 +300,7 @@ def CCSI_sub_alpha_purge(
 
 def CCSI_sub_probe_purge(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     Probepurge1_duration: float = 10,  # set before determining actual
 ):
     # only valve 3 4 opened, and 5A-cell closed, pump on//differ from alpha purge
@@ -311,7 +315,7 @@ def CCSI_sub_probe_purge(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 1}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 1}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     #   apm.add(MFC---stuff Flow ON)
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
@@ -322,7 +326,7 @@ def CCSI_sub_probe_purge(
 
 def CCSI_sub_sensor_purge(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     Sensorpurge1_duration: float = 10,  # set before determining actual
 ):
     # only valve 3 closed //differ from probe purge
@@ -338,9 +342,8 @@ def CCSI_sub_sensor_purge(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 1}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
+    # apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
     #    apm.add(ORCH_server,"wait",{"waittime": .25})
-    #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.Sensorpurge1_duration})
 
     return apm.action_list
@@ -348,7 +351,7 @@ def CCSI_sub_sensor_purge(
 
 def CCSI_sub_delta_purge(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     Deltapurge1_duration: float = 10,  # set before determining actual
 ):
     # recirculation loop
@@ -365,7 +368,7 @@ def CCSI_sub_delta_purge(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
+    # apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
     #    apm.add(ORCH_server,"wait",{"waittime": .25})
     #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.Deltapurge1_duration})
@@ -400,13 +403,14 @@ def CCSI_sub_headspace_purge_and_measure(
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 1}, asc.no_wait)
     #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
 
     # recirculation loop
     # 1A open , 6A-waste 1B closed pump on//differ from purge
 
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.5})
@@ -419,7 +423,7 @@ def CCSI_sub_headspace_purge_and_measure(
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0}, asc.no_wait)
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6B", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
+    # apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(
         CO2S_server,
@@ -475,15 +479,21 @@ def CCSI_sub_headspace_purge(
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1}, asc.no_wait)
-    #   apm.add(MFC---stuff Flow ON)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 1}, asc.no_wait)
+   #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
     #  MFC off
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1}, asc.no_wait)
+    apm.add(ORCH_server, "wait", {"waittime": 0.5})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
     apm.add(
         NI_server,
         "liquidvalve",
         {"liquidvalve": "6A-waste", "on": 0},
-    )
+    asc.no_wait)
 
     return apm.action_list
 
@@ -535,7 +545,7 @@ def CCSI_sub_peripumpoff(
 
 def CCSI_sub_initialization_firstpart(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     HSpurge1_duration: float = 30,
     Manpurge1_duration: float = 10,
     Alphapurge1_duration: float = 10,
@@ -554,7 +564,8 @@ def CCSI_sub_initialization_firstpart(
     )
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0}, asc.no_wait)
@@ -570,15 +581,16 @@ def CCSI_sub_initialization_firstpart(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 1}, asc.no_wait)
     #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge1_duration})
 
     #  valve 2 and 7 opened, 1B closed//differ from headspace purge
 
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 1})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    #   apm.add(MFC---stuff Flow ON)
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.Manpurge1_duration})
 
@@ -589,9 +601,9 @@ def CCSI_sub_initialization_firstpart(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 1}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    #   apm.add(MFC---stuff Flow ON)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 1}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.Alphapurge1_duration})
 
     # only valve 3 4 opened, and 5A-cell closed, pump on//differ from alpha purge
@@ -599,14 +611,12 @@ def CCSI_sub_initialization_firstpart(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 1}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    #   apm.add(MFC---stuff Flow ON)
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.Probepurge1_duration})
 
     # only valve 3 closed //differ from probe purge
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}, asc.no_wait)
     #    apm.add(ORCH_server,"wait",{"waittime": .25})
-    #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.Sensorpurge1_duration})
 
     # recirculation loop
@@ -617,7 +627,6 @@ def CCSI_sub_initialization_firstpart(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0}, asc.no_wait)
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B-waste", "on": 0}, asc.no_wait)
     #    apm.add(ORCH_server,"wait",{"waittime": .25})
-    #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.Deltapurge1_duration})
 
     return apm.action_list
@@ -625,14 +634,14 @@ def CCSI_sub_initialization_firstpart(
 
 def CCSI_sub_liquidfill_syringes(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 4,
     Solution_description: str = "KOH",
     Solution_reservoir_sample_no: int = 2,
     Solution_volume_ul: float = 500,
     Waterclean_reservoir_sample_no: int = 1,
     Waterclean_volume_ul: float = 2500,
-    Syringe_retraction_ul: float = 150,
-    Syringe_rate_ulsec: float = 300,
+#    Syringe_retraction_ul: float = 150,
+    deadspace_volume_ul: float = 50,
     LiquidFillWait_s: float = 15,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.5,
@@ -660,86 +669,109 @@ def CCSI_sub_liquidfill_syringes(
 #    inf1_acqtime = Solution_volume_ul/Syringe_rate_ulsec + .25
 #    apm.add(CO2S_server, "acquire_co2", {"duration": inf1_acqtime, "acquisition_rate": apm.pars.co2measure_acqrate})
 
-#    if Solution_volume_ul != 0:
-    apm.add(
-        SOLUTIONPUMP_server,
-        "infuse",
-        {
-            "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-            "volume_uL": apm.pars.Solution_volume_ul + apm.pars.Syringe_retraction_ul,
-        },
-        asc.no_wait,
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        process_finish=False,
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.samples_in,
-        ],
-)
+    if Solution_volume_ul == 0:
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    else:
+        apm.add(
+            SOLUTIONPUMP_server,
+            "infuse",
+            {
+                "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+                "volume_uL": apm.pars.Solution_volume_ul + apm.pars.deadspace_volume_ul,
+            },
+            
+            from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+            process_finish=False,
+            process_contrib=[
+                ProcessContrib.action_params,
+                ProcessContrib.samples_in,
+            ],
+    )
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
-#    if Waterclean_volume_ul != 0:
-    # during 2nd infusion
-#        inf2_acqtime = Waterclean_volume_ul/Syringe_rate_ulsec + .25
-#        apm.add(CO2S_server, "acquire_co2", {"duration": inf2_acqtime, "acquisition_rate": apm.pars.co2measure_acqrate})
-
-    apm.add(
-        WATERCLEANPUMP_server,
-        "infuse",
-        {
-            "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-            "volume_uL": apm.pars.Waterclean_volume_ul + apm.pars.Syringe_retraction_ul,
-        },
-        asc.no_wait,
-        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        process_finish=False,
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.samples_in,
-        ],
-)    
+    if Waterclean_volume_ul == 0:
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    else:    
+        apm.add(
+            WATERCLEANPUMP_server,
+            "infuse",
+            {
+                "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+                "volume_uL": apm.pars.Waterclean_volume_ul + apm.pars.deadspace_volume_ul,
+            },
+            
+            from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+            process_finish=False,
+            process_contrib=[
+                ProcessContrib.action_params,
+                ProcessContrib.samples_in,
+            ],
+    )    
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
     # v7  open, mfc flow, wait, syringes retract
 #    apm.add(CO2S_server, "acquire_co2", {"duration": apm.pars.LiquidFillWait_s, "acquisition_rate": apm.pars.co2measure_acqrate})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
     # mfc stuff add here
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.LiquidFillWait_s}, asc.no_wait)
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.LiquidFillWait_s})
 
-#    if Solution_volume_ul != 0:
-#    withdr_acqtime = Syringe_retraction_ul/Syringe_rate_ulsec + .25
-#    apm.add(CO2S_server, "acquire_co2", {"duration": withdr_acqtime, "acquisition_rate": apm.pars.co2measure_acqrate})
-    apm.add(
-        SOLUTIONPUMP_server,
-        "withdraw",
-        {
-            "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-            "volume_uL": apm.pars.Syringe_retraction_ul,
-        },
-        asc.no_wait,
-    )
-    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    if Solution_volume_ul == 0:
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    else:
+        apm.add(
+            SOLUTIONPUMP_server,
+            "withdraw",
+            {
+                "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+                "volume_uL": 100,
+            },
+        
+        )
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+        apm.add(
+            SOLUTIONPUMP_server,
+            "infuse",
+            {
+                "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+                "volume_uL": 25,
+            },
+            
+        )
 #    if Waterclean_volume_ul != 0:
 #    apm.add(CO2S_server, "acquire_co2", {"duration": withdr_acqtime, "acquisition_rate": apm.pars.co2measure_acqrate})
-    apm.add(
-        WATERCLEANPUMP_server,
-        "withdraw",
-        {
-            "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-            "volume_uL": apm.pars.Syringe_retraction_ul,
-        },
-        asc.no_wait,
-    )
+    if Waterclean_volume_ul == 0:
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    else:    
+        apm.add(
+            WATERCLEANPUMP_server,
+            "withdraw",
+            {
+                "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+                "volume_uL": 100,
+            },
+            
+        )
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+        apm.add(
+            WATERCLEANPUMP_server,
+            "infuse",
+            {
+                "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+                "volume_uL": 25,
+            },
+            
+        )
 
     # mfc off, v2, v1ab v7 close
     # mfc off
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0})
+    apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(
         CO2S_server,
@@ -758,6 +790,8 @@ def CCSI_sub_liquidfill_syringes(
         ],
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
     return apm.action_list
 
@@ -766,7 +800,7 @@ def CCSI_sub_drain_and_clean(
     experiment: Experiment,
     experiment_version: int = 4,
     Waterclean_volume_ul: float = 5000,
-    Syringe_retraction_ul: float = 500,
+    deadspace_volume_ul: float = 50,
     Syringe_rate_ulsec: float = 500,
     LiquidCleanWait_s: float = 30,
     co2measure_duration: float = 20,
@@ -776,7 +810,7 @@ def CCSI_sub_drain_and_clean(
     max_purge_iters: int = 5,
     HSpurge_duration: float = 20,  # set before determining actual
 ):
-    # recirculation loop
+    # drain
     # only 1B 6A-waste opened 1A closed pump off//differ from delta purge
 
     apm = ActionPlanMaker()
@@ -790,11 +824,14 @@ def CCSI_sub_drain_and_clean(
     #    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 1}, asc.no_wait)
     #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
     #  MFC off
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(
         NI_server,
@@ -813,14 +850,14 @@ def CCSI_sub_drain_and_clean(
         "infuse",
         {
             "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-            "volume_uL": apm.pars.Waterclean_volume_ul + apm.pars.Syringe_retraction_ul,
+            "volume_uL": apm.pars.Waterclean_volume_ul + apm.pars.deadspace_volume_ul,
         },
     )
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
     # v7  open, mfc flow, wait, syringe retract
 
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
     # mfc stuff add here
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.LiquidCleanWait_s})
     apm.add(
@@ -828,19 +865,29 @@ def CCSI_sub_drain_and_clean(
         "withdraw",
         {
             "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-            "volume_uL": apm.pars.Syringe_retraction_ul,
+            "volume_uL": 100,
         },
+    )
+    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(
+        WATERCLEANPUMP_server,
+        "infuse",
+        {
+            "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+            "volume_uL": 25,
+        },
+        
     )
 
     # mfc off, v2, v1ab v7 close
     # mfc off
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(
         CO2S_server,
@@ -885,17 +932,15 @@ def CCSI_sub_drain_and_clean(
 def CCSI_sub_refill_clean(
     experiment: Experiment,
     experiment_version: int = 1,
-    Waterclean_fill_volume_ul: float = 5000,
-    Waterclean_clean_volume_ul: float = 5000,
-    backlash_volume_ul: float = 25,
-    Syringe_rate_ulsec: float = 500,
+    Waterclean_volume_ul: float = 5000,
+    Syringe_rate_ulsec: float = 300,
 ):
     apm = ActionPlanMaker()
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
-    apm.add(WATERCLEANPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.Waterclean_fill_volume_ul + apm.pars.Waterclean_clean_volume_ul + apm.pars.backlash_volume_ul})    
-    apm.add(WATERCLEANPUMP_server, "infuse", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.backlash_volume_ul})    
+    apm.add(WATERCLEANPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.Waterclean_volume_ul + 25})    
+    apm.add(WATERCLEANPUMP_server, "infuse", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": 25})    
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 0})
     
