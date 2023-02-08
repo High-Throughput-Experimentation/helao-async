@@ -27,13 +27,13 @@ def find_server_names(vis: Vis, fast_key: str) -> list:
     return server_names
 
 
-def makeBokehApp(doc, confPrefix, servKey, helao_root):
+def makeBokehApp(doc, confPrefix, server_key, helao_root):
 
     config = config_loader(confPrefix, helao_root)
 
     app = HelaoVis(
         config=config,
-        server_key=servKey,
+        server_key=server_key,
         doc=doc,
     )
 

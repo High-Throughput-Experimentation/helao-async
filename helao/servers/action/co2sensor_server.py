@@ -14,19 +14,19 @@ from helao.drivers.sensor.sprintir_driver import SprintIR, CO2MonExec
 from helao.helpers.config_loader import config_loader
 
 
-def makeApp(confPrefix, servKey, helao_root):
+def makeApp(confPrefix, server_key, helao_root):
     config = config_loader(confPrefix, helao_root)
 
     app = HelaoBase(
         config=config,
-        server_key=servKey,
-        server_title=servKey,
+        server_key=server_key,
+        server_title=server_key,
         description="Sensor server",
         version=0.1,
         driver_class=SprintIR,
     )
 
-    @app.post(f"/{servKey}/acquire_co2")
+    @app.post(f"/{server_key}/acquire_co2", tags=["action"])
     async def acquire_co2(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -45,7 +45,7 @@ def makeApp(confPrefix, servKey, helao_root):
         active_action_dict = await active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{servKey}/cancel_acquire_co2")
+    @app.post(f"/{server_key}/cancel_acquire_co2", tags=["action"])
     async def cancel_acquire_co2(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,

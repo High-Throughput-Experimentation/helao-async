@@ -11,13 +11,13 @@ from helao.helpers.config_loader import config_loader
 
 
 async def galil_dyn_endpoints(app=None):
-    servKey = app.base.server.server_name
+    server_key = app.base.server.server_name
 
     if app.driver.galil_enabled is True:
 
         if app.driver.dev_ai:
 
-            @app.post(f"/{servKey}/get_analog_in")
+            @app.post(f"/{server_key}/get_analog_in", tags=["action"])
             async def get_analog_in(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 2,
@@ -36,7 +36,7 @@ async def galil_dyn_endpoints(app=None):
                 finished_action = await active.finish()
                 return finished_action.as_dict()
 
-            @app.post(f"/{servKey}/acquire_analog_in")
+            @app.post(f"/{server_key}/acquire_analog_in", tags=["action"])
             async def acquire_analog_in(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 1,
@@ -55,7 +55,7 @@ async def galil_dyn_endpoints(app=None):
                 active_action_dict = active.start_executor(executor)
                 return active_action_dict
 
-            @app.post(f"/{servKey}/cancel_acquire_analog_in")
+            @app.post(f"/{server_key}/cancel_acquire_analog_in", tags=["action"])
             async def cancel_acquire_analog_in(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 1,
@@ -70,7 +70,7 @@ async def galil_dyn_endpoints(app=None):
 
         if app.driver.dev_ao:
 
-            @app.post(f"/{servKey}/set_analog_out")
+            @app.post(f"/{server_key}/set_analog_out", tags=["action"])
             async def set_analog_out(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 2,
@@ -94,7 +94,7 @@ async def galil_dyn_endpoints(app=None):
 
         if app.driver.dev_di:
 
-            @app.post(f"/{servKey}/get_digital_in")
+            @app.post(f"/{server_key}/get_digital_in", tags=["action"])
             async def get_digital_in(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 2,
@@ -117,7 +117,7 @@ async def galil_dyn_endpoints(app=None):
 
         if app.driver.dev_do:
 
-            @app.post(f"/{servKey}/get_digital_out")
+            @app.post(f"/{server_key}/get_digital_out", tags=["action"])
             async def get_digital_out(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 2,
@@ -140,7 +140,7 @@ async def galil_dyn_endpoints(app=None):
 
         if app.driver.dev_do:
 
-            @app.post(f"/{servKey}/set_digital_out")
+            @app.post(f"/{server_key}/set_digital_out", tags=["action"])
             async def set_digital_out(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 2,
@@ -164,7 +164,7 @@ async def galil_dyn_endpoints(app=None):
 
         if app.driver.dev_di and app.driver.dev_do:
 
-            @app.post(f"/{servKey}/set_digital_cycle")
+            @app.post(f"/{server_key}/set_digital_cycle", tags=["action"])
             async def set_digital_cycle(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 2,
@@ -208,7 +208,7 @@ async def galil_dyn_endpoints(app=None):
 
         if app.driver.dev_di and app.driver.dev_do:
 
-            @app.post(f"/{servKey}/stop_digital_cycle")
+            @app.post(f"/{server_key}/stop_digital_cycle", tags=["action"])
             async def stop_digital_cycle(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 2,
@@ -223,7 +223,7 @@ async def galil_dyn_endpoints(app=None):
                 finished_action = await active.finish()
                 return finished_action.as_dict()
 
-        @app.post(f"/{servKey}/reset")
+        @app.post(f"/{server_key}/reset", tags=["action"])
         async def reset(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -237,14 +237,14 @@ async def galil_dyn_endpoints(app=None):
             return finished_action.as_dict()
 
 
-def makeApp(confPrefix, servKey, helao_root):
+def makeApp(confPrefix, server_key, helao_root):
 
     config = config_loader(confPrefix, helao_root)
 
     app = HelaoBase(
         config=config,
-        server_key=servKey,
-        server_title=servKey,
+        server_key=server_key,
+        server_title=server_key,
         description="Galil IO server",
         version=2.0,
         driver_class=Galil,

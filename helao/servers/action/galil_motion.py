@@ -30,7 +30,7 @@ from helao.helpers.config_loader import config_loader
 
 
 async def galil_dyn_endpoints(app=None):
-    servKey = app.base.server.server_name
+    server_key = app.base.server.server_name
 
     if app.driver.galil_enabled is True:
 
@@ -39,7 +39,7 @@ async def galil_dyn_endpoints(app=None):
 
         if dev_axis:
 
-            @app.post(f"/{servKey}/setmotionref")
+            @app.post(f"/{server_key}/setmotionref", tags=["action"])
             async def setmotionref(action: Optional[Action] = Body({}, embed=True)):
                 """Set the reference position for xyz by
                 (1) homing xyz,
@@ -55,7 +55,7 @@ async def galil_dyn_endpoints(app=None):
                 finished_action = await active.finish()
                 return finished_action.as_dict()
 
-        @app.post(f"/{servKey}/reset_plate_alignment", tags=["public_aligner"])
+        @app.post(f"/{server_key}/reset_plate_alignment", tags=["action"])
         async def reset_plate_alignment(
             action: Optional[Action] = Body({}, embed=True)
         ):
@@ -64,7 +64,7 @@ async def galil_dyn_endpoints(app=None):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{servKey}/load_plate_alignment", tags=["public_aligner"])
+        @app.post(f"/{server_key}/load_plate_alignment", tags=["action"])
         async def load_plater_alignment(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -78,7 +78,7 @@ async def galil_dyn_endpoints(app=None):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{servKey}/run_aligner", tags=["public_aligner"])
+        @app.post(f"/{server_key}/run_aligner", tags=["action"])
         async def run_aligner(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -89,7 +89,7 @@ async def galil_dyn_endpoints(app=None):
             active_dict = await app.driver.run_aligner(A)
             return active_dict
 
-        @app.post(f"/{servKey}/stop_aligner", tags=["public_aligner"])
+        @app.post(f"/{server_key}/stop_aligner", tags=["action"])
         async def stop_aligner(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -101,7 +101,7 @@ async def galil_dyn_endpoints(app=None):
             return finished_action.as_dict()
 
         # parse as {'M':json.dumps(np.matrix(M).tolist()),'platexy':json.dumps(np.array(platexy).tolist())}
-        @app.post(f"/{servKey}/toMotorXY")
+        @app.post(f"/{server_key}/toMotorXY", tags=["action"])
         async def transform_platexy_to_motorxy(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -120,7 +120,7 @@ async def galil_dyn_endpoints(app=None):
             return finished_action.as_dict()
 
         # parse as {'M':json.dumps(np.matrix(M).tolist()),'platexy':json.dumps(np.array(motorxy).tolist())}
-        @app.post(f"/{servKey}/toPlateXY")
+        @app.post(f"/{server_key}/toPlateXY", tags=["action"])
         async def transform_motorxy_to_platexy(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -138,7 +138,7 @@ async def galil_dyn_endpoints(app=None):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{servKey}/MxytoMPlate")
+        @app.post(f"/{server_key}/MxytoMPlate", tags=["action"])
         async def MxytoMPlate(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -158,7 +158,7 @@ async def galil_dyn_endpoints(app=None):
 
         if dev_axis:
 
-            @app.post(f"/{servKey}/move")
+            @app.post(f"/{server_key}/move", tags=["action"])
             async def move(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 1,
@@ -184,7 +184,7 @@ async def galil_dyn_endpoints(app=None):
 
         if dev_axis:
 
-            @app.post(f"/{servKey}/easymove")
+            @app.post(f"/{server_key}/easymove", tags=["action"])
             async def easymove(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 1,
@@ -208,7 +208,7 @@ async def galil_dyn_endpoints(app=None):
                 finished_action = await active.finish()
                 return finished_action.as_dict()
 
-        @app.post(f"/{servKey}/disconnect")
+        @app.post(f"/{server_key}/disconnect", tags=["action"])
         async def disconnect(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -220,7 +220,7 @@ async def galil_dyn_endpoints(app=None):
 
         if dev_axis:
 
-            @app.post(f"/{servKey}/query_positions")
+            @app.post(f"/{server_key}/query_positions", tags=["action"])
             async def query_positions(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 1,
@@ -238,7 +238,7 @@ async def galil_dyn_endpoints(app=None):
 
         if dev_axis:
 
-            @app.post(f"/{servKey}/query_position")
+            @app.post(f"/{server_key}/query_position", tags=["action"])
             async def query_position(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 1,
@@ -258,7 +258,7 @@ async def galil_dyn_endpoints(app=None):
 
         if dev_axis:
 
-            @app.post(f"/{servKey}/query_moving")
+            @app.post(f"/{server_key}/query_moving", tags=["action"])
             async def query_moving(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 1,
@@ -279,7 +279,7 @@ async def galil_dyn_endpoints(app=None):
 
         if dev_axis:
 
-            @app.post(f"/{servKey}/axis_off")
+            @app.post(f"/{server_key}/axis_off", tags=["action"])
             async def axis_off(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 1,
@@ -298,7 +298,7 @@ async def galil_dyn_endpoints(app=None):
 
         if dev_axis:
 
-            @app.post(f"/{servKey}/axis_on")
+            @app.post(f"/{server_key}/axis_on", tags=["action"])
             async def axis_on(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 1,
@@ -313,7 +313,7 @@ async def galil_dyn_endpoints(app=None):
                 finished_action = await active.finish()
                 return finished_action.as_dict()
 
-        @app.post(f"/{servKey}/solid_get_platemap")
+        @app.post(f"/{server_key}/solid_get_platemap", tags=["action"])
         async def solid_get_platemap(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -327,7 +327,7 @@ async def galil_dyn_endpoints(app=None):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{servKey}/solid_get_samples_xy")
+        @app.post(f"/{server_key}/solid_get_samples_xy", tags=["action"])
         async def solid_get_samples_xy(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -344,7 +344,7 @@ async def galil_dyn_endpoints(app=None):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{servKey}/solid_get_builtin_specref")
+        @app.post(f"/{server_key}/solid_get_builtin_specref", tags=["action"])
         async def solid_get_builtin_specref(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -357,7 +357,7 @@ async def galil_dyn_endpoints(app=None):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{servKey}/solid_get_nearest_specref")
+        @app.post(f"/{server_key}/solid_get_nearest_specref", tags=["action"])
         async def solid_get_nearest_specref(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -399,7 +399,7 @@ async def galil_dyn_endpoints(app=None):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{servKey}/stop")
+        @app.post(f"/{server_key}/stop", tags=["action"])
         async def stop(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -413,7 +413,7 @@ async def galil_dyn_endpoints(app=None):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{servKey}/reset")
+        @app.post(f"/{server_key}/reset", tags=["action"])
         async def reset(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -432,7 +432,7 @@ async def galil_dyn_endpoints(app=None):
             zpos_dict["NA"] = None
             Zpos = Enum("Zpos", {k: k for k in zpos_dict.keys()})
 
-            @app.post(f"/{servKey}/z_move")
+            @app.post(f"/{server_key}/z_move", tags=["action"])
             async def z_move(
                 action: Optional[Action] = Body({}, embed=True),
                 action_version: int = 1,
@@ -466,14 +466,14 @@ async def galil_dyn_endpoints(app=None):
                 return finished_action.as_dict()
 
 
-def makeApp(confPrefix, servKey, helao_root):
+def makeApp(confPrefix, server_key, helao_root):
 
     config = config_loader(confPrefix, helao_root)
 
     app = HelaoBase(
         config=config,
-        server_key=servKey,
-        server_title=servKey,
+        server_key=server_key,
+        server_title=server_key,
         description="Galil motion server",
         version=2.0,
         driver_class=Galil,
