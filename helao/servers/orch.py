@@ -81,7 +81,7 @@ class HelaoOrch(HelaoFastAPI):
             version=version,
             openapi_tags=hlotags_metadata,
         )
-        self.Orch = Orch(fastapp=self)
+        self.orch = Orch(fastapp=self)
         self.driver = None
 
         @self.on_event("startup")
@@ -93,7 +93,7 @@ class HelaoOrch(HelaoFastAPI):
             and append dummy experiments to the
             experiment queue for testing.
             """
-            self.orch = Orch(app)
+            self.orch.myinit()
             if driver_class:
                 self.driver = driver_class(self.orch)
 
