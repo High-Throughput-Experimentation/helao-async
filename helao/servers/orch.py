@@ -448,10 +448,6 @@ class Orch(Base):
             config=self.world_cfg,
             server_key=self.server.server_name,
             doc=doc,
-            server_title=self.server.server_name,
-            description=f"{self.run_type} Operator",
-            version=2.0,
-            driver_class=None,
         )
 
         # _ = Operator(app.vis)
