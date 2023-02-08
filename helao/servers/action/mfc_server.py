@@ -8,7 +8,7 @@ __all__ = ["makeApp"]
 from typing import Optional, List, Union
 from fastapi import Body
 from helao.helpers.premodels import Action
-from helao.servers.base import makeActionServ
+from helao.servers.base import HelaoBase
 from helaocore.models.sample import SampleUnion
 from helao.drivers.mfc.alicat_driver import AliCatMFC, MfcExec, PfcExec
 from helao.helpers.config_loader import config_loader
@@ -21,7 +21,7 @@ def makeApp(confPrefix, servKey, helao_root):
     # current plan is 1 mfc per COM
     dev_name = list(config["servers"][servKey]["params"]["devices"].keys())[0]
 
-    app = makeActionServ(
+    app = HelaoBase(
         config=config,
         server_key=servKey,
         server_title=servKey,
