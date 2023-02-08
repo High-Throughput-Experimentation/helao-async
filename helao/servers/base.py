@@ -85,11 +85,11 @@ class HelaoBase(HelaoFastAPI):
             version=version,
             openapi_tags=hlotags_metadata,
         )
-        self.base = Base(fastapp=self, dyn_endpoints=dyn_endpoints)
         self.driver = None
 
         @self.on_event("startup")
         def startup_event():
+            self.base = Base(fastapp=self, dyn_endpoints=dyn_endpoints)
             self.base.myinit()
             if driver_class is not None:
                 self.driver = driver_class(self.base)
