@@ -110,10 +110,14 @@ class HelaoBase(HelaoFastAPI):
             version=version,
             openapi_tags=hlotags_metadata,
         )
-
         self.base = Base(fastapp=self, dyn_endpoints=dyn_endpoints)
-        if driver_class is not None:
-            self.driver = driver_class(self.base)
+        self.driver = None
+
+        @self.on_event("startup")
+        def startup_event():
+            self.base.myinit()
+            if driver_class is not None:
+                self.driver = driver_class(self.base)
 
         @self.websocket("/ws_status")
         async def websocket_status(websocket: WebSocket):
@@ -169,17 +173,17 @@ class HelaoBase(HelaoFastAPI):
             )
             has_estop = getattr(self.driver, "estop", None)
             if has_estop is not None and callable(has_estop):
-                self.driver.base.print_message("driver has estop function", info=True)
+                self.base.print_message("driver has estop function", info=True)
                 await active.enqueue_data_dflt(
                     datadict={
                         "estop": await self.driver.estop(**active.action.action_params)
                     }
                 )
             else:
-                self.driver.base.print_message(
+                self.base.print_message(
                     "driver has NO estop function", info=True
                 )
-                self.driver.base.actionservermodel.estop = switch
+                self.base.actionservermodel.estop = switch
             if switch:
                 active.action.action_status.selfend(HloStatus.estopped)
             finished_action = await active.finish()
@@ -204,12 +208,12 @@ class HelaoBase(HelaoFastAPI):
 
             shutdown = getattr(self.driver, "shutdown", None)
             if shutdown is not None and callable(shutdown):
-                self.driver.base.print_message(
+                self.base.print_message(
                     "driver has shutdown function", info=True
                 )
                 retval = shutdown()
             else:
-                self.driver.base.print_message(
+                self.base.print_message(
                     "driver has NO shutdown function", error=True
                 )
                 retval = {"shutdown"}
@@ -326,13 +330,13 @@ class Base:
         )
 
         self.fastapp = fastapp
+        self.dyn_endpoints = dyn_endpoints
         self.server_cfg = self.fastapp.helao_cfg["servers"][self.server.server_name]
         self.server_params = self.fastapp.helao_cfg["servers"][
             self.server.server_name
         ].get("params", {})
         self.world_cfg = self.fastapp.helao_cfg
         self.run_type = None
-        self.aloop = asyncio.get_running_loop()
 
         self.helaodirs = helao_dirs(self.world_cfg, self.server.server_name)
 
@@ -379,6 +383,8 @@ class Base:
                         self.ntp_last_sync, self.ntp_offset = tmps
                         self.ntp_offset = float(self.ntp_offset)
 
+    def myinit(self):
+        self.aloop = asyncio.get_running_loop()
         if self.ntp_last_sync is None:
             asyncio.gather(self.get_ntp_time())
 
@@ -390,7 +396,7 @@ class Base:
         # if callable(dyn_endpoints):
         #     asyncio.gather(dyn_endpoints(app=self.fastapp))
 
-        asyncio.gather(self.init_endpoint_status(dyn_endpoints))
+        asyncio.gather(self.init_endpoint_status(self.dyn_endpoints))
 
         self.fast_urls = self.get_endpoint_urls()
         self.status_logger = self.aloop.create_task(self.log_status_task())

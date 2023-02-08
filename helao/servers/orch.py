@@ -364,7 +364,7 @@ class Orch(Base):
     by a self-subscriber task to update the action server status dict and log changes.
     """
 
-    def __init__(self, fastapp: HelaoFastAPI):
+    def __init__(self, fastapp: HelaoBase):
         super().__init__(fastapp)
         self.experiment_lib = import_experiments(
             world_config_dict=self.world_cfg,
