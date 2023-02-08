@@ -61,8 +61,8 @@ from helaocore.error import ErrorCodes
 colorama.init(strip=not sys.stdout.isatty())
 
 hlotags_metadata = [
-    {"name": "public", "description": "public action server endpoints"},
-    {"name": "private", "description": "private action server endpoints"},
+    {"name": "action", "description": "action endpoints will register status and block"},
+    {"name": "private", "description": "private endpoints don't create actions"},
 ]
 
 

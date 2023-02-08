@@ -58,8 +58,8 @@ from helao.helpers.zdeque import zdeque
 colorama.init(strip=not sys.stdout.isatty())
 
 hlotags_metadata = [
-    {"name": "public", "description": "public orchestrator endpoints"},
-    {"name": "private", "description": "private orchestrator endpoints"},
+    {"name": "action", "description": "action endpoints will register status and block"},
+    {"name": "private", "description": "private endpoints don't create actions"},
 ]
 
 
