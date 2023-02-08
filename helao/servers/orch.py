@@ -911,37 +911,6 @@ class Orch(Base):
                 self.world_cfg, A
             )
 
-            # orch gets back an active action dict, we can self-register the dispatched action in global status
-            resmod = ActionModel(**result_actiondict)
-            srvname = resmod.action_server.server_name
-            actname = resmod.action_name
-            resuuid = resmod.action_uuid
-            actstat = resmod.action_status
-            srvkeys = self.orchstatusmodel.server_dict.keys()
-            srvkey = [k for k in srvkeys if k[0] == srvname][0]
-            if HloStatus.active in actstat:
-                self.orchstatusmodel.active_dict[resuuid] = resmod
-                self.orchstatusmodel.server_dict[srvkey].endpoints[actname].active_dict[
-                    resuuid
-                ] = resmod
-            else:
-                self.orchstatusmodel.nonactive_dict[actstat[0]][resuuid] = resmod
-                self.orchstatusmodel.server_dict[srvkey].endpoints[
-                    actname
-                ].nonactive_dict[actstat[0]][resuuid] = resmod
-            # await self.interrupt_q.put(self.orchstatusmodel)
-            # await self.update_operator(True)
-            # await self.globstat_q.put(self.orchstatusmodel.as_json())
-
-            endpoint_uuids = [
-                str(k) for k in self.orchstatusmodel.active_dict.keys()
-            ] + [
-                str(k)
-                for k in self.orchstatusmodel.nonactive_dict.get("finished", {}).keys()
-            ]
-            self.print_message(
-                f"Current {A.action_name} received uuids: {endpoint_uuids}"
-            )
             result_uuid = result_actiondict["action_uuid"]
             self.track_action_uuid(UUID(result_uuid))
             self.print_message(
@@ -955,6 +924,37 @@ class Orch(Base):
                     error_code = await self.loop_task_dispatch_action()
 
             if not A.nonblocking:
+                # orch gets back an active action dict, we can self-register the dispatched action in global status
+                resmod = ActionModel(**result_actiondict)
+                srvname = resmod.action_server.server_name
+                actname = resmod.action_name
+                resuuid = resmod.action_uuid
+                actstat = resmod.action_status
+                srvkeys = self.orchstatusmodel.server_dict.keys()
+                srvkey = [k for k in srvkeys if k[0] == srvname][0]
+                if HloStatus.active in actstat:
+                    self.orchstatusmodel.active_dict[resuuid] = resmod
+                    self.orchstatusmodel.server_dict[srvkey].endpoints[actname].active_dict[
+                        resuuid
+                    ] = resmod
+                else:
+                    self.orchstatusmodel.nonactive_dict[actstat[0]][resuuid] = resmod
+                    self.orchstatusmodel.server_dict[srvkey].endpoints[
+                        actname
+                    ].nonactive_dict[actstat[0]][resuuid] = resmod
+                # await self.interrupt_q.put(self.orchstatusmodel)
+                # await self.update_operator(True)
+                # await self.globstat_q.put(self.orchstatusmodel.as_json())
+
+                endpoint_uuids = [
+                    str(k) for k in self.orchstatusmodel.active_dict.keys()
+                ] + [
+                    str(k)
+                    for k in self.orchstatusmodel.nonactive_dict.get("finished", {}).keys()
+                ]
+                self.print_message(
+                    f"Current {A.action_name} received uuids: {endpoint_uuids}"
+                )
                 while result_uuid not in endpoint_uuids:
                     self.print_message(
                         f"Waiting for dispatched {A.action_name}, {A.action_uuid} request to register in global status."
