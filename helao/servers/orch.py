@@ -58,8 +58,8 @@ from helao.helpers.zdeque import zdeque
 colorama.init(strip=not sys.stdout.isatty())
 
 hlotags_metadata = [
-    {"name": "public", "description": "public orchestrator endpoints"},
-    {"name": "private", "description": "private orchestrator endpoints"},
+    {"name": "action", "description": "action endpoints will register status and block"},
+    {"name": "private", "description": "private endpoints don't create actions"},
 ]
 
 
@@ -268,7 +268,7 @@ class HelaoOrch(HelaoFastAPI):
             )
             return {"experiment_uuid": exp_uuid}
 
-        @self.post("/prepend_experiment")
+        @self.post("/prepend_experiment", tags=["private"])
         async def prepend_experiment(
             experiment: Optional[Experiment] = Body({}, embed=True)
         ):
@@ -280,7 +280,7 @@ class HelaoOrch(HelaoFastAPI):
             )
             return {"experiment_uuid": exp_uuid}
 
-        @self.post("/insert_experiment")
+        @self.post("/insert_experiment", tags=["private"])
         async def insert_experiment(
             experiment: Optional[Experiment] = Body({}, embed=True),
             idx: Optional[int] = 0,
@@ -327,7 +327,7 @@ class HelaoOrch(HelaoFastAPI):
         def list_non_blocking():
             return self.orch.nonblocking
 
-        @self.post(f"/{server_key}/wait")
+        @self.post(f"/{server_key}/wait", tags=["action"])
         async def wait(
             action: Optional[Action] = Body({}, embed=True),
             waittime: Optional[float] = 10.0,
@@ -342,7 +342,7 @@ class HelaoOrch(HelaoFastAPI):
             active_action_dict = await active.start_executor(executor)
             return active_action_dict
 
-        @self.post(f"/{server_key}/cancel_wait")
+        @self.post(f"/{server_key}/cancel_wait", tags=["action"])
         async def cancel_wait(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -355,7 +355,7 @@ class HelaoOrch(HelaoFastAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @self.post(f"/{server_key}/interrupt")
+        @self.post(f"/{server_key}/interrupt", tags=["action"])
         async def interrupt(
             action: Optional[Action] = Body({}, embed=True),
             reason: Optional[str] = "wait",
@@ -368,7 +368,7 @@ class HelaoOrch(HelaoFastAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @self.post(f"/{server_key}/estop", tags=["public"])
+        @self.post(f"/{server_key}/estop", tags=["action"])
         async def act_estop(
             action: Optional[Action] = Body({}, embed=True),
             switch: Optional[bool] = True,

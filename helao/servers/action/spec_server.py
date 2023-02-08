@@ -21,20 +21,20 @@ from helao.helpers.config_loader import config_loader
 from helao.drivers.io.enum import TriggerType
 
 
-def makeApp(confPrefix, servKey, helao_root):
+def makeApp(confPrefix, server_key, helao_root):
 
     config = config_loader(confPrefix, helao_root)
 
     app = HelaoBase(
         config=config,
-        server_key=servKey,
-        server_title=servKey,
+        server_key=server_key,
+        server_title=server_key,
         description="Spectrometer server",
         version=0.1,
         driver_class=SM303,
     )
 
-    @app.post(f"/{servKey}/acquire_spec")
+    @app.post(f"/{server_key}/acquire_spec", tags=["action"])
     async def acquire_spec(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -64,7 +64,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{servKey}/acquire_spec_adv")
+    @app.post(f"/{server_key}/acquire_spec_adv", tags=["action"])
     async def acquire_spec_adv(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -94,7 +94,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{servKey}/acquire_spec_extrig")
+    @app.post(f"/{server_key}/acquire_spec_extrig", tags=["action"])
     async def acquire_spec_extrig(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -113,7 +113,7 @@ def makeApp(confPrefix, servKey, helao_root):
         # app.base.print_message("External trigger task initiated.", info=True)
         return active_dict
 
-    @app.post(f"/{servKey}/stop_extrig_after")
+    @app.post(f"/{server_key}/stop_extrig_after", tags=["action"])
     async def stop_extrig(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
