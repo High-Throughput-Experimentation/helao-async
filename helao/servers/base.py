@@ -60,12 +60,8 @@ from helaocore.error import ErrorCodes
 # strip colors if stdout is redirected
 colorama.init(strip=not sys.stdout.isatty())
 
-hlotags_metadata = [
-    {"name": "action", "description": "action endpoints will register status and block"},
-    {"name": "private", "description": "private endpoints don't create actions"},
-]
 
-
+# TODO: HelaoBase will return FastAPI app to replace "makeApp" func
 class HelaoBase(HelaoFastAPI):
     def __init__(
         self,
@@ -83,7 +79,6 @@ class HelaoBase(HelaoFastAPI):
             title=server_title,
             description=description,
             version=version,
-            openapi_tags=hlotags_metadata,
         )
         self.driver = None
 
@@ -184,7 +179,7 @@ class HelaoBase(HelaoFastAPI):
                 self.base.print_message("driver has NO estop function", info=True)
                 self.base.actionservermodel.estop = switch
             if switch:
-                active.action.action_status.selfend(HloStatus.estopped)
+                active.action.action_status.append(HloStatus.estopped)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -293,6 +288,7 @@ class Base:
     and folders will be written as follows: TBD
     """
 
+    # TODO: add world_cfg: dict parameter for HelaoBase to pass config instead of fastapp
     def __init__(self, fastapp: HelaoBase, dyn_endpoints=None):
         self.server = MachineModel(
             server_name=fastapp.helao_srv, machine_name=gethostname()
@@ -379,6 +375,7 @@ class Base:
             **kwargs,
         )
 
+    # TODO: add app: FastAPI parameter for HelaoBase to pass app
     async def init_endpoint_status(self, dyn_endpoints=None):
         """Populate status dict
         with FastAPI server endpoints for monitoring."""
@@ -465,6 +462,7 @@ class Base:
 
         # name of the caller function
         calname = sys._getframe().f_back.f_back.f_code.co_name
+        # TODO: build calname: urlname dict mapping during init_endpoint_status
         # fastapi url for caller function
         urlname = self.fastapp.url_path_for(calname)
 

@@ -3,11 +3,17 @@ from fastapi import FastAPI
 __all__ = ["HelaoBokehAPI", "HelaoFastAPI"]
 
 
+TAGS = [
+    {"name": "action", "description": "action endpoints will register status and block"},
+    {"name": "private", "description": "private endpoints don't create actions"},
+]
+
+
 class HelaoFastAPI(FastAPI):
     """Standard FastAPI class with HELAO config attached for simpler import."""
 
     def __init__(self, helao_cfg: dict, helao_srv: str, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs, openapi_tags=TAGS)
         self.helao_cfg = helao_cfg
         self.helao_srv = helao_srv
         self.server_cfg = self.helao_cfg["servers"][self.helao_srv]
