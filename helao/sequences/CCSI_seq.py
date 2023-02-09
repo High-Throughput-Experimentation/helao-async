@@ -22,7 +22,7 @@ SEQUENCES = __all__
 #     Alphapurge1_duration: float = 10,
 #     Probepurge1_duration: float = 10,
 #     Sensorpurge1_duration: float = 10,
-#     Deltapurge1_duration: float = 10,
+#     DeltaDilute1_duration: float = 10,
 #     HSpurge_duration: float = 20, 
 #     HSmeasure1_duration: float = 20,
 #     CO2measure_duration: float = 20,
@@ -41,7 +41,7 @@ SEQUENCES = __all__
 #     epm.add_experiment("CCSI_sub_alpha_purge", {"Alphapurge1_duration": Alphapurge1_duration})
 #     epm.add_experiment("CCSI_sub_probe_purge", {"Probepurge1_duration": Probepurge1_duration})
 #     epm.add_experiment("CCSI_sub_sensor_purge", {"Sensorpurge1_duration": Sensorpurge1_duration})
-#     epm.add_experiment("CCSI_sub_delta_purge", {"Deltapurge1_duration": Deltapurge1_duration})
+#     epm.add_experiment("CCSI_sub_delta_purge", {"DeltaDilute1_duration": DeltaDilute1_duration})
 #     for _ in range(headspace_purge_cycles):
 #         epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {"HSpurge_duration": HSpurge_duration, "HSmeasure1_duration":HSmeasure1_duration, "CO2measure_duration": CO2measure_duration, "CO2measure_acqrate": CO2measure_acqrate})
 #     epm.add_experiment("CCSI_sub_initialization_end_state", {})
@@ -56,7 +56,7 @@ def CCSI_initialization(
     Alphapurge1_duration: float = 10,
     Probepurge1_duration: float = 10,
     Sensorpurge1_duration: float = 15,
-    Deltapurge1_duration: float = 10,
+    DeltaDilute1_duration: float = 10,
     HSpurge_duration: float = 20, 
  #   HSmeasure1_duration: float = 20,
     CO2measure_duration: float = 20,
@@ -73,11 +73,11 @@ def CCSI_initialization(
         "Alphapurge1_duration": Alphapurge1_duration,
         "Probepurge1_duration": Probepurge1_duration,
         "Sensorpurge1_duration": Sensorpurge1_duration,
-        "Deltapurge1_duration": Deltapurge1_duration
+        "DeltaDilute1_duration": DeltaDilute1_duration
         })
 
-    for _ in range(headspace_purge_cycles):
-        epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {"HSpurge_duration": HSpurge_duration, "co2measure_duration": CO2measure_duration, "co2measure_acqrate": CO2measure_acqrate, "co2_ppm_thresh": CO2threshold, "purge_if": "below"})
+    epm.add_experiment("CCSI_sub_headspace_purge", {"HSpurge_duration": HSpurge_duration})
+    epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {"HSpurge_duration": HSpurge_duration, "co2measure_duration": CO2measure_duration, "co2measure_acqrate": CO2measure_acqrate, "co2_ppm_thresh": CO2threshold, "purge_if": "below"})
     epm.add_experiment("CCSI_sub_initialization_end_state", {})
 
     return epm.experiment_plan_list
