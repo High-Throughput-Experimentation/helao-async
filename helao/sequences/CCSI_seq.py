@@ -201,7 +201,7 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
             "volume_ul_cell_liquid": KOHvolume,
             "water_True_False": False,
         })
-        watervolume = total_sample_volume_ul - KOHvolume,
+        watervolume = total_sample_volume_ul - KOHvolume
 
         epm.add_experiment("CCSI_sub_load_liquid", {
             "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
