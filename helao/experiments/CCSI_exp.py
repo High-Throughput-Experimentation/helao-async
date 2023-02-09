@@ -634,13 +634,13 @@ def CCSI_sub_initialization_firstpart(
 
 def CCSI_sub_liquidfill_syringes(
     experiment: Experiment,
-    experiment_version: int = 4,
+    experiment_version: int = 5,
     Solution_description: str = "KOH",
     Solution_reservoir_sample_no: int = 2,
     Solution_volume_ul: float = 500,
     Waterclean_reservoir_sample_no: int = 1,
     Waterclean_volume_ul: float = 2500,
-#    Syringe_retraction_ul: float = 150,
+    Syringe_retraction_ul: float = 150,
     deadspace_volume_ul: float = 50,
     LiquidFillWait_s: float = 15,
     co2measure_duration: float = 20,
@@ -723,7 +723,7 @@ def CCSI_sub_liquidfill_syringes(
             "withdraw",
             {
                 "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-                "volume_uL": 100,
+                "volume_uL": Syringe_retraction_ul,
             },
         
         )
@@ -747,7 +747,7 @@ def CCSI_sub_liquidfill_syringes(
             "withdraw",
             {
                 "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-                "volume_uL": 100,
+                "volume_uL": Syringe_retraction_ul,
             },
             
         )
@@ -798,10 +798,11 @@ def CCSI_sub_liquidfill_syringes(
 
 def CCSI_sub_drain_and_clean(
     experiment: Experiment,
-    experiment_version: int = 4,
+    experiment_version: int = 5,
     Waterclean_volume_ul: float = 5000,
     deadspace_volume_ul: float = 50,
     Syringe_rate_ulsec: float = 500,
+    Syringe_retraction_ul: float = 150,
     LiquidCleanWait_s: float = 15,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.1,
@@ -865,7 +866,7 @@ def CCSI_sub_drain_and_clean(
         "withdraw",
         {
             "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-            "volume_uL": 100,
+            "volume_uL": Syringe_retraction_ul,
         },
     )
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
