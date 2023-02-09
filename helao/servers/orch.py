@@ -57,12 +57,8 @@ from helao.helpers.zdeque import zdeque
 # strip colors if stdout is redirected
 colorama.init(strip=not sys.stdout.isatty())
 
-hlotags_metadata = [
-    {"name": "action", "description": "action endpoints will register status and block"},
-    {"name": "private", "description": "private endpoints don't create actions"},
-]
 
-
+# TODO: HelaoOrch will return FastAPI app to replace makeApp func
 class HelaoOrch(HelaoFastAPI):
     def __init__(
         self,
@@ -79,7 +75,6 @@ class HelaoOrch(HelaoFastAPI):
             title=server_title,
             description=description,
             version=version,
-            openapi_tags=hlotags_metadata,
         )
         self.driver = None
 
@@ -388,7 +383,7 @@ class HelaoOrch(HelaoFastAPI):
                 self.orch.print_message("driver has NO estop function", info=True)
                 self.orch.actionservermodel.estop = switch
             if switch:
-                active.action.action_status.selfend(HloStatus.estopped)
+                active.action.action_status.append(HloStatus.estopped)
             finished_action = await active.finish()
             return finished_action.as_dict()
 

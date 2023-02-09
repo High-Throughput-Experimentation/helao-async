@@ -8,6 +8,7 @@ from helao.helpers.print_message import print_message
 from helaocore.models.machine import MachineModel
 
 
+# TODO: HelaoVis will return doc to replace makeBokehApp func
 class HelaoVis(HelaoBokehAPI):
     def __init__(
         self,
