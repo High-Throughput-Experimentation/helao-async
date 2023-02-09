@@ -23,6 +23,7 @@ __all__ = [
     "CCSI_sub_initialization_firstpart",
     "CCSI_sub_liquidfill_syringes",
     "CCSI_sub_drain_and_clean",
+    "CCSI_sub_refill_clean",
     "CCSI_debug_co2purge",
 ]
 
@@ -167,15 +168,13 @@ def CCSI_sub_load_gas(
     apm = ActionPlanMaker()
     apm.add(
         PAL_server,
-        "archive_custom_add_liquid",  # not sure there is a server function for gas
+        "archive_custom_load",  # not sure there is a server function for gas
         {
             "custom": "cell1_we",
-            "source_liquid_in": GasSample(
+            "load_sample_in": GasSample(
                 sample_no=apm.pars.reservoir_gas_sample_no, machine_name=ORCH_HOST
             ).dict(),
             "volume_ml": apm.pars.volume_ul_cell_gas / 1000,
-            "combine_liquids": True,
-            # "dilute_liquids": True,
         },
     )
     return apm.action_list
@@ -460,13 +459,15 @@ def CCSI_sub_headspace_purge_and_measure(
 
 def CCSI_sub_headspace_purge(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int =2,
     HSpurge_duration: float = 20,  # set before determining actual
 ):
     # recirculation loop
     # only 1B 6A-waste opened 1A closed pump off//differ from delta purge
 
     apm = ActionPlanMaker()
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": 15})  #sensorpurge time
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0}, asc.no_wait)
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}, asc.no_wait)
@@ -485,7 +486,7 @@ def CCSI_sub_headspace_purge(
     #  MFC off
     apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": 0.5})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
@@ -546,11 +547,11 @@ def CCSI_sub_peripumpoff(
 def CCSI_sub_initialization_firstpart(
     experiment: Experiment,
     experiment_version: int = 2,
-    HSpurge1_duration: float = 30,
+    HSpurge1_duration: float = 60,
     Manpurge1_duration: float = 10,
     Alphapurge1_duration: float = 10,
     Probepurge1_duration: float = 10,
-    Sensorpurge1_duration: float = 10,
+    Sensorpurge1_duration: float = 15,
     Deltapurge1_duration: float = 10,
 ):
     apm = ActionPlanMaker()
@@ -802,13 +803,13 @@ def CCSI_sub_drain_and_clean(
     Waterclean_volume_ul: float = 5000,
     deadspace_volume_ul: float = 50,
     Syringe_rate_ulsec: float = 500,
-    LiquidCleanWait_s: float = 30,
+    LiquidCleanWait_s: float = 15,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.1,
     co2_ppm_thresh: float = 90000,
     purge_if: Union[str, float] = -0.05,
     max_purge_iters: int = 5,
-    HSpurge_duration: float = 20,  # set before determining actual
+    LiquidCleanPurge_duration: float = 60,  # set before determining actual
 ):
     # drain
     # only 1B 6A-waste opened 1A closed pump off//differ from delta purge
@@ -828,7 +829,7 @@ def CCSI_sub_drain_and_clean(
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 1}, asc.no_wait)
     #   apm.add(MFC---stuff Flow ON)
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.LiquidCleanPurge_duration})
     #  MFC off
     apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
@@ -923,7 +924,7 @@ def CCSI_sub_drain_and_clean(
 #                 "co2measure_acqrate": 0.1,
 #                 "co2_ppm_thresh": 90000,
 #                 "purge_if": -0.05,
-#                 "HSpurge_duration": 20 
+#                 "LiquidCleanPurge": 20 
 #             }
 #         }
 #     )
