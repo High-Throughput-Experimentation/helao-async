@@ -160,7 +160,7 @@ def CCSI_validation_KOH_procedure(
 def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
     sequence_version: int = 1,
     gas_sample_no: int = 1,
-    KOH_volume_ul: list = [0,500, 50],
+    KOH_volume_ul: List[float] = [0,500, 50],
     KOH_reservoir_sample_no: int = 2,
     total_sample_volume_ul: float = 5000,
     Waterclean_reservoir_sample_no: int = 1,
