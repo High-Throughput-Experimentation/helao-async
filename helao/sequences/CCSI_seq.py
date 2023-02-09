@@ -235,8 +235,9 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
             })
             epm.add_experiment("CCSI_sub_headspace_purge", {"HSpurge_duration": LiquidCleanPurge_duration})
 
+        refill_volume = watervolume + drainclean_volume_ul*cleanloop
         epm.add_experiment("CCSI_sub_refill_clean", {
-            "Waterclean_volume_ul": watervolume + drainclean_volume_ul*cleanloop,
+            "Waterclean_volume_ul": refill_volume ,
             "deadspace_volume_ul": deadspace_volume_ul,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
         })
