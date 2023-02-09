@@ -1266,6 +1266,7 @@ class Archive:
         # and get sample from custom position
         if custom in self.positions.customs_dict:
             custom_sample = deepcopy(self.positions.customs_dict[custom].sample)
+            self.base.print_message(f"custom sample in valid position: {custom_sample}")
         else:
             error = ErrorCodes.not_available
             return error, [], []
