@@ -51,7 +51,8 @@ class SprintIR:
         )
 
         # set POLL and flush present buffer until empty
-        self.send("K 1")
+        self.base.print_message("Setting sensor to polling mode.")
+        self.send("K 2")
         # self.send("! 0")
         # self.send("Y")
         # self.send("! 0")
@@ -79,6 +80,7 @@ class SprintIR:
         ]
         ifw_map = {v: k for k, v in fw_map}
         self.fw = {}
+        self.base.print_message("Reading scaling factor and initial co2 ppm.")
         for k, v in fw_map:
             resp, aux = self.send(v)
             if resp:
