@@ -96,7 +96,8 @@ class SprintIR:
 
         # set streaming mode before starting async task
         self.base.print_message("Setting sensor to streaming mode.")
-        self.com.write("K 1\r\n".encode("utf8"))
+        # self.com.write("K 1\r\n".encode("utf8"))
+        self.send("K 1")
 
         self.action = None
         self.active = None
