@@ -51,7 +51,7 @@ class SprintIR:
         )
 
         # set POLL and flush present buffer until empty
-        self.send("K 2")
+        self.send("K 1")
         # self.send("! 0")
         # self.send("Y")
         # self.send("! 0")
@@ -238,10 +238,10 @@ class SprintIR:
         while True:
             if blanks == reset_after:
                 self.base.print_message(
-                    f"Did not receive a co2 message from sensor after {reset_after} checks, resetting polling mode.",
+                    f"Did not receive a co2 message from sensor after {reset_after} checks, resetting streaming mode.",
                     warning=True,
                 )
-                self.send("K 2")
+                self.send("K 1")
                 blanks = 0
             try:
                 co2_level, co2_level_unfilt = self.read_stream()
