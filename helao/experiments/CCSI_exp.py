@@ -655,6 +655,7 @@ def CCSI_sub_liquidfill_syringes(
     Waterclean_volume_ul: float = 2500,
     Syringe_retraction_ul: float = 150,
     deadspace_volume_ul: float = 50,
+    backlash_volume_ul: float = 50,
     LiquidFillWait_s: float = 15,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.5,
@@ -746,7 +747,7 @@ def CCSI_sub_liquidfill_syringes(
             "infuse",
             {
                 "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-                "volume_uL": 25,
+                "volume_uL": apm.pars.backlash_volume_ul,
             },
             
         )
@@ -770,7 +771,7 @@ def CCSI_sub_liquidfill_syringes(
             "infuse",
             {
                 "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-                "volume_uL": 25,
+                "volume_uL": apm.pars.backlash_volume_ul,
             },
             
         )
