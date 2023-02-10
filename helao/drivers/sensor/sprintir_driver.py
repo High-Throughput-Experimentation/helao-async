@@ -223,6 +223,7 @@ class SprintIR:
         return cmd_resp, aux_resp
 
     def read_stream(self):
+        self.com.flush()
         buf = self.com.readline()
         lines = buf.decode("utf8").split("\n")
         for line in lines:
