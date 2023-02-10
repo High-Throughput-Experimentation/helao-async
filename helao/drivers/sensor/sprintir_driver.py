@@ -231,7 +231,7 @@ class SprintIR:
                 return filt, unfilt
         return False, False
 
-    async def poll_sensor_loop(self, frequency: int = 20, reset_after: int = 10):
+    async def poll_sensor_loop(self, frequency: int = 10, reset_after: int = 10):
         waittime = 1.0 / frequency
         self.base.print_message("Starting polling loop")
         blanks = 0
@@ -245,7 +245,8 @@ class SprintIR:
                 blanks = 0
             try:
                 co2_level, co2_level_unfilt = self.read_stream()
-            except Exception:
+            except Exception as err:
+                self.base.print_message(f"Could not parse streaming value, got {err}")
                 continue
             if co2_level:
                 msg_dict = {
