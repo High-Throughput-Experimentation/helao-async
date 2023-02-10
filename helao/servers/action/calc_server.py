@@ -12,23 +12,23 @@ from fastapi import Body
 
 from helaocore.models.file import HloHeaderModel, HloFileGroup
 from helao.helpers.premodels import Action
-from helao.servers.base import makeActionServ
+from helao.servers.base import HelaoBase
 from helao.drivers.data.calc_driver import Calc
 from helao.helpers.config_loader import config_loader
 
 
-def makeApp(confPrefix, servKey, helao_root):
+def makeApp(confPrefix, server_key, helao_root):
     config = config_loader(confPrefix, helao_root)
-    app = makeActionServ(
+    app = HelaoBase(
         config=config,
-        server_key=servKey,
-        server_title=servKey,
+        server_key=server_key,
+        server_title=server_key,
         description="Calculation server",
         version=0.1,
         driver_class=Calc,
     )
 
-    @app.post(f"/{servKey}/calc_uvis_abs")
+    @app.post(f"/{server_key}/calc_uvis_abs", tags=["action"])
     async def calc_uvis_abs(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 2,
@@ -83,7 +83,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/check_co2_purge")
+    @app.post(f"/{server_key}/check_co2_purge", tags=["action"])
     async def check_co2_purge(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 2,

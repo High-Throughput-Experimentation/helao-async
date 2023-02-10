@@ -33,7 +33,7 @@ import asyncio
 from typing import Optional, List
 from fastapi import Body, Query
 
-from helao.servers.base import makeActionServ
+from helao.servers.base import HelaoBase
 from helaocore.models.sample import SampleUnion
 from helao.helpers.premodels import Action
 from helao.drivers.pstat.gamry_driver import gamry
@@ -41,7 +41,7 @@ from helao.helpers.config_loader import config_loader
 
 
 async def gamry_dyn_endpoints(app=None):
-    servKey = app.base.server.server_name
+    server_key = app.base.server.server_name
     enable_pstat = False
 
     while not app.driver.ready:
@@ -53,7 +53,7 @@ async def gamry_dyn_endpoints(app=None):
 
     if enable_pstat:
 
-        @app.post(f"/{servKey}/run_LSV")
+        @app.post(f"/{server_key}/run_LSV", tags=["action"])
         async def run_LSV(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -79,7 +79,7 @@ async def gamry_dyn_endpoints(app=None):
             active_dict = await app.driver.technique_LSV(A)
             return active_dict
 
-        @app.post(f"/{servKey}/run_CA")
+        @app.post(f"/{server_key}/run_CA", tags=["action"])
         async def run_CA(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -105,7 +105,7 @@ async def gamry_dyn_endpoints(app=None):
             active_dict = await app.driver.technique_CA(A)
             return active_dict
 
-        @app.post(f"/{servKey}/run_CP")
+        @app.post(f"/{server_key}/run_CP", tags=["action"])
         async def run_CP(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -130,7 +130,7 @@ async def gamry_dyn_endpoints(app=None):
             active_dict = await app.driver.technique_CP(A)
             return active_dict
 
-        @app.post(f"/{servKey}/run_CV")
+        @app.post(f"/{server_key}/run_CV", tags=["action"])
         async def run_CV(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -160,7 +160,7 @@ async def gamry_dyn_endpoints(app=None):
             active_dict = await app.driver.technique_CV(A)
             return active_dict
 
-        @app.post(f"/{servKey}/run_EIS")
+        @app.post(f"/{server_key}/run_EIS", tags=["action"])
         async def run_EIS(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -191,7 +191,7 @@ async def gamry_dyn_endpoints(app=None):
             active_dict = await app.driver.technique_EIS(A)
             return active_dict
 
-        @app.post(f"/{servKey}/run_OCV")
+        @app.post(f"/{server_key}/run_OCV", tags=["action"])
         async def run_OCV(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -216,21 +216,21 @@ async def gamry_dyn_endpoints(app=None):
             return active_dict
 
 
-def makeApp(confPrefix, servKey, helao_root):
+def makeApp(confPrefix, server_key, helao_root):
 
     config = config_loader(confPrefix, helao_root)
 
-    app = makeActionServ(
+    app = HelaoBase(
         config=config,
-        server_key=servKey,
-        server_title=servKey,
+        server_key=server_key,
+        server_title=server_key,
         description="Gamry instrument/action server",
         version=2.0,
         driver_class=gamry,
         dyn_endpoints=gamry_dyn_endpoints,
     )
 
-    @app.post(f"/{servKey}/get_meas_status")
+    @app.post(f"/{server_key}/get_meas_status", tags=["action"])
     async def get_meas_status(action: Optional[Action] = Body({}, embed=True)):
         """Will return 'idle' or 'measuring'.
         Should be used in conjuction with eta to async.sleep loop poll"""
@@ -239,7 +239,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/stop")
+    @app.post(f"/{server_key}/stop", tags=["action"])
     async def stop(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,

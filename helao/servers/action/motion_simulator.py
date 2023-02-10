@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from helao.servers.base import Base
-from helao.servers.base import makeActionServ
+from helao.servers.base import HelaoBase
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
 from helaocore.error import ErrorCodes
@@ -51,20 +51,20 @@ class MotionSim:
         pass
 
 
-def makeApp(confPrefix, servKey, helao_root):
+def makeApp(confPrefix, server_key, helao_root):
 
     config = config_loader(confPrefix, helao_root)
 
-    app = makeActionServ(
+    app = HelaoBase(
         config=config,
-        server_key=servKey,
-        server_title=servKey,
+        server_key=server_key,
+        server_title=server_key,
         description="Motion simulator",
         version=2.0,
         driver_class=MotionSim
     )
 
-    @app.post(f"/{servKey}/solid_get_samples_xy", tags=["public"])
+    @app.post(f"/{server_key}/solid_get_samples_xy", tags=["action"])
     async def solid_get_samples_xy(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -79,7 +79,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/move", tags=["public"])
+    @app.post(f"/{server_key}/move", tags=["action"])
     async def move(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,

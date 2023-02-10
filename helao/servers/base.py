@@ -1,4 +1,4 @@
-__all__ = ["Base", "ActiveParams", "makeActionServ", "Active", "Executor", "DummyBase"]
+__all__ = ["Base", "ActiveParams", "HelaoBase", "Active", "Executor", "DummyBase"]
 
 import asyncio
 import json
@@ -22,7 +22,6 @@ import pyaml
 
 from fastapi import Body, WebSocket
 from fastapi.dependencies.utils import get_flat_params
-
 
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.dispatcher import async_private_dispatcher
@@ -60,139 +59,129 @@ from helaocore.error import ErrorCodes
 # ANSI color codes converted to the Windows versions
 # strip colors if stdout is redirected
 colorama.init(strip=not sys.stdout.isatty())
-# colorama.init()
-
-hlotags_metadata = [
-    {"name": "public", "description": "public action server endpoints"},
-    {"name": "private", "description": "private action server endpoints"},
-]
-
-# TODO: major refactor, move makeActionServ & makeVisServ methods under Base
-# 1. input confPrefix, servKey, helao_root to Base init
-# 2. initialize driver and app in Base
-# 3. Base method returns app for server templates
-# 4. need to revise drivers that directly reference Base (almost all use printmsg),
-#    better to remove Base dependency and use Executor as shim, and all external calls
-#    to driver should return dict: {"response": ..., "data": ..., "error": ...}
-# 5. Executors can be stored alongside driver module, but better to put in server
 
 
-def makeActionServ(
-    config,
-    server_key,
-    server_title,
-    description,
-    version,
-    driver_class=None,
-    dyn_endpoints=None,
-):
-    app = HelaoFastAPI(
-        helao_cfg=config,
-        helao_srv=server_key,
-        title=server_title,
-        description=description,
-        version=version,
-        openapi_tags=hlotags_metadata,
-    )
-
-    @app.on_event("startup")
-    def startup_event():
-        app.base = Base(app, driver_class, dyn_endpoints)
-
-    @app.websocket("/ws_status")
-    async def websocket_status(websocket: WebSocket):
-        """Broadcast status messages.
-
-        Args:
-        websocket: a fastapi.WebSocket object
-        """
-        await app.base.ws_status(websocket)
-
-    @app.websocket("/ws_data")
-    async def websocket_data(websocket: WebSocket):
-        """Broadcast status dicts.
-
-        Args:
-        websocket: a fastapi.WebSocket object
-        """
-        await app.base.ws_data(websocket)
-
-    @app.websocket("/ws_live")
-    async def websocket_live(websocket: WebSocket):
-        """Broadcast live buffer dicts.
-
-        Args:
-        websocket: a fastapi.WebSocket object
-        """
-        await app.base.ws_live(websocket)
-
-    @app.post("/get_status", tags=["private"])
-    def status_wrapper():
-        return app.base.actionservermodel
-
-    @app.post("/attach_client", tags=["private"])
-    async def attach_client(client_servkey: str):
-        return await app.base.attach_client(client_servkey)
-
-    @app.post("/stop_executor", tags=["private"])
-    def stop_executor(executor_id: str):
-        return app.base.stop_executor(executor_id)
-
-    @app.post("/endpoints", tags=["private"])
-    def get_all_urls():
-        """Return a list of all endpoints on this server."""
-        return app.base.get_endpoint_urls()
-
-    @app.post(f"/{server_key}/estop", tags=["public"])
-    async def estop(
-        action: Optional[Action] = Body({}, embed=True), switch: Optional[bool] = True
+# TODO: HelaoBase will return FastAPI app to replace "makeApp" func
+class HelaoBase(HelaoFastAPI):
+    def __init__(
+        self,
+        config,
+        server_key,
+        server_title,
+        description,
+        version,
+        driver_class=None,
+        dyn_endpoints=None,
     ):
-        active = await app.base.setup_and_contain_action(
-            json_data_keys=["estop"], action_abbr="estop"
+        super().__init__(
+            helao_cfg=config,
+            helao_srv=server_key,
+            title=server_title,
+            description=description,
+            version=version,
         )
-        has_estop = getattr(app.driver, "estop", None)
-        if has_estop is not None and callable(has_estop):
-            app.driver.base.print_message("driver has estop function", info=True)
-            await active.enqueue_data_dflt(
-                datadict={
-                    "estop": await app.driver.estop(**active.action.action_params)
-                }
+        self.driver = None
+
+        @self.on_event("startup")
+        def startup_event():
+            self.base = Base(fastapp=self, dyn_endpoints=dyn_endpoints)
+            self.base.myinit()
+            if driver_class is not None:
+                self.driver = driver_class(self.base)
+
+        @self.websocket("/ws_status")
+        async def websocket_status(websocket: WebSocket):
+            """Broadcast status messages.
+
+            Args:
+            websocket: a fastapi.WebSocket object
+            """
+            await self.base.ws_status(websocket)
+
+        @self.websocket("/ws_data")
+        async def websocket_data(websocket: WebSocket):
+            """Broadcast status dicts.
+
+            Args:
+            websocket: a fastapi.WebSocket object
+            """
+            await self.base.ws_data(websocket)
+
+        @self.websocket("/ws_live")
+        async def websocket_live(websocket: WebSocket):
+            """Broadcast live buffer dicts.
+
+            Args:
+            websocket: a fastapi.WebSocket object
+            """
+            await self.base.ws_live(websocket)
+
+        @self.post("/get_status", tags=["private"])
+        def get_status():
+            return self.base.actionservermodel
+
+        @self.post("/attach_client", tags=["private"])
+        async def attach_client(client_servkey: str):
+            return await self.base.attach_client(client_servkey)
+
+        @self.post("/stop_executor", tags=["private"])
+        def stop_executor(executor_id: str):
+            return self.base.stop_executor(executor_id)
+
+        @self.post("/endpoints", tags=["private"])
+        def get_all_urls():
+            """Return a list of all endpoints on this server."""
+            return self.base.get_endpoint_urls()
+
+        @self.post("/get_lbuf", tags=["private"])
+        def get_lbuf():
+            return self.base.live_buffer
+
+        @self.post("/list_executors", tags=["private"])
+        def list_executors():
+            return list(self.base.executors.keys())
+
+        @self.post("/shutdown", tags=["private"])
+        async def post_shutdown():
+            await shutdown_event()
+
+        @self.on_event("shutdown")
+        async def shutdown_event():
+            self.base.print_message("action shutdown", info=True)
+            await self.base.shutdown()
+
+            shutdown = getattr(self.driver, "shutdown", None)
+            if shutdown is not None and callable(shutdown):
+                self.base.print_message("driver has shutdown function", info=True)
+                retval = shutdown()
+            else:
+                self.base.print_message("driver has NO shutdown function", error=True)
+                retval = {"shutdown"}
+            return retval
+
+        @self.post(f"/{server_key}/estop", tags=["action"])
+        async def estop(
+            action: Optional[Action] = Body({}, embed=True),
+            switch: Optional[bool] = True,
+        ):
+            active = await self.base.setup_and_contain_action(
+                json_data_keys=["estop"], action_abbr="estop"
             )
-        else:
-            app.driver.base.print_message("driver has NO estop function", info=True)
-            app.driver.base.actionservermodel.estop = switch
-        if switch:
-            active.action.action_status.append(HloStatus.estopped)
-        finished_action = await active.finish()
-        return finished_action.as_dict()
-
-    @app.post("/get_lbuf", tags=["private"])
-    def get_lbuf():
-        return app.base.live_buffer
-
-    @app.post("/list_executors", tags=["private"])
-    def list_executors():
-        return list(app.base.executors.keys())
-
-    @app.post("/shutdown", tags=["private"])
-    async def post_shutdown():
-        await shutdown_event()
-
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        app.base.print_message("action shutdown", info=True)
-        await app.base.shutdown()
-
-        shutdown = getattr(app.driver, "shutdown", None)
-        if shutdown is not None and callable(shutdown):
-            app.driver.base.print_message("driver has shutdown function", info=True)
-            retval = shutdown()
-        else:
-            app.driver.base.print_message("driver has NO shutdown function", error=True)
-            retval = {"shutdown"}
-        return retval
-
-    return app
+            has_estop = getattr(self.driver, "estop", None)
+            if has_estop is not None and callable(has_estop):
+                self.base.print_message("driver has estop function", info=True)
+                await active.enqueue_data_dflt(
+                    datadict={
+                        "estop": await self.driver.estop(**active.action.action_params)
+                    }
+                )
+            else:
+                self.base.print_message("driver has NO estop function", info=True)
+                self.base.actionservermodel.estop = switch
+            if switch:
+                active.action.action_status.append(HloStatus.estopped)
+            finished_action = await active.finish()
+            return finished_action.as_dict()
 
 
 class Executor:
@@ -299,26 +288,26 @@ class Base:
     and folders will be written as follows: TBD
     """
 
-    def __init__(self, fastapp: HelaoFastAPI, driver_class=None, dyn_endpoints=None):
+    # TODO: add world_cfg: dict parameter for HelaoBase to pass config instead of fastapp
+    def __init__(self, fastapp: HelaoBase, dyn_endpoints=None):
         self.server = MachineModel(
             server_name=fastapp.helao_srv, machine_name=gethostname()
         )
 
         self.fastapp = fastapp
+        self.dyn_endpoints = dyn_endpoints
         self.server_cfg = self.fastapp.helao_cfg["servers"][self.server.server_name]
         self.server_params = self.fastapp.helao_cfg["servers"][
             self.server.server_name
         ].get("params", {})
         self.world_cfg = self.fastapp.helao_cfg
         self.run_type = None
-        self.aloop = asyncio.get_running_loop()
 
         self.helaodirs = helao_dirs(self.world_cfg, self.server.server_name)
 
         if self.helaodirs.root is None:
             raise ValueError(
                 "Warning: root directory was not defined. Logs, PRCs, PRGs, and data will not be written.",
-                error=True,
             )
 
         if "run_type" in self.world_cfg:
@@ -329,7 +318,6 @@ class Base:
         else:
             raise ValueError(
                 "Missing 'run_type' in config, cannot create server object.",
-                error=True,
             )
 
         self.actives: Dict[UUID, object] = {}
@@ -360,6 +348,8 @@ class Base:
                         self.ntp_last_sync, self.ntp_offset = tmps
                         self.ntp_offset = float(self.ntp_offset)
 
+    def myinit(self):
+        self.aloop = asyncio.get_running_loop()
         if self.ntp_last_sync is None:
             asyncio.gather(self.get_ntp_time())
 
@@ -367,14 +357,11 @@ class Base:
         self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
         self.bufferer = self.aloop.create_task(self.live_buffer_task())
 
-        if driver_class is not None:
-            self.fastapp.driver = driver_class(self)
-
         # # if provided add more dynmaic endpoints after driver initialization
         # if callable(dyn_endpoints):
         #     asyncio.gather(dyn_endpoints(app=self.fastapp))
 
-        asyncio.gather(self.init_endpoint_status(dyn_endpoints))
+        asyncio.gather(self.init_endpoint_status(self.dyn_endpoints))
 
         self.fast_urls = self.get_endpoint_urls()
         self.status_logger = self.aloop.create_task(self.log_status_task())
@@ -388,6 +375,7 @@ class Base:
             **kwargs,
         )
 
+    # TODO: add app: FastAPI parameter for HelaoBase to pass app
     async def init_endpoint_status(self, dyn_endpoints=None):
         """Populate status dict
         with FastAPI server endpoints for monitoring."""
@@ -474,16 +462,17 @@ class Base:
 
         # name of the caller function
         calname = sys._getframe().f_back.f_back.f_code.co_name
+        # TODO: build calname: urlname dict mapping during init_endpoint_status
         # fastapi url for caller function
         urlname = self.fastapp.url_path_for(calname)
 
         # action name should be the last one
         action_name = urlname.strip("/").split("/")[-1]
-        # use the already known servKey, not the one from the url
-        servKey = self.server.server_name
+        # use the already known server_key, not the one from the url
+        server_key = self.server.server_name
 
         action.action_server = MachineModel(
-            server_name=servKey, machine_name=gethostname()
+            server_name=server_key, machine_name=gethostname()
         )
         action.action_name = action_name
 
@@ -515,7 +504,7 @@ class Base:
         action_abbr: Optional[str] = None,
         file_type: Optional[str] = "helao__file",
         hloheader: Optional[HloHeaderModel] = HloHeaderModel(),
-    ) -> object:
+    ):
         """This is a simple shortcut for very basic endpoints
         which just want to return some simple data"""
         action = await self._get_action(frame=inspect.currentframe().f_back)
@@ -536,7 +525,7 @@ class Base:
         )
         return active
 
-    async def contain_action(self, activeparams: ActiveParams) -> object:
+    async def contain_action(self, activeparams: ActiveParams):
         """return an active Action:
         file_type: type of output data file
         json_data_keys: data keys for json encoded data (dict)
@@ -1193,7 +1182,7 @@ class Active:
     def finish_hlo_header(
         self,
         file_conn_keys: Optional[List[UUID]] = None,
-        realtime: Optional[int] = None,
+        realtime: Optional[float] = None,
     ):
         """this just adds a timestamp for the data"""
         # needs to be a sync function

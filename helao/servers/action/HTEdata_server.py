@@ -5,16 +5,16 @@ __all__ = ["makeApp"]
 from typing import Optional
 from fastapi import Body
 from importlib import import_module
-from helao.servers.base import makeActionServ
+from helao.servers.base import HelaoBase
 from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
 
 
-def makeApp(confPrefix, servKey, helao_root):
+def makeApp(confPrefix, server_key, helao_root):
 
     config = config_loader(confPrefix, helao_root)
     C = config["servers"]
-    S = C[servKey]
+    S = C[server_key]
 
     # check if 'mode' setting is present
     if not "mode" in S:
@@ -33,16 +33,16 @@ def makeApp(confPrefix, servKey, helao_root):
     # print("Unknown data mode")
     #    from HTEdata_dummy import HTEdata
 
-    app = makeActionServ(
+    app = HelaoBase(
         config=config,
-        server_key=servKey,
-        server_title=servKey,
+        server_key=server_key,
+        server_title=server_key,
         description="HTE data management server",
         version=2.0,
         driver_class=HTEdata,
     )
 
-    @app.post(f"/{servKey}/get_elements_plateid")
+    @app.post(f"/{server_key}/get_elements_plateid", tags=["action"])
     async def get_elements_plateid(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -60,7 +60,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/get_platemap_plateid")
+    @app.post(f"/{server_key}/get_platemap_plateid", tags=["action"])
     async def get_platemap_plateid(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -78,7 +78,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/get_platexycalibration")
+    @app.post(f"/{server_key}/get_platexycalibration", tags=["action"])
     async def get_platexycalibration(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -96,7 +96,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/save_platexycalibration")
+    @app.post(f"/{server_key}/save_platexycalibration", tags=["action"])
     async def save_platexycalibration(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -114,7 +114,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/check_plateid")
+    @app.post(f"/{server_key}/check_plateid", tags=["action"])
     async def check_plateid(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -130,7 +130,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/check_printrecord_plateid")
+    @app.post(f"/{server_key}/check_printrecord_plateid", tags=["action"])
     async def check_printrecord_plateid(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -148,7 +148,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/check_annealrecord_plateid")
+    @app.post(f"/{server_key}/check_annealrecord_plateid", tags=["action"])
     async def check_annealrecord_plateid(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -166,7 +166,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/get_info_plateid")
+    @app.post(f"/{server_key}/get_info_plateid", tags=["action"])
     async def get_info_plateid(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -181,7 +181,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/get_rcp_plateid")
+    @app.post(f"/{server_key}/get_rcp_plateid", tags=["action"])
     async def get_rcp_plateid(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,

@@ -1,26 +1,32 @@
-__all__ = ["Vis"]
+__all__ = ["Vis", "HelaoVis"]
 
-import sys
 from socket import gethostname
-
-import colorama
-
 
 from helao.helpers.server_api import HelaoBokehAPI
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.print_message import print_message
 from helaocore.models.machine import MachineModel
 
-# ANSI color codes converted to the Windows versions
-colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
-# colorama.init()
+
+# TODO: HelaoVis will return doc to replace makeBokehApp func
+class HelaoVis(HelaoBokehAPI):
+    def __init__(
+        self,
+        config,
+        server_key,
+        doc,
+    ):
+        super().__init__(config, server_key, doc)
+        self.vis = Vis(self)
 
 
 class Vis:
     """Base class for all HELAO bokeh servers."""
 
     def __init__(self, bokehapp: HelaoBokehAPI):
-        self.server = MachineModel(server_name=bokehapp.helao_srv, machine_name=gethostname())
+        self.server = MachineModel(
+            server_name=bokehapp.helao_srv, machine_name=gethostname()
+        )
         self.server_cfg = bokehapp.helao_cfg["servers"][self.server.server_name]
         self.world_cfg = bokehapp.helao_cfg
         self.doc = bokehapp.doc
@@ -33,10 +39,11 @@ class Vis:
                 error=True,
             )
 
-        # self.run_type = None
-        # self.aloop = asyncio.get_running_loop()
-
     def print_message(self, *args, **kwargs):
         print_message(
-            self.server_cfg, self.server.server_name, log_dir=self.helaodirs.log_root, *args, **kwargs
+            self.server_cfg,
+            self.server.server_name,
+            log_dir=self.helaodirs.log_root,
+            *args,
+            **kwargs
         )

@@ -21,7 +21,7 @@ from typing import Optional, List
 from socket import gethostname
 
 
-from helao.servers.base import makeActionServ
+from helao.servers.base import HelaoBase
 from helao.drivers.io.nidaqmx_driver import cNIMAX, DevMonExec
 from helaocore.models.sample import LiquidSample, SampleUnion
 from helao.helpers.make_str_enum import make_str_enum
@@ -30,14 +30,14 @@ from helaocore.error import ErrorCodes
 from helao.helpers.config_loader import config_loader
 
 
-def makeApp(confPrefix, servKey, helao_root):
+def makeApp(confPrefix, server_key, helao_root):
 
     config = config_loader(confPrefix, helao_root)
 
-    app = makeActionServ(
+    app = HelaoBase(
         config=config,
-        server_key=servKey,
-        server_title=servKey,
+        server_key=server_key,
+        server_title=server_key,
         description="NIdaqmx server",
         version=2.0,
         driver_class=cNIMAX,
@@ -84,7 +84,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if dev_mastercell:
 
-        @app.post(f"/{servKey}/mastercell", tags=["public"])
+        @app.post(f"/{server_key}/mastercell", tags=["action"])
         async def mastercell(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -108,7 +108,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if dev_activecell:
 
-        @app.post(f"/{servKey}/activecell", tags=["public"])
+        @app.post(f"/{server_key}/activecell", tags=["action"])
         async def activecell(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -132,7 +132,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if dev_pump:
 
-        @app.post(f"/{servKey}/pump", tags=["public"])
+        @app.post(f"/{server_key}/pump", tags=["action"])
         async def pump(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -156,7 +156,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if dev_gasvalve:
 
-        @app.post(f"/{servKey}/gasvalve", tags=["public"])
+        @app.post(f"/{server_key}/gasvalve", tags=["action"])
         async def gasvalve(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -182,7 +182,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if dev_liquidvalve:
 
-        @app.post(f"/{servKey}/liquidvalve", tags=["public"])
+        @app.post(f"/{server_key}/liquidvalve", tags=["action"])
         async def liquidvalve(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -208,7 +208,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if dev_led:
 
-        @app.post(f"/{servKey}/led", tags=["public"])
+        @app.post(f"/{server_key}/led", tags=["action"])
         async def led(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -232,7 +232,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if dev_fswbcd:
 
-        @app.post(f"/{servKey}/fswbcd", tags=["public"])
+        @app.post(f"/{server_key}/fswbcd", tags=["action"])
         async def fswbcd(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -258,7 +258,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if dev_fsw:
 
-        @app.post(f"/{servKey}/fsw", tags=["public"])
+        @app.post(f"/{server_key}/fsw", tags=["action"])
         async def fsw(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -281,7 +281,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if dev_cellcurrent and dev_cellvoltage:
 
-        @app.post(f"/{servKey}/cellIV", tags=["public"])
+        @app.post(f"/{server_key}/cellIV", tags=["action"])
         async def cellIV(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -302,7 +302,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if dev_monitor:
 
-        @app.post(f"/{servKey}/acquire_monitors")
+        @app.post(f"/{server_key}/acquire_monitors", tags=["action"])
         async def acquire_monitors(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -321,7 +321,7 @@ def makeApp(confPrefix, servKey, helao_root):
             active_action_dict = await active.start_executor(executor)
             return active_action_dict
 
-        @app.post(f"/{servKey}/cancel_acquire_monitors")
+        @app.post(f"/{server_key}/cancel_acquire_monitors", tags=["action"])
         async def cancel_acquire_monitors(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -344,7 +344,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if dev_heat:
 
-        @app.post(f"/{servKey}/heater", tags=["public"])
+        @app.post(f"/{server_key}/heater", tags=["action"])
         async def heater(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -375,7 +375,7 @@ def makeApp(confPrefix, servKey, helao_root):
             # A = await app.base.setup_action()
             A = await app.driver.monitorloop()
 
-        @app.post(f"/{servKey}/heatloop", tags=["public"])
+        @app.post(f"/{server_key}/heatloop", tags=["action"])
         async def heatloop(
             # action: Optional[Action] = Body({}, embed=True),
             # action_version: int = 1,
@@ -426,11 +426,11 @@ def makeApp(confPrefix, servKey, helao_root):
         #        heater(heater="cellheater", on = False)
         #        heater(heater="res_heater", on = False)
 
-        # @app.post(f"/stoptemp", tags=["public"])
+        # @app.post(f"/stoptemp", tags=["action"])
         # async def stop_temp():
         #     app.driver.stop_Ttask()
 
-        # @app.post(f"/starttemp", tags=["public"])
+        # @app.post(f"/starttemp", tags=["action"])
         # async def start_temp():
         #     app.driver.create_Ttask()
 
@@ -442,7 +442,7 @@ def makeApp(confPrefix, servKey, helao_root):
         async def heatloopstop():
             app.driver.stop_heatloop()
 
-    @app.post(f"/{servKey}/stop", tags=["public"])
+    @app.post(f"/{server_key}/stop", tags=["action"])
     async def stop(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,

@@ -1212,7 +1212,7 @@ class Aligner:
         if len(pmapxy):
             diff = pmapxy - xy
             sumdiff = (diff**2).sum(axis=1)
-            return np.int(np.argmin(sumdiff))
+            return int(np.argmin(sumdiff))
         else:
             return None
 

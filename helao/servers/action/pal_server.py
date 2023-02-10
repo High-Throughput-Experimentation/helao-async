@@ -7,7 +7,7 @@ from time import strftime
 from fastapi import Body, Query
 from typing import Optional, List  # , Tuple
 
-from helao.servers.base import makeActionServ
+from helao.servers.base import HelaoBase
 from helao.drivers.robot.pal_driver import (
     PAL,
     Spacingmethod,
@@ -33,14 +33,14 @@ from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
 
 
-def makeApp(confPrefix, servKey, helao_root):
+def makeApp(confPrefix, server_key, helao_root):
 
     config = config_loader(confPrefix, helao_root)
 
-    app = makeActionServ(
+    app = HelaoBase(
         config,
-        servKey,
-        servKey,
+        server_key,
+        server_key,
         "PAL Autosampler Server",
         version=2.0,
         driver_class=PAL,
@@ -58,7 +58,7 @@ def makeApp(confPrefix, servKey, helao_root):
         "dev_custom", {key: key for key in dev_custom.keys()}
     )
 
-    @app.post(f"/{servKey}/stop", tags=["public"])
+    @app.post(f"/{server_key}/stop", tags=["action"])
     async def stop(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -69,7 +69,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/kill_PAL", tags=["public"])
+    @app.post(f"/{server_key}/kill_PAL", tags=["action"])
     async def kill_PAL(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -81,7 +81,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/convert_v1DB", tags=["public_db"])
+    @app.post(f"/{server_key}/convert_v1DB", tags=["action"])
     async def convert_v1DB(action: Optional[Action] = Body({}, embed=True)):
         # await app.driver.convert_oldDB_to_sqllite()
         await app.driver.archive.unified_db.liquidAPI.old_jsondb_to_sqlitedb()
@@ -89,7 +89,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if _cams:
 
-        @app.post(f"/{servKey}/PAL_run_method", tags=["public_PAL"])
+        @app.post(f"/{server_key}/PAL_run_method", tags=["action"])
         async def PAL_run_method(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -169,7 +169,7 @@ def makeApp(confPrefix, servKey, helao_root):
         and "archive"
     ):
 
-        @app.post(f"/{servKey}/PAL_ANEC_aliquot", tags=["PAL_ANEC"])
+        @app.post(f"/{server_key}/PAL_ANEC_aliquot", tags=["action"])
         async def PAL_ANEC_aliquot(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -195,7 +195,7 @@ def makeApp(confPrefix, servKey, helao_root):
         or "injection_custom_GC_gas_wait" in _cams
     ):
 
-        @app.post(f"/{servKey}/PAL_ANEC_GC", tags=["PAL_ANEC"])
+        @app.post(f"/{server_key}/PAL_ANEC_GC", tags=["action"])
         async def PAL_ANEC_GC(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -215,7 +215,7 @@ def makeApp(confPrefix, servKey, helao_root):
         or "injection_tray_GC_gas_wait" in _cams
     ):
 
-        @app.post(f"/{servKey}/PAL_injection_tray_GC", tags=["PAL_GC"])
+        @app.post(f"/{server_key}/PAL_injection_tray_GC", tags=["action"])
         async def PAL_injection_tray_GC(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -244,7 +244,7 @@ def makeApp(confPrefix, servKey, helao_root):
         or "injection_custom_GC_gas_wait" in _cams
     ):
 
-        @app.post(f"/{servKey}/PAL_injection_custom_GC", tags=["PAL_GC"])
+        @app.post(f"/{server_key}/PAL_injection_custom_GC", tags=["action"])
         async def PAL_injection_custom_GC(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -266,7 +266,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if "injection_custom_HPLC" in _cams:
 
-        @app.post(f"/{servKey}/PAL_injection_custom_HPLC", tags=["PAL_HPLC"])
+        @app.post(f"/{server_key}/PAL_injection_custom_HPLC", tags=["action"])
         async def PAL_injection_custom_HPLC(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -286,7 +286,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if "injection_tray_HPLC" in _cams:
 
-        @app.post(f"/{servKey}/PAL_injection_tray_HPLC", tags=["PAL_HPLC"])
+        @app.post(f"/{server_key}/PAL_injection_tray_HPLC", tags=["action"])
         async def PAL_injection_tray_HPLC(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -309,7 +309,7 @@ def makeApp(confPrefix, servKey, helao_root):
 #    if "transfer_tray_tray" in _cams:
     if "transfer_tray_tray" in _cams:
 
-        @app.post(f"/{servKey}/PAL_transfer_tray_tray", tags=["PAL_transfer"])
+        @app.post(f"/{server_key}/PAL_transfer_tray_tray", tags=["action"])
         async def PAL_transfer_tray_tray(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -338,7 +338,7 @@ def makeApp(confPrefix, servKey, helao_root):
 #    if "transfer_tray_custom" in _cams:
     if "transfer_tray_custom" in _cams:
 
-        @app.post(f"/{servKey}/PAL_transfer_tray_custom", tags=["PAL_transfer"])
+        @app.post(f"/{server_key}/PAL_transfer_tray_custom", tags=["action"])
         async def PAL_transfer_tray_custom(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -365,7 +365,7 @@ def makeApp(confPrefix, servKey, helao_root):
 #    if "transfer_custom_tray" in _cams:
     if "transfer_custom_tray" in _cams:
 
-        @app.post(f"/{servKey}/PAL_transfer_custom_tray", tags=["PAL_transfer"])
+        @app.post(f"/{server_key}/PAL_transfer_custom_tray", tags=["action"])
         async def PAL_transfer_custom_tray(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -391,7 +391,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if "transfer_custom_custom" in _cams:
 
-        @app.post(f"/{servKey}/PAL_transfer_custom_custom", tags=["PAL_transfer"])
+        @app.post(f"/{server_key}/PAL_transfer_custom_custom", tags=["action"])
         async def PAL_transfer_custom_custom(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -415,7 +415,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if "archive" in _cams:
 
-        @app.post(f"/{servKey}/PAL_archive", tags=["public_PAL"])
+        @app.post(f"/{server_key}/PAL_archive", tags=["action"])
         async def PAL_archive(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -437,7 +437,7 @@ def makeApp(confPrefix, servKey, helao_root):
             return active_dict
 
     # if "fill" in _cams:
-    #     @app.post(f"/{servKey}/PAL_fill", tags=["public_PAL"])
+    #     @app.post(f"/{server_key}/PAL_fill", tags=["action"])
     #     async def PAL_fill(
     #         action: Optional[Action] = \
     #                 Body({}, embed=True),
@@ -456,7 +456,7 @@ def makeApp(confPrefix, servKey, helao_root):
     #         return active_dict
 
     # if "fillfixed" in _cams:
-    #     @app.post(f"/{servKey}/PAL_fillfixed", tags=["public_PAL"])
+    #     @app.post(f"/{server_key}/PAL_fillfixed", tags=["action"])
     #     async def PAL_fillfixed(
     #         action: Optional[Action] = \
     #                 Body({}, embed=True),
@@ -476,7 +476,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if "deepclean" in _cams:
 
-        @app.post(f"/{servKey}/PAL_deepclean", tags=["public_PAL"])
+        @app.post(f"/{server_key}/PAL_deepclean", tags=["action"])
         async def PAL_deepclean(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -496,7 +496,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if "dilute" in _cams:
 
-        @app.post(f"/{servKey}/PAL_dilute", tags=["public_PAL"])
+        @app.post(f"/{server_key}/PAL_dilute", tags=["action"])
         async def PAL_dilute(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -522,7 +522,7 @@ def makeApp(confPrefix, servKey, helao_root):
 
     if "autodilute" in _cams:
 
-        @app.post(f"/{servKey}/PAL_autodilute", tags=["public_PAL"])
+        @app.post(f"/{server_key}/PAL_autodilute", tags=["action"])
         async def PAL_autodilute(
             action: Optional[Action] = Body({}, embed=True),
             action_version: int = 1,
@@ -543,7 +543,7 @@ def makeApp(confPrefix, servKey, helao_root):
             active_dict = await app.driver.method_autodilute(A)
             return active_dict
 
-    @app.post(f"/{servKey}/archive_tray_query_sample", tags=["public_archive"])
+    @app.post(f"/{server_key}/archive_tray_query_sample", tags=["action"])
     async def archive_tray_query_sample(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -564,7 +564,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/archive_tray_unloadall", tags=["public_archive"])
+    @app.post(f"/{server_key}/archive_tray_unloadall", tags=["action"])
     async def archive_tray_unloadall(action: Optional[Action] = Body({}, embed=True)):
         """Resets app.driver vial table."""
         active = await app.base.setup_and_contain_action(action_abbr="unload_sample")
@@ -582,7 +582,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{servKey}/archive_tray_load", tags=["public_archive"])
+    @app.post(f"/{server_key}/archive_tray_load", tags=["action"])
     async def archive_tray_load(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -608,7 +608,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{servKey}/archive_tray_unload", tags=["public_archive"])
+    @app.post(f"/{server_key}/archive_tray_unload", tags=["action"])
     async def archive_tray_unload(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -631,7 +631,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{servKey}/archive_tray_new_position", tags=["public_archive"])
+    @app.post(f"/{server_key}/archive_tray_new_position", tags=["action"])
     async def archive_tray_new(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -650,7 +650,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/archive_tray_update_position", tags=["public_archive"])
+    @app.post(f"/{server_key}/archive_tray_update_position", tags=["action"])
     async def archive_tray_update_position(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -673,7 +673,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/archive_tray_export_json", tags=["public_archive"])
+    @app.post(f"/{server_key}/archive_tray_export_json", tags=["action"])
     async def archive_tray_export_json(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -692,7 +692,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/archive_tray_export_icpms", tags=["public_archive"])
+    @app.post(f"/{server_key}/archive_tray_export_icpms", tags=["action"])
     async def archive_tray_export_icpms(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -718,7 +718,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/archive_tray_export_csv", tags=["public_archive"])
+    @app.post(f"/{server_key}/archive_tray_export_csv", tags=["action"])
     async def archive_tray_export_csv(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -737,7 +737,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/archive_custom_load_solid", tags=["public_archive"])
+    @app.post(f"/{server_key}/archive_custom_load_solid", tags=["action"])
     async def archive_custom_load_solid(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -763,7 +763,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{servKey}/archive_custom_load", tags=["public_archive"])
+    @app.post(f"/{server_key}/archive_custom_load", tags=["action"])
     async def archive_custom_load(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -786,7 +786,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{servKey}/archive_custom_unload", tags=["public_archive"])
+    @app.post(f"/{server_key}/archive_custom_unload", tags=["action"])
     async def archive_custom_unload(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -817,7 +817,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{servKey}/archive_custom_unloadall", tags=["public_archive"])
+    @app.post(f"/{server_key}/archive_custom_unloadall", tags=["action"])
     async def archive_custom_unloadall(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -857,7 +857,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{servKey}/archive_custom_query_sample", tags=["public_archive"])
+    @app.post(f"/{server_key}/archive_custom_query_sample", tags=["action"])
     async def archive_custom_query_sample(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -878,7 +878,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/archive_custom_add_liquid", tags=["public_archive"])
+    @app.post(f"/{server_key}/archive_custom_add_liquid", tags=["action"])
     async def archive_custom_add_liquid(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -925,7 +925,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/db_get_samples", tags=["public_db"])
+    @app.post(f"/{server_key}/db_get_samples", tags=["action"])
     async def db_get_samples(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -949,7 +949,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/db_new_samples", tags=["public_db"])
+    @app.post(f"/{server_key}/db_new_samples", tags=["action"])
     async def db_new_samples(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -993,7 +993,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/generate_plate_sample_no_list", tags=["public_db"])
+    @app.post(f"/{server_key}/generate_plate_sample_no_list", tags=["action"])
     async def generate_plate_sample_no_list(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -1026,7 +1026,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{servKey}/get_loaded_positions", tags=["private_archive"])
+    @app.post(f"/{server_key}/get_loaded_positions", tags=["action"])
     async def get_positions(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
@@ -1057,7 +1057,7 @@ def makeApp(confPrefix, servKey, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/list_new_samples", tags=["public_db"])
+    @app.post(f"/list_new_samples", tags=["action"])
     async def list_new_samples(num_smps: int = 10, give_only: str = "false"):
         """List num_smps newest global sample labels from each local DB table."""
         give_bool = True if give_only == "true" else False

@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from helao.servers.base import Base
-from helao.servers.base import makeActionServ
+from helao.servers.base import HelaoBase
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
 from helaocore.error import ErrorCodes
@@ -68,20 +68,20 @@ class AnalysisSim:
         pass
 
 
-def makeApp(confPrefix, servKey, helao_root):
+def makeApp(confPrefix, server_key, helao_root):
 
     config = config_loader(confPrefix, helao_root)
 
-    app = makeActionServ(
+    app = HelaoBase(
         config=config,
-        server_key=servKey,
-        server_title=servKey,
+        server_key=server_key,
+        server_title=server_key,
         description="Analysis simulator",
         version=2.0,
         driver_class=AnalysisSim
     )
 
-    @app.post(f"/{servKey}/calc_cpfom", tags=["public"])
+    @app.post(f"/{server_key}/calc_cpfom", tags=["action"])
     async def calc_cpfom(
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
