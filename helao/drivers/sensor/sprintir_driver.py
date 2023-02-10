@@ -97,9 +97,8 @@ class SprintIR:
             time.sleep(0.1)
 
         # set streaming mode before starting async task
-        self.base.print_message("Setting sensor to streaming mode.")
-        self.com.write("K 1\r\n".encode("utf8"))
-        # self.send("K 1")
+        self.base.print_message("Setting sensor to polling mode.")
+        self.com.write(b"K 2\r\n")
 
         self.action = None
         self.active = None
@@ -224,8 +223,10 @@ class SprintIR:
 
     def read_stream(self):
         self.com.flush()
-        buf = self.com.readline()
-        lines = buf.decode("utf8").split("\n")
+        # buf = self.com.readline()
+        # lines = buf.decode("utf8").split("\n")
+        resp, _ = self.send("Z")
+        lines = [resp]
         for line in lines:
             stripped = line.strip()
             # self.base.print_message(strip)
@@ -237,17 +238,17 @@ class SprintIR:
                 return filt, unfilt
         return False, False
 
-    async def poll_sensor_loop(self, frequency: int = 10, reset_after: int = 10):
+    async def poll_sensor_loop(self, frequency: int = 4, reset_after: int = 5):
         waittime = 1.0 / frequency
         self.base.print_message("Starting polling loop")
         blanks = 0
         while True:
             if blanks == reset_after:
                 self.base.print_message(
-                    f"Did not receive a co2 message from sensor after {reset_after} checks, resetting streaming mode.",
+                    f"Did not receive a co2 message from sensor after {reset_after} checks, resetting polling mode.",
                     warning=True,
                 )
-                self.send("K 1")
+                self.com.write(b"K 2\r\n")
                 blanks = 0
             try:
                 co2_level, co2_level_unfilt = self.read_stream()
