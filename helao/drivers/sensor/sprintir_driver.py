@@ -260,7 +260,11 @@ class SprintIR:
                     "co2_ppm": int(co2_level) * self.fw["scaling_factor"],
                     "co2_ppm_unflt": int(co2_level_unfilt) * self.fw["scaling_factor"],
                 }
-                await self.base.put_lbuf(msg_dict)
+                if msg_dict["co2_ppm"] > 50 and msg_dict["co2_ppm"] < 1e6:
+                    await self.base.put_lbuf(msg_dict)
+                else:
+                    self.base.print_message(f"Got unreasonable co2_ppm value {msg_dict['co2_ppm']}")
+                continue
                 blanks = 0
             else:
                 blanks += 1
