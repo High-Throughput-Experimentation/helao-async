@@ -386,6 +386,14 @@ class SprintIR:
         return activeDict
 
     def shutdown(self):
+        try:
+            self.polling_task.cancel()
+        except asyncio.CancelledError:
+            self.base.print_message("closed sensor polling loop task")
+        try:
+            self.recording_task.cancel()
+        except asyncio.CancelledError:
+            self.base.print_message("closed sensor recording loop task")
         self.com.close()
 
 
