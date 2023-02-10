@@ -377,8 +377,10 @@ def CCSI_sub_delta_purge(
 
 def CCSI_sub_headspace_purge_and_measure(
     experiment: Experiment,
-    experiment_version: int = 5,
+    experiment_version: int = 6,
     HSpurge_duration: float = 20,  # set before determining actual
+    DeltaDilute1_duration: float = 0,
+    initialization: bool = False,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.1,
     co2_ppm_thresh: float = 90000,
@@ -388,8 +390,11 @@ def CCSI_sub_headspace_purge_and_measure(
 ):
 
     apm = ActionPlanMaker()
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": 15})  #DeltaDilute time
+    if DeltaDilute1_duration == 0:
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    else:   
+        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": DeltaDilute1_duration})  #DeltaDilute time usually 15
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0}, asc.no_wait)
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}, asc.no_wait)
@@ -406,13 +411,15 @@ def CCSI_sub_headspace_purge_and_measure(
     #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
 
-    apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": 0.5})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0},asc.no_wait)
+    if initialization:
+        apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": 0.5})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0},asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0})
+    if initialization:
+        apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0}, asc.no_wait)
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}, asc.no_wait)
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0}, asc.no_wait)
@@ -433,7 +440,7 @@ def CCSI_sub_headspace_purge_and_measure(
         process_contrib=[ProcessContrib.files],
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration}, asc.no_wait)
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
     # apm.add(
@@ -456,15 +463,19 @@ def CCSI_sub_headspace_purge_and_measure(
 
 def CCSI_sub_headspace_purge(
     experiment: Experiment,
-    experiment_version: int =2,
+    experiment_version: int =4,
     HSpurge_duration: float = 20,  # set before determining actual
-        #    DeltaDilute1_duration: float = 15,
+    DeltaDilute1_duration: float = 0,
+    initialization: bool = False,
 ):
     # recirculation loop
 
     apm = ActionPlanMaker()
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": 15})  #DeltaDilute time
+    if DeltaDilute1_duration == 0:
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    else:   
+        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": DeltaDilute1_duration})  #DeltaDilute time usually 15
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0}, asc.no_wait)
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}, asc.no_wait)
@@ -481,13 +492,15 @@ def CCSI_sub_headspace_purge(
    #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
 
-    apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": 0.5})
-    apm.add(NI_server,"liquidvalve",{"liquidvalve": "6A-waste", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0},asc.no_wait)
+    if initialization:
+        apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": 0.5})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wai)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
+    apm.add(NI_server,"liquidvalve",{"liquidvalve": "6A-waste", "on": 0})
+    if initialization:
+        apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
 
     return apm.action_list
 

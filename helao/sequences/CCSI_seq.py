@@ -49,7 +49,7 @@ SEQUENCES = __all__
 #     return epm.experiment_plan_list
 
 def CCSI_initialization(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     headspace_purge_cycles: int = 5,
     HSpurge1_duration: float = 60,
     Manpurge1_duration: float = 10,
@@ -60,8 +60,8 @@ def CCSI_initialization(
     HSpurge_duration: float = 20, 
  #   HSmeasure1_duration: float = 20,
     CO2measure_duration: float = 20,
-    CO2measure_acqrate: float = 0.1,
-    CO2threshold: float = 1  # value and units????
+    CO2measure_acqrate: float = 1,
+    CO2threshold: float = 9000  # value and units????
 ):
 
     epm = ExperimentPlanMaker()
@@ -73,11 +73,22 @@ def CCSI_initialization(
         "Alphapurge1_duration": Alphapurge1_duration,
         "Probepurge1_duration": Probepurge1_duration,
         "Sensorpurge1_duration": Sensorpurge1_duration,
-        "DeltaDilute1_duration": DeltaDilute1_duration
         })
 
-    epm.add_experiment("CCSI_sub_headspace_purge", {"HSpurge_duration": HSpurge_duration})
-    epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {"HSpurge_duration": HSpurge_duration, "co2measure_duration": CO2measure_duration, "co2measure_acqrate": CO2measure_acqrate, "co2_ppm_thresh": CO2threshold, "purge_if": "below"})
+    epm.add_experiment("CCSI_sub_headspace_purge", {
+        "HSpurge_duration": HSpurge_duration,
+        "DeltaDilute1_duration": DeltaDilute1_duration,
+        "initialization": True,
+        })
+    epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {
+        "HSpurge_duration": HSpurge_duration, 
+        "DeltaDilute1_duration": DeltaDilute1_duration,
+        "initialization": True,
+        "co2measure_duration": CO2measure_duration, 
+        "co2measure_acqrate": CO2measure_acqrate, 
+        "co2_ppm_thresh": CO2threshold, 
+        "purge_if": "below"
+        })
     epm.add_experiment("CCSI_sub_initialization_end_state", {})
 
     return epm.experiment_plan_list
@@ -179,6 +190,7 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
 #    clean_co2_ppm_thresh: float = 90000,
 #    purge_if: Union[str, float] = "below",
     HSpurge_duration: float = 15,
+    DeltaDilute1_duration: float = 15,
 #    purge_co2measure_duration: float = 20,
 #    purge_co2threshhold: float = 95000,
     
@@ -242,10 +254,13 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
         epm.add_experiment("CCSI_sub_refill_clean", {
             "Waterclean_volume_ul": refill_volume ,
             "deadspace_volume_ul": deadspace_volume_ul,
-            "Syringe_rate_ulsec": syringe_rate_ulsec,
+            "Syringe_rate_ulsec": 1000,
         })
     
         for _ in range(headspace_purge_cycles):
-            epm.add_experiment("CCSI_sub_headspace_purge", {"HSpurge_duration": HSpurge_duration})
+            epm.add_experiment("CCSI_sub_headspace_purge", {
+                "HSpurge_duration": HSpurge_duration,
+                "DeltaDilute1_duration": DeltaDilute1_duration,
+                })
 
     return epm.experiment_plan_list
