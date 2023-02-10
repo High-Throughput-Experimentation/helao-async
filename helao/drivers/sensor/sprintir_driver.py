@@ -225,8 +225,7 @@ class SprintIR:
         self.com.flush()
         # buf = self.com.readline()
         # lines = buf.decode("utf8").split("\n")
-        resp, _ = self.send("Z")
-        lines = [resp]
+        lines, _ = self.send("Z")
         for line in lines:
             stripped = line.strip()
             # self.base.print_message(strip)
