@@ -223,19 +223,14 @@ class SprintIR:
 
     def read_stream(self):
         self.com.flush()
-        # buf = self.com.readline()
-        # lines = buf.decode("utf8").split("\n")
         lines, _ = self.send("Z")
-        for line in lines:
+        for line in lines[::-1]:
             stripped = line.strip()
-            # self.base.print_message(strip)
             filts = re.findall("Z\s[0-9]+", stripped)
-            unfilts = re.findall("z\s[0-9]+", stripped)
             filt = filts[-1].split()[-1] if filts else False
-            unfilt = unfilts[-1].split()[-1] if unfilts else False
-            if filt and unfilt:
-                return filt, unfilt
-        return False, False
+            if filt:
+                return filt
+        return False
 
     async def poll_sensor_loop(self, frequency: int = 4, reset_after: int = 5):
         waittime = 1.0 / frequency
@@ -250,20 +245,21 @@ class SprintIR:
                 self.com.write(b"K 2\r\n")
                 blanks = 0
             try:
-                co2_level, co2_level_unfilt = self.read_stream()
+                co2_level = self.read_stream()
             except Exception as err:
                 self.base.print_message(f"Could not parse streaming value, got {err}")
                 continue
             if co2_level:
                 msg_dict = {
                     "co2_ppm": int(co2_level) * self.fw["scaling_factor"],
-                    "co2_ppm_unflt": int(co2_level_unfilt) * self.fw["scaling_factor"],
+                    # "co2_ppm_unflt": int(co2_level_unfilt) * self.fw["scaling_factor"],
                 }
                 if msg_dict["co2_ppm"] > 50 and msg_dict["co2_ppm"] < 1e6:
                     await self.base.put_lbuf(msg_dict)
                 else:
-                    self.base.print_message(f"Got unreasonable co2_ppm value {msg_dict['co2_ppm']}")
-                continue
+                    self.base.print_message(
+                        f"Got unreasonable co2_ppm value {msg_dict['co2_ppm']}"
+                    )
                 blanks = 0
             else:
                 blanks += 1
