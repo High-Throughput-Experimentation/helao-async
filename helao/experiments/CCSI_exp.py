@@ -440,7 +440,7 @@ def CCSI_sub_headspace_purge_and_measure(
         process_contrib=[ProcessContrib.files],
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration}, asc.no_wait)
+#    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration}, asc.no_wait)
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
     # apm.add(
@@ -804,7 +804,7 @@ def CCSI_sub_liquidfill_syringes(
         ],
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
+#    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
     return apm.action_list
@@ -815,6 +815,7 @@ def CCSI_sub_drain_and_clean(
     experiment_version: int = 5,
     Waterclean_volume_ul: float = 5000,
     deadspace_volume_ul: float = 50,
+    backlash_volume_ul: float = 50,
     Syringe_rate_ulsec: float = 500,
     Syringe_retraction_ul: float = 150,
     LiquidCleanWait_s: float = 15,
@@ -889,7 +890,7 @@ def CCSI_sub_drain_and_clean(
         "infuse",
         {
             "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-            "volume_uL": 25,
+            "volume_uL": apm.pars.backlash_volume_ul,
         },
         
     )
@@ -918,7 +919,7 @@ def CCSI_sub_drain_and_clean(
         ],
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
+#    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
 #     apm.add(

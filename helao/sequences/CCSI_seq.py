@@ -176,6 +176,7 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
     total_sample_volume_ul: float = 5000,
     Waterclean_reservoir_sample_no: int = 1,
     deadspace_volume_ul: float =50,
+    backlash_volume_ul: float = 50,
     Syringe_retraction_ul: float = 150,
     syringe_rate_ulsec: float = 300,
     LiquidFillWait_s: float = 20,
@@ -226,6 +227,7 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
             "Solution_volume_ul": KOHvolume,
             "Waterclean_volume_ul": watervolume,
             "deadspace_volume_ul": deadspace_volume_ul,
+            "backlash_volume_ul": backlash_volume_ul,
             "Syringe_retraction_ul": Syringe_retraction_ul,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "LiquidFillWait_s": LiquidFillWait_s,
@@ -238,6 +240,7 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
             epm.add_experiment("CCSI_sub_drain_and_clean", {
                 "Waterclean_volume_ul": drainclean_volume_ul,
                 "deadspace_volume_ul": deadspace_volume_ul,
+                "backlash_volume_ul": backlash_volume_ul,
                 "Syringe_rate_ulsec": syringe_rate_ulsec,
                 "Syringe_retraction_ul": Syringe_retraction_ul,
                 "LiquidCleanWait_s": LiquidFillWait_s,
