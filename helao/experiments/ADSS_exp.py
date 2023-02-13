@@ -1640,6 +1640,8 @@ def ADSS_sub_clean_cell(
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.ReturnLineWait_s})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
 
+    apm.add(MOTOR_server, "z_move", {"z_position": "load"})
+
     return apm.action_list
 
 
