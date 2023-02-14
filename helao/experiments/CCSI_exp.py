@@ -394,7 +394,7 @@ def CCSI_sub_headspace_purge_and_measure(
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
     else:   
         apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
-        apm.add(ORCH_server, "wait", {"waittime": DeltaDilute1_duration})  #DeltaDilute time usually 15
+        apm.add(ORCH_server, "wait", {"waittime": apm.pars.DeltaDilute1_duration})  #DeltaDilute time usually 15
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0}, asc.no_wait)
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}, asc.no_wait)
@@ -475,7 +475,7 @@ def CCSI_sub_headspace_purge(
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
     else:   
         apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
-        apm.add(ORCH_server, "wait", {"waittime": DeltaDilute1_duration})  #DeltaDilute time usually 15
+        apm.add(ORCH_server, "wait", {"waittime": apm.pars.DeltaDilute1_duration})  #DeltaDilute time usually 15
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0}, asc.no_wait)
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}, asc.no_wait)

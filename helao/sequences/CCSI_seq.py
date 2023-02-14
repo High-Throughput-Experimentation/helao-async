@@ -77,12 +77,12 @@ def CCSI_initialization(
 
     epm.add_experiment("CCSI_sub_headspace_purge", {
         "HSpurge_duration": HSpurge_duration,
-        "DeltaDilute1_duration": 0,
+        "DeltaDilute1_duration": DeltaDilute1_duration,
         "initialization": True,
         })
     epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {
         "HSpurge_duration": HSpurge_duration, 
-        "DeltaDilute1_duration": 0,
+        "DeltaDilute1_duration": DeltaDilute1_duration,
         "initialization": True,
         "co2measure_duration": CO2measure_duration, 
         "co2measure_acqrate": CO2measure_acqrate, 
