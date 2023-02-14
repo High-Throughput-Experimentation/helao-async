@@ -667,14 +667,13 @@ def CCSI_sub_initialization_firstpart(
 
 def CCSI_sub_liquidfill_syringes(
     experiment: Experiment,
-    experiment_version: int = 6,
+    experiment_version: int = 5,
     Solution_description: str = "KOH",
     Solution_reservoir_sample_no: int = 2,
     Solution_volume_ul: float = 500,
     Waterclean_reservoir_sample_no: int = 1,
     Waterclean_volume_ul: float = 2500,
     Syringe_retraction_ul: float = 150,
-    Syringe_rate_ulsec: float = 300,
     deadspace_volume_ul: float = 50,
     backlash_volume_ul: float = 50,
     LiquidFillWait_s: float = 15,
@@ -758,7 +757,7 @@ def CCSI_sub_liquidfill_syringes(
             "withdraw",
             {
                 "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-                "volume_uL": apm.pars.Syringe_retraction_ul,
+                "volume_uL": Syringe_retraction_ul,
             },
         
         )
@@ -782,7 +781,7 @@ def CCSI_sub_liquidfill_syringes(
             "withdraw",
             {
                 "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-                "volume_uL": apm.pars.Syringe_retraction_ul,
+                "volume_uL": Syringe_retraction_ul,
             },
             
         )
@@ -837,7 +836,7 @@ def CCSI_sub_drain_and_clean(
     Waterclean_volume_ul: float = 5000,
     deadspace_volume_ul: float = 50,
     backlash_volume_ul: float = 50,
-    Syringe_rate_ulsec: float = 300,
+    Syringe_rate_ulsec: float = 500,
     Syringe_retraction_ul: float = 150,
     LiquidCleanWait_s: float = 15,
     co2measure_duration: float = 20,
@@ -970,14 +969,14 @@ def CCSI_sub_refill_clean(
     experiment: Experiment,
     experiment_version: int = 1,
     Waterclean_volume_ul: float = 5000,
-    Syringe_rate_ulsec: float = 1000,
+    Syringe_rate_ulsec: float = 300,
 ):
     apm = ActionPlanMaker()
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
     apm.add(WATERCLEANPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.Waterclean_volume_ul + 25})    
-    apm.add(WATERCLEANPUMP_server, "infuse", {"rate_uL_sec": 300, "volume_uL": 25})    
+    apm.add(WATERCLEANPUMP_server, "infuse", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": 25})    
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 0})
     
