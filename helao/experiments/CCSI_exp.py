@@ -696,11 +696,11 @@ def CCSI_sub_liquidfill_syringes(
             },
             
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-            # process_finish=False,
-            # process_contrib=[
-            #     ProcessContrib.action_params,
-            #     ProcessContrib.samples_in,
-            # ],
+                process_finish=False,
+                process_contrib=[
+                    ProcessContrib.action_params,
+    #            ProcessContrib.samples_in,
+            ],
     )
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
@@ -716,11 +716,11 @@ def CCSI_sub_liquidfill_syringes(
             },
             
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-            # process_finish=False,
-            # process_contrib=[
-            #     ProcessContrib.action_params,
-            #     ProcessContrib.samples_in,
-            # ],
+            process_finish=False,
+            process_contrib=[
+                ProcessContrib.action_params,
+#                ProcessContrib.samples_in,
+            ],
     )    
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
