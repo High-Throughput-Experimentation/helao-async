@@ -75,7 +75,7 @@ def CCSI_initialization(
         "Sensorpurge1_duration": Sensorpurge1_duration,
         })
 
-    epm.add_experiment("CCSI_sub_headspace_purge", {
+    epm.add_experiment("CCSI_sub_drain", {
         "HSpurge_duration": HSpurge_duration,
         "DeltaDilute1_duration": DeltaDilute1_duration,
         "initialization": True,
@@ -95,7 +95,7 @@ def CCSI_initialization(
 
 
 def CCSI_validation_KOH_procedure(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     gas_sample_no: int = 1,
     KOH_volume_ul: float = 500,
     KOH_reservoir_sample_no: int = 2,
@@ -147,9 +147,10 @@ def CCSI_validation_KOH_procedure(
         "co2measure_duration": co2measure_duration,
         "co2measure_acqrate": co2measure_acqrate,
     })
+    epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration})
 
  #   for _ in range(liquid_purge_cycles):
-    epm.add_experiment("CCSI_sub_drain_and_clean", {
+    epm.add_experiment("CCSI_sub_clean_inject", {
     "Waterclean_volume_ul": drainclean_volume_ul,
     "Syringe_retraction_ul": retraction_volume_ul,
     "Syringe_rate_ulsec": syringe_rate_ulsec,
@@ -234,10 +235,11 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
             "co2measure_duration": co2measure_duration,
             "co2measure_acqrate": co2measure_acqrate,
         })
-        epm.add_experiment("CCSI_sub_headspace_purge", {"HSpurge_duration": LiquidCleanPurge_duration})
+        epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration})
 
         for _ in range(cleanloop):
-            epm.add_experiment("CCSI_sub_drain_and_clean", {
+            epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration})
+            epm.add_experiment("CCSI_sub_clean_inject", {
                 "Waterclean_volume_ul": drainclean_volume_ul,
                 "deadspace_volume_ul": deadspace_volume_ul,
                 "backlash_volume_ul": backlash_volume_ul,
@@ -251,7 +253,7 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
               #  "purge_if": purge_if,
               #  "HSpurge_duration": LiquidCleanPurge_duration,
             })
-            epm.add_experiment("CCSI_sub_headspace_purge", {"HSpurge_duration": LiquidCleanPurge_duration})
+            epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration})
 
         refill_volume = watervolume + drainclean_volume_ul*cleanloop
         epm.add_experiment("CCSI_sub_refill_clean", {
@@ -261,7 +263,7 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
         })
     
         for _ in range(headspace_purge_cycles):
-            epm.add_experiment("CCSI_sub_headspace_purge", {
+            epm.add_experiment("CCSI_sub_drain", {
                 "HSpurge_duration": HSpurge_duration,
                 "DeltaDilute1_duration": DeltaDilute1_duration,
                 })
