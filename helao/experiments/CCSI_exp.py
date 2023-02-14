@@ -18,6 +18,7 @@ __all__ = [
     # "CCSI_sub_delta_purge",
     "CCSI_sub_headspace_purge_and_measure",
     "CCSI_sub_headspace_purge",
+    "CCSI_sub_headspace_purge_withdilution",
     "CCSI_sub_initialization_end_state",
     "CCSI_sub_peripumpoff",
     "CCSI_sub_initialization_firstpart",
@@ -379,7 +380,6 @@ def CCSI_sub_headspace_purge_and_measure(
     experiment: Experiment,
     experiment_version: int = 6,
     HSpurge_duration: float = 20,  # set before determining actual
-    DeltaDilute1_duration: float = 0,
     initialization: bool = False,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.1,
@@ -390,11 +390,6 @@ def CCSI_sub_headspace_purge_and_measure(
 ):
 
     apm = ActionPlanMaker()
-    if DeltaDilute1_duration == 0:
-        apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    else:   
-        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
-        apm.add(ORCH_server, "wait", {"waittime": DeltaDilute1_duration})  #DeltaDilute time usually 15
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0}, asc.no_wait)
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}, asc.no_wait)
@@ -463,19 +458,13 @@ def CCSI_sub_headspace_purge_and_measure(
 
 def CCSI_sub_headspace_purge(
     experiment: Experiment,
-    experiment_version: int =4,
+    experiment_version: int =5,
     HSpurge_duration: float = 20,  # set before determining actual
-    DeltaDilute1_duration: float = 0,
     initialization: bool = False,
 ):
     # recirculation loop
 
     apm = ActionPlanMaker()
-    if DeltaDilute1_duration == 0:
-        apm.add(ORCH_server, "wait", {"waittime": 0.25})
-    else:   
-        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
-        apm.add(ORCH_server, "wait", {"waittime": DeltaDilute1_duration})  #DeltaDilute time usually 15
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "2", "on": 0}, asc.no_wait)
     #    apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 0}, asc.no_wait)
@@ -503,6 +492,37 @@ def CCSI_sub_headspace_purge(
         apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
 
     return apm.action_list
+
+def CCSI_sub_headspace_purge_withdilution(
+    experiment: Experiment,
+    experiment_version: int =1,
+    HSpurge_duration: float = 20,  # set before determining actual
+    DeltaDilute1_duration: float = 15,
+):
+    # recirculation loop
+
+    apm = ActionPlanMaker()
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": DeltaDilute1_duration})  #DeltaDilute time usually 15
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
+    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1}, asc.no_wait)
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 1}, asc.no_wait)
+   #   apm.add(MFC---stuff Flow ON)
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
+
+#        apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
+#        apm.add(ORCH_server, "wait", {"waittime": 0.5})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
+    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(NI_server,"liquidvalve",{"liquidvalve": "6A-waste", "on": 0})
+#        apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
+
+    return apm.action_list
+
 
 
 def CCSI_sub_initialization_end_state(
@@ -882,7 +902,7 @@ def CCSI_sub_drain_and_clean(
         "withdraw",
         {
             "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-            "volume_uL": Syringe_retraction_ul,
+            "volume_uL": apm.pars.Syringe_retraction_ul,
         },
     )
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
