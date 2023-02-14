@@ -238,7 +238,6 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
         epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration})
 
         for _ in range(cleanloop):
-            epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration})
             epm.add_experiment("CCSI_sub_clean_inject", {
                 "Waterclean_volume_ul": drainclean_volume_ul,
                 "deadspace_volume_ul": deadspace_volume_ul,
