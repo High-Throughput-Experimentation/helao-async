@@ -128,10 +128,11 @@ def CCSI_sub_load_solid(
 
 def CCSI_sub_load_liquid(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     reservoir_liquid_sample_no: Optional[int] = 1,
     volume_ul_cell_liquid: Optional[int] = 1000,
     water_True_False: bool = False,
+    combine_True_False: bool = False,
 ):
     """Add liquid volume to cell position.
 
@@ -150,7 +151,7 @@ def CCSI_sub_load_liquid(
                 sample_no=apm.pars.reservoir_liquid_sample_no, machine_name=ORCH_HOST
             ).dict(),
             "volume_ml": apm.pars.volume_ul_cell_liquid / 1000,
-            "combine_liquids": apm.pars.water_True_False,
+            "combine_liquids": apm.pars.combine_True_False,
             "dilute_liquids": apm.pars.water_True_False,
         },
     )

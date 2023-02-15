@@ -268,3 +268,105 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
                 })
 
     return epm.experiment_plan_list
+
+def CCSI_debug_liquidloads(  #assumes initialization performed previously
+    sequence_version: int = 1,
+    gas_sample_no: int = 1,
+    KOH_volume_ul: float = 1000,
+    KOH_reservoir_sample_no: int = 2,
+    total_sample_volume_ul: float = 5000,
+    Waterclean_reservoir_sample_no: int = 1,
+    
+):
+
+    epm = ExperimentPlanMaker()
+
+        epm.add_experiment("CCSI_sub_unload_cell",{})
+
+        # epm.add_experiment("CCSI_sub_load_gas", {
+        #     "reservoir_gas_sample_no": gas_sample_no,
+        #     "volume_ul_cell_gas": 5000,
+        # })
+        epm.add_experiment("CCSI_sub_load_liquid", {
+            "reservoir_liquid_sample_no": KOH_reservoir_sample_no,
+            "volume_ul_cell_liquid": KOH_volume_ul,
+            "water_True_False": False,
+            "combine_True_False": False,
+        })
+        watervolume = total_sample_volume_ul - KOH_volume_ul
+
+        epm.add_experiment("CCSI_sub_load_liquid", {
+            "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+            "volume_ul_cell_liquid": watervolume,
+            "water_True_False": False,
+            "combine_True_False": False,
+    })
+
+    ###############
+        epm.add_experiment("CCSI_sub_unload_cell",{})
+
+        # epm.add_experiment("CCSI_sub_load_gas", {
+        #     "reservoir_gas_sample_no": gas_sample_no,
+        #     "volume_ul_cell_gas": 5000,
+        # })
+        epm.add_experiment("CCSI_sub_load_liquid", {
+            "reservoir_liquid_sample_no": KOH_reservoir_sample_no,
+            "volume_ul_cell_liquid": KOH_volume_ul,
+            "water_True_False": False,
+            "combine_True_False": False,
+        })
+        watervolume = total_sample_volume_ul - KOH_volume_ul
+
+        epm.add_experiment("CCSI_sub_load_liquid", {
+            "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+            "volume_ul_cell_liquid": watervolume,
+            "water_True_False": False,
+            "combine_True_False": True,
+    })
+
+
+    ###############
+        epm.add_experiment("CCSI_sub_unload_cell",{})
+
+        # epm.add_experiment("CCSI_sub_load_gas", {
+        #     "reservoir_gas_sample_no": gas_sample_no,
+        #     "volume_ul_cell_gas": 5000,
+        # })
+        epm.add_experiment("CCSI_sub_load_liquid", {
+            "reservoir_liquid_sample_no": KOH_reservoir_sample_no,
+            "volume_ul_cell_liquid": KOH_volume_ul,
+            "water_True_False": False,
+            "combine_True_False": False,
+        })
+        watervolume = total_sample_volume_ul - KOH_volume_ul
+
+        epm.add_experiment("CCSI_sub_load_liquid", {
+            "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+            "volume_ul_cell_liquid": watervolume,
+            "water_True_False": True,  #dilution volume
+            "combine_True_False": True,
+    })
+
+    ###############
+        epm.add_experiment("CCSI_sub_unload_cell",{})
+
+        # epm.add_experiment("CCSI_sub_load_gas", {
+        #     "reservoir_gas_sample_no": gas_sample_no,
+        #     "volume_ul_cell_gas": 5000,
+        # })
+        epm.add_experiment("CCSI_sub_load_liquid", {
+            "reservoir_liquid_sample_no": KOH_reservoir_sample_no,
+            "volume_ul_cell_liquid": KOH_volume_ul,
+            "water_True_False": False,
+            "combine_True_False": False,
+        })
+        watervolume = total_sample_volume_ul - KOH_volume_ul
+
+        epm.add_experiment("CCSI_sub_load_liquid", {
+            "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+            "volume_ul_cell_liquid": watervolume,
+            "water_True_False": True,  #dilution volume
+            "combine_True_False": False,
+    })
+
+    return epm.experiment_plan_list
