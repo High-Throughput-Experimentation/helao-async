@@ -212,20 +212,21 @@ def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
             "reservoir_gas_sample_no": gas_sample_no,
             "volume_ul_cell_gas": 5000,
         })
-        epm.add_experiment("CCSI_sub_load_liquid", {
-            "reservoir_liquid_sample_no": KOH_reservoir_sample_no,
-            "volume_ul_cell_liquid": KOHvolume,
-            "combine_True_False": False,
-            "water_True_False": False,
-        })
+        if KOHvolume != 0:
+            epm.add_experiment("CCSI_sub_load_liquid", {
+                "reservoir_liquid_sample_no": KOH_reservoir_sample_no,
+                "volume_ul_cell_liquid": KOHvolume,
+                "combine_True_False": False,
+                "water_True_False": False,
+            })
         watervolume = total_sample_volume_ul - KOHvolume
-
-        epm.add_experiment("CCSI_sub_load_liquid", {
-            "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
-            "volume_ul_cell_liquid": watervolume,
-            "combine_True_False": True,
-            "water_True_False": True,
-        })
+        if watervolume != 0:
+            epm.add_experiment("CCSI_sub_load_liquid", {
+                "reservoir_liquid_sample_no": Waterclean_reservoir_sample_no,
+                "volume_ul_cell_liquid": watervolume,
+                "combine_True_False": True,
+                "water_True_False": True,
+            })
 
         epm.add_experiment("CCSI_sub_liquidfill_syringes", {
             "Solution_volume_ul": KOHvolume,
