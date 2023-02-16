@@ -700,7 +700,7 @@ def CCSI_sub_liquidfill_syringes(
                 process_finish=False,
                 process_contrib=[
                     ProcessContrib.action_params,
-    #            ProcessContrib.samples_in,
+                    ProcessContrib.samples_in,
             ],
     )
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
@@ -720,7 +720,7 @@ def CCSI_sub_liquidfill_syringes(
             process_finish=False,
             process_contrib=[
                 ProcessContrib.action_params,
-#                ProcessContrib.samples_in,
+                ProcessContrib.samples_in,
             ],
     )    
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
