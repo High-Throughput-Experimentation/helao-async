@@ -596,14 +596,19 @@ def ADSS_sub_CA(
     )
 
     # calculate potential
+    versus = 0  # for vs rhe
+    if apm.pars.potential_versus == "oer":
+        versus = 1.23
     if apm.pars.ref_type == "rhe":
         potential = (
             apm.pars.CA_potential
-            - apm.pars.ref_offset__V)
+            - apm.pars.ref_offset__V
+            + versus)
     else:
         potential = (
             apm.pars.CA_potential
             - 1.0 * apm.pars.ref_offset__V
+            + versus
             - 0.059 * apm.pars.ph
             - REF_TABLE[apm.pars.ref_type]
         )
