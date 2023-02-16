@@ -609,14 +609,6 @@ def ADSS_CA_NiSb_validation(
                     "solid_sample_no": solid_sample_no,
                 }
             )
-            epm.add_experiment(
-                "ADSS_sub_sample_aliquot",
-                {
-                    "EquilibrationTime_s": EquilibrationTime_s,
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "PAL_Injector": PAL_Injector,
-                }
-            )
 
             epm.add_experiment(
                 "ADSS_sub_OCV",
@@ -624,6 +616,14 @@ def ADSS_CA_NiSb_validation(
                     "Tval__s": OCV_duration,
                     "SampleRate": 0.05,
                 },
+            )
+            epm.add_experiment(
+                "ADSS_sub_sample_aliquot",
+                {
+                    "EquilibrationTime_s": EquilibrationTime_s,
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "PAL_Injector": PAL_Injector,
+                }
             )
 
             epm.add_experiment(
@@ -640,6 +640,14 @@ def ADSS_CA_NiSb_validation(
                     "aliquot_times_sec": aliquot_times_sec,
                     "aliquot_insitu": True,
                 },
+            )
+            epm.add_experiment(
+                "ADSS_sub_sample_aliquot",
+                {
+                    "EquilibrationTime_s": EquilibrationTime_s,
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "PAL_Injector": PAL_Injector,
+                }
             )
 
             epm.add_experiment(
