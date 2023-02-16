@@ -596,12 +596,17 @@ def ADSS_sub_CA(
     )
 
     # calculate potential
-    potential = (
-        apm.pars.CA_potential
-        - 1.0 * apm.pars.ref_offset__V
-        - 0.059 * apm.pars.ph
-        - REF_TABLE[apm.pars.ref_type]
-    )
+    if apm.pars.ref_type == "rhe":
+        potential = (
+            apm.pars.CA_potential
+            - apm.pars.ref_offset__V)
+    else:
+        potential = (
+            apm.pars.CA_potential
+            - 1.0 * apm.pars.ref_offset__V
+            - 0.059 * apm.pars.ph
+            - REF_TABLE[apm.pars.ref_type]
+        )
     print(f"ADSS_sub_CA potential: {potential}")
 
     # apply potential
