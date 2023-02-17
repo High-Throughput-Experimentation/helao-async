@@ -431,6 +431,7 @@ class Orch(Base):
         # holder for tracking dispatched action in status
         self.last_dispatched_action_uuid = None
         self.last_10_action_uuids = []
+        self.last_action_uuid = ""
         # hold schema objects
         self.active_experiment = None
         self.last_experiment = None
@@ -875,6 +876,16 @@ class Orch(Base):
                         )
                         if endpoint_free:
                             break
+                elif A.start_condition == ActionStartCondition.wait_for_previous:
+                    self.print_message("orch is waiting for previous action to finish")
+                    while True:
+                        await self.wait_for_interrupt()
+                        previous_action_free = (
+                            self.last_action_uuid
+                            in self.globalstatusmodel.active_dict.keys()
+                        )
+                        if previous_action_free:
+                            break
                 elif A.start_condition == ActionStartCondition.wait_for_all:
                     await self.orch_wait_for_all_actions()
 
@@ -907,6 +918,7 @@ class Orch(Base):
             )
 
             result_uuid = result_actiondict["action_uuid"]
+            self.last_action_uuid = result_uuid
             self.track_action_uuid(UUID(result_uuid))
             self.print_message(
                 f"Action {A.action_name} dispatched with uuid: {result_uuid}"
@@ -929,9 +941,9 @@ class Orch(Base):
                 srvkey = [k for k in srvkeys if k[0] == srvname][0]
                 if HloStatus.active in actstat:
                     self.globalstatusmodel.active_dict[resuuid] = resmod
-                    self.globalstatusmodel.server_dict[srvkey].endpoints[actname].active_dict[
-                        resuuid
-                    ] = resmod
+                    self.globalstatusmodel.server_dict[srvkey].endpoints[
+                        actname
+                    ].active_dict[resuuid] = resmod
                 else:
                     self.globalstatusmodel.nonactive_dict[actstat[0]][resuuid] = resmod
                     self.globalstatusmodel.server_dict[srvkey].endpoints[
@@ -945,7 +957,9 @@ class Orch(Base):
                     str(k) for k in self.globalstatusmodel.active_dict.keys()
                 ] + [
                     str(k)
-                    for k in self.globalstatusmodel.nonactive_dict.get("finished", {}).keys()
+                    for k in self.globalstatusmodel.nonactive_dict.get(
+                        "finished", {}
+                    ).keys()
                 ]
                 self.print_message(
                     f"Current {A.action_name} received uuids: {endpoint_uuids}"
