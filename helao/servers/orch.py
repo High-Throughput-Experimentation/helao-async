@@ -160,7 +160,7 @@ class HelaoOrch(HelaoFastAPI):
         # --- ORCH-specific endpoints ---
         @self.post("/global_status", tags=["private"])
         def global_status():
-            return self.orch.orchstatusmodel.as_json()
+            return self.orch.globalstatusmodel.as_json()
 
         @self.post("/update_status", tags=["private"])
         async def update_status(
@@ -198,9 +198,9 @@ class HelaoOrch(HelaoFastAPI):
         @self.post("/estop", tags=["private"])
         async def estop():
             """Emergency stop experiment and action queues, interrupt running actions."""
-            if self.orch.orchstatusmodel.loop_state == OrchStatus.started:
+            if self.orch.globalstatusmodel.loop_state == OrchStatus.started:
                 await self.orch.estop_loop()
-            elif self.orch.orchstatusmodel.loop_state == OrchStatus.estop:
+            elif self.orch.globalstatusmodel.loop_state == OrchStatus.estop:
                 self.orch.print_message("orchestrator E-STOP flag already raised")
             else:
                 self.orch.print_message("orchestrator is not running")
@@ -215,7 +215,7 @@ class HelaoOrch(HelaoFastAPI):
         @self.post("/clear_estop", tags=["private"])
         async def clear_estop():
             """Remove emergency stop condition."""
-            if self.orch.orchstatusmodel.loop_state != OrchStatus.estop:
+            if self.orch.globalstatusmodel.loop_state != OrchStatus.estop:
                 self.orch.print_message("orchestrator is not currently in E-STOP")
             else:
                 await self.orch.clear_estop()
@@ -223,7 +223,7 @@ class HelaoOrch(HelaoFastAPI):
         @self.post("/clear_error", tags=["private"])
         async def clear_error():
             """Remove error condition."""
-            if self.orch.orchstatusmodel.loop_state != OrchStatus.error:
+            if self.orch.globalstatusmodel.loop_state != OrchStatus.error:
                 self.orch.print_message("orchestrator is not currently in ERROR")
             else:
                 await self.orch.clear_error()
@@ -441,8 +441,8 @@ class Orch(Base):
         self.orch_op = None
         self.op_enabled = self.server_params.get("enable_op", False)
         # basemodel which holds all information for orch
-        self.orchstatusmodel = GlobalStatusModel(orchestrator=self.server)
-        self.orchstatusmodel._sort_status()
+        self.globalstatusmodel = GlobalStatusModel(orchestrator=self.server)
+        self.globalstatusmodel._sort_status()
         # this queue is simply used for waiting for any interrupt
         # but it does not do anything with its content
         self.interrupt_q = asyncio.Queue()
@@ -628,34 +628,34 @@ class Orch(Base):
         # update GlobalStatusModel with new ActionServerModel
         # and sort the new status dict
         self.register_action_uuid(actionservermodel.last_action_uuid)
-        self.orchstatusmodel.update_global_with_acts(
+        self.globalstatusmodel.update_global_with_acts(
             actionservermodel=actionservermodel
         )
 
         # check if one action is in estop in the error list:
-        estop_uuids = self.orchstatusmodel.find_hlostatus_in_finished(
+        estop_uuids = self.globalstatusmodel.find_hlostatus_in_finished(
             hlostatus=HloStatus.estopped,
         )
 
-        error_uuids = self.orchstatusmodel.find_hlostatus_in_finished(
+        error_uuids = self.globalstatusmodel.find_hlostatus_in_finished(
             hlostatus=HloStatus.errored,
         )
 
-        if estop_uuids and self.orchstatusmodel.loop_state == OrchStatus.started:
+        if estop_uuids and self.globalstatusmodel.loop_state == OrchStatus.started:
             await self.estop_loop()
-        elif error_uuids and self.orchstatusmodel.loop_state == OrchStatus.started:
-            self.orchstatusmodel.orch_state = OrchStatus.error
-        elif not self.orchstatusmodel.active_dict:
+        elif error_uuids and self.globalstatusmodel.loop_state == OrchStatus.started:
+            self.globalstatusmodel.orch_state = OrchStatus.error
+        elif not self.globalstatusmodel.active_dict:
             # no uuids in active action dict
-            self.orchstatusmodel.orch_state = OrchStatus.idle
+            self.globalstatusmodel.orch_state = OrchStatus.idle
         else:
-            self.orchstatusmodel.orch_state = OrchStatus.busy
-            self.print_message(f"running_states: {self.orchstatusmodel.active_dict}")
+            self.globalstatusmodel.orch_state = OrchStatus.busy
+            self.print_message(f"running_states: {self.globalstatusmodel.active_dict}")
 
         # now push it to the interrupt_q
-        await self.interrupt_q.put(self.orchstatusmodel)
+        await self.interrupt_q.put(self.globalstatusmodel)
         await self.update_operator(True)
-        await self.globstat_q.put(self.orchstatusmodel.as_json())
+        await self.globstat_q.put(self.globalstatusmodel.as_json())
 
         return True
 
@@ -693,7 +693,7 @@ class Orch(Base):
                 seq=self.seq_file, experimentmodel=experimentmodel
             )
             if i == 0:
-                self.orchstatusmodel.loop_state = OrchStatus.started
+                self.globalstatusmodel.loop_state = OrchStatus.started
 
     async def loop_task_dispatch_sequence(self) -> ErrorCodes:
         if self.sequence_dq:
@@ -736,7 +736,7 @@ class Orch(Base):
         else:
             self.print_message("sequence queue is empty, cannot start orch loop")
 
-            self.orchstatusmodel.loop_state = OrchStatus.stopped
+            self.globalstatusmodel.loop_state = OrchStatus.stopped
             await self.intend_none()
 
         return ErrorCodes.none
@@ -773,7 +773,7 @@ class Orch(Base):
         self.active_experiment.orchestrator = self.server
         self.active_experiment.init_exp(time_offset=self.ntp_offset)
 
-        self.orchstatusmodel.new_experiment(
+        self.globalstatusmodel.new_experiment(
             exp_uuid=self.active_experiment.experiment_uuid
         )
 
@@ -813,28 +813,28 @@ class Orch(Base):
 
     async def loop_task_dispatch_action(self) -> ErrorCodes:
         # self.print_message("actions in action_dq, processing them")
-        if self.orchstatusmodel.loop_intent == OrchStatus.stop:
+        if self.globalstatusmodel.loop_intent == OrchStatus.stop:
             self.print_message("stopping orchestrator")
             # monitor status of running action_dq, then end loop
-            while self.orchstatusmodel.loop_state != OrchStatus.stopped:
+            while self.globalstatusmodel.loop_state != OrchStatus.stopped:
                 # wait for all orch actions to finish first
                 await self.orch_wait_for_all_actions()
-                if self.orchstatusmodel.orch_state == OrchStatus.idle:
+                if self.globalstatusmodel.orch_state == OrchStatus.idle:
                     await self.intend_none()
                     self.print_message("got stop")
-                    self.orchstatusmodel.loop_state = OrchStatus.stopped
+                    self.globalstatusmodel.loop_state = OrchStatus.stopped
                     break
 
-        elif self.orchstatusmodel.loop_intent == OrchStatus.skip:
+        elif self.globalstatusmodel.loop_intent == OrchStatus.skip:
             # clear action queue, forcing next experiment
             self.action_dq.clear()
             await self.intend_none()
             self.print_message("skipping to next experiment")
-        elif self.orchstatusmodel.loop_intent == OrchStatus.estop:
+        elif self.globalstatusmodel.loop_intent == OrchStatus.estop:
             self.action_dq.clear()
             await self.intend_none()
             self.print_message("estopping")
-            self.orchstatusmodel.loop_state = OrchStatus.estop
+            self.globalstatusmodel.loop_state = OrchStatus.estop
         else:
             # all action blocking is handled like preempt,
             # check Action requirements
@@ -850,7 +850,7 @@ class Orch(Base):
                     )
                     while True:
                         await self.wait_for_interrupt()
-                        endpoint_free = self.orchstatusmodel.endpoint_free(
+                        endpoint_free = self.globalstatusmodel.endpoint_free(
                             action_server=A.action_server, endpoint_name=A.action_name
                         )
                         if endpoint_free:
@@ -859,7 +859,7 @@ class Orch(Base):
                     self.print_message("orch is waiting for server to become available")
                     while True:
                         await self.wait_for_interrupt()
-                        server_free = self.orchstatusmodel.server_free(
+                        server_free = self.globalstatusmodel.server_free(
                             action_server=A.action_server
                         )
                         if server_free:
@@ -870,7 +870,7 @@ class Orch(Base):
                     )
                     while True:
                         await self.wait_for_interrupt()
-                        endpoint_free = self.orchstatusmodel.endpoint_free(
+                        endpoint_free = self.globalstatusmodel.endpoint_free(
                             action_server=A.orchestrator, endpoint_name="wait"
                         )
                         if endpoint_free:
@@ -894,10 +894,10 @@ class Orch(Base):
                 f"dispatching action {A.action_name} on server {A.action_server.server_name}"
             )
             # keep running counter of dispatched actions
-            A.orch_submit_order = self.orchstatusmodel.counter_dispatched_actions[
+            A.orch_submit_order = self.globalstatusmodel.counter_dispatched_actions[
                 self.active_experiment.experiment_uuid
             ]
-            self.orchstatusmodel.counter_dispatched_actions[
+            self.globalstatusmodel.counter_dispatched_actions[
                 self.active_experiment.experiment_uuid
             ] += 1
 
@@ -925,27 +925,27 @@ class Orch(Base):
                 actname = resmod.action_name
                 resuuid = resmod.action_uuid
                 actstat = resmod.action_status
-                srvkeys = self.orchstatusmodel.server_dict.keys()
+                srvkeys = self.globalstatusmodel.server_dict.keys()
                 srvkey = [k for k in srvkeys if k[0] == srvname][0]
                 if HloStatus.active in actstat:
-                    self.orchstatusmodel.active_dict[resuuid] = resmod
-                    self.orchstatusmodel.server_dict[srvkey].endpoints[actname].active_dict[
+                    self.globalstatusmodel.active_dict[resuuid] = resmod
+                    self.globalstatusmodel.server_dict[srvkey].endpoints[actname].active_dict[
                         resuuid
                     ] = resmod
                 else:
-                    self.orchstatusmodel.nonactive_dict[actstat[0]][resuuid] = resmod
-                    self.orchstatusmodel.server_dict[srvkey].endpoints[
+                    self.globalstatusmodel.nonactive_dict[actstat[0]][resuuid] = resmod
+                    self.globalstatusmodel.server_dict[srvkey].endpoints[
                         actname
                     ].nonactive_dict[actstat[0]][resuuid] = resmod
-                # await self.interrupt_q.put(self.orchstatusmodel)
+                # await self.interrupt_q.put(self.globalstatusmodel)
                 # await self.update_operator(True)
-                # await self.globstat_q.put(self.orchstatusmodel.as_json())
+                # await self.globstat_q.put(self.globalstatusmodel.as_json())
 
                 endpoint_uuids = [
-                    str(k) for k in self.orchstatusmodel.active_dict.keys()
+                    str(k) for k in self.globalstatusmodel.active_dict.keys()
                 ] + [
                     str(k)
-                    for k in self.orchstatusmodel.nonactive_dict.get("finished", {}).keys()
+                    for k in self.globalstatusmodel.nonactive_dict.get("finished", {}).keys()
                 ]
                 self.print_message(
                     f"Current {A.action_name} received uuids: {endpoint_uuids}"
@@ -961,10 +961,10 @@ class Orch(Base):
                             "!!! Did not receive interrupt after 5 sec, retrying. !!!"
                         )
                     endpoint_uuids = [
-                        str(k) for k in self.orchstatusmodel.active_dict.keys()
+                        str(k) for k in self.globalstatusmodel.active_dict.keys()
                     ] + [
                         str(k)
-                        for k in self.orchstatusmodel.nonactive_dict.get(
+                        for k in self.globalstatusmodel.nonactive_dict.get(
                             "finished", {}
                         ).keys()
                     ]
@@ -1037,17 +1037,17 @@ class Orch(Base):
         """Parse experiment and action queues,
         and dispatch action_dq while tracking run state flags."""
         self.print_message("--- started operator orch ---")
-        self.print_message(f"current orch status: {self.orchstatusmodel.orch_state}")
+        self.print_message(f"current orch status: {self.globalstatusmodel.orch_state}")
         # clause for resuming paused action list
         # self.print_message(f"current orch sequences: {list(self.sequence_dq)[:5]}... ({len(self.sequence_dq)})")
         # self.print_message(f"current orch descisions: {list(self.experiment_dq)[:5]}... ({len(self.experiment_dq)})")
         # self.print_message(f"current orch actions: {list(self.action_dq)[:5]}... ({len(self.action_dq)})")
         # self.print_message("--- resuming orch loop now ---")
 
-        self.orchstatusmodel.loop_state = OrchStatus.started
+        self.globalstatusmodel.loop_state = OrchStatus.started
 
         try:
-            while self.orchstatusmodel.loop_state == OrchStatus.started and (
+            while self.globalstatusmodel.loop_state == OrchStatus.started and (
                 self.action_dq or self.experiment_dq or self.sequence_dq
             ):
                 self.print_message(
@@ -1064,7 +1064,7 @@ class Orch(Base):
                 if self.action_dq:
                     self.print_message("!!!dispatching next action", info=True)
                     # num_exp_actions = deepcopy(
-                    #     self.orchstatusmodel.counter_dispatched_actions[
+                    #     self.globalstatusmodel.counter_dispatched_actions[
                     #         self.active_experiment.experiment_uuid
                     #     ]
                     # )
@@ -1102,8 +1102,8 @@ class Orch(Base):
                 await self.update_operator(True)
 
             if (
-                self.orchstatusmodel.loop_state == OrchStatus.estop
-                or self.orchstatusmodel.loop_intent == OrchStatus.estop
+                self.globalstatusmodel.loop_state == OrchStatus.estop
+                or self.globalstatusmodel.loop_intent == OrchStatus.estop
             ):
                 await self.estop_loop()
 
@@ -1120,8 +1120,8 @@ class Orch(Base):
                 self.print_message("finishing final sequence")
                 await self.finish_active_sequence()
 
-            if self.orchstatusmodel.loop_state != OrchStatus.estop:
-                self.orchstatusmodel.loop_state = OrchStatus.stopped
+            if self.globalstatusmodel.loop_state != OrchStatus.estop:
+                self.globalstatusmodel.loop_state = OrchStatus.stopped
             await self.intend_none()
             await self.update_operator(True)
             return True
@@ -1143,7 +1143,7 @@ class Orch(Base):
 
         # some actions are active
         # we need to wait for them to finish
-        while not self.orchstatusmodel.actions_idle():
+        while not self.globalstatusmodel.actions_idle():
             self.print_message(
                 "some actions are still active, waiting for status update"
             )
@@ -1156,7 +1156,7 @@ class Orch(Base):
 
     async def start(self):
         """Begin experimenting experiment and action queues."""
-        if self.orchstatusmodel.loop_state == OrchStatus.stopped:
+        if self.globalstatusmodel.loop_state == OrchStatus.stopped:
             if (
                 self.action_dq or self.experiment_dq or self.sequence_dq
             ):  # resume actions from a paused run
@@ -1169,22 +1169,22 @@ class Orch(Base):
         await self.update_operator(True)
 
     async def start_loop(self):
-        if self.orchstatusmodel.loop_state == OrchStatus.stopped:
+        if self.globalstatusmodel.loop_state == OrchStatus.stopped:
             self.print_message("starting orch loop")
             self.loop_task = asyncio.create_task(self.dispatch_loop_task())
-        elif self.orchstatusmodel.loop_state == OrchStatus.estop:
+        elif self.globalstatusmodel.loop_state == OrchStatus.estop:
             self.print_message(
                 "E-STOP flag was raised, clear E-STOP before starting.", error=True
             )
         else:
             self.print_message("loop already started.")
-        return self.orchstatusmodel.loop_state
+        return self.globalstatusmodel.loop_state
 
     async def estop_loop(self):
         self.print_message("estopping orch", info=True)
 
-        # set orchstatusmodel.loop_state to estop
-        self.orchstatusmodel.loop_state = OrchStatus.estop
+        # set globalstatusmodel.loop_state to estop
+        self.globalstatusmodel.loop_state = OrchStatus.estop
 
         # force stop all running actions in the status dict (for this orch)
         await self.estop_actions(switch=True)
@@ -1223,7 +1223,7 @@ class Orch(Base):
         for (
             action_server_key,
             actionservermodel,
-        ) in self.orchstatusmodel.server_dict.items():
+        ) in self.globalstatusmodel.server_dict.items():
             # if actionservermodel.action_server == self.server:
             #     continue
 
@@ -1254,7 +1254,7 @@ class Orch(Base):
 
     async def skip(self):
         """Clear the present action queue while running."""
-        if self.orchstatusmodel.loop_state == OrchStatus.started:
+        if self.globalstatusmodel.loop_state == OrchStatus.started:
             await self.intend_skip()
         else:
             self.print_message("orchestrator not running, clearing action queue")
@@ -1263,50 +1263,50 @@ class Orch(Base):
 
     async def intend_skip(self):
         await asyncio.sleep(0.001)
-        self.orchstatusmodel.loop_intent = OrchStatus.skip
-        await self.interrupt_q.put(self.orchstatusmodel.loop_intent)
+        self.globalstatusmodel.loop_intent = OrchStatus.skip
+        await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
     async def stop(self):
         """Stop experimenting experiment and
         action queues after current actions finish."""
-        if self.orchstatusmodel.loop_state == OrchStatus.started:
+        if self.globalstatusmodel.loop_state == OrchStatus.started:
             await self.intend_stop()
-        elif self.orchstatusmodel.loop_state == OrchStatus.estop:
+        elif self.globalstatusmodel.loop_state == OrchStatus.estop:
             self.print_message("orchestrator E-STOP flag was raised; nothing to stop")
         else:
             self.print_message("orchestrator is not running")
 
     async def intend_stop(self):
         await asyncio.sleep(0.001)
-        self.orchstatusmodel.loop_intent = OrchStatus.stop
-        await self.interrupt_q.put(self.orchstatusmodel.loop_intent)
+        self.globalstatusmodel.loop_intent = OrchStatus.stop
+        await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
     async def intend_estop(self):
         await asyncio.sleep(0.001)
-        self.orchstatusmodel.loop_intent = OrchStatus.estop
-        await self.interrupt_q.put(self.orchstatusmodel.loop_intent)
+        self.globalstatusmodel.loop_intent = OrchStatus.estop
+        await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
     async def intend_none(self):
         await asyncio.sleep(0.001)
-        self.orchstatusmodel.loop_intent = OrchStatus.none
-        await self.interrupt_q.put(self.orchstatusmodel.loop_intent)
+        self.globalstatusmodel.loop_intent = OrchStatus.none
+        await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
     async def clear_estop(self):
         # which were estopped first
         await asyncio.sleep(0.001)
         self.print_message("clearing estopped uuids")
-        self.orchstatusmodel.clear_in_finished(hlostatus=HloStatus.estopped)
+        self.globalstatusmodel.clear_in_finished(hlostatus=HloStatus.estopped)
         # release estop for all action servers
         await self.estop_actions(switch=False)
         # set orch status from estop back to stopped
-        self.orchstatusmodel.loop_state = OrchStatus.stopped
+        self.globalstatusmodel.loop_state = OrchStatus.stopped
         await self.interrupt_q.put("cleared_estop")
 
     async def clear_error(self):
         # currently only resets the error dict
         self.print_message("clearing errored uuids")
         await asyncio.sleep(0.001)
-        self.orchstatusmodel.clear_in_finished(hlostatus=HloStatus.errored)
+        self.globalstatusmodel.clear_in_finished(hlostatus=HloStatus.errored)
         await self.interrupt_q.put("cleared_errored")
 
     async def clear_sequences(self):
@@ -1391,7 +1391,7 @@ class Orch(Base):
         """Return the current queue running actions."""
         return [
             statusmodel
-            for uuid, statusmodel in self.orchstatusmodel.active_dict.items()
+            for uuid, statusmodel in self.globalstatusmodel.active_dict.items()
         ]
 
     def list_actions(self, limit=10):
@@ -1406,7 +1406,7 @@ class Orch(Base):
         subversion of errored action,
         inherit parameters if desired."""
 
-        error_uuids = self.orchstatusmodel.find_hlostatus_in_finished(
+        error_uuids = self.globalstatusmodel.find_hlostatus_in_finished(
             hlostatus=HloStatus.errored,
         )
         if not error_uuids:
@@ -1485,7 +1485,7 @@ class Orch(Base):
         """Add action to end of current action queue."""
         if len(self.action_dq) == 0:
             last_action_order = (
-                self.orchstatusmodel.counter_dispatched_actions[
+                self.globalstatusmodel.counter_dispatched_actions[
                     self.active_experiment.experiment_uuid
                 ]
                 - 1
@@ -1514,7 +1514,7 @@ class Orch(Base):
             self.active_sequence = None
             self.active_seq_exp_counter = 0
 
-            self.orchstatusmodel.counter_dispatched_actions = {}
+            self.globalstatusmodel.counter_dispatched_actions = {}
 
             # DB server call to finish_yml if DB exists
             self.aloop.create_task(move_dir(self.last_sequence, base=self))
@@ -1539,7 +1539,7 @@ class Orch(Base):
 
             # TODO use exp uuid to filter actions?
             self.active_experiment.actionmodel_list = (
-                self.orchstatusmodel.finish_experiment(
+                self.globalstatusmodel.finish_experiment(
                     exp_uuid=self.active_experiment.experiment_uuid
                 )
             )
