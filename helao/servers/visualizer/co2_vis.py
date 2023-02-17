@@ -47,7 +47,7 @@ class C_co2:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["epoch_s", "co2_ppm", "co2_ppm_unflt","time_now"]
+        self.data_dict_keys = ["epoch_s", "co2_ppm", "time_now"]
         self.data_dict = {key: [] for key in self.data_dict_keys}
 
         self.datasource = ColumnDataSource(data=self.data_dict)
