@@ -26,8 +26,8 @@ def makeApp(confPrefix, server_key, helao_root):
     )
 
     @app.post(f"/finish_yml", tags=["private"])
-    async def finish_yml(yml_path: str):
-        await app.driver.add_yml_task(yml_path)
+    async def finish_yml(yml_path: str, timeout: int = 300):
+        await app.driver.add_yml_task(yml_path, timeout)
         return yml_path
 
     @app.post(f"/finish_pending", tags=["private"])
