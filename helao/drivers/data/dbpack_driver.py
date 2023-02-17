@@ -610,11 +610,13 @@ class DBPack:
 
     async def yml_task(self):
         while True:
-            yml_target = await self.task_queue.get()
+            yml_target, timeout = await self.task_queue.get()
             if os.path.exists(yml_target):
                 try:
                     await asyncio.sleep(1.0)  # delay to release base/orch file handles
-                    self.current_task = await self.finish_yml(yml_target)
+                    self.current_task = await asyncio.wait_for(
+                        self.finish_yml(yml_target), timeout=timeout
+                    )
                     self.current_task = None
                 except Exception as e:
                     tb = "".join(
@@ -639,7 +641,9 @@ class DBPack:
                 try:
                     dateonly = datetime.strptime(os.path.basename(datedir), "%Y%m%d")
                 except ValueError:
-                    dateonly = datetime.strptime(os.path.basename(datedir), "%Y%m%d.%H%M%S%f")
+                    dateonly = datetime.strptime(
+                        os.path.basename(datedir), "%Y%m%d.%H%M%S%f"
+                    )
                 if dateonly < today:
                     seq_dirs = glob(os.path.join(datedir, "*"))
                     if len(seq_dirs) == 0:
@@ -725,8 +729,8 @@ class DBPack:
         #     )
         return self.log_dict
 
-    async def add_yml_task(self, yml_path: str):
-        await self.task_queue.put(yml_path)
+    async def add_yml_task(self, yml_path: str, timeout: int = 300):
+        await self.task_queue.put((yml_path, timeout))
         self.base.print_message(f"Added {yml_path} to tasks.")
 
     async def finish_yml(self, yml_path: Union[str, HelaoPath]):
