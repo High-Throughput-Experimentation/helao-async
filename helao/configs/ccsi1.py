@@ -81,8 +81,8 @@ config["servers"] = {
             "dev_gasvalve": {
                 "1A": "cDAQ1Mod1/port0/line0",
                 "1B": "cDAQ1Mod1/port0/line1",
-                "7": "cDAQ1Mod1/port0/line9",
-                "multi_CMD0": "cDAQ1Mod1/port0/line28",
+                "7A": "cDAQ1Mod1/port0/line9",
+                "7B": "cDAQ1Mod1/port0/line10",
                 "multi_CMD1": "cDAQ1Mod1/port0/line29",
                 "multi_CMD2": "cDAQ1Mod1/port0/line30",
                 "multi_CMD3": "cDAQ1Mod1/port0/line31",
@@ -95,8 +95,8 @@ config["servers"] = {
                 "5B-waste": "cDAQ1Mod1/port0/line6",
                 "6A-waste": "cDAQ1Mod1/port0/line7",
                 "6B": "cDAQ1Mod1/port0/line8",
-                "8": "cDAQ1Mod1/port0/line10",
-                "9": "cDAQ1Mod1/port0/line11",
+                "8": "cDAQ1Mod1/port0/line11",
+                "9": "cDAQ1Mod1/port0/line13",
             },
             "dev_pump": {
                 "RecirculatingPeriPump1": "cDAQ1Mod1/port0/line12",

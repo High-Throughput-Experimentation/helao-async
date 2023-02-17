@@ -51,13 +51,15 @@ class SprintIR:
         )
 
         # set POLL and flush present buffer until empty
-        self.send("K 2")
-        # self.send("! 0")
-        # self.send("Y")
-        # self.send("! 0")
-        # self.send("Y")
-        # self.send("! 0")
-        # self.send("Y")
+        self.base.print_message("Setting sensor to polling mode.")
+        self.com.write(b"K 2\r\n")
+        # self.send("K 2")
+        self.send("! 0")
+        self.send("Y")
+        self.send("! 0")
+        self.send("Y")
+        self.send("! 0")
+        self.send("Y")
 
         # self.com.write(b"K 2\r\n")
         # self.com.flush()
@@ -79,7 +81,9 @@ class SprintIR:
         ]
         ifw_map = {v: k for k, v in fw_map}
         self.fw = {}
+        self.base.print_message("Reading scaling factor and initial co2 ppm.")
         for k, v in fw_map:
+            self.base.print_message(f"checking {k}")
             resp, aux = self.send(v)
             if resp:
                 fw_val = resp[0].split()[-1].replace(v, "").strip()
@@ -93,8 +97,8 @@ class SprintIR:
             time.sleep(0.1)
 
         # set streaming mode before starting async task
-        self.base.print_message("Setting sensor to streaming mode.")
-        self.com.write("K 1\r\n".encode("utf8"))
+        self.base.print_message("Setting sensor to polling mode.")
+        self.com.write(b"K 2\r\n")
 
         self.action = None
         self.active = None
@@ -218,20 +222,17 @@ class SprintIR:
         return cmd_resp, aux_resp
 
     def read_stream(self):
-        buf = self.com.readline()
-        lines = buf.decode("utf8").split("\n")
-        for line in lines:
+        self.com.flush()
+        lines, _ = self.send("Z")
+        for line in lines[::-1]:
             stripped = line.strip()
-            # self.base.print_message(strip)
             filts = re.findall("Z\s[0-9]+", stripped)
-            unfilts = re.findall("z\s[0-9]+", stripped)
             filt = filts[-1].split()[-1] if filts else False
-            unfilt = unfilts[-1].split()[-1] if unfilts else False
-            if filt and unfilt:
-                return filt, unfilt
-        return False, False
+            if filt:
+                return filt
+        return False
 
-    async def poll_sensor_loop(self, frequency: int = 20, reset_after: int = 10):
+    async def poll_sensor_loop(self, frequency: int = 4, reset_after: int = 5):
         waittime = 1.0 / frequency
         self.base.print_message("Starting polling loop")
         blanks = 0
@@ -241,18 +242,24 @@ class SprintIR:
                     f"Did not receive a co2 message from sensor after {reset_after} checks, resetting polling mode.",
                     warning=True,
                 )
-                self.send("K 2")
+                self.com.write(b"K 2\r\n")
                 blanks = 0
             try:
-                co2_level, co2_level_unfilt = self.read_stream()
-            except Exception:
+                co2_level = self.read_stream()
+            except Exception as err:
+                self.base.print_message(f"Could not parse streaming value, got {err}")
                 continue
             if co2_level:
                 msg_dict = {
                     "co2_ppm": int(co2_level) * self.fw["scaling_factor"],
-                    "co2_ppm_unflt": int(co2_level_unfilt) * self.fw["scaling_factor"],
+                    # "co2_ppm_unflt": int(co2_level_unfilt) * self.fw["scaling_factor"],
                 }
-                await self.base.put_lbuf(msg_dict)
+                if msg_dict["co2_ppm"] > 50 and msg_dict["co2_ppm"] < 1e6:
+                    await self.base.put_lbuf(msg_dict)
+                else:
+                    self.base.print_message(
+                        f"Got unreasonable co2_ppm value {msg_dict['co2_ppm']}"
+                    )
                 blanks = 0
             else:
                 blanks += 1
@@ -385,6 +392,14 @@ class SprintIR:
         return activeDict
 
     def shutdown(self):
+        try:
+            self.polling_task.cancel()
+        except asyncio.CancelledError:
+            self.base.print_message("closed sensor polling loop task")
+        try:
+            self.recording_task.cancel()
+        except asyncio.CancelledError:
+            self.base.print_message("closed sensor recording loop task")
         self.com.close()
 
 
