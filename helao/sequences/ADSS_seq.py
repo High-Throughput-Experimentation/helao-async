@@ -6,7 +6,7 @@ __all__ = [
     "ADSS_CV_nomove",
     "ADSS_CA_nomove",
     "ADSS_CombineEche",
-    "ADSS_CA_NaOH_validation",
+    "ADSS_CA_NiSb_validation",
 ]
 
 from typing import List
@@ -521,23 +521,24 @@ def ADSS_CombineEche(
 
 #     return epm.experiment_plan_list  # returns complete experiment list
 
-def ADSS_CA_NaOH_validation(
-    sequence_version: int = 5,
+def ADSS_CA_NiSb_validation(
+    sequence_version: int = 6,
     solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no_list: list = [14050],  # list instead of map select
     liquid_custom_position: str = "elec_res1",
     liquid_sample_no: int = 1,
-    liquid_sample_volume_ul: float = 3000,
+    liquid_sample_volume_ul: float = 4000,
     EquilibrationTime_s: float = 30,
-    CA_potentials_vsRHE: List[float] = [-0.2, 0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+    CA_potentials_vs: List[float] = [-0.2, 0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+    potential_versus: str = "oer",
     ph: float = 9.53,
-    ref_type: str = "inhouse",
+    ref_type: str = "rhe",
     ref_offset__V: float = 0.0,
     CA_duration_sec: float = 1320,
-    aliquot_times_sec: List[float] = [60, 530, 1060, 1560],
+    aliquot_times_sec: List[float] = [60, 600, 1140],
     aliquot_volume_ul: int = 200,
-    OCV_duration: float = 1,
+    OCV_duration: float = 60,
     samplerate_sec: float = 0.05,
     Syringe_rate_ulsec: float = 300,
     Cell_draintime_s: float = 60,
@@ -545,7 +546,7 @@ def ADSS_CA_NaOH_validation(
     ReturnLineReverseWait_s: float = 3,
     ResidualWait_s: float = 15,
     flush_volume_ul: float = 2000,
-    clean_volume_ul: float = 3000,
+    clean_volume_ul: float = 5000,
     PAL_Injector: str = "LS 4"
 ):
 
@@ -584,7 +585,7 @@ def ADSS_CA_NaOH_validation(
         #         "ResidualWait_s": ResidualWait_s,
         #     }
         # )
-        for CA_potential_vsRHE in CA_potentials_vsRHE:
+        for CA_potential_vs in CA_potentials_vs:
 
             epm.add_experiment(
                 "ADSS_sub_cellfill_prefilled",
@@ -608,6 +609,14 @@ def ADSS_CA_NaOH_validation(
                     "solid_sample_no": solid_sample_no,
                 }
             )
+
+            epm.add_experiment(
+                "ADSS_sub_OCV",
+                {
+                    "Tval__s": OCV_duration,
+                    "SampleRate": 0.05,
+                },
+            )
             epm.add_experiment(
                 "ADSS_sub_sample_aliquot",
                 {
@@ -618,26 +627,27 @@ def ADSS_CA_NaOH_validation(
             )
 
             epm.add_experiment(
-                "ADSS_sub_OCV",
-                {
-                    "Tval__s": OCV_duration,
-                    "SampleRate": 0.05,
-                },
-            )
-
-            epm.add_experiment(
                 "ADSS_sub_CA",
                 {
-                    "CA_potential": CA_potential_vsRHE,
+                    "CA_potential": CA_potential_vs,
                     "ph": ph,
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
+                    "potential_versus": potential_versus,
                     "samplerate_sec": samplerate_sec,
                     "CA_duration_sec": CA_duration_sec,
                     "aliquot_volume_ul": aliquot_volume_ul,
                     "aliquot_times_sec": aliquot_times_sec,
                     "aliquot_insitu": True,
                 },
+            )
+            epm.add_experiment(
+                "ADSS_sub_sample_aliquot",
+                {
+                    "EquilibrationTime_s": EquilibrationTime_s,
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "PAL_Injector": PAL_Injector,
+                }
             )
 
             epm.add_experiment(
