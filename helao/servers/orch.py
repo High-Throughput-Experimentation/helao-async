@@ -882,7 +882,7 @@ class Orch(Base):
                         await self.wait_for_interrupt()
                         previous_action_free = (
                             self.last_action_uuid
-                            in self.globalstatusmodel.active_dict.keys()
+                            not in self.globalstatusmodel.active_dict.keys()
                         )
                         if previous_action_free:
                             break
