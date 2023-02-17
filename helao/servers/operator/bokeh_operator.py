@@ -808,11 +808,11 @@ class Operator:
         self.vis.doc.add_next_tick_callback(partial(self.orch.estop_loop))
 
     def callback_start_orch(self, event):
-        if self.orch.orchstatusmodel.loop_state == OrchStatus.stopped:
+        if self.orch.globalstatusmodel.loop_state == OrchStatus.stopped:
             self.vis.print_message("starting orch")
             self.vis.doc.add_next_tick_callback(partial(self.orch.start))
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
-        elif self.orch.orchstatusmodel.loop_state == OrchStatus.estop:
+        elif self.orch.globalstatusmodel.loop_state == OrchStatus.estop:
             self.vis.print_message("orch is in estop", error=True)
         else:
             self.vis.print_message("Cannot start orch when not in a stopped state.")
@@ -1480,10 +1480,10 @@ class Operator:
 
         self.experimentplan_source.data = self.experiment_plan_list
 
-        if self.orch.orchstatusmodel.loop_state == OrchStatus.started:
+        if self.orch.globalstatusmodel.loop_state == OrchStatus.started:
             self.orch_status_button.label = "started"
             self.orch_status_button.button_type = "success"
-        elif self.orch.orchstatusmodel.loop_state == OrchStatus.stopped:
+        elif self.orch.globalstatusmodel.loop_state == OrchStatus.stopped:
             stop_msg = (
                 ": " + self.orch.current_stop_message
                 if self.orch.current_stop_message != ""
@@ -1494,7 +1494,7 @@ class Operator:
             # self.orch_status_button.button_type = "danger"
         else:
             self.orch_status_button.label = (
-                f"{self.orch.orchstatusmodel.loop_state.value}"
+                f"{self.orch.globalstatusmodel.loop_state.value}"
             )
             self.orch_status_button.button_type = "danger"
 
