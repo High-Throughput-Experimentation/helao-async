@@ -6,7 +6,7 @@ __all__ = [
     "ADSS_CV_nomove",
     "ADSS_CA_nomove",
     "ADSS_CombineEche",
-    "ADSS_CA_NaOH_validation",
+    "ADSS_CA_NiSb_validation",
 ]
 
 from typing import List
