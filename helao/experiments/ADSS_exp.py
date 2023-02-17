@@ -596,12 +596,22 @@ def ADSS_sub_CA(
     )
 
     # calculate potential
-    potential = (
-        apm.pars.CA_potential
-        - 1.0 * apm.pars.ref_offset__V
-        - 0.059 * apm.pars.ph
-        - REF_TABLE[apm.pars.ref_type]
-    )
+    versus = 0  # for vs rhe
+    if apm.pars.potential_versus == "oer":
+        versus = 1.23
+    if apm.pars.ref_type == "rhe":
+        potential = (
+            apm.pars.CA_potential
+            - apm.pars.ref_offset__V
+            + versus)
+    else:
+        potential = (
+            apm.pars.CA_potential
+            - 1.0 * apm.pars.ref_offset__V
+            + versus
+            - 0.059 * apm.pars.ph
+            - REF_TABLE[apm.pars.ref_type]
+        )
     print(f"ADSS_sub_CA potential: {potential}")
 
     # apply potential
@@ -661,7 +671,7 @@ def ADSS_sub_CA(
                 process_finish=True,
                 process_contrib=[
                     ProcessContrib.action_params,
-                    ProcessContrib.files,
+#                    ProcessContrib.files,
                     ProcessContrib.samples_in,
                     ProcessContrib.samples_out,
                     ProcessContrib.run_use,
@@ -800,7 +810,7 @@ def ADSS_sub_CV(
                 process_finish=True,
                 process_contrib=[
                     ProcessContrib.action_params,
-                    ProcessContrib.files,
+#                    ProcessContrib.files,
                     ProcessContrib.samples_in,
                     ProcessContrib.samples_out,
                     ProcessContrib.run_use,
@@ -892,7 +902,7 @@ def ADSS_sub_OCV(
                 process_finish=True,
                 process_contrib=[
                     ProcessContrib.action_params,
-                    ProcessContrib.files,
+#                    ProcessContrib.files,
                     ProcessContrib.samples_in,
                     ProcessContrib.samples_out,
                     ProcessContrib.run_use,
@@ -1531,7 +1541,7 @@ def ADSS_sub_cellfill_prefilled(
         technique_name="cell_fill",
         process_finish=True,
         process_contrib=[
-            ProcessContrib.files,
+#            ProcessContrib.files,
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
@@ -1640,6 +1650,8 @@ def ADSS_sub_clean_cell(
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.ReturnLineWait_s})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
 
+    apm.add(MOTOR_server, "z_move", {"z_position": "load"})
+
     return apm.action_list
 
 
@@ -1687,7 +1699,7 @@ def ADSS_sub_sample_aliquot(
         process_finish=True,
         process_contrib=[
             ProcessContrib.action_params,
-            ProcessContrib.files,
+            # ProcessContrib.files,
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
             ProcessContrib.run_use,
