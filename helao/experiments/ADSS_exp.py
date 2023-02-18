@@ -28,6 +28,7 @@ __all__ = [
     #    "ADSS_sub_empty_cell",
     "ADSS_sub_clean_cell",
     "ADSS_sub_sample_aliquot",
+    "ADSS_sub_recirculate",
     "ADSS_sub_abs_move",
 ]
 
@@ -636,7 +637,15 @@ def ADSS_sub_CA(
             ProcessContrib.run_use,
         ],
     )
+"""
+        intervals between PAL_archive aliquots include gas valving off
+        before aliquot, and a -65- second wait to turn back on gas valve
+        that occurs before full PAL action is completed
 
+
+
+
+"""
     atimes = apm.pars.aliquot_times_sec
     if atimes:
         intervals = [atimes[0]] + [
@@ -650,6 +659,7 @@ def ADSS_sub_CA(
 
         for interval in intervals:
             apm.add(ORCH_server, "wait", {"waittime": interval}, waitcond)
+            apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
             apm.add(
                 PAL_server,
                 "PAL_archive",
@@ -661,8 +671,8 @@ def ADSS_sub_CA(
                     "spacingmethod": Spacingmethod.linear,
                     "spacingfactor": 1.0,
                     "timeoffset": 0.0,
-                    "wash1": 0,
-                    "wash2": 0,
+                    "wash1": 1,
+                    "wash2": 1,
                     "wash3": 0,
                     "wash4": 0,
                 },
@@ -677,6 +687,8 @@ def ADSS_sub_CA(
                     ProcessContrib.run_use,
                 ],
             )
+            apm.add(ORCH_server, "wait", {"waittime": 65}, waitcond)
+            apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
 
     return apm.action_list  # returns complete action list to orch
 
@@ -1657,7 +1669,7 @@ def ADSS_sub_clean_cell(
 
 def ADSS_sub_sample_aliquot(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     aliquot_volume_ul: Optional[int] = 200,
     EquilibrationTime_s: float = 30,
     PAL_Injector: str = "LS 4",
@@ -1674,7 +1686,7 @@ def ADSS_sub_sample_aliquot(
             "_fast_samples_in"
         ],  # save new liquid_sample_no of eche cell to globals
     )
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.EquilibrationTime_s})
@@ -1705,5 +1717,22 @@ def ADSS_sub_sample_aliquot(
             ProcessContrib.run_use,
         ],
     )
+    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
 
+    return apm.action_list  # returns complete action list to orch
+
+def ADSS_sub_recirculate(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    direction_forward_or_reverse: str = "forward",
+):
+
+    apm = ActionPlanMaker()
+    if apm.pars.direction_forward_or_reverse == "forward":
+        dir = 0
+    else:
+        dir = 1
+    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "direction", "on": dir})
+    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
     return apm.action_list  # returns complete action list to orch
