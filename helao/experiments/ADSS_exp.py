@@ -681,7 +681,7 @@ def ADSS_sub_CA(
                 process_finish=True,
                 process_contrib=[
                     ProcessContrib.action_params,
-#                    ProcessContrib.files,
+                    ProcessContrib.files,
                     ProcessContrib.samples_in,
                     ProcessContrib.samples_out,
                     ProcessContrib.run_use,
