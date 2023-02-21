@@ -914,7 +914,7 @@ def ADSS_sub_OCV(
                 process_finish=True,
                 process_contrib=[
                     ProcessContrib.action_params,
-#                    ProcessContrib.files,
+                    ProcessContrib.files,
                     ProcessContrib.samples_in,
                     ProcessContrib.samples_out,
                     ProcessContrib.run_use,
@@ -1553,7 +1553,7 @@ def ADSS_sub_cellfill_prefilled(
         technique_name="cell_fill",
         process_finish=True,
         process_contrib=[
-#            ProcessContrib.files,
+            ProcessContrib.files,
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
@@ -1711,7 +1711,7 @@ def ADSS_sub_sample_aliquot(
         process_finish=True,
         process_contrib=[
             ProcessContrib.action_params,
-            # ProcessContrib.files,
+            ProcessContrib.files,
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
             ProcessContrib.run_use,
