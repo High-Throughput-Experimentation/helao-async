@@ -17,7 +17,9 @@ __all__ = [
     "ANEC_sub_normal_state",
     "ANEC_sub_GC_preparation",
     "ANEC_sub_cleanup",
+    "ANEC_sub_CP",
     "ANEC_sub_CA",
+    "ANEC_sub_liquidarchive",
     "ANEC_sub_aliquot",
     "ANEC_sub_alloff",
     "ANEC_sub_CV",
@@ -488,6 +490,48 @@ def ANEC_sub_load_solid_and_clean_cell(
     apm.add_action_list(ANEC_sub_drain_cell(experiment))
     return apm.action_list
 
+def ANEC_sub_liquidarchive(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    toolarchive: Optional[str] = "LS 3",
+    volume_ul_archive: Optional[int] = 500,
+    wash1: Optional[bool] = True,
+    wash2: Optional[bool] = True,
+    wash3: Optional[bool] = True,
+    wash4: Optional[bool] = False,
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    # first circulate the liquid back and forth
+    # e.g. mix it by reversing the flow a few times
+
+    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 0})
+    apm.add(
+        PAL_server,
+        "PAL_archive",
+        {
+            "tool": apm.pars.toolarchive,
+            "source": "cell1_we",
+            "volume_ul": apm.pars.volume_ul_archive,
+            "wash1": apm.pars.wash1,
+            "wash2": apm.pars.wash2,
+            "wash3": apm.pars.wash3,
+            "wash4": apm.pars.wash4,
+        },
+        process_finish=True,
+        technique_name=[
+            "liquid_product_archive",
+        ],
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
+
+    return apm.action_list
 
 def ANEC_sub_aliquot(
     experiment: Experiment,
@@ -544,6 +588,55 @@ def ANEC_sub_aliquot(
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
 
     return apm.action_list
+
+def ANEC_sub_CP(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    WE_versus: Optional[str] = "ref",
+    ref_type: Optional[str] = "leakless",
+    pH: Optional[float] = 6.8,
+    CP_current: Optional[float] = 0.0,
+    SampleRate: Optional[float] = 0.01,
+    CP_duration_sec: Optional[float] = 60,
+    IErange: Optional[str] = "auto",
+):
+    """last functionality test: -"""
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    if int(round(apm.pars.toggle_illum_time)) == -1:
+        apm.pars.toggle_illum_time = apm.pars.CP_duration_sec
+
+    # get sample for gamry
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {"custom": "cell1_we"},
+        to_globalexp_params=["_fast_samples_in"],
+    )
+
+    apm.add(
+        PSTAT_server,
+        "run_CP",
+        {
+            "Ival": apm.pars.CP_current,
+            "Tval__s": apm.pars.CP_duration_sec,
+            "AcqInterval__s": apm.pars.SampleRate,
+            "IErange": apm.pars.IErange,
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        technique_name="CP",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+
+
+    return apm.action_list  # returns complete action list to orch
 
 
 def ANEC_sub_CA(
