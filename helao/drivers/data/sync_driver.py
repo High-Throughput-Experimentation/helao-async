@@ -60,6 +60,18 @@ plural = {
 }
 
 
+class Progress2:
+    def __init__(self, yml_path: Union[Path, str]):
+        """Loads and saves progress for a given Helao yml file."""
+        pass
+
+
+class HelaoSyncer:
+    def __init__(self, yml_path: Union[Path, str]):
+        """Loads and saves progress for a given Helao yml file."""
+        pass
+
+
 def dict2json(input_dict: dict):
     """Converts dict to file-like object containing json."""
     bio = io.BytesIO()
