@@ -651,7 +651,7 @@ def ADSS_sub_CA(
 
         for interval in intervals:
             apm.add(ORCH_server, "wait", {"waittime": interval}, waitcond)
-            apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
+            apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0},ActionStartCondition.wait_for_orch)
             apm.add(
                 PAL_server,
                 "PAL_archive",
@@ -668,7 +668,7 @@ def ADSS_sub_CA(
                     "wash3": 0,
                     "wash4": 0,
                 },
-                start_condition=ActionStartCondition.wait_for_orch,
+                #start_condition=ActionStartCondition.wait_for_orch,
                 technique_name="liquid_product_archive",
                 process_finish=True,
                 process_contrib=[
@@ -680,7 +680,7 @@ def ADSS_sub_CA(
                 ],
             )
             apm.add(ORCH_server, "wait", {"waittime": 65}, waitcond)
-            apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+            apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1},ActionStartCondition.wait_for_orch)
 
     return apm.action_list  # returns complete action list to orch
 
