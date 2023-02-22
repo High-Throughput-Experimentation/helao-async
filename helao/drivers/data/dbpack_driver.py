@@ -416,7 +416,7 @@ class ExpYml(HelaoYml):
         base_process.update(fill_process)
         meta_json = ProcessModel(**base_process).clean_dict()
         meta_json = wrap_sample_details(meta_json)
-        for file_dict in meta_json["files"]:
+        for file_dict in meta_json.get("files", {}):
             if file_dict["file_name"].endswith(".hlo"):
                 file_dict["file_name"] = f"{file_dict['file_name']}.json"
         self.progress[group_idx]["meta"] = meta_json
@@ -730,7 +730,8 @@ class DBPack:
         return self.log_dict
 
     async def add_yml_task(self, yml_path: str, timeout: int = 300):
-        await self.task_queue.put((yml_path, timeout))
+        resolved_path = Path(yml_path).resolve()
+        await self.task_queue.put((resolved_path, timeout))
         self.base.print_message(f"Added {yml_path} to tasks.")
 
     async def finish_yml(self, yml_path: Union[str, HelaoPath]):
