@@ -660,7 +660,7 @@ def ADSS_CA_NiSb_validation(
                 }
             )
             epm.add_experiment(
-                "ADSS_sub_cellfill_prefilled",
+                "ADSS_sub_cellfill_flush",
                 {
                     "Solution_volume_ul": flush_volume_ul,
                     "Syringe_rate_ulsec": Syringe_rate_ulsec,
