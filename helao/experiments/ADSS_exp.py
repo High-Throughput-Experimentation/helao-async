@@ -24,6 +24,7 @@ __all__ = [
     "ADSS_sub_heat",
     "ADSS_sub_stopheat",
     "ADSS_sub_cellfill_prefilled",
+    "ADSS_sub_cellfill_flush",
     "ADSS_sub_drain_cell",
     #    "ADSS_sub_empty_cell",
     "ADSS_sub_clean_cell",
@@ -1553,10 +1554,50 @@ def ADSS_sub_cellfill_prefilled(
         technique_name="cell_fill",
         process_finish=True,
         process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
+            ProcessContrib.action_params,
+            # ProcessContrib.files,
+            # ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
+    )
+    if apm.pars.ReturnLineWait_s != 0:
+        apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
+        apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": apm.pars.ReturnLineWait_s})
+        apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
+
+    #    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+
+    return apm.action_list
+def ADSS_sub_cellfill_flush(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    Solution_volume_ul: float = 3000,
+    Syringe_rate_ulsec: float = 300,
+    #    deadvolume_ul: int = 0,
+    #    PurgeWait_s: float = 2,
+    ReturnLineWait_s: float = 0,
+):
+
+    apm = ActionPlanMaker()
+    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
+    # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
+    # apm.add(
+    #     SOLUTIONPUMP_server,
+    #     "withdraw",
+    #     {
+    #         "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+    #         "volume_uL": apm.pars.Solution_volume_ul,
+    #     },
+    # )
+    # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
+    apm.add(
+        SOLUTIONPUMP_server,
+        "infuse",
+        {
+            "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+            "volume_uL": apm.pars.Solution_volume_ul,
+        },
     )
     if apm.pars.ReturnLineWait_s != 0:
         apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
