@@ -730,7 +730,8 @@ class DBPack:
         return self.log_dict
 
     async def add_yml_task(self, yml_path: str, timeout: int = 300):
-        await self.task_queue.put((yml_path, timeout))
+        resolved_path = Path(yml_path).resolve()
+        await self.task_queue.put((resolved_path, timeout))
         self.base.print_message(f"Added {yml_path} to tasks.")
 
     async def finish_yml(self, yml_path: Union[str, HelaoPath]):
