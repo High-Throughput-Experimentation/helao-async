@@ -668,7 +668,7 @@ def ADSS_sub_CA(
                     "wash3": 0,
                     "wash4": 0,
                 },
-                #start_condition=ActionStartCondition.wait_for_orch,
+                start_condition=ActionStartCondition.wait_for_previous,
                 technique_name="liquid_product_archive",
                 process_finish=True,
                 process_contrib=[
