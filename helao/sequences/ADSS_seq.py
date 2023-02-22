@@ -609,7 +609,7 @@ def ADSS_CA_NiSb_validation(
                     "solid_sample_no": solid_sample_no,
                 }
             )
-            epm.add_experiment("ADSS_sub_recirculate",)
+            epm.add_experiment("ADSS_sub_recirculate",{})
 
             epm.add_experiment(
                 "ADSS_sub_OCV",
