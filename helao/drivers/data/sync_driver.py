@@ -63,12 +63,24 @@ plural = {
 class Progress2:
     def __init__(self, yml_path: Union[Path, str]):
         """Loads and saves progress for a given Helao yml file."""
+        
+        # gather constituents in SYNCED and FINISHED
+        
+        # experiments only:
+        # gather constituents in ACTIVE to determine if process can be generated
+        
         pass
 
 
 class HelaoSyncer:
     def __init__(self, yml_path: Union[Path, str]):
-        """Loads and saves progress for a given Helao yml file."""
+        """Pushes yml to S3 and API."""
+        
+        # push happens via async task queue
+        # pushing an exp before processes/actions have synced will first enqueue actions
+        # then enqueue processes, then enqueue the exp again
+        # exp progress must be in memory before actions are checked
+        
         pass
 
 
