@@ -416,7 +416,7 @@ class ExpYml(HelaoYml):
         base_process.update(fill_process)
         meta_json = ProcessModel(**base_process).clean_dict()
         meta_json = wrap_sample_details(meta_json)
-        for file_dict in meta_json["files"]:
+        for file_dict in meta_json.get("files", {}):
             if file_dict["file_name"].endswith(".hlo"):
                 file_dict["file_name"] = f"{file_dict['file_name']}.json"
         self.progress[group_idx]["meta"] = meta_json
