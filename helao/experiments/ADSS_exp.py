@@ -679,8 +679,8 @@ def ADSS_sub_CA(
                     ProcessContrib.run_use,
                 ],
             )
-            apm.add(ORCH_server, "wait", {"waittime": 65}, waitcond)
-            apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1},ActionStartCondition.wait_for_orch)
+            #apm.add(ORCH_server, "wait", {"waittime": 65}, waitcond)
+            apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1},ActionStartCondition.wait_for_previous)
 
     return apm.action_list  # returns complete action list to orch
 
