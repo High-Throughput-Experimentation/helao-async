@@ -556,7 +556,7 @@ def ADSS_sub_fill(
 
 def ADSS_sub_CA(
     experiment: Experiment,
-    experiment_version: int = 7,
+    experiment_version: int = 8,
     CA_potential: Optional[float] = 0.0,
     ph: Optional[float] = 9.53,
     potential_versus: Optional[str] = "rhe",
@@ -641,6 +641,7 @@ def ADSS_sub_CA(
         that occurs before full PAL action is completed
     """
     atimes = apm.pars.aliquot_times_sec
+    vwait = 0
     if atimes:
         intervals = [atimes[0]] + [x - y for x, y in zip(atimes[1:], atimes[:-1])]
 
@@ -650,7 +651,7 @@ def ADSS_sub_CA(
             waitcond = ActionStartCondition.wait_for_all
 
         for interval in intervals:
-            apm.add(ORCH_server, "wait", {"waittime": interval}, waitcond)
+            apm.add(ORCH_server, "wait", {"waittime": interval - vwait}, waitcond)
             apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0},ActionStartCondition.wait_for_orch)
             apm.add(
                 PAL_server,
@@ -668,7 +669,7 @@ def ADSS_sub_CA(
                     "wash3": 0,
                     "wash4": 0,
                 },
-                start_condition=ActionStartCondition.wait_for_previous,
+                start_condition=ActionStartCondition.no_wait,
                 technique_name="liquid_product_archive",
                 process_finish=True,
                 process_contrib=[
@@ -679,8 +680,9 @@ def ADSS_sub_CA(
                     ProcessContrib.run_use,
                 ],
             )
-            #apm.add(ORCH_server, "wait", {"waittime": 65}, waitcond)
-            apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1},ActionStartCondition.wait_for_previous)
+            vwait = 65
+            apm.add(ORCH_server, "wait", {"waittime": vwait}, waitcond)
+            apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1},ActionStartCondition.wait_for_orch)
 
     return apm.action_list  # returns complete action list to orch
 
