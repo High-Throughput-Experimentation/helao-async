@@ -25,7 +25,7 @@ from ruamel.yaml import YAML
 from pathlib import Path
 from glob import glob
 from datetime import datetime
-from typing import Union, Optional
+from typing import Union, Optional, Dict, List
 from collections import UserDict, defaultdict
 import traceback
 
@@ -45,42 +45,233 @@ from helao.helpers.print_message import print_message
 from helao.helpers.zip_dir import zip_dir
 from helao.drivers.data.enum import YmlType
 
-
-modmap = {
+ABR_MAP = {"act": "action", "exp": "experiment", "seq": "sequence"}
+MOD_MAP = {
     "action": ActionModel,
     "experiment": ExperimentModel,
     "sequence": SequenceModel,
     "process": ProcessModel,
 }
-plural = {
+PLURALS = {
     "action": "actions",
     "experiment": "experiments",
     "sequence": "sequences",
     "process": "processes",
 }
+YAML_LOADER = YAML(typ="safe")
+
+
+class HelaoPath2:
+    target: Path
+    dir: Path
+    parts: list
+
+    def __init__(self, target: Union[Path, str]):
+        if isinstance(target, str):
+            self.target = Path(target)
+        else:
+            self.target = target
+        if not self.target.exists():
+            self.exists = False
+            raise ValueError(f"{self.target} does not exist")
+        else:
+            if self.target.is_dir():
+                self.dir = self.target
+                possible_ymls = [
+                    x
+                    for x in list(self.dir.glob("*.yml"))
+                    if x.stem.endswith("-seq")
+                    or x.stem.endswith("-exp")
+                    or x.stem.endswith("-act")
+                ]
+                if len(possible_ymls) > 1:
+                    raise ValueError(
+                        f"{self.dir} contains multiple .yml files and is not a valid Helao directory"
+                    )
+                elif not possible_ymls:
+                    raise ValueError(
+                        f"{self.dir} does not contain any .yml files and is not a valid Helao dir"
+                    )
+                self.target = possible_ymls[0]
+            else:
+                self.dir = self.target.parent
+        self.parts = list(self.target.parts)
+        if not any([x.startswith("RUNS_") for x in self.dir.parts]):
+            raise ValueError(
+                f"{self.target} is not located with a Helao RUNS_* directory"
+            )
+
+    @property
+    def type(self):
+        return ABR_MAP[self.target.stem.split("-")[-1]]
+
+    @property
+    def status(self):
+        path_parts = [x for x in self.dir.parts if x.startswith("RUNS_")]
+        status = path_parts[0].split("_")[-1].lower()
+        return status
+
+    def rename(self, status: str) -> str:
+        tempparts = list(self.parts)
+        tempparts[self.status_idx] = status
+        return os.path.join(*tempparts)
+
+    @property
+    def status_idx(self):
+        valid_statuses = ("RUNS_ACTIVE", "RUNS_FINISHED", "RUNS_SYNCED")
+        return [any([x in valid_statuses]) for x in self.parts].index(True)
+
+    @property
+    def relative_path(self):
+        return "/".join(list(self.parts)[self.status_idx + 1 :])
+
+    @property
+    def active_path(self):
+        return Path(self.rename("RUNS_ACTIVE"))
+
+    @property
+    def finished_path(self):
+        return Path(self.rename("RUNS_FINISHED"))
+
+    @property
+    def synced_path(self):
+        return Path(self.rename("RUNS_SYNCED"))
+
+    def cleanup(self):
+        """Remove empty directories in RUNS_ACTIVE or RUNS_FINISHED."""
+        tempparts = list(self.parts)
+        steps = len(tempparts) - self.status_idx
+        for i in range(1, steps):
+            check_dir = Path(os.path.join(*tempparts[:-i]))
+            contents = [x for x in check_dir.glob("*") if x != check_dir]
+            if contents:
+                break
+            try:
+                check_dir.rmdir()
+                return "success"
+            except PermissionError as e:
+                _ = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+                return e
+
+    @property
+    def active_children(self) -> List[Path]:
+        return list(self.active_path.parent.glob("*/*.yml"))
+
+    @property
+    def finished_children(self) -> List[Path]:
+        return list(self.finished_path.parent.glob("*/*.yml"))
+
+    @property
+    def synced_children(self) -> List[Path]:
+        return list(self.synced_path.parent.glob("*/*.yml"))
+
+    @property
+    def misc_files(self) -> List[Path]:
+        return [
+            x
+            for x in self.dir.glob("*")
+            if x.is_file() and not x.suffix == ".yml" and not x.suffix == ".hlo"
+        ]
+
+    @property
+    def hlo_files(self) -> List[Path]:
+        return [x for x in self.dir.glob("*") if x.is_file() and x.suffix == ".hlo"]
+
+    @property
+    def parent_yml(self) -> Union[Path, None]:
+        if self.type == "sequence":
+            return None
+        else:
+            possible_parents = [
+                list(x.parent.parent.glob("*.yml"))
+                for x in (self.active_path, self.finished_path, self.synced_path)
+            ]
+            return [p[0] for p in possible_parents if p][0]
+
+    @property
+    def meta(self):
+        return YAML_LOADER.load(self.target)
 
 
 class Progress2:
-    def __init__(self, yml_path: Union[Path, str]):
-        """Loads and saves progress for a given Helao yml file."""
-        
-        # gather constituents in SYNCED and FINISHED
-        
-        # experiments only:
-        # gather constituents in ACTIVE to determine if process can be generated
-        
-        pass
+    yml: HelaoPath2
+    prg: Path
+
+    def __init__(self, path: Union[HelaoPath2, Path, str]):
+        """Loads and saves progress for a given Helao yml or prg file."""
+
+        if isinstance(path, HelaoPath2):
+            self.yml = path
+        elif isinstance(path, Path):
+            if path.suffix == ".yml":
+                self.yml = HelaoPath2(path)
+            elif path.suffix == ".prg":
+                self.prg = path
+        else:
+            if path.endswith(".yml"):
+                self.yml = HelaoPath2(path)
+            elif path.endswith(".prg"):
+                self.prg = Path(path)
+            else:
+                raise ValueError(f"{path} is not a valid Helao .yml or .prg file")
+
+        if not hasattr(self, "yml"):
+            self.read_dict()
+            self.yml = HelaoPath2(self.dict["yml"])
+
+        if not hasattr(self, "prg"):
+            self.prg = self.yml.synced_path.with_suffix(".prg")
+
+        # first time, write progress dict
+        if not self.prg.exists():
+            self.prg.parent.mkdir(parents=True, exist_ok=True)
+            self.dict = {"yml": self.yml.target.__str__(), "api": False, "s3": False}
+            if self.yml.type == "action":
+                act_dict = {
+                    "hlo_pending": self.yml.hlo_files,
+                    "hlo_s3": {},
+                    "misc_pending": self.yml.misc_files,
+                    "misc_s3": {},
+                }
+                self.dict.update(act_dict)
+            if self.yml.type == "experiment":
+                exp_dict = {"process_pending": [], "process_done": {}}
+                self.dict.update(exp_dict)
+            self.write_dict()
+        elif not hasattr(self, "dict"):
+            self.read_dict()
+
+    def read_dict(self):
+        self.dict = YAML_LOADER.load(self.prg)
+
+    def write_dict(self, new_dict: Optional[dict] = None):
+        if new_dict is None:
+            self.prg.write_text(str(pyaml.dump(self.dict, safe=True, sort_dicts=False)))
+        else:
+            self.prg.write_text(str(pyaml.dump(new_dict, safe=True, sort_dicts=False)))
+
+    @property
+    def s3_done(self):
+        return self.dict["s3"]
+
+    @property
+    def api_done(self):
+        return self.dict["api"]
+
+    def remove_prg(self):
+        self.prg.unlink()
 
 
 class HelaoSyncer:
     def __init__(self, yml_path: Union[Path, str]):
         """Pushes yml to S3 and API."""
-        
+
         # push happens via async task queue
+        # processes are checked after each action push
         # pushing an exp before processes/actions have synced will first enqueue actions
         # then enqueue processes, then enqueue the exp again
         # exp progress must be in memory before actions are checked
-        
+
         pass
 
 
@@ -242,7 +433,7 @@ class HelaoYml:
         self.progress = Progress(self)
         # print(f"!!! Successfully loaded progress from {self.progress_path}")
         if (self.status == "FINISHED") and (self.file_type != "experiment"):
-            meta_json = modmap[self.file_type](**self.dict).clean_dict()
+            meta_json = MOD_MAP[self.file_type](**self.dict).clean_dict()
             meta_json = wrap_sample_details(meta_json)
             for file_dict in meta_json.get("files", []):
                 if file_dict["file_name"].endswith(".hlo"):
@@ -368,7 +559,7 @@ class ExpYml(HelaoYml):
         group_keys = sorted([k for k in self.progress.keys() if isinstance(k, int)])
         process_metas = [self.progress[k]["meta"] for k in group_keys]
         if self.status == "FINISHED":
-            meta_json = modmap[self.file_type](**self.dict).clean_dict()
+            meta_json = MOD_MAP[self.file_type](**self.dict).clean_dict()
             meta_json = wrap_sample_details(meta_json)
             for file_dict in meta_json.get("files", []):
                 if file_dict["file_name"].endswith(".hlo"):
@@ -981,8 +1172,8 @@ class YmlOps:
         p_uuid = pdict["meta"][
             f"{meta_type}_uuid" if isinstance(progress_key, str) else "process_uuid"
         ]
-        req_model = modmap[meta_type](**pdict["meta"]).json_dict()
-        req_url = f"https://{self.dbp.api_host}/{plural[meta_type]}/"
+        req_model = MOD_MAP[meta_type](**pdict["meta"]).json_dict()
+        req_url = f"https://{self.dbp.api_host}/{PLURALS[meta_type]}/"
         self.dbp.base.print_message(
             f"attempting API push for {self.yml.target.__str__()} :: {progress_key} :: {p_uuid}"
         )
@@ -1021,7 +1212,7 @@ class YmlOps:
             # send yml and response status to API endpoint if failure.
             meta_s3_key = f"{meta_type}/{p_uuid}.json"
             fail_model = {
-                "endpoint": f"https://{self.dbp.api_host}/{plural[meta_type]}/",
+                "endpoint": f"https://{self.dbp.api_host}/{PLURALS[meta_type]}/",
                 "method": "POST" if try_create else "PATCH",
                 "status_code": resp.status,
                 "detail": last_response.get("detail", ""),
