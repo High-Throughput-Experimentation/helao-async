@@ -81,7 +81,8 @@ config["servers"] = {
             "dev_gasvalve": {
                 "1A": "cDAQ1Mod1/port0/line0",
                 "1B": "cDAQ1Mod1/port0/line1",
-                "7": "cDAQ1Mod1/port0/line9",
+                "7A": "cDAQ1Mod1/port0/line9",
+                "7B": "cDAQ1Mod1/port0/line10",
                 # "M4": ["cDAQ1Mod1/port0/line30"],
                 # "M5": ["cDAQ1Mod1/port0/line30","cDAQ1Mod1/port0/line28"],
                 # "M6": ["cDAQ1Mod1/port0/line30","cDAQ1Mod1/port0/line29"],
