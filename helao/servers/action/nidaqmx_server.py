@@ -206,6 +206,33 @@ def makeApp(confPrefix, server_key, helao_root):
             finished_act = await active.finish()
             return finished_act.as_dict()
 
+
+    if dev_multivalve:
+
+        @app.post(f"/{server_key}/multivalve", tags=["action"])
+        async def multivalve(
+            action: Optional[Action] = Body({}, embed=True),
+            action_version: int = 1,
+            multivalve: Optional[dev_multivalveitems] = None,
+            on: Optional[bool] = True,
+        ):
+            active = await app.base.setup_and_contain_action(action_abbr="lfv")
+            # some additional params in order to call the same driver functions
+            # for all DO actions
+            active.action.action_params["do_port"] = dev_multivalve[
+                active.action.action_params["multivalve"]
+            ]
+            active.action.action_params["do_name"] = active.action.action_params[
+                "multivalve"
+            ]
+            datadict = await app.driver.set_digital_out(**active.action.action_params)
+            active.action.error_code = datadict.get(
+                "error_code", ErrorCodes.unspecified
+            )
+            await active.enqueue_data_dflt(datadict=datadict)
+            finished_act = await active.finish()
+            return finished_act.as_dict()
+
     if dev_led:
 
         @app.post(f"/{server_key}/led", tags=["action"])
