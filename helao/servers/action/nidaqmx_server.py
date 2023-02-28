@@ -61,6 +61,11 @@ def makeApp(confPrefix, server_key, helao_root):
         "dev_liquidvalve", {key: key for key in dev_liquidvalve}
     )
 
+    dev_multivalve = app.server_params.get("dev_multivalve", {})
+    dev_multivalveitems = make_str_enum(
+        "dev_multivalve", {key: key for key in dev_multivalve}
+    )
+
     dev_led = app.server_params.get("dev_led", {})
     dev_leditems = make_str_enum("dev_led", {key: key for key in dev_led})
 
