@@ -86,7 +86,7 @@ config["servers"] = {
                 # "M5": ["cDAQ1Mod1/port0/line30","cDAQ1Mod1/port0/line28"],
                 # "M6": ["cDAQ1Mod1/port0/line30","cDAQ1Mod1/port0/line29"],
                 # "M7": ["cDAQ1Mod1/port0/line30","cDAQ1Mod1/port0/line29","cDAQ1Mod1/port0/line28"],
-            }
+            },
             "dev_multivalve": {
                 "multi_CMD0": "cDAQ1Mod1/port0/line28",
                 "multi_CMD1": "cDAQ1Mod1/port0/line29",
