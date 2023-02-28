@@ -102,8 +102,8 @@ config["servers"] = {
                 "5B-waste": "cDAQ1Mod1/port0/line6",
                 "6A-waste": "cDAQ1Mod1/port0/line7",
                 "6B": "cDAQ1Mod1/port0/line8",
-                "8": "cDAQ1Mod1/port0/line10",
-                "9": "cDAQ1Mod1/port0/line11",
+                "8": "cDAQ1Mod1/port0/line11",
+                "9": "cDAQ1Mod1/port0/line12",
             },
             "dev_pump": {
                 "RecirculatingPeriPump1": "cDAQ1Mod1/port0/line12",
