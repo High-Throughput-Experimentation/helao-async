@@ -654,7 +654,7 @@ def CCSI_sub_initialization_firstpart(
 
 def CCSI_sub_liquidfill_syringes(
     experiment: Experiment,
-    experiment_version: int = 7, #ver 6to7 implements multivalve
+    experiment_version: int = 8, #ver 6to7 implements multivalve
     Solution_description: str = "KOH",
     Solution_reservoir_sample_no: int = 2,
     Solution_volume_ul: float = 500,
@@ -706,10 +706,11 @@ def CCSI_sub_liquidfill_syringes(
             },
             
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-                process_finish=False,
-                process_contrib=[
-                    ProcessContrib.action_params,
-                    ProcessContrib.samples_in,
+            technique_name="syringe_inject",
+            process_finish=False,
+            process_contrib=[
+                ProcessContrib.action_params,
+                ProcessContrib.samples_in,
             ],
     )
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
@@ -729,10 +730,11 @@ def CCSI_sub_liquidfill_syringes(
             },
             
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-            process_finish=False,
+            technique_name="syringe_inject",
+            process_finish=True,
             process_contrib=[
                 ProcessContrib.action_params,
-                ProcessContrib.samples_in,
+                #ProcessContrib.samples_in,
             ],
     )    
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
