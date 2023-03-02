@@ -360,7 +360,7 @@ def CCSI_test_KOH_testing(  #assumes initialization performed previously
               #  "purge_if": purge_if,
               #  "HSpurge_duration": LiquidCleanPurge_duration,
             })
-            epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration})
+            epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration,"DeltaDilute1_duration": DeltaDilute1_duration,})
 
         refill_volume = watervolume + drainclean_volume_ul*cleanloop
         epm.add_experiment("CCSI_sub_refill_clean", {
