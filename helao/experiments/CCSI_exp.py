@@ -842,7 +842,7 @@ def CCSI_sub_liquidfill_syringes(
 
 def CCSI_sub_clean_inject(
     experiment: Experiment,
-    experiment_version: int = 2,  #ver 2 implements multivalve
+    experiment_version: int = 3,  #ver 2 implements multivalve, ver 3 conditional
     Waterclean_volume_ul: float = 5000,
     deadspace_volume_ul: float = 50,
     backlash_volume_ul: float = 50,
@@ -851,8 +851,8 @@ def CCSI_sub_clean_inject(
     LiquidCleanWait_s: float = 15,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.1,
-    co2_ppm_thresh: float = 90000,
-    purge_if: Union[str, float] = -0.05,
+    co2_ppm_thresh: float = 41000,
+    purge_if: Union[str, float] = below,
     max_purge_iters: int = 5,
     LiquidCleanPurge_duration: float = 60,  # set before determining actual
 ):
@@ -958,27 +958,20 @@ def CCSI_sub_clean_inject(
 #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
-#     apm.add(
-#         CALC_server,
-#         "check_co2_purge",
-#         {
-#             "co2_ppm_thresh": apm.pars.co2_ppm_thresh,
-#             "purge_if": apm.pars.purge_if,
-#             "repeat_experiment_name": "CCSI_sub_drain_and_clean",
-#             "repeat_experiment_params": {
-# #                k: v for k, v in vars(apm.pars).items() if not k.startswith('experiment')
-#                 "Waterclean_volume_ul": 5000,
-#                 "Syringe_retraction_ul": 500,
-#                 "Syringe_rate_ulsec": 500,
-#                 "LiquidFillWait_s": 15,
-#                 "co2measure_duration": 20,
-#                 "co2measure_acqrate": 0.1,
-#                 "co2_ppm_thresh": 90000,
-#                 "purge_if": -0.05,
-#                 "LiquidCleanPurge": 20 
-#             }
-#         }
-#     )
+    # apm.add(
+    #     CALC_server,
+    #     "check_co2_purge",
+    #     {
+    #         "co2_ppm_thresh": apm.pars.co2_ppm_thresh,
+    #         "purge_if": apm.pars.purge_if,
+    #         "repeat_experiment_name": "CCSI_sub_clean_inject",
+    #         "repeat_experiment_params": {
+    #             k: v
+    #             for k, v in vars(apm.pars).items()
+    #             if not k.startswith("experiment")
+    #         },
+    #     },
+    # )
     return apm.action_list
 
 def CCSI_sub_refill_clean(
