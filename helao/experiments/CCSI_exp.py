@@ -654,7 +654,7 @@ def CCSI_sub_initialization_firstpart(
 
 def CCSI_sub_liquidfill_syringes(
     experiment: Experiment,
-    experiment_version: int = 8, #ver 6to7 implements multivalve
+    experiment_version: int = 9, #ver 6to7 implements multivalve
     Solution_description: str = "KOH",
     Solution_reservoir_sample_no: int = 2,
     Solution_volume_ul: float = 500,
@@ -697,6 +697,10 @@ def CCSI_sub_liquidfill_syringes(
         apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1})
         apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 1}, asc.no_wait)
         apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 1}, asc.no_wait)
+        if apm.pars.Waterclean_volume_ul == 0:
+            procfinish = True
+        else:
+            procfinish = False
         apm.add(
             SOLUTIONPUMP_server,
             "infuse",
@@ -707,7 +711,7 @@ def CCSI_sub_liquidfill_syringes(
             
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
             technique_name="syringe_inject",
-            process_finish=False,
+            process_finish= procfinish,
             process_contrib=[
                 ProcessContrib.action_params,
                 ProcessContrib.samples_in,
@@ -721,6 +725,16 @@ def CCSI_sub_liquidfill_syringes(
         apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1})
         apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 1}, asc.no_wait)
         apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 0}, asc.no_wait)
+        if apm.pars.Solution_volume_ul == 0:
+            proccontrib = [
+                ProcessContrib.action_params,
+                ProcessContrib.samples_in,
+            ]
+        else:
+            proccontrib = [
+                ProcessContrib.action_params,
+            ]
+
         apm.add(
             WATERCLEANPUMP_server,
             "infuse",
@@ -732,10 +746,7 @@ def CCSI_sub_liquidfill_syringes(
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
             technique_name="syringe_inject",
             process_finish=True,
-            process_contrib=[
-                ProcessContrib.action_params,
-                #ProcessContrib.samples_in,
-            ],
+            process_contrib= proccontrib,
     )    
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
