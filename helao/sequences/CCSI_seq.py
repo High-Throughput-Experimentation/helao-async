@@ -308,7 +308,7 @@ def CCSI_test_KOH_testing(  #assumes initialization performed previously
         # if KOHvolume == 0:
         #     cleanloop = 1
         # else:
-        cleanloop = 4
+        cleanloop = 2
 
         epm.add_experiment("CCSI_sub_unload_cell",{})
 
