@@ -852,7 +852,7 @@ def CCSI_sub_clean_inject(
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.1,
     co2_ppm_thresh: float = 41000,
-    purge_if: Union[str, float] = below,
+    purge_if: Union[str, float] = "below",
     max_purge_iters: int = 5,
     LiquidCleanPurge_duration: float = 60,  # set before determining actual
 ):
