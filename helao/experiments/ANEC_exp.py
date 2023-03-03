@@ -19,6 +19,7 @@ __all__ = [
     "ANEC_sub_cleanup",
     "ANEC_sub_CP",
     "ANEC_sub_CA",
+    "ANEC_sub_OCV",
     "ANEC_sub_liquidarchive",
     "ANEC_sub_aliquot",
     "ANEC_sub_alloff",
@@ -690,6 +691,49 @@ def ANEC_sub_CA(
     # apm.add(ORCH_server, "wait", {"waittime": 10})
 
     return apm.action_list
+
+
+def ANEC_sub_OCV(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    Tval__s: Optional[float] = 900.0,
+    IErange: Optional[str] = "auto",
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    # get sample for gamry
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    )
+
+    # OCV
+    apm.add(
+        PSTAT_server,
+        "run_OCV",
+        {
+            "Tval__s": apm.pars.Tval__s,
+            "SampleRate": 0.05,
+            "IErange": apm.pars.IErange,
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        technique_name="CP",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+    return apm.action_list  # returns complete action list to orch
 
 
 def ANEC_sub_photo_CA(
