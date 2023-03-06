@@ -345,7 +345,7 @@ def CCSI_test_KOH_testing(  #assumes initialization performed previously
             "co2measure_duration": co2measure_duration,
             "co2measure_acqrate": co2measure_acqrate,
         })
-        epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration,"DeltaDilute1_duration": DeltaDilute1_duration,})
+        epm.add_experiment("CCSI_sub_drain_wcirc", {"HSpurge_duration": LiquidCleanPurge_duration})
 
         for _ in range(cleanloops):
         #cleanloops = 1
