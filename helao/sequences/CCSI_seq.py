@@ -411,7 +411,7 @@ def CCSI_newer_KOH_testing(  #assumes initialization performed previously
 ):
 
     epm = ExperimentPlanMaker()
-    init = 2
+    init = 3
     for _ in range(init):
         epm.add_experiment("CCSI_sub_clean_inject", {
             "Waterclean_volume_ul": drainclean_volume_ul,
@@ -427,6 +427,13 @@ def CCSI_newer_KOH_testing(  #assumes initialization performed previously
             "purge_if": purge_if,
             #  "HSpurge_duration": LiquidCleanPurge_duration,
         })
+
+    refill_volume = drainclean_volume_ul*(init)
+    epm.add_experiment("CCSI_sub_refill_clean", {
+        "Waterclean_volume_ul": refill_volume ,
+        "deadspace_volume_ul": deadspace_volume_ul,
+        "Syringe_rate_ulsec": 1000,
+    })
 
     for KOHvolume in KOH_volume_ul:  # have to indent add expts if used
         # if KOHvolume == 0:
@@ -486,8 +493,7 @@ def CCSI_newer_KOH_testing(  #assumes initialization performed previously
             })
         #epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration,})
 
-        refill_volume = watervolume + drainclean_volume_ul*(cleanloops+init)
-        init = 0
+        refill_volume = watervolume + drainclean_volume_ul*(cleanloops)
         epm.add_experiment("CCSI_sub_refill_clean", {
             "Waterclean_volume_ul": refill_volume ,
             "deadspace_volume_ul": deadspace_volume_ul,
