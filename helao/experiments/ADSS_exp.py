@@ -28,6 +28,7 @@ __all__ = [
     "ADSS_sub_drain_cell",
     #    "ADSS_sub_empty_cell",
     "ADSS_sub_clean_cell",
+    "ADSS_sub_refill_syringes",
     "ADSS_sub_sample_aliquot",
     "ADSS_sub_recirculate",
     "ADSS_sub_abs_move",
@@ -1285,6 +1286,32 @@ def ADSS_sub_clean_cell(
 
     apm.add(MOTOR_server, "z_move", {"z_position": "load"})
 
+    return apm.action_list
+
+def ADSS_sub_refill_syringes(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    Solution_volume_ul: float = 0,
+    Waterclean_volume_ul: float = 5000,
+    Syringe_rate_ulsec: float = 1000,
+):
+    apm = ActionPlanMaker()
+    if apm.pars.Solution_volume_ul !=0:
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "V3", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+        apm.add(SOLUTIONPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.Solution_volume_ul + 25})    
+        apm.add(SOLUTIONPUMP_server, "infuse", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": 25})    
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "V3", "on": 0})
+
+    if apm.pars.Waterclean_volume_ul !=0:
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "V2", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+        apm.add(WATERCLEANPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.Waterclean_volume_ul + 25})    
+        apm.add(WATERCLEANPUMP_server, "infuse", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": 25})    
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "V2", "on": 0})
+    
     return apm.action_list
 
 
