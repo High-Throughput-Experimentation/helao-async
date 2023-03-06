@@ -1019,7 +1019,7 @@ def CCSI_sub_clean_inject(
     #         },
     #     },
     # )
-    apm.add_action_list(CCSI_sub_drain(experiment=experiment,HSpurge_duration=LiquidCleanPurge_duration))
+    apm.add_action_list(CCSI_sub_drain_wcirc(experiment=experiment,HSpurge_duration=LiquidCleanPurge_duration))
 
     return apm.action_list
 
