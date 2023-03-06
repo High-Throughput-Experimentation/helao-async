@@ -143,7 +143,6 @@ def ECHEUVIS_sub_CV_led(
         process_finish=False,
         process_contrib=[
             ProcessContrib.files,
-            ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
     )
@@ -162,7 +161,6 @@ def ECHEUVIS_sub_CV_led(
             technique_name=apm.pars.spec_technique,
             process_contrib=[
                 ProcessContrib.files,
-                ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
         )
@@ -296,7 +294,6 @@ def ECHEUVIS_sub_CA_led(
         process_finish=False,
         process_contrib=[
             ProcessContrib.files,
-            ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
     )
@@ -315,7 +312,6 @@ def ECHEUVIS_sub_CA_led(
             technique_name=apm.pars.spec_technique,
             process_contrib=[
                 ProcessContrib.files,
-                ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
         )
@@ -443,7 +439,6 @@ def ECHEUVIS_sub_CP_led(
         process_finish=False,
         process_contrib=[
             ProcessContrib.files,
-            ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
     )
@@ -462,7 +457,6 @@ def ECHEUVIS_sub_CP_led(
             technique_name=apm.pars.spec_technique,
             process_contrib=[
                 ProcessContrib.files,
-                ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
         )
