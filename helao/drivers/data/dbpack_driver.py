@@ -429,7 +429,7 @@ class ExpYml(HelaoYml):
                 smpinact = [
                     x
                     for x in expacts
-                    if x["action_uuid"] == smpinuuid or x["action_uuid"] == [smpinuuid]
+                    if x["action_uuid"] == smpinuuid or [x["action_uuid"]] == smpinuuid
                 ][0]
                 smpints = smpinact["action_timestamp"]
                 smpindates.append((smpinglab, smpints, smpind))
