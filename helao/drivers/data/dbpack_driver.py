@@ -416,8 +416,8 @@ class ExpYml(HelaoYml):
 
         # deduplicate samples_in by earliest action, samples_out by latest
         expacts = [x for k, x in self.dict.items() if k.startswith("action--")]
+        print(expacts)
         if fill_process["samples_in"]:
-            print(fill_process["samples_in"])
             smpindates = []
             for smpind in fill_process["samples_in"]:
                 smpinglab = smpind["global_label"]
