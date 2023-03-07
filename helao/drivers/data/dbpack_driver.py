@@ -420,6 +420,7 @@ class ExpYml(HelaoYml):
         ]
         print(expacts)
         if fill_process["samples_in"]:
+            print(fill_process["samples_in"])
             smpindates = []
             for smpind in fill_process["samples_in"]:
                 smpinglab = smpind["global_label"]
