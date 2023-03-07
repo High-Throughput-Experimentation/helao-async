@@ -427,7 +427,9 @@ class ExpYml(HelaoYml):
                 smpinuuid = smpind["action_uuid"]
                 print(smpinuuid)
                 smpinact = [
-                    x for x in expacts if x["action_uuid"] == smpinuuid
+                    x
+                    for x in expacts
+                    if x["action_uuid"] == smpinuuid or x["action_uuid"] == [smpinuuid]
                 ][0]
                 smpints = smpinact["action_timestamp"]
                 smpindates.append((smpinglab, smpints, smpind))
@@ -442,9 +444,7 @@ class ExpYml(HelaoYml):
             for smpoutd in fill_process["samples_in"]:
                 smpoutglab = smpoutd["global_label"]
                 smpoutuuid = smpoutd["action_uuid"]
-                smpoutact = [
-                    x for x in expacts if x["action_uuid"] == smpoutuuid
-                ][0]
+                smpoutact = [x for x in expacts if x["action_uuid"] == smpoutuuid][0]
                 smpoutts = smpoutact["action_timestamp"]
                 smpoutdates.append((smpoutglab, smpoutts, smpoutd))
             usmpoutlabs = {x[0] for x in smpoutdates}
