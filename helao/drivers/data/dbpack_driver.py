@@ -418,14 +418,11 @@ class ExpYml(HelaoYml):
         expacts = [
             x["meta"] for x in self.progress.values() if x.get("type", "") == "action"
         ]
-        print(expacts)
         if fill_process["samples_in"]:
-            print(fill_process["samples_in"])
             smpindates = []
             for smpind in fill_process["samples_in"]:
                 smpinglab = smpind["global_label"]
                 smpinuuid = smpind["action_uuid"]
-                print(smpinuuid)
                 smpinact = [
                     x
                     for x in expacts
