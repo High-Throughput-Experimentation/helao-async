@@ -415,7 +415,9 @@ class ExpYml(HelaoYml):
         fill_process["process_params"] = fill_process.pop("action_params")
 
         # deduplicate samples_in by earliest action, samples_out by latest
-        expacts = [x for k, x in self.progress.items() if k.startswith("action--")]
+        expacts = [
+            x["meta"] for x in self.progress.values() if x.get("type", "") == "action"
+        ]
         print(expacts)
         if fill_process["samples_in"]:
             smpindates = []
@@ -423,7 +425,7 @@ class ExpYml(HelaoYml):
                 smpinglab = smpind["global_label"]
                 smpinuuid = smpind["action_uuid"]
                 smpinact = [
-                    x for x in expacts if x["meta"]["action_uuid"] == smpinuuid
+                    x for x in expacts if x["action_uuid"] == smpinuuid
                 ][0]
                 smpints = smpinact["action_timestamp"]
                 smpindates.append((smpinglab, smpints, smpind))
@@ -439,7 +441,7 @@ class ExpYml(HelaoYml):
                 smpoutglab = smpoutd["global_label"]
                 smpoutuuid = smpoutd["action_uuid"]
                 smpoutact = [
-                    x for x in expacts if x["meta"]["action_uuid"] == smpoutuuid
+                    x for x in expacts if x["action_uuid"] == smpoutuuid
                 ][0]
                 smpoutts = smpoutact["action_timestamp"]
                 smpoutdates.append((smpoutglab, smpoutts, smpoutd))
