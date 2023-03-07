@@ -424,6 +424,7 @@ class ExpYml(HelaoYml):
             for smpind in fill_process["samples_in"]:
                 smpinglab = smpind["global_label"]
                 smpinuuid = smpind["action_uuid"]
+                print(smpinuuid)
                 smpinact = [
                     x for x in expacts if x["action_uuid"] == smpinuuid
                 ][0]
