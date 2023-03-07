@@ -413,6 +413,44 @@ class ExpYml(HelaoYml):
                     )
                     self.progress.write()
         fill_process["process_params"] = fill_process.pop("action_params")
+
+        # deduplicate samples_in by earliest action, samples_out by latest
+        expacts = [x for k, x in self.dict.items() if k.startswith("action--")]
+        if fill_process["samples_in"]:
+            smpindates = []
+            for smpind in fill_process["samples_in"]:
+                smpinglab = smpind["global_label"]
+                smpinuuid = smpind["sample_details"]["action_uuid"]
+                smpinact = [
+                    x for x in expacts if x["meta"]["action_uuid"] == smpinuuid
+                ][0]
+                smpints = smpinact["action_timestamp"]
+                smpindates.append((smpinglab, smpints, smpind))
+            usmpinlabs = {x[0] for x in smpindates}
+            usmpins = []
+            for glab in usmpinlabs:
+                smpin = min([x for x in smpindates if x[0] == glab], key=lambda y: y[1])
+                usmpins.append(smpin[2])
+            fill_process["samples_in"] = usmpins
+        if fill_process["samples_out"]:
+            smpoutdates = []
+            for smpoutd in fill_process["samples_in"]:
+                smpoutglab = smpoutd["global_label"]
+                smpoutuuid = smpoutd["sample_details"]["action_uuid"]
+                smpoutact = [
+                    x for x in expacts if x["meta"]["action_uuid"] == smpoutuuid
+                ][0]
+                smpoutts = smpoutact["action_timestamp"]
+                smpoutdates.append((smpoutglab, smpoutts, smpoutd))
+            usmpoutlabs = {x[0] for x in smpoutdates}
+            usmpouts = []
+            for glab in usmpoutlabs:
+                smpout = max(
+                    [x for x in smpoutdates if x[0] == glab], key=lambda y: y[1]
+                )
+                usmpouts.append(smpout[2])
+            fill_process["samples_out"] = usmpouts
+
         base_process.update(fill_process)
         meta_json = ProcessModel(**base_process).clean_dict()
         meta_json = wrap_sample_details(meta_json)
