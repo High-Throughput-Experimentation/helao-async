@@ -1321,20 +1321,20 @@ def ADSS_sub_refill_syringes(
 ):
     apm = ActionPlanMaker()
     if apm.pars.Solution_volume_ul !=0:
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "V3", "on": 1})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(SOLUTIONPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.Solution_volume_ul + 25})    
         apm.add(SOLUTIONPUMP_server, "infuse", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": 25})    
         apm.add(ORCH_server, "wait", {"waittime": 40})
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "V3", "on": 0})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
 
     if apm.pars.Waterclean_volume_ul !=0:
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "V2", "on": 1})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(WATERCLEANPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.Waterclean_volume_ul + 25})    
         apm.add(WATERCLEANPUMP_server, "infuse", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": 25})    
         apm.add(ORCH_server, "wait", {"waittime": 10})
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "V2", "on": 0})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 0})
     
     return apm.action_list
 

@@ -585,8 +585,10 @@ def ADSS_CA_NiSb_validation(
         #         "ResidualWait_s": ResidualWait_s,
         #     }
         # )
+        counter = 0
         for CA_potential_vs in CA_potentials_vs:
 
+            counter += 1   
             epm.add_experiment(
                 "ADSS_sub_cellfill_prefilled",
                 {
@@ -696,6 +698,12 @@ def ADSS_CA_NiSb_validation(
                 "ResidualWait_s": ResidualWait_s,
             }
         )
+        refill_volume = (flush_volume_ul + liquid_sample_volume_ul)*counter
+        epm.add_experiment("ADSS_sub_refill_syringes", {
+            "Waterclean_volume_ul": water_refill_volume ,
+            "Solution_volume_ul": refill_volume,
+            "Syringe_rate_ulsec": 300,
+        })
 
 #    epm.add_experiment("ADSS_sub_tray_unload",{})
 
