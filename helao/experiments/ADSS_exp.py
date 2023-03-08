@@ -1270,7 +1270,7 @@ def ADSS_sub_clean_cell(
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.ReturnLineWait_s})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
 
-    apm.add_action_list(ADSS_sub_drain_cell(DrainWait_s=apm.pars.DrainWait_s,ReturnLineReverseWait_s=apm.pars.ReturnLineReverseWait_s,ResidualWait_s=apm.pars.ResidualWait_s))
+    apm.add_action_list(ADSS_sub_drain_cell(experiment=experiment,DrainWait_s=apm.pars.DrainWait_s,ReturnLineReverseWait_s=apm.pars.ReturnLineReverseWait_s,ResidualWait_s=apm.pars.ResidualWait_s))
 
 
     apm.add(MOTOR_server, "z_move", {"z_position": "load"})
