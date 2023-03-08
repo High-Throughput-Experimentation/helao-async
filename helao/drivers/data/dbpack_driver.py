@@ -218,9 +218,15 @@ class HelaoYml:
 
     @property
     def time(self):
-        return datetime.strptime(
-            self.dict[f"{self.file_type}_timestamp"], "%Y-%m-%d %H:%M:%S.%f"
-        )
+        try:
+            parsed_time = datetime.strptime(
+                self.dict[f"{self.file_type}_timestamp"], "%Y-%m-%d %H:%M:%S.%f"
+            )
+        except ValueError:
+            parsed_time = datetime.strptime(
+                self.dict[f"{self.file_type}_timestamp"], "%Y-%m-%d %H:%M:%S"
+            )
+        return parsed_time
 
     @property
     def name(self):
