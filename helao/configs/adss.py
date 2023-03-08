@@ -9,7 +9,7 @@ config["simulation"] = False
 # action library provides generator functions which produce actions
 # lists from input experiment_id grouping
   
-config["builtin_ref_motorxy"] = [135, 20]  # absolute plate coords
+config["builtin_ref_motorxy"] = [-10, 10]  # absolute plate coords
 config["experiment_libraries"] = ["ADSS_exp", "samples_exp"]
 config["experiment_params"] = {
     "gamrychannelwait": -1,
