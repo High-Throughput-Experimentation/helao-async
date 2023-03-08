@@ -1,6 +1,6 @@
 hostip = "127.0.0.1"
 config = {}
-config["dummy"] = True
+config["dummy"] = False
 config["simulation"] = False
 
 # action library provides generator functions which produce actions
@@ -83,6 +83,13 @@ config["servers"] = {
                 "1B": "cDAQ1Mod1/port0/line1",
                 "7A": "cDAQ1Mod1/port0/line9",
                 "7B": "cDAQ1Mod1/port0/line10",
+                # "M4": ["cDAQ1Mod1/port0/line30"],
+                # "M5": ["cDAQ1Mod1/port0/line30","cDAQ1Mod1/port0/line28"],
+                # "M6": ["cDAQ1Mod1/port0/line30","cDAQ1Mod1/port0/line29"],
+                # "M7": ["cDAQ1Mod1/port0/line30","cDAQ1Mod1/port0/line29","cDAQ1Mod1/port0/line28"],
+            },
+            "dev_multivalve": {
+                "multi_CMD0": "cDAQ1Mod1/port0/line28",
                 "multi_CMD1": "cDAQ1Mod1/port0/line29",
                 "multi_CMD2": "cDAQ1Mod1/port0/line30",
                 "multi_CMD3": "cDAQ1Mod1/port0/line31",
@@ -96,7 +103,7 @@ config["servers"] = {
                 "6A-waste": "cDAQ1Mod1/port0/line7",
                 "6B": "cDAQ1Mod1/port0/line8",
                 "8": "cDAQ1Mod1/port0/line11",
-                "9": "cDAQ1Mod1/port0/line13",
+                "9": "cDAQ1Mod1/port0/line12",
             },
             "dev_pump": {
                 "RecirculatingPeriPump1": "cDAQ1Mod1/port0/line12",

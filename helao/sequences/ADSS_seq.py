@@ -677,21 +677,24 @@ def ADSS_CA_NiSb_validation(
             )
             epm.add_experiment("ADSS_sub_unload_liquid",{})
 
+        epm.add_experiment("ADSS_sub_unloadall_customs",{})
+
+
+        epm.add_experiment(
+            "ADSS_sub_move_to_clean_cell",
+            {}
+        )
+
         epm.add_experiment(
             "ADSS_sub_clean_cell",
             {
                 "Clean_volume_ul": clean_volume_ul,
                 "Syringe_rate_ulsec": Syringe_rate_ulsec,
                 "ReturnLineWait_s": ReturnLineWait_s,
-        }
-        )
-        epm.add_experiment(
-            "ADSS_sub_drain_cell",
-            {
                 "DrainWait_s": Cell_draintime_s,
                 "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
                 "ResidualWait_s": ResidualWait_s,
-            }
+        }
         )
 
 #    epm.add_experiment("ADSS_sub_tray_unload",{})
