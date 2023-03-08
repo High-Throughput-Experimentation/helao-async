@@ -699,6 +699,7 @@ def ADSS_CA_NiSb_validation(
             }
         )
         refill_volume = (flush_volume_ul + liquid_sample_volume_ul)*counter
+        water_refill_volume = 0
         epm.add_experiment("ADSS_sub_refill_syringes", {
             "Waterclean_volume_ul": water_refill_volume ,
             "Solution_volume_ul": refill_volume,
