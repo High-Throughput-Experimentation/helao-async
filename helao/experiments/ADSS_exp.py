@@ -27,6 +27,7 @@ __all__ = [
     "ADSS_sub_cellfill_flush",
     "ADSS_sub_drain_cell",
     #    "ADSS_sub_empty_cell",
+    "ADSS_sub_move_to_clean_cell",
     "ADSS_sub_clean_cell",
     "ADSS_sub_sample_aliquot",
     "ADSS_sub_recirculate",
@@ -1239,11 +1240,42 @@ def ADSS_sub_drain_cell(
 # need to move to clean spot first before beginning clean
 def ADSS_sub_clean_cell(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     Clean_volume_ul: float = 3000,
     Syringe_rate_ulsec: float = 300,
     PurgeWait_s: float = 3,
     ReturnLineWait_s: float = 30,
+    DrainWait_s: float = 60,
+    ReturnLineReverseWait_s: float = 5,
+    ResidualWait_s: float = 15,
+
+):
+    apm.add(
+        WATERCLEANPUMP_server,
+        "infuse",
+        {
+            "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+            "volume_uL": apm.pars.Clean_volume_ul,
+        },
+    )
+    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.PurgeWait_s})
+
+    apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
+    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.ReturnLineWait_s})
+    apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
+
+    apm.add_action_list(ADSS_sub_drain_cell(DrainWait_s=apm.pars.DrainWait_s,ReturnLineReverseWait_s=apm.pars.ReturnLineReverseWait_s,ResidualWait_s=apm.pars.ResidualWait_s))
+
+
+    apm.add(MOTOR_server, "z_move", {"z_position": "load"})
+
+    return apm.action_list
+
+def ADSS_sub_move_to_clean_cell(
+    experiment: Experiment,
+    experiment_version: int = 1,
 ):
     apm = ActionPlanMaker()
     apm.add(MOTOR_server, "z_move", {"z_position": "load"})
@@ -1273,18 +1305,8 @@ def ADSS_sub_clean_cell(
             "volume_uL": apm.pars.Clean_volume_ul,
         },
     )
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.PurgeWait_s})
-
-    apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
-    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.ReturnLineWait_s})
-    apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
-
-    apm.add(MOTOR_server, "z_move", {"z_position": "load"})
 
     return apm.action_list
-
 
 def ADSS_sub_sample_aliquot(
     experiment: Experiment,
@@ -1319,8 +1341,8 @@ def ADSS_sub_sample_aliquot(
             "spacingmethod": Spacingmethod.custom,
             "spacingfactor": 1.0,
             "timeoffset": 0.0,
-            "wash1": 0,
-            "wash2": 0,
+            "wash1": 1,
+            "wash2": 1,
             "wash3": 0,
             "wash4": 0,
         },
