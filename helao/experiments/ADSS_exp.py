@@ -1253,6 +1253,7 @@ def ADSS_sub_clean_cell(
     ResidualWait_s: float = 15,
 
 ):
+    apm = ActionPlanMaker()
     apm.add(
         WATERCLEANPUMP_server,
         "infuse",
