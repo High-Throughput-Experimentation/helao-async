@@ -1301,14 +1301,6 @@ def ADSS_sub_move_to_clean_cell(
     )
 
     apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
-    apm.add(
-        WATERCLEANPUMP_server,
-        "infuse",
-        {
-            "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-            "volume_uL": apm.pars.Clean_volume_ul,
-        },
-    )
 
     return apm.action_list
 
