@@ -865,6 +865,7 @@ def CCSI_sub_liquidfill_syringes(
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(IO_server, "acquire_analog_in", {"duration":apm.pars.co2measure_duration + 1,"acquisition_rate": apm.pars.co2measure_acqrate, })
     apm.add(
         CO2S_server,
         "acquire_co2",
@@ -880,6 +881,7 @@ def CCSI_sub_liquidfill_syringes(
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
+        asc.no_wait,
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
 #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
@@ -988,6 +990,7 @@ def CCSI_sub_clean_inject(
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(IO_server, "acquire_analog_in", {"duration":apm.pars.co2measure_duration + 1,"acquisition_rate": apm.pars.co2measure_acqrate, })
     apm.add(
         CO2S_server,
         "acquire_co2",
@@ -1000,6 +1003,7 @@ def CCSI_sub_clean_inject(
         process_contrib=[
             ProcessContrib.files,
         ],
+        asc.no_wait,
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
 #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
@@ -1019,7 +1023,8 @@ def CCSI_sub_clean_inject(
     #         },
     #     },
     # )
-    apm.add_action_list(CCSI_sub_drain_wcirc(experiment=experiment,HSpurge_duration=LiquidCleanPurge_duration))
+    apm.add_action_list(CCSI_sub_drain(experiment=experiment,HSpurge_duration=LiquidCleanPurge_duration))
+    #apm.add_action_list(CCSI_sub_drain_wcirc(experiment=experiment,HSpurge_duration=LiquidCleanPurge_duration))
 
     return apm.action_list
 
