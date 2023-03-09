@@ -873,6 +873,7 @@ def CCSI_sub_liquidfill_syringes(
             "duration": apm.pars.co2measure_duration,
             "acquisition_rate": apm.pars.co2measure_acqrate,
         },
+        asc.no_wait,
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="Recirculate_headspace",
         process_finish=True,
@@ -881,7 +882,6 @@ def CCSI_sub_liquidfill_syringes(
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
-        asc.no_wait,
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
 #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
@@ -998,12 +998,12 @@ def CCSI_sub_clean_inject(
             "duration": apm.pars.co2measure_duration,
             "acquisition_rate": apm.pars.co2measure_acqrate,
         },
+        asc.no_wait,
         technique_name="liquid_purge",
         process_finish=True,
         process_contrib=[
             ProcessContrib.files,
         ],
-        asc.no_wait,
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
 #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
