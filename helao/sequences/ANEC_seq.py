@@ -25,6 +25,7 @@ def ANEC_sample_ready(
     SampleRate: float = 0.01,
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
+    liquidDrain_time: float = 80.0,
 ):
     """Repeat CA and aliquot sampling at the cell1_we position.
 
@@ -94,7 +95,7 @@ def ANEC_sample_ready(
         )
 
 
-        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
     return epm.experiment_plan_list
 
@@ -117,6 +118,7 @@ def ANEC_series_CA(
     toolarchive: str = "LS 3",
     volume_ul_GC: int = 300,
     volume_ul_archive: int = 500,
+    liquidDrain_time: float = 80.0,
     wash1: bool = True,
     wash2: bool = True,
     wash3: bool = True,
@@ -195,7 +197,7 @@ def ANEC_series_CA(
             },
         )
 
-        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
     epm.add_experiment("ANEC_sub_alloff", {})
     
@@ -217,6 +219,7 @@ def ANEC_series_CAliquidOnly(
     ref_offset__V: float = 0.0,
     toolarchive: str = "LS 3",
     volume_ul_archive: int = 500,
+    liquidDrain_time: float = 80.0,
     wash1: bool = True,
     wash2: bool = True,
     wash3: bool = True,
@@ -293,7 +296,7 @@ def ANEC_series_CAliquidOnly(
             },
         )
 
-        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
     epm.add_experiment("ANEC_sub_alloff", {})
     
@@ -332,6 +335,7 @@ def ANEC_photo_CA(
     wash2: bool = True,
     wash3: bool = True,
     wash4: bool = False,
+    liquidDrain_time: float = 80.0,
 ):
     """Repeat CA and aliquot sampling at the cell1_we position.
 
@@ -417,7 +421,7 @@ def ANEC_photo_CA(
             },
         )
 
-        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
     if len(WE_potential__V)>1:
         epm.add_experiment("ANEC_sub_alloff", {})
     return epm.experiment_plan_list
@@ -452,6 +456,7 @@ def ANEC_photo_CV(
     toggleCA_illum_period: float = 1.0,
     toggleCA_dark_time_init: float = 0,
     toggleCA_illum_time: float = -1,
+    liquidDrain_time: float = 80.0,
 ):
     """Repeat CV at the cell1_we position.
 
@@ -524,7 +529,7 @@ def ANEC_photo_CV(
             },
         )
 
-        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
     return epm.experiment_plan_list
 
@@ -560,6 +565,7 @@ def ANEC_CA_pretreat(
     SampleRate: float = 0.01,
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
+    liquidDrain_time: float = 80.0,
 ):
     """Repeat CA and aliquot sampling at the cell1_we position.
 
@@ -619,7 +625,7 @@ def ANEC_CA_pretreat(
         )
 
 
-        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
     return epm.experiment_plan_list
 
@@ -647,6 +653,7 @@ def ANEC_repeat_CA(
     wash2: bool = True,
     wash3: bool = True,
     wash4: bool = False,
+    liquidDrain_time: float = 80.0,
 ):
     """Repeat CA and aliquot sampling at the cell1_we position.
 
@@ -720,7 +727,7 @@ def ANEC_repeat_CA(
             },
         )
 
-        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
     return epm.experiment_plan_list
 
@@ -741,6 +748,7 @@ def ANEC_gasonly_CA(
     ref_offset__V: float = 0.0,
     toolGC: str = "HS 2",
     volume_ul_GC: int = 300,
+    liquidDrain_time: float = 80.0,
 ):
     """Repeat CA and aliquot sampling at the cell1_we position.
 
@@ -808,7 +816,7 @@ def ANEC_gasonly_CA(
             },
         )
 
-        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
     return epm.experiment_plan_list
 
@@ -833,6 +841,7 @@ def ANEC_repeat_CV(
     SampleRate: float = 0.01,
     IErange: str = "auto",
     ref_offset: float = 0.0,
+    liquidDrain_time: float = 80.0,
 ):
     """Repeat CV at the cell1_we position.
 
@@ -894,7 +903,7 @@ def ANEC_repeat_CV(
             },
         )
 
-        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": 50.0})
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
     return epm.experiment_plan_list
 
