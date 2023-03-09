@@ -476,12 +476,12 @@ class AiMonExec(Executor):
         self.active.base.print_message("AiMonExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
+        self.active.base.print_message("AiMonExec init complete.")
 
     async def _poll(self):
         """Read analog inputs from live buffer."""
         data_dict = {}
         times = []
-        self.active.base.print_message("AiMonExec entering polling loop.")
         for ai_name in self.active.base.fastapp.driver.monitor_ai.keys():
             val, epoch_s = self.active.base.get_lbuf(ai_name)
             data_dict[ai_name] = val

@@ -1089,6 +1089,7 @@ class Active:
 
     def start_executor(self, executor: Executor):
         self.action_task = self.base.aloop.create_task(self.action_loop_task(executor))
+        self.base.print_message("Executor task started.")
         return self.action.as_dict()
 
     async def update_act_file(self):
