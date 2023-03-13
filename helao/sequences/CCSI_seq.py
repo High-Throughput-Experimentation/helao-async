@@ -406,6 +406,7 @@ def CCSI_newer_KOH_testing(  #assumes initialization performed previously
     HSpurge_duration: float = 15,
     DeltaDilute1_duration: float = 15,
     cleanloops: int = 2,
+    drainrecirc: bool = True,
 #    purge_co2measure_duration: float = 20,
 #    purge_co2threshhold: float = 95000,
     
@@ -475,7 +476,7 @@ def CCSI_newer_KOH_testing(  #assumes initialization performed previously
             "co2measure_duration": co2measure_duration,
             "co2measure_acqrate": co2measure_acqrate,
         })
-        epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration,"DeltaDilute1_duration": DeltaDilute1_duration,})
+        epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration,"DeltaDilute1_duration": DeltaDilute1_duration,"recirculation":drainrecirc,})
 
         for _ in range(cleanloops):
             epm.add_experiment("CCSI_sub_clean_inject", {

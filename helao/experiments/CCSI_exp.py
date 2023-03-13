@@ -469,10 +469,11 @@ def CCSI_sub_headspace_purge_and_measure(
 
 def CCSI_sub_drain(
     experiment: Experiment,
-    experiment_version: int =1,
+    experiment_version: int =2,
     HSpurge_duration: float = 20,  # set before determining actual
     DeltaDilute1_duration: float = 0,
     initialization: bool = False,
+    recirculation: bool = True
 ):
     # recirculation loop
 
@@ -495,8 +496,14 @@ def CCSI_sub_drain(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 1}, asc.no_wait)
+    if apm.pars.recirculation:
+        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 1}, asc.no_wait)
    #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
+    if apm.pars.recirculation:
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0})
+        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0}, asc.no_wait)
 
     if apm.pars.initialization:
         apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
@@ -891,7 +898,7 @@ def CCSI_sub_liquidfill_syringes(
 
 def CCSI_sub_clean_inject(
     experiment: Experiment,
-    experiment_version: int = 3,  #ver 2 implements multivalve, ver 3 conditional
+    experiment_version: int = 4,  #ver 2 implements multivalve, ver 3 conditional
     Waterclean_volume_ul: float = 5000,
     deadspace_volume_ul: float = 50,
     backlash_volume_ul: float = 50,
@@ -904,6 +911,7 @@ def CCSI_sub_clean_inject(
     purge_if: Union[str, float] = "below",
     max_purge_iters: int = 5,
     LiquidCleanPurge_duration: float = 60,  # set before determining actual
+    drainrecirc: bool = True,
 ):
     # drain
     # only 1B 6A-waste opened 1A closed pump off//differ from delta purge
@@ -1023,8 +1031,7 @@ def CCSI_sub_clean_inject(
     #         },
     #     },
     # )
-    apm.add_action_list(CCSI_sub_drain(experiment=experiment,HSpurge_duration=LiquidCleanPurge_duration))
-    #apm.add_action_list(CCSI_sub_drain_wcirc(experiment=experiment,HSpurge_duration=LiquidCleanPurge_duration))
+    apm.add_action_list(CCSI_sub_drain(experiment=experiment,HSpurge_duration=apm.pars.LiquidCleanPurge_duration,recirculaton=apm.pars.drainrecirc))
 
     return apm.action_list
 
