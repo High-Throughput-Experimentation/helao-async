@@ -247,7 +247,7 @@ def ANEC_sub_flush_fill_cell(
     liquid_flush_time: Optional[float] = 80,
     co2_purge_time: Optional[float] = 15,
     equilibration_time: Optional[float] = 1.0,
-    reservoir_liquid_sample_no: Optional[int] = 1,
+    reservoir_liquid_sample_no: Optional[int] = 1511,
     volume_ul_cell_liquid: Optional[int] = 1000,
 ):
     """Add liquid volume to cell position.
@@ -340,7 +340,7 @@ def ANEC_sub_drain_cell(
 def ANEC_sub_cleanup(
     experiment: Experiment,
     experiment_version: int = 1,
-    reservoir_liquid_sample_no: Optional[int] = 1,
+    reservoir_liquid_sample_no: Optional[int] = 1511,
 ):
     """Flush and purge ANEC cell.
 
@@ -440,7 +440,7 @@ def ANEC_sub_load_solid_and_clean_cell(
     experiment_version: int = 1,
     solid_plate_id: Optional[int] = 1,
     solid_sample_no: Optional[int] = 1,
-    reservoir_liquid_sample_no: Optional[int] = 1,
+    reservoir_liquid_sample_no: Optional[int] = 1511,
     recirculation_time: Optional[float] = 60,
     toolGC: Optional[str] = "HS 2",
     volume_ul_GC: Optional[int] = 300,
