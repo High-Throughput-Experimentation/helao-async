@@ -324,8 +324,8 @@ def ANEC_sub_unload_liquid(
 
 def ANEC_sub_drain_cell(
     experiment: Experiment,
-    experiment_version: int = 2,
-    drain_time: Optional[float] = 50.0,
+    experiment_version: int = 3,
+    drain_time: Optional[float] = 70.0,
 ):
     """Drain liquid from cell and unload liquid sample."""
 
