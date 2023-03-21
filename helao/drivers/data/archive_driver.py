@@ -25,7 +25,7 @@ from enum import Enum
 import json
 
 
-from helao.servers.base import Base
+from helao.servers.base import Base, Active
 from helaocore.error import ErrorCodes
 
 from helaocore.models.sample import (
@@ -74,7 +74,6 @@ class ScanOperator(str, Enum):
 
 class Archive:
     def __init__(self, action_serv: Base):
-
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
@@ -83,9 +82,9 @@ class Archive:
         asyncio.gather(self.unified_db.init_db())
 
         self.position_config = self.config_dict.get("positions", None)
-        self.archivepck = None
+        self.archivejson = None
         if self.base.helaodirs.states_root is not None:
-            self.archivepck = os.path.join(
+            self.archivejson = os.path.join(
                 self.base.helaodirs.states_root,
                 f"{gethostname()}_{self.base.server.server_name}_archive.json",
             )
@@ -103,7 +102,7 @@ class Archive:
             self.positions = self.load_config()
         except IOError:
             self.base.print_message(
-                f"'{self.archivepck}' does not exist, writing empty global dict.",
+                f"'{self.archivejson}' does not exist, writing empty global dict.",
                 error=True,
             )
             self.write_config()
@@ -157,7 +156,6 @@ class Archive:
         if len(self.positions.customs_dict) == len(self.startup_positions.customs_dict):
             for key, val in self.positions.customs_dict.items():
                 if key not in self.startup_positions.customs_dict:
-
                     failed = True
                     break
                 else:
@@ -249,17 +247,17 @@ class Archive:
         return positions  # trays_dict, custom_positions
 
     def load_config(self):
-        if self.archivepck is not None:
-            with open(self.archivepck, "r") as f:
+        if self.archivejson is not None:
+            with open(self.archivejson, "r") as f:
                 try:
-                    data = json.loads(f.readline())
+                    data = json.load(f)
                     return Positions(**data)
                 except Exception as e:
                     tb = "".join(
                         traceback.format_exception(type(e), e, e.__traceback__)
                     )
                     self.base.print_message(
-                        f"error loading {self.archivepck}: {repr(e), tb,}", error=True
+                        f"error loading {self.archivejson}: {repr(e), tb,}", error=True
                     )
                     return Positions()
         #         data = pickle.load(f)
@@ -270,12 +268,12 @@ class Archive:
         # self.positions.customs_dict = {}
 
     def write_config(self):
-        if self.archivepck is not None:
-            with open(self.archivepck, "w") as f:
-                f.write(json.dumps(self.positions.json_dict()))
-        # if self.archivepck is not None:
+        if self.archivejson is not None:
+            with open(self.archivejson, "w") as f:
+                json.dump(self.positions.json_dict(), f)
+        # if self.archivejson is not None:
         #     data = {"customs":self.positions.customs_dict, "trays":self.positions.trays_dict}
-        #     with open(self.archivepck, "wb") as f:
+        #     with open(self.archivejson, "wb") as f:
         #         pickle.dump(data, f)
 
     async def update_samples_from_db(self):
@@ -341,7 +339,7 @@ class Archive:
         error = ErrorCodes.not_available
 
         if load_sample_in is None:
-            return False, NoneSample(),{}
+            return False, NoneSample(), {}
 
         # check if sample actually exists
         load_samples_in = await self.unified_db.get_samples(
@@ -505,57 +503,52 @@ class Archive:
         self,
         tray: int = None,
         slot: int = None,
-        myactive=None,
+        myactive: Active = None,
         survey_runs: int = None,
         main_runs: int = None,
         rack: int = None,
         dilution_factor: float = None,
     ):
-
         self.write_config()  # save backup
+
+        trayobj = self.positions.trays_dict.get(tray, {})
         tmp_output_str = ""
+        samplelist = []
 
-        if tray in self.positions.trays_dict:
-            if self.positions.trays_dict[tray] is not None:
-                if slot in self.positions.trays_dict[tray]:
-                    if self.positions.trays_dict[tray][slot] is not None:
-                        for i, vial in enumerate(
-                            self.positions.trays_dict[tray][slot].vials
-                        ):
-                            if tmp_output_str != "":
-                                tmp_output_str += "\n"
-                            if (
-                                vial is True
-                                and self.positions.trays_dict[tray][slot].samples[i]
-                                != NoneSample()
-                            ):
+        if slot in trayobj.keys():
+            slotobj = trayobj[slot]
+            vials = slotobj.vials
 
-                                if dilution_factor is None:
-                                    temp_dilution_factor = (
-                                        self.positions.trays_dict[tray][slot]
-                                        .samples[i]
-                                        .get_dilution_factor()
-                                    )
-                                tmp_output_str += ";".join(
-                                    [
-                                        str(
-                                            self.positions.trays_dict[tray][slot]
-                                            .samples[i]
-                                            .get_global_label()
-                                        ),
-                                        str(survey_runs),
-                                        str(main_runs),
-                                        str(rack),
-                                        str(i + 1),
-                                        str(temp_dilution_factor),
-                                    ]
-                                )
+            sampletups = [
+                (i, slotobj.samples[i])
+                for i, v in enumerate(vials)
+                if v and slotobj.samples[i] != NoneSample()
+            ]
+            tmp_output_str = "\n".join(
+                [
+                    ";".join(
+                        [
+                            f"{x}"
+                            for x in [
+                                v.get_global_label(),
+                                survey_runs,
+                                main_runs,
+                                rack,
+                                i + 1,
+                                dilution_factor
+                                if dilution_factor is not None
+                                else v.get_dilution_factor(),
+                            ]
+                        ]
+                    )
+                    for i, v in sampletups
+                ]
+            )
 
-        await myactive.write_file(
-            file_type="pal_icpms_file",
-            filename=f"VialTable__tray{tray}__slot{slot}__{datetime.now().strftime('%Y%m%d-%H%M%S%f')}_ICPMS.csv",
-            output_str=tmp_output_str,
-            header=";".join(
+            samplelist = [v for _, v in sampletups]
+            self.base.print_message(f"Found {len(samplelist)} vials on tray {tray}, slot {slot}. Exporting csv.")
+
+            headerline = ";".join(
                 [
                     "global_sample_label",
                     "Survey Runs",
@@ -564,9 +557,18 @@ class Archive:
                     "Vial",
                     "Dilution Factor",
                 ]
-            ),
-            sample_str=None,
-        )
+            )
+            csv_filename = f"VialTable__tray{tray}__slot{slot}__{datetime.now().strftime('%Y%m%d-%H%M%S%f')}_ICPMS.csv"
+            csv_dir = os.path.join(self.base.helaodirs.save_root.__str__(), myactive.action.get_action_dir())
+            csv_path = os.path.join(csv_dir, csv_filename)
+            with open(csv_path, "w") as f:
+                f.write("\n".join([headerline, tmp_output_str]))
+
+            await myactive.track_file(
+                file_type="pal_icpms_file", file_path=csv_path, samples=samplelist
+            )
+        else:
+            self.base.print_message(f"Slot {slot} not found in positions dict. Cannot export.")
 
     async def tray_query_sample(
         self, tray: int = None, slot: int = None, vial: int = None
@@ -594,7 +596,8 @@ class Archive:
     async def tray_new_position(self, req_vol: float = 2.0, *args, **kwargs):
         """Returns an empty vial position for given max volume.
         For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.
-        It will select the first empty vial which has the smallest volume that still can hold req_vol"""
+        It will select the first empty vial which has the smallest volume that still can hold req_vol
+        """
 
         await asyncio.sleep(0.001)
         lock = asyncio.Lock()
@@ -637,7 +640,6 @@ class Archive:
     async def tray_get_next_full(
         self, after_tray: int = None, after_slot: int = None, after_vial: int = None
     ):
-
         """Finds the next full vial after the current vial position
         defined in micropal."""
         if after_tray is None:
@@ -784,7 +786,6 @@ class Archive:
         *args,
         **kwargs,
     ) -> Tuple[bool, SampleUnion]:
-
         if sample is None:
             return False, NoneSample()
 
@@ -980,7 +981,6 @@ class Archive:
         destroy_gas: bool = False,
         destroy_solid: bool = False,
     ) -> Tuple[List[SampleUnion], List[SampleUnion]]:
-
         # update samlpes with most recent info from db
         for sample in samples:
             sample = await self.update_samples_from_db_helper(sample=sample)
@@ -1022,13 +1022,12 @@ class Archive:
     async def custom_load(
         self, custom: str = None, load_sample_in: SampleUnion = None, *args, **kwargs
     ):
-
         sample = NoneSample()
         loaded = False
         customs_dict = {}
 
         if load_sample_in is None:
-            return False, NoneSample(),{}
+            return False, NoneSample(), {}
 
         # check if sample actually exists
         load_samples_in = await self.unified_db.get_samples(
@@ -1037,7 +1036,7 @@ class Archive:
 
         if not load_samples_in:
             print_message({}, "archive", "Sample does not exist in DB.", error=True)
-            return False, NoneSample(),{}
+            return False, NoneSample(), {}
 
         if custom in self.positions.customs_dict:
             loaded, sample = self.positions.customs_dict[custom].load(
