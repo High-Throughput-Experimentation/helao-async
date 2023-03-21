@@ -90,6 +90,7 @@ class _BaseSampleAPI:
         self.ready = False
 
     async def _open_db(self):
+        """Opens sqlite db file, retries if in use, and assigns connection & cursor."""
         while file_in_use(self._db):
             self._base.print_message("db already in use, waiting", info=True)
             await asyncio.sleep(1)
@@ -97,6 +98,7 @@ class _BaseSampleAPI:
         self._cur = self._con.cursor()
 
     def _close_db(self):
+        """Commits changes to sqlite db and closes connection and cursor."""
         if self._con is not None:
             # commit any changes
             self._con.commit()
