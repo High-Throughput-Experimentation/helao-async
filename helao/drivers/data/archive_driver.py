@@ -559,7 +559,7 @@ class Archive:
                 ]
             )
             csv_filename = f"VialTable__tray{tray}__slot{slot}__{datetime.now().strftime('%Y%m%d-%H%M%S%f')}_ICPMS.csv"
-            csv_dir = myactive.action.get_action_dir()
+            csv_dir = os.path.join(self.base.helaodirs.save_root.__str__(), myactive.action.get_action_dir())
             csv_path = os.path.join(csv_dir, csv_filename)
             with open(csv_path, "w") as f:
                 f.write("\n".join([headerline, tmp_output_str]))
