@@ -513,38 +513,42 @@ class Archive:
 
         trayobj = self.positions.trays_dict.get(tray, {})
         tmp_output_str = ""
-        
+        samplelist = []
+
         if slot in trayobj.keys():
             slotobj = trayobj[slot]
             vials = slotobj.vials
 
+            sampletups = [
+                (i, slotobj.samples[i])
+                for i, v in enumerate(vials)
+                if v and slotobj.samples[i] != NoneSample()
+            ]
             tmp_output_str = "\n".join(
                 [
                     ";".join(
                         [
                             f"{x}"
                             for x in [
-                                slotobj.samples[i].get_global_label(),
+                                v.get_global_label(),
                                 survey_runs,
                                 main_runs,
                                 rack,
                                 i + 1,
                                 dilution_factor
                                 if dilution_factor is not None
-                                else slotobj.samples[i].get_dilution_factor(),
+                                else v.get_dilution_factor(),
                             ]
                         ]
                     )
-                    for i, vial in enumerate(vials)
-                    if vial and slotobj.samples[i] != NoneSample()
+                    for i, v in sampletups
                 ]
             )
 
-        await myactive.write_file(
-            file_type="pal_icpms_file",
-            filename=f"VialTable__tray{tray}__slot{slot}__{datetime.now().strftime('%Y%m%d-%H%M%S%f')}_ICPMS.csv",
-            output_str=tmp_output_str,
-            header=";".join(
+            samplelist = [v for _, v in sampletups]
+            self.base.print_message(f"Found {len(samplelist)} vials on tray {tray}, slot {slot}. Exporting csv.")
+
+            headerline = ";".join(
                 [
                     "global_sample_label",
                     "Survey Runs",
@@ -553,9 +557,18 @@ class Archive:
                     "Vial",
                     "Dilution Factor",
                 ]
-            ),
-            sample_str=None,
-        )
+            )
+            csv_filename = f"VialTable__tray{tray}__slot{slot}__{datetime.now().strftime('%Y%m%d-%H%M%S%f')}_ICPMS.csv"
+            csv_dir = myactive.action.get_action_dir()
+            csv_path = os.path.join(csv_dir, csv_filename)
+            with open(csv_path, "w") as f:
+                f.write("\n".join([headerline, tmp_output_str]))
+
+            await myactive.track_file(
+                file_type="pal_icpms_file", file_path=csv_path, samples=samplelist
+            )
+        else:
+            self.base.print_message(f"Slot {slot} not found in positions dict. Cannot export.")
 
     async def tray_query_sample(
         self, tray: int = None, slot: int = None, vial: int = None
