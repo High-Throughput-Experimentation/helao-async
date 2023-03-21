@@ -707,9 +707,9 @@ def makeApp(confPrefix, server_key, helao_root):
             action_abbr="traytoicpms",
         )
         await app.driver.archive.tray_export_icpms(
-            myactive=active,
             tray=active.action.action_params.get("tray", None),
             slot=active.action.action_params.get("slot", None),
+            myactive=active,
             survey_runs=active.action.action_params.get("survey_runs", None),
             main_runs=active.action.action_params.get("main_runs", None),
             rack=active.action.action_params.get("rack", None),
