@@ -618,6 +618,10 @@ def ADSS_CA_NiSb_validation(
                 {
                     "Tval__s": OCV_duration,
                     "SampleRate": 0.05,
+                    "ph": ph,
+                    "ref_type": ref_type,
+                    "ref_offset__V": ref_offset__V,
+
                 },
             )
             epm.add_experiment(

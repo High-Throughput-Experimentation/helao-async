@@ -652,6 +652,7 @@ def ADSS_sub_CA(
         else:
             waitcond = ActionStartCondition.wait_for_all
 
+        washmod = 0
         for interval in intervals:
             apm.add(ORCH_server, "wait", {"waittime": interval - vwait}, waitcond)
             apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0},ActionStartCondition.wait_for_orch)
@@ -666,10 +667,10 @@ def ADSS_sub_CA(
                     "spacingmethod": Spacingmethod.linear,
                     "spacingfactor": 1.0,
                     "timeoffset": 0.0,
-                    "wash1": 1,
-                    "wash2": 1,
-                    "wash3": 0,
-                    "wash4": 0,
+                    "wash1": washmod % 2,
+                    "wash2": washmod % 2,
+                    "wash3": (washmod + 1) % 2,
+                    "wash4": (washmod + 1) % 2,
                 },
                 start_condition=ActionStartCondition.no_wait,
                 technique_name="liquid_product_archive",
@@ -683,8 +684,10 @@ def ADSS_sub_CA(
                 ],
             )
             vwait = 65
+            washmod += 1
             apm.add(ORCH_server, "wait", {"waittime": vwait}, waitcond)
             apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1},ActionStartCondition.wait_for_orch)
+
 
     return apm.action_list  # returns complete action list to orch
 
@@ -830,6 +833,9 @@ def ADSS_sub_OCV(
     experiment_version: int = 3,
     Tval__s: Optional[float] = 60.0,
     gamry_i_range: Optional[str] = "auto",
+    ph: Optional[float] = 9.53,
+    ref_type: Optional[str] = "inhouse",
+    ref_offset__V: Optional[float] = 0.0,
     aliquot_volume_ul: Optional[int] = 200,
     aliquot_times_sec: Optional[List[float]] = [],
     aliquot_insitu: Optional[bool] = False,
