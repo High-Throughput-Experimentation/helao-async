@@ -709,16 +709,16 @@ def CCSI_sub_initialization_firstpart(
 
 def CCSI_sub_liquidfill_syringes(
     experiment: Experiment,
-    experiment_version: int = 9, #ver 6to7 implements multivalve
+    experiment_version: int = 10, #ver 6to7 implements multivalve
     Solution_description: str = "KOH",
     Solution_reservoir_sample_no: int = 2,
     Solution_volume_ul: float = 500,
     Waterclean_reservoir_sample_no: int = 1,
     Waterclean_volume_ul: float = 2500,
-    Syringe_retraction_ul: float = 150,
+    #Syringe_retraction_ul: float = 150,
     Syringe_rate_ulsec: float = 300,
-    deadspace_volume_ul: float = 50,
-    backlash_volume_ul: float = 50,
+    #deadspace_volume_ul: float = 50,
+    #backlash_volume_ul: float = 50,
     LiquidFillWait_s: float = 15,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.5,
@@ -761,7 +761,7 @@ def CCSI_sub_liquidfill_syringes(
             "infuse",
             {
                 "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-                "volume_uL": apm.pars.Solution_volume_ul + apm.pars.deadspace_volume_ul,
+                "volume_uL": apm.pars.Solution_volume_ul,
             },
             
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
@@ -795,7 +795,7 @@ def CCSI_sub_liquidfill_syringes(
             "infuse",
             {
                 "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-                "volume_uL": apm.pars.Waterclean_volume_ul + apm.pars.deadspace_volume_ul,
+                "volume_uL": apm.pars.Waterclean_volume_ul,
             },
             
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
@@ -898,12 +898,12 @@ def CCSI_sub_liquidfill_syringes(
 
 def CCSI_sub_clean_inject(
     experiment: Experiment,
-    experiment_version: int = 4,  #ver 2 implements multivalve, ver 3 conditional
+    experiment_version: int = 5,  #ver 2 implements multivalve, ver 3 conditional
     Waterclean_volume_ul: float = 5000,
-    deadspace_volume_ul: float = 50,
-    backlash_volume_ul: float = 50,
+    #deadspace_volume_ul: float = 50,
+    #backlash_volume_ul: float = 50,
     Syringe_rate_ulsec: float = 500,
-    Syringe_retraction_ul: float = 150,
+    #Syringe_retraction_ul: float = 150,
     LiquidCleanWait_s: float = 15,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.1,
@@ -956,7 +956,7 @@ def CCSI_sub_clean_inject(
         "infuse",
         {
             "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-            "volume_uL": apm.pars.Waterclean_volume_ul + apm.pars.deadspace_volume_ul,
+            "volume_uL": apm.pars.Waterclean_volume_ul,
         },
     )
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
@@ -1037,12 +1037,12 @@ def CCSI_sub_clean_inject(
 
 def CCSI_sub_clean_inject_withcheck(
     experiment: Experiment,
-    experiment_version: int = 3,  #ver 2 implements multivalve, ver 3 conditional
+    experiment_version: int = 4,  #ver 2 implements multivalve, ver 3 conditional
     Waterclean_volume_ul: float = 5000,
-    deadspace_volume_ul: float = 50,
-    backlash_volume_ul: float = 50,
+    #deadspace_volume_ul: float = 50,
+    #backlash_volume_ul: float = 50,
     Syringe_rate_ulsec: float = 500,
-    Syringe_retraction_ul: float = 150,
+    #Syringe_retraction_ul: float = 150,
     LiquidCleanWait_s: float = 15,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.1,
@@ -1094,8 +1094,8 @@ def CCSI_sub_clean_inject_withcheck(
         "infuse",
         {
             "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-            "volume_uL": apm.pars.Waterclean_volume_ul + apm.pars.deadspace_volume_ul,
-        },
+            "volume_uL": apm.pars.Waterclean_volume_ul,
+            }
     )
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
