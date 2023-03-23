@@ -184,7 +184,7 @@ class HelaoOrch(HelaoFastAPI):
                 f"'{self.orch.server.server_name.upper()}' "
                 f"got nonblocking status from "
                 f"'{actionmodel.action_server.server_name}': "
-                f"exid: {actionmodel.exid} -- status: {actionmodel.action_status}"
+                f"exec_id: {actionmodel.exec_id} -- status: {actionmodel.action_status}"
             )
             result_dict = self.orch.update_nonblocking(actionmodel)
             return result_dict
@@ -344,8 +344,8 @@ class HelaoOrch(HelaoFastAPI):
         ):
             """Stop sleep action."""
             active = await self.orch.setup_and_contain_action()
-            for exid, executor in self.orch.executors.items():
-                if exid.split()[0] == "wait":
+            for exec_id, executor in self.orch.executors.items():
+                if exec_id.split()[0] == "wait":
                     await executor.stop_action_task()
             finished_action = await active.finish()
             return finished_action.as_dict()
@@ -598,23 +598,23 @@ class Orch(Base):
         """Update method for action server to push non-blocking action ids."""
         print(actionmodel.clean_dict())
         server_key = actionmodel.action_server.server_name
-        server_exid = (server_key, actionmodel.exid)
+        server_exec_id = (server_key, actionmodel.exec_id)
         if "active" in actionmodel.action_status:
-            self.nonblocking.append(server_exid)
+            self.nonblocking.append(server_exec_id)
         else:
-            self.nonblocking.remove(server_exid)
+            self.nonblocking.remove(server_exec_id)
         return {"success": True}
 
     async def clear_nonblocking(self):
         """Clear method for orch to purge non-blocking action ids."""
         resp_tups = []
-        for server_key, exid in self.nonblocking:
-            print(server_key, exid)
+        for server_key, exec_id in self.nonblocking:
+            print(server_key, exec_id)
             response, error_code = await async_private_dispatcher(
                 world_config_dict=self.world_cfg,
                 server=server_key,
                 private_action="stop_executor",
-                params_dict={"executor_id": exid},
+                params_dict={"executor_id": exec_id},
                 json_dict={},
             )
             resp_tups.append((response, error_code))
