@@ -664,7 +664,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
             #  "HSpurge_duration": LiquidCleanPurge_duration,
         })
 
-    refill_volume = drainclean_volume_ul*(init)
+    refill_volume = drainclean_volume_ul*(initcleans)
     epm.add_experiment("CCSI_sub_refill_clean", {
         "Waterclean_volume_ul": refill_volume ,
         # "deadspace_volume_ul": deadspace_volume_ul,
