@@ -52,8 +52,8 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         """Stop running CO2 acquisition."""
         active = await app.base.setup_and_contain_action()
-        for exid, executor in app.base.executors.items():
-            if exid.split()[0] == "acquire_co2":
+        for exec_id, executor in app.base.executors.items():
+            if exec_id.split()[0] == "acquire_co2":
                 executor.stop_action_task()
         finished_action = await active.finish()
         return finished_action.as_dict()

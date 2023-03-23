@@ -204,16 +204,16 @@ class Executor:
         active,
         poll_rate: float = 0.2,
         oneoff: bool = True,
-        exid: Optional[str] = None,
+        exec_id: Optional[str] = None,
     ):
         self.active = active
         self.oneoff = oneoff
         self.poll_rate = poll_rate
-        if exid is None:
-            self.exid = f"{active.action.action_name} {active.action.action_uuid}"
+        if exec_id is None:
+            self.exec_id = f"{active.action.action_name} {active.action.action_uuid}"
         else:
-            self.exid = exid
-        self.active.action.exid = self.exid
+            self.exec_id = exec_id
+        self.active.action.exec_id = self.exec_id
 
     async def _pre_exec(self):
         "Setup methods, return error state."
@@ -1975,7 +1975,7 @@ class Active:
             return await self.finish()
 
         # shortcut to active exectuors
-        self.base.executors[executor.exid] = self
+        self.base.executors[executor.exec_id] = self
 
         # action operations
         result = await executor._exec()
@@ -2030,7 +2030,7 @@ class Active:
         if cleanup_error != ErrorCodes.none:
             self.base.print_message("Error encountered during executor cleanup.")
 
-        _ = self.base.executors.pop(executor.exid)
+        _ = self.base.executors.pop(executor.exec_id)
         await self.finish()
         if self.action.nonblocking:
             await self.send_nonblocking_status()
