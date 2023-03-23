@@ -571,6 +571,7 @@ def ADSS_sub_CA(
     aliquot_times_sec: Optional[List[float]] = [],
     aliquot_insitu: Optional[bool] = True,
     PAL_Injector: Optional[str] = "LS 4",
+    PAL_Injector_id: Optional[str] = "fill serial number here"
 ):
     """Primary CA experiment with optional PAL sampling.
 
@@ -1343,6 +1344,7 @@ def ADSS_sub_sample_aliquot(
     aliquot_volume_ul: Optional[int] = 200,
     EquilibrationTime_s: float = 30,
     PAL_Injector: str = "LS 4",
+    PAL_Injector_id: str = "fill serial number here"
 ):
     apm = ActionPlanMaker()
     apm.add(

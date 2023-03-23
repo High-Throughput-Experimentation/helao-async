@@ -548,6 +548,7 @@ def ADSS_CA_NiSb_validation(
     flush_volume_ul: float = 2000,
     clean_volume_ul: float = 5000,
     PAL_Injector: str = "LS 4"
+    PAL_Injector_id: str = "fill serial number here"
 ):
 
     """tbd
@@ -630,6 +631,7 @@ def ADSS_CA_NiSb_validation(
                     "EquilibrationTime_s": EquilibrationTime_s,
                     "aliquot_volume_ul": aliquot_volume_ul,
                     "PAL_Injector": PAL_Injector,
+                    "PAL_Injector_id": PAL_Injector_id,
                 }
             )
 
@@ -646,6 +648,8 @@ def ADSS_CA_NiSb_validation(
                     "aliquot_volume_ul": aliquot_volume_ul,
                     "aliquot_times_sec": aliquot_times_sec,
                     "aliquot_insitu": True,
+                    "PAL_Injector": PAL_Injector,
+                    "PAL_Injector_id": PAL_Injector_id,
                 },
             )
             epm.add_experiment(
@@ -654,7 +658,8 @@ def ADSS_CA_NiSb_validation(
                     "EquilibrationTime_s": EquilibrationTime_s,
                     "aliquot_volume_ul": aliquot_volume_ul,
                     "PAL_Injector": PAL_Injector,
-                }
+                    "PAL_Injector_id": PAL_Injector_id,
+            }
             )
 
             epm.add_experiment(
