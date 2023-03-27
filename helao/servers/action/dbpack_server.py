@@ -30,6 +30,14 @@ def makeApp(confPrefix, server_key, helao_root):
         await app.driver.enqueue_yml(yml_path)
         return yml_path
 
+    @app.post("/running", tags=["private"])
+    async def running():
+        return list(app.driver.running_tasks.keys())
+    
+    @app.post("/n_queue", tags=["private"])
+    async def n_queue():
+        return len(app.driver.task_queue)
+    
     # @app.post("/finish_pending", tags=["private"])
     # async def finish_pending():
     #     pending_dict = await app.driver.finish_pending()
