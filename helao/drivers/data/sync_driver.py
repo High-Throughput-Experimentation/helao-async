@@ -368,6 +368,7 @@ class HelaoSyncer:
         self.api_host = self.config_dict["api_host"]
 
         self.progress = {}
+        self.sequence_objs = {}
         self.task_queue = asyncio.PriorityQueue()
         self.running_tasks = {}
         # push happens via async task queue
@@ -421,15 +422,17 @@ class HelaoSyncer:
                                 error=True,
                             )
 
+    def clear_task(self, )
+
     async def syncer(self):
         """Syncer loop coroutine which consumes the task queue."""
         while True:
             if len(self.running_tasks) < MAX_TASKS:
                 _, yml_target = await self.task_queue.get()
                 if yml_target.name not in self.running_tasks:
-                    task = asyncio.create_task(self.sync_yml(yml_target))
-                    self.running_tasks[yml_target.name] = task
-                    task.add_done_callback(self.running_tasks.pop(yml_target.name))
+                    self.running_tasks[yml_target.name] = asyncio.create_task(
+                        self.sync_yml(yml_target)
+                    )
                 else:
                     print_message(f"{yml_target} sync is already in progress.")
             else:
@@ -572,7 +575,6 @@ class HelaoSyncer:
                 yml = prog.yml
                 prog.dict["yml"] = str(yml_success)
                 prog.write_dict()
-                self.progress.pop(yml_path.name)
 
                 # cleanup
                 self.base.print_message(f"cleaning up {str(yml.target)}")
@@ -581,6 +583,11 @@ class HelaoSyncer:
                     self.base.print_message("Could not clean directory after moving.")
                     self.base.print_message(clean_success)
 
+            # pop children from progress dict
+            if yml.type in ["experiment", "sequence"]:
+                for x in yml.children:
+                    self.progress.pop(x.name)
+            
             if yml.type == "sequence":
                 zip_target = yml.target.parent.parent.joinpath(
                     f"{yml.target.parent.name}.zip"
@@ -597,11 +604,8 @@ class HelaoSyncer:
             if meta.get("process_finish", False):
                 await self.sync_process(exp_prog)
 
-        if not prog.api_done:
-            api_success = False
-            if api_success:
-                prog.dict["api"] = True
-                prog.write_dict()
+        self.running_tasks.pop(yml.target.name)
+        self.progress.pop(yml.target.name)
 
         return_dict = {k: d for k, d in prog.dict.items() if k != "process_metas"}
         return return_dict
