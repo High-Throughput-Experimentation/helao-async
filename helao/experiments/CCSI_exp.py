@@ -1015,22 +1015,30 @@ def CCSI_sub_clean_inject(
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
 #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
+    apm.add(
+        CO2S_server,
+        "acquire_co2",
+        {
+            "duration": 1.5,
+            "acquisition_rate": 0.5,
+        },
+    )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
-    # apm.add(
-    #     CALC_server,
-    #     "check_co2_purge",
-    #     {
-    #         "co2_ppm_thresh": apm.pars.co2_ppm_thresh,
-    #         "purge_if": apm.pars.purge_if,
-    #         "repeat_experiment_name": "CCSI_sub_clean_inject",
-    #         "repeat_experiment_params": {
-    #             k: v
-    #             for k, v in vars(apm.pars).items()
-    #             if not k.startswith("experiment")
-    #         },
-    #     },
-    # )
+    apm.add(
+        CALC_server,
+        "check_co2_purge",
+        {
+            "co2_ppm_thresh": apm.pars.co2_ppm_thresh,
+            "purge_if": apm.pars.purge_if,
+            "repeat_experiment_name": "CCSI_sub_clean_inject",
+            "repeat_experiment_params": {
+                k: v
+                for k, v in vars(apm.pars).items()
+                if not k.startswith("experiment")
+            },
+        },
+    )
     apm.add_action_list(CCSI_sub_drain(experiment=experiment,HSpurge_duration=apm.pars.LiquidCleanPurge_duration,recirculation=apm.pars.drainrecirc))
 
     return apm.action_list
