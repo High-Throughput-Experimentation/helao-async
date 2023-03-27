@@ -1050,6 +1050,7 @@ def CCSI_sub_clean_inject_withcheck(
     purge_if: Union[str, float] = "below",
     max_purge_iters: int = 5,
     LiquidCleanPurge_duration: float = 60,  # set before determining actual
+    drainrecirc: bool = True,
 ):
     # drain
     # only 1B 6A-waste opened 1A closed pump off//differ from delta purge
@@ -1136,6 +1137,7 @@ def CCSI_sub_clean_inject_withcheck(
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(IO_server, "acquire_analog_in", {"duration":apm.pars.co2measure_duration + 1,"acquisition_rate": apm.pars.co2measure_acqrate, })
     apm.add(
         CO2S_server,
         "acquire_co2",
@@ -1143,6 +1145,7 @@ def CCSI_sub_clean_inject_withcheck(
             "duration": apm.pars.co2measure_duration,
             "acquisition_rate": apm.pars.co2measure_acqrate,
         },
+        asc.no_wait,
         technique_name="liquid_purge",
         process_finish=True,
         process_contrib=[
@@ -1159,7 +1162,7 @@ def CCSI_sub_clean_inject_withcheck(
         {
             "co2_ppm_thresh": apm.pars.co2_ppm_thresh,
             "purge_if": apm.pars.purge_if,
-            "repeat_experiment_name": "CCSI_sub_clean_inject",
+            "repeat_experiment_name": "CCSI_sub_clean_inject_withcheck",
             "repeat_experiment_params": {
                 k: v
                 for k, v in vars(apm.pars).items()
@@ -1167,7 +1170,7 @@ def CCSI_sub_clean_inject_withcheck(
             },
         },
     )
-    apm.add_action_list(CCSI_sub_drain(experiment=experiment,HSpurge_duration=LiquidCleanPurge_duration))
+    apm.add_action_list(CCSI_sub_drain(experiment=experiment,HSpurge_duration=apm.pars.LiquidCleanPurge_duration,recirculation=apm.pars.drainrecirc))
 
     return apm.action_list
 
