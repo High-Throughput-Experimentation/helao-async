@@ -74,6 +74,20 @@ def dict2json(input_dict: dict):
     return bio
 
 
+def move_to_synced(file_path: Path):
+    """Moves item from RUNS_FINISHED to RUNS_SYNCED."""
+    parts = list(file_path.parts)
+    state_index = parts.index("RUNS_FINISHED")
+    parts[state_index] = "RUNS_SYNCED"
+    target_path = Path(*parts)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        file_path.replace(target_path)
+        return target_path
+    except PermissionError:
+        return False
+
+
 class HelaoYml:
     target: Path
     dir: Path
@@ -366,7 +380,49 @@ class HelaoSyncer:
         # exp progress must be in memory before actions are checked
 
         self.syncer_loop = asyncio.create_task(self.syncer())
-        pass
+
+    def cleanup_root(self):
+        """Remove leftover empty directories."""
+        today = datetime.strptime(datetime.now().strftime("%Y%m%d"), "%Y%m%d")
+        chkdirs = ["RUNS_ACTIVE", "RUNS_FINISHED"]
+        for cd in chkdirs:
+            seq_dates = glob(os.path.join(self.world_config["root"], cd, "*", "*"))
+            for datedir in seq_dates:
+                try:
+                    dateonly = datetime.strptime(os.path.basename(datedir), "%Y%m%d")
+                except ValueError:
+                    dateonly = datetime.strptime(
+                        os.path.basename(datedir), "%Y%m%d.%H%M%S%f"
+                    )
+                if dateonly < today:
+                    seq_dirs = glob(os.path.join(datedir, "*"))
+                    if len(seq_dirs) == 0:
+                        try:
+                            os.rmdir(datedir)
+                        except Exception as err:
+                            tb = "".join(
+                                traceback.format_exception(
+                                    type(err), err, err.__traceback__
+                                )
+                            )
+                            self.base.print_message(
+                                f"Directory {datedir} is empty, but could not removed. {repr(err), tb,}",
+                                error=True,
+                            )
+                    weekdir = os.path.dirname(datedir)
+                    if len(glob(os.path.join(weekdir, "*"))) == 0:
+                        try:
+                            os.rmdir(weekdir)
+                        except Exception as err:
+                            tb = "".join(
+                                traceback.format_exception(
+                                    type(err), err, err.__traceback__
+                                )
+                            )
+                            self.base.print_message(
+                                f"Directory {weekdir} is empty, but could not removed. {repr(err), tb,}",
+                                error=True,
+                            )
 
     async def syncer(self):
         """Syncer loop coroutine which consumes the task queue."""
@@ -388,7 +444,7 @@ class HelaoSyncer:
             prog = self.progress[yml_path.name]
             if not prog.yml.exists:
                 prog.yml.check_paths()
-                prog.dict.update({"yml": prog.yml.target.__str__()})
+                prog.dict.update({"yml": str(prog.yml.target)})
                 prog.write_dict()
         else:
             prog = Progress(yml_path)
@@ -466,15 +522,6 @@ class HelaoSyncer:
                         prog.dict["files_s3"].update({fp.name: file_s3_key})
                         prog.write_dict()
 
-        # next push yml to S3
-        if not prog.s3_done:
-            uuid_key = meta[f"{yml.type}_uuid"]
-            meta_s3_key = f"{yml.type}/{uuid_key}.json"
-            s3_success = await self.to_s3(meta, meta_s3_key)
-            if s3_success:
-                prog.dict["s3"] = True
-                prog.write_dict()
-
         # if yml is an experiment first check processes before pushing to API
         if yml.type == "experiment":
             retry_count = 0
@@ -490,6 +537,19 @@ class HelaoSyncer:
                     f"Processes in {str(yml.target)} did not sync after 3 tries."
                 )
                 return False
+            if prog.dict["process_metas"]:
+                meta["process_list"] = [
+                    d["process_uuid"] for d in prog.dict["process_metas"].items()
+                ]
+
+        # next push yml to S3
+        if not prog.s3_done:
+            uuid_key = meta[f"{yml.type}_uuid"]
+            meta_s3_key = f"{yml.type}/{uuid_key}.json"
+            s3_success = await self.to_s3(meta, meta_s3_key)
+            if s3_success:
+                prog.dict["s3"] = True
+                prog.write_dict()
 
         # next push yml to API
         if not prog.api_done:
@@ -499,29 +559,40 @@ class HelaoSyncer:
                 prog.dict["api"] = True
                 prog.write_dict()
 
-        # TODO: move to synced
+        # move to synced
         if prog.s3_done and prog.api_done:
             for file_path in yml.misc_files + yml.hlo_files:
-                file_path.synced.parent.mkdir(parents=True, exist_ok=True)
-                # self.dbp.base.print_message(f"moving {file_path.__str__()} to SYNCED")
-                move_success = False
+                move_success = move_to_synced(file_path)
                 while not move_success:
-                    try:
-                        file_path.replace(file_path.synced)
-                        move_success = True
-                    except PermissionError:
-                        self.dbp.base.print_message(f"{file_path} is in use, retrying.")
-                        sleep(1)
-            self.yml.target.synced.parent.mkdir(parents=True, exist_ok=True)
-            # self.dbp.base.print_message(f"moving {self.yml.target.__str__()} to SYNCED")
-            new_target = self.yml.target.replace(self.yml.target.synced)
-            # self.dbp.base.print_message(f"cleaning up {self.yml.target.__str__()}")
-            clean_success = self.yml.target.cleanup()
-            if clean_success != "success":
-                self.dbp.base.print_message("Could not clean directory after moving.")
-                self.dbp.base.print_message(clean_success)
-            # TODO: also need to zip of sequence is finished
-            pass
+                    self.base.print_message(f"{file_path} is in use, retrying.")
+                    sleep(1)
+                    move_success = move_to_synced(file_path)
+
+            # finally move yaml and update target
+            yml_success = move_to_synced(yml_path)
+            if yml_success:
+                prog.yml = HelaoYml(yml_success)
+                yml = prog.yml
+                prog.dict["yml"] = str(yml_success)
+                prog.write_dict()
+                self.progress.pop(yml_path.name)
+
+                # cleanup
+                self.base.print_message(f"cleaning up {str(yml.target)}")
+                clean_success = yml.cleanup()
+                if clean_success != "success":
+                    self.base.print_message("Could not clean directory after moving.")
+                    self.base.print_message(clean_success)
+
+            if yml.type == "sequence":
+                zip_target = yml.target.parent.parent.joinpath(
+                    f"{yml.target.parent.name}.zip"
+                )
+                self.base.print_message(
+                    f"Full sequence has synced, creating zip: {str(zip_target)}"
+                )
+                zip_dir(yml.target.parent, zip_target)
+                self.cleanup_root()
 
         # if action contributes processes, update processes
         if yml.type == "action" and meta.get("process_contrib", False):
@@ -534,6 +605,9 @@ class HelaoSyncer:
             if api_success:
                 prog.dict["api"] = True
                 prog.write_dict()
+
+        return_dict = {k: d for k, d in prog.dict.items() if k != "process_metas"}
+        return return_dict
 
     def update_process(self, act_yml: HelaoYml, act_meta: Dict):
         """Takes action yml and updates processes in exp parent."""
@@ -645,6 +719,7 @@ class HelaoSyncer:
         return False
 
     async def to_api(self, req_model: dict, meta_type: str, retries: int = 3):
+        """POST/PATCH model via Modelyst API."""
         req_url = f"https://{self.api_host}/{PLURALS[meta_type]}/"
         meta_name = req_model[f"{meta_type.replace('process', 'technique')}_name"]
         meta_uuid = req_model[f"{meta_type}_uuid"]
