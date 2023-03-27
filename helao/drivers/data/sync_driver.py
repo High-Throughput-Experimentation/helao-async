@@ -553,7 +553,7 @@ class HelaoSyncer:
 
         # next push yml to API
         if not prog.api_done:
-            model = MOD_MAP[yml.type](**meta)
+            model = MOD_MAP[yml.type](**meta).clean_dict()
             api_success = await self.to_api(model, "process")
             if api_success:
                 prog.dict["api"] = True
@@ -686,7 +686,7 @@ class HelaoSyncer:
             gids = exp_prog.dict["process_groups"][pidx]
             if all([i in exp_prog.dict["process_finished_idxs"] for i in gids]):
                 meta = exp_prog.dict["process_metas"][pidx]
-                model = MOD_MAP["process"](**meta)
+                model = MOD_MAP["process"](**meta).clean_dict()
                 api_success = await self.to_api(model, "process")
                 if api_success:
                     exp_prog.dict["process_api"].append(pidx)
