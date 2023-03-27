@@ -36,7 +36,7 @@ def makeApp(confPrefix, server_key, helao_root):
     
     @app.post("/n_queue", tags=["private"])
     async def n_queue():
-        return len(app.driver.task_queue)
+        return app.driver.task_queue.qsize()
     
     # @app.post("/finish_pending", tags=["private"])
     # async def finish_pending():

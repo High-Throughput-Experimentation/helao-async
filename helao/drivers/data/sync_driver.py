@@ -574,13 +574,6 @@ class HelaoSyncer:
                 prog.dict["yml"] = str(yml_success)
                 prog.write_dict()
 
-                # cleanup
-                self.base.print_message(f"cleaning up {str(yml.target)}")
-                clean_success = yml.cleanup()
-                if clean_success != "success":
-                    self.base.print_message("Could not clean directory after moving.")
-                    self.base.print_message(clean_success)
-
             # pop children from progress dict
             if yml.type in ["experiment", "sequence"]:
                 for x in yml.children:
@@ -594,6 +587,13 @@ class HelaoSyncer:
                     f"Full sequence has synced, creating zip: {str(zip_target)}"
                 )
                 zip_dir(yml.target.parent, zip_target)
+                # cleanup
+                self.base.print_message(f"cleaning up {str(yml.target)}")
+                clean_success = yml.cleanup()
+                if clean_success != "success":
+                    self.base.print_message("Could not clean directory after moving.")
+                    self.base.print_message(clean_success)
+
                 self.cleanup_root()
 
         # if action contributes processes, update processes
