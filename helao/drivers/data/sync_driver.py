@@ -13,7 +13,7 @@ Handles Helao data and metadata uploads to S3 and Modelyst API.
 
 """
 
-__all__ = ["DBPack", "ActYml", "ExpYml", "SeqYml", "HelaoPath", "YmlOps"]
+__all__ = ["HelaoYml", "Progress", "HelaoSyncer"]
 
 import os
 import io
@@ -38,14 +38,11 @@ from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.read_hlo import read_hlo
 from helao.helpers.print_message import print_message
 from helao.helpers.zip_dir import zip_dir
-from helao.drivers.data.enum import YmlType
 
 
 from time import sleep
 from glob import glob
-from collections import UserDict, defaultdict
 import aiohttp
-from helaocore.error import ErrorCodes
 
 ABR_MAP = {"act": "action", "exp": "experiment", "seq": "sequence"}
 MOD_MAP = {
@@ -554,7 +551,7 @@ class HelaoSyncer:
         # next push yml to API
         if not prog.api_done:
             model = MOD_MAP[yml.type](**meta).clean_dict()
-            api_success = await self.to_api(model, "process")
+            api_success = await self.to_api(model, yml.type)
             if api_success:
                 prog.dict["api"] = True
                 prog.write_dict()
@@ -721,7 +718,9 @@ class HelaoSyncer:
     async def to_api(self, req_model: dict, meta_type: str, retries: int = 3):
         """POST/PATCH model via Modelyst API."""
         req_url = f"https://{self.api_host}/{PLURALS[meta_type]}/"
-        meta_name = req_model[f"{meta_type.replace('process', 'technique')}_name"]
+        meta_name = req_model.get(
+            f"{meta_type.replace('process', 'technique')}_name",
+        )
         meta_uuid = req_model[f"{meta_type}_uuid"]
         self.base.print_message(
             f"attempting API push for {meta_type}: {meta_uuid} {meta_name}"
