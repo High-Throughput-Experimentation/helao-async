@@ -422,8 +422,6 @@ class HelaoSyncer:
                                 error=True,
                             )
 
-    def clear_task(self, )
-
     async def syncer(self):
         """Syncer loop coroutine which consumes the task queue."""
         while True:
