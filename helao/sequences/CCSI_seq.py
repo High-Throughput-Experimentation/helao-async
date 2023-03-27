@@ -5,8 +5,8 @@ __all__ = [
     "CCSI_initialization",
 #    "CCSI_validation_KOH_procedure",
     #"CCSI_repeated_KOH_testing",
-    "CCSI_test_KOH_testing",
-    "CCSI_newer_KOH_testing",
+#    "CCSI_test_KOH_testing",
+#    "CCSI_newer_KOH_testing",
     "CCSI_Solution_testing",
     #"CCSI_debug_liquidloads",
 ]
