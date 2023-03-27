@@ -507,7 +507,7 @@ class HelaoSyncer:
                 and p not in prog.dict["files_s3"]
             ]
             # push files to S3
-            while prog.dict.get(["files_pending"], []):
+            while prog.dict.get("files_pending", []):
                 for fp in prog.dict["files_pending"]:
                     if fp.suffix == ".hlo":
                         file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}.json"
