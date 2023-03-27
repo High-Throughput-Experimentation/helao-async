@@ -1154,6 +1154,14 @@ def CCSI_sub_clean_inject_withcheck(
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
 #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
+    apm.add(
+        CO2S_server,
+        "acquire_co2",
+        {
+            "duration": 1.5,
+            "acquisition_rate": 0.5,
+        },
+    )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
     apm.add(
