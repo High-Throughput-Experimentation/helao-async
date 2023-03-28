@@ -584,19 +584,19 @@ class HelaoSyncer:
             self.base.print_message(f"Moving {yml.target.name} to RUNS_SYNCED")
             yml_success = move_to_synced(yml_path)
             if yml_success:
-                prog.yml = HelaoYml(yml_success)
-                yml = prog.yml
-                prog.dict["yml"] = str(yml_success)
-                prog.write_dict()
+                result = yml.cleanup()
+                self.base.print_message(f"Cleanup {yml.target.name} returned {result}.")
+                if result == 'success':
+                    prog.yml = HelaoYml(yml_success)
+                    yml = prog.yml
+                    prog.dict["yml"] = str(yml_success)
+                    prog.write_dict()
 
             # pop children from progress dict
             if yml.type in ["experiment", "sequence"]:
                 self.base.print_message(f"Removing children from progress.")
                 for x in yml.children:
-                    result = self.progress[x.name].yml.cleanup()
-                    self.base.print_message(f"Cleanup {x.name} returned {result}.")
-                    if result == 'success':
-                        self.progress.pop(x.name)
+                    self.progress.pop(x.name)
 
             if yml.type == "sequence":
                 self.base.print_message(f"Zipping {yml.target.parent.name}.")
