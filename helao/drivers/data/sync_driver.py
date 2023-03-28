@@ -186,21 +186,23 @@ class HelaoYml:
 
     def cleanup(self):
         """Remove empty directories in RUNS_ACTIVE or RUNS_FINISHED."""
+        if not self.target.exists():
+            return "success"
         tempparts = list(self.parts)
         steps = len(tempparts) - self.status_idx
         for i in range(1, steps):
             check_dir = Path(os.path.join(*tempparts[:-i]))
             contents = [x for x in check_dir.glob("*") if x != check_dir]
             if contents:
-                print(f"{str(check_dir)} is not empty, clean up failed")
+                print(f"{str(check_dir)} is not empty")
                 return "failed"
             try:
                 check_dir.rmdir()
             except PermissionError as err:
-                _ = "".join(
+                str_err = "".join(
                     traceback.format_exception(type(err), err, err.__traceback__)
                 )
-                return err
+                return str_err
         return "success"
 
     def list_children(self, yml_path: Path):
@@ -586,7 +588,7 @@ class HelaoSyncer:
             yml_success = move_to_synced(yml_path)
             if yml_success:
                 result = yml.cleanup()
-                self.base.print_message(f"Cleanup {yml.target.name} returned {result}.")
+                self.base.print_message(f"Cleanup {yml.target.name} {result}.")
                 if result == 'success':
                     prog.yml = HelaoYml(yml_success)
                     yml = prog.yml
@@ -595,7 +597,7 @@ class HelaoSyncer:
 
             # pop children from progress dict
             if yml.type in ["experiment", "sequence"]:
-                self.base.print_message("Removing children from progress.")
+                self.base.print_message(f"Removing children from progress: {yml.children}.")
                 for x in yml.children:
                     self.base.print_message(f"Clearing {x.name}")
                     try:
@@ -612,12 +614,6 @@ class HelaoSyncer:
                     f"Full sequence has synced, creating zip: {str(zip_target)}"
                 )
                 zip_dir(yml.target.parent, zip_target)
-                # cleanup
-                self.base.print_message(f"cleaning up {str(yml.target)}")
-                clean_success = yml.cleanup()
-                if clean_success != "success":
-                    self.base.print_message("Could not clean directory after moving.")
-                    self.base.print_message(clean_success)
 
                 self.cleanup_root()
                 self.base.print_message(f"Removing sequence from progress.")
