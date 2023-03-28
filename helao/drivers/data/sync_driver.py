@@ -548,7 +548,6 @@ class HelaoSyncer:
 
         self.base.print_message(f"Patching model for {yml.target.name}")
         patched_meta = {MOD_PATCH.get(k, k): v for k,v in meta.items()}
-        model = MOD_MAP[yml.type](**patched_meta).clean_dict()
 
         # next push yml to S3
         if not prog.s3_done:
@@ -565,6 +564,7 @@ class HelaoSyncer:
             self.base.print_message(f"Pushing yml to API for {yml.target.name}")
             model = MOD_MAP[yml.type](**patched_meta).clean_dict()
             api_success = await self.to_api(model, yml.type)
+            self.base.print_message(f"API push returned {api_success} for {yml.target.name}")
             if api_success:
                 prog.dict["api"] = True
                 prog.write_dict()
@@ -745,6 +745,9 @@ class HelaoSyncer:
     async def to_api(self, req_model: dict, meta_type: str, retries: int = 3):
         """POST/PATCH model via Modelyst API."""
         req_url = f"https://{self.api_host}/{PLURALS[meta_type]}/"
+        self.base.print_message(
+            f"preparing API push to {req_url}"
+        )
         meta_name = req_model.get(
             f"{meta_type.replace('process', 'technique')}_name",
             req_model["experiment_name"],
