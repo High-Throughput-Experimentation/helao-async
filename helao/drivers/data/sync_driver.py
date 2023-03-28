@@ -58,7 +58,7 @@ PLURALS = {
     "process": "processes",
 }
 YAML_LOADER = YAML(typ="safe")
-MAX_TASKS = 4
+MAX_TASKS = 1
 
 
 def dict2json(input_dict: dict):
@@ -577,6 +577,7 @@ class HelaoSyncer:
             # pop children from progress dict
             if yml.type in ["experiment", "sequence"]:
                 for x in yml.children:
+                    self.progress[x.name].yml.cleanup()
                     self.progress.pop(x.name)
             
             if yml.type == "sequence":
