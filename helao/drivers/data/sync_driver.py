@@ -61,7 +61,7 @@ MOD_PATCH = {
     "exid": "exec_id",
 }
 YAML_LOADER = YAML(typ="safe")
-MAX_TASKS = 1
+MAX_TASKS = 4
 
 
 def dict2json(input_dict: dict):
