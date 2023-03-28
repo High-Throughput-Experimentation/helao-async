@@ -510,8 +510,8 @@ class HelaoSyncer:
             ]
             # push files to S3
             while prog.dict.get("files_pending", []):
-                self.base.print_message(f"Pushing {str(fp)} to S3 for {yml.target.name}")
                 for fp in prog.dict["files_pending"]:
+                    self.base.print_message(f"Pushing {str(fp)} to S3 for {yml.target.name}")
                     if fp.suffix == ".hlo":
                         file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}.json"
                         file_meta, file_data = read_hlo(str(fp))
@@ -546,20 +546,24 @@ class HelaoSyncer:
                     d["process_uuid"] for d in prog.dict["process_metas"].items()
                 ]
 
+        self.base.print_message(f"Patching model for {yml.target.name}")
+        patched_meta = {MOD_PATCH.get(k, k): v for k,v in meta.items()}
+        model = MOD_MAP[yml.type](**patched_meta).clean_dict()
+
         # next push yml to S3
         if not prog.s3_done:
             self.base.print_message(f"Pushing yml->json to S3 for {yml.target.name}")
-            uuid_key = meta[f"{yml.type}_uuid"]
+            uuid_key = patched_meta[f"{yml.type}_uuid"]
             meta_s3_key = f"{yml.type}/{uuid_key}.json"
-            s3_success = await self.to_s3(meta, meta_s3_key)
+            s3_success = await self.to_s3(patched_meta, meta_s3_key)
             if s3_success:
                 prog.dict["s3"] = True
                 prog.write_dict()
 
         # next push yml to API
         if not prog.api_done:
-            self.base.print_message(f"Pushing yml->json to API for {yml.target.name}")
-            model = MOD_MAP[yml.type](**meta).clean_dict()
+            self.base.print_message(f"Pushing yml to API for {yml.target.name}")
+            model = MOD_MAP[yml.type](**patched_meta).clean_dict()
             api_success = await self.to_api(model, yml.type)
             if api_success:
                 prog.dict["api"] = True
@@ -716,7 +720,6 @@ class HelaoSyncer:
     async def to_s3(self, msg: Union[dict, Path], target: str, retries: int = 3):
         """Uploads to S3: dict sent as json, path sent as file."""
         if isinstance(msg, dict):
-            msg = {MOD_PATCH.get(k, k): v for k, v in msg.items()}
             uploaded = dict2json(msg)
             uploader = self.s3.upload_fileobj
         else:
@@ -742,7 +745,6 @@ class HelaoSyncer:
     async def to_api(self, req_model: dict, meta_type: str, retries: int = 3):
         """POST/PATCH model via Modelyst API."""
         req_url = f"https://{self.api_host}/{PLURALS[meta_type]}/"
-        req_model = {MOD_PATCH.get(k, k): v for k, v in req_model.items()}
         meta_name = req_model.get(
             f"{meta_type.replace('process', 'technique')}_name",
             req_model["experiment_name"],
