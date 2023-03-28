@@ -13,7 +13,6 @@ from helao.helpers.config_loader import config_loader
 
 
 def makeApp(confPrefix, server_key, helao_root):
-
     config = config_loader(confPrefix, helao_root)
 
     app = HelaoBase(
@@ -33,11 +32,15 @@ def makeApp(confPrefix, server_key, helao_root):
     @app.post("/running", tags=["private"])
     async def running():
         return list(app.driver.running_tasks.keys())
-    
+
+    @app.post("/list_exceptions", tags=["private"])
+    async def list_exceptions():
+        return {k: d.exception() for k, d in app.driver.running_tasks.items()}
+
     @app.post("/n_queue", tags=["private"])
     async def n_queue():
         return app.driver.task_queue.qsize()
-    
+
     # @app.post("/finish_pending", tags=["private"])
     # async def finish_pending():
     #     pending_dict = await app.driver.finish_pending()
@@ -47,5 +50,5 @@ def makeApp(confPrefix, server_key, helao_root):
     # def list_pending():
     #     pending_dict = app.driver.list_pending()
     #     return pending_dict
-        
+
     return app
