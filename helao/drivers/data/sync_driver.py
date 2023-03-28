@@ -704,6 +704,7 @@ class HelaoSyncer:
     async def to_s3(self, msg: Union[dict, Path], target: str, retries: int = 3):
         """Uploads to S3: dict sent as json, path sent as file."""
         if isinstance(msg, dict):
+            msg = {MOD_PATCH.get(k, k): v for k, v in msg.items()}
             uploaded = dict2json(msg)
             uploader = self.s3.upload_fileobj
         else:
@@ -729,6 +730,7 @@ class HelaoSyncer:
     async def to_api(self, req_model: dict, meta_type: str, retries: int = 3):
         """POST/PATCH model via Modelyst API."""
         req_url = f"https://{self.api_host}/{PLURALS[meta_type]}/"
+        req_model = {MOD_PATCH.get(k, k): v for k, v in req_model.items()}
         meta_name = req_model.get(
             f"{meta_type.replace('process', 'technique')}_name",
             req_model["experiment_name"],
