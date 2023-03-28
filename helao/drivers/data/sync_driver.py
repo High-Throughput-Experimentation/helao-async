@@ -599,6 +599,9 @@ class HelaoSyncer:
                     self.base.print_message(clean_success)
 
                 self.cleanup_root()
+                self.progress.pop(yml.target.name)
+
+            self.running_tasks.pop(yml.target.name)
 
         # if action contributes processes, update processes
         if yml.type == "action" and meta.get("process_contrib", False):
@@ -606,8 +609,6 @@ class HelaoSyncer:
             if meta.get("process_finish", False):
                 await self.sync_process(exp_prog)
 
-        self.running_tasks.pop(yml.target.name)
-        self.progress.pop(yml.target.name)
 
         return_dict = {k: d for k, d in prog.dict.items() if k != "process_metas"}
         return return_dict
