@@ -459,6 +459,7 @@ class HelaoSyncer:
         """Adds yml to sync queue, defaulting to lowest priority."""
         yml_path = Path(upath) if isinstance(upath, str) else upath
         await self.task_queue.put((rank, yml_path))
+        self.base.print_message(f"Added {str(yml_path)} to syncer queue.")
 
     async def sync_yml(self, yml_path: Path, retries: int = 3):
         """Coroutine for syncing a single yml"""
@@ -514,7 +515,9 @@ class HelaoSyncer:
             # push files to S3
             while prog.dict.get("files_pending", []):
                 for fp in prog.dict["files_pending"]:
-                    self.base.print_message(f"Pushing {str(fp)} to S3 for {yml.target.name}")
+                    self.base.print_message(
+                        f"Pushing {str(fp)} to S3 for {yml.target.name}"
+                    )
                     if fp.suffix == ".hlo":
                         file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}.json"
                         file_meta, file_data = read_hlo(str(fp))
@@ -550,7 +553,7 @@ class HelaoSyncer:
                 ]
 
         self.base.print_message(f"Patching model for {yml.target.name}")
-        patched_meta = {MOD_PATCH.get(k, k): v for k,v in meta.items()}
+        patched_meta = {MOD_PATCH.get(k, k): v for k, v in meta.items()}
 
         # next push yml to S3
         if not prog.s3_done:
@@ -567,14 +570,18 @@ class HelaoSyncer:
             self.base.print_message(f"Pushing yml to API for {yml.target.name}")
             model = MOD_MAP[yml.type](**patched_meta).clean_dict()
             api_success = await self.to_api(model, yml.type)
-            self.base.print_message(f"API push returned {api_success} for {yml.target.name}")
+            self.base.print_message(
+                f"API push returned {api_success} for {yml.target.name}"
+            )
             if api_success:
                 prog.dict["api"] = True
                 prog.write_dict()
 
         # move to synced
         if prog.s3_done and prog.api_done:
-            self.base.print_message(f"Moving files to RUNS_SYNCED for {yml.target.name}")
+            self.base.print_message(
+                f"Moving files to RUNS_SYNCED for {yml.target.name}"
+            )
             for file_path in yml.misc_files + yml.hlo_files:
                 self.base.print_message(f"Moving {str(file_path)}")
                 move_success = move_to_synced(file_path)
@@ -589,7 +596,7 @@ class HelaoSyncer:
             if yml_success:
                 result = yml.cleanup()
                 self.base.print_message(f"Cleanup {yml.target.name} {result}.")
-                if result == 'success':
+                if result == "success":
                     prog.yml = HelaoYml(yml_success)
                     yml = prog.yml
                     prog.dict["yml"] = str(yml_success)
@@ -604,7 +611,9 @@ class HelaoSyncer:
                     try:
                         self.progress.pop(childyml.target.name)
                     except Exception as err:
-                        self.base.print_message(f"Could not remove {childyml.target.name}: {err}")
+                        self.base.print_message(
+                            f"Could not remove {childyml.target.name}: {err}"
+                        )
 
             if yml.type == "sequence":
                 self.base.print_message(f"Zipping {yml.target.parent.name}.")
@@ -749,17 +758,13 @@ class HelaoSyncer:
     async def to_api(self, req_model: dict, meta_type: str, retries: int = 3):
         """POST/PATCH model via Modelyst API."""
         req_url = f"https://{self.api_host}/{PLURALS[meta_type]}/"
-        self.base.print_message(
-            f"preparing API push to {req_url}"
-        )
+        self.base.print_message(f"preparing API push to {req_url}")
         # meta_name = req_model.get(
         #     f"{meta_type.replace('process', 'technique')}_name",
         #     req_model["experiment_name"],
         # )
         meta_uuid = req_model[f"{meta_type}_uuid"]
-        self.base.print_message(
-            f"attempting API push for {meta_type}: {meta_uuid}"
-        )
+        self.base.print_message(f"attempting API push for {meta_type}: {meta_uuid}")
         try_create = True
         api_success = False
         last_status = 0
