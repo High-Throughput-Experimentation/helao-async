@@ -192,7 +192,8 @@ class HelaoYml:
             check_dir = Path(os.path.join(*tempparts[:-i]))
             contents = [x for x in check_dir.glob("*") if x != check_dir]
             if contents:
-                break
+                print(f"{str(check_dir)} is not empty, clean up failed")
+                return "failed"
             try:
                 check_dir.rmdir()
             except PermissionError as err:
@@ -594,9 +595,13 @@ class HelaoSyncer:
 
             # pop children from progress dict
             if yml.type in ["experiment", "sequence"]:
-                self.base.print_message(f"Removing children from progress.")
+                self.base.print_message("Removing children from progress.")
                 for x in yml.children:
-                    self.progress.pop(x.name)
+                    self.base.print_message(f"Clearing {x.name}")
+                    try:
+                        self.progress.pop(x.name)
+                    except Exception as err:
+                        self.base.print_message(f"Could not remove {x.name}: {err}")
 
             if yml.type == "sequence":
                 self.base.print_message(f"Zipping {yml.target.parent.name}.")
