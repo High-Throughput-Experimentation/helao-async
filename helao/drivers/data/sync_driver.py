@@ -748,13 +748,13 @@ class HelaoSyncer:
         self.base.print_message(
             f"preparing API push to {req_url}"
         )
-        meta_name = req_model.get(
-            f"{meta_type.replace('process', 'technique')}_name",
-            req_model["experiment_name"],
-        )
+        # meta_name = req_model.get(
+        #     f"{meta_type.replace('process', 'technique')}_name",
+        #     req_model["experiment_name"],
+        # )
         meta_uuid = req_model[f"{meta_type}_uuid"]
         self.base.print_message(
-            f"attempting API push for {meta_type}: {meta_uuid} {meta_name}"
+            f"attempting API push for {meta_type}: {meta_uuid}"
         )
         try_create = True
         api_success = False
@@ -799,11 +799,11 @@ class HelaoSyncer:
                         async with session.post(fail_url, json=fail_model) as resp:
                             if resp.status == 200:
                                 self.base.print_message(
-                                    f"successful debug API push for {meta_type}: {meta_uuid} {meta_name}"
+                                    f"successful debug API push for {meta_type}: {meta_uuid}"
                                 )
                                 break
                             self.base.print_message(
-                                f"failed debug API push for {meta_type}: {meta_uuid} {meta_name}"
+                                f"failed debug API push for {meta_type}: {meta_uuid}"
                             )
                             self.base.print_message(f"response: {await resp.json()}")
         return api_success
