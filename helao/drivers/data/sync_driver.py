@@ -195,12 +195,12 @@ class HelaoYml:
                 break
             try:
                 check_dir.rmdir()
-                return "success"
             except PermissionError as err:
                 _ = "".join(
                     traceback.format_exception(type(err), err, err.__traceback__)
                 )
                 return err
+        return "success"
 
     def list_children(self, yml_path: Path):
         paths = yml_path.parent.glob("*/*.yml")
@@ -593,8 +593,10 @@ class HelaoSyncer:
             if yml.type in ["experiment", "sequence"]:
                 self.base.print_message(f"Removing children from progress.")
                 for x in yml.children:
-                    self.progress[x.name].yml.cleanup()
-                    self.progress.pop(x.name)
+                    result = self.progress[x.name].yml.cleanup()
+                    self.base.print_message(f"Cleanup {x.name} returned {result}.")
+                    if result == 'success':
+                        self.progress.pop(x.name)
 
             if yml.type == "sequence":
                 self.base.print_message(f"Zipping {yml.target.parent.name}.")
