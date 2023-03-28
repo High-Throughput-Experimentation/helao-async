@@ -597,13 +597,14 @@ class HelaoSyncer:
 
             # pop children from progress dict
             if yml.type in ["experiment", "sequence"]:
-                self.base.print_message(f"Removing children from progress: {yml.children}.")
-                for x in yml.children:
-                    self.base.print_message(f"Clearing {x.name}")
+                children = yml.children
+                self.base.print_message(f"Removing children from progress: {children}.")
+                for childyml in children:
+                    self.base.print_message(f"Clearing {childyml.target.name}")
                     try:
-                        self.progress.pop(x.name)
+                        self.progress.pop(childyml.target.name)
                     except Exception as err:
-                        self.base.print_message(f"Could not remove {x.name}: {err}")
+                        self.base.print_message(f"Could not remove {childyml.target.name}: {err}")
 
             if yml.type == "sequence":
                 self.base.print_message(f"Zipping {yml.target.parent.name}.")
