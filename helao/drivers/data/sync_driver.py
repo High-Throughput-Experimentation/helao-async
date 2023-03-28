@@ -57,6 +57,9 @@ PLURALS = {
     "sequence": "sequences",
     "process": "processes",
 }
+MOD_PATCH = {
+    "exid": "exec_id",
+}
 YAML_LOADER = YAML(typ="safe")
 MAX_TASKS = 1
 
@@ -579,7 +582,7 @@ class HelaoSyncer:
                 for x in yml.children:
                     self.progress[x.name].yml.cleanup()
                     self.progress.pop(x.name)
-            
+
             if yml.type == "sequence":
                 zip_target = yml.target.parent.parent.joinpath(
                     f"{yml.target.parent.name}.zip"
@@ -647,6 +650,11 @@ class HelaoSyncer:
                     "run_type",
                 ]
             }
+            exp_prog.dict["process_metas"][pidx][
+                "technique_name"
+            ] = exp_prog.yml.meta.get(
+                "technique_name", exp_prog.yml.meta["experiment_name"]
+            )
             exp_prog.dict["process_metas"][pidx]["process_uuid"] = gen_uuid()
             exp_prog.dict["process_metas"][pidx]["process_group_index"] = pidx
             exp_prog.dict["process_metas"][pidx]["action_list"] = []
@@ -723,6 +731,7 @@ class HelaoSyncer:
         req_url = f"https://{self.api_host}/{PLURALS[meta_type]}/"
         meta_name = req_model.get(
             f"{meta_type.replace('process', 'technique')}_name",
+            req_model["experiment_name"],
         )
         meta_uuid = req_model[f"{meta_type}_uuid"]
         self.base.print_message(
