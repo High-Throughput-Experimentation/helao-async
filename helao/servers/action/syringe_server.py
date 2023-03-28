@@ -12,12 +12,12 @@ from fastapi import Body
 from helao.drivers.pump.legato_driver import KDS100, PumpExec
 from helao.servers.base import HelaoBase
 from helao.helpers.premodels import Action
+from helaocore.models.data import DataModel
 from helaocore.error import ErrorCodes
 from helao.helpers.config_loader import config_loader
 
 
 def makeApp(confPrefix, server_key, helao_root):
-
     config = config_loader(confPrefix, helao_root)
 
     app = HelaoBase(
@@ -61,13 +61,27 @@ def makeApp(confPrefix, server_key, helao_root):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
+    @app.post(f"/{server_key}/get_present_volume", tags=["action"])
+    async def get_present_volume(
+        action: Optional[Action] = Body({}, embed=True),
+        action_version: int = 1,
+    ):
+        active = await app.base.setup_and_contain_action()
+        present_volume = app.driver.present_volume_ul
+        datadict = {"present_volume_ul": present_volume, "error_code": ErrorCodes.none}
+        datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
+        active.action.action_params.update({"_present_volume_ul": present_volume})
+        active.enqueue_data_nowait(datamodel, action=active.action)
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
     @app.post(f"/set_present_volume", tags=["private"])
     async def set_present_volume(volume_uL: float = 0):
         app.driver.present_volume_ul = volume_uL
         return {"present_volume_ul": volume_uL}
 
     @app.post(f"/get_present_volume", tags=["private"])
-    async def get_present_volume():
+    async def get_present_volume_priv():
         return {"present_volume_ul": app.driver.present_volume_ul}
 
     @app.post("/set_rate", tags=["private"])
