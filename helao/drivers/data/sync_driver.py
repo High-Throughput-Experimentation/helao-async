@@ -501,6 +501,7 @@ class HelaoSyncer:
         # next push files to S3 (actions only)
         if yml.type == "action":
             # re-check file lists
+            self.base.print_message(f"Checking file lists for {yml.target.name}")
             prog.dict["files_pending"] += [
                 p
                 for p in yml.hlo_files + yml.misc_files
@@ -509,6 +510,7 @@ class HelaoSyncer:
             ]
             # push files to S3
             while prog.dict.get("files_pending", []):
+                self.base.print_message(f"Pushing {str(fp)} to S3 for {yml.target.name}")
                 for fp in prog.dict["files_pending"]:
                     if fp.suffix == ".hlo":
                         file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}.json"
@@ -525,6 +527,7 @@ class HelaoSyncer:
 
         # if yml is an experiment first check processes before pushing to API
         if yml.type == "experiment":
+            self.base.print_message(f"Finishing processes for {yml.target.name}")
             retry_count = 0
             s3_unf, api_unf = prog.list_unfinished_procs()
             while s3_unf or api_unf:
@@ -545,6 +548,7 @@ class HelaoSyncer:
 
         # next push yml to S3
         if not prog.s3_done:
+            self.base.print_message(f"Pushing yml->json to S3 for {yml.target.name}")
             uuid_key = meta[f"{yml.type}_uuid"]
             meta_s3_key = f"{yml.type}/{uuid_key}.json"
             s3_success = await self.to_s3(meta, meta_s3_key)
@@ -554,6 +558,7 @@ class HelaoSyncer:
 
         # next push yml to API
         if not prog.api_done:
+            self.base.print_message(f"Pushing yml->json to API for {yml.target.name}")
             model = MOD_MAP[yml.type](**meta).clean_dict()
             api_success = await self.to_api(model, yml.type)
             if api_success:
@@ -562,7 +567,9 @@ class HelaoSyncer:
 
         # move to synced
         if prog.s3_done and prog.api_done:
+            self.base.print_message(f"Moving files to RUNS_SYNCED for {yml.target.name}")
             for file_path in yml.misc_files + yml.hlo_files:
+                self.base.print_message(f"Moving {str(file_path)}")
                 move_success = move_to_synced(file_path)
                 while not move_success:
                     self.base.print_message(f"{file_path} is in use, retrying.")
@@ -570,6 +577,7 @@ class HelaoSyncer:
                     move_success = move_to_synced(file_path)
 
             # finally move yaml and update target
+            self.base.print_message(f"Moving {yml.target.name} to RUNS_SYNCED")
             yml_success = move_to_synced(yml_path)
             if yml_success:
                 prog.yml = HelaoYml(yml_success)
@@ -579,11 +587,13 @@ class HelaoSyncer:
 
             # pop children from progress dict
             if yml.type in ["experiment", "sequence"]:
+                self.base.print_message(f"Removing children from progress.")
                 for x in yml.children:
                     self.progress[x.name].yml.cleanup()
                     self.progress.pop(x.name)
 
             if yml.type == "sequence":
+                self.base.print_message(f"Zipping {yml.target.parent.name}.")
                 zip_target = yml.target.parent.parent.joinpath(
                     f"{yml.target.parent.name}.zip"
                 )
@@ -599,8 +609,10 @@ class HelaoSyncer:
                     self.base.print_message(clean_success)
 
                 self.cleanup_root()
+                self.base.print_message(f"Removing sequence from progress.")
                 self.progress.pop(yml.target.name)
 
+            self.base.print_message(f"Removing task from running_tasks.")
             self.running_tasks.pop(yml.target.name)
 
         # if action contributes processes, update processes
@@ -608,7 +620,6 @@ class HelaoSyncer:
             exp_prog = self.update_process(yml, meta)
             if meta.get("process_finish", False):
                 await self.sync_process(exp_prog)
-
 
         return_dict = {k: d for k, d in prog.dict.items() if k != "process_metas"}
         return return_dict
