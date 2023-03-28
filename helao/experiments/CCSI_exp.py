@@ -919,9 +919,22 @@ def CCSI_sub_clean_inject(
 
     apm = ActionPlanMaker()
     if use_co2_check:
-        current_vol = apm.add(WATERCLEANPUMP_server, "get_present_volume",{}) 
-        if current_vol < 15000:
-            apm.add_action_list(CCSI_sub_refill_syringe(experiment=experiment,syringe="waterclean",target_volume_ul=current_vol + apm.pars.Waterclean_volume_ul))
+        apm.add(WATERCLEANPUMP_server, "get_present_volume",{},to_globalexp_params=["syringe_present_volume_ul"]) 
+        apm.add(
+            CALC_server,
+            "check_syringe_volume",
+            {
+                "syringe": "waterclean",
+                "check_volume": 15000,
+                "repeat_experiment_name": "CCSI_sub_refill_syringe",
+                "repeat_experiment_params": {
+                    k: v
+                    for k, v in vars(apm.pars).items()
+                    if not k.startswith("experiment")
+                },
+            },
+            from_globalexp_params={"syringe_present_volume_ul": "syringe_present_volume_ul"},
+    )
 
     # v2 v1ab open, clean inject
 

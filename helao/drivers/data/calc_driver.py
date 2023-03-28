@@ -722,5 +722,56 @@ class Calc:
         }
         return return_dict
 
+    async def check_syringe_volume(self, activeobj: Active):
+        params = activeobj.action.action_params
+        syringe = params["syringe"]
+        check_volume_ul = params["check_volume_ul"]
+        syringe_present_volume_ul = params["syringe_present_volume_ul"]
+
+        repeat_experiment_name = params["repeat_experiment_name"]
+        repeat_experiment_params = params["repeat_experiment_params"]
+        kwargs = params["repeat_experiment_kwargs"]
+
+        if syringe_present_volume_ul < check_volume_ul:
+
+            self.base.print_message(
+                f"current syringe volume: {syringe_present_volume_ul} does not meet threshold condition. Refilling"
+            )
+            world_config = self.base.fastapp.helao_cfg
+            orch_name = [
+                k
+                for k, d in world_config.get("servers", {}).items()
+                if d["group"] == "orchestrator"
+            ][0]
+            rep_exp = Experiment(
+                experiment_name=repeat_experiment_name,
+                experiment_params=repeat_experiment_params,
+                **kwargs,
+            )
+            self.base.print_message("queueing repeat experiment request on Orch")
+            resp, error = await async_private_dispatcher(
+                world_config,
+                orch_name,
+                "insert_experiment",
+                params_dict={},
+                json_dict={
+                    "idx": 0,
+                    "experiment": rep_exp.json_dict(),
+                },
+            )
+            self.base.print_message(f"insert_experiment got response: {resp}")
+            self.base.print_message(f"insert_experiment returned error: {error}")
+        else:
+            self.base.print_message(
+                f"current syringe volume: {syringe_present_volume_ul} does meet threshold condition. No action needed."
+            )
+
+        return_dict = {
+            "epoch": float(time.time()),
+            "syringe_present_volume_ul": float(syringe_present_volume_ul),
+        }
+        return return_dict
+
+
     def shutdown(self):
         pass
