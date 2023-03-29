@@ -473,11 +473,19 @@ class HelaoSyncer:
             )
             return True
 
-        if yml.status != "finished":
+        self.base.print_message(
+            f"{str(yml.target)} status is not synced, checking for finished."
+        )
+
+        if yml.status == "active":
             self.base.print_message(
                 f"Cannot sync {str(yml.target)}, status is not 'finished'."
             )
             return False
+
+        self.base.print_message(
+            f"{str(yml.target)} status is finished, proceeding."
+        )
 
         # first check if child objects are registered with API (non-actions)
         if yml.type != "action":
@@ -500,7 +508,14 @@ class HelaoSyncer:
                     f"Re-adding {str(yml.target)} to sync queue with high priority."
                 )
                 await self.enqueue_yml(yml.target, 1)
+                self.base.print_message(
+                    f"{str(yml.target)} re-queued, exiting."
+                )
                 return False
+        
+        self.base.print_message(
+            f"{str(yml.target)} children are synced, proceeding."
+        )
 
         # next push files to S3 (actions only)
         if yml.type == "action":
