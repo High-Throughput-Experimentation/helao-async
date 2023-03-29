@@ -429,12 +429,13 @@ class HelaoSyncer:
                             )
 
     def sync_exit_callback(self, task: asyncio.Task):
-        if task.name in self.running_tasks:
-            self.base.print_message(f"Removing {task.name} from running_tasks.")
-            self.running_tasks.pop(task.name)
+        task_name = task.get_name()
+        if task_name in self.running_tasks:
+            self.base.print_message(f"Removing {task_name} from running_tasks.")
+            self.running_tasks.pop(task_name)
         else:
             self.base.print_message(
-                f"{task.name} was already removed from running_tasks."
+                f"{task_name} was already removed from running_tasks."
             )
 
     async def syncer(self):
