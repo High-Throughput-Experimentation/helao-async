@@ -442,11 +442,13 @@ class HelaoSyncer:
         """Syncer loop coroutine which consumes the task queue."""
         while True:
             if len(self.running_tasks) < MAX_TASKS:
-                self.base.print_message('Getting next yml_target from queue.')
-                _, yml_target = await self.task_queue.get()
-                self.base.print_message(f'Acquired {yml_target.name}.')
+                self.base.print_message("Getting next yml_target from queue.")
+                priority, yml_target = await self.task_queue.get()
+                self.base.print_message(f"Acquired {yml_target.name} with priority {priority}.")
                 if yml_target.name not in self.running_tasks:
-                    self.base.print_message(f'Creating sync task for {yml_target.name}.')
+                    self.base.print_message(
+                        f"Creating sync task for {yml_target.name}."
+                    )
                     self.running_tasks[yml_target.name] = asyncio.create_task(
                         self.sync_yml(yml_target), name=yml_target.name
                     )
