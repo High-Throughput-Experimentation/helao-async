@@ -433,7 +433,9 @@ class HelaoSyncer:
             self.base.print_message(f"Removing {task.name} from running_tasks.")
             self.running_tasks.pop(task.name)
         else:
-            self.base.print_message(f"{task.name} was already removed from running_tasks.")
+            self.base.print_message(
+                f"{task.name} was already removed from running_tasks."
+            )
 
     async def syncer(self):
         """Syncer loop coroutine which consumes the task queue."""
@@ -442,9 +444,11 @@ class HelaoSyncer:
                 _, yml_target = await self.task_queue.get()
                 if yml_target.name not in self.running_tasks:
                     self.running_tasks[yml_target.name] = asyncio.create_task(
-                        self.sync_yml(yml_target, name=yml_target.name)
+                        self.sync_yml(yml_target), name=yml_target.name
                     )
-                    self.running_tasks[yml_target.name].add_done_callback(self.sync_exit_callback)
+                    self.running_tasks[yml_target.name].add_done_callback(
+                        self.sync_exit_callback
+                    )
                 else:
                     print_message(f"{yml_target} sync is already in progress.")
             else:
@@ -491,9 +495,7 @@ class HelaoSyncer:
             )
             return False
 
-        self.base.print_message(
-            f"{str(yml.target)} status is finished, proceeding."
-        )
+        self.base.print_message(f"{str(yml.target)} status is finished, proceeding.")
 
         # first check if child objects are registered with API (non-actions)
         if yml.type != "action":
@@ -517,14 +519,10 @@ class HelaoSyncer:
                 )
                 self.running_tasks.pop(yml.target.name)
                 await self.enqueue_yml(yml.target, 1)
-                self.base.print_message(
-                    f"{str(yml.target)} re-queued, exiting."
-                )
+                self.base.print_message(f"{str(yml.target)} re-queued, exiting.")
                 return False
-        
-        self.base.print_message(
-            f"{str(yml.target)} children are synced, proceeding."
-        )
+
+        self.base.print_message(f"{str(yml.target)} children are synced, proceeding.")
 
         # next push files to S3 (actions only)
         if yml.type == "action":
