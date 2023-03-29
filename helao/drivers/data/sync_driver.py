@@ -738,6 +738,8 @@ class HelaoSyncer:
         exp_prog.dict["process_metas"][pidx]["action_list"].append(
             ShortActionModel(**act_meta).clean_dict()
         )
+
+        self.base.print_message(f"current experiment progress:\n{exp_prog.dict}")
         if act_idx == min(exp_prog.dict["process_groups"][pidx]):
             exp_prog.dict["process_metas"][pidx]["process_timestamp"] = act_meta["action_timestamp"]
         for pc in act_meta["process_contrib"]:
