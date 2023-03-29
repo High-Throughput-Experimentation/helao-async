@@ -733,21 +733,22 @@ class HelaoSyncer:
             exp_prog.dict["process_metas"][pidx]["process_uuid"] = gen_uuid()
             exp_prog.dict["process_metas"][pidx]["process_group_index"] = pidx
             exp_prog.dict["process_metas"][pidx]["action_list"] = []
-        with exp_prog.dict["process_metas"][pidx] as process_meta:
-            process_meta["action_list"].append(
-                ShortActionModel(**act_meta).clean_dict()
-            )
-            if act_idx == min(exp_prog.dict["process_groups"][pidx]):
-                process_meta["process_timestamp"] = act_meta["action_timestamp"]
-            for pc in act_meta["process_contrib"]:
-                contrib = act_meta[pc.name]
-                new_name = pc.name.replace("action_", "process_")
-                if isinstance(contrib, dict):
-                    process_meta[new_name].update(contrib)
-                elif isinstance(contrib, list):
-                    process_meta[new_name] += contrib
-                else:
-                    process_meta[new_name] = contrib
+
+        # update experiment progress with action
+        exp_prog.dict["process_metas"][pidx]["action_list"].append(
+            ShortActionModel(**act_meta).clean_dict()
+        )
+        if act_idx == min(exp_prog.dict["process_groups"][pidx]):
+            exp_prog.dict["process_metas"][pidx]["process_timestamp"] = act_meta["action_timestamp"]
+        for pc in act_meta["process_contrib"]:
+            contrib = act_meta[pc.name]
+            new_name = pc.name.replace("action_", "process_")
+            if isinstance(contrib, dict):
+                exp_prog.dict["process_metas"][pidx][new_name].update(contrib)
+            elif isinstance(contrib, list):
+                exp_prog.dict["process_metas"][pidx][new_name] += contrib
+            else:
+                exp_prog.dict["process_metas"][pidx][new_name] = contrib
         exp_prog.write_dict()
         return exp_prog
 
