@@ -376,6 +376,7 @@ class HelaoSyncer:
         self.progress = {}
         self.sequence_objs = {}
         self.task_queue = asyncio.PriorityQueue()
+        self.task_set = set()
         self.running_tasks = {}
         # push happens via async task queue
         # processes are checked after each action push
@@ -433,6 +434,7 @@ class HelaoSyncer:
         if task_name in self.running_tasks:
             self.base.print_message(f"Removing {task_name} from running_tasks.")
             self.running_tasks.pop(task_name)
+            self.task_set.remove(task_name)
         else:
             self.base.print_message(
                 f"{task_name} was already removed from running_tasks."
@@ -444,7 +446,9 @@ class HelaoSyncer:
             if len(self.running_tasks) < MAX_TASKS:
                 self.base.print_message("Getting next yml_target from queue.")
                 priority, yml_target = await self.task_queue.get()
-                self.base.print_message(f"Acquired {yml_target.name} with priority {priority}.")
+                self.base.print_message(
+                    f"Acquired {yml_target.name} with priority {priority}."
+                )
                 if yml_target.name not in self.running_tasks:
                     self.base.print_message(
                         f"Creating sync task for {yml_target.name}."
@@ -457,8 +461,7 @@ class HelaoSyncer:
                     )
                 else:
                     print_message(f"{yml_target} sync is already in progress.")
-            else:
-                await asyncio.sleep(0.1)
+            await asyncio.sleep(0.1)
 
     def get_progress(self, yml_path: Path):
         """Returns progress from global dict, updates yml_path if yml path not found."""
@@ -469,6 +472,8 @@ class HelaoSyncer:
                 prog.dict.update({"yml": str(prog.yml.target)})
                 prog.write_dict()
         else:
+            if not yml_path.exists():
+                return False
             prog = Progress(yml_path)
             self.progress[yml_path.name] = prog
         return prog
@@ -476,12 +481,20 @@ class HelaoSyncer:
     async def enqueue_yml(self, upath: Union[Path, str], rank: int = 2):
         """Adds yml to sync queue, defaulting to lowest priority."""
         yml_path = Path(upath) if isinstance(upath, str) else upath
+        self.task_set.add(yml_path.name)
         await self.task_queue.put((rank, yml_path))
-        self.base.print_message(f"Added {str(yml_path)} to syncer queue.")
+        self.base.print_message(
+            f"Added {str(yml_path)} to syncer queue with priority {rank}."
+        )
 
     async def sync_yml(self, yml_path: Path, retries: int = 3):
         """Coroutine for syncing a single yml"""
         prog = self.get_progress(yml_path)
+        if not prog:
+            self.base.print_message(
+                f"{str(yml_path)} does not exist, assume yml has moved to synced."
+            )
+            return True
         yml = prog.yml
         meta = yml.meta
 
@@ -518,12 +531,17 @@ class HelaoSyncer:
                     "Adding 'finished' children to sync queue with highest priority."
                 )
                 for child in yml.finished_children:
-                    await self.enqueue_yml(child.target, 0)
-                    self.base.print_message(str(child.target))
+                    if (
+                        child.target.name not in self.task_set
+                        and child.target.name not in self.running_tasks
+                    ):
+                        await self.enqueue_yml(child.target, 0)
+                        self.base.print_message(str(child.target))
                 self.base.print_message(
                     f"Re-adding {str(yml.target)} to sync queue with high priority."
                 )
                 self.running_tasks.pop(yml.target.name)
+                self.task_set.remove(yml.target.name)
                 await self.enqueue_yml(yml.target, 1)
                 self.base.print_message(f"{str(yml.target)} re-queued, exiting.")
                 return False
