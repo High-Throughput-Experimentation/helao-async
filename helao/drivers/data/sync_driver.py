@@ -440,11 +440,13 @@ class HelaoSyncer:
 
     async def syncer(self):
         """Syncer loop coroutine which consumes the task queue."""
-        running_task_count = len(self.running_tasks.keys())
         while True:
-            if running_task_count < MAX_TASKS:
+            if len(self.running_tasks) < MAX_TASKS:
+                self.base.print_message('Getting next yml_target from queue.')
                 _, yml_target = await self.task_queue.get()
+                self.base.print_message(f'Acquired {yml_target.name}.')
                 if yml_target.name not in self.running_tasks:
+                    self.base.print_message(f'Creating sync task for {yml_target.name}.')
                     self.running_tasks[yml_target.name] = asyncio.create_task(
                         self.sync_yml(yml_target), name=yml_target.name
                     )
@@ -455,7 +457,6 @@ class HelaoSyncer:
                     print_message(f"{yml_target} sync is already in progress.")
             else:
                 await asyncio.sleep(0.1)
-            running_task_count = len(self.running_tasks.keys())
 
     def get_progress(self, yml_path: Path):
         """Returns progress from global dict, updates yml_path if yml path not found."""
@@ -515,13 +516,13 @@ class HelaoSyncer:
                     "Adding 'finished' children to sync queue with highest priority."
                 )
                 for child in yml.finished_children:
-                    await self.enqueue_yml(child.target)
+                    await self.enqueue_yml(child.target, 0)
                     self.base.print_message(str(child.target))
                 self.base.print_message(
                     f"Re-adding {str(yml.target)} to sync queue with high priority."
                 )
                 self.running_tasks.pop(yml.target.name)
-                await self.enqueue_yml(yml.target)
+                await self.enqueue_yml(yml.target, 1)
                 self.base.print_message(f"{str(yml.target)} re-queued, exiting.")
                 return False
 
