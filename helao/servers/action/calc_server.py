@@ -100,4 +100,22 @@ def makeApp(confPrefix, server_key, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
+    @app.post(f"/{server_key}/fill_syringe_volume_check", tags=["action"])
+    async def fill_syringe_volume_check(
+        action: Optional[Action] = Body({}, embed=True),
+        action_version: int = 1,
+        check_volume_ul: float = 0,
+        target_volume_ul: float = 0,
+        present_volume_ul: float = 0,
+        repeat_experiment_name: str = "CCSI_sub_fill_syringe",
+        repeat_experiment_params: dict = {},
+        repeat_experiment_kwargs: dict = {},
+    ):
+        active = await app.base.setup_and_contain_action(action_abbr="syringefillvolume")
+        result = await app.driver.fill_syringe_volume_check(active)
+        app.base.print_message(f"result dict was: {result}")
+        await active.enqueue_data_dflt(datadict=result)
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
     return app
