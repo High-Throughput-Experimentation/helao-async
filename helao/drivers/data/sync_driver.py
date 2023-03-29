@@ -383,7 +383,7 @@ class HelaoSyncer:
         # then enqueue processes, then enqueue the exp again
         # exp progress must be in memory before actions are checked
 
-        self.syncer_loop = asyncio.create_task(self.syncer())
+        self.syncer_loop = asyncio.create_task(self.syncer(), name="syncer_loop")
 
     def cleanup_root(self):
         """Remove leftover empty directories."""
@@ -428,6 +428,13 @@ class HelaoSyncer:
                                 error=True,
                             )
 
+    def sync_exit_callback(self, task: asyncio.Task):
+        if task.name in self.running_tasks:
+            self.base.print_message(f"Removing {task.name} from running_tasks.")
+            self.running_tasks.pop(task.name)
+        else:
+            self.base.print_message(f"{task.name} was already removed from running_tasks.")
+
     async def syncer(self):
         """Syncer loop coroutine which consumes the task queue."""
         while True:
@@ -435,8 +442,9 @@ class HelaoSyncer:
                 _, yml_target = await self.task_queue.get()
                 if yml_target.name not in self.running_tasks:
                     self.running_tasks[yml_target.name] = asyncio.create_task(
-                        self.sync_yml(yml_target)
+                        self.sync_yml(yml_target, name=yml_target.name)
                     )
+                    self.running_tasks[yml_target.name].add_done_callback(self.sync_exit_callback)
                 else:
                     print_message(f"{yml_target} sync is already in progress.")
             else:
@@ -507,6 +515,7 @@ class HelaoSyncer:
                 self.base.print_message(
                     f"Re-adding {str(yml.target)} to sync queue with high priority."
                 )
+                self.running_tasks.pop(yml.target.name)
                 await self.enqueue_yml(yml.target, 1)
                 self.base.print_message(
                     f"{str(yml.target)} re-queued, exiting."
