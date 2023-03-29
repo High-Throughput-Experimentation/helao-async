@@ -515,13 +515,13 @@ class HelaoSyncer:
                     "Adding 'finished' children to sync queue with highest priority."
                 )
                 for child in yml.finished_children:
-                    await self.enqueue_yml(child.target, 0)
+                    await self.enqueue_yml(child.target)
                     self.base.print_message(str(child.target))
                 self.base.print_message(
                     f"Re-adding {str(yml.target)} to sync queue with high priority."
                 )
                 self.running_tasks.pop(yml.target.name)
-                await self.enqueue_yml(yml.target, 1)
+                await self.enqueue_yml(yml.target)
                 self.base.print_message(f"{str(yml.target)} re-queued, exiting.")
                 return False
 
