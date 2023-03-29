@@ -440,8 +440,9 @@ class HelaoSyncer:
 
     async def syncer(self):
         """Syncer loop coroutine which consumes the task queue."""
+        running_task_count = len(self.running_tasks)
         while True:
-            if len(self.running_tasks) < MAX_TASKS:
+            if running_task_count < MAX_TASKS:
                 _, yml_target = await self.task_queue.get()
                 if yml_target.name not in self.running_tasks:
                     self.running_tasks[yml_target.name] = asyncio.create_task(
@@ -454,6 +455,7 @@ class HelaoSyncer:
                     print_message(f"{yml_target} sync is already in progress.")
             else:
                 await asyncio.sleep(0.1)
+            running_task_count = len(self.running_tasks)
 
     def get_progress(self, yml_path: Path):
         """Returns progress from global dict, updates yml_path if yml path not found."""
