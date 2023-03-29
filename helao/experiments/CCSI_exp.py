@@ -919,20 +919,21 @@ def CCSI_sub_clean_inject(
 
     apm = ActionPlanMaker()
     if use_co2_check:
-        apm.add(WATERCLEANPUMP_server, "get_present_volume",{},to_globalexp_params=["present_volume_ul"]) 
+        apm.add(WATERCLEANPUMP_server, "get_present_volume",{},to_globalexp_params=["_present_volume_ul"]) 
         apm.add(
             CALC_server,
-            "check_syringe_volume",
+            "fill_syringe_volume_check",
             {
-                "check_volume": 15000,
+                "check_volume_ul": 15000,
+                "target_volume_ul": 25000,
                 "repeat_experiment_name": "CCSI_sub_refill_syringe",
                 "repeat_experiment_params": {
-                    "experiment": experiment,
+                    "experiment": apm.pars.experiment,
                     "syringe": "waterclean",
-                    "fill_volume_ul": 10000,
+                    "fill_volume_ul": 0,
                 },
             },
-            from_globalexp_params={"present_volume_ul": "present_volume_ul"},
+            from_globalexp_params={"_present_volume_ul": "present_volume_ul"},
     )
 
     # v2 v1ab open, clean inject
@@ -1196,6 +1197,38 @@ def CCSI_sub_set_syringe_start(
         apm.add(SOLUTIONPUMP_server, "set_present_volume", {"volume_uL": apm.pars.Starting_volume_ul}) 
     # if more syringes can add more names here
     return apm.action_list
+
+
+def CCSI_sub_full_fill_syringe(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    syringe: str = "waterclean",
+    target_volume_ul: float = 0,
+    Syringe_rate_ulsec: float = 1000,
+):
+    apm = ActionPlanMaker()
+    apm.add(WATERCLEANPUMP_server, "get_present_volume",{},to_globalexp_params=["_present_volume_ul"]) 
+    apm.add(
+        CALC_server,
+        "fill_syringe_volume_check",
+        {
+            "check_volume_ul": 0,
+            "target_volume_ul": apm.pars.target_volume_ul,
+            "repeat_experiment_name": "CCSI_sub_refill_syringe",
+            "repeat_experiment_params": {
+                "experiment": apm.pars.experiment,
+                "syringe": "waterclean",
+                "fill_volume_ul": 0,
+            },
+        },
+        from_globalexp_params={"_present_volume_ul": "present_volume_ul"},
+)
+
+
+
+    return apm.action_list
+
+
 
 def CCSI_sub_fill_syringe(
     experiment: Experiment,
