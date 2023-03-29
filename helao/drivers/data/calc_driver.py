@@ -722,9 +722,10 @@ class Calc:
         }
         return return_dict
 
-    async def check_syringe_volume(self, activeobj: Active):
+    async def fill_syringe_volume_check(self, activeobj: Active):
         params = activeobj.action.action_params
         check_volume_ul = params["check_volume_ul"]
+        target_volume_ul = params["target_volume_ul"]
         present_volume_ul = params["present_volume_ul"]
 
         repeat_experiment_name = params["repeat_experiment_name"]
@@ -732,10 +733,25 @@ class Calc:
         kwargs = params["repeat_experiment_kwargs"]
 
         if present_volume_ul < check_volume_ul:
-
+            fill_needed = True
+            fill_vol = target_volume_ul - present_volume_ul
+            repeat_experiment_params = {"fill_volume_ul": fill_vol}
             self.base.print_message(
                 f"current syringe volume: {present_volume_ul} does not meet threshold condition. Refilling"
             )
+        elif check_volume_ul == 0:
+            fill_needed = True
+            fill_vol = target_volume_ul - present_volume_ul
+            repeat_experiment_params = {"fill_volume_ul": fill_vol}
+            self.base.print_message(
+                f"Refilling to target volume: {target_volume_ul}")
+        else:
+            fill_needed = False
+            self.base.print_message(
+                f"current syringe volume: {present_volume_ul} does meet threshold condition. No action needed."
+            )
+
+        if fill_needed:
             world_config = self.base.fastapp.helao_cfg
             orch_name = [
                 k
@@ -760,10 +776,6 @@ class Calc:
             )
             self.base.print_message(f"insert_experiment got response: {resp}")
             self.base.print_message(f"insert_experiment returned error: {error}")
-        else:
-            self.base.print_message(
-                f"current syringe volume: {present_volume_ul} does meet threshold condition. No action needed."
-            )
 
         return_dict = {
             "epoch": float(time.time()),

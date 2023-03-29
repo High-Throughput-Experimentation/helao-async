@@ -713,7 +713,8 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
             #  "HSpurge_duration": LiquidCleanPurge_duration,
         })
 
-        epm.add_experiment("CCSI_sub_refill_syringe", {
+        epm.add_experiment("CCSI_sub_full_fill_syringe", {
+            "syringe": "waterclean",
             "target_volume_ul": 55000 ,
             "Syringe_rate_ulsec": 1000,
         })
