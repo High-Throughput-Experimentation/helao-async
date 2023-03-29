@@ -317,7 +317,7 @@ class Progress:
                 }
                 self.dict.update(exp_dict)
             self.write_dict()
-        elif not hasattr(self, "dict"):
+        else:
             self.read_dict()
 
     def list_unfinished_procs(self):
@@ -476,7 +476,7 @@ class HelaoSyncer:
                 return False
             prog = Progress(yml_path)
             self.progress[yml_path.name] = prog
-        return prog
+        return self.progress[yml_path.name]
 
     async def enqueue_yml(self, upath: Union[Path, str], rank: int = 2):
         """Adds yml to sync queue, defaulting to lowest priority."""
