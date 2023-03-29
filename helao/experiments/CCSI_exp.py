@@ -28,7 +28,7 @@ __all__ = [
     "CCSI_sub_refill_clean",
     "CCSI_debug_co2purge",
     "CCSI_sub_set_syringe_start",
-    "CCSI_sub_refill_syringe",
+    "CCSI_sub_fill_syringe",
 
 ]
 
@@ -919,21 +919,20 @@ def CCSI_sub_clean_inject(
 
     apm = ActionPlanMaker()
     if use_co2_check:
-        apm.add(WATERCLEANPUMP_server, "get_present_volume",{},to_globalexp_params=["syringe_present_volume_ul"]) 
+        apm.add(WATERCLEANPUMP_server, "get_present_volume",{},to_globalexp_params=["present_volume_ul"]) 
         apm.add(
             CALC_server,
             "check_syringe_volume",
             {
-                "syringe": "waterclean",
                 "check_volume": 15000,
                 "repeat_experiment_name": "CCSI_sub_refill_syringe",
                 "repeat_experiment_params": {
-                    k: v
-                    for k, v in vars(apm.pars).items()
-                    if not k.startswith("experiment")
+                    "experiment": experiment,
+                    "syringe": "waterclean",
+                    "fill_volume_ul": 10000,
                 },
             },
-            from_globalexp_params={"syringe_present_volume_ul": "syringe_present_volume_ul"},
+            from_globalexp_params={"present_volume_ul": "present_volume_ul"},
     )
 
     # v2 v1ab open, clean inject
@@ -1198,28 +1197,26 @@ def CCSI_sub_set_syringe_start(
     # if more syringes can add more names here
     return apm.action_list
 
-def CCSI_sub_refill_syringe(
+def CCSI_sub_fill_syringe(
     experiment: Experiment,
     experiment_version: int = 1,
     syringe: str = "waterclean",
-    target_volume_ul: float = 55000,
+    fill_volume_ul: float = 0,
     Syringe_rate_ulsec: float = 1000,
 ):
     apm = ActionPlanMaker()
     if apm.pars.syringe == "waterclean":
-        current_vol = apm.add(WATERCLEANPUMP_server, "get_present_volume",{}) 
-        fill_vol = apm.pars.target_volume_ul - current_vol
-
         apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
-
-        apm.add(WATERCLEANPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": fill_vol})    
+        apm.add(WATERCLEANPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.fill_volume_ul})    
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 0})
 
     if apm.pars.syringe == "solution1":
-        current_vol = apm.add(SOLUTIONPUMP_server, "get_present_volume",{}) 
-        fill_vol = apm.pars.target_volume_ul - current_vol
+        #need valve for this soln
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+        apm.add(SOLUTIONPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.fill_volume_ul})    
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
         #would need a valve for refill of this syringe, then copy steps from watersyringe
 
     return apm.action_list

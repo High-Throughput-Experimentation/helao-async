@@ -724,18 +724,17 @@ class Calc:
 
     async def check_syringe_volume(self, activeobj: Active):
         params = activeobj.action.action_params
-        syringe = params["syringe"]
         check_volume_ul = params["check_volume_ul"]
-        syringe_present_volume_ul = params["syringe_present_volume_ul"]
+        present_volume_ul = params["present_volume_ul"]
 
         repeat_experiment_name = params["repeat_experiment_name"]
         repeat_experiment_params = params["repeat_experiment_params"]
         kwargs = params["repeat_experiment_kwargs"]
 
-        if syringe_present_volume_ul < check_volume_ul:
+        if present_volume_ul < check_volume_ul:
 
             self.base.print_message(
-                f"current syringe volume: {syringe_present_volume_ul} does not meet threshold condition. Refilling"
+                f"current syringe volume: {present_volume_ul} does not meet threshold condition. Refilling"
             )
             world_config = self.base.fastapp.helao_cfg
             orch_name = [
@@ -763,12 +762,12 @@ class Calc:
             self.base.print_message(f"insert_experiment returned error: {error}")
         else:
             self.base.print_message(
-                f"current syringe volume: {syringe_present_volume_ul} does meet threshold condition. No action needed."
+                f"current syringe volume: {present_volume_ul} does meet threshold condition. No action needed."
             )
 
         return_dict = {
             "epoch": float(time.time()),
-            "syringe_present_volume_ul": float(syringe_present_volume_ul),
+            "syringe_present_volume_ul": float(present_volume_ul),
         }
         return return_dict
 
