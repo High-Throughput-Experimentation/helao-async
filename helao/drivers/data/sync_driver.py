@@ -600,13 +600,14 @@ class HelaoSyncer:
 
         self.base.print_message(f"Patching model for {yml.target.name}")
         patched_meta = {MOD_PATCH.get(k, k): v for k, v in meta.items()}
+        yml_model = MOD_MAP[yml.type](**patched_meta).clean_dict()
 
         # next push yml to S3
         if not prog.s3_done:
             self.base.print_message(f"Pushing yml->json to S3 for {yml.target.name}")
             uuid_key = patched_meta[f"{yml.type}_uuid"]
             meta_s3_key = f"{yml.type}/{uuid_key}.json"
-            s3_success = await self.to_s3(patched_meta, meta_s3_key)
+            s3_success = await self.to_s3(yml_model, meta_s3_key)
             if s3_success:
                 prog.dict["s3"] = True
                 prog.write_dict()
@@ -614,8 +615,7 @@ class HelaoSyncer:
         # next push yml to API
         if not prog.api_done:
             self.base.print_message(f"Pushing yml to API for {yml.target.name}")
-            model = MOD_MAP[yml.type](**patched_meta).clean_dict()
-            api_success = await self.to_api(model, yml.type)
+            api_success = await self.to_api(yml_model, yml.type)
             self.base.print_message(
                 f"API push returned {api_success} for {yml.target.name}"
             )
