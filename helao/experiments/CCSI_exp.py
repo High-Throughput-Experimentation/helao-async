@@ -926,7 +926,7 @@ def CCSI_sub_clean_inject(
             {
                 "check_volume_ul": 15000,
                 "target_volume_ul": 25000,
-                "repeat_experiment_name": "CCSI_sub_refill_syringe",
+                "repeat_experiment_name": "CCSI_sub_fill_syringe",
                 "repeat_experiment_params": {
                     "experiment": experiment,
                     "syringe": "waterclean",
