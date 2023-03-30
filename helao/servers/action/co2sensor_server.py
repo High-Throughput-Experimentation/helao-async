@@ -42,7 +42,7 @@ def makeApp(confPrefix, server_key, helao_root):
             oneoff=False,
             poll_rate=active.action.action_params["acquisition_rate"],
         )
-        active_action_dict = await active.start_executor(executor)
+        active_action_dict = active.start_executor(executor)
         return active_action_dict
 
     @app.post(f"/{server_key}/cancel_acquire_co2", tags=["action"])
