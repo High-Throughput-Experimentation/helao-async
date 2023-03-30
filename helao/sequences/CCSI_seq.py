@@ -640,25 +640,27 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 #    purge_if: Union[str, float] = "below",
     HSpurge_duration: float = 15,
     DeltaDilute1_duration: float = 15,
+    initcleans: int = 3,
     drainrecirc: bool = True,
     
 ):
 
     epm = ExperimentPlanMaker()
-    epm.add_experiment("CCSI_sub_clean_inject", {
-        "Waterclean_volume_ul": drainclean_volume_ul,
-        "Syringe_rate_ulsec": syringe_rate_ulsec,
-        "LiquidCleanWait_s": LiquidFillWait_s,
-        "LiquidCleanPurge_duration": LiquidCleanPurge_duration,
-        "co2measure_duration": clean_co2measure_duration,
-        "co2measure_acqrate": co2measure_acqrate,
-        "use_co2_check": True,
-        "co2_ppm_thresh": clean_co2_ppm_thresh,
-        "max_purge_iters": max_purge_iters,
-        # "purge_if": purge_if,
-        "drainrecirc": drainrecirc,
-        #  "HSpurge_duration": LiquidCleanPurge_duration,
-    })
+    for _ in range(initcleans):
+        epm.add_experiment("CCSI_sub_clean_inject", {
+            "Waterclean_volume_ul": drainclean_volume_ul,
+            "Syringe_rate_ulsec": syringe_rate_ulsec,
+            "LiquidCleanWait_s": LiquidFillWait_s,
+            "LiquidCleanPurge_duration": LiquidCleanPurge_duration,
+            "co2measure_duration": clean_co2measure_duration,
+            "co2measure_acqrate": co2measure_acqrate,
+            "use_co2_check": False,
+            "co2_ppm_thresh": clean_co2_ppm_thresh,
+            #"max_purge_iters": max_purge_iters,
+            # "purge_if": purge_if,
+            "drainrecirc": drainrecirc,
+            #  "HSpurge_duration": LiquidCleanPurge_duration,
+        })
 
     epm.add_experiment("CCSI_sub_full_fill_syringe", {
         "syringe": "waterclean",
