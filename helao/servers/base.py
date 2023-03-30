@@ -4,8 +4,9 @@ import asyncio
 import json
 import os
 import sys
+from random import randint
 from socket import gethostname
-from time import ctime, time, time_ns
+from time import ctime, time, time_ns, sleep
 from typing import List, Optional, Dict
 from types import MethodType
 from uuid import UUID, uuid1
@@ -342,6 +343,7 @@ class Base:
                 self.helaodirs.states_root, "ntpLastSync.txt"
             )
             if os.path.exists(self.ntp_last_sync_file):
+                sleep(randint(1, 5))
                 with open(self.ntp_last_sync_file, "r") as f:
                     tmps = f.readline().strip().split(",")
                     if len(tmps) == 2:
@@ -842,6 +844,7 @@ class Base:
                 # async with lock:
                 ntp_last_sync = ""
                 if self.ntp_last_sync_file is not None:
+                    await asyncio.sleep(randint(1, 5))
                     async with aiofiles.open(self.ntp_last_sync_file, "r") as f:
                         ntp_last_sync = await f.readline()
                 parts = ntp_last_sync.strip().split(",")
