@@ -1067,7 +1067,7 @@ def CCSI_sub_full_fill_syringe(
         {
             "check_volume_ul": 0,
             "target_volume_ul": apm.pars.target_volume_ul,
-            "repeat_experiment_name": "CCSI_sub_refill_syringe",
+            "repeat_experiment_name": "CCSI_sub_fill_syringe",
             "repeat_experiment_params": {
                 "syringe": "waterclean",
                 "fill_volume_ul": 0,
