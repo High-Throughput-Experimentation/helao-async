@@ -26,7 +26,6 @@ __all__ = [
     "CCSI_sub_clean_inject",
     "CCSI_sub_refill_clean",
     "CCSI_debug_co2purge",
-#    "CCSI_sub_set_syringe_start",
     "CCSI_sub_fill_syringe",
     "CCSI_sub_full_fill_syringe",
 
@@ -901,13 +900,14 @@ def CCSI_sub_liquidfill_syringes(
 
 def CCSI_sub_clean_inject(
     experiment: Experiment,
-    experiment_version: int = 6,  #ver 2 implements multivalve, ver 3 conditional, ver6 co2checktargetvolumerefills
+    experiment_version: int = 7,  #ver 2 implements multivalve, ver 3 conditional, ver6 co2checktargetvolumerefills
     Waterclean_volume_ul: float = 10000,
     Syringe_rate_ulsec: float = 500,
     LiquidCleanWait_s: float = 15,
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 1,
     use_co2_check: bool = True,
+    need_fill: bool = False,
     co2_ppm_thresh: float = 41000,
     purge_if: Union[str, float] = "below",
     max_purge_iters: int = 5,
@@ -918,22 +918,12 @@ def CCSI_sub_clean_inject(
     # only 1B 6A-waste opened 1A closed pump off//differ from delta purge
 
     apm = ActionPlanMaker()
-    # if use_co2_check:
-    #     apm.add(WATERCLEANPUMP_server, "get_present_volume",{},to_globalexp_params=["_present_volume_ul"]) 
-    #     apm.add(
-    #         CALC_server,
-    #         "fill_syringe_volume_check",
-    #         {
-    #             "check_volume_ul": 15000,
-    #             "target_volume_ul": 25000,
-    #             "repeat_experiment_name": "CCSI_sub_fill_syringe",
-    #             "repeat_experiment_params": {
-    #                 "syringe": "waterclean",
-    #                 "fill_volume_ul": 0,
-    #             },
-    #         },
-    #         from_globalexp_params={"_present_volume_ul": "present_volume_ul"},
-    # )
+    if apm.pars.need_fill:
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+        apm.add(WATERCLEANPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": 10000})    
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 0})
 
     # v2 v1ab open, clean inject
 
@@ -952,6 +942,7 @@ def CCSI_sub_clean_inject(
             "volume_uL": apm.pars.Waterclean_volume_ul,
         },
     )
+    apm.add(WATERCLEANPUMP_server, "get_present_volume",{},to_globalexp_params=["_present_volume_ul"]) 
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
     # v7  open, mfc flow, wait, syringe retract
@@ -990,7 +981,7 @@ def CCSI_sub_clean_inject(
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
 #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
-    if use_co2_check:
+    if apm.pars.use_co2_check:
         apm.add(
             CO2S_server,
             "acquire_co2",
@@ -1001,7 +992,7 @@ def CCSI_sub_clean_inject(
         )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
-    if use_co2_check:
+    if apm.pars.use_co2_check:
         apm.add(
             CALC_server,
             "check_co2_purge",
@@ -1015,6 +1006,7 @@ def CCSI_sub_clean_inject(
                     if not k.startswith("experiment")
                 },
             },
+            from_globalexp_params={"_present_volume_ul": "present_syringe_volume_ul"},
         )
     apm.add_action_list(CCSI_sub_drain(experiment=experiment,HSpurge_duration=apm.pars.LiquidCleanPurge_duration,recirculation=apm.pars.drainrecirc))
 

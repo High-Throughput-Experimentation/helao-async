@@ -632,6 +632,7 @@ class Calc:
         params = activeobj.action.action_params
         co2_ppm_thresh = params["co2_ppm_thresh"]
         purge_if = params["purge_if"]
+        present_syringe_volume_ul = params["present_syringe_volume_ul"]
         repeat_experiment_name = params["repeat_experiment_name"]
         repeat_experiment_params = params["repeat_experiment_params"]
         kwargs = params["repeat_experiment_kwargs"]
@@ -692,6 +693,9 @@ class Calc:
                 for k, d in world_config.get("servers", {}).items()
                 if d["group"] == "orchestrator"
             ][0]
+        if present_syringe_volume_ul < 15000:  #hard coded 15000ul check for syringe volume
+            repeat_experiment_params = {"need_fill": True} 
+            
             rep_exp = Experiment(
                 experiment_name=repeat_experiment_name,
                 experiment_params=repeat_experiment_params,
