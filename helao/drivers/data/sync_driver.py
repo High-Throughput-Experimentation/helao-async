@@ -598,7 +598,8 @@ class HelaoSyncer:
                 return False
             if prog.dict["process_metas"]:
                 meta["process_list"] = [
-                    d["process_uuid"] for d in prog.dict["process_metas"].items()
+                    d["process_uuid"]
+                    for _, d in sorted(prog.dict["process_metas"].items())
                 ]
 
         self.base.print_message(f"Patching model for {yml.target.name}")
