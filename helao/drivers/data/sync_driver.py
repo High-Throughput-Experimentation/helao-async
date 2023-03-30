@@ -476,9 +476,10 @@ class HelaoSyncer:
                 hy = HelaoYml(yml_path)
                 hy.check_paths()
                 prog = Progress(hy.target)
+                prog.write_dict()
             else:
                 prog = Progress(yml_path)
-            self.progress[yml_path.name] = prog
+        self.progress[yml_path.name] = prog
         return self.progress[yml_path.name]
 
     async def enqueue_yml(self, upath: Union[Path, str], rank: int = 2):
