@@ -1087,8 +1087,9 @@ class Active:
         self.action_loop_running = False
         self.action_task = None
 
-    async def start_executor(self, executor: Executor):
+    def start_executor(self, executor: Executor):
         self.action_task = self.base.aloop.create_task(self.action_loop_task(executor))
+        self.base.print_message("Executor task started.")
         return self.action.as_dict()
 
     async def update_act_file(self):
@@ -2058,6 +2059,6 @@ class DummyBase:
         for k, v in message:
             self.live_buffer[k] = (v, now)
 
-    async def get_lbuf(self, buf_key: str) -> tuple:
+    def get_lbuf(self, buf_key: str) -> tuple:
         buf_val, buf_ts = self.live_buffer[buf_key]
         return buf_val, buf_ts

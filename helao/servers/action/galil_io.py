@@ -52,7 +52,9 @@ async def galil_dyn_endpoints(app=None):
                     oneoff=False,
                     poll_rate=active.action.action_params["acquisition_rate"],
                 )
+                app.base.print_message("Starting executor task.")
                 active_action_dict = active.start_executor(executor)
+                app.base.print_message("Returning active dict.")
                 return active_action_dict
 
             @app.post(f"/{server_key}/cancel_acquire_analog_in", tags=["action"])

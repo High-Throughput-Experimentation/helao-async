@@ -648,6 +648,7 @@ class Calc:
         params = activeobj.action.action_params
         co2_ppm_thresh = params["co2_ppm_thresh"]
         purge_if = params["purge_if"]
+        present_syringe_volume_ul = params["present_syringe_volume_ul"]
         repeat_experiment_name = params["repeat_experiment_name"]
         repeat_experiment_params = params["repeat_experiment_params"]
         kwargs = params["repeat_experiment_kwargs"]
@@ -694,6 +695,9 @@ class Calc:
                 abs(purge_if) * 2**0.5 * np.sign(purge_if)
             )
 
+        if present_syringe_volume_ul < 15000:  #hard coded 15000ul check for syringe volume
+            repeat_experiment_params["need_fill"] = True
+
         if loop_condition and len(exp_dict) == max_loops:
             self.base.print_message(
                 f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition but max_purge_iters ({max_loops}) reached. Exiting."
@@ -737,6 +741,68 @@ class Calc:
             "redo_purge": bool(loop_condition),
         }
         return return_dict
+
+    async def fill_syringe_volume_check(self, activeobj: Active):
+        params = activeobj.action.action_params
+        check_volume_ul = params["check_volume_ul"]
+        target_volume_ul = params["target_volume_ul"]
+        present_volume_ul = params["present_volume_ul"]
+
+        repeat_experiment_name = params["repeat_experiment_name"]
+        repeat_experiment_params = params["repeat_experiment_params"]
+        kwargs = params["repeat_experiment_kwargs"]
+
+        if present_volume_ul < check_volume_ul:
+            fill_needed = True
+            fill_vol = target_volume_ul - present_volume_ul
+            repeat_experiment_params = {"fill_volume_ul": fill_vol}
+            self.base.print_message(
+                f"current syringe volume: {present_volume_ul} does not meet threshold condition. Refilling"
+            )
+        elif check_volume_ul == 0:
+            fill_needed = True
+            fill_vol = target_volume_ul - present_volume_ul
+            repeat_experiment_params = {"fill_volume_ul": fill_vol}
+            self.base.print_message(
+                f"Refilling to target volume: {target_volume_ul}")
+        else:
+            fill_needed = False
+            self.base.print_message(
+                f"current syringe volume: {present_volume_ul} does meet threshold condition. No action needed."
+            )
+
+        if fill_needed:
+            world_config = self.base.fastapp.helao_cfg
+            orch_name = [
+                k
+                for k, d in world_config.get("servers", {}).items()
+                if d["group"] == "orchestrator"
+            ][0]
+            rep_exp = Experiment(
+                experiment_name=repeat_experiment_name,
+                experiment_params=repeat_experiment_params,
+                **kwargs,
+            )
+            self.base.print_message("queueing repeat experiment request on Orch")
+            resp, error = await async_private_dispatcher(
+                world_config,
+                orch_name,
+                "insert_experiment",
+                params_dict={},
+                json_dict={
+                    "idx": 0,
+                    "experiment": rep_exp.json_dict(),
+                },
+            )
+            self.base.print_message(f"insert_experiment got response: {resp}")
+            self.base.print_message(f"insert_experiment returned error: {error}")
+
+        return_dict = {
+            "epoch": float(time.time()),
+            "syringe_present_volume_ul": float(present_volume_ul),
+        }
+        return return_dict
+
 
     def shutdown(self):
         pass

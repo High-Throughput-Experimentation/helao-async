@@ -334,7 +334,7 @@ class HelaoOrch(HelaoFastAPI):
                 active=active,
                 oneoff=False,
             )
-            active_action_dict = await active.start_executor(executor)
+            active_action_dict = active.start_executor(executor)
             return active_action_dict
 
         @self.post(f"/{server_key}/cancel_wait", tags=["action"])
