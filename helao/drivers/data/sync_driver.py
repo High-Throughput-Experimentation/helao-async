@@ -385,6 +385,33 @@ class HelaoSyncer:
 
         self.syncer_loop = asyncio.create_task(self.syncer(), name="syncer_loop")
 
+    def try_remove_empty(self, remove_target):
+        success = False
+        contents = glob(os.path.join(remove_target, "*"))
+        if len(contents) == 0:
+            try:
+                os.rmdir(remove_target)
+                success = True
+            except Exception as err:
+                tb = "".join(
+                    traceback.format_exception(type(err), err, err.__traceback__)
+                )
+                self.base.print_message(
+                    f"Directory {remove_target} is empty, but could not removed. {repr(err), tb,}",
+                    error=True,
+                )
+        else:
+            sub_dirs = [x for x in contents if os.path.isdir(x)]
+            sub_success = False
+            sub_removes = []
+            for subdir in sub_dirs:
+                sub_removes.append(self.try_remove_empty(subdir))
+            sub_success = all(sub_removes)
+            sub_files = [x for x in contents if os.path.isfile(x)]
+            if not sub_files and sub_success:
+                success = True
+        return success
+
     def cleanup_root(self):
         """Remove leftover empty directories."""
         today = datetime.strptime(datetime.now().strftime("%Y%m%d"), "%Y%m%d")
@@ -398,35 +425,13 @@ class HelaoSyncer:
                     dateonly = datetime.strptime(
                         os.path.basename(datedir), "%Y%m%d.%H%M%S%f"
                     )
-                if dateonly < today:
+                if dateonly <= today:
                     seq_dirs = glob(os.path.join(datedir, "*"))
                     if len(seq_dirs) == 0:
-                        try:
-                            os.rmdir(datedir)
-                        except Exception as err:
-                            tb = "".join(
-                                traceback.format_exception(
-                                    type(err), err, err.__traceback__
-                                )
-                            )
-                            self.base.print_message(
-                                f"Directory {datedir} is empty, but could not removed. {repr(err), tb,}",
-                                error=True,
-                            )
+                        self.try_remove_empty(datedir)
                     weekdir = os.path.dirname(datedir)
                     if len(glob(os.path.join(weekdir, "*"))) == 0:
-                        try:
-                            os.rmdir(weekdir)
-                        except Exception as err:
-                            tb = "".join(
-                                traceback.format_exception(
-                                    type(err), err, err.__traceback__
-                                )
-                            )
-                            self.base.print_message(
-                                f"Directory {weekdir} is empty, but could not removed. {repr(err), tb,}",
-                                error=True,
-                            )
+                        self.try_remove_empty(weekdir)
 
     def sync_exit_callback(self, task: asyncio.Task):
         task_name = task.get_name()
@@ -674,7 +679,7 @@ class HelaoSyncer:
                     f"Full sequence has synced, creating zip: {str(zip_target)}"
                 )
                 zip_dir(yml.target.parent, zip_target)
-
+                self.try_remove_empty(yml.target.parent)
                 self.cleanup_root()
                 self.base.print_message(f"Removing sequence from progress.")
                 self.progress.pop(yml.target.name)
