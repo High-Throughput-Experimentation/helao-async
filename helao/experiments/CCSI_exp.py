@@ -921,7 +921,7 @@ def CCSI_sub_clean_inject(
     if apm.pars.need_fill:
         apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
-        apm.add(WATERCLEANPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": 10000})    
+        apm.add(WATERCLEANPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.Waterclean_volume_ul})    
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 0})
 
