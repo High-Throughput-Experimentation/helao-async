@@ -704,11 +704,13 @@ class HelaoSyncer:
         pidx = (
             len(pf_idxs)
             if act_idx > max(pf_idxs + [-1])
-            else min(x for x in pf_idxs if x >= act_idx)
+            else pf_idxs.index(min(x for x in pf_idxs if x >= act_idx))
         )
-        exp_prog.dict["process_groups"][pidx] = (
-            exp_prog.dict["process_groups"].get(pidx, []).append(act_idx)
+        exp_prog.dict["process_groups"][pidx] = exp_prog.dict["process_groups"].get(
+            pidx, []
         )
+        exp_prog.dict["process_groups"][pidx].append(act_idx)
+
         # if exp_prog doesn't yet have metadict, create one
         if pidx not in exp_prog.dict["process_metas"]:
             exp_prog.dict["process_metas"][pidx] = {
@@ -741,7 +743,9 @@ class HelaoSyncer:
 
         self.base.print_message(f"current experiment progress:\n{exp_prog.dict}")
         if act_idx == min(exp_prog.dict["process_groups"][pidx]):
-            exp_prog.dict["process_metas"][pidx]["process_timestamp"] = act_meta["action_timestamp"]
+            exp_prog.dict["process_metas"][pidx]["process_timestamp"] = act_meta[
+                "action_timestamp"
+            ]
         for pc in act_meta["process_contrib"]:
             contrib = act_meta[pc.name]
             new_name = pc.name.replace("action_", "process_")
