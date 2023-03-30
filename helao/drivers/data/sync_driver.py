@@ -109,27 +109,26 @@ class HelaoYml:
                     break
             if not self.exists:
                 raise ValueError(f"{self.target} does not exist")
+        if self.target.is_dir():
+            self.dir = self.target
+            possible_ymls = [
+                x
+                for x in list(self.dir.glob("*.yml"))
+                if x.stem.endswith("-seq")
+                or x.stem.endswith("-exp")
+                or x.stem.endswith("-act")
+            ]
+            if len(possible_ymls) > 1:
+                raise ValueError(
+                    f"{self.dir} contains multiple .yml files and is not a valid Helao directory"
+                )
+            elif not possible_ymls:
+                raise ValueError(
+                    f"{self.dir} does not contain any .yml files and is not a valid Helao dir"
+                )
+            self.target = possible_ymls[0]
         else:
-            if self.target.is_dir():
-                self.dir = self.target
-                possible_ymls = [
-                    x
-                    for x in list(self.dir.glob("*.yml"))
-                    if x.stem.endswith("-seq")
-                    or x.stem.endswith("-exp")
-                    or x.stem.endswith("-act")
-                ]
-                if len(possible_ymls) > 1:
-                    raise ValueError(
-                        f"{self.dir} contains multiple .yml files and is not a valid Helao directory"
-                    )
-                elif not possible_ymls:
-                    raise ValueError(
-                        f"{self.dir} does not contain any .yml files and is not a valid Helao dir"
-                    )
-                self.target = possible_ymls[0]
-            else:
-                self.dir = self.target.parent
+            self.dir = self.target.parent
         self.parts = list(self.target.parts)
         if not any([x.startswith("RUNS_") for x in self.dir.parts]):
             raise ValueError(
