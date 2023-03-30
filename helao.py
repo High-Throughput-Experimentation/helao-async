@@ -490,16 +490,19 @@ if __name__ == "__main__":
     for server_name in ["_MASTER_", "bokeh_launcher", "fast_launcher"]:
         old_log_txts = glob(os.path.join(log_root, server_name, "*.txt"))
         for old_log in old_log_txts:
-            with open(old_log) as f:
-                line0 = f.readline()
-            timestamp = re.findall("[0-9]{2}:[0-9]{2}:[0-9]{2}", line0)[0].replace(
-                ":", ""
-            )
-            zipname = old_log.replace(".txt", f"{timestamp}.zip")
-            arcname = os.path.basename(old_log).replace(".txt", f"{timestamp}.txt")
-            with zipfile.ZipFile(zipname, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-                zf.write(old_log, arcname)
-            os.remove(old_log)
+            try:
+                with open(old_log) as f:
+                    line0 = f.readline()
+                timestamp = re.findall("[0-9]{2}:[0-9]{2}:[0-9]{2}", line0)[0].replace(
+                    ":", ""
+                )
+                zipname = old_log.replace(".txt", f"{timestamp}.zip")
+                arcname = os.path.basename(old_log).replace(".txt", f"{timestamp}.txt")
+                with zipfile.ZipFile(zipname, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+                    zf.write(old_log, arcname)
+                os.remove(old_log)
+            except:
+                print_message({}, "launcher", f"Error compressing log: {old_log}")
 
     pidd = launcher(confArg=confArg, confDict=config, helao_root=helao_root)
 

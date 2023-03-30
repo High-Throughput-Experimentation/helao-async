@@ -936,19 +936,24 @@ class Orch(Base):
                 srvname = resmod.action_server.server_name
                 actname = resmod.action_name
                 resuuid = resmod.action_uuid
-                actstat = resmod.action_status
+                actstats = resmod.action_status
                 srvkeys = self.globalstatusmodel.server_dict.keys()
                 srvkey = [k for k in srvkeys if k[0] == srvname][0]
-                if HloStatus.active in actstat:
+                if HloStatus.active in actstats:
                     self.globalstatusmodel.active_dict[resuuid] = resmod
                     self.globalstatusmodel.server_dict[srvkey].endpoints[
                         actname
                     ].active_dict[resuuid] = resmod
                 else:
-                    self.globalstatusmodel.nonactive_dict[actstat[0]][resuuid] = resmod
-                    self.globalstatusmodel.server_dict[srvkey].endpoints[
-                        actname
-                    ].nonactive_dict[actstat[0]][resuuid] = resmod
+                    for actstat in actstats:
+                        try:
+                            self.globalstatusmodel.nonactive_dict[actstat][resuuid] = resmod
+                            self.globalstatusmodel.server_dict[srvkey].endpoints[
+                                actname
+                            ].nonactive_dict[actstat][resuuid] = resmod
+                            break
+                        except:
+                            self.print_message(f"{actstat} not found in globalstatus.nonactive_dict")
                 # await self.interrupt_q.put(self.globalstatusmodel)
                 # await self.update_operator(True)
                 # await self.globstat_q.put(self.globalstatusmodel.as_json())
