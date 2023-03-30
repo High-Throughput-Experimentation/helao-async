@@ -473,8 +473,11 @@ class HelaoSyncer:
                 prog.write_dict()
         else:
             if not yml_path.exists():
-                return False
-            prog = Progress(yml_path)
+                hy = HelaoYml(yml_path)
+                hy.check_paths()
+                prog = Progress(hy.target)
+            else:
+                prog = Progress(yml_path)
             self.progress[yml_path.name] = prog
         return self.progress[yml_path.name]
 
@@ -749,7 +752,9 @@ class HelaoSyncer:
         for pc in act_meta["process_contrib"]:
             contrib = act_meta[pc]
             new_name = pc.replace("action_", "process_")
-            if isinstance(contrib, dict):
+            if new_name not in exp_prog.dict["process_metas"][pidx]:
+                exp_prog.dict["process_metas"][pidx][new_name] = contrib
+            elif isinstance(contrib, dict):
                 exp_prog.dict["process_metas"][pidx][new_name].update(contrib)
             elif isinstance(contrib, list):
                 exp_prog.dict["process_metas"][pidx][new_name] += contrib
