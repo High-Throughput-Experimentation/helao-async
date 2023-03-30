@@ -650,6 +650,7 @@ class HelaoSyncer:
             yml_success = move_to_synced(yml_path)
             if yml_success:
                 result = yml.cleanup()
+                self.try_remove_empty(yml.target.parent)
                 self.base.print_message(f"Cleanup {yml.target.name} {result}.")
                 if result == "success":
                     prog.yml = HelaoYml(yml_success)
@@ -679,7 +680,6 @@ class HelaoSyncer:
                     f"Full sequence has synced, creating zip: {str(zip_target)}"
                 )
                 zip_dir(yml.target.parent, zip_target)
-                self.try_remove_empty(yml.target.parent)
                 self.cleanup_root()
                 self.base.print_message(f"Removing sequence from progress.")
                 self.progress.pop(yml.target.name)
