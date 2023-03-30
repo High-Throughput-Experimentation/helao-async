@@ -26,7 +26,7 @@ __all__ = [
     "CCSI_sub_clean_inject",
     "CCSI_sub_refill_clean",
     "CCSI_debug_co2purge",
-    "CCSI_sub_set_syringe_start",
+#    "CCSI_sub_set_syringe_start",
     "CCSI_sub_fill_syringe",
     "CCSI_sub_full_fill_syringe",
 
@@ -1037,19 +1037,19 @@ def CCSI_sub_refill_clean(
     
     return apm.action_list
 
-def CCSI_sub_set_syringe_start(
-    experiment: Experiment,
-    experiment_version: int = 1,
-    syringe: str = "waterclean",
-    Starting_volume_ul: float = 50000,
-):
-    apm = ActionPlanMaker()
-    if apm.pars.syringe == "waterclean":
-        apm.add(WATERCLEANPUMP_server, "set_present_volume", {"volume_uL": apm.pars.Starting_volume_ul}) 
-    if apm.pars.syringe == "solution1":
-        apm.add(SOLUTIONPUMP_server, "set_present_volume", {"volume_uL": apm.pars.Starting_volume_ul}) 
-    # if more syringes can add more names here
-    return apm.action_list
+# def CCSI_sub_set_syringe_start(
+#     experiment: Experiment,
+#     experiment_version: int = 1,
+#     syringe: str = "waterclean",
+#     Starting_volume_ul: float = 50000,
+# ):
+#     apm = ActionPlanMaker()
+#     if apm.pars.syringe == "waterclean":
+#         apm.add(WATERCLEANPUMP_server, "set_present_volume", {"volume_uL": apm.pars.Starting_volume_ul}) 
+#     if apm.pars.syringe == "solution1":
+#         apm.add(SOLUTIONPUMP_server, "set_present_volume", {"volume_uL": apm.pars.Starting_volume_ul}) 
+#     # if more syringes can add more names here
+#     return apm.action_list
 
 
 def CCSI_sub_full_fill_syringe(
