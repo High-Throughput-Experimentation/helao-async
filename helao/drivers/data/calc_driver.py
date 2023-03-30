@@ -679,6 +679,9 @@ class Calc:
                 abs(purge_if) * 2**0.5 * np.sign(purge_if)
             )
 
+        if present_syringe_volume_ul < 15000:  #hard coded 15000ul check for syringe volume
+            repeat_experiment_params["need_fill"] = True
+
         if loop_condition and len(exp_dict) == max_loops:
             self.base.print_message(
                 f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition but max_purge_iters ({max_loops}) reached. Exiting."
@@ -693,9 +696,6 @@ class Calc:
                 for k, d in world_config.get("servers", {}).items()
                 if d["group"] == "orchestrator"
             ][0]
-        if present_syringe_volume_ul < 15000:  #hard coded 15000ul check for syringe volume
-            repeat_experiment_params = {"need_fill": True} 
-            
             rep_exp = Experiment(
                 experiment_name=repeat_experiment_name,
                 experiment_params=repeat_experiment_params,
