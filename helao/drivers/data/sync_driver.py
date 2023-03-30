@@ -650,7 +650,6 @@ class HelaoSyncer:
             yml_success = move_to_synced(yml_path)
             if yml_success:
                 result = yml.cleanup()
-                self.try_remove_empty(yml.target.parent)
                 self.base.print_message(f"Cleanup {yml.target.name} {result}.")
                 if result == "success":
                     prog.yml = HelaoYml(yml_success)
@@ -664,12 +663,16 @@ class HelaoSyncer:
                 self.base.print_message(f"Removing children from progress: {children}.")
                 for childyml in children:
                     self.base.print_message(f"Clearing {childyml.target.name}")
+                    finished_child_path = childyml.finished_path.parent
+                    if finished_child_path.exists():
+                        self.try_remove_empty(str(finished_child_path))
                     try:
                         self.progress.pop(childyml.target.name)
                     except Exception as err:
                         self.base.print_message(
                             f"Could not remove {childyml.target.name}: {err}"
                         )
+                self.try_remove_empty(str(yml.finished_path.parent))
 
             if yml.type == "sequence":
                 self.base.print_message(f"Zipping {yml.target.parent.name}.")
