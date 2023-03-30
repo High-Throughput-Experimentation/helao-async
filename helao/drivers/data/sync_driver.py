@@ -750,6 +750,8 @@ class HelaoSyncer:
                 "action_timestamp"
             ]
         for pc in act_meta["process_contrib"]:
+            if pc not in act_meta:
+                continue
             contrib = act_meta[pc]
             new_name = pc.replace("action_", "process_")
             if new_name not in exp_prog.dict["process_metas"][pidx]:
