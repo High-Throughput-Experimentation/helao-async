@@ -747,8 +747,8 @@ class HelaoSyncer:
                 "action_timestamp"
             ]
         for pc in act_meta["process_contrib"]:
-            contrib = act_meta[pc.name]
-            new_name = pc.name.replace("action_", "process_")
+            contrib = act_meta[pc]
+            new_name = pc.replace("action_", "process_")
             if isinstance(contrib, dict):
                 exp_prog.dict["process_metas"][pidx][new_name].update(contrib)
             elif isinstance(contrib, list):
