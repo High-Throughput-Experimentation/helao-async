@@ -666,7 +666,7 @@ class Orch(Base):
         await websocket.accept()
         try:
             async for globstat_msg in self.globstat_q.subscribe():
-                await websocket.send_text(json.dumps(globstat_msg.json_dict()))
+                await websocket.send_text(json.dumps(globstat_msg.clean_dict()))
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             self.print_message(
@@ -1250,7 +1250,7 @@ class Orch(Base):
             action_dict.update(
                 {
                     "action_name": "estop",
-                    "action_server": actionservermodel.action_server.json_dict(),
+                    "action_server": actionservermodel.action_server.clean_dict(),
                     "action_params": {"switch": switch},
                     "start_condition": ActionStartCondition.no_wait,
                 }

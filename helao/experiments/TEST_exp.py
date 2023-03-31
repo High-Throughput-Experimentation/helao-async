@@ -19,9 +19,9 @@ from helao.drivers.io.enum import TriggerType
 
 EXPERIMENTS = __all__
 
-ORCH_server = MM(server_name="ORCH", machine_name=gethostname()).json_dict()
-PAL_server = MM(server_name="PAL", machine_name=gethostname()).json_dict()
-CALC_server = MM(server_name="CALC", machine_name=gethostname()).json_dict()
+ORCH_server = MM(server_name="ORCH", machine_name=gethostname()).clean_dict()
+PAL_server = MM(server_name="PAL", machine_name=gethostname()).clean_dict()
+CALC_server = MM(server_name="CALC", machine_name=gethostname()).clean_dict()
 
 
 def TEST_sub_noblocking(

@@ -607,7 +607,7 @@ class Base:
         actionmodel: ActionModel,
     ):
         # needs private dispatcher
-        json_dict = {"actionmodel": actionmodel.json_dict()}
+        json_dict = {"actionmodel": actionmodel.clean_dict()}
         self.print_message(f"sending non-blocking status: {json_dict}")
         response, error_code = await async_private_dispatcher(
             world_config_dict=self.world_cfg,
@@ -681,7 +681,7 @@ class Base:
         await websocket.accept()
         try:
             async for status_msg in self.status_q.subscribe():
-                await websocket.send_text(json.dumps(status_msg.json_dict()))
+                await websocket.send_text(json.dumps(status_msg.clean_dict()))
         # except WebSocketDisconnect:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -696,7 +696,7 @@ class Base:
         await websocket.accept()
         try:
             async for data_msg in self.data_q.subscribe():
-                await websocket.send_text(json.dumps(data_msg.json_dict()))
+                await websocket.send_text(json.dumps(data_msg.clean_dict()))
         # except WebSocketDisconnect:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))

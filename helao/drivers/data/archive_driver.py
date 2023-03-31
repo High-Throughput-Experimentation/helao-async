@@ -270,7 +270,7 @@ class Archive:
     def write_config(self):
         if self.archivejson is not None:
             with open(self.archivejson, "w") as f:
-                json.dump(self.positions.json_dict(), f)
+                json.dump(self.positions.clean_dict(), f)
         # if self.archivejson is not None:
         #     data = {"customs":self.positions.customs_dict, "trays":self.positions.trays_dict}
         #     with open(self.archivejson, "wb") as f:
