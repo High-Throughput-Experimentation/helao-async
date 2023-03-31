@@ -639,7 +639,7 @@ class Operator:
             self.sequence_list[key] = []
 
         for seq in sequences:
-            seqdict = seq.clean_dict()
+            seqdict = seq.as_dict()
             self.sequence_list["sequence_name"].append(
                 seqdict.get("sequence_name", None)
             )
@@ -659,7 +659,7 @@ class Operator:
             self.experiment_list[key] = []
 
         for exp in experiments:
-            expdict = exp.clean_dict()
+            expdict = exp.as_dict()
             self.experiment_list["experiment_name"].append(
                 expdict.get("experiment_name", None)
             )
@@ -679,7 +679,7 @@ class Operator:
             self.action_list[key] = []
 
         for act in actions:
-            actdict = act.clean_dict()
+            actdict = act.as_dict()
             self.action_list["action_name"].append(actdict.get("action_name", None))
             self.action_list["action_server"].append(act.action_server.disp_name())
             self.action_list["action_uuid"].append(actdict.get("action_uuid", None))
@@ -693,7 +693,7 @@ class Operator:
         for key in self.active_action_list:
             self.active_action_list[key] = []
         for act in actions:
-            actdict = act.clean_dict()
+            actdict = act.as_dict()
             liquid_list, solid_list, gas_list = unpack_samples_helper(
                 samples=act.samples_in
             )

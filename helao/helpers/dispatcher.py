@@ -29,7 +29,7 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action):
         async with session.post(
             url,
             params={},
-            json={"action": A.clean_dict()},
+            json={"action": A.as_dict()},
         ) as resp:
             error_code = ErrorCodes.none
             try:
