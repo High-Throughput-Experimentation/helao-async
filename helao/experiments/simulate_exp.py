@@ -32,11 +32,11 @@ from helaocore.models.machine import MachineModel
 EXPERIMENTS = __all__
 
 ORCH_HOST = gethostname()
-ANA_server = MachineModel(server_name="ANA", machine_name=ORCH_HOST).json_dict()
-PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).json_dict()
-MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).json_dict()
-ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).json_dict()
-PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).json_dict()
+ANA_server = MachineModel(server_name="ANA", machine_name=ORCH_HOST).clean_dict()
+PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).clean_dict()
+MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).clean_dict()
+ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).clean_dict()
+PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).clean_dict()
 
 
 # given solution pH, element space, and element fractions, measure CP at 3 and 10 mA/cm2

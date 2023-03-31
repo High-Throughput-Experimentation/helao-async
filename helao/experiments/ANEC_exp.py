@@ -50,12 +50,12 @@ from helao.drivers.io.enum import TriggerType
 EXPERIMENTS = __all__
 
 ORCH_HOST = gethostname()
-PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).json_dict()
-MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).json_dict()
-NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).json_dict()
-ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).json_dict()
-PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).json_dict()
-IO_server = MachineModel(server_name="IO", machine_name=ORCH_HOST).json_dict()
+PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).clean_dict()
+MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).clean_dict()
+NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).clean_dict()
+ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).clean_dict()
+PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).clean_dict()
+IO_server = MachineModel(server_name="IO", machine_name=ORCH_HOST).clean_dict()
 
 toggle_triggertype = TriggerType.fallingedge
 

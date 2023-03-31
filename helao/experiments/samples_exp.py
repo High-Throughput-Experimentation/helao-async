@@ -24,7 +24,7 @@ from helaocore.models.machine import MachineModel
 
 EXPERIMENTS = __all__
 
-PAL_server = MachineModel(server_name="PAL", machine_name=gethostname()).json_dict()
+PAL_server = MachineModel(server_name="PAL", machine_name=gethostname()).clean_dict()
 
 
 def create_liquid_sample(

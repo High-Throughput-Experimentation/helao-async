@@ -988,7 +988,7 @@ class YmlOps:
         p_uuid = pdict["meta"][
             f"{meta_type}_uuid" if isinstance(progress_key, str) else "process_uuid"
         ]
-        req_model = modmap[meta_type](**pdict["meta"]).json_dict()
+        req_model = modmap[meta_type](**pdict["meta"]).clean_dict()
         req_url = f"https://{self.dbp.api_host}/{plural[meta_type]}/"
         self.dbp.base.print_message(
             f"attempting API push for {self.yml.target.__str__()} :: {progress_key} :: {p_uuid}"

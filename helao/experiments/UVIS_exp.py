@@ -33,13 +33,13 @@ from helao.drivers.spec.enum import SpecType
 
 EXPERIMENTS = __all__
 
-MOTOR_server = MM(server_name="MOTOR", machine_name=gethostname()).json_dict()
-IO_server = MM(server_name="IO", machine_name=gethostname()).json_dict()
-SPEC_T_server = MM(server_name="SPEC_T", machine_name=gethostname()).json_dict()
-SPEC_R_server = MM(server_name="SPEC_R", machine_name=gethostname()).json_dict()
-ORCH_server = MM(server_name="ORCH", machine_name=gethostname()).json_dict()
-PAL_server = MM(server_name="PAL", machine_name=gethostname()).json_dict()
-CALC_server = MM(server_name="CALC", machine_name=gethostname()).json_dict()
+MOTOR_server = MM(server_name="MOTOR", machine_name=gethostname()).clean_dict()
+IO_server = MM(server_name="IO", machine_name=gethostname()).clean_dict()
+SPEC_T_server = MM(server_name="SPEC_T", machine_name=gethostname()).clean_dict()
+SPEC_R_server = MM(server_name="SPEC_R", machine_name=gethostname()).clean_dict()
+ORCH_server = MM(server_name="ORCH", machine_name=gethostname()).clean_dict()
+PAL_server = MM(server_name="PAL", machine_name=gethostname()).clean_dict()
+CALC_server = MM(server_name="CALC", machine_name=gethostname()).clean_dict()
 
 toggle_triggertype = TriggerType.fallingedge
 

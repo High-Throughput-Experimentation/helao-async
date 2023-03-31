@@ -725,7 +725,7 @@ class Calc:
                 params_dict={},
                 json_dict={
                     "idx": 0,
-                    "experiment": rep_exp.json_dict(),
+                    "experiment": rep_exp.clean_dict(),
                 },
             )
             self.base.print_message(f"insert_experiment got response: {resp}")
@@ -791,7 +791,7 @@ class Calc:
                 params_dict={},
                 json_dict={
                     "idx": 0,
-                    "experiment": rep_exp.json_dict(),
+                    "experiment": rep_exp.clean_dict(),
                 },
             )
             self.base.print_message(f"insert_experiment got response: {resp}")
