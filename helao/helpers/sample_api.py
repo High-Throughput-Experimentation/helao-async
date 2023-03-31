@@ -180,7 +180,7 @@ class _BaseSampleAPI:
                 sample.last_update = self._base.get_realtime_nowait()
             sample.global_label = sample.get_global_label()
 
-            dfdict = sample.clean_dict()
+            dfdict = sample.as_dict()
             for key in self._jsonkeys:
                 dfdict.update({key: [json.dumps(dfdict[key])]})
 
@@ -368,7 +368,7 @@ class _BaseSampleAPI:
             retsample_list = self._df_to_samples(retdf)
             for retsample in retsample_list:
                 if retsample.sample_type is not None:
-                    ret_samples.append(retsample.clean_dict())
+                    ret_samples.append(retsample.as_dict())
             self._close_db()
             # print('\n\n', ret_samples, '\n\n')
         return ret_samples
@@ -456,7 +456,7 @@ class _BaseSampleAPI:
                 sample.last_update = self._base.get_realtime_nowait()
 
                 # update the old sample now
-                dfdict = sample.clean_dict()
+                dfdict = sample.as_dict()
                 for key in self._jsonkeys:
                     # fdict.update({key: [json.dumps(dfdict[key])]})
                     dfdict.update({key: json.dumps(dfdict[key])})
