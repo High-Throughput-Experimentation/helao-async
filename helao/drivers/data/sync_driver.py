@@ -778,10 +778,11 @@ class HelaoSyncer:
             gids = exp_prog.dict["process_groups"][pidx]
             if all([i in exp_prog.dict["process_finished_idxs"] for i in gids]):
                 meta = exp_prog.dict["process_metas"][pidx]
+                model = MOD_MAP["process"](**meta).clean_dict()
                 # sync to s3
                 uuid_key = meta["process_uuid"]
                 meta_s3_key = f"process/{uuid_key}.json"
-                s3_success = await self.to_s3(meta, meta_s3_key)
+                s3_success = await self.to_s3(model, meta_s3_key)
                 if s3_success:
                     exp_prog.dict["process_s3"].append(pidx)
                     exp_prog.write_dict()
