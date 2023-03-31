@@ -449,16 +449,16 @@ class HelaoSyncer:
         while True:
             if len(self.running_tasks) < MAX_TASKS:
                 self.base.print_message("Getting next yml_target from queue.")
-                priority, yml_target = await self.task_queue.get()
+                rank, yml_target = await self.task_queue.get()
                 self.base.print_message(
-                    f"Acquired {yml_target.name} with priority {priority}."
+                    f"Acquired {yml_target.name} with priority {rank}."
                 )
                 if yml_target.name not in self.running_tasks:
                     self.base.print_message(
                         f"Creating sync task for {yml_target.name}."
                     )
                     self.running_tasks[yml_target.name] = asyncio.create_task(
-                        self.sync_yml(yml_target), name=yml_target.name
+                        self.sync_yml(yml_target, rank), name=yml_target.name
                     )
                     self.running_tasks[yml_target.name].add_done_callback(
                         self.sync_exit_callback
@@ -486,7 +486,7 @@ class HelaoSyncer:
         self.progress[yml_path.name] = prog
         return self.progress[yml_path.name]
 
-    async def enqueue_yml(self, upath: Union[Path, str], rank: int = 2):
+    async def enqueue_yml(self, upath: Union[Path, str], rank: int = 5):
         """Adds yml to sync queue, defaulting to lowest priority."""
         yml_path = Path(upath) if isinstance(upath, str) else upath
         self.task_set.add(yml_path.name)
@@ -495,7 +495,7 @@ class HelaoSyncer:
             f"Added {str(yml_path)} to syncer queue with priority {rank}."
         )
 
-    async def sync_yml(self, yml_path: Path, retries: int = 3):
+    async def sync_yml(self, yml_path: Path, retries: int = 3, rank: int = 5):
         """Coroutine for syncing a single yml"""
         prog = self.get_progress(yml_path)
         if not prog:
@@ -539,18 +539,15 @@ class HelaoSyncer:
                     "Adding 'finished' children to sync queue with highest priority."
                 )
                 for child in yml.finished_children:
-                    if (
-                        child.target.name not in self.task_set
-                        and child.target.name not in self.running_tasks
-                    ):
-                        await self.enqueue_yml(child.target, 0)
+                    if child.target.name not in self.running_tasks:
+                        await self.enqueue_yml(child.target, rank - 2)
                         self.base.print_message(str(child.target))
                 self.base.print_message(
                     f"Re-adding {str(yml.target)} to sync queue with high priority."
                 )
                 self.running_tasks.pop(yml.target.name)
                 self.task_set.remove(yml.target.name)
-                await self.enqueue_yml(yml.target, 1)
+                await self.enqueue_yml(yml.target, rank - 1)
                 self.base.print_message(f"{str(yml.target)} re-queued, exiting.")
                 return False
 
