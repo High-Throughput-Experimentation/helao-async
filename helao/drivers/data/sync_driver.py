@@ -307,7 +307,7 @@ class Progress:
                 }
                 self.dict.update(act_dict)
             if self.yml.type == "experiment":
-                process_groups = self.yml.meta.get("_process_order_groups", {})
+                process_groups = self.yml.meta.get("process_order_groups", {})
                 exp_dict = {
                     "process_actions_done": {},  # {action submit order: yml.target.name}
                     "process_groups": process_groups,  # {process_idx: contributor action indices}
