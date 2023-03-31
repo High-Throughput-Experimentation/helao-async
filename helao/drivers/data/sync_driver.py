@@ -779,7 +779,7 @@ class HelaoSyncer:
                 dedupe_dict = defaultdict(list)
                 deduped_samples = []
                 for si, x in enumerate(sample_list):
-                    sample_label = x["sample_label"]
+                    sample_label = x["global_label"]
                     actuuid = x["action_uuid"][0]
                     actorder = actuuid_order[actuuid]
                     dedupe_dict[sample_label].append((actorder, si))
