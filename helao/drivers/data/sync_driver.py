@@ -25,6 +25,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Union, Optional, Dict, List
 import traceback
+from collections import defaultdict
 
 import pyaml
 import botocore.exceptions
@@ -768,6 +769,30 @@ class HelaoSyncer:
                 exp_prog.dict["process_metas"][pidx][new_name] += contrib
             else:
                 exp_prog.dict["process_metas"][pidx][new_name] = contrib
+            # deduplicate sample lists
+            if new_name in ["samples_in", "samples_out"]:
+                actuuid_order = {
+                    x["action_uuid"]: x["orch_submit_order"]
+                    for x in exp_prog.dict["process_metas"][pidx]["action_list"]
+                }
+                sample_list = exp_prog.dict["process_metas"][pidx][new_name]
+                dedupe_dict = defaultdict(list)
+                deduped_samples = []
+                for si, x in enumerate(sample_list):
+                    sample_label = x["sample_label"]
+                    actuuid = x["action_uuid"][0]
+                    actorder = actuuid_order[actuuid]
+                    dedupe_dict[sample_label].append((actorder, si))
+                if new_name == "samples_in":
+                    deduped_samples = [
+                        sample_list[min(v)[1]] for v in dedupe_dict.values()
+                    ]
+                elif new_name == "samples_out":
+                    deduped_samples = [
+                        sample_list[max(v)[1]] for v in dedupe_dict.values()
+                    ]
+                if deduped_samples:
+                    exp_prog.dict["process_metas"][pidx][new_name] = deduped_samples
         exp_prog.write_dict()
         return exp_prog
 
