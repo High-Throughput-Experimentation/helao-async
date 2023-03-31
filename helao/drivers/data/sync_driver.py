@@ -719,7 +719,7 @@ class HelaoSyncer:
                 else pf_idxs.index(min(x for x in pf_idxs if x >= act_idx))
             )
             exp_prog.dict["process_groups"][pidx] = exp_prog.dict["process_groups"].get(
-                pidx, defaultdict(list)
+                pidx, []
             )
             exp_prog.dict["process_groups"][pidx].append(act_idx)
         else:
