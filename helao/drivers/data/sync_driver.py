@@ -500,6 +500,11 @@ class HelaoSyncer:
 
     async def sync_yml(self, yml_path: Path, retries: int = 3, rank: int = 5):
         """Coroutine for syncing a single yml"""
+        if not yml_path.exists():
+            self.base.print_message(
+                f"{str(yml_path)} does not exist, assume yml has moved to synced."
+            )
+            return True
         prog = self.get_progress(yml_path)
         if not prog:
             self.base.print_message(
