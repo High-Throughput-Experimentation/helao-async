@@ -787,8 +787,12 @@ class HelaoSyncer:
                     sample_label = x["global_label"]
                     actuuid = [
                         y for y in x["action_uuid"] if y in actuuid_order.keys()
-                    ][0]
-                    actorder = actuuid_order[actuuid]
+                    ]
+                    if not actuuid:
+                        self.base.print_message("no action_uuid for {sample_label}, using listed order")
+                        actorder = si
+                    else:
+                        actorder = actuuid_order[actuuid[0]]
                     dedupe_dict[sample_label].append((actorder, si))
                 if new_name == "samples_in":
                     deduped_samples = [
