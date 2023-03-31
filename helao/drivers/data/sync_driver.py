@@ -926,3 +926,6 @@ class HelaoSyncer:
                             )
                             self.base.print_message(f"response: {await resp.json()}")
         return api_success
+
+    def shutdown(self):
+        pass
