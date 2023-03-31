@@ -52,17 +52,17 @@ from helao.drivers.robot.pal_driver import Spacingmethod, PALtools
 EXPERIMENTS = __all__
 
 ORCH_HOST = gethostname()
-PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).clean_dict()
-MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).clean_dict()
-NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).clean_dict()
-ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).clean_dict()
-PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).clean_dict()
+PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).as_dict()
+MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).as_dict()
+NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).as_dict()
+ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
+PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
 SOLUTIONPUMP_server = MachineModel(
     server_name="SYRINGE0", machine_name=ORCH_HOST
-).clean_dict()
+).as_dict()
 WATERCLEANPUMP_server = MachineModel(
     server_name="SYRINGE1", machine_name=ORCH_HOST
-).clean_dict()
+).as_dict()
 
 
 # cannot save data without exp
