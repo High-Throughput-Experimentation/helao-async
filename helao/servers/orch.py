@@ -26,7 +26,7 @@ import colorama
 import time
 from fastapi import WebSocket, Body
 from functools import partial
-
+from collections import defaultdict
 
 from bokeh.server.server import Server
 from helao.servers.operator.bokeh_operator import Operator
@@ -191,7 +191,7 @@ class HelaoOrch(HelaoFastAPI):
 
         @self.post("/start", tags=["private"])
         async def start():
-            """Begin experimenting experiment and action queues."""
+            """Begin dispatching experiment and action queues."""
             await self.orch.start()
             return {}
 
@@ -208,7 +208,7 @@ class HelaoOrch(HelaoFastAPI):
 
         @self.post("/stop", tags=["private"])
         async def stop():
-            """Stop experimenting experiment and action queues after current actions finish."""
+            """Stop dispatching experiment and action queues after current actions finish."""
             await self.orch.stop()
             return {}
 
@@ -791,6 +791,8 @@ class Orch(Base):
             self.action_dq = zdeque([])
             return ErrorCodes.none
 
+        process_order_groups = defaultdict(list)
+        process_count = 0
         # self.print_message("setting action order")
         for i, act in enumerate(unpacked_acts):
             # init uuid now for tracking later
@@ -800,8 +802,13 @@ class Orch(Base):
             # will be incremented as necessary
             act.orch_submit_order = int(i)
             self.action_dq.append(act)
+            if act.process_contrib:
+                process_order_groups[process_count].append(i)
+            if act.process_finish:
+                process_count += 1
+        if process_order_groups:
+            self.active_experiment._process_order_groups = process_order_groups
 
-        # TODO:update experiment code
         # self.print_message("adding unpacked actions to action_dq")
         self.print_message(f"got: {self.action_dq}")
         self.print_message(
