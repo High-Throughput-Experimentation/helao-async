@@ -321,7 +321,7 @@ class Archive:
                     sample = _sample[0]
             else:
                 self.base.print_message(
-                    f"Bug found: reference sample was saved in pck file: {sample}",
+                    f"Bug found: reference sample was saved in archive.json file: {sample}",
                     error=True,
                 )
 
