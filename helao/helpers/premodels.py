@@ -211,9 +211,6 @@ class Experiment(Sequence, ExperimentModel):
         #     print_message({}, "experiment", f"samples_in labels: {in_labels}", error=True)
         #     print_message({}, "experiment", f"samples_out labels: {out_labels}", error=True)
 
-    def assign_process_groups(self, process_order_dict: Dict):
-        """Set process_order_groups private attr"""
-        self._process_order_groups = process_order_dict
 
 class Action(Experiment, ActionModel):
     "Sample-action identifier class."

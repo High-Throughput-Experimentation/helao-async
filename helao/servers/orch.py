@@ -807,7 +807,7 @@ class Orch(Base):
             if act.process_finish:
                 process_count += 1
         if process_order_groups:
-            self.active_experiment.assign_process_groups(process_order_groups)
+            self.active_experiment.process_order_groups = process_order_groups
 
         # self.print_message("adding unpacked actions to action_dq")
         self.print_message(f"got: {self.action_dq}")
