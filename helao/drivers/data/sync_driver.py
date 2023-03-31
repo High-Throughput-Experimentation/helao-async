@@ -307,13 +307,15 @@ class Progress:
                 }
                 self.dict.update(act_dict)
             if self.yml.type == "experiment":
+                process_groups = self.yml.meta.get("_process_order_groups", {})
                 exp_dict = {
-                    "process_finisher_idxs": [],  # end action indices (submit order)
-                    "process_finished_idxs": [],  # finished action indices
-                    "process_groups": {},  # {process_idx: contributor action indices}
+                    "process_actions_done": {},  # {action submit order: yml.target.name}
+                    "process_groups": process_groups,  # {process_idx: contributor action indices}
                     "process_metas": {},  # {process_idx: yml_dict}
                     "process_s3": [],  # list of process_idx with S3 done
                     "process_api": [],  # list of process_idx with API done
+                    "legacy_finisher_idxs": [],  # end action indicies (submit order)
+                    "legacy_experiment": False if process_groups else True,
                 }
                 self.dict.update(exp_dict)
             self.write_dict()
@@ -591,7 +593,7 @@ class HelaoSyncer:
             while s3_unf or api_unf:
                 if retry_count == retries:
                     break
-                await self.sync_process(prog)
+                await self.sync_process(prog, force=True)
                 s3_unf, api_unf = prog.list_unfinished_procs()
                 retry_count += 1
             if s3_unf or api_unf:
@@ -607,7 +609,7 @@ class HelaoSyncer:
 
         self.base.print_message(f"Patching model for {yml.target.name}")
         patched_meta = {MOD_PATCH.get(k, k): v for k, v in meta.items()}
-        yml_model = MOD_MAP[yml.type](**patched_meta).clean_dict()
+        yml_model = MOD_MAP[yml.type](**patched_meta).clean_dict(strip_private=True)
 
         # next push yml to S3
         if not prog.s3_done:
@@ -691,8 +693,7 @@ class HelaoSyncer:
         # if action contributes processes, update processes
         if yml.type == "action" and meta.get("process_contrib", False):
             exp_prog = self.update_process(yml, meta)
-            if meta.get("process_finish", False):
-                await self.sync_process(exp_prog)
+            await self.sync_process(exp_prog)
 
         return_dict = {k: d for k, d in prog.dict.items() if k != "process_metas"}
         return return_dict
@@ -702,25 +703,29 @@ class HelaoSyncer:
         exp_path = Path(act_yml.parent_path)
         exp_prog = self.get_progress(exp_path)
         act_idx = act_meta["action_order"]
-        # if action is a process finisher, add to exp progress
-        if act_meta["process_finish"]:
-            exp_prog.dict["process_finisher_idxs"] = sorted(
-                set(exp_prog.dict["process_finished_idxs"]).union([act_idx])
+        # register finished action in process_actions_done {order: ymltargetname}
+        exp_prog.dict["process_actions_done"].update({act_idx: act_yml.target.name})
+        # handle legacy experiments (no process list)
+        if exp_prog.dict["legacy_experiment"]:
+            # if action is a process finisher, add to exp progress
+            if act_meta["process_finish"]:
+                exp_prog.dict["legacy_finisher_idxs"] = sorted(
+                    set(exp_prog.dict["legacy_finisher_idxs"]).union([act_idx])
+                )
+            pf_idxs = exp_prog.dict["legacy_finisher_idxs"]
+            pidx = (
+                len(pf_idxs)
+                if act_idx > max(pf_idxs + [-1])
+                else pf_idxs.index(min(x for x in pf_idxs if x >= act_idx))
             )
-        exp_prog.dict["process_finished_idxs"] = sorted(
-            set(exp_prog.dict["process_finished_idxs"]).union([act_idx])
-        )
-        pf_idxs = exp_prog.dict["process_finisher_idxs"]
-        pidx = (
-            len(pf_idxs)
-            if act_idx > max(pf_idxs + [-1])
-            else pf_idxs.index(min(x for x in pf_idxs if x >= act_idx))
-        )
-        exp_prog.dict["process_groups"][pidx] = exp_prog.dict["process_groups"].get(
-            pidx, []
-        )
-        exp_prog.dict["process_groups"][pidx].append(act_idx)
-
+            exp_prog.dict["process_groups"][pidx] = exp_prog.dict["process_groups"].get(
+                pidx, defaultdict(list)
+            )
+            exp_prog.dict["process_groups"][pidx].append(act_idx)
+        else:
+            pidx = [
+                k for k, l in exp_prog.dict["process_groups"].items() if act_idx in l
+            ][0]
         # if exp_prog doesn't yet have metadict, create one
         if pidx not in exp_prog.dict["process_metas"]:
             exp_prog.dict["process_metas"][pidx] = {
@@ -748,7 +753,7 @@ class HelaoSyncer:
 
         # update experiment progress with action
         exp_prog.dict["process_metas"][pidx]["action_list"].append(
-            ShortActionModel(**act_meta).clean_dict()
+            ShortActionModel(**act_meta).clean_dict(strip_private=True)
         )
 
         self.base.print_message(f"current experiment progress:\n{exp_prog.dict}")
@@ -780,7 +785,9 @@ class HelaoSyncer:
                 deduped_samples = []
                 for si, x in enumerate(sample_list):
                     sample_label = x["global_label"]
-                    actuuid = x["action_uuid"][0]
+                    actuuid = [
+                        y for y in x["action_uuid"] if y in actuuid_order.keys()
+                    ][0]
                     actorder = actuuid_order[actuuid]
                     dedupe_dict[sample_label].append((actorder, si))
                 if new_name == "samples_in":
@@ -796,14 +803,25 @@ class HelaoSyncer:
         exp_prog.write_dict()
         return exp_prog
 
-    async def sync_process(self, exp_prog: Progress):
+    async def sync_process(self, exp_prog: Progress, force: bool = False):
         """Pushes unfinished procesess to S3 & API from experiment progress."""
         s3_unfinished, api_unfinished = exp_prog.list_unfinished_procs()
         for pidx in s3_unfinished:
             gids = exp_prog.dict["process_groups"][pidx]
-            if all([i in exp_prog.dict["process_finished_idxs"] for i in gids]):
+            push_condition = False
+            if force:
+                push_condition = force
+            elif exp_prog.dict["legacy_experiment"]:
+                push_condition = max(gids) in exp_prog.dict[
+                    "legacy_finisher_idxs"
+                ] and all(i in exp_prog.dict["process_actions_done"] for i in gids)
+            else:
+                push_condition = all(
+                    i in exp_prog.dict["process_actions_done"] for i in gids
+                )
+            if push_condition:
                 meta = exp_prog.dict["process_metas"][pidx]
-                model = MOD_MAP["process"](**meta).clean_dict()
+                model = MOD_MAP["process"](**meta).clean_dict(strip_private=True)
                 # sync to s3
                 uuid_key = meta["process_uuid"]
                 meta_s3_key = f"process/{uuid_key}.json"
@@ -813,9 +831,9 @@ class HelaoSyncer:
                     exp_prog.write_dict()
         for pidx in api_unfinished:
             gids = exp_prog.dict["process_groups"][pidx]
-            if all([i in exp_prog.dict["process_finished_idxs"] for i in gids]):
+            if all(i in exp_prog.dict["process_actions_done"] for i in gids):
                 meta = exp_prog.dict["process_metas"][pidx]
-                model = MOD_MAP["process"](**meta).clean_dict()
+                model = MOD_MAP["process"](**meta).clean_dict(strip_private=True)
                 api_success = await self.to_api(model, "process")
                 if api_success:
                     exp_prog.dict["process_api"].append(pidx)
