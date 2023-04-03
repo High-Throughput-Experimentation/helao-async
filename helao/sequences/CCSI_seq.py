@@ -642,6 +642,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
     DeltaDilute1_duration: float = 15,
     initcleans: int = 3,
     drainrecirc: bool = True,
+    need_fill: bool = False,
     
 ):
 
@@ -659,6 +660,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
             #"max_purge_iters": max_purge_iters,
             # "purge_if": purge_if,
             "drainrecirc": drainrecirc,
+            "need_fill": need_fill,
             #  "HSpurge_duration": LiquidCleanPurge_duration,
         })
 
