@@ -70,8 +70,6 @@ class Calc:
 
     def gather_seq_data(self, seq_reldir: str, action_name: str):
         """Get all files using FileMapper to traverse ACTIVE/FINISHED/SYNCED."""
-        # get all files from current sequence directory
-        # produce tuples, (run_type, technique_name, run_use, hlo_path)
         active_save_dir = self.base.helaodirs.save_root.__str__()
         seq_absdir = os.path.join(active_save_dir, seq_reldir)
         FM = FileMapper(seq_absdir)
@@ -111,9 +109,7 @@ class Calc:
         return hlo_dict
 
     def gather_seq_exps(self, seq_reldir: str, exp_name: str):
-        """Get all files using FileMapper to traverse ACTIVE/FINISHED/SYNCED."""
-        # get all files from current sequence directory
-        # produce tuples, (run_type, technique_name, run_use, hlo_path)
+        """Get all exp dicts using FileMapper to traverse ACTIVE/FINISHED/SYNCED."""
         active_save_dir = self.base.helaodirs.save_root.__str__()
         seq_absdir = os.path.join(active_save_dir, seq_reldir)
         FM = FileMapper(seq_absdir)
@@ -123,6 +119,18 @@ class Calc:
         for ep in ymls:
             expd = FM.read_yml(ep)
             yml_dict[ep] = expd
+        return yml_dict
+
+    def get_seq_dict(self, seq_reldir: str):
+        """Get sequence dict."""
+        active_save_dir = self.base.helaodirs.save_root.__str__()
+        seq_absdir = os.path.join(active_save_dir, seq_reldir)
+        FM = FileMapper(seq_absdir)
+        ymls = [x for x in FM.relstrs if x.endswith("seq.yml")]
+        yml_dict = {}
+        for sp in ymls:
+            seqd = FM.read_yml(sp)
+            yml_dict = seqd
         return yml_dict
 
     def calc_uvis_abs(self, activeobj: Active):
@@ -653,8 +661,8 @@ class Calc:
         repeat_experiment_params = params["repeat_experiment_params"]
         kwargs = params["repeat_experiment_kwargs"]
         seq_reldir = activeobj.action.get_sequence_dir()
+        seq_dict = self.get_seq_dict(seq_reldir)
 
-        exp_dict = self.gather_seq_exps(seq_reldir, repeat_experiment_name)
         max_loops = (
             repeat_experiment_params.get("max_purge_iters", 5) + 1
         )  # add original purge
@@ -705,7 +713,20 @@ class Calc:
         ):  # hard coded 15000ul check for syringe volume
             repeat_experiment_params["need_fill"] = True
 
-        if loop_condition and len(exp_dict) == max_loops:
+        repeat_experiment_idxs = [
+            i
+            for i, x in enumerate(seq_dict["experiment_list"])
+            if x["experiment_name"] == repeat_experiment_name
+        ]
+        current_experiment_idx = max(repeat_experiment_idxs)
+        num_consecutive_repeats = 0
+        for i in range(current_experiment_idx):
+            if current_experiment_idx - i - 1 in repeat_experiment_idxs:
+                num_consecutive_repeats += 1
+            else:
+                break
+
+        if loop_condition and num_consecutive_repeats >= max_loops:
             self.base.print_message(
                 f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition but max_purge_iters ({max_loops}) reached. Exiting."
             )
