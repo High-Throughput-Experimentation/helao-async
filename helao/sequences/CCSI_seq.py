@@ -618,7 +618,7 @@ def CCSI_debug_liquidloads(  #assumes initialization performed previously
     return epm.experiment_plan_list
 
 def CCSI_Solution_testing(  #assumes initialization performed previously
-    sequence_version: int = 3,
+    sequence_version: int = 4, #4 new threshold criteria
     gas_sample_no: int = 2,
     Solution_volume_ul: List[float] = [0,500, 50],
     Solution_reservoir_sample_no: int = 2,
@@ -635,34 +635,34 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
     headspace_co2measure_duration: float = 30,
     clean_co2measure_duration: float = 120,
     LiquidCleanPurge_duration: float = 60,
-    clean_co2_ppm_thresh: float = 48500,
+    clean_co2_ppm_thresh: float = 51500,
     max_purge_iters: int = 5,
-#    purge_if: Union[str, float] = "below",
+    purge_if: Union[str, float] = 0.03,
     HSpurge_duration: float = 15,
     DeltaDilute1_duration: float = 15,
-    initcleans: int = 3,
+    #initcleans: int = 3,
     drainrecirc: bool = True,
     need_fill: bool = False,
     
 ):
 
     epm = ExperimentPlanMaker()
-    for _ in range(initcleans):
-        epm.add_experiment("CCSI_sub_clean_inject", {
-            "Waterclean_volume_ul": drainclean_volume_ul,
-            "Syringe_rate_ulsec": syringe_rate_ulsec,
-            "LiquidCleanWait_s": LiquidFillWait_s,
-            "LiquidCleanPurge_duration": LiquidCleanPurge_duration,
-            "co2measure_duration": clean_co2measure_duration,
-            "co2measure_acqrate": co2measure_acqrate,
-            "use_co2_check": False,
-            "co2_ppm_thresh": clean_co2_ppm_thresh,
-            #"max_purge_iters": max_purge_iters,
-            # "purge_if": purge_if,
-            "drainrecirc": drainrecirc,
-            "need_fill": need_fill,
-            #  "HSpurge_duration": LiquidCleanPurge_duration,
-        })
+    #for _ in range(initcleans):
+    epm.add_experiment("CCSI_sub_clean_inject", {
+        "Waterclean_volume_ul": drainclean_volume_ul,
+        "Syringe_rate_ulsec": syringe_rate_ulsec,
+        "LiquidCleanWait_s": LiquidFillWait_s,
+        "LiquidCleanPurge_duration": LiquidCleanPurge_duration,
+        "co2measure_duration": clean_co2measure_duration,
+        "co2measure_acqrate": co2measure_acqrate,
+        "use_co2_check": True,
+        "co2_ppm_thresh": clean_co2_ppm_thresh,
+        "max_purge_iters": max_purge_iters,
+        "purge_if": purge_if,
+        "drainrecirc": drainrecirc,
+        "need_fill": need_fill,
+        #  "HSpurge_duration": LiquidCleanPurge_duration,
+    })
 
     epm.add_experiment("CCSI_sub_full_fill_syringe", {
         "syringe": "waterclean",
