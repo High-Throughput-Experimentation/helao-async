@@ -766,6 +766,10 @@ class HelaoSyncer:
             exp_prog.dict["process_metas"][pidx]["process_timestamp"] = act_meta[
                 "action_timestamp"
             ]
+        if "technique_name" in act_meta:
+            exp_prog.dict["process_metas"][pidx]["technique_name"] = act_meta[
+                "technique_name"
+            ]
         for pc in act_meta["process_contrib"]:
             if pc not in act_meta:
                 continue
@@ -790,11 +794,11 @@ class HelaoSyncer:
                 deduped_samples = []
                 for si, x in enumerate(sample_list):
                     sample_label = x["global_label"]
-                    actuuid = [
-                        y for y in x["action_uuid"] if y in actuuid_order.keys()
-                    ]
+                    actuuid = [y for y in x["action_uuid"] if y in actuuid_order.keys()]
                     if not actuuid:
-                        self.base.print_message("no action_uuid for {sample_label}, using listed order")
+                        self.base.print_message(
+                            "no action_uuid for {sample_label}, using listed order"
+                        )
                         actorder = si
                     else:
                         actorder = actuuid_order[actuuid[0]]
