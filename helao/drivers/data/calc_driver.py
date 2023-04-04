@@ -684,18 +684,25 @@ class Calc:
                 self.base.print_message(
                     "abs('purge_if') parameter is numerical and < 1.0, treating as fraction of threshold"
                 )
-            # purge_if<0 means purge if current ppm is below pct diff
-            # purge_if>0 means purge if current ppm is above pct diff
+            ## old behavior: signed value determines over or under threshold
+            ## purge_if<0 means purge if current ppm is below pct diff
+            ## purge_if>0 means purge if current ppm is above pct diff
+            # loop_condition = (
+            #     np.sign(purge_if) * (mean_co2_ppm - co2_ppm_thresh) / co2_ppm_thresh
+            #     > np.sign(purge_if) * purge_if
+            # )
+            ## adjust next loop params in case loop condition is met (double purge_if every 2 loops)
+            # repeat_experiment_params["purge_if"] = (
+            #     abs(purge_if) * 2**0.5 * np.sign(purge_if)
+            # )
+            ## new behavior: symmetric pct difference around thershold
             loop_condition = (
-                np.sign(purge_if) * (mean_co2_ppm - co2_ppm_thresh) / co2_ppm_thresh
-                > np.sign(purge_if) * purge_if
-            )
-            # adjust next loop params in case loop condition is met (double purge_if every 2 loops)
-            repeat_experiment_params["purge_if"] = (
-                abs(purge_if) * 2**0.5 * np.sign(purge_if)
+                np.abs(mean_co2_ppm - co2_ppm_thresh) / co2_ppm_thresh > purge_if
             )
 
-        if present_syringe_volume_ul < 15000:  #hard coded 15000ul check for syringe volume
+        if (
+            present_syringe_volume_ul < 15000
+        ):  # hard coded 15000ul check for syringe volume
             repeat_experiment_params["need_fill"] = True
 
         if loop_condition and len(exp_dict) == max_loops:
@@ -763,8 +770,7 @@ class Calc:
             fill_needed = True
             fill_vol = target_volume_ul - present_volume_ul
             repeat_experiment_params = {"fill_volume_ul": fill_vol}
-            self.base.print_message(
-                f"Refilling to target volume: {target_volume_ul}")
+            self.base.print_message(f"Refilling to target volume: {target_volume_ul}")
         else:
             fill_needed = False
             self.base.print_message(
@@ -802,7 +808,6 @@ class Calc:
             "syringe_present_volume_ul": float(present_volume_ul),
         }
         return return_dict
-
 
     def shutdown(self):
         pass
