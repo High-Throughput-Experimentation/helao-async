@@ -514,7 +514,6 @@ def ECHEUVIS_sub_interrupt(
 def ECHEUVIS_sub_OCV_led(
     experiment: Experiment,
     experiment_version: int = 3,
-    OCV_duration_sec: Optional[float] = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
@@ -523,6 +522,8 @@ def ECHEUVIS_sub_OCV_led(
     ref_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
     samplerate_sec: Optional[float] = 0.1,
+    OCV_duration_sec: Optional[float] = 0.0,
+    gamry_i_range: Optional[str] = "auto",
     gamrychannelwait: Optional[int] = -1,
     gamrychannelsend: Optional[int] = 0,
     illumination_source: Optional[str] = "doric_wled",
