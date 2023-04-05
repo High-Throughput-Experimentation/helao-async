@@ -108,9 +108,9 @@ class Archive:
                 error=True,
             )
             self.write_config()
-        except Exception:
+        # except Exception:
             # print_message({}, "launcher", f"Error loading '{pidFile}', writing empty global dict.", error = True)
-            self.write_config()
+            # self.write_config()
 
         # check trays
         failed = False
@@ -175,10 +175,9 @@ class Archive:
             self.positions.customs_dict = deepcopy(self.startup_positions.customs_dict)
         else:
             self.base.print_message("customs matched", info=True)
-
-        # update all samples in tray and custom positions
-        self.write_config()
-        asyncio.gather(self.update_samples_from_db())
+            # update all samples in tray and custom positions
+            self.write_config()
+            asyncio.gather(self.update_samples_from_db())
 
     def action_startup_config(self):
         positions = Positions()
