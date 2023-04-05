@@ -96,12 +96,12 @@ class Archive:
         # get some empty db dicts from default config
 
         self.startup_positions = self.action_startup_config()
-        self.base.print(f"Config trays_dict has {len(self.startup_positions.trays_dict)} keys")
+        self.base.print_message(f"Config trays_dict has {len(self.startup_positions.trays_dict)} keys")
         # compare default config to backup
 
         try:
             self.positions = self.load_config()
-            self.base.print(f"Archive json has {len(self.positions.trays_dict)} keys")
+            self.base.print_message(f"Archive json has {len(self.positions.trays_dict)} keys")
         except IOError:
             self.base.print_message(
                 f"'{self.archivejson}' does not exist, writing empty global dict.",
