@@ -623,7 +623,7 @@ def ECHEUVIS_sub_OCV_led(
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_server,
-        technique_name="CA",
+        technique_name="OCV",
         process_finish=True,
         process_contrib=[
             ProcessContrib.files,
