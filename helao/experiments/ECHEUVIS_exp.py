@@ -7,6 +7,7 @@ __all__ = [
     "ECHEUVIS_sub_CV_led",
     "ECHEUVIS_sub_CA_led",
     "ECHEUVIS_sub_CP_led",
+    "ECHEUVIS_sub_OCV_led",
     "ECHEUVIS_sub_interrupt",
 ]
 
