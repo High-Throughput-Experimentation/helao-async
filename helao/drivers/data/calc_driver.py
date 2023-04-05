@@ -113,7 +113,10 @@ class Calc:
         active_save_dir = self.base.helaodirs.save_root.__str__()
         seq_absdir = os.path.join(active_save_dir, seq_reldir)
         FM = FileMapper(seq_absdir)
-        paths = [x for x in FM.relstrs if exp_name in x]
+        if exp_name == "*":
+            paths = FM.relstrs
+        else:
+            paths = [x for x in FM.relstrs if exp_name in x]
         ymls = sorted([x for x in paths if x.endswith("exp.yml")])
         yml_dict = {}
         for ep in ymls:
@@ -661,13 +664,14 @@ class Calc:
         repeat_experiment_params = params["repeat_experiment_params"]
         kwargs = params["repeat_experiment_kwargs"]
         seq_reldir = activeobj.action.get_sequence_dir()
-        seq_dict = self.get_seq_dict(seq_reldir)
+        # seq_dict = self.get_seq_dict(seq_reldir)
 
         max_loops = (
             repeat_experiment_params.get("max_purge_iters", 5) + 1
         )  # add original purge
 
         hlo_dict = self.gather_seq_data(seq_reldir, "acquire_co2")
+        all_exps = self.gather_seq_exps(seq_reldir, "*")
         latest = hlo_dict[sorted(hlo_dict.keys())[-1]]
 
         mean_co2_ppm = np.mean(latest["data"]["co2_ppm"])
@@ -715,8 +719,8 @@ class Calc:
 
         repeat_experiment_idxs = [
             i
-            for i, x in enumerate(seq_dict["experiment_list"])
-            if x["experiment_name"] == repeat_experiment_name
+            for i, x in enumerate(sorted(all_exps.keys()))
+            if repeat_experiment_name in x
         ]
         current_experiment_idx = max(repeat_experiment_idxs)
         num_consecutive_repeats = 0
