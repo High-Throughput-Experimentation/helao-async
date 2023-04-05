@@ -118,6 +118,7 @@ config["servers"] = {
                 "archive": "HELAO_GCHeadspace_Liquid_Archive_220215.cam",
             },
             "positions": {
+                "tray1": {"slot1": None, "slot2": "VT54", "slot3": "VT54"},
                 "tray2": {"slot1": "VT54", "slot2": "VT54", "slot3": "VT54"},
                 "custom": {
                     "cell1_we": "cell",
