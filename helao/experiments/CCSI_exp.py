@@ -393,7 +393,7 @@ def CCSI_sub_headspace_purge_and_measure(
     co2measure_acqrate: float = 0.1,
     co2_ppm_thresh: float = 90000,
     purge_if: Union[str, float] = "below",
-    max_purge_iters: int = 5,
+    max_repeats: int = 5,
     # HSmeasure1_duration: float = 20,  # set before determining actual
 ):
 
@@ -862,7 +862,7 @@ def CCSI_sub_clean_inject(
     need_fill: bool = False,
     co2_ppm_thresh: float = 41000,
     purge_if: Union[str, float] = "below",
-    max_purge_iters: int = 5,
+    max_repeats: int = 5,
     LiquidCleanPurge_duration: float = 60,  # set before determining actual
     drainrecirc: bool = True,
 ):
