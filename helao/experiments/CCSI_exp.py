@@ -774,10 +774,11 @@ def CCSI_sub_liquidfill_syringes(
                 ProcessContrib.samples_in,
             ],
         )
+        apm.add(ORCH_server, "wait", {"waittime": 5.25})
         apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
         apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 0}, asc.no_wait)
         apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 0}, asc.no_wait)
-        apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1})
+        apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1}, asc.no_wait)
         apm.add(ORCH_server, "wait", {"waittime": apm.pars.LiquidFillWait_s})
         apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0})
         
@@ -812,10 +813,11 @@ def CCSI_sub_liquidfill_syringes(
             process_finish=True,
             process_contrib= proccontrib,
         )    
+        apm.add(ORCH_server, "wait", {"waittime": 5.25})
         apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
         apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 0}, asc.no_wait)
         apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 0}, asc.no_wait)
-        apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1})
+        apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1}, asc.no_wait)
         apm.add(ORCH_server, "wait", {"waittime": apm.pars.LiquidFillWait_s})
         apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 0})
 
@@ -872,7 +874,7 @@ def CCSI_sub_clean_inject(
         apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(WATERCLEANPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.Waterclean_volume_ul})    
-        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+        apm.add(ORCH_server, "wait", {"waittime": 5.25})
         apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 0})
 
     # v2 v1ab open, clean inject
@@ -893,14 +895,14 @@ def CCSI_sub_clean_inject(
         },
     )
     apm.add(WATERCLEANPUMP_server, "get_present_volume",{},to_globalexp_params=["_present_volume_ul"]) 
-    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(ORCH_server, "wait", {"waittime": 5.25})
 
     # v7  open, mfc flow, wait, syringe retract
 
     apm.add(NI_server, "gasvalve", {"gasvalve": "7B", "on": 1})
     apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD0", "on": 0}, asc.no_wait)
     apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD1", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1})
+    apm.add(NI_server, "multivalve", {"multivalve": "multi_CMD2", "on": 1}, asc.no_wait)
     # mfc stuff add here
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.LiquidCleanWait_s})
 
@@ -974,7 +976,7 @@ def CCSI_sub_refill_clean(
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
     apm.add(WATERCLEANPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.Waterclean_volume_ul})    
-    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+    apm.add(ORCH_server, "wait", {"waittime": 5.25})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 0})
     
     return apm.action_list
@@ -1036,14 +1038,14 @@ def CCSI_sub_fill_syringe(
         apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(WATERCLEANPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.fill_volume_ul})    
-        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+        apm.add(ORCH_server, "wait", {"waittime": 5.25})
         apm.add(NI_server, "liquidvalve", {"liquidvalve": "8", "on": 0})
 
     if apm.pars.syringe == "solution1":
         #need valve for this soln
         apm.add(ORCH_server, "wait", {"waittime": 0.25})
         apm.add(SOLUTIONPUMP_server, "withdraw", {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": apm.pars.fill_volume_ul})    
-        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+        apm.add(ORCH_server, "wait", {"waittime": 5.25})
         #would need a valve for refill of this syringe, then copy steps from watersyringe
 
     return apm.action_list
