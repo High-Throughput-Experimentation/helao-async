@@ -138,6 +138,7 @@ class Calc:
         seq_reldir = activeobj.action.get_sequence_dir()
         hlo_dict = self.gather_seq_data(seq_reldir, "acquire_spec")
 
+        params = activeobj.action.action_params
         spec_types = ["T", "R"]
         ru_keys = ("ref_dark", "ref_light", "data")
         specd = {}
@@ -272,14 +273,29 @@ class Calc:
                         smplist.append(solid_smp)
                         wllist.append(d["meta"]["optional"]["wl"])
                         actuuids.append(actd["action_uuid"])
-                        bsnlist.append((d["raw"] - mindark) / (maxlight - mindark))
+                        bsnlist.append(d["raw"])
 
                 wlarr = np.array(wllist).mean(axis=0)
+                mini = np.where(wlarr > params["lower_wl"])[0].min()
+                maxi = np.where(wlarr < params["upper_wl"])[0].max()
+
+                refdark = np.vstack([d["mean"] for d in rud["ref_dark"].values()])[
+                    :, mini:maxi
+                ]
+                reflight = np.vstack([d["mean"] for d in rud["ref_light"].values()])[
+                    :, mini:maxi
+                ]
+                mindark = refdark.min(axis=0)
+                maxlight = reflight.max(axis=0)
+
                 specd[spec] = {
                     "smplist": smplist,
                     "action_uuids": actuuids,
-                    "bsnlist": bsnlist,
-                    "wlarr": wlarr,
+                    "bsnlist": [
+                        (x[:, mini:maxi] - mindark) / (maxlight - mindark)
+                        for x in bsnlist
+                    ],
+                    "wlarr": wlarr[mini:maxi],
                     "epoch": epochlist,
                     "technique": rud["technique_name"],
                 }
@@ -290,7 +306,6 @@ class Calc:
             )
             return {}
 
-        params = activeobj.action.action_params
         pred = {}
         binds = []
         # pred holds intermediate outputs for "T", "R", and/or "TR"
