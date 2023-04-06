@@ -915,7 +915,7 @@ def ECHEUVIS_multiCA_led(
                     "reference_electrode_type": "NHE",
                     "ref_vs_nhe": ref_vs_nhe,
                     "samplerate_sec": CA_samplerate_sec,
-                    "OCV_duration_sec": CA_duration_sec,
+                    "OCV_duration_sec": OCV_duration_sec,
                     "gamry_i_range": gamry_i_range,
                     "illumination_source": led_name_CA,
                     "illumination_wavelength": led_wavelengths_nm[
