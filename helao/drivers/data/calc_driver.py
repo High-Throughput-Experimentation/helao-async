@@ -139,6 +139,7 @@ class Calc:
         hlo_dict = self.gather_seq_data(seq_reldir, "acquire_spec")
 
         params = activeobj.action.action_params
+        skip_nspec = params.get("skip_nspec", 0)
         spec_types = ["T", "R"]
         ru_keys = ("ref_dark", "ref_light", "data")
         specd = {}
@@ -170,6 +171,10 @@ class Calc:
                 for dk in list(rud[rk].keys()):
                     rud["technique_name"] = rud[rk][dk]["actd"]["technique_name"]
                     data = rud[rk][dk]["data"]
+                    if len(data) > skip_nspec:
+                        data = data[skip_nspec:]
+                    else:
+                        data = data[-1:]
                     epochs = data["epoch_s"]
                     vals = [
                         data[chk]

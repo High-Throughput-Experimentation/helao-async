@@ -791,7 +791,7 @@ def ECHEUVIS_multiCA_led(
     toggleCA_dark_time_init: float = 0,
     toggleCA_illum_time: float = -1,
     toggleSpec_duty: float = 0.5,
-    toggleSpec_period: float = 0.4,
+    toggleSpec_period: float = 0.25,
     toggleSpec_init_delay: float = 0.0,
     toggleSpec_time: float = -1,
     spec_ref_duration: float = 5,
@@ -804,6 +804,7 @@ def ECHEUVIS_multiCA_led(
     calc_poly_order: int = 4,
     calc_lower_wl: float = 370.0,
     calc_upper_wl: float = 700.0,
+    calc_skip_nspec: int = 4,
     random_start_potential: bool = True,
 ):
 
@@ -1045,6 +1046,7 @@ def ECHEUVIS_multiCA_led(
             "poly_order": calc_poly_order,
             "lower_wl": calc_lower_wl,
             "upper_wl": calc_upper_wl,
+            "skip_nspec": calc_skip_nspec,
         },
     )
     epm.add_experiment("ECHE_sub_shutdown", {})
