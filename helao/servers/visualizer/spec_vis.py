@@ -1,3 +1,4 @@
+import time
 import websockets
 import asyncio
 import json
@@ -32,6 +33,7 @@ class C_specvis:
         self.vis = visServ
         self.config_dict = self.vis.server_cfg["params"]
         self.max_spectra = 5
+        self.min_update_delay = 0.5  # drop plots if spectra come in too quickly
 
         self.spec_key = serv_key
         specserv_config = self.vis.world_cfg["servers"].get(self.spec_key, None)
@@ -162,11 +164,15 @@ class C_specvis:
             try:
                 async with websockets.connect(self.data_url) as ws:
                     self.IOloop_data_run = True
+                    last_update = time.time()
                     while self.IOloop_data_run:
                         try:
                             datapackage = DataPackageModel(
                                 **json.loads(await ws.recv())
                             )
+                            if time.time() - last_update < self.min_update_delay:
+                                continue
+                            last_update = time.time()
                             datastatus = datapackage.datamodel.status
                             if (
                                 datapackage.action_name
