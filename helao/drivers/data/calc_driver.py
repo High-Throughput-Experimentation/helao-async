@@ -354,8 +354,11 @@ class Calc:
             pred[k]["binds"] = binds  # list of lists of indices per bin
             rsi = [np.median(inds).astype(int) for inds in pred[k]["binds"]]
             pred[k]["rsi"] = rsi  # raw indices from full vector
-            pred[k]["bin"]["wl"] = pred["T"]["full"]["wl"][rsi]  # center index of bin
-            pred[k]["bin"]["epoch"] = pred[k]["full"]["epoch"]
+
+            for bin_key in ("bin", "smooth", "smooth_refadj", "smooth_refadj_scl"):
+                pred[k][bin_key]["wl"] = pred["T"]["full"]["wl"][rsi]  # center index of bin
+                pred[k][bin_key]["epoch"] = pred[k]["full"]["epoch"]
+                
             hv = [
                 1239.8 / x for x in pred[k]["bin"]["wl"]
             ]  # convert binned wl[nm] to energy[eV]
