@@ -171,10 +171,11 @@ class Calc:
                 for dk in list(rud[rk].keys()):
                     rud["technique_name"] = rud[rk][dk]["actd"]["technique_name"]
                     data = rud[rk][dk]["data"]
-                    if len(data) > skip_nspec:
-                        data = data[skip_nspec:]
-                    else:
-                        data = data[-1:]
+                    if len(np.array(data).shape) > 1:
+                        if len(data) > skip_nspec:
+                            data = data[skip_nspec:]
+                        else:
+                            data = data[-1:]
                     epochs = data["epoch_s"]
                     vals = [
                         data[chk]
