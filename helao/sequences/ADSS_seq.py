@@ -547,7 +547,7 @@ def ADSS_CA_NiSb_validation(
     ResidualWait_s: float = 15,
     flush_volume_ul: float = 2000,
     clean_volume_ul: float = 5000,
-    PAL_Injector: str = "LS 4"
+    PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "fill serial number here"
 ):
 
