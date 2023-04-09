@@ -42,7 +42,7 @@ def makeApp(confPrefix, server_key, helao_root):
             oneoff=False,
             poll_rate=active.action.action_params["acquisition_rate"],
         )
-        active_action_dict = await active.start_executor(executor)
+        active_action_dict = active.start_executor(executor)
         return active_action_dict
 
     @app.post(f"/{server_key}/cancel_acquire_co2", tags=["action"])
@@ -52,8 +52,8 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         """Stop running CO2 acquisition."""
         active = await app.base.setup_and_contain_action()
-        for exid, executor in app.base.executors.items():
-            if exid.split()[0] == "acquire_co2":
+        for exec_id, executor in app.base.executors.items():
+            if exec_id.split()[0] == "acquire_co2":
                 executor.stop_action_task()
         finished_action = await active.finish()
         return finished_action.as_dict()

@@ -7,6 +7,7 @@ __all__ = [
     "ECHEUVIS_sub_CV_led",
     "ECHEUVIS_sub_CA_led",
     "ECHEUVIS_sub_CP_led",
+    "ECHEUVIS_sub_OCV_led",
     "ECHEUVIS_sub_interrupt",
 ]
 
@@ -26,14 +27,14 @@ from helao.drivers.io.enum import TriggerType
 
 EXPERIMENTS = __all__
 
-PSTAT_server = MM(server_name="PSTAT", machine_name=gethostname()).json_dict()
-MOTOR_server = MM(server_name="MOTOR", machine_name=gethostname()).json_dict()
-IO_server = MM(server_name="IO", machine_name=gethostname()).json_dict()
-SPEC_T_server = MM(server_name="SPEC_T", machine_name=gethostname()).json_dict()
-SPEC_R_server = MM(server_name="SPEC_R", machine_name=gethostname()).json_dict()
-ORCH_server = MM(server_name="ORCH", machine_name=gethostname()).json_dict()
-PAL_server = MM(server_name="PAL", machine_name=gethostname()).json_dict()
-CALC_server = MM(server_name="CALC", machine_name=gethostname()).json_dict()
+PSTAT_server = MM(server_name="PSTAT", machine_name=gethostname()).as_dict()
+MOTOR_server = MM(server_name="MOTOR", machine_name=gethostname()).as_dict()
+IO_server = MM(server_name="IO", machine_name=gethostname()).as_dict()
+SPEC_T_server = MM(server_name="SPEC_T", machine_name=gethostname()).as_dict()
+SPEC_R_server = MM(server_name="SPEC_R", machine_name=gethostname()).as_dict()
+ORCH_server = MM(server_name="ORCH", machine_name=gethostname()).as_dict()
+PAL_server = MM(server_name="PAL", machine_name=gethostname()).as_dict()
+CALC_server = MM(server_name="CALC", machine_name=gethostname()).as_dict()
 
 toggle_triggertype = TriggerType.fallingedge
 
@@ -143,7 +144,6 @@ def ECHEUVIS_sub_CV_led(
         process_finish=False,
         process_contrib=[
             ProcessContrib.files,
-            ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
     )
@@ -162,7 +162,6 @@ def ECHEUVIS_sub_CV_led(
             technique_name=apm.pars.spec_technique,
             process_contrib=[
                 ProcessContrib.files,
-                ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
         )
@@ -296,7 +295,6 @@ def ECHEUVIS_sub_CA_led(
         process_finish=False,
         process_contrib=[
             ProcessContrib.files,
-            ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
     )
@@ -315,7 +313,6 @@ def ECHEUVIS_sub_CA_led(
             technique_name=apm.pars.spec_technique,
             process_contrib=[
                 ProcessContrib.files,
-                ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
         )
@@ -443,7 +440,6 @@ def ECHEUVIS_sub_CP_led(
         process_finish=False,
         process_contrib=[
             ProcessContrib.files,
-            ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
     )
@@ -462,7 +458,6 @@ def ECHEUVIS_sub_CP_led(
             technique_name=apm.pars.spec_technique,
             process_contrib=[
                 ProcessContrib.files,
-                ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
             ],
         )
@@ -514,3 +509,139 @@ def ECHEUVIS_sub_interrupt(
     apm = ActionPlanMaker()
     apm.add(ORCH_server, "interrupt", {"reason": apm.pars.reason})
     return apm.action_list
+
+
+def ECHEUVIS_sub_OCV_led(
+    experiment: Experiment,
+    experiment_version: int = 3,
+    solution_ph: float = 9.53,
+    reservoir_electrolyte: Electrolyte = "SLF10",
+    reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
+    solution_bubble_gas: str = "O2",
+    measurement_area: float = 0.071,  # 3mm diameter droplet
+    ref_electrode_type: str = "NHE",
+    ref_vs_nhe: float = 0.21,
+    samplerate_sec: Optional[float] = 0.1,
+    OCV_duration_sec: Optional[float] = 0.0,
+    gamry_i_range: Optional[str] = "auto",
+    gamrychannelwait: Optional[int] = -1,
+    gamrychannelsend: Optional[int] = 0,
+    illumination_source: Optional[str] = "doric_wled",
+    illumination_wavelength: Optional[float] = 0.0,
+    illumination_intensity: Optional[float] = 0.0,
+    illumination_intensity_date: Optional[str] = "n/a",
+    illumination_side: Optional[str] = "front",
+    toggle_dark_time_init: Optional[float] = 0.0,
+    toggle_illum_duty: Optional[float] = 0.5,
+    toggle_illum_period: Optional[float] = 2.0,
+    toggle_illum_time: Optional[float] = -1,
+    toggle2_source: Optional[str] = "spec_trig",
+    toggle2_init_delay: Optional[float] = 0.0,
+    toggle2_duty: Optional[float] = 0.5,
+    toggle2_period: Optional[float] = 2.0,
+    toggle2_time: Optional[float] = -1,
+    spec_int_time_ms: Optional[float] = 15,
+    spec_n_avg: Optional[int] = 1,
+    spec_technique: Optional[str] = "T_UVVIS",
+    comment: Optional[str] = "",
+):
+    """last functionality test: -"""
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    if int(round(apm.pars.toggle_illum_time)) == -1:
+        apm.pars.toggle_illum_time = apm.pars.OCV_duration_sec
+    if int(round(apm.pars.toggle2_time)) == -1:
+        apm.pars.toggle2_time = apm.pars.OCV_duration_sec
+
+    # get sample for gamry
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    )
+
+    # setup toggle on galil_io
+    apm.add(
+        IO_server,
+        "set_digital_cycle",
+        {
+            "trigger_name": "gamry_ttl0",
+            "triggertype": toggle_triggertype,
+            "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
+            "out_name_gamry": None,
+            "toggle_init_delay": [
+                apm.pars.toggle_dark_time_init,
+                apm.pars.toggle2_init_delay,
+            ],
+            "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
+            "toggle_period": [
+                apm.pars.toggle_illum_period,
+                apm.pars.toggle2_period,
+            ],
+            "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
+        },
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_out,
+        ],
+    )
+
+    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
+        apm.add(
+            ss,
+            "acquire_spec_extrig",
+            {
+                "int_time": apm.pars.spec_int_time_ms,
+                "n_avg": apm.pars.spec_n_avg,
+                "duration": apm.pars.toggle2_time,
+            },
+            from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+            start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+            technique_name=apm.pars.spec_technique,
+            process_contrib=[
+                ProcessContrib.files,
+                ProcessContrib.samples_out,
+            ],
+        )
+
+    apm.add(
+        PSTAT_server,
+        "run_OCV",
+        {
+            "Tval__s": apm.pars.OCV_duration_sec,
+            "AcqInterval__s": apm.pars.samplerate_sec,
+            "TTLwait": apm.pars.gamrychannelwait,  # -1 disables, else select TTL 0-3
+            "TTLsend": apm.pars.gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "IErange": apm.pars.gamry_i_range,
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_server,
+        technique_name="OCV",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+
+    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
+        apm.add(
+            ss,
+            "stop_extrig_after",
+            {"delay": apm.pars.toggle2_time},
+            start_condition=ActionStartCondition.no_wait,
+        )
+
+    apm.add(IO_server, "stop_digital_cycle", {})
+
+    return apm.action_list  # returns complete action list to orch

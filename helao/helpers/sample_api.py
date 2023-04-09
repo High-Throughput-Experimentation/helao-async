@@ -90,6 +90,7 @@ class _BaseSampleAPI:
         self.ready = False
 
     async def _open_db(self):
+        """Opens sqlite db file, retries if in use, and assigns connection & cursor."""
         while file_in_use(self._db):
             self._base.print_message("db already in use, waiting", info=True)
             await asyncio.sleep(1)
@@ -97,6 +98,7 @@ class _BaseSampleAPI:
         self._cur = self._con.cursor()
 
     def _close_db(self):
+        """Commits changes to sqlite db and closes connection and cursor."""
         if self._con is not None:
             # commit any changes
             self._con.commit()
@@ -178,7 +180,7 @@ class _BaseSampleAPI:
                 sample.last_update = self._base.get_realtime_nowait()
             sample.global_label = sample.get_global_label()
 
-            dfdict = sample.json_dict()
+            dfdict = sample.as_dict()
             for key in self._jsonkeys:
                 dfdict.update({key: [json.dumps(dfdict[key])]})
 
@@ -366,7 +368,7 @@ class _BaseSampleAPI:
             retsample_list = self._df_to_samples(retdf)
             for retsample in retsample_list:
                 if retsample.sample_type is not None:
-                    ret_samples.append(retsample.clean_dict())
+                    ret_samples.append(retsample.as_dict())
             self._close_db()
             # print('\n\n', ret_samples, '\n\n')
         return ret_samples
@@ -454,7 +456,7 @@ class _BaseSampleAPI:
                 sample.last_update = self._base.get_realtime_nowait()
 
                 # update the old sample now
-                dfdict = sample.json_dict()
+                dfdict = sample.as_dict()
                 for key in self._jsonkeys:
                     # fdict.update({key: [json.dumps(dfdict[key])]})
                     dfdict.update({key: json.dumps(dfdict[key])})

@@ -16,18 +16,6 @@ def handlenan_savgol_filter(
     d_arr, window_length, polyorder, delta=1.0, deriv=0, replacenan_value=0.1
 ):
     """Custom savgol_filter from JCAPDataProcess uvis_basics.py, updated for array ops."""
-    nans = np.isnan(d_arr)
-    xarr = np.arange(len(d_arr))
-    if len(nans) > 1 and len(nans) < len(d_arr):
-        d_arr[nans] = interp(xarr[nans], xarr[~nans], d_arr[~nans])
-        naninds = np.where(np.isnan(d_arr))[0]
-        if len(naninds) > 1:
-            d_arr[naninds] = np.array(
-                [
-                    np.nanmean(d_arr[max(0, nind - 3) : min(nind + 3, len(d_arr))])
-                    for nind in naninds
-                ]
-            )
     try:
         return savgol_filter(d_arr, window_length, polyorder, delta=delta, deriv=deriv)
     except Exception:
@@ -41,21 +29,35 @@ def refadjust(v, min_mthd_allowed, max_mthd_allowed, min_limit, max_limit):
     """Normalization func from JCAPDataProcess uvis_basics.py, updated for array ops."""
     w = copy(v)
     min_rescaled = np.bitwise_and(
-        (w.min(axis=1) >= min_mthd_allowed),
-        (w.min(axis=1) < min_limit),
+        (w.min(axis=-1) >= min_mthd_allowed),
+        (w.min(axis=-1) < min_limit),
     )
-    w[min_rescaled, :] = (
-        w[min_rescaled, :] - w[min_rescaled, :].min(axis=1).reshape(-1, 1) + min_limit
+    w[min_rescaled] = (
+        w[min_rescaled] - w[min_rescaled].min(axis=-1).reshape(-1, 1) + min_limit
     )
     max_rescaled = np.bitwise_and(
-        (w.max(axis=1) <= max_mthd_allowed),
-        (w.max(axis=1) >= max_limit),
+        (w.max(axis=-1) <= max_mthd_allowed),
+        (w.max(axis=-1) >= max_limit),
     )
-    w[max_rescaled, :] = w[max_rescaled, :] / (
-        w[max_rescaled, :].max(axis=1).reshape(-1, 1) + 0.02
+    w[max_rescaled] = w[max_rescaled] / (
+        w[max_rescaled].max(axis=-1).reshape(-1, 1) + 0.02
     )
 
     return min_rescaled, max_rescaled, w
+
+
+def squeeze_foms(d):
+    sd = {}
+    for k, v in d.items():
+        if isinstance(v, np.ndarray):
+            if len(v.shape) > 1:
+                sv = v.mean(axis=1).tolist()
+            else:
+                sv = v.tolist()
+        else:
+            sv = v
+        sd[k] = sv
+    return sd
 
 
 class Calc:
@@ -68,8 +70,6 @@ class Calc:
 
     def gather_seq_data(self, seq_reldir: str, action_name: str):
         """Get all files using FileMapper to traverse ACTIVE/FINISHED/SYNCED."""
-        # get all files from current sequence directory
-        # produce tuples, (run_type, technique_name, run_use, hlo_path)
         active_save_dir = self.base.helaodirs.save_root.__str__()
         seq_absdir = os.path.join(active_save_dir, seq_reldir)
         FM = FileMapper(seq_absdir)
@@ -109,18 +109,31 @@ class Calc:
         return hlo_dict
 
     def gather_seq_exps(self, seq_reldir: str, exp_name: str):
-        """Get all files using FileMapper to traverse ACTIVE/FINISHED/SYNCED."""
-        # get all files from current sequence directory
-        # produce tuples, (run_type, technique_name, run_use, hlo_path)
+        """Get all exp dicts using FileMapper to traverse ACTIVE/FINISHED/SYNCED."""
         active_save_dir = self.base.helaodirs.save_root.__str__()
         seq_absdir = os.path.join(active_save_dir, seq_reldir)
         FM = FileMapper(seq_absdir)
-        paths = [x for x in FM.relstrs if exp_name in x]
+        if exp_name == "*":
+            paths = FM.relstrs
+        else:
+            paths = [x for x in FM.relstrs if exp_name in x]
         ymls = sorted([x for x in paths if x.endswith("exp.yml")])
         yml_dict = {}
         for ep in ymls:
             expd = FM.read_yml(ep)
             yml_dict[ep] = expd
+        return yml_dict
+
+    def get_seq_dict(self, seq_reldir: str):
+        """Get sequence dict."""
+        active_save_dir = self.base.helaodirs.save_root.__str__()
+        seq_absdir = os.path.join(active_save_dir, seq_reldir)
+        FM = FileMapper(seq_absdir)
+        ymls = [x for x in FM.relstrs if x.endswith("seq.yml")]
+        yml_dict = {}
+        for sp in ymls:
+            seqd = FM.read_yml(sp)
+            yml_dict = seqd
         return yml_dict
 
     def calc_uvis_abs(self, activeobj: Active):
@@ -159,6 +172,7 @@ class Calc:
                 for dk in list(rud[rk].keys()):
                     rud["technique_name"] = rud[rk][dk]["actd"]["technique_name"]
                     data = rud[rk][dk]["data"]
+                    epochs = data["epoch_s"]
                     vals = [
                         data[chk]
                         for chk in sorted(
@@ -172,6 +186,7 @@ class Calc:
                             "raw": arr,
                             "median": np.median(arr, axis=0),
                             "mean": arr.mean(axis=0),
+                            "epoch": epochs,
                         }
                     )
 
@@ -230,6 +245,7 @@ class Calc:
                 smplist = []
                 wllist = []
                 bsnlist = []
+                epochlist = []
 
                 for d in rud["data"].values():
                     actd = d["actd"]
@@ -259,7 +275,7 @@ class Calc:
                         smplist.append(solid_smp)
                         wllist.append(d["meta"]["optional"]["wl"])
                         actuuids.append(actd["action_uuid"])
-                        bsnlist.append((d["mean"] - mindark) / (maxlight - mindark))
+                        bsnlist.append((d["raw"] - mindark) / (maxlight - mindark))
 
                 wlarr = np.array(wllist).mean(axis=0)
                 specd[spec] = {
@@ -267,6 +283,7 @@ class Calc:
                     "action_uuids": actuuids,
                     "bsnlist": bsnlist,
                     "wlarr": wlarr,
+                    "epoch": epochlist,
                     "technique": rud["technique_name"],
                 }
 
@@ -302,7 +319,12 @@ class Calc:
             wl = np.array(sd["wlarr"])
             wlmask = np.where((wl > params["lower_wl"]) & (wl < params["upper_wl"]))[0]
             pred[k]["full"]["wl"] = wl[wlmask]
-            pred[k]["full"]["sig"] = np.array(sd["bsnlist"])[:, wlmask]
+
+            shortest = min([x.shape[0] for x in sd["bsnlist"]])
+            trunc_bsnlist = [x[:shortest] for x in sd["bsnlist"]]
+            trunc_epoch = [x[:shortest] for x in sd["epoch"]]
+            pred[k]["full"]["sig"] = np.array(trunc_bsnlist)[:, :, wlmask]
+            pred[k]["full"]["epoch"] = np.array(trunc_epoch)
             binds = [
                 [
                     y
@@ -315,6 +337,7 @@ class Calc:
             rsi = [np.median(inds).astype(int) for inds in pred[k]["binds"]]
             pred[k]["rsi"] = rsi  # raw indices from full vector
             pred[k]["bin"]["wl"] = pred["T"]["full"]["wl"][rsi]  # center index of bin
+            pred[k]["bin"]["epoch"] = pred[k]["full"]["epoch"]
             hv = [
                 1239.8 / x for x in pred[k]["bin"]["wl"]
             ]  # convert binned wl[nm] to energy[eV]
@@ -339,9 +362,9 @@ class Calc:
             smplist = specd["T"]["smplist"]
             smpT = np.array(smplist)
             asT = np.argsort(smpT)
-            arrTR = pred["T"]["full"]["sig"] / (1 - pred["R"]["full"]["sig"][asT, :])
+            arrTR = pred["T"]["full"]["sig"] / (1 - pred["R"]["full"]["sig"][asT, :, :])
             pred["TR"]["full"]["sig"] = arrTR
-            omTR = 1 - pred["T"]["full"]["sig"] - pred["R"]["full"]["sig"][asT, :]
+            omTR = 1 - pred["T"]["full"]["sig"] - pred["R"]["full"]["sig"][asT, :, :]
             omT = 1 - pred["T"]["full"]["sig"]
             pred["TR"]["full"]["omTR"] = omTR
             pred["TR"]["full"]["omT"] = omT
@@ -366,8 +389,12 @@ class Calc:
             # bin full arrays that haven't been binned
             for k, arr in pred[sk]["full"].items():
                 if k not in pred[sk]["bin"].keys():
-                    pred[sk]["bin"][k] = [arr[:, inds].mean(axis=1) for inds in binds]
-                    pred[sk]["bin"][k] = np.array(pred[sk]["bin"][k]).transpose()
+                    pred[sk]["bin"][k] = [
+                        arr[:, :, inds].mean(axis=-1) for inds in binds
+                    ]
+                    pred[sk]["bin"][k] = np.array(pred[sk]["bin"][k]).transpose(
+                        (1, 2, 0)
+                    )
             # smooth binned arrays that haven't been smoothed
             for k, arr in pred[sk]["bin"].items():
                 if (k != "abs" or sk == "T") and k not in pred[sk]["smooth"].keys():
@@ -474,30 +501,30 @@ class Calc:
                 lo, hi = evp[i], evp[i + 1]
                 evrange = np.bitwise_and((interd["hv"] > lo), (interd["hv"] < hi))
                 datadict[f"1-T-R_av_{lo}_{hi}"] = interd["smooth"]["omTR"][
-                    :, evrange
-                ].mean(axis=1)
+                    :, :, evrange
+                ].mean(axis=-1)
                 datadict[f"1-T_av_{lo}_{hi}"] = interd["smooth"]["omT"][
-                    :, evrange
-                ].mean(axis=1)
+                    :, :, evrange
+                ].mean(axis=-1)
             # full range
             lo, hi = evp[0], evp[-1]
             evrange = np.bitwise_and((interd["hv"] > lo), (interd["hv"] < hi))
-            datadict[f"1-T-R_av_{lo}_{hi}"] = interd["smooth"]["omTR"][:, evrange].mean(
-                axis=1
-            )
-            datadict[f"1-T_av_{lo}_{hi}"] = interd["smooth"]["omT"][:, evrange].mean(
-                axis=1
+            datadict[f"1-T-R_av_{lo}_{hi}"] = interd["smooth"]["omTR"][
+                :, :, evrange
+            ].mean(axis=-1)
+            datadict[f"1-T_av_{lo}_{hi}"] = interd["smooth"]["omT"][:, :, evrange].mean(
+                axis=-1
             )
             datadict["TplusR_0to1"] = np.bitwise_and(
                 (interd["smooth"]["omTR"] > 0.0), (interd["smooth"]["omTR"] < 1.0)
-            ).all(axis=1)
+            ).all(axis=-1)
 
             datadict["T_0to1"] = np.bitwise_and(
                 (pred["T"]["smooth"]["sig"] > 0.0), (pred["T"]["smooth"]["sig"] < 1.0)
-            ).all(axis=1)
+            ).all(axis=-1)
             datadict["R_0to1"] = np.bitwise_and(
                 (pred["R"]["smooth"]["sig"] > 0.0), (pred["R"]["smooth"]["sig"] < 1.0)
-            ).all(axis=1)
+            ).all(axis=-1)
 
         elif specd.get("T", {}) and not specd.get("R", {}):  # T_UVVIS only
             interd = pred["T"]
@@ -506,50 +533,51 @@ class Calc:
                 lo, hi = evp[i], evp[i + 1]
                 evrange = np.bitwise_and((interd["hv"] > lo), (interd["hv"] < hi))
                 datadict[f"1-T_av_{lo}_{hi}"] = interd["smooth"]["omT"][
-                    :, evrange
-                ].mean(axis=1)
+                    :, :, evrange
+                ].mean(axis=-1)
             # full range
             lo, hi = evp[0], evp[-1]
             evrange = np.bitwise_and((interd["hv"] > lo), (interd["hv"] < hi))
-            datadict[f"1-T_av_{lo}_{hi}"] = interd["smooth"]["omT"][:, evrange].mean(
-                axis=1
+            datadict[f"1-T_av_{lo}_{hi}"] = interd["smooth"]["omT"][:, :, evrange].mean(
+                axis=-1
             )
             datadict["T_0to1"] = np.bitwise_and(
                 (pred["T"]["smooth"]["sig"] > 0.0), (pred["T"]["smooth"]["sig"] < 1.0)
-            ).all(axis=1)
+            ).all(axis=-1)
 
         elif specd.get("R", {}) and not specd.get("T", {}):  # DR_UVVIS only
             interd = pred["R"]
             datadict["DR_0to1"] = np.bitwise_and(
                 (pred["R"]["smooth"]["sig"] > 0.0), (pred["R"]["smooth"]["sig"] < 1.0)
-            ).all(axis=1)
+            ).all(axis=-1)
 
-        datadict["max_abs"] = np.nanmax(interd["smooth_refadj"]["abs"], axis=1)
+        datadict["max_abs"] = np.nanmax(interd["smooth_refadj"]["abs"], axis=-1)
         checknanrange = np.bitwise_and(
             (interd["bin"]["wl"] >= 410), (interd["bin"]["wl"] <= 850)
         )
         datadict["abs_hasnan"] = np.any(
-            np.isnan(interd["smooth_refadj"]["abs"][:, checknanrange]), axis=1
+            np.isnan(interd["smooth_refadj"]["abs"][:, :, checknanrange]), axis=-1
         )
+
         evp = params["ev_parts"]
         for i in range(len(evp) - 1):
             lo, hi = evp[i], evp[i + 1]
             evrange = np.bitwise_and((interd["hv"] > lo), (interd["hv"] < hi))
             datadict[f"abs_{lo}_{hi}"] = -1 * np.trapz(
-                interd["smooth_refadj"]["abs"][:, evrange], x=interd["hv"][evrange]
+                interd["smooth_refadj"]["abs"][:, :, evrange], x=interd["hv"][evrange]
             )
         # full range
         lo, hi = evp[0], evp[-1]
         evrange = np.bitwise_and((interd["hv"] > lo), (interd["hv"] < hi))
         datadict[f"abs_{lo}_{hi}"] = -1 * np.trapz(
-            interd["smooth_refadj"]["abs"][:, evrange], x=interd["hv"][evrange]
+            interd["smooth_refadj"]["abs"][:, :, evrange], x=interd["hv"][evrange]
         )
 
         datadict["max_abs2ndderiv"] = np.nanmax(
-            interd["smooth_refadj_scl"]["abs_2ndderiv"], axis=1
+            interd["smooth_refadj_scl"]["abs_2ndderiv"], axis=-1
         )
         datadict["min_abs1stderiv"] = np.nanmin(
-            interd["smooth_refadj_scl"]["abs_1stderiv"], axis=1
+            interd["smooth_refadj_scl"]["abs_1stderiv"], axis=-1
         )
 
         for z in ("DA", "IA", "DF", "IF"):
@@ -568,7 +596,7 @@ class Calc:
                 )
                 / sdx
             )
-            datadict[f"{z}_minslope"] = np.nanmin(slope, axis=1)
+            datadict[f"{z}_minslope"] = np.nanmin(slope, axis=-1)
 
         datadict["sample_label"] = smplist
         datadict["min_rescaled"] = interd["min_rescaled"]
@@ -599,6 +627,7 @@ class Calc:
             "smooth_refadj_scl": "interlen_smoothrefadjscl",
         }
         keymap = {"omTR": "one_minus_T_minus_R", "omT": "one_minus_T", "abs": "abs"}
+
         for sk, sd in pred.items():
             for bk, bd in sd.items():
                 if not isinstance(bd, dict):
@@ -614,6 +643,7 @@ class Calc:
                     ad = {
                         "sample_label": specd[uk]["smplist"],
                         "action_uuids": specd[uk]["action_uuids"],
+                        "epoch": sd["bin"]["epoch"].tolist(),
                         "wavelength": sd["bin"]["wl"].tolist()
                         if bk.startswith("smooth")
                         else bd["wl"].tolist(),
@@ -621,10 +651,7 @@ class Calc:
                     }
                     arraydict[f"{arrayname}"] = ad
 
-        datadict = {
-            k: v.tolist() if isinstance(v, np.ndarray) else v
-            for k, v in datadict.items()
-        }
+        datadict = squeeze_foms(datadict)
 
         return datadict, arraydict
 
@@ -632,17 +659,19 @@ class Calc:
         params = activeobj.action.action_params
         co2_ppm_thresh = params["co2_ppm_thresh"]
         purge_if = params["purge_if"]
+        present_syringe_volume_ul = params["present_syringe_volume_ul"]
         repeat_experiment_name = params["repeat_experiment_name"]
         repeat_experiment_params = params["repeat_experiment_params"]
         kwargs = params["repeat_experiment_kwargs"]
         seq_reldir = activeobj.action.get_sequence_dir()
+        # seq_dict = self.get_seq_dict(seq_reldir)
 
-        exp_dict = self.gather_seq_exps(seq_reldir, repeat_experiment_name)
         max_loops = (
             repeat_experiment_params.get("max_purge_iters", 5) + 1
         )  # add original purge
 
         hlo_dict = self.gather_seq_data(seq_reldir, "acquire_co2")
+        all_exps = self.gather_seq_exps(seq_reldir, "*")
         latest = hlo_dict[sorted(hlo_dict.keys())[-1]]
 
         mean_co2_ppm = np.mean(latest["data"]["co2_ppm"])
@@ -667,18 +696,41 @@ class Calc:
                 self.base.print_message(
                     "abs('purge_if') parameter is numerical and < 1.0, treating as fraction of threshold"
                 )
-            # purge_if<0 means purge if current ppm is below pct diff
-            # purge_if>0 means purge if current ppm is above pct diff
+            ## old behavior: signed value determines over or under threshold
+            ## purge_if<0 means purge if current ppm is below pct diff
+            ## purge_if>0 means purge if current ppm is above pct diff
+            # loop_condition = (
+            #     np.sign(purge_if) * (mean_co2_ppm - co2_ppm_thresh) / co2_ppm_thresh
+            #     > np.sign(purge_if) * purge_if
+            # )
+            ## adjust next loop params in case loop condition is met (double purge_if every 2 loops)
+            # repeat_experiment_params["purge_if"] = (
+            #     abs(purge_if) * 2**0.5 * np.sign(purge_if)
+            # )
+            ## new behavior: symmetric pct difference around thershold
             loop_condition = (
-                np.sign(purge_if) * (mean_co2_ppm - co2_ppm_thresh) / co2_ppm_thresh
-                > np.sign(purge_if) * purge_if
-            )
-            # adjust next loop params in case loop condition is met (double purge_if every 2 loops)
-            repeat_experiment_params["purge_if"] = (
-                abs(purge_if) * 2**0.5 * np.sign(purge_if)
+                np.abs(mean_co2_ppm - co2_ppm_thresh) / co2_ppm_thresh > purge_if
             )
 
-        if loop_condition and len(exp_dict) == max_loops:
+        if (
+            present_syringe_volume_ul < 15000
+        ):  # hard coded 15000ul check for syringe volume
+            repeat_experiment_params["need_fill"] = True
+
+        repeat_experiment_idxs = [
+            i
+            for i, x in enumerate(sorted(all_exps.keys()))
+            if repeat_experiment_name in x
+        ]
+        current_experiment_idx = max(repeat_experiment_idxs)
+        num_consecutive_repeats = 0
+        for i in range(current_experiment_idx):
+            if current_experiment_idx - i - 1 in repeat_experiment_idxs:
+                num_consecutive_repeats += 1
+            else:
+                break
+
+        if loop_condition and num_consecutive_repeats >= max_loops:
             self.base.print_message(
                 f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition but max_purge_iters ({max_loops}) reached. Exiting."
             )
@@ -705,7 +757,7 @@ class Calc:
                 params_dict={},
                 json_dict={
                     "idx": 0,
-                    "experiment": rep_exp.json_dict(),
+                    "experiment": rep_exp.clean_dict(),
                 },
             )
             self.base.print_message(f"insert_experiment got response: {resp}")
@@ -719,6 +771,66 @@ class Calc:
             "epoch": float(time.time()),
             "mean_co2_ppm": float(mean_co2_ppm),
             "redo_purge": bool(loop_condition),
+        }
+        return return_dict
+
+    async def fill_syringe_volume_check(self, activeobj: Active):
+        params = activeobj.action.action_params
+        check_volume_ul = params["check_volume_ul"]
+        target_volume_ul = params["target_volume_ul"]
+        present_volume_ul = params["present_volume_ul"]
+
+        repeat_experiment_name = params["repeat_experiment_name"]
+        repeat_experiment_params = params["repeat_experiment_params"]
+        kwargs = params["repeat_experiment_kwargs"]
+
+        if present_volume_ul < check_volume_ul:
+            fill_needed = True
+            fill_vol = target_volume_ul - present_volume_ul
+            repeat_experiment_params = {"fill_volume_ul": fill_vol}
+            self.base.print_message(
+                f"current syringe volume: {present_volume_ul} does not meet threshold condition. Refilling"
+            )
+        elif check_volume_ul == 0:
+            fill_needed = True
+            fill_vol = target_volume_ul - present_volume_ul
+            repeat_experiment_params = {"fill_volume_ul": fill_vol}
+            self.base.print_message(f"Refilling to target volume: {target_volume_ul}")
+        else:
+            fill_needed = False
+            self.base.print_message(
+                f"current syringe volume: {present_volume_ul} does meet threshold condition. No action needed."
+            )
+
+        if fill_needed:
+            world_config = self.base.fastapp.helao_cfg
+            orch_name = [
+                k
+                for k, d in world_config.get("servers", {}).items()
+                if d["group"] == "orchestrator"
+            ][0]
+            rep_exp = Experiment(
+                experiment_name=repeat_experiment_name,
+                experiment_params=repeat_experiment_params,
+                **kwargs,
+            )
+            self.base.print_message("queueing repeat experiment request on Orch")
+            resp, error = await async_private_dispatcher(
+                world_config,
+                orch_name,
+                "insert_experiment",
+                params_dict={},
+                json_dict={
+                    "idx": 0,
+                    "experiment": rep_exp.clean_dict(),
+                },
+            )
+            self.base.print_message(f"insert_experiment got response: {resp}")
+            self.base.print_message(f"insert_experiment returned error: {error}")
+
+        return_dict = {
+            "epoch": float(time.time()),
+            "syringe_present_volume_ul": float(present_volume_ul),
         }
         return return_dict
 

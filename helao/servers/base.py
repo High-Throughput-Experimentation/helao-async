@@ -4,8 +4,9 @@ import asyncio
 import json
 import os
 import sys
+from random import randint
 from socket import gethostname
-from time import ctime, time, time_ns
+from time import ctime, time, time_ns, sleep
 from typing import List, Optional, Dict
 from types import MethodType
 from uuid import UUID, uuid1
@@ -204,16 +205,16 @@ class Executor:
         active,
         poll_rate: float = 0.2,
         oneoff: bool = True,
-        exid: Optional[str] = None,
+        exec_id: Optional[str] = None,
     ):
         self.active = active
         self.oneoff = oneoff
         self.poll_rate = poll_rate
-        if exid is None:
-            self.exid = f"{active.action.action_name} {active.action.action_uuid}"
+        if exec_id is None:
+            self.exec_id = f"{active.action.action_name} {active.action.action_uuid}"
         else:
-            self.exid = exid
-        self.active.action.exid = self.exid
+            self.exec_id = exec_id
+        self.active.action.exec_id = self.exec_id
 
     async def _pre_exec(self):
         "Setup methods, return error state."
@@ -342,6 +343,7 @@ class Base:
                 self.helaodirs.states_root, "ntpLastSync.txt"
             )
             if os.path.exists(self.ntp_last_sync_file):
+                sleep(randint(1, 5))
                 with open(self.ntp_last_sync_file, "r") as f:
                     tmps = f.readline().strip().split(",")
                     if len(tmps) == 2:
@@ -605,7 +607,7 @@ class Base:
         actionmodel: ActionModel,
     ):
         # needs private dispatcher
-        json_dict = {"actionmodel": actionmodel.json_dict()}
+        json_dict = {"actionmodel": actionmodel.as_dict()}
         self.print_message(f"sending non-blocking status: {json_dict}")
         response, error_code = await async_private_dispatcher(
             world_config_dict=self.world_cfg,
@@ -679,7 +681,7 @@ class Base:
         await websocket.accept()
         try:
             async for status_msg in self.status_q.subscribe():
-                await websocket.send_text(json.dumps(status_msg.json_dict()))
+                await websocket.send_text(json.dumps(status_msg.as_dict()))
         # except WebSocketDisconnect:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -694,7 +696,7 @@ class Base:
         await websocket.accept()
         try:
             async for data_msg in self.data_q.subscribe():
-                await websocket.send_text(json.dumps(data_msg.json_dict()))
+                await websocket.send_text(json.dumps(data_msg.as_dict()))
         # except WebSocketDisconnect:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -842,6 +844,7 @@ class Base:
                 # async with lock:
                 ntp_last_sync = ""
                 if self.ntp_last_sync_file is not None:
+                    await asyncio.sleep(randint(1, 5))
                     async with aiofiles.open(self.ntp_last_sync_file, "r") as f:
                         ntp_last_sync = await f.readline()
                 parts = ntp_last_sync.strip().split(",")
@@ -1087,8 +1090,9 @@ class Active:
         self.action_loop_running = False
         self.action_task = None
 
-    async def start_executor(self, executor: Executor):
+    def start_executor(self, executor: Executor):
         self.action_task = self.base.aloop.create_task(self.action_loop_task(executor))
+        self.base.print_message("Executor task started.")
         return self.action.as_dict()
 
     async def update_act_file(self):
@@ -1975,7 +1979,7 @@ class Active:
             return await self.finish()
 
         # shortcut to active exectuors
-        self.base.executors[executor.exid] = self
+        self.base.executors[executor.exec_id] = self
 
         # action operations
         result = await executor._exec()
@@ -2030,7 +2034,7 @@ class Active:
         if cleanup_error != ErrorCodes.none:
             self.base.print_message("Error encountered during executor cleanup.")
 
-        _ = self.base.executors.pop(executor.exid)
+        _ = self.base.executors.pop(executor.exec_id)
         await self.finish()
         if self.action.nonblocking:
             await self.send_nonblocking_status()
@@ -2058,6 +2062,6 @@ class DummyBase:
         for k, v in message:
             self.live_buffer[k] = (v, now)
 
-    async def get_lbuf(self, buf_key: str) -> tuple:
+    def get_lbuf(self, buf_key: str) -> tuple:
         buf_val, buf_ts = self.live_buffer[buf_key]
         return buf_val, buf_ts

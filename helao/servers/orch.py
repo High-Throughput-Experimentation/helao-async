@@ -26,7 +26,7 @@ import colorama
 import time
 from fastapi import WebSocket, Body
 from functools import partial
-
+from collections import defaultdict
 
 from bokeh.server.server import Server
 from helao.servers.operator.bokeh_operator import Operator
@@ -184,14 +184,14 @@ class HelaoOrch(HelaoFastAPI):
                 f"'{self.orch.server.server_name.upper()}' "
                 f"got nonblocking status from "
                 f"'{actionmodel.action_server.server_name}': "
-                f"exid: {actionmodel.exid} -- status: {actionmodel.action_status}"
+                f"exec_id: {actionmodel.exec_id} -- status: {actionmodel.action_status}"
             )
             result_dict = self.orch.update_nonblocking(actionmodel)
             return result_dict
 
         @self.post("/start", tags=["private"])
         async def start():
-            """Begin experimenting experiment and action queues."""
+            """Begin dispatching experiment and action queues."""
             await self.orch.start()
             return {}
 
@@ -208,7 +208,7 @@ class HelaoOrch(HelaoFastAPI):
 
         @self.post("/stop", tags=["private"])
         async def stop():
-            """Stop experimenting experiment and action queues after current actions finish."""
+            """Stop dispatching experiment and action queues after current actions finish."""
             await self.orch.stop()
             return {}
 
@@ -334,7 +334,7 @@ class HelaoOrch(HelaoFastAPI):
                 active=active,
                 oneoff=False,
             )
-            active_action_dict = await active.start_executor(executor)
+            active_action_dict = active.start_executor(executor)
             return active_action_dict
 
         @self.post(f"/{server_key}/cancel_wait", tags=["action"])
@@ -344,8 +344,8 @@ class HelaoOrch(HelaoFastAPI):
         ):
             """Stop sleep action."""
             active = await self.orch.setup_and_contain_action()
-            for exid, executor in self.orch.executors.items():
-                if exid.split()[0] == "wait":
+            for exec_id, executor in self.orch.executors.items():
+                if exec_id.split()[0] == "wait":
                     await executor.stop_action_task()
             finished_action = await active.finish()
             return finished_action.as_dict()
@@ -598,23 +598,23 @@ class Orch(Base):
         """Update method for action server to push non-blocking action ids."""
         print(actionmodel.clean_dict())
         server_key = actionmodel.action_server.server_name
-        server_exid = (server_key, actionmodel.exid)
+        server_exec_id = (server_key, actionmodel.exec_id)
         if "active" in actionmodel.action_status:
-            self.nonblocking.append(server_exid)
+            self.nonblocking.append(server_exec_id)
         else:
-            self.nonblocking.remove(server_exid)
+            self.nonblocking.remove(server_exec_id)
         return {"success": True}
 
     async def clear_nonblocking(self):
         """Clear method for orch to purge non-blocking action ids."""
         resp_tups = []
-        for server_key, exid in self.nonblocking:
-            print(server_key, exid)
+        for server_key, exec_id in self.nonblocking:
+            print(server_key, exec_id)
             response, error_code = await async_private_dispatcher(
                 world_config_dict=self.world_cfg,
                 server=server_key,
                 private_action="stop_executor",
-                params_dict={"executor_id": exid},
+                params_dict={"executor_id": exec_id},
                 json_dict={},
             )
             resp_tups.append((response, error_code))
@@ -666,7 +666,7 @@ class Orch(Base):
         await websocket.accept()
         try:
             async for globstat_msg in self.globstat_q.subscribe():
-                await websocket.send_text(json.dumps(globstat_msg.json_dict()))
+                await websocket.send_text(json.dumps(globstat_msg.as_dict()))
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             self.print_message(
@@ -791,6 +791,8 @@ class Orch(Base):
             self.action_dq = zdeque([])
             return ErrorCodes.none
 
+        process_order_groups = defaultdict(list)
+        process_count = 0
         # self.print_message("setting action order")
         for i, act in enumerate(unpacked_acts):
             # init uuid now for tracking later
@@ -800,8 +802,13 @@ class Orch(Base):
             # will be incremented as necessary
             act.orch_submit_order = int(i)
             self.action_dq.append(act)
+            if act.process_contrib:
+                process_order_groups[process_count].append(i)
+            if act.process_finish:
+                process_count += 1
+        if process_order_groups:
+            self.active_experiment.process_order_groups = process_order_groups
 
-        # TODO:update experiment code
         # self.print_message("adding unpacked actions to action_dq")
         self.print_message(f"got: {self.action_dq}")
         self.print_message(
@@ -936,19 +943,24 @@ class Orch(Base):
                 srvname = resmod.action_server.server_name
                 actname = resmod.action_name
                 resuuid = resmod.action_uuid
-                actstat = resmod.action_status
+                actstats = resmod.action_status
                 srvkeys = self.globalstatusmodel.server_dict.keys()
                 srvkey = [k for k in srvkeys if k[0] == srvname][0]
-                if HloStatus.active in actstat:
+                if HloStatus.active in actstats:
                     self.globalstatusmodel.active_dict[resuuid] = resmod
                     self.globalstatusmodel.server_dict[srvkey].endpoints[
                         actname
                     ].active_dict[resuuid] = resmod
                 else:
-                    self.globalstatusmodel.nonactive_dict[actstat[0]][resuuid] = resmod
-                    self.globalstatusmodel.server_dict[srvkey].endpoints[
-                        actname
-                    ].nonactive_dict[actstat[0]][resuuid] = resmod
+                    for actstat in actstats:
+                        try:
+                            self.globalstatusmodel.nonactive_dict[actstat][resuuid] = resmod
+                            self.globalstatusmodel.server_dict[srvkey].endpoints[
+                                actname
+                            ].nonactive_dict[actstat][resuuid] = resmod
+                            break
+                        except:
+                            self.print_message(f"{actstat} not found in globalstatus.nonactive_dict")
                 # await self.interrupt_q.put(self.globalstatusmodel)
                 # await self.update_operator(True)
                 # await self.globstat_q.put(self.globalstatusmodel.as_json())
@@ -1245,7 +1257,7 @@ class Orch(Base):
             action_dict.update(
                 {
                     "action_name": "estop",
-                    "action_server": actionservermodel.action_server.json_dict(),
+                    "action_server": actionservermodel.action_server.as_dict(),
                     "action_params": {"switch": switch},
                     "start_condition": ActionStartCondition.no_wait,
                 }

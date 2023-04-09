@@ -53,17 +53,17 @@ from helao.drivers.robot.pal_driver import Spacingmethod, PALtools
 EXPERIMENTS = __all__
 
 ORCH_HOST = gethostname()
-PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).json_dict()
-MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).json_dict()
-NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).json_dict()
-ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).json_dict()
-PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).json_dict()
+PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).as_dict()
+MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).as_dict()
+NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).as_dict()
+ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
+PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
 SOLUTIONPUMP_server = MachineModel(
     server_name="SYRINGE0", machine_name=ORCH_HOST
-).json_dict()
+).as_dict()
 WATERCLEANPUMP_server = MachineModel(
     server_name="SYRINGE1", machine_name=ORCH_HOST
-).json_dict()
+).as_dict()
 
 
 # cannot save data without exp
@@ -1261,6 +1261,7 @@ def ADSS_sub_clean_cell(
 
 ):
     apm = ActionPlanMaker()
+
     apm.add(
         WATERCLEANPUMP_server,
         "infuse",
@@ -1277,7 +1278,9 @@ def ADSS_sub_clean_cell(
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.ReturnLineWait_s})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
 
+
     apm.add_action_list(ADSS_sub_drain_cell(experiment=experiment,DrainWait_s=apm.pars.DrainWait_s,ReturnLineReverseWait_s=apm.pars.ReturnLineReverseWait_s,ResidualWait_s=apm.pars.ResidualWait_s))
+
 
 
     apm.add(MOTOR_server, "z_move", {"z_position": "load"})
@@ -1309,7 +1312,9 @@ def ADSS_sub_move_to_clean_cell(
 
     apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
 
+
     return apm.action_list
+
 
 def ADSS_sub_refill_syringes(
     experiment: Experiment,
@@ -1336,7 +1341,6 @@ def ADSS_sub_refill_syringes(
         apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 0})
     
     return apm.action_list
-
 
 def ADSS_sub_sample_aliquot(
     experiment: Experiment,

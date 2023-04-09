@@ -705,7 +705,7 @@ def ADSS_CA_NiSb_validation(
                 "DrainWait_s": Cell_draintime_s,
                 "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
                 "ResidualWait_s": ResidualWait_s,
-            }
+        }
         )
         refill_volume = (flush_volume_ul + liquid_sample_volume_ul)*counter
         water_refill_volume = 0
