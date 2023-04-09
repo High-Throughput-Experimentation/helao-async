@@ -547,7 +547,8 @@ def ADSS_CA_NiSb_validation(
     ResidualWait_s: float = 15,
     flush_volume_ul: float = 2000,
     clean_volume_ul: float = 5000,
-    PAL_Injector: str = "LS 4"
+    PAL_Injector: str = "LS 4",
+    PAL_Injector_id: str = "fill serial number here"
 ):
 
     """tbd
@@ -585,8 +586,10 @@ def ADSS_CA_NiSb_validation(
         #         "ResidualWait_s": ResidualWait_s,
         #     }
         # )
+        counter = 0
         for CA_potential_vs in CA_potentials_vs:
 
+            counter += 1   
             epm.add_experiment(
                 "ADSS_sub_cellfill_prefilled",
                 {
@@ -609,13 +612,17 @@ def ADSS_CA_NiSb_validation(
                     "solid_sample_no": solid_sample_no,
                 }
             )
-            epm.add_experiment("ADSS_sub_recirculate",)
+            epm.add_experiment("ADSS_sub_recirculate",{})
 
             epm.add_experiment(
                 "ADSS_sub_OCV",
                 {
                     "Tval__s": OCV_duration,
                     "SampleRate": 0.05,
+                    "ph": ph,
+                    "ref_type": ref_type,
+                    "ref_offset__V": ref_offset__V,
+
                 },
             )
             epm.add_experiment(
@@ -624,6 +631,7 @@ def ADSS_CA_NiSb_validation(
                     "EquilibrationTime_s": EquilibrationTime_s,
                     "aliquot_volume_ul": aliquot_volume_ul,
                     "PAL_Injector": PAL_Injector,
+                    "PAL_Injector_id": PAL_Injector_id,
                 }
             )
 
@@ -640,6 +648,8 @@ def ADSS_CA_NiSb_validation(
                     "aliquot_volume_ul": aliquot_volume_ul,
                     "aliquot_times_sec": aliquot_times_sec,
                     "aliquot_insitu": True,
+                    "PAL_Injector": PAL_Injector,
+                    "PAL_Injector_id": PAL_Injector_id,
                 },
             )
             epm.add_experiment(
@@ -648,7 +658,8 @@ def ADSS_CA_NiSb_validation(
                     "EquilibrationTime_s": EquilibrationTime_s,
                     "aliquot_volume_ul": aliquot_volume_ul,
                     "PAL_Injector": PAL_Injector,
-                }
+                    "PAL_Injector_id": PAL_Injector_id,
+            }
             )
 
             epm.add_experiment(
@@ -696,6 +707,13 @@ def ADSS_CA_NiSb_validation(
                 "ResidualWait_s": ResidualWait_s,
         }
         )
+        refill_volume = (flush_volume_ul + liquid_sample_volume_ul)*counter
+        water_refill_volume = 0
+        epm.add_experiment("ADSS_sub_refill_syringes", {
+            "Waterclean_volume_ul": water_refill_volume ,
+            "Solution_volume_ul": refill_volume,
+            "Syringe_rate_ulsec": 300,
+        })
 
 #    epm.add_experiment("ADSS_sub_tray_unload",{})
 
