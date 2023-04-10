@@ -441,7 +441,10 @@ class HelaoSyncer:
         if task_name in self.running_tasks:
             # self.base.print_message(f"Removing {task_name} from running_tasks.")
             self.running_tasks.pop(task_name)
-            self.task_set.remove(task_name)
+            try:
+                self.task_set.remove(task_name)
+            except KeyError:
+                pass
         # else:
         #     self.base.print_message(
         #         f"{task_name} was already removed from running_tasks."
