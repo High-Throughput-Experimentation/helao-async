@@ -163,7 +163,7 @@ class HelaoOrch(HelaoFastAPI):
             return self.orch.globalstatusmodel.as_json()
 
         @self.post("/update_status", tags=["private"])
-        async def update_status(
+        def update_status(
             actionservermodel: Optional[ActionServerModel] = Body({}, embed=True)
         ):
             if actionservermodel is None:
@@ -174,7 +174,7 @@ class HelaoOrch(HelaoFastAPI):
                 f"'{actionservermodel.action_server.server_name}': "
                 f"{actionservermodel.endpoints}"
             )
-            return await self.orch.update_status(actionservermodel=actionservermodel)
+            return self.orch.update_status(actionservermodel=actionservermodel)
 
         @self.post("/update_nonblocking", tags=["private"])
         async def update_nonblocking(
@@ -430,7 +430,7 @@ class Orch(Base):
 
         # holder for tracking dispatched action in status
         self.last_dispatched_action_uuid = None
-        self.last_10_action_uuids = []
+        self.last_50_action_uuids = []
         self.last_action_uuid = ""
         # hold schema objects
         self.active_experiment = None
@@ -483,9 +483,9 @@ class Orch(Base):
         self.globstat_broadcaster = asyncio.create_task(self.globstat_broadcast_task())
 
     def register_action_uuid(self, action_uuid):
-        if len(self.last_10_action_uuids) == 10:
-            self.last_10_action_uuids.pop(0)
-        self.last_10_action_uuids.append(action_uuid)
+        while len(self.last_50_action_uuids) >= 50:
+            self.last_50_action_uuids.pop(0)
+        self.last_50_action_uuids.append(action_uuid)
 
     def track_action_uuid(self, action_uuid):
         self.last_dispatched_action_uuid = action_uuid
@@ -620,7 +620,7 @@ class Orch(Base):
             resp_tups.append((response, error_code))
         return resp_tups
 
-    async def update_status(
+    def update_status(
         self, actionservermodel: Optional[ActionServerModel] = None
     ):
         """Dict update method for action server to push status messages."""
@@ -1085,19 +1085,13 @@ class Orch(Base):
                 self.print_message(
                     f"current content of sequence_dq: {[self.sequence_dq[i] for i in range(min(len(self.sequence_dq), 5))]}... ({len(self.sequence_dq)})"
                 )
-                # await asyncio.sleep(0.001)
 
                 if self.action_dq:
                     self.print_message("!!!dispatching next action", info=True)
-                    # num_exp_actions = deepcopy(
-                    #     self.globalstatusmodel.counter_dispatched_actions[
-                    #         self.active_experiment.experiment_uuid
-                    #     ]
-                    # )
                     error_code = await self.loop_task_dispatch_action()
                     if (
                         self.last_dispatched_action_uuid
-                        not in self.last_10_action_uuids
+                        not in self.last_50_action_uuids
                     ):
                         await asyncio.sleep(0.001)
                 elif self.experiment_dq:
