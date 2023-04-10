@@ -56,7 +56,7 @@ def makeApp(confPrefix, server_key, helao_root):
         specdict = app.driver.acquire_spec_adv(**active.action.action_params)
         await active.enqueue_data_dflt(datadict=specdict)
         # duration loop
-        while time.time() - starttime < duration_sec:
+        while time.time() - starttime < active.action.action_params["duration_sec"]:
             specdict = app.driver.acquire_spec_adv(**active.action.action_params)
             await active.enqueue_data_dflt(datadict=specdict)
         # wait 1 second to capture dangling data messages
@@ -86,7 +86,7 @@ def makeApp(confPrefix, server_key, helao_root):
         specdict = app.driver.acquire_spec_adv(**active.action.action_params)
         await active.enqueue_data_dflt(datadict=specdict)
         # duration loop
-        while time.time() - starttime < duration_sec:
+        while time.time() - starttime < active.action.action_params["duration_sec"]:
             specdict = app.driver.acquire_spec_adv(**active.action.action_params)
             await active.enqueue_data_dflt(datadict=specdict)
         # wait 1 second to capture dangling data messages

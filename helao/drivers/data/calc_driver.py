@@ -141,6 +141,8 @@ class Calc:
         seq_reldir = activeobj.action.get_sequence_dir()
         hlo_dict = self.gather_seq_data(seq_reldir, "acquire_spec")
 
+        params = activeobj.action.action_params
+        skip_nspec = params.get("skip_nspec", 0)
         spec_types = ["T", "R"]
         ru_keys = ("ref_dark", "ref_light", "data")
         specd = {}
@@ -172,6 +174,11 @@ class Calc:
                 for dk in list(rud[rk].keys()):
                     rud["technique_name"] = rud[rk][dk]["actd"]["technique_name"]
                     data = rud[rk][dk]["data"]
+                    if len(np.array(data).shape) > 1:
+                        if len(data) > skip_nspec:
+                            data = data[skip_nspec:]
+                        else:
+                            data = data[-1:]
                     epochs = data["epoch_s"]
                     vals = [
                         data[chk]
@@ -275,14 +282,29 @@ class Calc:
                         smplist.append(solid_smp)
                         wllist.append(d["meta"]["optional"]["wl"])
                         actuuids.append(actd["action_uuid"])
-                        bsnlist.append((d["raw"] - mindark) / (maxlight - mindark))
+                        bsnlist.append(d["raw"])
 
                 wlarr = np.array(wllist).mean(axis=0)
+                mini = np.where(wlarr > params["lower_wl"])[0].min()
+                maxi = np.where(wlarr < params["upper_wl"])[0].max()
+
+                refdark = np.vstack([d["mean"] for d in rud["ref_dark"].values()])[
+                    :, mini:maxi
+                ]
+                reflight = np.vstack([d["mean"] for d in rud["ref_light"].values()])[
+                    :, mini:maxi
+                ]
+                mindark = refdark.min(axis=0)
+                maxlight = reflight.max(axis=0)
+
                 specd[spec] = {
                     "smplist": smplist,
                     "action_uuids": actuuids,
-                    "bsnlist": bsnlist,
-                    "wlarr": wlarr,
+                    "bsnlist": [
+                        (x[:, mini:maxi] - mindark) / (maxlight - mindark)
+                        for x in bsnlist
+                    ],
+                    "wlarr": wlarr[mini:maxi],
                     "epoch": epochlist,
                     "technique": rud["technique_name"],
                 }
@@ -293,7 +315,6 @@ class Calc:
             )
             return {}
 
-        params = activeobj.action.action_params
         pred = {}
         binds = []
         # pred holds intermediate outputs for "T", "R", and/or "TR"
@@ -336,8 +357,11 @@ class Calc:
             pred[k]["binds"] = binds  # list of lists of indices per bin
             rsi = [np.median(inds).astype(int) for inds in pred[k]["binds"]]
             pred[k]["rsi"] = rsi  # raw indices from full vector
-            pred[k]["bin"]["wl"] = pred["T"]["full"]["wl"][rsi]  # center index of bin
-            pred[k]["bin"]["epoch"] = pred[k]["full"]["epoch"]
+
+            for bin_key in ("bin", "smooth", "smooth_refadj", "smooth_refadj_scl"):
+                pred[k][bin_key]["wl"] = pred["T"]["full"]["wl"][rsi]  # center index of bin
+                pred[k][bin_key]["epoch"] = pred[k]["full"]["epoch"]
+                
             hv = [
                 1239.8 / x for x in pred[k]["bin"]["wl"]
             ]  # convert binned wl[nm] to energy[eV]

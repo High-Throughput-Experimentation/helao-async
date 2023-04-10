@@ -439,35 +439,38 @@ class HelaoSyncer:
     def sync_exit_callback(self, task: asyncio.Task):
         task_name = task.get_name()
         if task_name in self.running_tasks:
-            self.base.print_message(f"Removing {task_name} from running_tasks.")
+            # self.base.print_message(f"Removing {task_name} from running_tasks.")
             self.running_tasks.pop(task_name)
-            self.task_set.remove(task_name)
-        else:
-            self.base.print_message(
-                f"{task_name} was already removed from running_tasks."
-            )
+            try:
+                self.task_set.remove(task_name)
+            except KeyError:
+                pass
+        # else:
+        #     self.base.print_message(
+        #         f"{task_name} was already removed from running_tasks."
+        #     )
 
     async def syncer(self):
         """Syncer loop coroutine which consumes the task queue."""
         while True:
             if len(self.running_tasks) < MAX_TASKS:
-                self.base.print_message("Getting next yml_target from queue.")
+                # self.base.print_message("Getting next yml_target from queue.")
                 rank, yml_target = await self.task_queue.get()
-                self.base.print_message(
-                    f"Acquired {yml_target.name} with priority {rank}."
-                )
+                # self.base.print_message(
+                #     f"Acquired {yml_target.name} with priority {rank}."
+                # )
                 if yml_target.name not in self.running_tasks:
-                    self.base.print_message(
-                        f"Creating sync task for {yml_target.name}."
-                    )
+                    # self.base.print_message(
+                    #     f"Creating sync task for {yml_target.name}."
+                    # )
                     self.running_tasks[yml_target.name] = asyncio.create_task(
                         self.sync_yml(yml_target, rank), name=yml_target.name
                     )
                     self.running_tasks[yml_target.name].add_done_callback(
                         self.sync_exit_callback
                     )
-                else:
-                    print_message(f"{yml_target} sync is already in progress.")
+                # else:
+                #     print_message(f"{yml_target} sync is already in progress.")
             await asyncio.sleep(0.1)
 
     def get_progress(self, yml_path: Path):
@@ -501,36 +504,36 @@ class HelaoSyncer:
     async def sync_yml(self, yml_path: Path, retries: int = 3, rank: int = 5):
         """Coroutine for syncing a single yml"""
         if not yml_path.exists():
-            self.base.print_message(
-                f"{str(yml_path)} does not exist, assume yml has moved to synced."
-            )
+            # self.base.print_message(
+            #     f"{str(yml_path)} does not exist, assume yml has moved to synced."
+            # )
             return True
         prog = self.get_progress(yml_path)
         if not prog:
-            self.base.print_message(
-                f"{str(yml_path)} does not exist, assume yml has moved to synced."
-            )
+            # self.base.print_message(
+            #     f"{str(yml_path)} does not exist, assume yml has moved to synced."
+            # )
             return True
         yml = prog.yml
         meta = yml.meta
 
         if yml.status == "synced":
-            self.base.print_message(
-                f"Cannot sync {str(yml.target)}, status is already 'synced'."
-            )
+            # self.base.print_message(
+            #     f"Cannot sync {str(yml.target)}, status is already 'synced'."
+            # )
             return True
 
-        self.base.print_message(
-            f"{str(yml.target)} status is not synced, checking for finished."
-        )
+        # self.base.print_message(
+        #     f"{str(yml.target)} status is not synced, checking for finished."
+        # )
 
         if yml.status == "active":
-            self.base.print_message(
-                f"Cannot sync {str(yml.target)}, status is not 'finished'."
-            )
+            # self.base.print_message(
+            #     f"Cannot sync {str(yml.target)}, status is not 'finished'."
+            # )
             return False
 
-        self.base.print_message(f"{str(yml.target)} status is finished, proceeding.")
+        # self.base.print_message(f"{str(yml.target)} status is finished, proceeding.")
 
         # first check if child objects are registered with API (non-actions)
         if yml.type != "action":
@@ -540,31 +543,31 @@ class HelaoSyncer:
                 )
                 return False
             if yml.finished_children:
-                self.base.print_message(
-                    f"Cannot sync {str(yml.target)}, children are not 'synced'."
-                )
-                self.base.print_message(
-                    "Adding 'finished' children to sync queue with highest priority."
-                )
+                # self.base.print_message(
+                #     f"Cannot sync {str(yml.target)}, children are not 'synced'."
+                # )
+                # self.base.print_message(
+                #     "Adding 'finished' children to sync queue with highest priority."
+                # )
                 for child in yml.finished_children:
                     if child.target.name not in self.running_tasks:
                         await self.enqueue_yml(child.target, rank - 2)
                         self.base.print_message(str(child.target))
-                self.base.print_message(
-                    f"Re-adding {str(yml.target)} to sync queue with high priority."
-                )
+                # self.base.print_message(
+                #     f"Re-adding {str(yml.target)} to sync queue with high priority."
+                # )
                 self.running_tasks.pop(yml.target.name)
                 self.task_set.remove(yml.target.name)
                 await self.enqueue_yml(yml.target, rank - 1)
                 self.base.print_message(f"{str(yml.target)} re-queued, exiting.")
                 return False
 
-        self.base.print_message(f"{str(yml.target)} children are synced, proceeding.")
+        # self.base.print_message(f"{str(yml.target)} children are synced, proceeding.")
 
         # next push files to S3 (actions only)
         if yml.type == "action":
             # re-check file lists
-            self.base.print_message(f"Checking file lists for {yml.target.name}")
+            # self.base.print_message(f"Checking file lists for {yml.target.name}")
             prog.dict["files_pending"] += [
                 p
                 for p in yml.hlo_files + yml.misc_files
@@ -667,7 +670,7 @@ class HelaoSyncer:
                 children = yml.children
                 self.base.print_message(f"Removing children from progress: {children}.")
                 for childyml in children:
-                    self.base.print_message(f"Clearing {childyml.target.name}")
+                    # self.base.print_message(f"Clearing {childyml.target.name}")
                     finished_child_path = childyml.finished_path.parent
                     if finished_child_path.exists():
                         self.try_remove_empty(str(finished_child_path))
@@ -689,10 +692,10 @@ class HelaoSyncer:
                 )
                 zip_dir(yml.target.parent, zip_target)
                 self.cleanup_root()
-                self.base.print_message(f"Removing sequence from progress.")
+                # self.base.print_message(f"Removing sequence from progress.")
                 self.progress.pop(yml.target.name)
 
-            self.base.print_message(f"Removing task from running_tasks.")
+            # self.base.print_message(f"Removing task from running_tasks.")
             self.running_tasks.pop(yml.target.name)
 
         # if action contributes processes, update processes
@@ -761,7 +764,7 @@ class HelaoSyncer:
             ShortActionModel(**act_meta).clean_dict(strip_private=True)
         )
 
-        self.base.print_message(f"current experiment progress:\n{exp_prog.dict}")
+        # self.base.print_message(f"current experiment progress:\n{exp_prog.dict}")
         if act_idx == min(exp_prog.dict["process_groups"][pidx]):
             exp_prog.dict["process_metas"][pidx]["process_timestamp"] = act_meta[
                 "action_timestamp"
@@ -796,9 +799,9 @@ class HelaoSyncer:
                     sample_label = x["global_label"]
                     actuuid = [y for y in x["action_uuid"] if y in actuuid_order.keys()]
                     if not actuuid:
-                        self.base.print_message(
-                            "no action_uuid for {sample_label}, using listed order"
-                        )
+                        # self.base.print_message(
+                        #     "no action_uuid for {sample_label}, using listed order"
+                        # )
                         actorder = si
                     else:
                         actorder = actuuid_order[actuuid[0]]
@@ -881,7 +884,7 @@ class HelaoSyncer:
     async def to_api(self, req_model: dict, meta_type: str, retries: int = 3):
         """POST/PATCH model via Modelyst API."""
         req_url = f"https://{self.api_host}/{PLURALS[meta_type]}/"
-        self.base.print_message(f"preparing API push to {req_url}")
+        # self.base.print_message(f"preparing API push to {req_url}")
         # meta_name = req_model.get(
         #     f"{meta_type.replace('process', 'technique')}_name",
         #     req_model["experiment_name"],
