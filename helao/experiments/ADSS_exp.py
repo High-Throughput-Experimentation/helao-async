@@ -834,6 +834,7 @@ def ADSS_sub_OCV(
     experiment_version: int = 3,
     Tval__s: Optional[float] = 60.0,
     gamry_i_range: Optional[str] = "auto",
+    samplerate_sec: Optional[float] = 0.05,
     ph: Optional[float] = 9.53,
     ref_type: Optional[str] = "inhouse",
     ref_offset__V: Optional[float] = 0.0,
@@ -863,7 +864,7 @@ def ADSS_sub_OCV(
         "run_OCV",
         {
             "Tval__s": apm.pars.Tval__s,
-            "SampleRate": 0.05,
+            "SampleRate": apm.pars.samplerate_sec,
             "IErange": apm.pars.gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
