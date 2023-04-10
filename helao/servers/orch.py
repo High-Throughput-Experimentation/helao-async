@@ -163,7 +163,7 @@ class HelaoOrch(HelaoFastAPI):
             return self.orch.globalstatusmodel.as_json()
 
         @self.post("/update_status", tags=["private"])
-        def update_status(
+        async def update_status(
             actionservermodel: Optional[ActionServerModel] = Body({}, embed=True)
         ):
             if actionservermodel is None:
@@ -174,7 +174,7 @@ class HelaoOrch(HelaoFastAPI):
                 f"'{actionservermodel.action_server.server_name}': "
                 f"{actionservermodel.endpoints}"
             )
-            return self.orch.update_status(actionservermodel=actionservermodel)
+            return await self.orch.update_status(actionservermodel=actionservermodel)
 
         @self.post("/update_nonblocking", tags=["private"])
         async def update_nonblocking(
@@ -620,7 +620,7 @@ class Orch(Base):
             resp_tups.append((response, error_code))
         return resp_tups
 
-    def update_status(
+    async def update_status(
         self, actionservermodel: Optional[ActionServerModel] = None
     ):
         """Dict update method for action server to push status messages."""
