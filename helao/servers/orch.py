@@ -920,9 +920,15 @@ class Orch(Base):
             ] += 1
 
             A.init_act(time_offset=self.ntp_offset)
-            result_actiondict, error_code = await async_action_dispatcher(
-                self.world_cfg, A
-            )
+            try:
+                result_actiondict, error_code = await async_action_dispatcher(
+                    self.world_cfg, A
+                )
+            except asyncio.exceptions.TimeoutError:
+                result_actiondict, error_code = await async_private_dispatcher(
+                    self.world_cfg, A.action_server.server_name, "resend_active",
+                    params={"action_uuid": A.action_uuid}
+                )
 
             result_uuid = result_actiondict["action_uuid"]
             self.last_action_uuid = result_uuid
