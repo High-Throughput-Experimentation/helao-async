@@ -11,7 +11,7 @@ from typing import List, Optional, Dict
 from types import MethodType
 from uuid import UUID, uuid1
 import hashlib
-from copy import deepcopy
+from copy import deepcopy, copy
 import inspect
 import traceback
 
@@ -141,6 +141,14 @@ class HelaoBase(HelaoFastAPI):
         @self.post("/list_executors", tags=["private"])
         def list_executors():
             return list(self.base.executors.keys())
+
+        @self.post("/resend_active", tags=["private"])
+        def resend_active(action_uuid: str):
+            l10 = [y for x, y in self.last_10_active]
+            if l10:
+                return l10[0].action.as_dict()
+            else:
+                return Action(action_uuid=action_uuid).as_dict()
 
         @self.post("/shutdown", tags=["private"])
         async def post_shutdown():
@@ -322,6 +330,7 @@ class Base:
             )
 
         self.actives: Dict[UUID, object] = {}
+        self.last_10_active: []
         self.executors = {}  # shortcut to running Executors
         # basemodel to describe the full action server
         self.actionservermodel = ActionServerModel(action_server=self.server)
@@ -539,11 +548,15 @@ class Base:
             self, activeparams=activeparams
         )
         await self.actives[activeparams.action.action_uuid].myinit()
+        l10 = copy(self.actives[activeparams.action.action_uuid])
+        if len(self.last_10_active) == 10:
+            _ = self.last_10.active.pop(0)
+        self.last_10_active.append(l10)
         return self.actives[activeparams.action.action_uuid]
 
     async def get_active_info(self, action_uuid: UUID):
         if action_uuid in self.actives:
-            action_dict = await self.actives[action_uuid].active.as_dict()
+            action_dict = await self.actives[action_uuid].action.as_dict()
             return action_dict
         else:
             self.print_message(
@@ -1859,7 +1872,18 @@ class Active:
 
             # finish the data writer
             self.data_logger.cancel()
-            _ = self.base.actives.pop(self.active_uuid, None)
+            l10 = self.base.actives.pop(self.active_uuid, None)
+            i10 = [
+                i
+                for i, (x, _) in enumerate(self.base.last_10_active)
+                if x == self.active_uuid
+            ]
+            if i10:
+                self.base.last_10_active.pop(i10[0])
+            if len(self.base.last_10_active) > 10:
+                self.base.last_10_active.pop(0)
+            self.base.last_10_active.append(l10)
+
             self.base.print_message(
                 "all active action are done, closing active", info=True
             )
