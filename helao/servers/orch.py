@@ -24,6 +24,8 @@ import traceback
 import aiohttp
 import colorama
 import time
+import os
+import pickle
 from fastapi import WebSocket, Body
 from functools import partial
 from collections import defaultdict
@@ -161,6 +163,38 @@ class HelaoOrch(HelaoFastAPI):
         @self.post("/global_status", tags=["private"])
         def global_status():
             return self.orch.globalstatusmodel.as_json()
+
+        @self.post("/export_queues", tags=["private"])
+        def export_queues():
+            save_dir = self.orch.world_cfg["root"]
+            queue_dict = {
+                "seq": list(self.orch.sequence_dq),
+                "exp": list(self.orch.experiment_dq),
+                "act": list(self.orch.action_dq),
+            }
+            save_path = os.path.join(save_dir, "queues.pck")
+            pickle.dump(queue_dict, open(save_path, "wb"))
+            return save_path
+
+        @self.post("/import_queues", tags=["private"])
+        def import_queues():
+            save_dir = self.orch.world_cfg["root"]
+            save_path = os.path.join(save_dir, "queues.pck")
+            if os.path.exists(save_path):
+                queue_dict = pickle.load(open(save_path, "rb"))
+            else:
+                self.orch.print_message("Exported queues.pck does not exist. Cannot restore.")
+            if self.orch.sequence_dq or self.orch.experiment_dq or self.orch.action_dq:
+                self.orch.print_message("Existing queues are not empty. Cannot restore.")
+            else:
+                self.orch.print_message("Restoring queues from saved pck.")
+                for x in queue_dict["act"]:
+                    self.orch.action_dq.append(x)
+                for x in queue_dict["exp"]:
+                    self.orch.experiment_dq.append(x)
+                for x in queue_dict["seq"]:
+                    self.orch.sequence_dq.append(x)
+            return save_path
 
         @self.post("/update_status", tags=["private"])
         async def update_status(
@@ -926,8 +960,10 @@ class Orch(Base):
                 )
             except asyncio.exceptions.TimeoutError:
                 result_actiondict, error_code = await async_private_dispatcher(
-                    self.world_cfg, A.action_server.server_name, "resend_active",
-                    params={"action_uuid": A.action_uuid}
+                    self.world_cfg,
+                    A.action_server.server_name,
+                    "resend_active",
+                    params={"action_uuid": A.action_uuid},
                 )
 
             result_uuid = result_actiondict["action_uuid"]
@@ -960,13 +996,17 @@ class Orch(Base):
                 else:
                     for actstat in actstats:
                         try:
-                            self.globalstatusmodel.nonactive_dict[actstat][resuuid] = resmod
+                            self.globalstatusmodel.nonactive_dict[actstat][
+                                resuuid
+                            ] = resmod
                             self.globalstatusmodel.server_dict[srvkey].endpoints[
                                 actname
                             ].nonactive_dict[actstat][resuuid] = resmod
                             break
                         except:
-                            self.print_message(f"{actstat} not found in globalstatus.nonactive_dict")
+                            self.print_message(
+                                f"{actstat} not found in globalstatus.nonactive_dict"
+                            )
                 # await self.interrupt_q.put(self.globalstatusmodel)
                 # await self.update_operator(True)
                 # await self.globstat_q.put(self.globalstatusmodel.as_json())
