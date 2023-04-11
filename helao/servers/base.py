@@ -551,7 +551,7 @@ class Base:
         l10 = copy(self.actives[activeparams.action.action_uuid])
         if len(self.last_10_active) == 10:
             _ = self.last_10.active.pop(0)
-        self.last_10_active.append(l10)
+        self.last_10_active.append((l10.action.action_uuid, l10))
         return self.actives[activeparams.action.action_uuid]
 
     async def get_active_info(self, action_uuid: UUID):
@@ -1882,7 +1882,7 @@ class Active:
                 self.base.last_10_active.pop(i10[0])
             if len(self.base.last_10_active) > 10:
                 self.base.last_10_active.pop(0)
-            self.base.last_10_active.append(l10)
+            self.base.last_10_active.append((l10.action.action_uuid, l10))
 
             self.base.print_message(
                 "all active action are done, closing active", info=True
