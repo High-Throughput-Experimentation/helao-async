@@ -26,6 +26,7 @@ from bokeh.models import DataTable, TableColumn
 from bokeh.models.widgets import Paragraph
 from bokeh.models import Select
 from bokeh.models import Button
+from bokeh.models import CheckboxGroup
 from bokeh.models.widgets import Div
 from bokeh.models.widgets.inputs import TextInput
 from bokeh.plotting import figure, Figure
@@ -280,6 +281,9 @@ class Operator:
         )
         self.button_last_exp_pars.on_event(ButtonClick, self.callback_last_exp_pars)
 
+        self.save_last_exp_pars = CheckboxGroup(labels=["save exp params"], active=[0])
+        self.save_last_seq_pars = CheckboxGroup(labels=["save seq params"], active=[0])
+
         self.sequence_descr_txt = Div(text="""select a sequence item""", width=600)
         self.experiment_descr_txt = Div(text="""select a experiment item""", width=600)
         self.error_txt = Paragraph(
@@ -360,6 +364,7 @@ class Operator:
                             self.button_append_seq,
                             self.button_prepend_seq,
                             self.button_last_seq_pars,
+                            self.save_last_seq_pars,
                         ]
                     ],
                     background="#808080",
@@ -408,6 +413,7 @@ class Operator:
                             self.button_append_exp,
                             self.button_prepend_exp,
                             self.button_last_exp_pars,
+                            self.save_last_exp_pars,
                         ],
                     ],
                     background="#808080",
@@ -919,8 +925,11 @@ class Operator:
             pdict = {"seq": {}, "exp": {}}
         else:
             pdict = json.load(open(param_file_path))
-        pdict[ptype].update({name: pars})
-        json.dump(pdict, open(param_file_path, "w"))
+        if (ptype == "seq" and self.save_last_seq_pars.active == [0]) or (
+            ptype == "exp" and self.save_last_exp_pars.active == [0]
+        ):
+            pdict[ptype].update({name: pars})
+            json.dump(pdict, open(param_file_path, "w"))
 
     def read_params(self, ptype: str, name: str):
         param_file_path = os.path.join(
