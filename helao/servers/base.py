@@ -1873,16 +1873,17 @@ class Active:
             # finish the data writer
             self.data_logger.cancel()
             l10 = self.base.actives.pop(self.active_uuid, None)
-            i10 = [
-                i
-                for i, (x, _) in enumerate(self.base.last_10_active)
-                if x == self.active_uuid
-            ]
-            if i10:
-                self.base.last_10_active.pop(i10[0])
-            if len(self.base.last_10_active) > 10:
-                self.base.last_10_active.pop(0)
-            self.base.last_10_active.append((l10.action.action_uuid, l10))
+            if l10 is not None:
+                i10 = [
+                    i
+                    for i, (x, _) in enumerate(self.base.last_10_active)
+                    if x == self.active_uuid
+                ]
+                if i10:
+                    self.base.last_10_active.pop(i10[0])
+                if len(self.base.last_10_active) > 10:
+                    self.base.last_10_active.pop(0)
+                self.base.last_10_active.append((l10.action.action_uuid, l10))
 
             self.base.print_message(
                 "all active action are done, closing active", info=True
