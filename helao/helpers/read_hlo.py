@@ -9,6 +9,7 @@ from collections import defaultdict
 from glob import glob
 from ruamel.yaml import YAML
 from zipfile import ZipFile
+import zipfile
 
 
 def read_hlo(path: str) -> Tuple[dict, dict]:
@@ -139,6 +140,10 @@ class HelaoData:
             return meta, data
         else:
             return read_hlo(hlotarget)
+
+    def read_file(self, hlotarget):
+        bytes = zipfile.Path(self.target,hlotarget).read_bytes()
+        return bytes
 
     @property
     def data(self):
