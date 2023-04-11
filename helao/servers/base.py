@@ -554,9 +554,9 @@ class Base:
         self.last_10_active.append((l10.action.action_uuid, l10))
         return self.actives[activeparams.action.action_uuid]
 
-    async def get_active_info(self, action_uuid: UUID):
+    def get_active_info(self, action_uuid: UUID):
         if action_uuid in self.actives:
-            action_dict = await self.actives[action_uuid].action.as_dict()
+            action_dict = self.actives[action_uuid].action.as_dict()
             return action_dict
         else:
             self.print_message(
