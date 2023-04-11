@@ -1559,7 +1559,7 @@ class Operator:
         for k, v in loaded_pars.items():
             seq_input = self.find_input(self.seq_param_input, k)
             self.vis.doc.add_next_tick_callback(
-                partial(self.update_input_value, seq_input, v)
+                partial(self.update_input_value, seq_input, str(v))
             )
 
     def callback_last_exp_pars(self):
@@ -1567,5 +1567,5 @@ class Operator:
         for k, v in loaded_pars.items():
             exp_input = self.find_input(self.exp_param_input, k)
             self.vis.doc.add_next_tick_callback(
-                partial(self.update_input_value, exp_input, v)
+                partial(self.update_input_value, exp_input, str(v))
             )
