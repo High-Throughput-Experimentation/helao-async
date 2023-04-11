@@ -550,7 +550,7 @@ class Base:
         await self.actives[activeparams.action.action_uuid].myinit()
         l10 = copy(self.actives[activeparams.action.action_uuid])
         if len(self.last_10_active) == 10:
-            _ = self.last_10.active.pop(0)
+            _ = self.last_10_active.pop(0)
         self.last_10_active.append((l10.action.action_uuid, l10))
         return self.actives[activeparams.action.action_uuid]
 
