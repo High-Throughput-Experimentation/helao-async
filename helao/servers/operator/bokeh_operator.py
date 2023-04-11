@@ -407,7 +407,7 @@ class Operator:
                         [
                             self.experiment_dropdown,
                             Spacer(width=20),
-                            self.input_sequence2_label,
+                            self.input_sequence_label2,
                         ],
                         [
                             Spacer(width=10),
