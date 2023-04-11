@@ -927,7 +927,7 @@ class Operator:
             self.orch.world_cfg["root"], "STATES", "previous_params.json"
         )
         if not os.path.exists(param_file_path):
-            os.makedirs(param_file_path, exist_ok=True)
+            os.makedirs(os.path.dirname(param_file_path), exist_ok=True)
             pdict = {"seq": {}, "exp": {}}
         else:
             pdict = json.load(open(param_file_path))
