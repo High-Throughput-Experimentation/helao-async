@@ -302,7 +302,7 @@ class Operator:
         )
         self.input_sequence_label.on_change("value", self.callback_copy_sequence_label)
 
-        self.input_sequence2_label = TextInput(
+        self.input_sequence_label2 = TextInput(
             value="nolabel",
             title="sequence label",
             disabled=False,
@@ -1599,7 +1599,7 @@ class Operator:
         self.vis.doc.add_next_tick_callback(
             partial(
                 self.update_input_value,
-                self.input_sequence2_label,
+                self.input_sequence_label2,
                 self.input_sequence_label.value,
             )
         )
@@ -1609,6 +1609,6 @@ class Operator:
             partial(
                 self.update_input_value,
                 self.input_sequence_label,
-                self.input_sequence2_label.value,
+                self.input_sequence_label2.value,
             )
         )
