@@ -900,19 +900,24 @@ class HelaoSyncer:
                 if not api_success:
                     req_method = session.post if try_create else session.patch
                     api_str = f"API {'POST' if try_create else 'PATCH'}"
-                    async with req_method(req_url, json=req_model) as resp:
-                        if resp.status == 200:
-                            api_success = True
-                        elif resp.status == 400:
-                            try_create = False
+                    try:
+                        async with req_method(req_url, json=req_model) as resp:
+                            if resp.status == 200:
+                                api_success = True
+                            elif resp.status == 400:
+                                try_create = False
+                            self.base.print_message(
+                                f"[{i+1}/{retries}] {api_str} {meta_uuid} returned status: {resp.status}"
+                            )
+                            last_response = await resp.json()
+                            self.base.print_message(
+                                f"[{i+1}/{retries}] {api_str} {meta_uuid} response: {last_response}"
+                            )
+                            last_status = resp.status
+                    except Exception as e:
                         self.base.print_message(
-                            f"[{i+1}/{retries}] {api_str} {meta_uuid} returned status: {resp.status}"
+                            f"[{i+1}/{retries}] an exception occurred: {e}"
                         )
-                        last_response = await resp.json()
-                        self.base.print_message(
-                            f"[{i+1}/{retries}] {api_str} {meta_uuid} response: {last_response}"
-                        )
-                        last_status = resp.status
             if not api_success:
                 meta_s3_key = f"{meta_type}/{meta_uuid}.json"
                 fail_model = {
