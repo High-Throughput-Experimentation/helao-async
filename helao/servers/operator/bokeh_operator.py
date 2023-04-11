@@ -2,6 +2,7 @@ import traceback
 import asyncio
 import io
 import json
+import os
 from typing import List
 from pybase64 import b64decode
 from socket import gethostname
@@ -260,15 +261,24 @@ class Operator:
         self.button_append_exp.on_event(ButtonClick, self.callback_append_exp)
 
         self.button_prepend_seq = Button(
-            label="prepend seq to experiment plan list",
+            label="prepend seq to exp plan",
             button_type="default",
-            width=250,
+            width=150,
         )
         self.button_prepend_seq.on_event(ButtonClick, self.callback_prepend_seq)
         self.button_append_seq = Button(
-            label="append seq to experiment plan list", button_type="default", width=250
+            label="append seq to exp plan", button_type="default", width=150
         )
         self.button_append_seq.on_event(ButtonClick, self.callback_append_seq)
+
+        self.button_last_seq_pars = Button(
+            label="Load last seq params", button_type="default", width=150
+        )
+        self.button_last_seq_pars.on_event(ButtonClick, self.callback_last_seq_pars)
+        self.button_last_exp_pars = Button(
+            label="Load last exp params", button_type="default", width=150
+        )
+        self.button_last_exp_pars.on_event(ButtonClick, self.callback_last_exp_pars)
 
         self.sequence_descr_txt = Div(text="""select a sequence item""", width=600)
         self.experiment_descr_txt = Div(text="""select a experiment item""", width=600)
@@ -325,7 +335,7 @@ class Operator:
                 ),
                 layout(
                     [
-                        [self.sequence_dropdown],
+                        [self.sequence_dropdown, Spacer(width=20), self.input_sequence_label],
                         [
                             Spacer(width=10),
                             Div(
@@ -344,6 +354,7 @@ class Operator:
                     [
                         self.button_append_seq,
                         self.button_prepend_seq,
+                        self.button_last_seq_pars,
                     ],
                     background="#808080",
                     width=self.max_width,
@@ -387,7 +398,7 @@ class Operator:
                 ),
                 layout(
                     [
-                        [self.button_append_exp, self.button_prepend_exp],
+                        [self.button_append_exp, self.button_prepend_exp, self.button_last_exp_pars],
                     ],
                     background="#808080",
                     width=self.max_width,
@@ -409,7 +420,6 @@ class Operator:
                 layout(
                     [
                         [
-                            self.input_sequence_label,
                             self.button_add_expplan,
                             Spacer(width=10),
                             self.button_start_orch,
@@ -890,6 +900,25 @@ class Operator:
         experimentmodel = self.populate_experimentmodel()
         self.sequence.experiment_plan_list.insert(0, experimentmodel)
 
+    def write_params(self, ptype: str, name: str, pars: dict):
+        param_file_path = os.path.join(self.orch.world_cfg["root"], "STATES", "previous_params.json")
+        if not os.path.exists(param_file_path):
+            os.makedirs(param_file_path, exist_ok=True)
+            pdict = {"seq": {}, "exp": {}}
+        else:
+            pdict = json.load(open(param_file_path))
+        pdict[ptype].update({name: pars})
+        json.dump(pdict, open(param_file_path, "w"))
+
+    def read_params(self, ptype: str, name: str):
+        param_file_path = os.path.join(self.orch.world_cfg["root"], "STATES", "previous_params.json")
+        if not os.path.exists(param_file_path):
+            os.makedirs(param_file_path, exist_ok=True)
+            pdict = {"seq": {}, "exp": {}}
+        else:
+            pdict = json.load(open(param_file_path))
+        return pdict.get(ptype, {}).get(name, {})
+
     def populate_sequence(self):
         selected_sequence = self.sequence_dropdown.value
         self.vis.print_message(f"selected sequence from list: {selected_sequence}")
@@ -898,6 +927,7 @@ class Operator:
             paraminput.title: to_json(paraminput.value)
             for paraminput in self.seq_param_input
         }
+        self.write_params("seq", selected_sequence, sequence_params)
         expplan_list = self.orch.unpack_sequence(
             sequence_name=selected_sequence, sequence_params=sequence_params
         )
@@ -924,6 +954,7 @@ class Operator:
             paraminput.title: to_json(paraminput.value)
             for paraminput in self.exp_param_input
         }
+        self.write_params("exp", selected_experiment, experiment_params)
         experimentmodel = ExperimentModel(
             experiment_name=selected_experiment, experiment_params=experiment_params
         )
@@ -1510,3 +1541,19 @@ class Operator:
                 self.vis.print_message(
                     f"Operator IOloop error: {repr(e), tb,}", error=True
                 )
+
+    def callback_last_seq_pars(self):
+        loaded_pars = self.read_params("seq", self.sequence_dropdown.value)
+        for k, v in loaded_pars.items():
+            seq_input = self.find_input(self.seq_param_input, k)
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_input_value, seq_input, v)
+            )
+    
+    def callback_last_exp_pars(self):
+        loaded_pars = self.read_params("exp", self.experiment_dropdown.value)
+        for k, v in loaded_pars.items():
+            exp_input = self.find_input(self.exp_param_input, k)
+            self.vis.doc.add_next_tick_callback(
+                partial(self.update_input_value, exp_input, v)
+            )
