@@ -275,11 +275,11 @@ class Operator:
         self.button_last_seq_pars = Button(
             label="Load last seq params", button_type="default", width=150
         )
-        self.button_last_seq_pars.on_event(ButtonClick, self.callback_last_seq_pars)
+        self.button_last_seq_pars.on_event(ButtonClick, self.get_last_seq_pars)
         self.button_last_exp_pars = Button(
             label="Load last exp params", button_type="default", width=150
         )
-        self.button_last_exp_pars.on_event(ButtonClick, self.callback_last_exp_pars)
+        self.button_last_exp_pars.on_event(ButtonClick, self.get_last_exp_pars)
 
         self.save_last_exp_pars = CheckboxGroup(labels=["save exp params"], active=[0])
         self.save_last_seq_pars = CheckboxGroup(labels=["save seq params"], active=[0])
@@ -1579,7 +1579,7 @@ class Operator:
                     f"Operator IOloop error: {repr(e), tb,}", error=True
                 )
 
-    def callback_last_seq_pars(self):
+    def get_last_seq_pars(self):
         loaded_pars = self.read_params("seq", self.sequence_dropdown.value)
         for k, v in loaded_pars.items():
             seq_input = self.find_input(self.seq_param_input, k)
@@ -1587,7 +1587,7 @@ class Operator:
                 partial(self.update_input_value, seq_input, str(v))
             )
 
-    def callback_last_exp_pars(self):
+    def get_last_exp_pars(self):
         loaded_pars = self.read_params("exp", self.experiment_dropdown.value)
         for k, v in loaded_pars.items():
             exp_input = self.find_input(self.exp_param_input, k)
@@ -1595,7 +1595,7 @@ class Operator:
                 partial(self.update_input_value, exp_input, str(v))
             )
 
-    def callback_copy_sequence_label(self):
+    def callback_copy_sequence_label(self, event):
         self.vis.doc.add_next_tick_callback(
             partial(
                 self.update_input_value,
@@ -1604,7 +1604,7 @@ class Operator:
             )
         )
 
-    def callback_copy_sequence_label2(self):
+    def callback_copy_sequence_label2(self, event):
         self.vis.doc.add_next_tick_callback(
             partial(
                 self.update_input_value,
