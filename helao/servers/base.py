@@ -330,7 +330,7 @@ class Base:
             )
 
         self.actives: Dict[UUID, object] = {}
-        self.last_10_active: []
+        self.last_10_active = []
         self.executors = {}  # shortcut to running Executors
         # basemodel to describe the full action server
         self.actionservermodel = ActionServerModel(action_server=self.server)
