@@ -217,7 +217,7 @@ class Operator:
         )
         self.button_estop_orch.on_event(ButtonClick, self.callback_estop_orch)
         self.button_add_expplan = Button(
-            label="add exp plan", button_type="default", width=100
+            label="Add exp plan", button_type="default", width=100
         )
         self.button_add_expplan.on_event(ButtonClick, self.callback_add_expplan)
         self.button_stop_orch = Button(
@@ -227,11 +227,11 @@ class Operator:
         self.button_skip_exp = Button(label="Skip exp", button_type="danger", width=70)
         self.button_skip_exp.on_event(ButtonClick, self.callback_skip_exp)
         self.button_update = Button(
-            label="update tables", button_type="default", width=120
+            label="Update tables", button_type="default", width=120
         )
         self.button_update.on_event(ButtonClick, self.callback_update_tables)
         self.button_clear_expplan = Button(
-            label="clear expplan", button_type="default", width=100
+            label="Clear expplan", button_type="default", width=100
         )
         self.button_clear_expplan.on_event(ButtonClick, self.callback_clear_expplan)
         self.orch_status_button = Toggle(
@@ -239,35 +239,35 @@ class Operator:
         )  # success: green, danger: red
 
         self.button_clear_seqs = Button(
-            label="clear seqs", button_type="danger", width=100
+            label="Clear seqs", button_type="danger", width=100
         )
         self.button_clear_seqs.on_event(ButtonClick, self.callback_clear_sequences)
         self.button_clear_exps = Button(
-            label="clear exp", button_type="danger", width=100
+            label="Clear exp", button_type="danger", width=100
         )
         self.button_clear_exps.on_event(ButtonClick, self.callback_clear_experiments)
         self.button_clear_action = Button(
-            label="clear act", button_type="danger", width=100
+            label="Clear act", button_type="danger", width=100
         )
         self.button_clear_action.on_event(ButtonClick, self.callback_clear_actions)
 
         self.button_prepend_exp = Button(
-            label="prepend exp to exp plan", button_type="default", width=150
+            label="Prepend exp to exp plan", button_type="default", width=150
         )
         self.button_prepend_exp.on_event(ButtonClick, self.callback_prepend_exp)
         self.button_append_exp = Button(
-            label="append exp to exp plan", button_type="default", width=150
+            label="Append exp to exp plan", button_type="default", width=150
         )
         self.button_append_exp.on_event(ButtonClick, self.callback_append_exp)
 
         self.button_prepend_seq = Button(
-            label="prepend seq to exp plan",
+            label="Prepend seq to exp plan",
             button_type="default",
             width=150,
         )
         self.button_prepend_seq.on_event(ButtonClick, self.callback_prepend_seq)
         self.button_append_seq = Button(
-            label="append seq to exp plan", button_type="default", width=150
+            label="Append seq to exp plan", button_type="default", width=150
         )
         self.button_append_seq.on_event(ButtonClick, self.callback_append_seq)
 
@@ -335,7 +335,11 @@ class Operator:
                 ),
                 layout(
                     [
-                        [self.sequence_dropdown, Spacer(width=20), self.input_sequence_label],
+                        [
+                            self.sequence_dropdown,
+                            Spacer(width=20),
+                            self.input_sequence_label,
+                        ],
                         [
                             Spacer(width=10),
                             Div(
@@ -352,9 +356,11 @@ class Operator:
                 ),
                 layout(
                     [
-                        self.button_append_seq,
-                        self.button_prepend_seq,
-                        self.button_last_seq_pars,
+                        [
+                            self.button_append_seq,
+                            self.button_prepend_seq,
+                            self.button_last_seq_pars,
+                        ]
                     ],
                     background="#808080",
                     width=self.max_width,
@@ -398,7 +404,11 @@ class Operator:
                 ),
                 layout(
                     [
-                        [self.button_append_exp, self.button_prepend_exp, self.button_last_exp_pars],
+                        [
+                            self.button_append_exp,
+                            self.button_prepend_exp,
+                            self.button_last_exp_pars,
+                        ],
                     ],
                     background="#808080",
                     width=self.max_width,
@@ -901,9 +911,11 @@ class Operator:
         self.sequence.experiment_plan_list.insert(0, experimentmodel)
 
     def write_params(self, ptype: str, name: str, pars: dict):
-        param_file_path = os.path.join(self.orch.world_cfg["root"], "STATES", "previous_params.json")
+        param_file_path = os.path.join(
+            self.orch.world_cfg["root"], "STATES", "previous_params.json"
+        )
         if not os.path.exists(param_file_path):
-            os.makedirs(param_file_path, exist_ok=True)
+            os.makedirs(os.path.dirname(param_file_path), exist_ok=True)
             pdict = {"seq": {}, "exp": {}}
         else:
             pdict = json.load(open(param_file_path))
@@ -911,7 +923,9 @@ class Operator:
         json.dump(pdict, open(param_file_path, "w"))
 
     def read_params(self, ptype: str, name: str):
-        param_file_path = os.path.join(self.orch.world_cfg["root"], "STATES", "previous_params.json")
+        param_file_path = os.path.join(
+            self.orch.world_cfg["root"], "STATES", "previous_params.json"
+        )
         if not os.path.exists(param_file_path):
             os.makedirs(param_file_path, exist_ok=True)
             pdict = {"seq": {}, "exp": {}}
@@ -1285,7 +1299,6 @@ class Operator:
         self.error_txt.text = value
 
     def update_xysamples(self, xval, yval, sender):
-
         private_input, param_input = self.find_param_private_input(sender)
         if private_input is None or param_input is None:
             return False
@@ -1367,7 +1380,6 @@ class Operator:
         input_elements = self.find_input(private_input, "elements")
 
         if input_elements is not None:
-
             elements = self.dataAPI.get_elements_plateid(
                 plateid,
                 multielementink_concentrationinfo_bool=False,
@@ -1549,7 +1561,7 @@ class Operator:
             self.vis.doc.add_next_tick_callback(
                 partial(self.update_input_value, seq_input, v)
             )
-    
+
     def callback_last_exp_pars(self):
         loaded_pars = self.read_params("exp", self.experiment_dropdown.value)
         for k, v in loaded_pars.items():
