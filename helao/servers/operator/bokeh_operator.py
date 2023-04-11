@@ -297,8 +297,20 @@ class Operator:
             value="nolabel",
             title="sequence label",
             disabled=False,
-            width=120,
+            width=150,
             height=40,
+        )
+        self.input_sequence_label.on_change("value", self.callback_copy_sequence_label)
+
+        self.input_sequence2_label = TextInput(
+            value="nolabel",
+            title="sequence label",
+            disabled=False,
+            width=150,
+            height=40,
+        )
+        self.input_sequence_label2.on_change(
+            "value", self.callback_copy_sequence_label2
         )
 
         self.orch_section = Div(
@@ -392,7 +404,11 @@ class Operator:
                 Spacer(height=10),
                 layout(
                     [
-                        [self.experiment_dropdown],
+                        [
+                            self.experiment_dropdown,
+                            Spacer(width=20),
+                            self.input_sequence2_label,
+                        ],
                         [
                             Spacer(width=10),
                             Div(
@@ -1578,3 +1594,21 @@ class Operator:
             self.vis.doc.add_next_tick_callback(
                 partial(self.update_input_value, exp_input, str(v))
             )
+
+    def callback_copy_sequence_label(self):
+        self.vis.doc.add_next_tick_callback(
+            partial(
+                self.update_input_value,
+                self.input_sequence2_label,
+                self.input_sequence_label.value,
+            )
+        )
+
+    def callback_copy_sequence_label2(self):
+        self.vis.doc.add_next_tick_callback(
+            partial(
+                self.update_input_value,
+                self.input_sequence_label,
+                self.input_sequence_label2.value,
+            )
+        )
