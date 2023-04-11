@@ -1595,7 +1595,7 @@ class Operator:
                 partial(self.update_input_value, exp_input, str(v))
             )
 
-    def callback_copy_sequence_label(self, event):
+    def callback_copy_sequence_label(self, attr, old, new):
         self.vis.doc.add_next_tick_callback(
             partial(
                 self.update_input_value,
@@ -1604,11 +1604,11 @@ class Operator:
             )
         )
 
-    def callback_copy_sequence_label2(self, event):
+    def callback_copy_sequence_label2(self, attr, old, new):
         self.vis.doc.add_next_tick_callback(
             partial(
                 self.update_input_value,
                 self.input_sequence_label,
-                self.input_sequence_label2.value,
+                self.input_sequence2_label.value,
             )
         )
