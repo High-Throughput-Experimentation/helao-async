@@ -751,6 +751,9 @@ class HelaoSyncer:
                 ]
             }
             exp_prog.dict["process_metas"][pidx][
+                "process_params"
+            ] = exp_prog.yml.meta.get("experiment_params", {})
+            exp_prog.dict["process_metas"][pidx][
                 "technique_name"
             ] = exp_prog.yml.meta.get(
                 "technique_name", exp_prog.yml.meta["experiment_name"]
