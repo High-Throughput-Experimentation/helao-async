@@ -773,6 +773,10 @@ class HelaoSyncer:
             exp_prog.dict["process_metas"][pidx]["technique_name"] = act_meta[
                 "technique_name"
             ]
+        tech_name = exp_prog.dict["process_metas"][pidx]["technique_name"]
+        if isinstance(tech_name, list):
+            split_technique = tech_name[act_meta.get("action_split", 0)]
+            exp_prog.dict["process_metas"][pidx]["technique_name"] = split_technique
         for pc in act_meta["process_contrib"]:
             if pc not in act_meta:
                 continue
