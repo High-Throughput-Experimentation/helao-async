@@ -1,6 +1,15 @@
 MIT License
 
-Copyright (c) 2023 Dan Guevarra
+Portions Copyright (c) 2019-2023 [Dan Guevarra](https://github.com/High-Throughput-Experimentation/helao-async/contributors)
+Portions Copyright (c) 2020-2022 [Matthias Richter](https://github.com/High-Throughput-Experimentation/helao-async/contributors)
+Portions Copyright (c) 2022-2023 [Kevin Kan](https://github.com/High-Throughput-Experimentation/helao-async/contributors)
+Portions Copyright (c) 2022-2023 [Yungchieh Lai](https://github.com/High-Throughput-Experimentation/helao-async/contributors)
+Portions Copyright (c) 2022-2023 [Lan Zhou](https://github.com/High-Throughput-Experimentation/helao-async/contributors)
+
+Portions Copyright (c) 2019-2020 Helge Stein
+Portions Copyright (c) 2020 Phillip Donnelly
+Portions Copyright (c) 2019 John Gregoire
+Portions Copyright (c) 2017 Santosh Suram
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
