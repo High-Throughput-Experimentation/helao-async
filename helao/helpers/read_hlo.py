@@ -92,25 +92,28 @@ class HelaoData:
                 HelaoData(x)
                 for x in sorted(
                     glob(os.path.join(self.ymldir, "*", "*-seq.yml")),
-                    key=lambda x: float(os.path.basename(x).split("__")[0]),
+                    key=lambda x: float(
+                        os.path.basename(os.path.dirname(x)).split("__")[0]
+                    ),
                 )
-                if os.path.isdir(x)
             ]
             self.exp = [
                 HelaoData(x)
                 for x in sorted(
                     glob(os.path.join(self.ymldir, "*", "*-exp.yml")),
-                    key=lambda x: float(os.path.basename(x).split("__")[0]),
+                    key=lambda x: float(
+                        os.path.basename(os.path.dirname(x)).split("__")[0]
+                    ),
                 )
-                if os.path.isdir(x)
             ]
             self.act = [
                 HelaoData(x)
                 for x in sorted(
                     glob(os.path.join(self.ymldir, "*", "*-act.yml")),
-                    key=lambda x: float(os.path.basename(x).split("__")[0]),
+                    key=lambda x: float(
+                        os.path.basename(os.path.dirname(x)).split("__")[0]
+                    ),
                 )
-                if os.path.isdir(x)
             ]
             self.data_files = glob(os.path.join(self.ymldir, "*.hlo"))
 
