@@ -63,13 +63,23 @@ class HelaoData:
             if self.type == "seq":
                 self.exp = [
                     HelaoData(self.target, zflist=self.zflist, ztarget=p)
-                    for p in self.zflist
+                    for p in sorted(
+                        self.zflist,
+                        key=lambda x: float(
+                            os.path.basename(os.path.dirname(x)).split("__")[0]
+                        ),
+                    )
                     if p.endswith("-exp.yml") and p.startswith(self.ymldir)
                 ]
             elif self.type == "exp":
                 self.act = [
                     HelaoData(self.target, zflist=self.zflist, ztarget=p)
-                    for p in self.zflist
+                    for p in sorted(
+                        self.zflist,
+                        key=lambda x: float(
+                            os.path.basename(os.path.dirname(x)).split("__")[0]
+                        ),
+                    )
                     if p.endswith("-act.yml") and p.startswith(self.ymldir)
                 ]
             self.data_files = [
