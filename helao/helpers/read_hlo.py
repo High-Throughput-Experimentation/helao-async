@@ -79,7 +79,7 @@ class HelaoData:
                 sub_acts = [
                     p
                     for p in self.zflist
-                    if p.endswith("-exp.yml") and p.startswith(self.ymldir)
+                    if p.endswith("-act.yml") and p.startswith(self.ymldir)
                 ]
                 self.act = [
                     HelaoData(self.target, zflist=self.zflist, ztarget=p)
@@ -89,7 +89,6 @@ class HelaoData:
                             os.path.basename(os.path.dirname(x)).split("__")[0]
                         ),
                     )
-                    if p.endswith("-act.yml") and p.startswith(self.ymldir)
                 ]
             self.data_files = [
                 p
