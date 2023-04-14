@@ -90,15 +90,27 @@ class HelaoData:
             self.yml = yaml.load("".join(builtins.open(self.ymlpath, "r").readlines()))
             self.seq = [
                 HelaoData(x)
-                for x in sorted(glob(os.path.join(self.ymldir, "*", "*-seq.yml")))
+                for x in sorted(
+                    glob(os.path.join(self.ymldir, "*", "*-seq.yml")),
+                    key=lambda x: float(os.path.basename(x).split("__")[0]),
+                )
+                if os.path.isdir(x)
             ]
             self.exp = [
                 HelaoData(x)
-                for x in sorted(glob(os.path.join(self.ymldir, "*", "*-exp.yml")))
+                for x in sorted(
+                    glob(os.path.join(self.ymldir, "*", "*-exp.yml")),
+                    key=lambda x: float(os.path.basename(x).split("__")[0]),
+                )
+                if os.path.isdir(x)
             ]
             self.act = [
                 HelaoData(x)
-                for x in sorted(glob(os.path.join(self.ymldir, "*", "*-act.yml")))
+                for x in sorted(
+                    glob(os.path.join(self.ymldir, "*", "*-act.yml")),
+                    key=lambda x: float(os.path.basename(x).split("__")[0]),
+                )
+                if os.path.isdir(x)
             ]
             self.data_files = glob(os.path.join(self.ymldir, "*.hlo"))
 
@@ -142,7 +154,7 @@ class HelaoData:
             return read_hlo(hlotarget)
 
     def read_file(self, hlotarget):
-        bytes = zipfile.Path(self.target,hlotarget).read_bytes()
+        bytes = zipfile.Path(self.target, hlotarget).read_bytes()
         return bytes
 
     @property
