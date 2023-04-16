@@ -323,7 +323,7 @@ class Base:
             self.print_message(
                 f"Found run_type in config: {self.world_cfg['run_type']}",
             )
-            self.run_type = self.world_cfg["run_type"]
+            self.run_type = self.world_cfg["run_type"].lower()
         else:
             raise ValueError(
                 "Missing 'run_type' in config, cannot create server object.",
