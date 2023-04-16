@@ -669,9 +669,9 @@ def ADSS_sub_CA(
                     "spacingfactor": 1.0,
                     "timeoffset": 0.0,
                     "wash1": 0,
-                    "wash2": (washmod % 3) % 2,
-                    "wash3": ((washmod + 1) % 3) % 2,
-                    "wash4": ((washmod + 2) % 3) % 2,
+                    "wash2": washmod % 2,
+                    "wash3": (washmod + 1) % 2,
+                    "wash4": 0,
                 },
                 start_condition=ActionStartCondition.no_wait,
                 technique_name="liquid_product_archive",
@@ -1345,11 +1345,13 @@ def ADSS_sub_refill_syringes(
 
 def ADSS_sub_sample_aliquot(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     aliquot_volume_ul: Optional[int] = 200,
     EquilibrationTime_s: float = 30,
     PAL_Injector: str = "LS 4",
-    PAL_Injector_id: str = "fill serial number here"
+    PAL_Injector_id: str = "fill serial number here",
+    rinse_1: int = 1,
+    rinse_4: int = 0,
 ):
     apm = ActionPlanMaker()
     apm.add(
