@@ -38,14 +38,14 @@ from helao.drivers.io.enum import TriggerType
 
 EXPERIMENTS = __all__
 
-PSTAT_server = MachineModel(server_name="PSTAT", machine_name=gethostname()).as_dict()
+PSTAT_server = MachineModel(server_name="PSTAT", machine_name=gethostname().lower()).as_dict()
 
-MOTOR_server = MachineModel(server_name="MOTOR", machine_name=gethostname()).as_dict()
-IO_server = MachineModel(server_name="IO", machine_name=gethostname()).as_dict()
+MOTOR_server = MachineModel(server_name="MOTOR", machine_name=gethostname().lower()).as_dict()
+IO_server = MachineModel(server_name="IO", machine_name=gethostname().lower()).as_dict()
 
 
-ORCH_server = MachineModel(server_name="ORCH", machine_name=gethostname()).as_dict()
-PAL_server = MachineModel(server_name="PAL", machine_name=gethostname()).as_dict()
+ORCH_server = MachineModel(server_name="ORCH", machine_name=gethostname().lower()).as_dict()
+PAL_server = MachineModel(server_name="PAL", machine_name=gethostname().lower()).as_dict()
 
 toggle_triggertype = TriggerType.fallingedge
 
@@ -85,7 +85,7 @@ def ECHE_sub_add_liquid(
             "source_liquid_in": LiquidSample(
                 **{
                     "sample_no": apm.pars.reservoir_liquid_sample_no,
-                    "machine_name": gethostname(),
+                    "machine_name": gethostname().lower(),
                 }
             ).dict(),
             "volume_ml": apm.pars.liquid_volume_ml,

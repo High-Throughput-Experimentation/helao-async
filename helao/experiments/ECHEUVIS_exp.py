@@ -27,14 +27,14 @@ from helao.drivers.io.enum import TriggerType
 
 EXPERIMENTS = __all__
 
-PSTAT_server = MM(server_name="PSTAT", machine_name=gethostname()).as_dict()
-MOTOR_server = MM(server_name="MOTOR", machine_name=gethostname()).as_dict()
-IO_server = MM(server_name="IO", machine_name=gethostname()).as_dict()
-SPEC_T_server = MM(server_name="SPEC_T", machine_name=gethostname()).as_dict()
-SPEC_R_server = MM(server_name="SPEC_R", machine_name=gethostname()).as_dict()
-ORCH_server = MM(server_name="ORCH", machine_name=gethostname()).as_dict()
-PAL_server = MM(server_name="PAL", machine_name=gethostname()).as_dict()
-CALC_server = MM(server_name="CALC", machine_name=gethostname()).as_dict()
+PSTAT_server = MM(server_name="PSTAT", machine_name=gethostname().lower()).as_dict()
+MOTOR_server = MM(server_name="MOTOR", machine_name=gethostname().lower()).as_dict()
+IO_server = MM(server_name="IO", machine_name=gethostname().lower()).as_dict()
+SPEC_T_server = MM(server_name="SPEC_T", machine_name=gethostname().lower()).as_dict()
+SPEC_R_server = MM(server_name="SPEC_R", machine_name=gethostname().lower()).as_dict()
+ORCH_server = MM(server_name="ORCH", machine_name=gethostname().lower()).as_dict()
+PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
+CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict()
 
 toggle_triggertype = TriggerType.fallingedge
 

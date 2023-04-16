@@ -31,7 +31,7 @@ from helaocore.models.machine import MachineModel
 # list valid experiment functions
 EXPERIMENTS = __all__
 
-ORCH_HOST = gethostname()
+ORCH_HOST = gethostname().lower()
 ANA_server = MachineModel(server_name="ANA", machine_name=ORCH_HOST).as_dict()
 PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).as_dict()
 MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).as_dict()

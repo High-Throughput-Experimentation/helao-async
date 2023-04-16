@@ -86,7 +86,7 @@ class Archive:
         if self.base.helaodirs.states_root is not None:
             self.archivejson = os.path.join(
                 self.base.helaodirs.states_root,
-                f"{gethostname()}_{self.base.server.server_name}_archive.json",
+                f"{gethostname().lower()}_{self.base.server.server_name}_archive.json",
             )
         self.config = {}
 

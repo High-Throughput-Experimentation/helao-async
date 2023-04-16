@@ -24,7 +24,7 @@ from helaocore.models.machine import MachineModel
 
 EXPERIMENTS = __all__
 
-PAL_server = MachineModel(server_name="PAL", machine_name=gethostname()).as_dict()
+PAL_server = MachineModel(server_name="PAL", machine_name=gethostname().lower()).as_dict()
 
 
 def create_liquid_sample(
@@ -52,7 +52,7 @@ def create_liquid_sample(
             "fast_samples_in": [
                 LiquidSample(
                     **{
-                        "machine_name": gethostname(),
+                        "machine_name": gethostname().lower(),
                         "source": apm.pars.source,
                         "volume_ml": apm.pars.volume_ml,
                         "chemical": apm.pars.chemical,
@@ -95,7 +95,7 @@ def create_gas_sample(
             "fast_samples_in": [
                 GasSample(
                     **{
-                        "machine_name": gethostname(),
+                        "machine_name": gethostname().lower(),
                         "source": apm.pars.source,
                         "volume_ml": apm.pars.volume_ml,
                         "chemical": apm.pars.chemical,
@@ -147,11 +147,11 @@ def create_assembly_sample(
         return apm.action_list
 
     liquid_list = [
-        LiquidSample(machine_name=gethostname(), sample_no=sample_no)
+        LiquidSample(machine_name=gethostname().lower(), sample_no=sample_no)
         for sample_no in apm.pars.liquid_sample_nos
     ]
     gas_list = [
-        GasSample(machine_name=gethostname(), sample_no=sample_no)
+        GasSample(machine_name=gethostname().lower(), sample_no=sample_no)
         for sample_no in apm.pars.gas_sample_nos
     ]
     solid_list = [
@@ -177,7 +177,7 @@ def create_assembly_sample(
             "fast_samples_in": [
                 AssemblySample(
                     **{
-                        "machine_name": gethostname(),
+                        "machine_name": gethostname().lower(),
                         "parts": parts,
                         # "source": apm.pars.source,
                         "volume_ml": apm.pars.volume_ml,

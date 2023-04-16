@@ -25,7 +25,7 @@ class Vis:
 
     def __init__(self, bokehapp: HelaoBokehAPI):
         self.server = MachineModel(
-            server_name=bokehapp.helao_srv, machine_name=gethostname()
+            server_name=bokehapp.helao_srv, machine_name=gethostname().lower()
         )
         self.server_cfg = bokehapp.helao_cfg["servers"][self.server.server_name]
         self.world_cfg = bokehapp.helao_cfg
