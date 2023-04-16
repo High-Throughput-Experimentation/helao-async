@@ -300,7 +300,7 @@ class Base:
     # TODO: add world_cfg: dict parameter for HelaoBase to pass config instead of fastapp
     def __init__(self, fastapp: HelaoBase, dyn_endpoints=None):
         self.server = MachineModel(
-            server_name=fastapp.helao_srv, machine_name=gethostname()
+            server_name=fastapp.helao_srv, machine_name=gethostname().lower()
         )
 
         self.fastapp = fastapp
@@ -483,7 +483,7 @@ class Base:
         server_key = self.server.server_name
 
         action.action_server = MachineModel(
-            server_name=server_key, machine_name=gethostname()
+            server_name=server_key, machine_name=gethostname().lower()
         )
         action.action_name = action_name
 
@@ -502,7 +502,7 @@ class Base:
         if action.run_type is None:
             action.run_type = self.run_type
             action.orchestrator = MachineModel(
-                server_name="MANUAL", machine_name=gethostname()
+                server_name="MANUAL", machine_name=gethostname().lower()
             )
         return action
 

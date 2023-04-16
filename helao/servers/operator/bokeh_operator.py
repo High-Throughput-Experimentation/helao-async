@@ -326,7 +326,7 @@ class Operator:
                     [
                         Spacer(width=20),
                         Div(
-                            text=f"<b>{self.config_dict.get('doc_name', 'Operator')} on {gethostname()}</b>",
+                            text=f"<b>{self.config_dict.get('doc_name', 'Operator')} on {gethostname().lower()}</b>",
                             width=self.max_width - 20,
                             height=32,
                             style={"font-size": "200%", "color": "red"},

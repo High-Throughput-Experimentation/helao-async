@@ -49,7 +49,7 @@ from helao.drivers.io.enum import TriggerType
 # list valid experiment functions
 EXPERIMENTS = __all__
 
-ORCH_HOST = gethostname()
+ORCH_HOST = gethostname().lower()
 PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).as_dict()
 MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).as_dict()
 NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).as_dict()

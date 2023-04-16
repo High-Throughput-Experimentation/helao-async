@@ -55,7 +55,7 @@ class Galil:
         if self.base.helaodirs.states_root is not None:
             self.file_backup_transfermatrix = os.path.join(
                 self.base.helaodirs.states_root,
-                f"{gethostname()}_last_plate_calib.json",
+                f"{gethostname().lower()}_last_plate_calib.json",
             )
 
         self.plate_transfermatrix = self.load_transfermatrix(
@@ -74,7 +74,7 @@ class Galil:
             file=os.path.join(
                 self.base.helaodirs.db_root,
                 "plate_calib",
-                f"{gethostname()}_instrument_calib.json",
+                f"{gethostname().lower()}_instrument_calib.json",
             )
         )
 

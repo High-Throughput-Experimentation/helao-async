@@ -42,7 +42,7 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
             [
                 Spacer(width=20),
                 Div(
-                    text=f"<b>Sensors on {gethostname()}</b>",
+                    text=f"<b>Sensors on {gethostname().lower()}</b>",
                     width=1004,
                     height=32,
                     style={"font-size": "200%", "color": "red"},

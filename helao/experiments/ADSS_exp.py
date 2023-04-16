@@ -52,7 +52,7 @@ from helao.drivers.robot.pal_driver import Spacingmethod, PALtools
 
 EXPERIMENTS = __all__
 
-ORCH_HOST = gethostname()
+ORCH_HOST = gethostname().lower()
 PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).as_dict()
 MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).as_dict()
 NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).as_dict()
@@ -226,7 +226,7 @@ def ADSS_sub_load_liquid(
             "load_sample_in": LiquidSample(
                 **{
                     "sample_no": apm.pars.liquid_sample_no,
-                    "machine_name": gethostname(),
+                    "machine_name": gethostname().lower(),
                 }
             ).dict(),
         },

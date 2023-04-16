@@ -1117,7 +1117,7 @@ class Aligner:
                 file=os.path.join(
                     self.motor.base.helaodirs.db_root,
                     "plate_calib",
-                    f"{gethostname()}_plate_{self.motor.aligner_plateid}_calib.json",
+                    f"{gethostname().lower()}_plate_{self.motor.aligner_plateid}_calib.json",
                 )
             )
             self.motor.aligner_active.action.error_code = (
@@ -1125,7 +1125,7 @@ class Aligner:
             )
             await self.motor.aligner_active.write_file(
                 file_type="plate_calib",
-                filename=f"{gethostname()}_plate_{self.motor.aligner_plateid}_calib.json",
+                filename=f"{gethostname().lower()}_plate_{self.motor.aligner_plateid}_calib.json",
                 output_str=json.dumps(self.motor.plate_transfermatrix.tolist()),
                 # header = ";".join(["global_sample_label", "Survey Runs", "Main Runs", "Rack", "Vial", "Dilution Factor"]),
                 # sample_str = None

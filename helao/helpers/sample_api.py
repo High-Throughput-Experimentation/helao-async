@@ -71,7 +71,7 @@ class _BaseSampleAPI:
 
         self._sampleclass = sampleclass
         self._sample_type = f"{sampleclass.sample_type}_sample"
-        self._dbfilename = gethostname() + f"__{self._sample_type}.db"
+        self._dbfilename = gethostname().lower() + f"__{self._sample_type}.db"
         self._base = Serv_class
         self._dbfilepath = self._base.helaodirs.db_root
         self._db = os.path.join(self._dbfilepath, self._dbfilename)
@@ -508,10 +508,10 @@ class LiquidSampleAPI(_BaseSampleAPI):
         counts = await old_liquid_sample_db.count_samples()
         self._base.print_message(f"old db sample count: {counts}")
         for i in range(counts):
-            sample = LiquidSample(**{"sample_no": i + 1, "machine_name": gethostname()})
+            sample = LiquidSample(**{"sample_no": i + 1, "machine_name": gethostname().lower()})
             sample = await old_liquid_sample_db.get_samples(sample)
             sample.server_name = "PAL"
-            sample.machine_name = gethostname()
+            sample.machine_name = gethostname().lower()
             sample.global_label = sample.get_global_label()
             sample.sample_creation_timecode = 0
             # sample.action_timestamp = "00000000.000000000000"
@@ -727,7 +727,7 @@ class OldLiquidSampleAPI:
             return retval
 
         # for now it only checks against local samples
-        if sample.machine_name != gethostname():
+        if sample.machine_name != gethostname().lower():
             self._base.print_message(
                 f"can only load from local db, got {sample.machine_name}",
                 error=True,
@@ -762,7 +762,7 @@ class OldLiquidSampleAPI:
             new_source = []
             for src in source:
                 if src != "":
-                    new_source.append(f"{gethostname()}__liquid__{src}")
+                    new_source.append(f"{gethostname().lower()}__liquid__{src}")
 
             liquid_sample_jsondict.update({"source": new_source})
 

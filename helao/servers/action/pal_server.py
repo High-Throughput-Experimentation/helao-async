@@ -587,7 +587,7 @@ def makeApp(confPrefix, server_key, helao_root):
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
         load_sample_in: Optional[SampleUnion] = Body(
-            LiquidSample(**{"sample_no": 1, "machine_name": gethostname()}), embed=True
+            LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}), embed=True
         ),
         tray: Optional[int] = None,
         slot: Optional[int] = None,
@@ -655,7 +655,7 @@ def makeApp(confPrefix, server_key, helao_root):
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
         sample: Optional[SampleUnion] = Body(
-            LiquidSample(**{"sample_no": 1, "machine_name": gethostname()}), embed=True
+            LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}), embed=True
         ),
         tray: Optional[int] = None,
         slot: Optional[int] = None,
@@ -769,7 +769,7 @@ def makeApp(confPrefix, server_key, helao_root):
         action_version: int = 1,
         custom: Optional[dev_customitems] = None,
         load_sample_in: Optional[SampleUnion] = Body(
-            LiquidSample(**{"sample_no": 1, "machine_name": gethostname()}), embed=True
+            LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}), embed=True
         ),
     ):
         active = await app.base.setup_and_contain_action(
@@ -884,7 +884,7 @@ def makeApp(confPrefix, server_key, helao_root):
         action_version: int = 1,
         custom: Optional[dev_customitems] = None,
         source_liquid_in: Optional[LiquidSample] = Body(
-            LiquidSample(**{"sample_no": 1, "machine_name": gethostname()}), embed=True
+            LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}), embed=True
         ),
         volume_ml: float = 0.0,
         combine_liquids: bool = False,
@@ -930,7 +930,7 @@ def makeApp(confPrefix, server_key, helao_root):
         action: Optional[Action] = Body({}, embed=True),
         action_version: int = 1,
         fast_samples_in: Optional[List[SampleUnion]] = Body(
-            [LiquidSample(**{"sample_no": 1, "machine_name": gethostname()})],
+            [LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()})],
             embed=True,
         ),
     ):
@@ -957,7 +957,7 @@ def makeApp(confPrefix, server_key, helao_root):
             [
                 LiquidSample(
                     **{
-                        "machine_name": gethostname(),
+                        "machine_name": gethostname().lower(),
                         "source": [],
                         "volume_ml": 0.0,
                         "action_time": strftime("%Y%m%d.%H%M%S"),
