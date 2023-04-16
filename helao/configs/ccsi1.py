@@ -14,7 +14,7 @@ config["sequence_params"] = {
     "gamrychannelwait": -1,
     "gamrychannelsend": 1,
 }
-config["run_type"] = "CCSI"
+config["run_type"] = "ccsi"
 config["root"] = r"C:\INST_hlo"
 
 
