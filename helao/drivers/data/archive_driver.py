@@ -552,7 +552,7 @@ class Archive:
 
             headerline = ";".join(
                 [
-                    "global_sample_label",
+                    "liquid_sample_no",
                     "Survey Runs",
                     "Main Runs",
                     "Rack",
