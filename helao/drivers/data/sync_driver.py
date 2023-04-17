@@ -501,7 +501,14 @@ class HelaoSyncer:
             f"Added {str(yml_path)} to syncer queue with priority {rank}."
         )
 
-    async def sync_yml(self, yml_path: Path, retries: int = 3, rank: int = 5):
+    async def sync_yml(
+        self,
+        yml_path: Path,
+        retries: int = 3,
+        rank: int = 5,
+        force_s3: bool = False,
+        force_api: bool = False,
+    ):
         """Coroutine for syncing a single yml"""
         if not yml_path.exists():
             # self.base.print_message(
@@ -620,7 +627,7 @@ class HelaoSyncer:
         yml_model = MOD_MAP[yml.type](**patched_meta).clean_dict(strip_private=True)
 
         # next push yml to S3
-        if not prog.s3_done:
+        if not prog.s3_done or force_s3:
             self.base.print_message(f"Pushing yml->json to S3 for {yml.target.name}")
             uuid_key = patched_meta[f"{yml.type}_uuid"]
             meta_s3_key = f"{yml.type}/{uuid_key}.json"
@@ -630,7 +637,7 @@ class HelaoSyncer:
                 prog.write_dict()
 
         # next push yml to API
-        if not prog.api_done:
+        if not prog.api_done or force_api:
             self.base.print_message(f"Pushing yml to API for {yml.target.name}")
             api_success = await self.to_api(yml_model, yml.type)
             self.base.print_message(
