@@ -18,11 +18,10 @@ class AxisCam:
     def __init__(self, action_serv: Base):
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
-        self.aloop = asyncio.get_running_loop()
 
     def acquire_image(self):
         """Save image stream."""
-        self.base.print_message(f"creating http session")
+        self.base.print_message("creating http session")
         with requests.Session() as session:
             self.base.print_message(
                 f"making get request to {self.config_dict['axis_ip']}"
@@ -73,14 +72,14 @@ class AxisCamExec(Executor):
         self.active.base.print_message(
             f"Image acquisition started at {self.start_time}"
         )
-        img = self.active.base.driver.acquire_image()
+        img = self.active.base.fastapp.driver.acquire_image()
         live_dict = await self.write_image(img, self.start_time)
         return {"error": ErrorCodes.none, "data": live_dict}
 
     async def _poll(self):
         """Acquire subsequent images."""
         iter_time = time.time()
-        img = self.active.base.driver.acquire_image()
+        img = self.active.base.fastapp.driver.acquire_image()
         live_dict = await self.write_image(img, iter_time)
         elapsed_time = iter_time - self.start_time
         if (self.duration < 0) or (elapsed_time < self.duration):
