@@ -52,7 +52,7 @@ from helao.drivers.robot.pal_driver import Spacingmethod, PALtools
 
 EXPERIMENTS = __all__
 
-ORCH_HOST = gethostname().lower()
+ORCH_HOST = gethostname()
 PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).as_dict()
 MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).as_dict()
 NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).as_dict()
@@ -226,7 +226,7 @@ def ADSS_sub_load_liquid(
             "load_sample_in": LiquidSample(
                 **{
                     "sample_no": apm.pars.liquid_sample_no,
-                    "machine_name": gethostname().lower(),
+                    "machine_name": gethostname(),
                 }
             ).dict(),
         },
@@ -831,7 +831,7 @@ def ADSS_sub_CV(
 
 def ADSS_sub_OCV(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 4,
     Tval__s: Optional[float] = 60.0,
     gamry_i_range: Optional[str] = "auto",
     samplerate_sec: Optional[float] = 0.05,
@@ -842,6 +842,9 @@ def ADSS_sub_OCV(
     aliquot_times_sec: Optional[List[float]] = [],
     aliquot_insitu: Optional[bool] = False,
     PAL_Injector: Optional[str] = "LS 4",
+    PAL_Injector_id: Optional[str] = "fill serial number here",
+    rinse_1: int = 1,
+    rinse_4: int = 0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -902,10 +905,10 @@ def ADSS_sub_OCV(
                     "spacingmethod": Spacingmethod.custom,
                     "spacingfactor": 1.0,
                     "timeoffset": 0.0,
-                    "wash1": 0,
+                    "wash1": apm.pars.rinse_1,
                     "wash2": 0,
                     "wash3": 0,
-                    "wash4": 0,
+                    "wash4": apm.pars.rinse_4,
                 },
                 start_condition=ActionStartCondition.wait_for_orch,
                 technique_name="liquid_product_archive",

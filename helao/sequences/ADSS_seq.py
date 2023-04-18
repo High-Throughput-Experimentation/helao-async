@@ -726,7 +726,7 @@ def ADSS_CA_NiSb_validation(
     return epm.experiment_plan_list  # returns complete experiment list
 
 def ADSS_CA_NiSb_cell_1potential(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no_list: list = [14050],  # list instead of map select
@@ -800,7 +800,7 @@ def ADSS_CA_NiSb_cell_1potential(
                 "Syringe_rate_ulsec": Syringe_rate_ulsec,
             }
         )
-        epm.add_experiment(
+        epm.add_experiment( 
             "ADSS_sub_load_liquid",
             {
                 "liquid_custom_position": liquid_custom_position,
@@ -825,19 +825,14 @@ def ADSS_CA_NiSb_cell_1potential(
                 "ph": ph,
                 "ref_type": ref_type,
                 "ref_offset__V": ref_offset__V,
-
-            },
-        )
-        epm.add_experiment(
-            "ADSS_sub_sample_aliquot",
-            {
-                "EquilibrationTime_s": EquilibrationTime_s,
                 "aliquot_volume_ul": aliquot_volume_ul,
+                "aliquot_times_sec": 5,
+                "aliquot_insitu": True,
                 "PAL_Injector": PAL_Injector,
                 "PAL_Injector_id": PAL_Injector_id,
-            }
+                "rinse_1": 1,
+            },
         )
-
         epm.add_experiment(
             "ADSS_sub_CA",
             {
@@ -856,15 +851,22 @@ def ADSS_CA_NiSb_cell_1potential(
             },
         )
         epm.add_experiment(
-            "ADSS_sub_sample_aliquot",
+            "ADSS_sub_OCV",
             {
-                "EquilibrationTime_s": EquilibrationTime_s,
+                "Tval__s": OCV_duration,
+                "SampleRate": samplerate_sec,
+                "ph": ph,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
                 "aliquot_volume_ul": aliquot_volume_ul,
+                "aliquot_times_sec": 5,
+                "aliquot_insitu": True,
                 "PAL_Injector": PAL_Injector,
                 "PAL_Injector_id": PAL_Injector_id,
                 "rinse_1": 0,
                 "rinse_4": 1,
-        }
+
+            },
         )
 
         epm.add_experiment(
