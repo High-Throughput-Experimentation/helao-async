@@ -45,13 +45,13 @@ class AxisCamExec(Executor):
         self.counter = 0
         self.output_dir = self.active.action.action_output_dir
 
-    def write_image(self, imgbytes, epoch):
+    async def write_image(self, imgbytes, epoch):
         """Write image to action output directory."""
         filename = f"cam_{self.counter:06}.jpg"
         with open(os.path.join(self.output_dir, filename), "wb") as f:
             f.write(imgbytes)
         live_dict = {"epoch_s": epoch, "filename": filename}
-        self.active.track_file(
+        await self.active.track_file(
             "webcam_image",
             os.path.join(self.output_dir, filename),
             samples=self.active.action.samples_in,
@@ -64,14 +64,14 @@ class AxisCamExec(Executor):
         self.start_time = time.time()
         img = await self.active.base.driver.acquire_image()
         self.active.base.print_message(f"acquired image at: {self.start_time}")
-        live_dict = self.write_image(img, self.start_time)
+        live_dict = await self.write_image(img, self.start_time)
         return {"error": ErrorCodes.none, "data": live_dict}
 
     async def _poll(self):
         """Acquire subsequent images."""
         iter_time = time.time()
         img = await self.active.base.driver.acquire_image()
-        live_dict = self.write_image(img, iter_time)
+        live_dict = await self.write_image(img, iter_time)
         elapsed_time = iter_time - self.start_time
         if (self.duration < 0) or (elapsed_time < self.duration):
             status = HloStatus.active
