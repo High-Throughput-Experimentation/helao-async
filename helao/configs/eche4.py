@@ -159,4 +159,13 @@ config["servers"] = {
             "testing": False,
         },
     },
+    "CAM": {
+        "host": hostip,
+        "port": 8013,
+        "group": "action",
+        "fast": "cam(-server)",
+        "params": {
+            "axis_ip": "192.168.200.210",
+        },
+    },
 }
