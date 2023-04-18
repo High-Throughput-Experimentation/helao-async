@@ -1932,7 +1932,8 @@ class Active:
                 self.action.action_output_dir,
                 os.path.basename(x),
             )
-            await async_copy(x, new_path)
+            if x != new_path:
+                await async_copy(x, new_path)
 
     async def finish_manual_action(self):
         # self.action_list[-1] is the very first action
