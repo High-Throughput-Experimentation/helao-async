@@ -45,7 +45,7 @@ class AxisCamExec(Executor):
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
         self.counter = 0
-        self.output_dir = self.active.action.action_output_dir
+        self.output_dir = self.active.action.get_action_dir()
 
     async def _pre_exec(self):
         "Set flow rate."
@@ -55,6 +55,7 @@ class AxisCamExec(Executor):
     async def write_image(self, imgbytes, epoch):
         """Write image to action output directory."""
         filename = f"cam_{self.counter:06}.jpg"
+        self.active.base.print_message(f"Writing mage to: {os.path.join(self.output_dir, filename)}")
         with open(os.path.join(self.output_dir, filename), "wb") as f:
             f.write(imgbytes)
         live_dict = {"epoch_s": epoch, "filename": filename}
@@ -73,6 +74,7 @@ class AxisCamExec(Executor):
             f"Image acquisition started at {self.start_time}"
         )
         img = self.active.base.fastapp.driver.acquire_image()
+        self.active.base.print_message("image acquired")
         live_dict = await self.write_image(img, self.start_time)
         return {"error": ErrorCodes.none, "data": live_dict}
 
