@@ -7,6 +7,7 @@ __all__ = ["makeApp"]
 
 from typing import Optional, List, Union
 from fastapi import Body
+from helaocore.models.sample import SampleUnion
 from helao.helpers.premodels import Action
 from helao.servers.base import HelaoBase
 from helao.drivers.sensor.axiscam_driver import AxisCam, AxisCamExec
