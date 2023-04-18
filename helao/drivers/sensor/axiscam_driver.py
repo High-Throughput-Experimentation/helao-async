@@ -7,7 +7,7 @@ __all__ = ["AxisCam", "AxisCamExec"]
 import os
 import time
 import asyncio
-import aiohttp
+import requests
 
 from helaocore.error import ErrorCodes
 from helao.servers.base import Base, Executor
@@ -20,14 +20,14 @@ class AxisCam:
         self.config_dict = action_serv.server_cfg["params"]
         self.aloop = asyncio.get_running_loop()
 
-    async def acquire_image(self):
+    def acquire_image(self):
         """Save image stream."""
-        async with aiohttp.ClientSession() as session:
+        with requests.Session() as session:
             self.base.print_message(f"making get request to {self.config_dict['axis_ip']}")
-            async with session.get(
+            with session.get(
                 f"http://{self.config_dict['axis_ip']}/jpg/1/image.jpg"
             ) as resp:
-                img = await resp.read()
+                img = resp.content
                 self.base.print_message(f"acquired image at: {time.time()}")
         return img
 
@@ -64,14 +64,14 @@ class AxisCamExec(Executor):
     async def _exec(self):
         "Acquire single image."
         self.start_time = time.time()
-        img = await self.active.base.driver.acquire_image()
+        img = self.active.base.driver.acquire_image()
         live_dict = await self.write_image(img, self.start_time)
         return {"error": ErrorCodes.none, "data": live_dict}
 
     async def _poll(self):
         """Acquire subsequent images."""
         iter_time = time.time()
-        img = await self.active.base.driver.acquire_image()
+        img = self.active.base.driver.acquire_image()
         live_dict = await self.write_image(img, iter_time)
         elapsed_time = iter_time - self.start_time
         if (self.duration < 0) or (elapsed_time < self.duration):
