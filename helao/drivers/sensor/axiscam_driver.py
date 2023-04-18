@@ -23,10 +23,12 @@ class AxisCam:
     async def acquire_image(self):
         """Save image stream."""
         async with aiohttp.ClientSession() as session:
+            self.base.print_message(f"making get request to {self.config_dict['axis_ip']}")
             async with session.get(
                 f"http://{self.config_dict['axis_ip']}/jpg/1/image.jpg"
             ) as resp:
                 img = await resp.read()
+                self.base.print_message(f"acquired image at: {time.time()}")
         return img
 
     def shutdown(self):
@@ -63,7 +65,6 @@ class AxisCamExec(Executor):
         "Acquire single image."
         self.start_time = time.time()
         img = await self.active.base.driver.acquire_image()
-        self.active.base.print_message(f"acquired image at: {self.start_time}")
         live_dict = await self.write_image(img, self.start_time)
         return {"error": ErrorCodes.none, "data": live_dict}
 
