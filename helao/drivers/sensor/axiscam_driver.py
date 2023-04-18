@@ -22,8 +22,11 @@ class AxisCam:
 
     def acquire_image(self):
         """Save image stream."""
+        self.base.print_message(f"creating http session")
         with requests.Session() as session:
-            self.base.print_message(f"making get request to {self.config_dict['axis_ip']}")
+            self.base.print_message(
+                f"making get request to {self.config_dict['axis_ip']}"
+            )
             with session.get(
                 f"http://{self.config_dict['axis_ip']}/jpg/1/image.jpg"
             ) as resp:

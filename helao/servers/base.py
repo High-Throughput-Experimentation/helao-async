@@ -2009,6 +2009,7 @@ class Active:
         self.base.executors[executor.exec_id] = self
 
         # action operations
+        self.base.print_message(f"Running executor._exec() method")
         result = await executor._exec()
         error = result.get("error", ErrorCodes.none)
         data = result.get("data", {})
