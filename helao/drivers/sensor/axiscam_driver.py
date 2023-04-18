@@ -47,6 +47,11 @@ class AxisCamExec(Executor):
         self.counter = 0
         self.output_dir = self.active.action.action_output_dir
 
+    async def _pre_exec(self):
+        "Set flow rate."
+        self.active.base.print_message("AxisCamExec running setup methods.")
+        return {"error": ErrorCodes.none}
+
     async def write_image(self, imgbytes, epoch):
         """Write image to action output directory."""
         filename = f"cam_{self.counter:06}.jpg"
