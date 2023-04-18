@@ -114,10 +114,10 @@ config["servers"] = {
                 "Ttemp_Ktc_out_cell_C": "PXI-6289/ai1",
                 "Ttemp_Ktc_out_reservoir_C": "PXI-6289/ai2",
             },
-            "dev_heat": {
-                "cellheater": "PXI-6289/port0/line0",
-                "res_heater": "PXI-6289/port0/line4",
-            },
+            # "dev_heat": {
+            #     "cellheater": "PXI-6289/port0/line0",
+            #     "res_heater": "PXI-6289/port0/line4",
+            # },
             "dev_gasvalve": {
                 "V1": "PXI-6284/port1/line2", #1-6 white ground
                 "V2": "PXI-6284/port1/line3", #7-9 grey ground
@@ -137,6 +137,9 @@ config["servers"] = {
                 "done": "PXI-6284/port2/line4",
                 "error": "PXI-6284/port2/line6",
             },
+            "dev_led":{
+                "led": "PXI-6289/port0/line0"
+            }
         },
     },
     "PAL": {

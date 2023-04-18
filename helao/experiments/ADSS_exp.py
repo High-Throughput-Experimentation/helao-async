@@ -33,6 +33,7 @@ __all__ = [
     "ADSS_sub_sample_aliquot",
     "ADSS_sub_recirculate",
     "ADSS_sub_abs_move",
+    "ADSS_sub_cell_illumination",
 ]
 
 
@@ -1416,4 +1417,18 @@ def ADSS_sub_recirculate(
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": dir})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
+    return apm.action_list  # returns complete action list to orch
+
+def ADSS_sub_cell_illumination(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    led_wavelength: str = "385",
+    illumination_on: bool = False,
+):
+    apm = ActionPlanMaker()
+    if apm.pars.illumination_on:
+        apm.add(NI_server, "led", {"led": "led", "on": 1})
+    else:
+        apm.add(NI_server, "led", {"led": "led", "on": 0})
+
     return apm.action_list  # returns complete action list to orch
