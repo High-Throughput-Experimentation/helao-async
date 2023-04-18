@@ -2005,6 +2005,7 @@ class Active:
             return await self.finish()
 
         # shortcut to active exectuors
+        self.base.print_message(f"Registering exec_id: '{executor.exec_id}' with server")
         self.base.executors[executor.exec_id] = self
 
         # action operations
