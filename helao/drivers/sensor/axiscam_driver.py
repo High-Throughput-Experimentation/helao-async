@@ -27,11 +27,9 @@ class AxisCam:
             self.base.print_message(
                 f"making get request to {self.config_dict['axis_ip']}"
             )
-            with session.get(
-                f"http://{self.config_dict['axis_ip']}/jpg/1/image.jpg"
-            ) as resp:
-                img = resp.content
-                self.base.print_message(f"acquired image at: {time.time()}")
+            resp = session.get(f"http://{self.config_dict['axis_ip']}/jpg/1/image.jpg")
+            img = resp.content
+            self.base.print_message(f"acquired image at: {time.time()}")
         return img
 
     def shutdown(self):
@@ -72,6 +70,9 @@ class AxisCamExec(Executor):
     async def _exec(self):
         "Acquire single image."
         self.start_time = time.time()
+        self.active.base.print_message(
+            f"Image acquisition started at {self.start_time}"
+        )
         img = self.active.base.driver.acquire_image()
         live_dict = await self.write_image(img, self.start_time)
         return {"error": ErrorCodes.none, "data": live_dict}
