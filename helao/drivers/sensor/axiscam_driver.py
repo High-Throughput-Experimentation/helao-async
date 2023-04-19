@@ -75,11 +75,11 @@ class AxisCamExec(Executor):
     async def _exec(self):
         "Acquire single image."
         self.start_time = time.time()
-        self.active.base.print_message(
-            f"Image acquisition started at {self.start_time}"
-        )
+        # self.active.base.print_message(
+        #     f"Image acquisition started at {self.start_time}"
+        # )
         img = self.active.base.fastapp.driver.acquire_image()
-        self.active.base.print_message("image acquired")
+        # self.active.base.print_message("image acquired")
         live_dict = await self.write_image(img, self.start_time)
         return {"error": ErrorCodes.none, "data": live_dict}
 
