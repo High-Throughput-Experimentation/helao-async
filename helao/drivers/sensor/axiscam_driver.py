@@ -8,6 +8,7 @@ import os
 import time
 import asyncio
 import requests
+import aiofiles
 
 from helaocore.error import ErrorCodes
 from helao.servers.base import Base, Executor
@@ -55,9 +56,9 @@ class AxisCamExec(Executor):
     async def write_image(self, imgbytes, epoch):
         """Write image to action output directory."""
         filename = f"cam_{self.counter:06}.jpg"
-        self.active.base.print_message(f"Writing mage to: {os.path.join(self.output_dir, filename)}")
-        with open(os.path.join(self.output_dir, filename), "wb") as f:
-            f.write(imgbytes)
+        self.active.base.print_message(f"Writing image to: {os.path.join(self.output_dir, filename)}")
+        async with aiofiles.open(os.path.join(self.output_dir, filename), "wb") as f:
+            await f.write(imgbytes)
         live_dict = {"epoch_s": epoch, "filename": filename}
         await self.active.track_file(
             "webcam_image",
