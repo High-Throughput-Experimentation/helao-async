@@ -1932,7 +1932,8 @@ class Active:
                 self.action.action_output_dir,
                 os.path.basename(x),
             )
-            await async_copy(x, new_path)
+            if x != new_path:
+                await async_copy(x, new_path)
 
     async def finish_manual_action(self):
         # self.action_list[-1] is the very first action
@@ -2004,9 +2005,11 @@ class Active:
             return await self.finish()
 
         # shortcut to active exectuors
+        self.base.print_message(f"Registering exec_id: '{executor.exec_id}' with server")
         self.base.executors[executor.exec_id] = self
 
         # action operations
+        self.base.print_message(f"Running executor._exec() method")
         result = await executor._exec()
         error = result.get("error", ErrorCodes.none)
         data = result.get("data", {})
