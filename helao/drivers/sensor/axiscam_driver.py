@@ -47,7 +47,7 @@ class AxisCamExec(Executor):
         self.duration = self.active.action.action_params.get("duration", -1)
         self.counter = 0
         self.output_dir = os.path.join(
-            self.active.base.helao_dirs.save_root, self.active.action.action_output_dir
+            self.active.base.helaodirs.save_root, self.active.action.action_output_dir
         )
 
     async def _pre_exec(self):
