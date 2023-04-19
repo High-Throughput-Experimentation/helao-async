@@ -626,6 +626,12 @@ class HelaoSyncer:
         patched_meta = {MOD_PATCH.get(k, k): v for k, v in meta.items()}
         yml_model = MOD_MAP[yml.type](**patched_meta).clean_dict(strip_private=True)
 
+        # patch technique lists in yml_model
+        tech_name = yml_model.get("technique_name", "NA")
+        if isinstance(tech_name, list):
+            split_technique = tech_name[yml_model.get("action_split", 0)]
+            yml_model["technique_name"] = split_technique
+
         # next push yml to S3
         if not prog.s3_done or force_s3:
             self.base.print_message(f"Pushing yml->json to S3 for {yml.target.name}")
