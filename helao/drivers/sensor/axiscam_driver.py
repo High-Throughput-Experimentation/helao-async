@@ -28,7 +28,7 @@ class AxisCam:
             )
             resp = session.get(f"http://{self.config_dict['axis_ip']}/jpg/1/image.jpg")
             img = resp.content
-            self.base.print_message(f"acquired image at: {time.time()}")
+            self.base.print_message(f"acquired image {len(img)} at: {time.time()}")
         return img
 
     def shutdown(self):
