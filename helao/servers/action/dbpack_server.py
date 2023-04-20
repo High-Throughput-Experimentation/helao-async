@@ -40,11 +40,11 @@ def makeApp(confPrefix, server_key, helao_root):
         """Finds and queues sequence ymls from RUNS_FINISHED."""
         return await app.driver.finish_pending()
 
-    # @app.post("/reset_sync", tags=["private"])
-    # async def reset_sync(sync_path: str):
-    #     """Resets a synced sequence zip or partially-synced folder."""
-    #     await app.driver.reset_sync(sync_path.strip('"').strip("'"))
-    #     return yml_path
+    @app.post("/reset_sync", tags=["private"])
+    async def reset_sync(sync_path: str):
+        """Resets a synced sequence zip or partially-synced folder."""
+        await app.driver.reset_sync(sync_path.strip('"').strip("'"))
+        return sync_path
 
     @app.post("/running", tags=["private"])
     async def running():
@@ -64,15 +64,5 @@ def makeApp(confPrefix, server_key, helao_root):
     @app.post("/current_progress", tags=["private"])
     async def current_progress():
         return app.driver.progress
-
-    # @app.post("/finish_pending", tags=["private"])
-    # async def finish_pending():
-    #     pending_dict = await app.driver.finish_pending()
-    #     return pending_dict
-
-    # @app.post("/list_pending", tags=["private"])
-    # def list_pending():
-    #     pending_dict = app.driver.list_pending()
-    #     return pending_dict
 
     return app

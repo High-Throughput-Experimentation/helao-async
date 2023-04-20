@@ -16,10 +16,12 @@ Handles Helao data and metadata uploads to S3 and Modelyst API.
 __all__ = ["HelaoYml", "Progress", "HelaoSyncer"]
 
 import os
+import shutil
 import io
 import codecs
 import json
 import asyncio
+from zipfile import ZipFile
 from ruamel.yaml import YAML
 from pathlib import Path
 from datetime import datetime
@@ -984,7 +986,7 @@ class HelaoSyncer:
 
     def list_pending(self, omit_manual_exps: bool = True):
         """Finds and queues ymls form RUNS_FINISHED."""
-        finished_dir = self.base.helaodirs.save_root.replace(
+        finished_dir = str(self.base.helaodirs.save_root).replace(
             "RUNS_ACTIVE", "RUNS_FINISHED"
         )
         pending = glob(os.path.join(finished_dir, "**", "*-seq.yml"), recursive=True)
@@ -1002,16 +1004,78 @@ class HelaoSyncer:
             f"Enqueueing {len(pending)} sequences from RUNS_FINISHED."
         )
         for p in pending:
-            self.enqueue_yml(p)
+            await self.enqueue_yml(p)
         return pending
 
-    async def reset_sync(self, sync_path: str):
-        """Resets a synced sequence zip or partially-synced folder."""
+    def reset_sync(self, sync_path: str):
+        """Resets a synced sequence zip or partially-synced sequence folder."""
+        if not os.path.exists(sync_path):
+            self.base.print_message(f"{sync_path} does not exist.")
+            return False
         if "RUNS_SYNCED" not in sync_path:
             self.base.print_message(
-                f"Cannot reset path not in RUNS_SYNCED: {sync_path}"
+                f"Cannot reset path that's not in RUNS_SYNCED: {sync_path}"
             )
-        pass
+            return False
+        ## if path is a zip
+        if sync_path.endswith(".zip"):
+            zf = ZipFile(sync_path)
+            if any(x.endswith("-seq.prg") for x in zf.namelist()):
+                seqzip_dir = os.path.dirname(sync_path)
+                dest = os.path.join(
+                    seqzip_dir.replace("RUNS_SYNCED", "RUNS_FINISHED"),
+                    os.path.basename(sync_path).replace(".zip", ""),
+                )
+                os.makedirs(dest, exist_ok=True)
+                zf.extractall(dest)
+                zf.close()
+                if not os.path.exists(sync_path.replace(".zip", ".orig")):
+                    shutil.move(sync_path, sync_path.replace(".zip", ".orig"))
+                self.base.print_message(f"Restored zip to {dest}")
+                return True
+            zf.close()
+            self.base.print_message("Zip does not contain a valid sequence.")
+            return False
+
+        ## if path is a directory
+        elif os.path.isdir(sync_path):
+            seq_prgs = glob(os.path.join(sync_path, "**", "*-seq.prg"))
+            if not seq_prgs:
+                self.base.print_message(
+                    f"Did not find any *-seq.prg files in subdirectories of {sync_path}"
+                )
+            else:
+                self.base.print_message(
+                    f"Found {len(seq_prgs)} *-seq.prg files in subdirectories of {sync_path}"
+                )
+                # remove all .prg files
+                for prg in seq_prgs:
+                    seq_dir = os.path.basename(prg)
+                    sub_prgs = glob(os.path.join(seq_dir, "**", "*.prg"))
+                    self.base.print_message(
+                        f"Removing {len(seq_prgs)} prg files in subdirectories of {seq_dir}"
+                    )
+                    for sp in sub_prgs:
+                        os.remove(sp)
+                    # move path back to RUNS_FINISHED
+                    shutil.move(
+                        seq_dir, seq_dir.replace("RUNS_SYNCED", "RUNS_FINISHED")
+                    )
+                    self.base.print_message(f"Successfully reverted {seq_dir}")
+            seq_zips = glob(os.path.join(sync_path, "**", "*.zip"))
+            if not seq_zips:
+                self.base.print_message(
+                    f"Did not find any zip files in subdirectories of {sync_path}"
+                )
+            else:
+                self.base.print_message(
+                    f"Found {len(seq_zips)} zip files in subdirectories of {sync_path}"
+                )
+                for seq_zip in seq_zips:
+                    self.reset_sync(seq_zip)
+            return True
+        self.base.print_message("Arg was not a sequence path or zip.")
+        return False
 
     def shutdown(self):
         pass
