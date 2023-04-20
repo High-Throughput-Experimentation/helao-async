@@ -580,7 +580,7 @@ class Base:
                     f"from {self.ntp_server}",
                 )
             except ntplib.NTPException:
-                self.print_message(f"{self.ntp_server} ntp timeout", error=True)
+                self.print_message(f"{self.ntp_server} ntp timeout", info=True)
                 self.ntp_last_sync = time()
                 self.ntp_offset = 0.0
 
@@ -857,7 +857,7 @@ class Base:
                 # async with lock:
                 ntp_last_sync = ""
                 if self.ntp_last_sync_file is not None:
-                    await asyncio.sleep(randint(1, 5))
+                    await asyncio.sleep(randint(5, 10))
                     async with aiofiles.open(self.ntp_last_sync_file, "r") as f:
                         ntp_last_sync = await f.readline()
                 parts = ntp_last_sync.strip().split(",")
