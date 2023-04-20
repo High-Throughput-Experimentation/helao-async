@@ -89,6 +89,20 @@ def move_to_synced(file_path: Path):
         return False
 
 
+def revert_to_finished(file_path: Path):
+    """Moves item from RUNS_SYNCED to RUNS_FINISHED."""
+    parts = list(file_path.parts)
+    state_index = parts.index("RUNS_SYNCED")
+    parts[state_index] = "RUNS_FINISHED"
+    target_path = Path(*parts)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        file_path.replace(target_path)
+        return target_path
+    except PermissionError:
+        return False
+
+
 class HelaoYml:
     target: Path
     dir: Path
@@ -967,6 +981,37 @@ class HelaoSyncer:
                             )
                             self.base.print_message(f"response: {await resp.json()}")
         return api_success
+
+    def list_pending(self, omit_manual_exps: bool = True):
+        """Finds and queues ymls form RUNS_FINISHED."""
+        finished_dir = self.base.helaodirs.save_root.replace(
+            "RUNS_ACTIVE", "RUNS_FINISHED"
+        )
+        pending = glob(os.path.join(finished_dir, "**", "*-seq.yml"), recursive=True)
+        if omit_manual_exps:
+            pending = [x for x in pending if "manual_orch_seq" not in x]
+        self.base.print_message(
+            f"Found {len(pending)} pending sequences in RUNS_FINISHED."
+        )
+        return pending
+
+    async def finish_pending(self, omit_manual_exps: bool = True):
+        """Finds and queues sequence ymls from RUNS_FINISHED."""
+        pending = self.list_pending(omit_manual_exps)
+        self.base.print_message(
+            f"Enqueueing {len(pending)} sequences from RUNS_FINISHED."
+        )
+        for p in pending:
+            self.enqueue_yml(p)
+        return pending
+
+    async def reset_sync(self, sync_path: str):
+        """Resets a synced sequence zip or partially-synced folder."""
+        if "RUNS_SYNCED" not in sync_path:
+            self.base.print_message(
+                f"Cannot reset path not in RUNS_SYNCED: {sync_path}"
+            )
+        pass
 
     def shutdown(self):
         pass
