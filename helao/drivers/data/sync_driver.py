@@ -1045,23 +1045,35 @@ class HelaoSyncer:
 
         ## if path is a directory
         elif os.path.isdir(sync_path):
-            seq_prgs = [
+            base_prgs = [
                 x
                 for x in glob(
-                    os.path.join(sync_path, "**", "*-seq.pr*"), recursive=True
+                    os.path.join(sync_path, "**", "*-.pr*"), recursive=True
                 )
                 if x.endswith(".progress") or x.endswith(".prg")
             ]
-            if not seq_prgs:
+            seq_prgs = [x for x in base_prgs if "-seq.pr" in x]
+            for x in seq_prgs:
+                base_prgs = [y for y in base_prgs if not x.startswith(os.path.dirname(x))]
+            exp_prgs = [x for x in base_prgs if "-exp.pr" in x]
+            for x in exp_prgs:
+                base_prgs = [y for y in base_prgs if not x.startswith(os.path.dirname(x))]
+            act_prgs = [x for x in base_prgs if "-act.pr" in x]
+            for x in act_prgs:
+                base_prgs = [y for y in base_prgs if not x.startswith(os.path.dirname(x))]
+            
+            base_prgs = act_prgs + exp_prgs + seq_prgs
+            
+            if not base_prgs:
                 self.base.print_message(
-                    f"Did not find any *-seq.prg or *-seq.progress files in subdirectories of {sync_path}"
+                    f"Did not find any .prg or .progress files in subdirectories of {sync_path}"
                 )
             else:
                 self.base.print_message(
-                    f"Found {len(seq_prgs)} *-seq.pr or *-seq.progress files in subdirectories of {sync_path}"
+                    f"Found {len(base_prgs)} .prg or .progress files in subdirectories of {sync_path}"
                 )
                 # remove all .prg files
-                for prg in seq_prgs:
+                for prg in base_prgs:
                     seq_dir = os.path.dirname(prg)
                     sub_prgs = [
                         x
@@ -1071,7 +1083,7 @@ class HelaoSyncer:
                         if x.endswith(".progress") or x.endswith(".prg")
                     ]
                     self.base.print_message(
-                        f"Removing {len(seq_prgs)} prg and progress files in subdirectories of {seq_dir}"
+                        f"Removing {len(base_prgs)} prg and progress files in subdirectories of {seq_dir}"
                     )
                     for sp in sub_prgs:
                         os.remove(sp)
@@ -1080,6 +1092,7 @@ class HelaoSyncer:
                         seq_dir, seq_dir.replace("RUNS_SYNCED", "RUNS_FINISHED")
                     )
                     self.base.print_message(f"Successfully reverted {seq_dir}")
+
             seq_zips = glob(os.path.join(sync_path, "**", "*.zip"), recursive=True)
             if not seq_zips:
                 self.base.print_message(
