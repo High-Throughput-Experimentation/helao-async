@@ -1047,7 +1047,9 @@ class HelaoSyncer:
         elif os.path.isdir(sync_path):
             seq_prgs = [
                 x
-                for x in glob(os.path.join(sync_path, "**", "*-seq.pr*"))
+                for x in glob(
+                    os.path.join(sync_path, "**", "*-seq.pr*"), recursive=True
+                )
                 if x.endswith(".progress") or x.endswith(".prg")
             ]
             if not seq_prgs:
@@ -1063,7 +1065,9 @@ class HelaoSyncer:
                     seq_dir = os.path.basename(prg)
                     sub_prgs = [
                         x
-                        for x in glob(os.path.join(seq_dir, "**", "*.pr*"))
+                        for x in glob(
+                            os.path.join(seq_dir, "**", "*.pr*"), recursive=True
+                        )
                         if x.endswith(".progress") or x.endswith(".prg")
                     ]
                     self.base.print_message(
@@ -1076,7 +1080,7 @@ class HelaoSyncer:
                         seq_dir, seq_dir.replace("RUNS_SYNCED", "RUNS_FINISHED")
                     )
                     self.base.print_message(f"Successfully reverted {seq_dir}")
-            seq_zips = glob(os.path.join(sync_path, "**", "*.zip"))
+            seq_zips = glob(os.path.join(sync_path, "**", "*.zip"), recursive=True)
             if not seq_zips:
                 self.base.print_message(
                     f"Did not find any zip files in subdirectories of {sync_path}"
