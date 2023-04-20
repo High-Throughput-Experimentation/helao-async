@@ -1003,8 +1003,14 @@ class HelaoSyncer:
         self.base.print_message(
             f"Enqueueing {len(pending)} sequences from RUNS_FINISHED."
         )
-        for p in pending:
-            await self.enqueue_yml(p)
+        for pp in pending:
+            if os.path.exists(
+                pp.replace("RUNS_FINISHED", "RUNS_SYNCED").replace(".yml", ".progress")
+            ):
+                self.reset_sync(
+                    os.path.dirname(pp).replace("RUNS_FINISHED", "RUNS_SYNCED")
+                )
+            await self.enqueue_yml(pp)
         return pending
 
     def reset_sync(self, sync_path: str):
@@ -1039,21 +1045,29 @@ class HelaoSyncer:
 
         ## if path is a directory
         elif os.path.isdir(sync_path):
-            seq_prgs = glob(os.path.join(sync_path, "**", "*-seq.prg"))
+            seq_prgs = [
+                x
+                for x in glob(os.path.join(sync_path, "**", "*-seq.pr*"))
+                if x.endswith(".progress") or x.endswith(".prg")
+            ]
             if not seq_prgs:
                 self.base.print_message(
-                    f"Did not find any *-seq.prg files in subdirectories of {sync_path}"
+                    f"Did not find any *-seq.prg or *-seq.progress files in subdirectories of {sync_path}"
                 )
             else:
                 self.base.print_message(
-                    f"Found {len(seq_prgs)} *-seq.prg files in subdirectories of {sync_path}"
+                    f"Found {len(seq_prgs)} *-seq.pr or *-seq.progress files in subdirectories of {sync_path}"
                 )
                 # remove all .prg files
                 for prg in seq_prgs:
                     seq_dir = os.path.basename(prg)
-                    sub_prgs = glob(os.path.join(seq_dir, "**", "*.prg"))
+                    sub_prgs = [
+                        x
+                        for x in glob(os.path.join(seq_dir, "**", "*.pr*"))
+                        if x.endswith(".progress") or x.endswith(".prg")
+                    ]
                     self.base.print_message(
-                        f"Removing {len(seq_prgs)} prg files in subdirectories of {seq_dir}"
+                        f"Removing {len(seq_prgs)} prg and progress files in subdirectories of {seq_dir}"
                     )
                     for sp in sub_prgs:
                         os.remove(sp)
