@@ -1054,13 +1054,13 @@ class HelaoSyncer:
             ]
             seq_prgs = [x for x in base_prgs if "-seq.pr" in x]
             for x in seq_prgs:
-                base_prgs = [y for y in base_prgs if not x.startswith(os.path.dirname(x))]
+                base_prgs = [y for y in base_prgs if not y.startswith(os.path.dirname(x))]
             exp_prgs = [x for x in base_prgs if "-exp.pr" in x]
             for x in exp_prgs:
-                base_prgs = [y for y in base_prgs if not x.startswith(os.path.dirname(x))]
+                base_prgs = [y for y in base_prgs if not y.startswith(os.path.dirname(x))]
             act_prgs = [x for x in base_prgs if "-act.pr" in x]
             for x in act_prgs:
-                base_prgs = [y for y in base_prgs if not x.startswith(os.path.dirname(x))]
+                base_prgs = [y for y in base_prgs if not y.startswith(os.path.dirname(x))]
             
             base_prgs = act_prgs + exp_prgs + seq_prgs
             
