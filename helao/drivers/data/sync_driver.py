@@ -1048,11 +1048,10 @@ class HelaoSyncer:
             base_prgs = [
                 x
                 for x in glob(
-                    os.path.join(sync_path, "**", "*-.pr*"), recursive=True
+                    os.path.join(sync_path, "**", "*-*.pr*"), recursive=True
                 )
                 if x.endswith(".progress") or x.endswith(".prg")
             ]
-            print(base_prgs)
             seq_prgs = [x for x in base_prgs if "-seq.pr" in x]
             for x in seq_prgs:
                 base_prgs = [y for y in base_prgs if not y.startswith(os.path.dirname(x))]
@@ -1079,7 +1078,7 @@ class HelaoSyncer:
                     sub_prgs = [
                         x
                         for x in glob(
-                            os.path.join(base_dir, "**", "*.pr*"), recursive=True
+                            os.path.join(base_dir, "**", "*-*.pr*"), recursive=True
                         )
                         if x.endswith(".progress") or x.endswith(".prg")
                     ]
