@@ -1062,7 +1062,7 @@ class HelaoSyncer:
                 )
                 # remove all .prg files
                 for prg in seq_prgs:
-                    seq_dir = os.path.basename(prg)
+                    seq_dir = os.path.dirname(prg)
                     sub_prgs = [
                         x
                         for x in glob(
