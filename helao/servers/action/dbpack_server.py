@@ -26,19 +26,39 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post("/finish_yml", tags=["private"])
     async def finish_yml(yml_path: str):
-        await app.driver.enqueue_yml(yml_path)
+        """Pushes HELAO data to S3/API and moves files to RUNS_SYNCED."""
+        await app.driver.enqueue_yml(yml_path.strip('"').strip("'"))
         return yml_path
+
+    @app.post("/list_pending", tags=["private"])
+    def list_pending():
+        """Finds sequence ymls in RUNS_FINISHED."""
+        return app.driver.list_pending()
+
+    @app.post("/finish_pending", tags=["private"])
+    async def finish_pending():
+        """Finds and queues sequence ymls from RUNS_FINISHED."""
+        return await app.driver.finish_pending()
+
+    # @app.post("/reset_sync", tags=["private"])
+    # async def reset_sync(sync_path: str):
+    #     """Resets a synced sequence zip or partially-synced folder."""
+    #     await app.driver.reset_sync(sync_path.strip('"').strip("'"))
+    #     return yml_path
 
     @app.post("/running", tags=["private"])
     async def running():
+        """List running sync tasks."""
         return list(app.driver.running_tasks.keys())
 
     @app.post("/list_exceptions", tags=["private"])
     async def list_exceptions():
+        """Get exceptions from running tasks."""
         return {k: d.exception() for k, d in app.driver.running_tasks.items()}
 
     @app.post("/n_queue", tags=["private"])
     async def n_queue():
+        """Get number of enqueued sync tasks."""
         return app.driver.task_queue.qsize()
 
     @app.post("/current_progress", tags=["private"])
