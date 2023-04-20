@@ -41,9 +41,9 @@ def makeApp(confPrefix, server_key, helao_root):
         return await app.driver.finish_pending()
 
     @app.post("/reset_sync", tags=["private"])
-    async def reset_sync(sync_path: str):
+    def reset_sync(sync_path: str):
         """Resets a synced sequence zip or partially-synced folder."""
-        await app.driver.reset_sync(sync_path.strip('"').strip("'"))
+        app.driver.reset_sync(sync_path.strip('"').strip("'"))
         return sync_path
 
     @app.post("/running", tags=["private"])
