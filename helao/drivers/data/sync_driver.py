@@ -1052,6 +1052,7 @@ class HelaoSyncer:
                 )
                 if x.endswith(".progress") or x.endswith(".prg")
             ]
+            print(base_prgs)
             seq_prgs = [x for x in base_prgs if "-seq.pr" in x]
             for x in seq_prgs:
                 base_prgs = [y for y in base_prgs if not y.startswith(os.path.dirname(x))]
@@ -1074,24 +1075,24 @@ class HelaoSyncer:
                 )
                 # remove all .prg files
                 for prg in base_prgs:
-                    seq_dir = os.path.dirname(prg)
+                    base_dir = os.path.dirname(prg)
                     sub_prgs = [
                         x
                         for x in glob(
-                            os.path.join(seq_dir, "**", "*.pr*"), recursive=True
+                            os.path.join(base_dir, "**", "*.pr*"), recursive=True
                         )
                         if x.endswith(".progress") or x.endswith(".prg")
                     ]
                     self.base.print_message(
-                        f"Removing {len(base_prgs)} prg and progress files in subdirectories of {seq_dir}"
+                        f"Removing {len(base_prgs)} prg and progress files in subdirectories of {base_dir}"
                     )
                     for sp in sub_prgs:
                         os.remove(sp)
                     # move path back to RUNS_FINISHED
                     shutil.move(
-                        seq_dir, seq_dir.replace("RUNS_SYNCED", "RUNS_FINISHED")
+                        base_dir, base_dir.replace("RUNS_SYNCED", "RUNS_FINISHED")
                     )
-                    self.base.print_message(f"Successfully reverted {seq_dir}")
+                    self.base.print_message(f"Successfully reverted {base_dir}")
 
             seq_zips = glob(os.path.join(sync_path, "**", "*.zip"), recursive=True)
             if not seq_zips:
