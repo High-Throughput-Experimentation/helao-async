@@ -1,7 +1,7 @@
 __all__ = ["config"]
 
 
-hostip = "127.0.0.1"
+hostip = "adss-01"
 config = {}
 config["dummy"] = False
 config["simulation"] = False
@@ -27,7 +27,7 @@ config["root"] = r"C:\INST_hlo"
 # we define all the servers here so that the overview is a bit better
 config["servers"] = {
     "ORCH": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8001,
         "group": "orchestrator",
         "fast": "async_orch2",
@@ -35,7 +35,7 @@ config["servers"] = {
         "verbose": True,
     },
     "MOTOR": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8003,
         "group": "action",
         "fast": "galil_motion",
@@ -66,7 +66,7 @@ config["servers"] = {
         },
     },
     "PSTAT": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8004,
         "group": "action",
         "fast": "gamry_server",
@@ -78,7 +78,7 @@ config["servers"] = {
         },
     },
     "NI": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8006,
         "group": "action",
         "fast": "nidaqmx_server",
@@ -143,7 +143,7 @@ config["servers"] = {
         },
     },
     "PAL": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8007,
         "group": "action",
         "verbose": True,
@@ -179,7 +179,7 @@ config["servers"] = {
         },
     },
     "VIS": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 5001,
         "group": "visualizer",
         "bokeh": "action_visualizer",
@@ -207,7 +207,7 @@ config["servers"] = {
         "params": {"doc_name": "Sensor Visualizer"},
     },
     "DB": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8010,
         "group": "action",
         "fast": "dbpack_server",
