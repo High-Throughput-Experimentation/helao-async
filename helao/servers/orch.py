@@ -183,9 +183,13 @@ class HelaoOrch(HelaoFastAPI):
             if os.path.exists(save_path):
                 queue_dict = pickle.load(open(save_path, "rb"))
             else:
-                self.orch.print_message("Exported queues.pck does not exist. Cannot restore.")
+                self.orch.print_message(
+                    "Exported queues.pck does not exist. Cannot restore."
+                )
             if self.orch.sequence_dq or self.orch.experiment_dq or self.orch.action_dq:
-                self.orch.print_message("Existing queues are not empty. Cannot restore.")
+                self.orch.print_message(
+                    "Existing queues are not empty. Cannot restore."
+                )
             else:
                 self.orch.print_message("Restoring queues from saved pck.")
                 for x in queue_dict["act"]:
@@ -443,13 +447,13 @@ class Orch(Base):
 
     def __init__(self, fastapp: HelaoOrch):
         super().__init__(fastapp)
-        self.experiment_lib = import_experiments(
+        self.experiment_lib, self.experiment_codehash_lib = import_experiments(
             world_config_dict=self.world_cfg,
             experiment_path=None,
             server_name=self.server.server_name,
             user_experiment_path=self.helaodirs.user_exp,
         )
-        self.sequence_lib = import_sequences(
+        self.sequence_lib, self.sequence_codehash_lib = import_sequences(
             world_config_dict=self.world_cfg,
             sequence_path=None,
             server_name=self.server.server_name,
@@ -663,9 +667,11 @@ class Orch(Base):
         # update GlobalStatusModel with new ActionServerModel
         # and sort the new status dict
         self.register_action_uuid(actionservermodel.last_action_uuid)
-        self.globalstatusmodel.update_global_with_acts(
+        recent_nonactive = self.globalstatusmodel.update_global_with_acts(
             actionservermodel=actionservermodel
         )
+        for act_uuid, act_status in recent_nonactive:
+            await self.put_lbuf({act_uuid: {"status": act_status}})
 
         # check if one action is in estop in the error list:
         estop_uuids = self.globalstatusmodel.find_hlostatus_in_finished(
@@ -713,11 +719,16 @@ class Orch(Base):
         async for _ in self.globstat_q.subscribe():
             await asyncio.sleep(0.001)
 
-    def unpack_sequence(self, sequence_name, sequence_params) -> List[ExperimentModel]:
+    def unpack_sequence(
+        self, sequence_name: str, sequence_params
+    ) -> List[ExperimentModel]:
         if sequence_name in self.sequence_lib:
             return self.sequence_lib[sequence_name](**sequence_params)
         else:
             return []
+
+    def get_sequence_codehash(self, sequence_name: str) -> UUID:
+        return self.sequence_codehash_lib[sequence_name]
 
     async def seq_unpacker(self):
         for i, experimentmodel in enumerate(self.active_sequence.experiment_plan_list):
@@ -738,6 +749,14 @@ class Orch(Base):
             self.active_sequence = self.sequence_dq.popleft()
             self.print_message(
                 f"new active sequence is {self.active_sequence.sequence_name}"
+            )
+            await self.put_lbuf(
+                {
+                    self.active_sequence.sequence_uuid: {
+                        "sequence_name": self.active_sequence.sequence_name,
+                        "status": "active",
+                    }
+                }
             )
             if self.world_cfg.get("dummy", "False"):
                 self.active_sequence.dummy = True
@@ -800,6 +819,14 @@ class Orch(Base):
         self.print_message(
             f"new active experiment is {self.active_experiment.experiment_name}"
         )
+        await self.put_lbuf(
+            {
+                self.active_experiment.experiment_uuid: {
+                    "experiment_name": self.active_experiment.experiment_name,
+                    "status": "active",
+                }
+            }
+        )
         if self.world_cfg.get("dummy", "False"):
             self.active_experiment.dummy = True
         if self.world_cfg.get("simulation", "False"):
@@ -820,6 +847,9 @@ class Orch(Base):
         unpacked_acts = self.experiment_lib[self.active_experiment.experiment_name](
             self.active_experiment
         )
+        self.active_experiment.experiment_codehash = self.experiment_codehash_lib[
+            self.active_experiment.experiment_name
+        ]
         if unpacked_acts is None:
             self.print_message("no actions in experiment", error=True)
             self.action_dq = zdeque([])
@@ -971,6 +1001,9 @@ class Orch(Base):
             self.track_action_uuid(UUID(result_uuid))
             self.print_message(
                 f"Action {A.action_name} dispatched with uuid: {result_uuid}"
+            )
+            await self.put_lbuf(
+                {result_uuid: {"action_name": A.action_name, "status": "active"}}
             )
 
             # this will recursively call the next no_wait action in queue, and return its error
@@ -1577,11 +1610,17 @@ class Orch(Base):
             )
             await self.write_seq(self.active_sequence)
             self.last_sequence = deepcopy(self.active_sequence)
+            await self.put_lbuf(
+                {
+                    self.active_sequence.sequence_uuid: {
+                        "sequence_name": self.active_sequence.sequence_name,
+                        "status": "finished",
+                    }
+                }
+            )
             self.active_sequence = None
             self.active_seq_exp_counter = 0
-
             self.globalstatusmodel.counter_dispatched_actions = {}
-
             # DB server call to finish_yml if DB exists
             self.aloop.create_task(move_dir(self.last_sequence, base=self))
 
@@ -1599,6 +1638,14 @@ class Orch(Base):
                 f"finished exp uuid is: "
                 f"{self.active_experiment.experiment_uuid}, "
                 f"adding matching acts to it"
+            )
+            await self.put_lbuf(
+                {
+                    self.active_experiment.experiment_uuid: {
+                        "experiment_name": self.active_experiment.experiment_name,
+                        "status": "finished",
+                    }
+                }
             )
 
             self.active_experiment.actionmodel_list = []
