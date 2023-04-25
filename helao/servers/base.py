@@ -46,7 +46,7 @@ from helaocore.models.data import DataModel, DataPackageModel
 from helaocore.models.machine import MachineModel
 from helaocore.models.server import ActionServerModel, EndpointModel
 from helaocore.models.action import ActionModel
-from helacore.version import get_filehash
+from helaocore.version import get_filehash
 from helao.helpers.active_params import ActiveParams
 from helaocore.models.file import (
     FileConn,
