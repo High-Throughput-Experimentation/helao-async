@@ -667,9 +667,11 @@ class Orch(Base):
         # update GlobalStatusModel with new ActionServerModel
         # and sort the new status dict
         self.register_action_uuid(actionservermodel.last_action_uuid)
-        self.globalstatusmodel.update_global_with_acts(
+        recent_nonactive = self.globalstatusmodel.update_global_with_acts(
             actionservermodel=actionservermodel
         )
+        for act_uuid, act_status in recent_nonactive:
+            await self.put_lbuf({act_uuid: {"status": act_status}})
 
         # check if one action is in estop in the error list:
         estop_uuids = self.globalstatusmodel.find_hlostatus_in_finished(
@@ -748,6 +750,14 @@ class Orch(Base):
             self.print_message(
                 f"new active sequence is {self.active_sequence.sequence_name}"
             )
+            await self.put_lbuf(
+                {
+                    self.active_sequence.sequence_uuid: {
+                        "sequence_name": self.active_sequence.sequence_name,
+                        "status": "active",
+                    }
+                }
+            )
             if self.world_cfg.get("dummy", "False"):
                 self.active_sequence.dummy = True
             if self.world_cfg.get("simulation", "False"):
@@ -808,6 +818,14 @@ class Orch(Base):
 
         self.print_message(
             f"new active experiment is {self.active_experiment.experiment_name}"
+        )
+        await self.put_lbuf(
+            {
+                self.active_experiment.experiment_uuid: {
+                    "experiment_name": self.active_experiment.experiment_name,
+                    "status": "active",
+                }
+            }
         )
         if self.world_cfg.get("dummy", "False"):
             self.active_experiment.dummy = True
@@ -983,6 +1001,9 @@ class Orch(Base):
             self.track_action_uuid(UUID(result_uuid))
             self.print_message(
                 f"Action {A.action_name} dispatched with uuid: {result_uuid}"
+            )
+            await self.put_lbuf(
+                {result_uuid: {"action_name": A.action_name, "status": "active"}}
             )
 
             # this will recursively call the next no_wait action in queue, and return its error
@@ -1597,6 +1618,15 @@ class Orch(Base):
             # DB server call to finish_yml if DB exists
             self.aloop.create_task(move_dir(self.last_sequence, base=self))
 
+            await self.put_lbuf(
+                {
+                    self.active_sequence.sequence_uuid: {
+                        "sequence_name": self.active_sequence.sequence_name,
+                        "status": "finished",
+                    }
+                }
+            )
+
     async def finish_active_experiment(self):
         # we need to wait for all actions to finish first
         await self.orch_wait_for_all_actions()
@@ -1611,6 +1641,14 @@ class Orch(Base):
                 f"finished exp uuid is: "
                 f"{self.active_experiment.experiment_uuid}, "
                 f"adding matching acts to it"
+            )
+            await self.put_lbuf(
+                {
+                    self.active_experiment.experiment_uuid: {
+                        "experiment_name": self.active_experiment.experiment_name,
+                        "status": "finished",
+                    }
+                }
             )
 
             self.active_experiment.actionmodel_list = []
