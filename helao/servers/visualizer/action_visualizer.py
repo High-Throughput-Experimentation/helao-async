@@ -28,7 +28,6 @@ def find_server_names(vis: Vis, fast_key: str) -> list:
 
 
 def makeBokehApp(doc, confPrefix, server_key, helao_root):
-
     config = config_loader(confPrefix, helao_root)
 
     app = HelaoVis(
@@ -57,10 +56,10 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
     # create visualizer objects for defined instruments
     vis_map = {
         "gamry_server": C_potvis,
+        "spec_server": C_specvis,
         "nidaqmx_server": C_nidaqmxvis,
         "pal_server": C_palvis,
-        "spec_server": C_specvis,
-        }
+    }
     vis_dict = {}
 
     for fkey, viscls in vis_map.items():
