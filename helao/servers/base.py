@@ -473,9 +473,9 @@ class Base:
 
         # name of the caller function
         calname = sys._getframe().f_back.f_back.f_code.co_name
-        self.print_message(f"this code's filename was: {sys._getframe(0)[0]}")
-        self.print_message(f"caller's filename was: {sys._getframe(1)[0]}")
-        self.print_message(f"callercaller's filename was: {sys._getframe(2)[0]}")
+        self.print_message(f"this code's filename was: {sys._getframe(0).f_code.co_filename}")
+        self.print_message(f"caller's filename was: {sys._getframe(1).f_code.co_filename}")
+        self.print_message(f"callercaller's filename was: {sys._getframe(2).f_code.co_filename}")
         # TODO: build calname: urlname dict mapping during init_endpoint_status
         # fastapi url for caller function
         urlname = self.fastapp.url_path_for(calname)
