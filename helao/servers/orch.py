@@ -447,13 +447,13 @@ class Orch(Base):
 
     def __init__(self, fastapp: HelaoOrch):
         super().__init__(fastapp)
-        self.experiment_lib, self.experiment_hash_lib = import_experiments(
+        self.experiment_lib, self.experiment_codehash_lib = import_experiments(
             world_config_dict=self.world_cfg,
             experiment_path=None,
             server_name=self.server.server_name,
             user_experiment_path=self.helaodirs.user_exp,
         )
-        self.sequence_lib, self.sequence_hash_lib = import_sequences(
+        self.sequence_lib, self.sequence_codehash_lib = import_sequences(
             world_config_dict=self.world_cfg,
             sequence_path=None,
             server_name=self.server.server_name,
@@ -725,8 +725,8 @@ class Orch(Base):
         else:
             return []
 
-    def get_sequence_hash(self, sequence_name: str) -> UUID:
-        return self.sequence_hash_lib[sequence_name]
+    def get_sequence_codehash(self, sequence_name: str) -> UUID:
+        return self.sequence_codehash_lib[sequence_name]
 
     async def seq_unpacker(self):
         for i, experimentmodel in enumerate(self.active_sequence.experiment_plan_list):
@@ -829,7 +829,7 @@ class Orch(Base):
         unpacked_acts = self.experiment_lib[self.active_experiment.experiment_name](
             self.active_experiment
         )
-        self.active_experiment.experiment_hash = self.experiment_hash_lib[
+        self.active_experiment.experiment_codehash = self.experiment_codehash_lib[
             self.active_experiment.experiment_name
         ]
         if unpacked_acts is None:

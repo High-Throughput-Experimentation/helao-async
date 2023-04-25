@@ -17,7 +17,7 @@ def import_sequences(
     """Import sequence functions into environment."""
 
     sequence_lib = {}
-    sequence_hash_lib = {}
+    sequence_codehash_lib = {}
 
     def get_seqs(seq_path, seq_file):
         print_message(
@@ -34,7 +34,7 @@ def import_sequences(
         for func in tempd.get("SEQUENCES", []):
             if func in tempd:
                 sequence_lib.update({func: tempd[func]})
-                sequence_hash_lib.update({func: sequence_file_hash})
+                sequence_codehash_lib.update({func: sequence_file_hash})
                 print_message(
                     world_config_dict,
                     server_name,
@@ -84,4 +84,4 @@ def import_sequences(
         server_name,
         f"imported {len(seqlibs)} sequences specified by config.",
     )
-    return sequence_lib, sequence_hash_lib
+    return sequence_lib, sequence_codehash_lib

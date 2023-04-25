@@ -16,7 +16,7 @@ def import_experiments(
     """Import experiment functions into environment."""
 
     experiment_lib = {}
-    experiment_hash_lib = {}
+    experiment_codehash_lib = {}
 
     def get_exps(exp_path, exp_file):
         print_message(
@@ -33,7 +33,7 @@ def import_experiments(
         for func in tempd.get("EXPERIMENTS", []):
             if func in tempd:
                 experiment_lib.update({func: tempd[func]})
-                experiment_hash_lib.update({func: experiment_file_hash})
+                experiment_codehash_lib.update({func: experiment_file_hash})
                 print_message(
                     world_config_dict,
                     server_name,
@@ -83,4 +83,4 @@ def import_experiments(
         server_name,
         f"imported {len(explibs)} experiments specified by config.",
     )
-    return experiment_lib, experiment_hash_lib
+    return experiment_lib, experiment_codehash_lib

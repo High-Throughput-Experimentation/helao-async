@@ -514,7 +514,7 @@ class Base:
             action.orchestrator = MachineModel(
                 server_name="MANUAL", machine_name=gethostname().lower()
             )
-        action.action_hash = get_filehash(sys._getframe(2).f_code.co_filename)
+        action.action_codehash = get_filehash(sys._getframe(2).f_code.co_filename)
         return action
 
     async def setup_action(self) -> Action:
