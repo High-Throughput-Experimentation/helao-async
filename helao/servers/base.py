@@ -118,6 +118,10 @@ class HelaoBase(HelaoFastAPI):
             """
             await self.base.ws_live(websocket)
 
+        @self.post("/get_config", tags=["private"])
+        def get_config():
+            return self.base.world_cfg
+
         @self.post("/get_status", tags=["private"])
         def get_status():
             return self.base.actionservermodel
@@ -145,7 +149,7 @@ class HelaoBase(HelaoFastAPI):
 
         @self.post("/resend_active", tags=["private"])
         def resend_active(action_uuid: str):
-            l10 = [y for x, y in self.last_10_active]
+            l10 = [y for x, y in self.base.last_10_active]
             if l10:
                 return l10[0].action.as_dict()
             else:
