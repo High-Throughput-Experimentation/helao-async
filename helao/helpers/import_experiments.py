@@ -4,6 +4,7 @@ import os
 import time
 from importlib.machinery import SourceFileLoader
 from helao.helpers.print_message import print_message
+from helaocore.version import get_filehash
 
 
 def import_experiments(
@@ -14,16 +15,25 @@ def import_experiments(
 ):
     """Import experiment functions into environment."""
 
+    experiment_lib = {}
+    experiment_hash_lib = {}
+
     def get_exps(exp_path, exp_file):
         print_message(
             world_config_dict,
             server_name,
             f"importing exeriments from '{exp_file}' from '{exp_path}'",
         )
-        tempd = SourceFileLoader(exp_file, os.path.join(exp_path, f"{exp_file}.py")).load_module().__dict__
+        tempd = (
+            SourceFileLoader(exp_file, os.path.join(exp_path, f"{exp_file}.py"))
+            .load_module()
+            .__dict__
+        )
+        experiment_file_hash = get_filehash(os.path.join(exp_path, f"{exp_file}.py"))
         for func in tempd.get("EXPERIMENTS", []):
             if func in tempd:
                 experiment_lib.update({func: tempd[func]})
+                experiment_hash_lib.update({func: experiment_file_hash})
                 print_message(
                     world_config_dict,
                     server_name,
@@ -37,7 +47,6 @@ def import_experiments(
                     error=True,
                 )
 
-    experiment_lib = {}
     if experiment_path is None:
         experiment_path = world_config_dict.get(
             "experiment_path", os.path.join("helao", "experiments")
@@ -56,7 +65,9 @@ def import_experiments(
     # now add all user_exp
     if user_experiment_path is not None:
         userfiles = [
-            os.path.splitext(userfile)[0] for userfile in os.listdir(user_experiment_path) if userfile.endswith(".py")
+            os.path.splitext(userfile)[0]
+            for userfile in os.listdir(user_experiment_path)
+            if userfile.endswith(".py")
         ]
         for userfile in userfiles:
             get_exps(exp_path=user_experiment_path, exp_file=userfile)
@@ -72,4 +83,4 @@ def import_experiments(
         server_name,
         f"imported {len(explibs)} experiments specified by config.",
     )
-    return experiment_lib
+    return experiment_lib, experiment_hash_lib
