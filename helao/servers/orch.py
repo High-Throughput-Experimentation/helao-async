@@ -1610,14 +1610,6 @@ class Orch(Base):
             )
             await self.write_seq(self.active_sequence)
             self.last_sequence = deepcopy(self.active_sequence)
-            self.active_sequence = None
-            self.active_seq_exp_counter = 0
-
-            self.globalstatusmodel.counter_dispatched_actions = {}
-
-            # DB server call to finish_yml if DB exists
-            self.aloop.create_task(move_dir(self.last_sequence, base=self))
-
             await self.put_lbuf(
                 {
                     self.active_sequence.sequence_uuid: {
@@ -1626,6 +1618,11 @@ class Orch(Base):
                     }
                 }
             )
+            self.active_sequence = None
+            self.active_seq_exp_counter = 0
+            self.globalstatusmodel.counter_dispatched_actions = {}
+            # DB server call to finish_yml if DB exists
+            self.aloop.create_task(move_dir(self.last_sequence, base=self))
 
     async def finish_active_experiment(self):
         # we need to wait for all actions to finish first
