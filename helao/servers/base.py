@@ -46,6 +46,7 @@ from helaocore.models.data import DataModel, DataPackageModel
 from helaocore.models.machine import MachineModel
 from helaocore.models.server import ActionServerModel, EndpointModel
 from helaocore.models.action import ActionModel
+from helacore.version import get_filehash
 from helao.helpers.active_params import ActiveParams
 from helaocore.models.file import (
     FileConn,
@@ -473,9 +474,15 @@ class Base:
 
         # name of the caller function
         calname = sys._getframe().f_back.f_back.f_code.co_name
-        self.print_message(f"this code's filename was: {sys._getframe(0).f_code.co_filename}")
-        self.print_message(f"caller's filename was: {sys._getframe(1).f_code.co_filename}")
-        self.print_message(f"callercaller's filename was: {sys._getframe(2).f_code.co_filename}")
+        self.print_message(
+            f"this code's filename was: {sys._getframe(0).f_code.co_filename}"
+        )
+        self.print_message(
+            f"caller's filename was: {sys._getframe(1).f_code.co_filename}"
+        )
+        self.print_message(
+            f"callercaller's filename was: {sys._getframe(2).f_code.co_filename}"
+        )
         # TODO: build calname: urlname dict mapping during init_endpoint_status
         # fastapi url for caller function
         urlname = self.fastapp.url_path_for(calname)
@@ -507,6 +514,7 @@ class Base:
             action.orchestrator = MachineModel(
                 server_name="MANUAL", machine_name=gethostname().lower()
             )
+        action.action_hash = get_filehash(sys._getframe(2).f_code.co_filename)
         return action
 
     async def setup_action(self) -> Action:
@@ -2008,7 +2016,9 @@ class Active:
             return await self.finish()
 
         # shortcut to active exectuors
-        self.base.print_message(f"Registering exec_id: '{executor.exec_id}' with server")
+        self.base.print_message(
+            f"Registering exec_id: '{executor.exec_id}' with server"
+        )
         self.base.executors[executor.exec_id] = self
 
         # action operations
