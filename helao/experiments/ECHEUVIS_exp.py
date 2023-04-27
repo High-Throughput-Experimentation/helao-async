@@ -9,6 +9,8 @@ __all__ = [
     "ECHEUVIS_sub_CP_led",
     "ECHEUVIS_sub_OCV_led",
     "ECHEUVIS_sub_interrupt",
+    "ECHEUVIS_sub_startup",
+    "ECHEUVIS_sub_shutdown",
 ]
 
 
@@ -35,8 +37,25 @@ SPEC_R_server = MM(server_name="SPEC_R", machine_name=gethostname().lower()).as_
 ORCH_server = MM(server_name="ORCH", machine_name=gethostname().lower()).as_dict()
 PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
 CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict()
+CAM_server = MM(server_name="CAM", machine_name=gethostname().lower()).as_dict()
 
 toggle_triggertype = TriggerType.fallingedge
+
+
+def ECHEUVIS_sub_startup(experiment: Experiment):
+    """Unload custom position and enable IR emitter."""
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
+    apm.add(IO_server, "set_digital_out", {"do_item": "ir_emitter", "on": True})
+    return apm.action_list  # returns complete action list to orch
+
+
+def ECHEUVIS_sub_shutdown(experiment: Experiment):
+    """Unload custom position and disable IR emitter."""
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
+    apm.add(IO_server, "set_digital_out", {"do_item": "ir_emitter", "on": False})
+    return apm.action_list  # returns complete action list to orch
 
 
 def ECHEUVIS_sub_CV_led(
@@ -165,6 +184,13 @@ def ECHEUVIS_sub_CV_led(
                 ProcessContrib.samples_out,
             ],
         )
+
+    apm.add(
+        CAM_server,
+        "acquire_image",
+        {"duration": min(CV_duration_sec, 10), "acqusition_rate": 0.5},
+        nonblocking=True,
+    )
 
     # apply potential
     apm.add(
@@ -324,6 +350,14 @@ def ECHEUVIS_sub_CA_led(
         - 0.059 * apm.pars.solution_ph
     )
     print(f"ECHE_sub_CA potential: {potential}")
+
+    apm.add(
+        CAM_server,
+        "acquire_image",
+        {"duration": min(apm.pars.CA_duration_sec, 10), "acqusition_rate": 0.5},
+        nonblocking=True,
+    )
+
     apm.add(
         PSTAT_server,
         "run_CA",
@@ -461,6 +495,13 @@ def ECHEUVIS_sub_CP_led(
                 ProcessContrib.samples_out,
             ],
         )
+
+    apm.add(
+        CAM_server,
+        "acquire_image",
+        {"duration": min(apm.pars.CP_duration_sec, 10), "acqusition_rate": 0.5},
+        nonblocking=True,
+    )
 
     apm.add(
         PSTAT_server,
@@ -612,6 +653,13 @@ def ECHEUVIS_sub_OCV_led(
                 ProcessContrib.samples_out,
             ],
         )
+
+    apm.add(
+        CAM_server,
+        "acquire_image",
+        {"duration": min(apm.pars.OCV_duration_sec, 10), "acqusition_rate": 0.5},
+        nonblocking=True,
+    )
 
     apm.add(
         PSTAT_server,
