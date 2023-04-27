@@ -214,7 +214,6 @@ class CM0134:
         else:
             self.samples_in = samples_in
             self.action = A
-            file_header = self.fw
             dflt_conn_key = self.base.dflt_file_conn_key()
             file_conn_params = FileConnParams(
                 file_conn_key=dflt_conn_key,
@@ -222,7 +221,7 @@ class CM0134:
                     sample.get_global_label() for sample in samples_in
                 ],
                 file_type="o2-sense_helao__file",
-                hloheader=HloHeaderModel(optional=file_header),
+                hloheader=HloHeaderModel(),
             )
             active_params = ActiveParams(
                 action=self.action,
