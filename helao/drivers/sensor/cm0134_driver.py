@@ -1,34 +1,24 @@
-
 __all__ = []
 
-import re
 import time
 import asyncio
-
+import serial
 import minimalmodbus
 
 from helaocore.error import ErrorCodes
-from helao.servers.base import Base, Executor
 from helaocore.models.data import DataModel
 from helaocore.models.file import FileConnParams, HloHeaderModel
 from helaocore.models.sample import SampleInheritance, SampleStatus
 from helaocore.models.hlostatus import HloStatus
+from helao.servers.base import Base, Executor
 from helao.helpers.premodels import Action
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 
 
-""" Notes:
+class CM0134:
+    """Device driver class for the CM0134 oxygen sensor using RS-485 communication."""
 
-Setup polling task to populate base.live_buffer dictionary, record CO2 action will read
-from dictionary.
-
-TODO: send CO2 reading to bokeh visualizer w/o writing data
-
-"""
-
-
-class TR250Z:
     def __init__(self, action_serv: Base):
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
@@ -36,66 +26,10 @@ class TR250Z:
 
         self.bokehapp = None
 
-        # read pump addr and strings from config dict
-        self.com = serial.Serial(
-            port=self.config_dict["port"],
-            baudrate=9600,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            timeout=0.5,
-            xonxoff=False,
-            rtscts=False,
+        self.inst = minimalmodbus.Instrument(
+            self.config_dict.get("device", "COM7"), self.config_dict.get("address", 254)
         )
-
-        # set POLL and flush present buffer until empty
-        self.base.print_message("Setting sensor to polling mode.")
-        self.com.write(b"K 2\r\n")
-        # self.send("K 2")
-        self.send("! 0")
-        self.send("Y")
-        self.send("! 0")
-        self.send("Y")
-        self.send("! 0")
-        self.send("Y")
-
-        # self.com.write(b"K 2\r\n")
-        # self.com.flush()
-        # buf = self.com.read_all()
-        # while not buf == b"":
-        #     buf = self.com.read_all()
-
-        fw_map = [
-            ("scaling_factor", "."),
-            ("init_co2_filtered", "Z"),
-            # ("zero-point_air", "G"),
-            # ("undocumented_t", "t"),
-            # ("undocumented_y", "y"),
-            # ("pressure", "B"),
-            # ("humidity", "H"),
-            # ("zero-point_n2", "U"),
-            # ("pc_compensation", "s"),
-            # ("digital_filter_value", "a"),
-        ]
-        ifw_map = {v: k for k, v in fw_map}
-        self.fw = {}
-        self.base.print_message("Reading scaling factor and initial co2 ppm.")
-        for k, v in fw_map:
-            self.base.print_message(f"checking {k}")
-            resp, aux = self.send(v)
-            if resp:
-                fw_val = resp[0].split()[-1].replace(v, "").strip()
-                if fw_val not in ["?", ""]:
-                    self.fw[k] = int(fw_val)
-            for aresp in aux:
-                cmd = aresp[0]
-                if cmd in ifw_map.keys():
-                    fw_val = aresp.split()[-1].replace(cmd, "").strip()
-                    self.fw[ifw_map[cmd]] = int(fw_val)
-            time.sleep(0.1)
-
-        # set streaming mode before starting async task
-        self.base.print_message("Setting sensor to polling mode.")
-        self.com.write(b"K 2\r\n")
+        self.inst.serial.baudrate = self.config_dict.get("baudrate", 9600)
 
         self.action = None
         self.active = None
@@ -145,7 +79,7 @@ class TR250Z:
                 if self.IO_do_meas:
                     # are we in estop?
                     if not self.base.actionservermodel.estop:
-                        self.base.print_message("CO2-sense got measurement request")
+                        self.base.print_message("O2-sense got measurement request")
                         try:
                             await asyncio.wait_for(
                                 self.continuous_record(),
@@ -156,22 +90,22 @@ class TR250Z:
                         if self.base.actionservermodel.estop:
                             self.IO_do_meas = False
                             self.base.print_message(
-                                "CO2-sense is in estop after measurement.", error=True
+                                "O2-sense is in estop after measurement.", error=True
                             )
                         else:
-                            self.base.print_message("setting CO2-sense to idle")
+                            self.base.print_message("setting O2-sense to idle")
                             # await self.stat.set_idle()
-                        self.base.print_message("CO2 measurement is done")
+                        self.base.print_message("O2 measurement is done")
                     else:
                         self.active.action.action_status.append(HloStatus.estopped)
                         self.IO_do_meas = False
-                        self.base.print_message("CO2-sense is in estop.", error=True)
+                        self.base.print_message("O2-sense is in estop.", error=True)
 
                 # endpoint can return even we got errors
                 self.IO_continue = True
 
                 if self.active:
-                    self.base.print_message("CO2-sense finishes active action")
+                    self.base.print_message("O2-sense finishes active action")
                     active_not_finished = True
                     while active_not_finished:
                         try:
@@ -188,78 +122,21 @@ class TR250Z:
             self.IO_continue = True
             self.base.print_message("IOloop task was cancelled")
 
-    def send(self, command_str: str):
-        if not command_str.endswith("\r\n"):
-            command_str = command_str + "\r\n"
-        self.com.write(command_str.encode("utf8"))
-        self.com.flush()
-        lines = []
-        buf = self.com.read_until(b"\r\n")
-        lines += buf.decode("utf8").split("\n")
-        while buf != b"":
-            buf = self.com.read_until(b"\r\n")
-            lines += buf.decode("utf8").split("\n")
-        cmd_resp = []
-        aux_resp = []
-        for line in lines:
-            strip = line.strip()
-            if strip.startswith(command_str[0]):
-                cmd_resp.append(strip)
-            elif strip:
-                aux_resp.append(strip)
-        if aux_resp:
-            self.base.print_message(
-                f"Received auxiliary responses: {aux_resp}", info=True
-            )
-        # while not cmd_resp:
-        #     repeats = self.send(command_str)
-        #     cmd_resp += repeats[0]
-        #     aux_resp += repeats[1]
-        #     time.sleep(0.1)
-        return cmd_resp, aux_resp
-
-    def read_stream(self):
-        self.com.flush()
-        lines, _ = self.send("Z")
-        for line in lines[::-1]:
-            stripped = line.strip()
-            filts = re.findall("Z\s[0-9]+", stripped)
-            filt = filts[-1].split()[-1] if filts else False
-            if filt:
-                return filt
-        return False
-
-    async def poll_sensor_loop(self, frequency: int = 4, reset_after: int = 5):
+    async def poll_sensor_loop(self, frequency: int = 2):
         waittime = 1.0 / frequency
         self.base.print_message("Starting polling loop")
-        blanks = 0
         while True:
-            if blanks == reset_after:
-                self.base.print_message(
-                    f"Did not receive a co2 message from sensor after {reset_after} checks, resetting polling mode.",
-                    warning=True,
-                )
-                self.com.write(b"K 2\r\n")
-                blanks = 0
             try:
-                co2_level = self.read_stream()
-            except Exception as err:
-                self.base.print_message(f"Could not parse streaming value, got {err}")
+                o2_level = self.inst.read_register(1, functioncode=4) * 10
+            except minimalmodbus.NoResponseError as err:
+                self.base.print_message(f"NoResponseError: Driver polling rate is too fast. {err}")
                 continue
-            if co2_level:
-                msg_dict = {
-                    "co2_ppm": int(co2_level) * self.fw["scaling_factor"],
-                    # "co2_ppm_unflt": int(co2_level_unfilt) * self.fw["scaling_factor"],
-                }
-                if msg_dict["co2_ppm"] > 50 and msg_dict["co2_ppm"] < 1e6:
-                    await self.base.put_lbuf(msg_dict)
-                else:
-                    self.base.print_message(
-                        f"Got unreasonable co2_ppm value {msg_dict['co2_ppm']}"
-                    )
-                blanks = 0
-            else:
-                blanks += 1
+            except serial.SerialException as err:
+                self.base.print_message(f"Device {self.config_dict['device']} is in use. {err}")
+                continue
+            if o2_level:
+                msg_dict = {"o2_ppm": int(o2_level)}
+                await self.base.put_lbuf(msg_dict)
             await asyncio.sleep(waittime)
 
     async def continuous_record(self):
@@ -273,9 +150,9 @@ class TR250Z:
         # first_print = True
         # await asyncio.sleep(0.001)
 
-        if self.com is None:
+        if self.inst is None:
             self.IO_measuring = False
-            return {"co2-measure": "not initialized"}
+            return {"o2-measure": "not initialized"}
 
         else:
             # active object is set so we can set the continue flag
@@ -289,15 +166,11 @@ class TR250Z:
             )
             valid_rate = (now - self.last_rec_time) >= self.recording_rate
             if valid_time and valid_rate:
-                # if 1:
                 co2_ppm, co2_ts = self.base.get_lbuf("co2_ppm")
-                co2_ppm_unflt, co2_ts = self.base.get_lbuf("co2_ppm_unflt")
                 datadict = {
                     "epoch_s": co2_ts,
-                    "co2_ppm": co2_ppm,
-                    "co2_ppm_unflt": co2_ppm_unflt,
+                    "o2_ppm": co2_ppm,
                 }
-                # await self.active.enqueue_data(
                 self.active.enqueue_data_nowait(
                     datamodel=DataModel(
                         data={self.active.action.file_conn_keys[0]: datadict},
@@ -307,7 +180,6 @@ class TR250Z:
                 )
                 self.last_rec_time = now
             await asyncio.sleep(0.001)
-            # await asyncio.sleep(self.recording_rate)
 
         self.base.print_message("polling loop duration complete, finishing")
         if self.IO_measuring:
@@ -318,9 +190,9 @@ class TR250Z:
         else:
             pass
 
-        return {"co2-measure": "done"}
+        return {"o2-measure": "done"}
 
-    async def acquire_co2(self, A: Action):
+    async def acquire_o2(self, A: Action):
         """Perform async acquisition of co2 level for set duration.
 
         Return active dict.
@@ -342,7 +214,6 @@ class TR250Z:
         else:
             self.samples_in = samples_in
             self.action = A
-            # self.base.print_message("Writing initial spec_helao__file", info=True)
             file_header = self.fw
             dflt_conn_key = self.base.dflt_file_conn_key()
             file_conn_params = FileConnParams(
@@ -350,7 +221,7 @@ class TR250Z:
                 sample_global_labels=[
                     sample.get_global_label() for sample in samples_in
                 ],
-                file_type="co2-sense_helao__file",
+                file_type="o2-sense_helao__file",
                 hloheader=HloHeaderModel(optional=file_header),
             )
             active_params = ActiveParams(
@@ -364,9 +235,7 @@ class TR250Z:
 
             self.active.action.samples_in = []
             # now add updated samples to sample_in again
-            await self.active.append_sample(
-                samples=[sample_in for sample_in in self.samples_in], IO="in"
-            )
+            await self.active.append_sample(samples=self.samples_in, IO="in")
 
             self.base.print_message(f"start_time: {self.start_time}")
             self.active.finish_hlo_header(
@@ -397,22 +266,21 @@ class TR250Z:
             self.recording_task.cancel()
         except asyncio.CancelledError:
             self.base.print_message("closed sensor recording loop task")
-        self.com.close()
+        self.inst.serial.close()
 
 
-class CO2MonExec(Executor):
+class O2MonExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.active.base.print_message("CO2MonExec initialized.")
+        self.active.base.print_message("O2MonExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
 
     async def _poll(self):
-        """Read CO2 ppm from live buffer."""
+        """Read O2 ppm from live buffer."""
         live_dict = {}
-        co2_ppm, epoch_s = self.active.base.get_lbuf("co2_ppm")
-        # self.active.base.print_message(f"got from live buffer: {co2_ppm}")
-        live_dict["co2_ppm"] = co2_ppm
+        o2_ppm, epoch_s = self.active.base.get_lbuf("o2_ppm")
+        live_dict["co2_ppm"] = o2_ppm
         live_dict["epoch_s"] = epoch_s
         iter_time = time.time()
         elapsed_time = iter_time - self.start_time
@@ -421,8 +289,7 @@ class CO2MonExec(Executor):
         else:
             status = HloStatus.finished
         await asyncio.sleep(0.001)
-        # self.active.base.print_message(f"sending status: {status}")
-        # self.active.base.print_message(f"sending data: {live_dict}")
+
         return {
             "error": ErrorCodes.none,
             "status": status,
