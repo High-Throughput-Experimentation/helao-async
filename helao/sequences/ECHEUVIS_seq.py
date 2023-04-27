@@ -810,7 +810,7 @@ def ECHEUVIS_multiCA_led(
 
     epm = ExperimentPlanMaker()
 
-    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+    epm.add_experiment("ECHEUVIS_sub_startup", {})
     epm.add_experiment(
         "ECHEUVIS_sub_interrupt",
         {"reason": "Stop flow and prepare for xy motion to ref location."},
@@ -1049,6 +1049,6 @@ def ECHEUVIS_multiCA_led(
             "skip_nspec": calc_skip_nspec,
         },
     )
-    epm.add_experiment("ECHE_sub_shutdown", {})
+    epm.add_experiment("ECHEUVIS_sub_shutdown", {})
 
     return epm.experiment_plan_list  # returns complete experiment list

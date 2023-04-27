@@ -1,7 +1,7 @@
 __all__ = ["config"]
 
 
-hostip = "127.0.0.1"
+hostip = "eche-04"
 config = {}
 config["dummy"] = True
 config["simulation"] = False
@@ -95,7 +95,8 @@ config["servers"] = {
                 "doric_wled": 5,
                 "doric_led2": 5,
                 "doric_led3": 6,
-                "doric_led4": 7,
+                # "doric_led4": 7,
+                "ir_emitter": 7,
             },
         },
     },
