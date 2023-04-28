@@ -82,7 +82,7 @@ class O2MonExec(Executor):
         """Read O2 ppm from live buffer."""
         live_dict = {}
         o2_ppm, epoch_s = self.active.base.get_lbuf("o2_ppm")
-        live_dict["co2_ppm"] = o2_ppm
+        live_dict["o2_ppm"] = o2_ppm
         live_dict["epoch_s"] = epoch_s
         iter_time = time.time()
         elapsed_time = iter_time - self.start_time
