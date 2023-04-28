@@ -189,6 +189,7 @@ def ECHEUVIS_sub_CV_led(
         CAM_server,
         "acquire_image",
         {"duration": min(CV_duration_sec, 10), "acqusition_rate": 0.5},
+        start_condition=ActionStartCondition.no_wait,
         nonblocking=True,
     )
 
@@ -355,6 +356,7 @@ def ECHEUVIS_sub_CA_led(
         CAM_server,
         "acquire_image",
         {"duration": min(apm.pars.CA_duration_sec, 10), "acqusition_rate": 0.5},
+        start_condition=ActionStartCondition.no_wait,
         nonblocking=True,
     )
 
@@ -500,6 +502,7 @@ def ECHEUVIS_sub_CP_led(
         CAM_server,
         "acquire_image",
         {"duration": min(apm.pars.CP_duration_sec, 10), "acqusition_rate": 0.5},
+        start_condition=ActionStartCondition.no_wait,
         nonblocking=True,
     )
 
@@ -658,6 +661,7 @@ def ECHEUVIS_sub_OCV_led(
         CAM_server,
         "acquire_image",
         {"duration": min(apm.pars.OCV_duration_sec, 10), "acqusition_rate": 0.5},
+        start_condition=ActionStartCondition.no_wait,
         nonblocking=True,
     )
 
