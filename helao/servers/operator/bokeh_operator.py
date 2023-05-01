@@ -27,6 +27,7 @@ from bokeh.models.widgets import Paragraph
 from bokeh.models import Select
 from bokeh.models import Button
 from bokeh.models import CheckboxGroup
+from bokeh.models.annotations import Tooltip
 from bokeh.models.widgets import Div
 from bokeh.models.widgets.inputs import TextInput
 from bokeh.plotting import figure, Figure
@@ -42,6 +43,7 @@ class return_sequence_lib(BaseModel):
     doc: str
     args: list
     defaults: list
+    argtypes: list
 
 
 class return_experiment_lib(BaseModel):
@@ -52,6 +54,7 @@ class return_experiment_lib(BaseModel):
     doc: str
     args: list
     defaults: list
+    argtypes: list
 
 
 class Operator:
@@ -580,6 +583,9 @@ class Operator:
             argspec = inspect.getfullargspec(self.sequence_lib[sequence])
             tmpargs = argspec.args
             tmpdefs = argspec.defaults
+            tmptypes = [
+                argspec.annotations.get(k, "unspecified") for k in list(tmpargs)
+            ]
 
             if tmpdefs is None:
                 tmpdefs = []
@@ -596,13 +602,16 @@ class Operator:
                 if len(tmpargs) == len(tmpdefs):
                     tmpargs.pop(idx - j)
                     tmpdefs.pop(idx - j)
+                    tmptypes.pop(idx - j)
                 else:
                     tmpargs.pop(idx - j)
+                    tmptypes.pop(idx - j)
             # use defaults specified in config
             seq_defs = self.orch.world_cfg.get("sequence_params", {})
             tmpdefs = [seq_defs.get(ta, td) for ta, td in zip(tmpargs, tmpdefs)]
             tmpargs = tuple(tmpargs)
             tmpdefs = tuple(tmpdefs)
+            tmptypes = tuple(tmptypes)
 
             for t in tmpdefs:
                 t = json.dumps(t)
@@ -614,6 +623,7 @@ class Operator:
                     doc=tmpdoc,
                     args=tmpargs,
                     defaults=tmpdefs,
+                    argtypes=tmptypes,
                 ).dict()
             )
         for item in self.sequences:
@@ -631,6 +641,9 @@ class Operator:
             argspec = inspect.getfullargspec(self.experiment_lib[experiment])
             tmpargs = argspec.args
             tmpdefs = argspec.defaults
+            tmptypes = [
+                argspec.annotations.get(k, "unspecified") for k in list(tmpargs)
+            ]
             if tmpdefs is None:
                 tmpdefs = []
 
@@ -647,13 +660,16 @@ class Operator:
                 if len(tmpargs) == len(tmpdefs):
                     tmpargs.pop(idx - j)
                     tmpdefs.pop(idx - j)
+                    tmptypes.pop(idx - j)
                 else:
                     tmpargs.pop(idx - j)
+                    tmptypes.pop(idx - j)
             # use defaults specified in config
             exp_defs = self.orch.world_cfg.get("experiment_params", {})
             tmpdefs = [exp_defs.get(ta, td) for ta, td in zip(tmpargs, tmpdefs)]
             tmpargs = tuple(tmpargs)
             tmpdefs = tuple(tmpdefs)
+            tmptypes = tuple(tmptypes)
 
             for t in tmpdefs:
                 t = json.dumps(t)
@@ -665,6 +681,7 @@ class Operator:
                     doc=tmpdoc,
                     args=tmpargs,
                     defaults=tmpdefs,
+                    argtypes=tmptypes,
                 ).dict()
             )
         for item in self.experiments:
@@ -1041,6 +1058,7 @@ class Operator:
     def update_seq_param_layout(self, idx):
         args = self.sequences[idx]["args"]
         defaults = self.sequences[idx]["defaults"]
+        argtypes = self.sequences[idx]["argtypes"]
         self.dynamic_col.children.pop(1)
 
         for _ in range(len(args) - len(defaults)):
@@ -1072,6 +1090,7 @@ class Operator:
             self.seq_param_layout,
             args,
             defaults,
+            argtypes,
         )
 
         if not self.seq_param_input:
@@ -1100,6 +1119,7 @@ class Operator:
     def update_exp_param_layout(self, idx):
         args = self.experiments[idx]["args"]
         defaults = self.experiments[idx]["defaults"]
+        argtypes = self.experiments[idx]["argtypes"]
         self.dynamic_col.children.pop(3)
 
         for _ in range(len(args) - len(defaults)):
@@ -1130,6 +1150,7 @@ class Operator:
             self.exp_param_layout,
             args,
             defaults,
+            argtypes,
         )
 
         if not self.exp_param_input:
@@ -1156,7 +1177,7 @@ class Operator:
         self.refresh_inputs(self.exp_param_input, self.exp_private_input)
 
     def add_dynamic_inputs(
-        self, param_input, private_input, param_layout, args, defaults
+        self, param_input, private_input, param_layout, args, defaults, argtypes
     ):
         item = 0
         for idx in range(len(args)):
@@ -1172,6 +1193,7 @@ class Operator:
                     disabled=True if args[idx].endswith("_version") else False,
                     width=400,
                     height=40,
+                    description=Tooltip(content=argtypes[idx], position="right")
                 )
             )
             param_layout.append(
