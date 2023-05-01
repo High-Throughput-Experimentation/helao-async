@@ -572,7 +572,7 @@ class Operator:
         """Return the current list of sequences."""
         self.sequences = []
         self.vis.print_message(
-            f"found sequences: {[sequence for sequence in self.sequence_lib]}"
+            f"found sequences: {list(self.sequence_lib)}"
         )
         for i, sequence in enumerate(self.sequence_lib):
             tmpdoc = self.sequence_lib[sequence].__doc__
@@ -625,7 +625,7 @@ class Operator:
         """Return the current list of experiments."""
         self.experiments = []
         self.vis.print_message(
-            f"found experiment: {[experiment for experiment in self.experiment_lib]}"
+            f"found experiment: {list(self.experiment_lib)}"
         )
         for i, experiment in enumerate(self.experiment_lib):
             tmpdoc = self.experiment_lib[experiment].__doc__
@@ -940,12 +940,12 @@ class Operator:
             os.makedirs(os.path.dirname(param_file_path), exist_ok=True)
             pdict = {"seq": {}, "exp": {}}
         else:
-            pdict = json.load(open(param_file_path))
+            pdict = json.load(param_file_path)
         if (ptype == "seq" and self.save_last_seq_pars.active == [0]) or (
             ptype == "exp" and self.save_last_exp_pars.active == [0]
         ):
             pdict[ptype].update({name: pars})
-            json.dump(pdict, open(param_file_path, "w"))
+            json.dump(pdict, param_file_path)
 
     def read_params(self, ptype: str, name: str):
         param_file_path = os.path.join(
