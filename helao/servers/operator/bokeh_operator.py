@@ -940,12 +940,14 @@ class Operator:
             os.makedirs(os.path.dirname(param_file_path), exist_ok=True)
             pdict = {"seq": {}, "exp": {}}
         else:
-            pdict = json.load(param_file_path)
+            with open(param_file_path, 'r', encoding='utf8') as f:
+                pdict = json.load(f)
         if (ptype == "seq" and self.save_last_seq_pars.active == [0]) or (
             ptype == "exp" and self.save_last_exp_pars.active == [0]
         ):
             pdict[ptype].update({name: pars})
-            json.dump(pdict, param_file_path)
+            with open(param_file_path, "r", encoding="utf8") as f:
+                json.dump(pdict, f)
 
     def read_params(self, ptype: str, name: str):
         param_file_path = os.path.join(
@@ -955,7 +957,8 @@ class Operator:
             os.makedirs(os.path.dirname(param_file_path), exist_ok=True)
             pdict = {"seq": {}, "exp": {}}
         else:
-            pdict = json.load(open(param_file_path))
+            with open(param_file_path, 'r', encoding='utf8') as f:
+                pdict = json.load(f)
         return pdict.get(ptype, {}).get(name, {})
 
     def populate_sequence(self):
