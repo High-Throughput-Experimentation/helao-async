@@ -27,7 +27,6 @@ from bokeh.models.widgets import Paragraph
 from bokeh.models import Select
 from bokeh.models import Button
 from bokeh.models import CheckboxGroup
-from bokeh.models.annotations import Tooltip
 from bokeh.models.widgets import Div
 from bokeh.models.widgets.inputs import TextInput
 from bokeh.plotting import figure, Figure
@@ -1193,7 +1192,7 @@ class Operator:
                     disabled=True if args[idx].endswith("_version") else False,
                     width=400,
                     height=40,
-                    description=Tooltip(content=argtypes[idx], position="right")
+                    description=argtypes[idx]
                 )
             )
             param_layout.append(
