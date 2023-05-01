@@ -21,17 +21,17 @@ from uuid import UUID
 import json
 import traceback
 
-import aiohttp
-import colorama
 import time
 import os
 import pickle
-from fastapi import WebSocket, Body
 from functools import partial
 from collections import defaultdict
 
+import aiohttp
+import colorama
+from fastapi import WebSocket, Body
 from bokeh.server.server import Server
-from helao.servers.operator.bokeh_operator import Operator
+
 from helaocore.models.action_start_condition import ActionStartCondition
 from helaocore.models.sequence import SequenceModel
 from helaocore.models.experiment import ExperimentModel
@@ -41,7 +41,7 @@ from helaocore.models.server import ActionServerModel, GlobalStatusModel
 from helaocore.models.orchstatus import OrchStatus
 from helaocore.error import ErrorCodes
 
-
+from helao.servers.operator.bokeh_operator import Operator
 from helao.helpers.server_api import HelaoFastAPI
 from helao.servers.vis import HelaoVis
 from helao.helpers.import_experiments import import_experiments
@@ -171,21 +171,33 @@ class HelaoOrch(HelaoFastAPI):
                 "seq": list(self.orch.sequence_dq),
                 "exp": list(self.orch.experiment_dq),
                 "act": list(self.orch.action_dq),
+                "active_exp": self.orch.active_experiment,
+                "last_exp": self.orch.last_experiment,
+                "active_seq": self.orch.active_sequence,
+                "last_seq": self.orch.last_sequence,
+                "active_counter": self.orch.active_seq_exp_counter,
+                "last_act": self.orch.last_action_uuid,
+                "last_dispatched_act": self.orch.last_dispatched_action_uuid,
+                "last_50_act_uuids": self.orch.last_50_action_uuids,
             }
-            save_path = os.path.join(save_dir, "queues.pck")
+            save_path = os.path.join(save_dir, "STATES", "queues.pck")
             pickle.dump(queue_dict, open(save_path, "wb"))
             return save_path
 
         @self.post("/import_queues", tags=["private"])
         def import_queues():
             save_dir = self.orch.world_cfg["root"]
-            save_path = os.path.join(save_dir, "queues.pck")
+            save_path = os.path.join(save_dir, "STATES", "queues.pck")
             if os.path.exists(save_path):
                 queue_dict = pickle.load(open(save_path, "rb"))
             else:
-                self.orch.print_message("Exported queues.pck does not exist. Cannot restore.")
+                self.orch.print_message(
+                    "Exported queues.pck does not exist. Cannot restore."
+                )
             if self.orch.sequence_dq or self.orch.experiment_dq or self.orch.action_dq:
-                self.orch.print_message("Existing queues are not empty. Cannot restore.")
+                self.orch.print_message(
+                    "Existing queues are not empty. Cannot restore."
+                )
             else:
                 self.orch.print_message("Restoring queues from saved pck.")
                 for x in queue_dict["act"]:
@@ -194,6 +206,16 @@ class HelaoOrch(HelaoFastAPI):
                     self.orch.experiment_dq.append(x)
                 for x in queue_dict["seq"]:
                     self.orch.sequence_dq.append(x)
+                self.orch.active_experiment = queue_dict["active_exp"]
+                self.orch.last_experiment = queue_dict["last_exp"]
+                self.orch.active_sequence = queue_dict["active_seq"]
+                self.orch.last_sequence = queue_dict["last_seq"]
+                self.orch.active_seq_exp_counter = queue_dict["active_counter"]
+                self.orch.last_action_uuid = queue_dict["last_act"]
+                self.orch.last_dispatched_action_uuid = queue_dict[
+                    "last_dispatched_act"
+                ]
+                self.orch.last_50_action_uuids = queue_dict["last_50_act_uuids"]
             return save_path
 
         @self.post("/update_status", tags=["private"])
