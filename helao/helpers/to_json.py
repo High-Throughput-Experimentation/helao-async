@@ -5,9 +5,10 @@ import json
 
 def fix_numerics(val):
     if isinstance(val, str):
-        stripped = val.lower().strip()
-        if stripped in ('True', 'False'):
+        stripped = val.strip()
+        if stripped in ['True', 'False']:
             return eval(stripped)
+        stripped = stripped.lower()
         cleaned = stripped.lstrip('-').replace('.', '', 1).replace('e-', '', 1).replace('e', '', 1)
         if cleaned.isdigit():
             retval = float(stripped)
