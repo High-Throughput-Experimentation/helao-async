@@ -1192,7 +1192,6 @@ class Operator:
                     disabled=True if args[idx].endswith("_version") else False,
                     width=400,
                     height=40,
-                    description=argtypes[idx]
                 )
             )
             param_layout.append(
