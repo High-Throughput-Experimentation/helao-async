@@ -10,7 +10,7 @@ import inspect
 from pydantic import BaseModel
 import numpy as np
 from functools import partial
-from helao.helpers.to_json import to_json
+from helao.helpers.to_json import parse_bokeh_input
 from helao.helpers.unpack_samples import unpack_samples_helper
 from helao.servers.vis import Vis
 from helao.helpers.legacy_api import HTELegacyAPI
@@ -963,7 +963,7 @@ class Operator:
         self.vis.print_message(f"selected sequence from list: {selected_sequence}")
 
         sequence_params = {
-            paraminput.title: to_json(paraminput.value)
+            paraminput.title: parse_bokeh_input(paraminput.value)
             for paraminput in self.seq_param_input
         }
         self.write_params("seq", selected_sequence, sequence_params)
@@ -990,7 +990,7 @@ class Operator:
         selected_experiment = self.experiment_dropdown.value
         self.vis.print_message(f"selected experiment from list: {selected_experiment}")
         experiment_params = {
-            paraminput.title: to_json(paraminput.value)
+            paraminput.title: parse_bokeh_input(paraminput.value)
             for paraminput in self.exp_param_input
         }
         self.write_params("exp", selected_experiment, experiment_params)
