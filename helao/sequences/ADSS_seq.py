@@ -897,31 +897,34 @@ def ADSS_CA_NiSb_cell_1potential(
 
         epm.add_experiment("ADSS_sub_unloadall_customs",{})
 
-        # if clean:
+        print(f"clean value is: {clean}")
+        if clean:
 
-        #     epm.add_experiment(
-        #         "ADSS_sub_move_to_clean_cell",
-        #         {}
-        #     )
+            epm.add_experiment(
+                "ADSS_sub_move_to_clean_cell",
+                {}
+            )
 
-        #     epm.add_experiment(
-        #         "ADSS_sub_clean_cell",
-        #         {
-        #             "Clean_volume_ul": clean_volume_ul,
-        #             "Syringe_rate_ulsec": Syringe_rate_ulsec,
-        #             "ReturnLineWait_s": ReturnLineWait_s,
-        #             "DrainWait_s": Cell_draintime_s,
-        #             "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-        #             "ResidualWait_s": ResidualWait_s,
-        #     }
-        #     )
-        # if refill:
-        #     water_refill_volume = refill_volume_ul / 42 * 5
-        #     epm.add_experiment("ADSS_sub_refill_syringes", {
-        #         "Waterclean_volume_ul": water_refill_volume ,
-        #         "Solution_volume_ul": refill_volume_ul,
-        #         "Syringe_rate_ulsec": 300,
-        #     })
+            epm.add_experiment(
+                "ADSS_sub_clean_cell",
+                {
+                    "Clean_volume_ul": clean_volume_ul,
+                    "Syringe_rate_ulsec": Syringe_rate_ulsec,
+                    "ReturnLineWait_s": ReturnLineWait_s,
+                    "DrainWait_s": Cell_draintime_s,
+                    "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+                    "ResidualWait_s": ResidualWait_s,
+            }
+            )
+
+        print(f"refill value is: {refill}")
+        if refill:
+            water_refill_volume = refill_volume_ul / 42 * 5
+            epm.add_experiment("ADSS_sub_refill_syringes", {
+                "Waterclean_volume_ul": water_refill_volume ,
+                "Solution_volume_ul": refill_volume_ul,
+                "Syringe_rate_ulsec": 300,
+            })
 
 #    epm.add_experiment("ADSS_sub_tray_unload",{})
 
