@@ -215,5 +215,6 @@ config["servers"] = {
             "api_host": "caltech-api.modelyst.com",
             "testing": False,
         },
+        "verbose": True,
     },
 }
