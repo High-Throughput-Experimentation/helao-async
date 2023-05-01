@@ -897,7 +897,7 @@ def ADSS_CA_NiSb_cell_1potential(
 
         epm.add_experiment("ADSS_sub_unloadall_customs",{})
 
-        print(f"clean value is: {clean}")
+        print(f"clean value is: {clean} with type {type(clean)}")
         if clean:
 
             epm.add_experiment(
@@ -917,7 +917,7 @@ def ADSS_CA_NiSb_cell_1potential(
             }
             )
 
-        print(f"refill value is: {refill}")
+        print(f"refill value is: {refill} with type {type(refill)}")
         if refill:
             water_refill_volume = refill_volume_ul / 42 * 5
             epm.add_experiment("ADSS_sub_refill_syringes", {
