@@ -1,4 +1,4 @@
-hostip = "127.0.0.1"
+hostip = "anec-03"
 config = {}
 config["dummy"] = False
 config["simulation"] = False
@@ -21,14 +21,14 @@ config["root"] = r"C:\INST_hlo"
 # we define all the servers here so that the overview is a bit better
 config["servers"] = {
     "ORCH": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8001,
         "group": "orchestrator",
         "fast": "async_orch2",
         "params": {"enable_op": True, "bokeh_port": 5002},
     },
     "MOTOR": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8003,
         "group": "action",
         "fast": "galil_motion",
@@ -51,14 +51,14 @@ config["servers"] = {
         },
     },
     "PSTAT": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8004,
         "group": "action",
         "fast": "gamry_server",
         "params": {"dev_id": 0, "filterfreq_hz": 1000.0, "grounded": True},
     },
     "IO": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8005,
         "group": "action",
         "fast": "galil_io",
@@ -71,7 +71,7 @@ config["servers"] = {
         },
     },
     "NI": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8006,
         "group": "action",
         "fast": "nidaqmx_server",
@@ -95,7 +95,7 @@ config["servers"] = {
         },
     },
     "PAL": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8007,
         "group": "action",
         "fast": "pal_server",
@@ -130,14 +130,14 @@ config["servers"] = {
         },
     },
     "VIS": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 5001,
         "group": "visualizer",
         "bokeh": "action_visualizer",
         "params": {"doc_name": "ANEC Visualizer"},
     },
     "DB": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8010,
         "group": "action",
         "fast": "dbpack_server",

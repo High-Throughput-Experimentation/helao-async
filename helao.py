@@ -102,19 +102,19 @@ class Pidd:
         helaoPids = self.list_pids()
         # print_message({}, "launcher", helaoPids)
         running = [tup for tup in helaoPids if psutil.pid_exists(tup[3])]
-        active = []
-        for tup in running:
-            pid = tup[3]
-            port = tup[2]
-            host = tup[1]
-            proc = psutil.Process(pid)
-            if proc.name() in self.PROC_NAMES:
-                connections = [
-                    c for c in proc.connections("tcp4") if c.status == "LISTEN"
-                ]
-                if (host, port) in [(c.laddr.ip, c.laddr.port) for c in connections]:
-                    active.append(tup)
-        return active
+        # active = []
+        # for tup in running:
+        #     pid = tup[3]
+        #     port = tup[2]
+        #     host = tup[1]
+        #     proc = psutil.Process(pid)
+        #     if proc.name() in self.PROC_NAMES:
+        #         connections = [
+        #             c for c in proc.connections("tcp4") if c.status == "LISTEN"
+        #         ]
+        #         if (host, port) in [(c.laddr.ip, c.laddr.port) for c in connections]:
+        #             active.append(tup)
+        return running
 
     def find_bokeh(self, host, port):
         pyPids = {

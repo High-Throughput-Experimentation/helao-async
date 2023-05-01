@@ -1,11 +1,14 @@
-__all__ = ["to_json"]
+__all__ = ["parse_bokeh_input"]
 
 import json
 
 
 def fix_numerics(val):
     if isinstance(val, str):
-        stripped = val.lower().strip()
+        stripped = val.strip()
+        if stripped in ['True', 'False']:
+            return eval(stripped)
+        stripped = stripped.lower()
         cleaned = stripped.lstrip('-').replace('.', '', 1).replace('e-', '', 1).replace('e', '', 1)
         if cleaned.isdigit():
             retval = float(stripped)
@@ -19,7 +22,7 @@ def fix_numerics(val):
     return val
 
 
-def to_json(v):
+def parse_bokeh_input(v):
     try:
         val = json.loads(v.replace("'", '"'))
     except ValueError:

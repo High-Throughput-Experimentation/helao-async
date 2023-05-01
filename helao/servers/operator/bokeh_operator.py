@@ -10,7 +10,7 @@ import inspect
 from pydantic import BaseModel
 import numpy as np
 from functools import partial
-from helao.helpers.to_json import to_json
+from helao.helpers.to_json import parse_bokeh_input
 from helao.helpers.unpack_samples import unpack_samples_helper
 from helao.servers.vis import Vis
 from helao.helpers.legacy_api import HTELegacyAPI
@@ -42,6 +42,7 @@ class return_sequence_lib(BaseModel):
     doc: str
     args: list
     defaults: list
+    argtypes: list
 
 
 class return_experiment_lib(BaseModel):
@@ -52,6 +53,7 @@ class return_experiment_lib(BaseModel):
     doc: str
     args: list
     defaults: list
+    argtypes: list
 
 
 class Operator:
@@ -571,9 +573,7 @@ class Operator:
     def get_sequence_lib(self):
         """Return the current list of sequences."""
         self.sequences = []
-        self.vis.print_message(
-            f"found sequences: {[sequence for sequence in self.sequence_lib]}"
-        )
+        self.vis.print_message(f"found sequences: {list(self.sequence_lib)}")
         for i, sequence in enumerate(self.sequence_lib):
             tmpdoc = self.sequence_lib[sequence].__doc__
             if tmpdoc is None:
@@ -582,6 +582,9 @@ class Operator:
             argspec = inspect.getfullargspec(self.sequence_lib[sequence])
             tmpargs = argspec.args
             tmpdefs = argspec.defaults
+            tmptypes = [
+                argspec.annotations.get(k, "unspecified") for k in list(tmpargs)
+            ]
 
             if tmpdefs is None:
                 tmpdefs = []
@@ -598,13 +601,16 @@ class Operator:
                 if len(tmpargs) == len(tmpdefs):
                     tmpargs.pop(idx - j)
                     tmpdefs.pop(idx - j)
+                    tmptypes.pop(idx - j)
                 else:
                     tmpargs.pop(idx - j)
+                    tmptypes.pop(idx - j)
             # use defaults specified in config
             seq_defs = self.orch.world_cfg.get("sequence_params", {})
             tmpdefs = [seq_defs.get(ta, td) for ta, td in zip(tmpargs, tmpdefs)]
             tmpargs = tuple(tmpargs)
             tmpdefs = tuple(tmpdefs)
+            tmptypes = tuple(tmptypes)
 
             for t in tmpdefs:
                 t = json.dumps(t)
@@ -616,6 +622,7 @@ class Operator:
                     doc=tmpdoc,
                     args=tmpargs,
                     defaults=tmpdefs,
+                    argtypes=tmptypes,
                 ).dict()
             )
         for item in self.sequences:
@@ -624,9 +631,7 @@ class Operator:
     def get_experiment_lib(self):
         """Return the current list of experiments."""
         self.experiments = []
-        self.vis.print_message(
-            f"found experiment: {[experiment for experiment in self.experiment_lib]}"
-        )
+        self.vis.print_message(f"found experiment: {list(self.experiment_lib)}")
         for i, experiment in enumerate(self.experiment_lib):
             tmpdoc = self.experiment_lib[experiment].__doc__
             if tmpdoc is None:
@@ -635,6 +640,9 @@ class Operator:
             argspec = inspect.getfullargspec(self.experiment_lib[experiment])
             tmpargs = argspec.args
             tmpdefs = argspec.defaults
+            tmptypes = [
+                argspec.annotations.get(k, "unspecified") for k in list(tmpargs)
+            ]
             if tmpdefs is None:
                 tmpdefs = []
 
@@ -651,13 +659,16 @@ class Operator:
                 if len(tmpargs) == len(tmpdefs):
                     tmpargs.pop(idx - j)
                     tmpdefs.pop(idx - j)
+                    tmptypes.pop(idx - j)
                 else:
                     tmpargs.pop(idx - j)
+                    tmptypes.pop(idx - j)
             # use defaults specified in config
             exp_defs = self.orch.world_cfg.get("experiment_params", {})
             tmpdefs = [exp_defs.get(ta, td) for ta, td in zip(tmpargs, tmpdefs)]
             tmpargs = tuple(tmpargs)
             tmpdefs = tuple(tmpdefs)
+            tmptypes = tuple(tmptypes)
 
             for t in tmpdefs:
                 t = json.dumps(t)
@@ -669,6 +680,7 @@ class Operator:
                     doc=tmpdoc,
                     args=tmpargs,
                     defaults=tmpdefs,
+                    argtypes=tmptypes,
                 ).dict()
             )
         for item in self.experiments:
@@ -940,12 +952,14 @@ class Operator:
             os.makedirs(os.path.dirname(param_file_path), exist_ok=True)
             pdict = {"seq": {}, "exp": {}}
         else:
-            pdict = json.load(open(param_file_path))
+            with open(param_file_path, "r", encoding="utf8") as f:
+                pdict = json.load(f)
         if (ptype == "seq" and self.save_last_seq_pars.active == [0]) or (
             ptype == "exp" and self.save_last_exp_pars.active == [0]
         ):
             pdict[ptype].update({name: pars})
-            json.dump(pdict, open(param_file_path, "w"))
+            with open(param_file_path, "w", encoding="utf8") as f:
+                json.dump(pdict, f)
 
     def read_params(self, ptype: str, name: str):
         param_file_path = os.path.join(
@@ -955,7 +969,8 @@ class Operator:
             os.makedirs(os.path.dirname(param_file_path), exist_ok=True)
             pdict = {"seq": {}, "exp": {}}
         else:
-            pdict = json.load(open(param_file_path))
+            with open(param_file_path, "r", encoding="utf8") as f:
+                pdict = json.load(f)
         return pdict.get(ptype, {}).get(name, {})
 
     def populate_sequence(self):
@@ -963,9 +978,14 @@ class Operator:
         self.vis.print_message(f"selected sequence from list: {selected_sequence}")
 
         sequence_params = {
-            paraminput.title: to_json(paraminput.value)
+            paraminput.title: parse_bokeh_input(paraminput.value)
             for paraminput in self.seq_param_input
         }
+        for k, v in sequence_params.items():
+            self.vis.print_message(
+                f"added sequence param '{k}' with value {v} and type {type(v)} "
+            )
+
         self.write_params("seq", selected_sequence, sequence_params)
         expplan_list = self.orch.unpack_sequence(
             sequence_name=selected_sequence, sequence_params=sequence_params
@@ -991,9 +1011,13 @@ class Operator:
         selected_experiment = self.experiment_dropdown.value
         self.vis.print_message(f"selected experiment from list: {selected_experiment}")
         experiment_params = {
-            paraminput.title: to_json(paraminput.value)
+            paraminput.title: parse_bokeh_input(paraminput.value)
             for paraminput in self.exp_param_input
         }
+        for k, v in experiment_params.items():
+            self.vis.print_message(
+                f"added experiment param '{k}' with value {v} and type {type(v)} "
+            )
         self.write_params("exp", selected_experiment, experiment_params)
         experimentmodel = ExperimentModel(
             experiment_name=selected_experiment, experiment_params=experiment_params
@@ -1034,6 +1058,7 @@ class Operator:
     def update_seq_param_layout(self, idx):
         args = self.sequences[idx]["args"]
         defaults = self.sequences[idx]["defaults"]
+        argtypes = self.sequences[idx]["argtypes"]
         self.dynamic_col.children.pop(1)
 
         for _ in range(len(args) - len(defaults)):
@@ -1065,6 +1090,7 @@ class Operator:
             self.seq_param_layout,
             args,
             defaults,
+            argtypes,
         )
 
         if not self.seq_param_input:
@@ -1093,6 +1119,7 @@ class Operator:
     def update_exp_param_layout(self, idx):
         args = self.experiments[idx]["args"]
         defaults = self.experiments[idx]["defaults"]
+        argtypes = self.experiments[idx]["argtypes"]
         self.dynamic_col.children.pop(3)
 
         for _ in range(len(args) - len(defaults)):
@@ -1123,6 +1150,7 @@ class Operator:
             self.exp_param_layout,
             args,
             defaults,
+            argtypes,
         )
 
         if not self.exp_param_input:
@@ -1149,7 +1177,7 @@ class Operator:
         self.refresh_inputs(self.exp_param_input, self.exp_private_input)
 
     def add_dynamic_inputs(
-        self, param_input, private_input, param_layout, args, defaults
+        self, param_input, private_input, param_layout, args, defaults, argtypes
     ):
         item = 0
         for idx in range(len(args)):

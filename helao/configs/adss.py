@@ -1,7 +1,7 @@
 __all__ = ["config"]
 
 
-hostip = "127.0.0.1"
+hostip = "adss-01"
 config = {}
 config["dummy"] = False
 config["simulation"] = False
@@ -27,7 +27,7 @@ config["root"] = r"C:\INST_hlo"
 # we define all the servers here so that the overview is a bit better
 config["servers"] = {
     "ORCH": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8001,
         "group": "orchestrator",
         "fast": "async_orch2",
@@ -35,7 +35,7 @@ config["servers"] = {
         "verbose": True,
     },
     "MOTOR": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8003,
         "group": "action",
         "fast": "galil_motion",
@@ -66,7 +66,7 @@ config["servers"] = {
         },
     },
     "PSTAT": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8004,
         "group": "action",
         "fast": "gamry_server",
@@ -78,7 +78,7 @@ config["servers"] = {
         },
     },
     "NI": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8006,
         "group": "action",
         "fast": "nidaqmx_server",
@@ -114,10 +114,10 @@ config["servers"] = {
                 "Ttemp_Ktc_out_cell_C": "PXI-6289/ai1",
                 "Ttemp_Ktc_out_reservoir_C": "PXI-6289/ai2",
             },
-            "dev_heat": {
-                "cellheater": "PXI-6289/port0/line0",
-                "res_heater": "PXI-6289/port0/line4",
-            },
+            # "dev_heat": {
+            #     "cellheater": "PXI-6289/port0/line0",
+            #     "res_heater": "PXI-6289/port0/line4",
+            # },
             "dev_gasvalve": {
                 "V1": "PXI-6284/port1/line2", #1-6 white ground
                 "V2": "PXI-6284/port1/line3", #7-9 grey ground
@@ -137,10 +137,13 @@ config["servers"] = {
                 "done": "PXI-6284/port2/line4",
                 "error": "PXI-6284/port2/line6",
             },
+            "dev_led":{
+                "led": "PXI-6289/port0/line0"
+            }
         },
     },
     "PAL": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8007,
         "group": "action",
         "verbose": True,
@@ -176,7 +179,7 @@ config["servers"] = {
         },
     },
     "VIS": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 5001,
         "group": "visualizer",
         "bokeh": "action_visualizer",
@@ -204,7 +207,7 @@ config["servers"] = {
         "params": {"doc_name": "Sensor Visualizer"},
     },
     "DB": {
-        "host": "127.0.0.1",
+        "host": hostip,
         "port": 8010,
         "group": "action",
         "fast": "dbpack_server",
