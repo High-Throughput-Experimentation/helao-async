@@ -965,6 +965,11 @@ class Operator:
             paraminput.title: parse_bokeh_input(paraminput.value)
             for paraminput in self.seq_param_input
         }
+        for k, v in sequence_params.items():
+            self.vis.print_message(
+                f"added sequence param '{k}' with value {v} and type {type(v)} "
+            )
+
         self.write_params("seq", selected_sequence, sequence_params)
         expplan_list = self.orch.unpack_sequence(
             sequence_name=selected_sequence, sequence_params=sequence_params
@@ -992,6 +997,10 @@ class Operator:
             paraminput.title: parse_bokeh_input(paraminput.value)
             for paraminput in self.exp_param_input
         }
+        for k, v in experiment_params.items():
+            self.vis.print_message(
+                f"added experiment param '{k}' with value {v} and type {type(v)} "
+            )
         self.write_params("exp", selected_experiment, experiment_params)
         experimentmodel = ExperimentModel(
             experiment_name=selected_experiment, experiment_params=experiment_params
