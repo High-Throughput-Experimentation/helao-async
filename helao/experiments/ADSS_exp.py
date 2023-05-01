@@ -34,6 +34,8 @@ __all__ = [
     "ADSS_sub_recirculate",
     "ADSS_sub_abs_move",
     "ADSS_sub_cell_illumination",
+    "ADSS_sub_CA_photo",
+    "ADSS_sub_OCV_photo",
 ]
 
 
@@ -693,6 +695,145 @@ def ADSS_sub_CA(
 
     return apm.action_list  # returns complete action list to orch
 
+def ADSS_sub_CA_photo(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    CA_potential: Optional[float] = 0.0,
+    ph: Optional[float] = 9.53,
+    potential_versus: Optional[str] = "rhe",
+    ref_type: Optional[str] = "inhouse",
+    ref_offset__V: Optional[float] = 0.0,
+    gamry_i_range: Optional[str] = "auto",
+    samplerate_sec: Optional[float] = 0.05,
+    CA_duration_sec: Optional[float] = 1800,
+    led_wavelength: str = "385",
+    aliquot_volume_ul: Optional[int] = 200,
+    aliquot_times_sec: Optional[List[float]] = [],
+    aliquot_insitu: Optional[bool] = True,
+    PAL_Injector: Optional[str] = "LS 4",
+    PAL_Injector_id: Optional[str] = "fill serial number here"
+):
+    """Primary CA experiment with optional PAL sampling.
+
+    aliquot_intervals_sec is an optional list of intervals aftedf
+    r which an aliquot
+    is sampled from the cell, e.g. [600, 600, 600] will take 3 aliquots at 10-minute
+    intervals; note due to PAL overhead, intervals must be longer than 4 minutes
+
+    aliquot_insitu flags whether the sampling interval timer begins at the start of the
+    PSTAT action (True) or after the PSTAT action (False)
+
+    """
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    # get sample for gamry
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    )
+
+    apm.add(NI_server, "led", {"led": "led", "on": 1})
+
+    # calculate potential
+    versus = 0  # for vs rhe
+    if apm.pars.potential_versus == "oer":
+        versus = 1.23
+    if apm.pars.ref_type == "rhe":
+        potential = apm.pars.CA_potential - apm.pars.ref_offset__V + versus
+    else:
+        potential = (
+            apm.pars.CA_potential
+            - 1.0 * apm.pars.ref_offset__V
+            + versus
+            - 0.059 * apm.pars.ph
+            - REF_TABLE[apm.pars.ref_type]
+        )
+    print(f"ADSS_sub_CA potential: {potential}")
+
+    # apply potential
+    apm.add(
+        PSTAT_server,
+        "run_CA",
+        {
+            "Vval__V": potential,
+            "Tval__s": apm.pars.CA_duration_sec,
+            "AcqInterval__s": apm.pars.samplerate_sec,
+            "IErange": apm.pars.gamry_i_range,
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        technique_name="CA_photo",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+            ProcessContrib.run_use,
+        ],
+    )
+    """
+        intervals between PAL_archive aliquots include gas valving off
+        before aliquot, and a -65- second wait to turn back on gas valve
+        that occurs before full PAL action is completed
+    """
+    atimes = apm.pars.aliquot_times_sec
+    vwait = 0
+    if atimes:
+        intervals = [atimes[0]] + [x - y for x, y in zip(atimes[1:], atimes[:-1])]
+
+        if apm.pars.aliquot_insitu:
+            waitcond = ActionStartCondition.no_wait
+        else:
+            waitcond = ActionStartCondition.wait_for_all
+
+        washmod = 0
+        for interval in intervals:
+            apm.add(ORCH_server, "wait", {"waittime": interval - vwait}, waitcond)
+            apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0},ActionStartCondition.wait_for_orch)
+            apm.add(
+                PAL_server,
+                "PAL_archive",
+                {
+                    "tool": apm.pars.PAL_Injector,
+                    "source": "cell1_we",
+                    "volume_ul": apm.pars.aliquot_volume_ul,
+                    "sampleperiod": [0.0],
+                    "spacingmethod": Spacingmethod.linear,
+                    "spacingfactor": 1.0,
+                    "timeoffset": 0.0,
+                    "wash1": 0,
+                    "wash2": washmod % 2,
+                    "wash3": (washmod + 1) % 2,
+                    "wash4": 0,
+                },
+                start_condition=ActionStartCondition.no_wait,
+                technique_name="liquid_product_archive",
+                process_finish=True,
+                process_contrib=[
+                    ProcessContrib.action_params,
+                    ProcessContrib.files,
+                    ProcessContrib.samples_in,
+                    ProcessContrib.samples_out,
+                    ProcessContrib.run_use,
+                ],
+            )
+            vwait = 65
+            washmod += 1
+            apm.add(ORCH_server, "wait", {"waittime": vwait}, waitcond)
+            apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1},ActionStartCondition.wait_for_orch)
+
+
+    return apm.action_list  # returns complete action list to orch
+
 
 def ADSS_sub_CV(
     experiment: Experiment,
@@ -924,6 +1065,105 @@ def ADSS_sub_OCV(
             )
 
     return apm.action_list  # returns complete action list to orch
+
+def ADSS_sub_OCV_photo(
+    experiment: Experiment,
+    experiment_version: int = 4,
+    Tval__s: Optional[float] = 60.0,
+    gamry_i_range: Optional[str] = "auto",
+    samplerate_sec: Optional[float] = 0.05,
+    ph: Optional[float] = 9.53,
+    ref_type: Optional[str] = "inhouse",
+    ref_offset__V: Optional[float] = 0.0,
+    led_wavelength: str = "385",
+    aliquot_volume_ul: Optional[int] = 200,
+    aliquot_times_sec: Optional[List[float]] = [],
+    aliquot_insitu: Optional[bool] = False,
+    PAL_Injector: Optional[str] = "LS 4",
+    PAL_Injector_id: Optional[str] = "fill serial number here",
+    rinse_1: int = 1,
+    rinse_4: int = 0,
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    # get sample for gamry
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {
+            "custom": "cell1_we",
+        },
+        to_globalexp_params=[
+            "_fast_samples_in"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    )
+
+    apm.add(NI_server, "led", {"led": "led", "on": 1})
+
+    # OCV
+    apm.add(
+        PSTAT_server,
+        "run_OCV",
+        {
+            "Tval__s": apm.pars.Tval__s,
+            "SampleRate": apm.pars.samplerate_sec,
+            "IErange": apm.pars.gamry_i_range,
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        technique_name="OCV_photo",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+            ProcessContrib.run_use,
+        ],
+    )
+
+    atimes = apm.pars.aliquot_times_sec
+    if atimes:
+        intervals = [atimes[0]] + [x - y for x, y in zip(atimes[1:], atimes[:-1])]
+
+        if apm.pars.aliquot_insitu:
+            waitcond = ActionStartCondition.no_wait
+        else:
+            waitcond = ActionStartCondition.wait_for_all
+
+        for interval in intervals:
+            apm.add(ORCH_server, "wait", {"waittime": interval}, waitcond)
+            apm.add(
+                PAL_server,
+                "PAL_archive",
+                {
+                    "tool": apm.pars.PAL_Injector,
+                    "source": "cell1_we",
+                    "volume_ul": apm.pars.aliquot_volume_ul,
+                    "sampleperiod": [0.0],
+                    "spacingmethod": Spacingmethod.custom,
+                    "spacingfactor": 1.0,
+                    "timeoffset": 0.0,
+                    "wash1": apm.pars.rinse_1,
+                    "wash2": 0,
+                    "wash3": 0,
+                    "wash4": apm.pars.rinse_4,
+                },
+                start_condition=ActionStartCondition.wait_for_orch,
+                technique_name="liquid_product_archive",
+                process_finish=True,
+                process_contrib=[
+                    ProcessContrib.action_params,
+                    ProcessContrib.files,
+                    ProcessContrib.samples_in,
+                    ProcessContrib.samples_out,
+                    ProcessContrib.run_use,
+                ],
+            )
+
+    return apm.action_list  # returns complete action list to orch
+
 
 
 def ADSS_sub_tray_unload(
@@ -1427,8 +1667,21 @@ def ADSS_sub_cell_illumination(
 ):
     apm = ActionPlanMaker()
     if apm.pars.illumination_on:
-        apm.add(NI_server, "led", {"led": "led", "on": 1})
+        apm.add(NI_server, "led", {"led": "led", "on": 1},
+            technique_name="led_on",
+            process_finish=True,
+            process_contrib=[
+                ProcessContrib.action_params,
+            ],
+                
+        )
     else:
-        apm.add(NI_server, "led", {"led": "led", "on": 0})
+        apm.add(NI_server, "led", {"led": "led", "on": 0},
+            technique_name="led_off",
+            process_finish=True,
+            process_contrib=[
+                ProcessContrib.action_params,
+            ],
+                )
 
     return apm.action_list  # returns complete action list to orch
