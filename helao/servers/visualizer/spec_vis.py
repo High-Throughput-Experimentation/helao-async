@@ -18,6 +18,7 @@ from bokeh.models import ColumnDataSource
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.data import DataPackageModel
 from helao.servers.vis import Vis
+from helao.helpers.dispatcher import async_private_dispatcher
 
 
 valid_data_status = (
@@ -46,6 +47,15 @@ class C_specvis:
             f"ws://{specserv_config['host']}:{specserv_config['port']}/ws_data"
         )
 
+        self.wl = asyncio.gather(
+            async_private_dispatcher(
+                self.vis.world_cfg,
+                self.spec_key,
+                "get_wl",
+                params_dict={},
+                json_dict={},
+            )
+        )
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
@@ -80,6 +90,8 @@ class C_specvis:
         # )
 
         self.plot = figure(title="Title", height=300, width=500)
+        self.plot.xaxis.axis_label = "Channel"  # "Epoch (seconds)"
+        self.plot.yaxis.axis_label = "Transmittance (counts/sec)"
 
         self.plot_prev = figure(title="Title", height=300, width=500)
         # combine all sublayouts into a single one
@@ -164,7 +176,7 @@ class C_specvis:
             try:
                 async with websockets.connect(self.data_url) as ws:
                     self.IOloop_data_run = True
-                    last_update = time.time()
+                    last_update = 0
                     while self.IOloop_data_run:
                         try:
                             datapackage = DataPackageModel(
