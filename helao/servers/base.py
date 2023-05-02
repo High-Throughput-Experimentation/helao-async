@@ -839,9 +839,7 @@ class Base:
         await self.data_q.put(StopAsyncIteration)
         await asyncio.sleep(1)
 
-    async def get_realtime(
-        self, epoch_ns: float = None, offset: float = None
-    ) -> float:
+    async def get_realtime(self, epoch_ns: float = None, offset: float = None) -> float:
         """returns epoch in ns"""
         return self.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
 
@@ -1201,8 +1199,7 @@ class Active:
             file_name=filename,
             data_keys=json_data_keys,
             sample=file_sample_label,
-            # action ID is here not necessary, or should we still add it?
-            # action_uuid: Optional[UUID]
+            action_uuid=action.action_uuid,
         )
 
         if header:
@@ -1271,9 +1268,7 @@ class Active:
             error=True,
         )
 
-    async def get_realtime(
-        self, epoch_ns: float = None, offset: float = None
-    ) -> float:
+    async def get_realtime(self, epoch_ns: float = None, offset: float = None) -> float:
         return self.base.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
 
     def get_realtime_nowait(
@@ -1308,9 +1303,7 @@ class Active:
             self.assemble_data_msg(datamodel=datamodel, action=action)
         )
 
-    def enqueue_data_nowait(
-        self, datamodel: DataModel, action: Action = None
-    ):
+    def enqueue_data_nowait(self, datamodel: DataModel, action: Action = None):
         if action is None:
             action = self.action
         self.base.data_q.put_nowait(
@@ -1931,7 +1924,7 @@ class Active:
             file_name=os.path.basename(file_path),
             # data_keys = json_data_keys,
             sample=[sample.get_global_label() for sample in samples],
-            # action_uuid: Optional[UUID]
+            action_uuid=action.action_uuid,
         )
 
         action.files.append(file_info)
