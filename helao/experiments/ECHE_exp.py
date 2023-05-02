@@ -70,10 +70,10 @@ def ECHE_sub_unloadall_customs(experiment: Experiment):
 def ECHE_sub_add_liquid(
     experiment: Experiment,
     experiment_version: int = 2,
-    solid_custom_position: Optional[str] = "cell1_we",
-    reservoir_liquid_sample_no: Optional[int] = 1,
-    solution_bubble_gas: Optional[str] = "O2",
-    liquid_volume_ml: Optional[float] = 1.0,
+    solid_custom_position: str = "cell1_we",
+    reservoir_liquid_sample_no: int = 1,
+    solution_bubble_gas: str = "O2",
+    liquid_volume_ml: float = 1.0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -102,9 +102,9 @@ def ECHE_sub_add_liquid(
 def ECHE_sub_load_solid(
     experiment: Experiment,
     experiment_version: int = 1,
-    solid_custom_position: Optional[str] = "cell1_we",
-    solid_plate_id: Optional[int] = 4534,
-    solid_sample_no: Optional[int] = 1,
+    solid_custom_position: str = "cell1_we",
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
 ):
     """last functionality test: -"""
 
@@ -132,12 +132,12 @@ def ECHE_sub_load_solid(
 def ECHE_sub_startup(
     experiment: Experiment,
     experiment_version: int = 2,
-    solid_custom_position: Optional[str] = "cell1_we",
-    solid_plate_id: Optional[int] = 4534,
-    solid_sample_no: Optional[int] = 1,
-    reservoir_liquid_sample_no: Optional[int] = 1,
-    solution_bubble_gas: Optional[str] = "N2",
-    liquid_volume_ml: Optional[float] = 1.0,
+    solid_custom_position: str = "cell1_we",
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
+    reservoir_liquid_sample_no: int = 1,
+    solution_bubble_gas: str = "N2",
+    liquid_volume_ml: float = 1.0,
 ):
     """Sub experiment
     last functionality test: -"""
@@ -215,7 +215,7 @@ def ECHE_sub_shutdown(experiment: Experiment):
 def ECHE_sub_CA_led(
     experiment: Experiment,
     experiment_version: int = 3,
-    CA_potential_vsRHE: Optional[float] = 0.0,
+    CA_potential_vsRHE: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
@@ -223,21 +223,21 @@ def ECHE_sub_CA_led(
     measurement_area: float = 0.071,  # 3mm diameter droplet
     ref_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
-    samplerate_sec: Optional[float] = 0.1,
-    CA_duration_sec: Optional[float] = 60,
-    gamry_i_range: Optional[str] = "auto",
-    gamrychannelwait: Optional[int] = -1,
-    gamrychannelsend: Optional[int] = 0,
-    illumination_source: Optional[str] = "doric_led1",
-    illumination_wavelength: Optional[float] = 0.0,
-    illumination_intensity: Optional[float] = 0.0,
-    illumination_intensity_date: Optional[str] = "n/a",
-    illumination_side: Optional[str] = "front",
-    toggle_dark_time_init: Optional[float] = 0.0,
-    toggle_illum_duty: Optional[float] = 0.5,
-    toggle_illum_period: Optional[float] = 2.0,
-    toggle_illum_time: Optional[float] = -1,
-    comment: Optional[str] = "",
+    samplerate_sec: float = 0.1,
+    CA_duration_sec: float = 60,
+    gamry_i_range: str = "auto",
+    gamrychannelwait: int = -1,
+    gamrychannelsend: int = 0,
+    illumination_source: str = "doric_led1",
+    illumination_wavelength: float = 0.0,
+    illumination_intensity: float = 0.0,
+    illumination_intensity_date: str = "n/a",
+    illumination_side: str = "front",
+    toggle_dark_time_init: float = 0.0,
+    toggle_illum_duty: float = 0.5,
+    toggle_illum_period: float = 2.0,
+    toggle_illum_time: float = -1,
+    comment: str = "",
 ):
     """last functionality test: -"""
 
@@ -357,9 +357,9 @@ def ECHE_sub_OCV(
 def ECHE_sub_preCV(
     experiment: Experiment,
     experiment_version: int = 1,
-    CA_potential: Optional[float] = 0.0,  # need to get from CV initial
-    samplerate_sec: Optional[float] = 0.05,
-    CA_duration_sec: Optional[float] = 3,  # adjustable pre_CV time
+    CA_potential: float = 0.0,  # need to get from CV initial
+    samplerate_sec: float = 0.05,
+    CA_duration_sec: float = 3,  # adjustable pre_CV time
 ):
     """last functionality test: 11/29/2021"""
 
@@ -405,7 +405,7 @@ def ECHE_sub_preCV(
 def ECHE_sub_CA(
     experiment: Experiment,
     experiment_version: int = 2,
-    CA_potential_vsRHE: Optional[float] = 0.0,
+    CA_potential_vsRHE: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
@@ -413,10 +413,10 @@ def ECHE_sub_CA(
     measurement_area: float = 0.071,  # 3mm diameter droplet
     ref_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
-    samplerate_sec: Optional[float] = 0.1,
-    CA_duration_sec: Optional[float] = 60,
-    gamry_i_range: Optional[str] = "auto",
-    comment: Optional[str] = "",
+    samplerate_sec: float = 0.1,
+    CA_duration_sec: float = 60,
+    gamry_i_range: str = "auto",
+    comment: str = "",
 ):
     """last functionality test: -"""
 
@@ -468,18 +468,18 @@ def ECHE_sub_CA(
 def ECHE_sub_CV_led(
     experiment: Experiment,
     experiment_version: int = 3,
-    Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
-    Vapex1_vsRHE: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
-    Vapex2_vsRHE: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
-    Vfinal_vsRHE: Optional[float] = 0.0,  # Final value in volts or amps.
+    Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
+    Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
+    Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
+    Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
     scanrate_voltsec: Optional[
         float
     ] = 0.02,  # scan rate in volts/second or amps/second.
-    samplerate_sec: Optional[float] = 0.1,
-    cycles: Optional[int] = 1,
-    gamry_i_range: Optional[str] = "auto",
-    gamrychannelwait: Optional[int] = -1,
-    gamrychannelsend: Optional[int] = 0,
+    samplerate_sec: float = 0.1,
+    cycles: int = 1,
+    gamry_i_range: str = "auto",
+    gamrychannelwait: int = -1,
+    gamrychannelsend: int = 0,
     solution_ph: float = 0,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
@@ -487,16 +487,16 @@ def ECHE_sub_CV_led(
     measurement_area: float = 0.071,  # 3mm diameter droplet
     ref_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
-    illumination_source: Optional[str] = "doric_led1",
-    illumination_wavelength: Optional[float] = 0.0,
-    illumination_intensity: Optional[float] = 0.0,
-    illumination_intensity_date: Optional[str] = "n/a",
-    illumination_side: Optional[str] = "front",
-    toggle_dark_time_init: Optional[float] = 0.0,
-    toggle_illum_duty: Optional[float] = 0.5,
-    toggle_illum_period: Optional[float] = 2.0,
-    toggle_illum_time: Optional[float] = -1,
-    comment: Optional[str] = "",
+    illumination_source: str = "doric_led1",
+    illumination_wavelength: float = 0.0,
+    illumination_intensity: float = 0.0,
+    illumination_intensity_date: str = "n/a",
+    illumination_side: str = "front",
+    toggle_dark_time_init: float = 0.0,
+    toggle_illum_duty: float = 0.5,
+    toggle_illum_period: float = 2.0,
+    toggle_illum_time: float = -1,
+    comment: str = "",
 ):
     """last functionality test: -"""
 
@@ -601,16 +601,16 @@ def ECHE_sub_CV_led(
 def ECHE_sub_CV(
     experiment: Experiment,
     experiment_version: int = 2,
-    Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
-    Vapex1_vsRHE: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
-    Vapex2_vsRHE: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
-    Vfinal_vsRHE: Optional[float] = 0.0,  # Final value in volts or amps.
+    Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
+    Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
+    Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
+    Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
     scanrate_voltsec: Optional[
         float
     ] = 0.020,  # scan rate in volts/second or amps/second.
-    samplerate_sec: Optional[float] = 0.1,
-    cycles: Optional[int] = 1,
-    gamry_i_range: Optional[str] = "auto",
+    samplerate_sec: float = 0.1,
+    cycles: int = 1,
+    gamry_i_range: str = "auto",
     solution_ph: float = 0,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
@@ -618,7 +618,7 @@ def ECHE_sub_CV(
     measurement_area: float = 0.071,  # 3mm diameter droplet
     ref_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
-    comment: Optional[str] = "",
+    comment: str = "",
 ):
     """last functionality test: -"""
 
@@ -676,7 +676,7 @@ def ECHE_sub_CV(
 def ECHE_sub_CP(
     experiment: Experiment,
     experiment_version: int = 2,
-    CP_current: Optional[float] = 0.0,
+    CP_current: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
@@ -684,10 +684,10 @@ def ECHE_sub_CP(
     measurement_area: float = 0.071,  # 3mm diameter droplet
     ref_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
-    samplerate_sec: Optional[float] = 0.1,
-    CP_duration_sec: Optional[float] = 60,
-    gamry_i_range: Optional[str] = "auto",
-    comment: Optional[str] = "",
+    samplerate_sec: float = 0.1,
+    CP_duration_sec: float = 60,
+    gamry_i_range: str = "auto",
+    comment: str = "",
 ):
     """last functionality test: -"""
 
@@ -737,7 +737,7 @@ def ECHE_sub_CP(
 def ECHE_sub_CP_led(
     experiment: Experiment,
     experiment_version: int = 3,
-    CP_current: Optional[float] = 0.0,
+    CP_current: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
@@ -745,21 +745,21 @@ def ECHE_sub_CP_led(
     measurement_area: float = 0.071,  # 3mm diameter droplet
     ref_electrode_type: str = "NHE",
     ref_vs_nhe: float = 0.21,
-    samplerate_sec: Optional[float] = 0.1,
-    CP_duration_sec: Optional[float] = 60,
-    gamry_i_range: Optional[str] = "auto",
-    gamrychannelwait: Optional[int] = -1,
-    gamrychannelsend: Optional[int] = 0,
-    illumination_source: Optional[str] = "doric_led1",
-    illumination_wavelength: Optional[float] = 0.0,
-    illumination_intensity: Optional[float] = 0.0,
-    illumination_intensity_date: Optional[str] = "n/a",
-    illumination_side: Optional[str] = "front",
-    toggle_dark_time_init: Optional[float] = 0.0,
-    toggle_illum_duty: Optional[float] = 0.5,
-    toggle_illum_period: Optional[float] = 2.0,
-    toggle_illum_time: Optional[float] = -1,
-    comment: Optional[str] = "",
+    samplerate_sec: float = 0.1,
+    CP_duration_sec: float = 60,
+    gamry_i_range: str = "auto",
+    gamrychannelwait: int = -1,
+    gamrychannelsend: int = 0,
+    illumination_source: str = "doric_led1",
+    illumination_wavelength: float = 0.0,
+    illumination_intensity: float = 0.0,
+    illumination_intensity_date: str = "n/a",
+    illumination_side: str = "front",
+    toggle_dark_time_init: float = 0.0,
+    toggle_illum_duty: float = 0.5,
+    toggle_illum_period: float = 2.0,
+    toggle_illum_time: float = -1,
+    comment: str = "",
 ):
     """last functionality test: -"""
 
@@ -833,8 +833,8 @@ def ECHE_sub_CP_led(
 def ECHE_sub_movetosample(
     experiment: Experiment,
     experiment_version: int = 1,
-    solid_plate_id: Optional[int] = 4534,
-    solid_sample_no: Optional[int] = 1,
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
 ):
     """Sub experiment
     last functionality test: -"""

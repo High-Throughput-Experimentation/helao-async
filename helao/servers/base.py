@@ -175,8 +175,8 @@ class HelaoBase(HelaoFastAPI):
 
         @self.post(f"/{server_key}/estop", tags=["action"])
         async def estop(
-            action: Optional[Action] = Body({}, embed=True),
-            switch: Optional[bool] = True,
+            action: Action = Body({}, embed=True),
+            switch: bool = True,
         ):
             active = await self.base.setup_and_contain_action(
                 json_data_keys=["estop"], action_abbr="estop"
@@ -218,7 +218,7 @@ class Executor:
         active,
         poll_rate: float = 0.2,
         oneoff: bool = True,
-        exec_id: Optional[str] = None,
+        exec_id: str = None,
     ):
         self.active = active
         self.oneoff = oneoff
@@ -527,9 +527,9 @@ class Base:
     async def setup_and_contain_action(
         self,
         json_data_keys: List[str] = [],
-        action_abbr: Optional[str] = None,
-        file_type: Optional[str] = "helao__file",
-        hloheader: Optional[HloHeaderModel] = HloHeaderModel(),
+        action_abbr: str = None,
+        file_type: str = "helao__file",
+        hloheader: HloHeaderModel = HloHeaderModel(),
     ):
         """This is a simple shortcut for very basic endpoints
         which just want to return some simple data"""
@@ -612,7 +612,7 @@ class Base:
     async def send_statuspackage(
         self,
         client_servkey: str,
-        action_name: Optional[str] = None,
+        action_name: str = None,
     ):
         # needs private dispatcher
         json_dict = {
@@ -840,13 +840,13 @@ class Base:
         await asyncio.sleep(1)
 
     async def get_realtime(
-        self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
+        self, epoch_ns: float = None, offset: float = None
     ) -> float:
         """returns epoch in ns"""
         return self.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
 
     def get_realtime_nowait(
-        self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
+        self, epoch_ns: float = None, offset: float = None
     ) -> float:
         """returns epoch in ns"""
         if offset is None:
@@ -1156,8 +1156,8 @@ class Active:
         file_sample_label,
         filename,
         file_group: HloFileGroup,
-        file_conn_key: Optional[str] = None,
-        action: Optional[Action] = None,
+        file_conn_key: str = None,
+        action: Action = None,
     ):
         filenum = 0
         if action is None:
@@ -1213,8 +1213,8 @@ class Active:
 
     def finish_hlo_header(
         self,
-        file_conn_keys: Optional[List[UUID]] = None,
-        realtime: Optional[float] = None,
+        file_conn_keys: List[UUID] = None,
+        realtime: float = None,
     ):
         """this just adds a timestamp for the data"""
         # needs to be a sync function
@@ -1243,7 +1243,7 @@ class Active:
         if not action.nonblocking:
             await self.base.status_q.put(action.get_actmodel())
 
-    async def set_estop(self, action: Optional[Action] = None):
+    async def set_estop(self, action: Action = None):
         if action is None:
             action = self.action
         action.action_status.append(HloStatus.estopped)
@@ -1254,8 +1254,8 @@ class Active:
 
     async def set_error(
         self,
-        error_code: Optional[ErrorCodes] = None,
-        action: Optional[Action] = None,
+        error_code: ErrorCodes = None,
+        action: Action = None,
     ):
         if action is None:
             action = self.action
@@ -1272,12 +1272,12 @@ class Active:
         )
 
     async def get_realtime(
-        self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
+        self, epoch_ns: float = None, offset: float = None
     ) -> float:
         return self.base.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
 
     def get_realtime_nowait(
-        self, epoch_ns: Optional[float] = None, offset: Optional[float] = None
+        self, epoch_ns: float = None, offset: float = None
     ) -> float:
         return self.base.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
 
@@ -1301,7 +1301,7 @@ class Active:
             )
         )
 
-    async def enqueue_data(self, datamodel: DataModel, action: Optional[Action] = None):
+    async def enqueue_data(self, datamodel: DataModel, action: Action = None):
         if action is None:
             action = self.action
         await self.base.data_q.put(
@@ -1309,7 +1309,7 @@ class Active:
         )
 
     def enqueue_data_nowait(
-        self, datamodel: DataModel, action: Optional[Action] = None
+        self, datamodel: DataModel, action: Action = None
     ):
         if action is None:
             action = self.action
@@ -1318,7 +1318,7 @@ class Active:
         )
 
     def assemble_data_msg(
-        self, datamodel: DataModel, action: Optional[Action] = None
+        self, datamodel: DataModel, action: Action = None
     ) -> DataPackageModel:
         if action is None:
             action = self.action
@@ -1553,13 +1553,13 @@ class Active:
         self,
         output_str: str,
         file_type: str,
-        filename: Optional[str] = None,
-        file_group: Optional[HloFileGroup] = HloFileGroup.aux_files,
-        header: Optional[str] = None,
-        sample_str: Optional[str] = None,
-        file_sample_label: Optional[str] = None,
-        json_data_keys: Optional[str] = None,
-        action: Optional[Action] = None,
+        filename: str = None,
+        file_group: HloFileGroup = HloFileGroup.aux_files,
+        header: str = None,
+        sample_str: str = None,
+        file_sample_label: str = None,
+        json_data_keys: str = None,
+        action: Action = None,
     ):
         """Write complete file, not used with queue streaming."""
         if action is None:
@@ -1598,13 +1598,13 @@ class Active:
         self,
         output_str: str,
         file_type: str,
-        filename: Optional[str] = None,
-        file_group: Optional[HloFileGroup] = HloFileGroup.aux_files,
-        header: Optional[str] = None,
-        sample_str: Optional[str] = None,
-        file_sample_label: Optional[str] = None,
-        json_data_keys: Optional[str] = None,
-        action: Optional[Action] = None,
+        filename: str = None,
+        file_group: HloFileGroup = HloFileGroup.aux_files,
+        header: str = None,
+        sample_str: str = None,
+        file_sample_label: str = None,
+        json_data_keys: str = None,
+        action: Action = None,
     ):
         """Write complete file, not used with queue streaming."""
         if action is None:
@@ -1646,7 +1646,7 @@ class Active:
                 self.set_sample_action_uuid(sample=part, action_uuid=action_uuid)
 
     async def append_sample(
-        self, samples: List[SampleUnion], IO: str, action: Optional[Action] = None
+        self, samples: List[SampleUnion], IO: str, action: Action = None
     ):
         """Add sample to samples_out and samples_in dict"""
         if action is None:
@@ -1697,8 +1697,8 @@ class Active:
 
     async def split(
         self,
-        uuid_list: Optional[List[UUID]] = None,
-        new_fileconnparams: Optional[FileConnParams] = None,
+        uuid_list: List[UUID] = None,
+        new_fileconnparams: FileConnParams = None,
     ) -> List[UUID]:
         """splits the current action and
         finishes all previous action in uuid_list
@@ -1800,7 +1800,7 @@ class Active:
 
     async def finish(
         self,
-        finish_uuid_list: Optional[List[UUID]] = None
+        finish_uuid_list: List[UUID] = None
         # end_state: HloStatus = HloStatus.finished
     ) -> Action:
         """Close file_conn, finish exp, copy aux,
@@ -1916,7 +1916,7 @@ class Active:
         file_type: str,
         file_path: str,
         samples: List[SampleUnion],
-        action: Optional[Action] = None,
+        action: Action = None,
     ) -> None:
         "Add auxiliary files to file dictionary."
         if action is None:

@@ -19,9 +19,9 @@ async def galil_dyn_endpoints(app=None):
 
             @app.post(f"/{server_key}/get_analog_in", tags=["action"])
             async def get_analog_in(
-                action: Optional[Action] = Body({}, embed=True),
+                action: Action = Body({}, embed=True),
                 action_version: int = 2,
-                ai_item: Optional[app.driver.dev_aiitems] = None,
+                ai_item: app.driver.dev_aiitems = None,
             ):
                 active = await app.base.setup_and_contain_action(action_abbr="get_ai")
 
@@ -38,11 +38,11 @@ async def galil_dyn_endpoints(app=None):
 
             @app.post(f"/{server_key}/acquire_analog_in", tags=["action"])
             async def acquire_analog_in(
-                action: Optional[Action] = Body({}, embed=True),
+                action: Action = Body({}, embed=True),
                 action_version: int = 1,
-                duration: Optional[float] = -1,
-                acquisition_rate: Optional[float] = 0.2,
-                fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
+                duration: float = -1,
+                acquisition_rate: float = 0.2,
+                fast_samples_in: List[SampleUnion] = Body([], embed=True),
             ):
                 """Record galil analog inputs (monitor_ai)."""
                 active = await app.base.setup_and_contain_action()
@@ -59,7 +59,7 @@ async def galil_dyn_endpoints(app=None):
 
             @app.post(f"/{server_key}/cancel_acquire_analog_in", tags=["action"])
             async def cancel_acquire_analog_in(
-                action: Optional[Action] = Body({}, embed=True),
+                action: Action = Body({}, embed=True),
                 action_version: int = 1,
             ):
                 """Stop galil analog input acquisition."""
@@ -74,10 +74,10 @@ async def galil_dyn_endpoints(app=None):
 
             @app.post(f"/{server_key}/set_analog_out", tags=["action"])
             async def set_analog_out(
-                action: Optional[Action] = Body({}, embed=True),
+                action: Action = Body({}, embed=True),
                 action_version: int = 2,
-                ao_item: Optional[app.driver.dev_aoitems] = None,
-                value: Optional[float] = None,
+                ao_item: app.driver.dev_aoitems = None,
+                value: float = None,
             ):
                 active = await app.base.setup_and_contain_action(action_abbr="set_ao")
 
@@ -98,9 +98,9 @@ async def galil_dyn_endpoints(app=None):
 
             @app.post(f"/{server_key}/get_digital_in", tags=["action"])
             async def get_digital_in(
-                action: Optional[Action] = Body({}, embed=True),
+                action: Action = Body({}, embed=True),
                 action_version: int = 2,
-                di_item: Optional[app.driver.dev_diitems] = None,
+                di_item: app.driver.dev_diitems = None,
             ):
                 active = await app.base.setup_and_contain_action(action_abbr="get_di")
 
@@ -121,9 +121,9 @@ async def galil_dyn_endpoints(app=None):
 
             @app.post(f"/{server_key}/get_digital_out", tags=["action"])
             async def get_digital_out(
-                action: Optional[Action] = Body({}, embed=True),
+                action: Action = Body({}, embed=True),
                 action_version: int = 2,
-                do_item: Optional[app.driver.dev_doitems] = None,
+                do_item: app.driver.dev_doitems = None,
             ):
                 active = await app.base.setup_and_contain_action(action_abbr="get_do")
 
@@ -144,10 +144,10 @@ async def galil_dyn_endpoints(app=None):
 
             @app.post(f"/{server_key}/set_digital_out", tags=["action"])
             async def set_digital_out(
-                action: Optional[Action] = Body({}, embed=True),
+                action: Action = Body({}, embed=True),
                 action_version: int = 2,
-                do_item: Optional[app.driver.dev_doitems] = None,
-                on: Optional[bool] = False,
+                do_item: app.driver.dev_doitems = None,
+                on: bool = False,
             ):
                 active = await app.base.setup_and_contain_action(action_abbr="set_do")
 
@@ -168,18 +168,18 @@ async def galil_dyn_endpoints(app=None):
 
             @app.post(f"/{server_key}/set_digital_cycle", tags=["action"])
             async def set_digital_cycle(
-                action: Optional[Action] = Body({}, embed=True),
+                action: Action = Body({}, embed=True),
                 action_version: int = 2,
-                trigger_name: Optional[app.driver.dev_diitems] = "gamry_ttl0",
-                triggertype: Optional[TriggerType] = TriggerType.fallingedge,
+                trigger_name: app.driver.dev_diitems = "gamry_ttl0",
+                triggertype: TriggerType = TriggerType.fallingedge,
                 out_name: Optional[
                     Union[app.driver.dev_doitems, List[app.driver.dev_doitems]]
                 ] = "led",
-                out_name_gamry: Optional[app.driver.dev_doitems] = "gamry_aux",
-                toggle_init_delay: Optional[Union[float, List[float]]] = 0,
-                toggle_duty: Optional[Union[float, List[float]]] = 0.5,
-                toggle_period: Optional[Union[float, List[float]]] = 2.0,
-                toggle_duration: Optional[Union[float, List[float]]] = -1,
+                out_name_gamry: app.driver.dev_doitems = "gamry_aux",
+                toggle_init_delay: Union[float, List[float]] = 0,
+                toggle_duty: Union[float, List[float]] = 0.5,
+                toggle_period: Union[float, List[float]] = 2.0,
+                toggle_duration: Union[float, List[float]] = -1,
                 req_out_name: Optional[
                     Union[app.driver.dev_doitems, List[app.driver.dev_doitems]]
                 ] = None,
@@ -212,7 +212,7 @@ async def galil_dyn_endpoints(app=None):
 
             @app.post(f"/{server_key}/stop_digital_cycle", tags=["action"])
             async def stop_digital_cycle(
-                action: Optional[Action] = Body({}, embed=True),
+                action: Action = Body({}, embed=True),
                 action_version: int = 2,
             ):
                 active = await app.base.setup_and_contain_action()
@@ -227,7 +227,7 @@ async def galil_dyn_endpoints(app=None):
 
         @app.post(f"/{server_key}/reset", tags=["action"])
         async def reset(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
         ):
             """FOR EMERGENCY USE ONLY!

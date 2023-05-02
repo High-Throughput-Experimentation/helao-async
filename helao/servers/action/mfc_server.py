@@ -32,14 +32,14 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/acquire_flowrate", tags=["action"])
     async def acquire_flowrate(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
         device_name: str = dev_name,
-        flowrate_sccm: Optional[float] = None,
-        ramp_sccm_sec: Optional[float] = 0,
-        duration: Optional[float] = -1,
-        acquisition_rate: Optional[float] = 0.2,
-        fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
+        flowrate_sccm: float = None,
+        ramp_sccm_sec: float = 0,
+        duration: float = -1,
+        acquisition_rate: float = 0.2,
+        fast_samples_in: List[SampleUnion] = Body([], embed=True),
     ):
         """Set flow rate and record."""
         active = await app.base.setup_and_contain_action()
@@ -54,14 +54,14 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/acquire_pressure", tags=["action"])
     async def acquire_pressure(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
         device_name: str = dev_name,
-        pressure_psia: Optional[float] = None,
-        ramp_psi_sec: Optional[float] = 0,
-        duration: Optional[float] = -1,
-        acquisition_rate: Optional[float] = 0.2,
-        fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
+        pressure_psia: float = None,
+        ramp_psi_sec: float = 0,
+        duration: float = -1,
+        acquisition_rate: float = 0.2,
+        fast_samples_in: List[SampleUnion] = Body([], embed=True),
     ):
         """Set pressure and record."""
         active = await app.base.setup_and_contain_action()
@@ -76,9 +76,9 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/cancel_acquire", tags=["action"])
     async def cancel_acquire_flowrate(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        device_name: Optional[str] = dev_name,
+        device_name: str = dev_name,
     ):
         """Stop flowrate & acquisition for given device_name."""
         active = await app.base.setup_and_contain_action()
@@ -90,11 +90,11 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/set_flowrate", tags=["action"])
     async def set_flowrate(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
         device_name: str = dev_name,
-        flowrate_sccm: Optional[float] = None,
-        ramp_sccm_sec: Optional[float] = 0,
+        flowrate_sccm: float = None,
+        ramp_sccm_sec: float = 0,
     ):
         active = await app.base.setup_and_contain_action(action_abbr="set_flow")
         app.driver.set_flowrate(**active.action.action_params)
@@ -103,11 +103,11 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/set_pressure", tags=["action"])
     async def set_pressure(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
         device_name: str = dev_name,
-        pressure_psia: Optional[float] = None,
-        ramp_psi_sec: Optional[float] = 0,
+        pressure_psia: float = None,
+        ramp_psi_sec: float = 0,
     ):
         active = await app.base.setup_and_contain_action(action_abbr="set_flow")
         app.driver.set_pressure(**active.action.action_params)

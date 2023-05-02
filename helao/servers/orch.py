@@ -220,7 +220,7 @@ class HelaoOrch(HelaoFastAPI):
 
         @self.post("/update_status", tags=["private"])
         async def update_status(
-            actionservermodel: Optional[ActionServerModel] = Body({}, embed=True)
+            actionservermodel: ActionServerModel = Body({}, embed=True)
         ):
             if actionservermodel is None:
                 return False
@@ -234,7 +234,7 @@ class HelaoOrch(HelaoFastAPI):
 
         @self.post("/update_nonblocking", tags=["private"])
         async def update_nonblocking(
-            actionmodel: Optional[ActionModel] = Body({}, embed=True)
+            actionmodel: ActionModel = Body({}, embed=True)
         ):
             self.orch.print_message(
                 f"'{self.orch.server.server_name.upper()}' "
@@ -304,14 +304,14 @@ class HelaoOrch(HelaoFastAPI):
 
         @self.post("/append_sequence", tags=["private"])
         async def append_sequence(
-            sequence: Optional[Sequence] = Body({}, embed=True),
+            sequence: Sequence = Body({}, embed=True),
         ):
             seq_uuid = await self.orch.add_sequence(sequence=sequence)
             return {"sequence_uuid": seq_uuid}
 
         @self.post("/append_experiment", tags=["private"])
         async def append_experiment(
-            experiment: Optional[Experiment] = Body({}, embed=True)
+            experiment: Experiment = Body({}, embed=True)
         ):
             """Add a experiment object to the end of the experiment queue."""
             exp_uuid = await self.orch.add_experiment(
@@ -321,7 +321,7 @@ class HelaoOrch(HelaoFastAPI):
 
         @self.post("/prepend_experiment", tags=["private"])
         async def prepend_experiment(
-            experiment: Optional[Experiment] = Body({}, embed=True)
+            experiment: Experiment = Body({}, embed=True)
         ):
             """Add a experiment object to the start of the experiment queue."""
             exp_uuid = await self.orch.add_experiment(
@@ -333,8 +333,8 @@ class HelaoOrch(HelaoFastAPI):
 
         @self.post("/insert_experiment", tags=["private"])
         async def insert_experiment(
-            experiment: Optional[Experiment] = Body({}, embed=True),
-            idx: Optional[int] = 0,
+            experiment: Experiment = Body({}, embed=True),
+            idx: int = 0,
         ):
             """Insert a experiment object at experiment queue index."""
             exp_uuid = await self.orch.add_experiment(
@@ -380,8 +380,8 @@ class HelaoOrch(HelaoFastAPI):
 
         @self.post(f"/{server_key}/wait", tags=["action"])
         async def wait(
-            action: Optional[Action] = Body({}, embed=True),
-            waittime: Optional[float] = 10.0,
+            action: Action = Body({}, embed=True),
+            waittime: float = 10.0,
         ):
             """Sleep action"""
             active = await self.orch.setup_and_contain_action()
@@ -395,7 +395,7 @@ class HelaoOrch(HelaoFastAPI):
 
         @self.post(f"/{server_key}/cancel_wait", tags=["action"])
         async def cancel_wait(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
         ):
             """Stop sleep action."""
@@ -408,8 +408,8 @@ class HelaoOrch(HelaoFastAPI):
 
         @self.post(f"/{server_key}/interrupt", tags=["action"])
         async def interrupt(
-            action: Optional[Action] = Body({}, embed=True),
-            reason: Optional[str] = "wait",
+            action: Action = Body({}, embed=True),
+            reason: str = "wait",
         ):
             """Stop dispatch loop for planned manual intervention."""
             active = await self.orch.setup_and_contain_action()
@@ -421,8 +421,8 @@ class HelaoOrch(HelaoFastAPI):
 
         @self.post(f"/{server_key}/estop", tags=["action"])
         async def act_estop(
-            action: Optional[Action] = Body({}, embed=True),
-            switch: Optional[bool] = True,
+            action: Action = Body({}, embed=True),
+            switch: bool = True,
         ):
             active = await self.orch.setup_and_contain_action(
                 json_data_keys=["estop"], action_abbr="estop"
@@ -677,7 +677,7 @@ class Orch(Base):
         return resp_tups
 
     async def update_status(
-        self, actionservermodel: Optional[ActionServerModel] = None
+        self, actionservermodel: ActionServerModel = None
     ):
         """Dict update method for action server to push status messages."""
         if actionservermodel is None:
@@ -1454,8 +1454,8 @@ class Orch(Base):
         self,
         seq: SequenceModel,
         experimentmodel: ExperimentModel,
-        prepend: Optional[bool] = False,
-        at_index: Optional[int] = None,
+        prepend: bool = False,
+        at_index: int = None,
     ):
         Ddict = experimentmodel.dict()
         Ddict.update(seq.dict())
@@ -1546,7 +1546,7 @@ class Orch(Base):
                 self.print_message(", ".join(self.error_uuids))
 
     def remove_experiment(
-        self, by_index: Optional[int] = None, by_uuid: Optional[UUID] = None
+        self, by_index: int = None, by_uuid: UUID = None
     ):
         """Remove experiment in list by enumeration index or uuid."""
         if by_index is not None:
@@ -1567,9 +1567,9 @@ class Orch(Base):
     def replace_action(
         self,
         sup_action: Action,
-        by_index: Optional[int] = None,
-        by_uuid: Optional[UUID] = None,
-        by_action_order: Optional[int] = None,
+        by_index: int = None,
+        by_uuid: UUID = None,
+        by_action_order: int = None,
     ):
         """Substitute a queued action."""
         if by_index:

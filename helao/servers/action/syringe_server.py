@@ -39,7 +39,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/infuse", tags=["action"])
     async def infuse(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
         rate_uL_sec: int = 0,
         volume_uL: int = 0,
@@ -51,7 +51,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/withdraw", tags=["action"])
     async def withdraw(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
         rate_uL_sec: int = 0,
         volume_uL: int = 0,
@@ -63,7 +63,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/get_present_volume", tags=["action"])
     async def get_present_volume(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
         active = await app.base.setup_and_contain_action()

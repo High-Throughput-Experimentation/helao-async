@@ -107,8 +107,8 @@ def CCSI_sub_unload_cell(experiment: Experiment, experiment_version: int = 1):
 def CCSI_sub_load_solid(
     experiment: Experiment,
     experiment_version: int = 1,
-    solid_plate_id: Optional[int] = 4534,
-    solid_sample_no: Optional[int] = 1,
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
 ):
     apm = ActionPlanMaker()
 
@@ -133,8 +133,8 @@ def CCSI_sub_load_solid(
 def CCSI_sub_load_liquid(
     experiment: Experiment,
     experiment_version: int = 2,
-    reservoir_liquid_sample_no: Optional[int] = 1,
-    volume_ul_cell_liquid: Optional[int] = 1000,
+    reservoir_liquid_sample_no: int = 1,
+    volume_ul_cell_liquid: int = 1000,
     water_True_False: bool = False,
     combine_True_False: bool = False,
 ):
@@ -165,8 +165,8 @@ def CCSI_sub_load_liquid(
 def CCSI_sub_load_gas(
     experiment: Experiment,
     experiment_version: int = 2,
-    reservoir_gas_sample_no: Optional[int] = 1,
-    volume_ul_cell_gas: Optional[int] = 1000,
+    reservoir_gas_sample_no: int = 1,
+    volume_ul_cell_gas: int = 1000,
 ):
     """Add gas volume to cell position."""
 

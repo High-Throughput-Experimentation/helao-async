@@ -44,9 +44,9 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/get_elements_plateid", tags=["action"])
     async def get_elements_plateid(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: Optional[int] = None,
+        plateid: int = None,
     ):
         """Gets the elements from the screening print in the info file"""
         active = await app.base.setup_and_contain_action()
@@ -62,9 +62,9 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/get_platemap_plateid", tags=["action"])
     async def get_platemap_plateid(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: Optional[int] = None,
+        plateid: int = None,
     ):
         """gets platemap"""
         active = await app.base.setup_and_contain_action()
@@ -80,9 +80,9 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/get_platexycalibration", tags=["action"])
     async def get_platexycalibration(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: Optional[int] = None,
+        plateid: int = None,
     ):
         """gets saved plate alignment matrix"""
         active = await app.base.setup_and_contain_action()
@@ -98,9 +98,9 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/save_platexycalibration", tags=["action"])
     async def save_platexycalibration(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: Optional[int] = None,
+        plateid: int = None,
     ):
         """saves alignment matrix"""
         active = await app.base.setup_and_contain_action()
@@ -116,9 +116,9 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/check_plateid", tags=["action"])
     async def check_plateid(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: Optional[int] = None,
+        plateid: int = None,
     ):
         """checks that the plate_id (info file) exists"""
         active = await app.base.setup_and_contain_action()
@@ -132,9 +132,9 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/check_printrecord_plateid", tags=["action"])
     async def check_printrecord_plateid(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: Optional[int] = None,
+        plateid: int = None,
     ):
         """checks that a print record exist in the info file"""
         active = await app.base.setup_and_contain_action()
@@ -150,9 +150,9 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/check_annealrecord_plateid", tags=["action"])
     async def check_annealrecord_plateid(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: Optional[int] = None,
+        plateid: int = None,
     ):
         """checks that a anneal record exist in the info file"""
         active = await app.base.setup_and_contain_action()
@@ -168,9 +168,9 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/get_info_plateid", tags=["action"])
     async def get_info_plateid(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: Optional[int] = None,
+        plateid: int = None,
     ):
         active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(
@@ -183,9 +183,9 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/get_rcp_plateid", tags=["action"])
     async def get_rcp_plateid(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plateid: Optional[int] = None,
+        plateid: int = None,
     ):
         active = await app.base.setup_and_contain_action()
         await active.enqueue_data_dflt(

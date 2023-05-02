@@ -83,7 +83,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/calc_cpfom", tags=["action"])
     async def calc_cpfom(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
         plate_id: int = 0,
         sample_no: int = 0,

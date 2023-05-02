@@ -43,9 +43,9 @@ PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
 def SIM_measure_CP(
     experiment: Experiment,
     experiment_version: int = 1,
-    solution_ph: Optional[int] = 13,
-    elements: Optional[List[str]] = [],
-    element_fracs: Optional[List[float]] = [],
+    solution_ph: int = 13,
+    elements: List[str] = [],
+    element_fracs: List[float] = [],
 ):
     apm = ActionPlanMaker()
 

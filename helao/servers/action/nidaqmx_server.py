@@ -91,10 +91,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/mastercell", tags=["action"])
         async def mastercell(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            cell: Optional[dev_mastercellitems] = None,
-            on: Optional[bool] = True,
+            cell: dev_mastercellitems = None,
+            on: bool = True,
         ):
             active = await app.base.setup_and_contain_action(action_abbr="mcell")
             # some additional params in order to call the same driver functions
@@ -115,10 +115,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/activecell", tags=["action"])
         async def activecell(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            cell: Optional[dev_activecellitems] = None,
-            on: Optional[bool] = True,
+            cell: dev_activecellitems = None,
+            on: bool = True,
         ):
             active = await app.base.setup_and_contain_action(action_abbr="acell")
             # some additional params in order to call the same driver functions
@@ -139,10 +139,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/pump", tags=["action"])
         async def pump(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            pump: Optional[dev_pumpitems] = None,
-            on: Optional[bool] = True,
+            pump: dev_pumpitems = None,
+            on: bool = True,
         ):
             active = await app.base.setup_and_contain_action(action_abbr="pump")
             # some additional params in order to call the same driver functions
@@ -163,10 +163,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/gasvalve", tags=["action"])
         async def gasvalve(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            gasvalve: Optional[dev_gasvalveitems] = None,
-            on: Optional[bool] = True,
+            gasvalve: dev_gasvalveitems = None,
+            on: bool = True,
         ):
             active = await app.base.setup_and_contain_action(action_abbr="gfv")
             # some additional params in order to call the same driver functions
@@ -189,10 +189,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/liquidvalve", tags=["action"])
         async def liquidvalve(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            liquidvalve: Optional[dev_liquidvalveitems] = None,
-            on: Optional[bool] = True,
+            liquidvalve: dev_liquidvalveitems = None,
+            on: bool = True,
         ):
             active = await app.base.setup_and_contain_action(action_abbr="lfv")
             # some additional params in order to call the same driver functions
@@ -216,10 +216,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/multivalve", tags=["action"])
         async def multivalve(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            multivalve: Optional[dev_multivalveitems] = None,
-            on: Optional[bool] = True,
+            multivalve: dev_multivalveitems = None,
+            on: bool = True,
         ):
             active = await app.base.setup_and_contain_action(action_abbr="lfv")
             # some additional params in order to call the same driver functions
@@ -242,10 +242,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/led", tags=["action"])
         async def led(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            led: Optional[dev_leditems] = None,
-            on: Optional[bool] = True,
+            led: dev_leditems = None,
+            on: bool = True,
         ):
             active = await app.base.setup_and_contain_action(action_abbr="led")
             # some additional params in order to call the same driver functions
@@ -266,10 +266,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/fswbcd", tags=["action"])
         async def fswbcd(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            fswbcd: Optional[dev_fswbcditems] = None,
-            on: Optional[bool] = True,
+            fswbcd: dev_fswbcditems = None,
+            on: bool = True,
         ):
             active = await app.base.setup_and_contain_action(action_abbr="fswbcd")
             # some additional params in order to call the same driver functions
@@ -292,9 +292,9 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/fsw", tags=["action"])
         async def fsw(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            fsw: Optional[dev_fswitems] = None,
+            fsw: dev_fswitems = None,
         ):
             active = await app.base.setup_and_contain_action(action_abbr="fsw")
             # some additional params in order to call the same driver functions
@@ -315,12 +315,12 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/cellIV", tags=["action"])
         async def cellIV(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
-            Tval: Optional[float] = 10.0,
-            SampleRate: Optional[int] = Query(1.0, ge=1),
-            TTLwait: Optional[int] = -1,  # -1 disables, else select TTL channel
+            fast_samples_in: List[SampleUnion] = Body([], embed=True),
+            Tval: float = 10.0,
+            SampleRate: int = Query(1.0, ge=1),
+            TTLwait: int = -1,  # -1 disables, else select TTL channel
         ):
             """Runs multi cell IV measurement.
             Args:
@@ -336,11 +336,11 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/acquire_monitors", tags=["action"])
         async def acquire_monitors(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            duration: Optional[float] = -1,
-            acquisition_rate: Optional[float] = 0.2,
-            fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
+            duration: float = -1,
+            acquisition_rate: float = 0.2,
+            fast_samples_in: List[SampleUnion] = Body([], embed=True),
         ):
             """Record NIMax monitor device channels."""
             active = await app.base.setup_and_contain_action()
@@ -355,7 +355,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/cancel_acquire_monitors", tags=["action"])
         async def cancel_acquire_monitors(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
         ):
             """Stop NIMax monitor acquisition."""
@@ -378,10 +378,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/heater", tags=["action"])
         async def heater(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            heater: Optional[dev_heatitems] = None,
-            on: Optional[bool] = True,
+            heater: dev_heatitems = None,
+            on: bool = True,
         ):
             active = await app.base.setup_and_contain_action(action_abbr="heat")
             # some additional params in order to call the same driver functions
@@ -409,7 +409,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/heatloop", tags=["action"])
         async def heatloop(
-            # action: Optional[Action] = Body({}, embed=True),
+            # action: Action = Body({}, embed=True),
             # action_version: int = 1,
             duration_hrs: float = 2,
             celltemp_min_C: float = 74.5,
@@ -476,7 +476,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/stop", tags=["action"])
     async def stop(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
         """Stops measurement in a controlled way."""

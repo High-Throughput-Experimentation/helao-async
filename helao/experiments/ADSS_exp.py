@@ -77,9 +77,9 @@ debug_save_data = True
 def debug(
     experiment: Experiment,
     experiment_version: int = 1,
-    d_mm: Optional[str] = "1.0",
-    x_mm: Optional[float] = 0.0,
-    y_mm: Optional[float] = 0.0,
+    d_mm: str = "1.0",
+    x_mm: float = 0.0,
+    y_mm: float = 0.0,
 ):
     """Test action for ORCH debugging
     simple plate is e.g. 4534"""
@@ -187,9 +187,9 @@ def ADSS_sub_unload_liquid(
 def ADSS_sub_load_solid(
     experiment: Experiment,
     experiment_version: int = 1,
-    solid_custom_position: Optional[str] = "cell1_we",
-    solid_plate_id: Optional[int] = 4534,
-    solid_sample_no: Optional[int] = 1,
+    solid_custom_position: str = "cell1_we",
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
 ):
     """last functionality test: 11/29/2021"""
 
@@ -215,8 +215,8 @@ def ADSS_sub_load_solid(
 def ADSS_sub_load_liquid(
     experiment: Experiment,
     experiment_version: int = 1,
-    liquid_custom_position: Optional[str] = "elec_res1",
-    liquid_sample_no: Optional[int] = 1,
+    liquid_custom_position: str = "elec_res1",
+    liquid_sample_no: int = 1,
 ):
     """last functionality test: 11/29/2021"""
 
@@ -241,11 +241,11 @@ def ADSS_sub_load_liquid(
 def ADSS_sub_load(
     experiment: Experiment,
     experiment_version: int = 1,
-    solid_custom_position: Optional[str] = "cell1_we",
-    solid_plate_id: Optional[int] = 4534,
-    solid_sample_no: Optional[int] = 1,
-    liquid_custom_position: Optional[str] = "elec_res1",
-    liquid_sample_no: Optional[int] = 1,
+    solid_custom_position: str = "cell1_we",
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
+    liquid_custom_position: str = "elec_res1",
+    liquid_sample_no: int = 1,
 ):
     apm = ActionPlanMaker()
 
@@ -276,13 +276,13 @@ def ADSS_sub_load(
 def ADSS_sub_sample_start(
     experiment: Experiment,
     experiment_version: int = 2,
-    solid_custom_position: Optional[str] = "cell1_we",
-    solid_plate_id: Optional[int] = 4534,
-    solid_sample_no: Optional[int] = 1,
-    #    x_mm: Optional[float] = 0.0,
-    #    y_mm: Optional[float] = 0.0,
-    liquid_custom_position: Optional[str] = "elec_res1",
-    liquid_sample_no: Optional[int] = 1,
+    solid_custom_position: str = "cell1_we",
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
+    #    x_mm: float = 0.0,
+    #    y_mm: float = 0.0,
+    liquid_custom_position: str = "elec_res1",
+    liquid_sample_no: int = 1,
 ):
     """Sub experiment
     (1) Unload all custom position samples
@@ -446,8 +446,8 @@ def ADSS_sub_drain(experiment: Experiment):
 def ADSS_sub_clean_PALtool(
     experiment: Experiment,
     experiment_version: int = 1,
-    clean_tool: Optional[str] = PALtools.LS3,
-    clean_volume_ul: Optional[int] = 500,
+    clean_tool: str = PALtools.LS3,
+    clean_volume_ul: int = 500,
 ):
     """Sub experiment
     Performs deep clean of selected PAL tool.
@@ -473,9 +473,9 @@ def ADSS_sub_clean_PALtool(
 def ADSS_sub_fillfixed(
     experiment: Experiment,
     experiment_version: int = 1,
-    fill_vol_ul: Optional[int] = 10000,
-    filltime_sec: Optional[float] = 10.0,
-    PAL_Injector: Optional[str] = "PALtools.LS3",
+    fill_vol_ul: int = 10000,
+    filltime_sec: float = 10.0,
+    PAL_Injector: str = "PALtools.LS3",
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -534,8 +534,8 @@ def ADSS_sub_fillfixed(
 def ADSS_sub_fill(
     experiment: Experiment,
     experiment_version: int = 1,
-    fill_vol_ul: Optional[int] = 1000,
-    PAL_Injector: Optional[str] = "PALtools.LS3",
+    fill_vol_ul: int = 1000,
+    PAL_Injector: str = "PALtools.LS3",
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -562,19 +562,19 @@ def ADSS_sub_fill(
 def ADSS_sub_CA(
     experiment: Experiment,
     experiment_version: int = 8,
-    CA_potential: Optional[float] = 0.0,
-    ph: Optional[float] = 9.53,
-    potential_versus: Optional[str] = "rhe",
-    ref_type: Optional[str] = "inhouse",
-    ref_offset__V: Optional[float] = 0.0,
-    gamry_i_range: Optional[str] = "auto",
-    samplerate_sec: Optional[float] = 0.05,
-    CA_duration_sec: Optional[float] = 1800,
-    aliquot_volume_ul: Optional[int] = 200,
-    aliquot_times_sec: Optional[List[float]] = [],
-    aliquot_insitu: Optional[bool] = True,
-    PAL_Injector: Optional[str] = "LS 4",
-    PAL_Injector_id: Optional[str] = "fill serial number here"
+    CA_potential: float = 0.0,
+    ph: float = 9.53,
+    potential_versus: str = "rhe",
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
+    gamry_i_range: str = "auto",
+    samplerate_sec: float = 0.05,
+    CA_duration_sec: float = 1800,
+    aliquot_volume_ul: int = 200,
+    aliquot_times_sec: List[float] = [],
+    aliquot_insitu: bool = True,
+    PAL_Injector: str = "LS 4",
+    PAL_Injector_id: str = "fill serial number here"
 ):
     """Primary CA experiment with optional PAL sampling.
 
@@ -698,20 +698,20 @@ def ADSS_sub_CA(
 def ADSS_sub_CA_photo(
     experiment: Experiment,
     experiment_version: int = 1,
-    CA_potential: Optional[float] = 0.0,
-    ph: Optional[float] = 9.53,
-    potential_versus: Optional[str] = "rhe",
-    ref_type: Optional[str] = "inhouse",
-    ref_offset__V: Optional[float] = 0.0,
-    gamry_i_range: Optional[str] = "auto",
-    samplerate_sec: Optional[float] = 0.05,
-    CA_duration_sec: Optional[float] = 1800,
+    CA_potential: float = 0.0,
+    ph: float = 9.53,
+    potential_versus: str = "rhe",
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
+    gamry_i_range: str = "auto",
+    samplerate_sec: float = 0.05,
+    CA_duration_sec: float = 1800,
     led_wavelength: str = "385",
-    aliquot_volume_ul: Optional[int] = 200,
-    aliquot_times_sec: Optional[List[float]] = [],
-    aliquot_insitu: Optional[bool] = True,
-    PAL_Injector: Optional[str] = "LS 4",
-    PAL_Injector_id: Optional[str] = "fill serial number here"
+    aliquot_volume_ul: int = 200,
+    aliquot_times_sec: List[float] = [],
+    aliquot_insitu: bool = True,
+    PAL_Injector: str = "LS 4",
+    PAL_Injector_id: str = "fill serial number here"
 ):
     """Primary CA experiment with optional PAL sampling.
 
@@ -838,24 +838,24 @@ def ADSS_sub_CA_photo(
 def ADSS_sub_CV(
     experiment: Experiment,
     experiment_version: int = 5,
-    Vinit_vsRHE: Optional[float] = 0.0,  # Initial value in volts or amps.
-    Vapex1_vsRHE: Optional[float] = 1.0,  # Apex 1 value in volts or amps.
-    Vapex2_vsRHE: Optional[float] = -1.0,  # Apex 2 value in volts or amps.
-    Vfinal_vsRHE: Optional[float] = 0.0,  # Final value in volts or amps.
+    Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
+    Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
+    Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
+    Vfinal_vsRHE: float = 0.0,  # Final value in volts or amps.
     scanrate_voltsec: Optional[
         float
     ] = 0.02,  # scan rate in volts/second or amps/second.
-    samplerate_sec: Optional[float] = 0.1,
-    cycles: Optional[int] = 1,
-    gamry_i_range: Optional[str] = "auto",
+    samplerate_sec: float = 0.1,
+    cycles: int = 1,
+    gamry_i_range: str = "auto",
     ph: float = 9.53,
-    potential_versus: Optional[str] = "rhe",
-    ref_type: Optional[str] = "inhouse",
-    ref_offset__V: Optional[float] = 0.0,
-    aliquot_volume_ul: Optional[int] = 200,
-    aliquot_times_sec: Optional[List[float]] = [],
-    aliquot_insitu: Optional[bool] = True,
-    PAL_Injector: Optional[str] = "LS 4",
+    potential_versus: str = "rhe",
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
+    aliquot_volume_ul: int = 200,
+    aliquot_times_sec: List[float] = [],
+    aliquot_insitu: bool = True,
+    PAL_Injector: str = "LS 4",
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -974,17 +974,17 @@ def ADSS_sub_CV(
 def ADSS_sub_OCV(
     experiment: Experiment,
     experiment_version: int = 4,
-    Tval__s: Optional[float] = 60.0,
-    gamry_i_range: Optional[str] = "auto",
-    samplerate_sec: Optional[float] = 0.05,
-    ph: Optional[float] = 9.53,
-    ref_type: Optional[str] = "inhouse",
-    ref_offset__V: Optional[float] = 0.0,
-    aliquot_volume_ul: Optional[int] = 200,
-    aliquot_times_sec: Optional[List[float]] = [],
-    aliquot_insitu: Optional[bool] = False,
-    PAL_Injector: Optional[str] = "LS 4",
-    PAL_Injector_id: Optional[str] = "fill serial number here",
+    Tval__s: float = 60.0,
+    gamry_i_range: str = "auto",
+    samplerate_sec: float = 0.05,
+    ph: float = 9.53,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
+    aliquot_volume_ul: int = 200,
+    aliquot_times_sec: List[float] = [],
+    aliquot_insitu: bool = False,
+    PAL_Injector: str = "LS 4",
+    PAL_Injector_id: str = "fill serial number here",
     rinse_1: int = 1,
     rinse_4: int = 0,
 ):
@@ -1069,18 +1069,18 @@ def ADSS_sub_OCV(
 def ADSS_sub_OCV_photo(
     experiment: Experiment,
     experiment_version: int = 4,
-    Tval__s: Optional[float] = 60.0,
-    gamry_i_range: Optional[str] = "auto",
-    samplerate_sec: Optional[float] = 0.05,
-    ph: Optional[float] = 9.53,
-    ref_type: Optional[str] = "inhouse",
-    ref_offset__V: Optional[float] = 0.0,
+    Tval__s: float = 60.0,
+    gamry_i_range: str = "auto",
+    samplerate_sec: float = 0.05,
+    ph: float = 9.53,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
     led_wavelength: str = "385",
-    aliquot_volume_ul: Optional[int] = 200,
-    aliquot_times_sec: Optional[List[float]] = [],
-    aliquot_insitu: Optional[bool] = False,
-    PAL_Injector: Optional[str] = "LS 4",
-    PAL_Injector_id: Optional[str] = "fill serial number here",
+    aliquot_volume_ul: int = 200,
+    aliquot_times_sec: List[float] = [],
+    aliquot_insitu: bool = False,
+    PAL_Injector: str = "LS 4",
+    PAL_Injector_id: str = "fill serial number here",
     rinse_1: int = 1,
     rinse_4: int = 0,
 ):
@@ -1169,11 +1169,11 @@ def ADSS_sub_OCV_photo(
 def ADSS_sub_tray_unload(
     experiment: Experiment,
     experiment_version: int = 1,
-    tray: Optional[int] = 2,
-    slot: Optional[int] = 1,
-    survey_runs: Optional[int] = 1,
-    main_runs: Optional[int] = 3,
-    rack: Optional[int] = 2,
+    tray: int = 2,
+    slot: int = 1,
+    survey_runs: int = 1,
+    main_runs: int = 3,
+    rack: int = 2,
 ):
     """Unloads a selected tray from PAL position tray-slot and creates
     (1) json
@@ -1590,7 +1590,7 @@ def ADSS_sub_refill_syringes(
 def ADSS_sub_sample_aliquot(
     experiment: Experiment,
     experiment_version: int = 3,
-    aliquot_volume_ul: Optional[int] = 200,
+    aliquot_volume_ul: int = 200,
     EquilibrationTime_s: float = 30,
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "fill serial number here",

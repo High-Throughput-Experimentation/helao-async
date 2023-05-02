@@ -30,16 +30,16 @@ PAL_server = MachineModel(server_name="PAL", machine_name=gethostname().lower())
 def create_liquid_sample(
     experiment: Experiment,
     experiment_version: int = 1,
-    volume_ml: Optional[float] = 1.0,
-    source: Optional[List[str]] = ["source1", "source2"],
-    partial_molarity: Optional[List[str]] = ["partial_molarity1", "partial_molarity2"],
-    chemical: Optional[List[str]] = ["chemical1", "chemical2"],
-    ph: Optional[float] = 7.0,
-    supplier: Optional[List[str]] = ["supplier1", "supplier2"],
-    lot_number: Optional[List[str]] = ["lot1", "lot2"],
-    electrolyte_name: Optional [str] = "name",
-    prep_date: Optional [str] = "2000-01-01",
-    comment: Optional[str] = "comment",
+    volume_ml: float = 1.0,
+    source: List[str] = ["source1", "source2"],
+    partial_molarity: List[str] = ["partial_molarity1", "partial_molarity2"],
+    chemical: List[str] = ["chemical1", "chemical2"],
+    ph: float = 7.0,
+    supplier: List[str] = ["supplier1", "supplier2"],
+    lot_number: List[str] = ["lot1", "lot2"],
+    electrolyte_name: str = "name",
+    prep_date: str = "2000-01-01",
+    comment: str = "comment",
 ):
     """creates a custom liquid sample
     input fields contain json strings"""
@@ -75,14 +75,14 @@ def create_liquid_sample(
 def create_gas_sample(
     experiment: Experiment,
     experiment_version: int = 1,
-    volume_ml: Optional[float] = 1.0,
-    source: Optional[List[str]] = ["source1", "source2"],
-    partial_molarity: Optional[List[str]] = ["partial_molarity1", "partial_molarity2"],
-    chemical: Optional[List[str]] = ["chemical1", "chemical2"],
-    supplier: Optional[List[str]] = ["supplier1", "supplier2"],
-    lot_number: Optional[List[str]] = ["lot1", "lot2"],
-    prep_date: Optional [str] = "2000-01-01",
-    comment: Optional[str] = "comment",
+    volume_ml: float = 1.0,
+    source: List[str] = ["source1", "source2"],
+    partial_molarity: List[str] = ["partial_molarity1", "partial_molarity2"],
+    chemical: List[str] = ["chemical1", "chemical2"],
+    supplier: List[str] = ["supplier1", "supplier2"],
+    lot_number: List[str] = ["lot1", "lot2"],
+    prep_date: str = "2000-01-01",
+    comment: str = "comment",
 ):
     """creates a custom gas sample
     input fields contain json strings"""
@@ -116,17 +116,17 @@ def create_gas_sample(
 def create_assembly_sample(
     experiment: Experiment,
     experiment_version: int = 1,
-    liquid_sample_nos: Optional[List[int]] = [1, 2],
-    gas_sample_nos: Optional[List[int]] = [1, 2],
-    solid_plate_ids: Optional[List[int]] = [1, 2],
-    solid_sample_nos: Optional[List[int]] = [1, 2],
-    volume_ml: Optional[float] = 1.0,
-    # source: Optional[List[str]] = ["source1","source2"],
-    # partial_molarity:  Optional[List[str]] = ["partial_molarity1","partial_molarity2"],
-    # chemical: Optional[List[str]] = ["chemical1","chemical2"],
-    # supplier: Optional[List[str]] = ["supplier1","supplier2"],
-    # lot_number: Optional[List[str]] = ["lot1","lot2"],
-    comment: Optional[str] = "comment",
+    liquid_sample_nos: List[int] = [1, 2],
+    gas_sample_nos: List[int] = [1, 2],
+    solid_plate_ids: List[int] = [1, 2],
+    solid_sample_nos: List[int] = [1, 2],
+    volume_ml: float = 1.0,
+    # source: List[str] = ["source1","source2"],
+    # partial_molarity:  List[str] = ["partial_molarity1","partial_molarity2"],
+    # chemical: List[str] = ["chemical1","chemical2"],
+    # supplier: List[str] = ["supplier1","supplier2"],
+    # lot_number: List[str] = ["lot1","lot2"],
+    comment: str = "comment",
 ):
     """creates a custom assembly sample
     from local samples
@@ -210,15 +210,15 @@ def sort_plate_sample_no_list(
 def generate_sample_no_list(
     experiment: Experiment,
     experiment_version: int = 1,
-    plate_id: Optional[int] = 1,
-    sample_code: Optional[int] = 0,
-    skip_n_samples: Optional[int] = 0,
-    direction: Optional[str] = None,
-    sample_nos: Optional[List[int]] = [],
-    sample_nos_operator: Optional[str] = "",
+    plate_id: int = 1,
+    sample_code: int = 0,
+    skip_n_samples: int = 0,
+    direction: str = None,
+    sample_nos: List[int] = [],
+    sample_nos_operator: str = "",
     # platemap_xys: List[Tuple[int, int]] = [],
     platemap_xys: List[Tuple[int, int]] = [(None, None)],
-    platemap_xys_operator: Optional[str] = "",
+    platemap_xys_operator: str = "",
 ):
     """tbd"""
 

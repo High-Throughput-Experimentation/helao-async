@@ -71,9 +71,9 @@ z_seal = 4.5
 def ANEC_sub_startup(
     experiment: Experiment,
     experiment_version: int = 1,
-    solid_plate_id: Optional[int] = 4534,
-    solid_sample_no: Optional[int] = 1,
-    z_move_mm: Optional[float] = 3.5,
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
+    z_move_mm: float = 3.5,
 ):
     """Sub experiment
     last functionality test: -"""
@@ -162,8 +162,8 @@ def ANEC_sub_disengage(experiment: Experiment, experiment_version: int = 1):
 def ANEC_sub_load_solid(
     experiment: Experiment,
     experiment_version: int = 1,
-    solid_plate_id: Optional[int] = 4534,
-    solid_sample_no: Optional[int] = 1,
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
 ):
     apm = ActionPlanMaker()
 
@@ -244,11 +244,11 @@ def ANEC_sub_normal_state(
 def ANEC_sub_flush_fill_cell(
     experiment: Experiment,
     experiment_version: int = 1,
-    liquid_flush_time: Optional[float] = 80,
-    co2_purge_time: Optional[float] = 15,
-    equilibration_time: Optional[float] = 1.0,
-    reservoir_liquid_sample_no: Optional[int] = 1511,
-    volume_ul_cell_liquid: Optional[int] = 1000,
+    liquid_flush_time: float = 80,
+    co2_purge_time: float = 15,
+    equilibration_time: float = 1.0,
+    reservoir_liquid_sample_no: int = 1511,
+    volume_ul_cell_liquid: int = 1000,
 ):
     """Add liquid volume to cell position.
 
@@ -325,7 +325,7 @@ def ANEC_sub_unload_liquid(
 def ANEC_sub_drain_cell(
     experiment: Experiment,
     experiment_version: int = 3,
-    drain_time: Optional[float] = 70.0,
+    drain_time: float = 70.0,
 ):
     """Drain liquid from cell and unload liquid sample."""
 
@@ -340,7 +340,7 @@ def ANEC_sub_drain_cell(
 def ANEC_sub_cleanup(
     experiment: Experiment,
     experiment_version: int = 1,
-    reservoir_liquid_sample_no: Optional[int] = 1511,
+    reservoir_liquid_sample_no: int = 1511,
 ):
     """Flush and purge ANEC cell.
 
@@ -368,8 +368,8 @@ def ANEC_sub_cleanup(
 def ANEC_sub_GC_preparation(
     experiment: Experiment,
     experiment_version: int = 1,
-    toolGC: Optional[str] = "HS 2",
-    volume_ul_GC: Optional[int] = 300,
+    toolGC: str = "HS 2",
+    volume_ul_GC: int = 300,
 ):
     """Sample headspace in cell1_we and inject into GC
 
@@ -413,8 +413,8 @@ def ANEC_sub_GC_preparation(
 def ANEC_sub_load_solid_only(
     experiment: Experiment,
     experiment_version: int = 1,
-    solid_plate_id: Optional[int] = 1,
-    solid_sample_no: Optional[int] = 1,
+    solid_plate_id: int = 1,
+    solid_sample_no: int = 1,
 ):
     """Load solid and clean cell."""
 
@@ -438,12 +438,12 @@ def ANEC_sub_load_solid_only(
 def ANEC_sub_load_solid_and_clean_cell(
     experiment: Experiment,
     experiment_version: int = 1,
-    solid_plate_id: Optional[int] = 1,
-    solid_sample_no: Optional[int] = 1,
-    reservoir_liquid_sample_no: Optional[int] = 1511,
-    recirculation_time: Optional[float] = 60,
-    toolGC: Optional[str] = "HS 2",
-    volume_ul_GC: Optional[int] = 300,
+    solid_plate_id: int = 1,
+    solid_sample_no: int = 1,
+    reservoir_liquid_sample_no: int = 1511,
+    recirculation_time: float = 60,
+    toolGC: str = "HS 2",
+    volume_ul_GC: int = 300,
 ):
     """Load solid and clean cell."""
 
@@ -494,12 +494,12 @@ def ANEC_sub_load_solid_and_clean_cell(
 def ANEC_sub_liquidarchive(
     experiment: Experiment,
     experiment_version: int = 1,
-    toolarchive: Optional[str] = "LS 3",
-    volume_ul_archive: Optional[int] = 500,
-    wash1: Optional[bool] = True,
-    wash2: Optional[bool] = True,
-    wash3: Optional[bool] = True,
-    wash4: Optional[bool] = False,
+    toolarchive: str = "LS 3",
+    volume_ul_archive: int = 500,
+    wash1: bool = True,
+    wash2: bool = True,
+    wash3: bool = True,
+    wash4: bool = False,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -537,14 +537,14 @@ def ANEC_sub_liquidarchive(
 def ANEC_sub_aliquot(
     experiment: Experiment,
     experiment_version: int = 1,
-    toolGC: Optional[str] = "HS 2",
-    toolarchive: Optional[str] = "LS 3",
-    volume_ul_GC: Optional[int] = 300,
-    volume_ul_archive: Optional[int] = 500,
-    wash1: Optional[bool] = True,
-    wash2: Optional[bool] = True,
-    wash3: Optional[bool] = True,
-    wash4: Optional[bool] = False,
+    toolGC: str = "HS 2",
+    toolarchive: str = "LS 3",
+    volume_ul_GC: int = 300,
+    volume_ul_archive: int = 500,
+    wash1: bool = True,
+    wash2: bool = True,
+    wash3: bool = True,
+    wash4: bool = False,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -593,13 +593,13 @@ def ANEC_sub_aliquot(
 def ANEC_sub_CP(
     experiment: Experiment,
     experiment_version: int = 1,
-    WE_versus: Optional[str] = "ref",
-    ref_type: Optional[str] = "leakless",
-    pH: Optional[float] = 6.8,
-    CP_current: Optional[float] = 0.0,
-    SampleRate: Optional[float] = 0.01,
-    CP_duration_sec: Optional[float] = 60,
-    IErange: Optional[str] = "auto",
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 6.8,
+    CP_current: float = 0.0,
+    SampleRate: float = 0.01,
+    CP_duration_sec: float = 60,
+    IErange: str = "auto",
 ):
     """last functionality test: -"""
 
@@ -643,14 +643,14 @@ def ANEC_sub_CP(
 def ANEC_sub_CA(
     experiment: Experiment,
     experiment_version: int = 1,
-    WE_potential__V: Optional[float] = 0.0,
-    WE_versus: Optional[str] = "ref",
-    CA_duration_sec: Optional[float] = 0.1,
-    SampleRate: Optional[float] = 0.01,
-    IErange: Optional[str] = "auto",
-    ref_offset__V: Optional[float] = 0.0,
-    ref_type: Optional[str] = "leakless",
-    pH: Optional[float] = 6.8,
+    WE_potential__V: float = 0.0,
+    WE_versus: str = "ref",
+    CA_duration_sec: float = 0.1,
+    SampleRate: float = 0.01,
+    IErange: str = "auto",
+    ref_offset__V: float = 0.0,
+    ref_type: str = "leakless",
+    pH: float = 6.8,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if apm.pars.WE_versus == "ref":
@@ -696,8 +696,8 @@ def ANEC_sub_CA(
 def ANEC_sub_OCV(
     experiment: Experiment,
     experiment_version: int = 1,
-    Tval__s: Optional[float] = 900.0,
-    IErange: Optional[str] = "auto",
+    Tval__s: float = 900.0,
+    IErange: str = "auto",
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -739,25 +739,25 @@ def ANEC_sub_OCV(
 def ANEC_sub_photo_CA(
     experiment: Experiment,
     experiment_version: int = 2,
-    WE_potential__V: Optional[float] = 0.0,
-    WE_versus: Optional[str] = "ref",
-    CA_duration_sec: Optional[float] = 0.1,
-    SampleRate: Optional[float] = 0.01,
-    IErange: Optional[str] = "auto",
-    gamrychannelwait: Optional[int] = -1,
-    gamrychannelsend: Optional[int] = 1,
-    ref_offset__V: Optional[float] = 0.0,
-    ref_type: Optional[str] = "leakless",
-    pH: Optional[float] = 6.8,
-    illumination_source: Optional[str] = "Thorlab_led",
-    illumination_wavelength: Optional[float] = 450.0,
-    illumination_intensity: Optional[float] = 9.0,
-    illumination_intensity_date: Optional[str] = "n/a",
-    illumination_side: Optional[str] = "front",
-    toggle_dark_time_init: Optional[float] = 0.0,
-    toggle_illum_duty: Optional[float] = 0.5,
-    toggle_illum_period: Optional[float] = 2.0,
-    toggle_illum_time: Optional[float] = -1,
+    WE_potential__V: float = 0.0,
+    WE_versus: str = "ref",
+    CA_duration_sec: float = 0.1,
+    SampleRate: float = 0.01,
+    IErange: str = "auto",
+    gamrychannelwait: int = -1,
+    gamrychannelsend: int = 1,
+    ref_offset__V: float = 0.0,
+    ref_type: str = "leakless",
+    pH: float = 6.8,
+    illumination_source: str = "Thorlab_led",
+    illumination_wavelength: float = 450.0,
+    illumination_intensity: float = 9.0,
+    illumination_intensity_date: str = "n/a",
+    illumination_side: str = "front",
+    toggle_dark_time_init: float = 0.0,
+    toggle_illum_duty: float = 0.5,
+    toggle_illum_period: float = 2.0,
+    toggle_illum_time: float = -1,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if int(round(apm.pars.toggle_illum_time)) == -1:
@@ -833,18 +833,18 @@ def ANEC_sub_photo_CA(
 def ANEC_sub_CV(
     experiment: Experiment,
     experiment_version: int = 1,
-    WE_versus: Optional[str] = "ref",
-    ref_type: Optional[str] = "leakless",
-    pH: Optional[float] = 6.8,
-    WE_potential_init__V: Optional[float] = 0.0,
-    WE_potential_apex1__V: Optional[float] = -1.0,
-    WE_potential_apex2__V: Optional[float] = -0.5,
-    WE_potential_final__V: Optional[float] = -0.5,
-    ScanRate_V_s: Optional[float] = 0.01,
-    Cycles: Optional[int] = 1,
-    SampleRate: Optional[float] = 0.01,
-    IErange: Optional[str] = "auto",
-    ref_offset__V: Optional[float] = 0.0,
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 6.8,
+    WE_potential_init__V: float = 0.0,
+    WE_potential_apex1__V: float = -1.0,
+    WE_potential_apex2__V: float = -0.5,
+    WE_potential_final__V: float = -0.5,
+    ScanRate_V_s: float = 0.01,
+    Cycles: int = 1,
+    SampleRate: float = 0.01,
+    IErange: str = "auto",
+    ref_offset__V: float = 0.0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if apm.pars.WE_versus == "ref":
@@ -925,29 +925,29 @@ def ANEC_sub_CV(
 def ANEC_sub_photo_CV(
     experiment: Experiment,
     experiment_version: int = 1,
-    WE_versus: Optional[str] = "ref",
-    ref_type: Optional[str] = "leakless",
-    pH: Optional[float] = 6.8,
-    WE_potential_init__V: Optional[float] = 0.0,
-    WE_potential_apex1__V: Optional[float] = -1.0,
-    WE_potential_apex2__V: Optional[float] = -0.5,
-    WE_potential_final__V: Optional[float] = -0.5,
-    ScanRate_V_s: Optional[float] = 0.01,
-    Cycles: Optional[int] = 1,
-    SampleRate: Optional[float] = 0.01,
-    IErange: Optional[str] = "auto",
-    gamrychannelwait: Optional[int] = -1,
-    gamrychannelsend: Optional[int] = 1,
-    ref_offset__V: Optional[float] = 0.0,
-    illumination_source: Optional[str] = "Thorlab_led",
-    illumination_wavelength: Optional[float] = 450.0,
-    illumination_intensity: Optional[float] = 9.0,
-    illumination_intensity_date: Optional[str] = "n/a",
-    illumination_side: Optional[str] = "front",
-    toggle_dark_time_init: Optional[float] = 0.0,
-    toggle_illum_duty: Optional[float] = 0.5,
-    toggle_illum_period: Optional[float] = 2.0,
-    toggle_illum_time: Optional[float] = -1,
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 6.8,
+    WE_potential_init__V: float = 0.0,
+    WE_potential_apex1__V: float = -1.0,
+    WE_potential_apex2__V: float = -0.5,
+    WE_potential_final__V: float = -0.5,
+    ScanRate_V_s: float = 0.01,
+    Cycles: int = 1,
+    SampleRate: float = 0.01,
+    IErange: str = "auto",
+    gamrychannelwait: int = -1,
+    gamrychannelsend: int = 1,
+    ref_offset__V: float = 0.0,
+    illumination_source: str = "Thorlab_led",
+    illumination_wavelength: float = 450.0,
+    illumination_intensity: float = 9.0,
+    illumination_intensity_date: str = "n/a",
+    illumination_side: str = "front",
+    toggle_dark_time_init: float = 0.0,
+    toggle_illum_duty: float = 0.5,
+    toggle_illum_period: float = 2.0,
+    toggle_illum_time: float = -1,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     CV_duration_sec = (
@@ -1078,19 +1078,19 @@ def ANEC_sub_photo_CV(
 def ANEC_sub_GCLiquid_analysis(
     experiment: Experiment,
     experiment_version: int = 1,
-    # startGC: Optional[bool] = None,
-    # sampletype: Optional[str] = None,
-    tool: Optional[str] = "LS 1",
-    source_tray: Optional[int] = 2,
-    source_slot: Optional[int] = 1,
-    source_vial: Optional[int] = 1,
-    dest: Optional[str] = "Injector 1",
-    volume_ul: Optional[int] = 2,
-    wash1: Optional[bool] = True,
-    wash2: Optional[bool] = True,
-    wash3: Optional[bool] = True,
-    wash4: Optional[bool] = False,
-    GC_analysis_time: Optional[float] = 520.0,
+    # startGC: bool = None,
+    # sampletype: str = None,
+    tool: str = "LS 1",
+    source_tray: int = 2,
+    source_slot: int = 1,
+    source_vial: int = 1,
+    dest: str = "Injector 1",
+    volume_ul: int = 2,
+    wash1: bool = True,
+    wash2: bool = True,
+    wash3: bool = True,
+    wash4: bool = False,
+    GC_analysis_time: float = 520.0,
 ):
     """Sample headspace in cell1_we and inject into GC
 
@@ -1133,19 +1133,19 @@ def ANEC_sub_GCLiquid_analysis(
 def ANEC_sub_HPLCLiquid_analysis(
     experiment: Experiment,
     experiment_version: int = 1,
-    # startGC: Optional[bool] = None,
-    # sampletype: Optional[str] = None,
-    tool: Optional[str] = "LS 1",
-    source_tray: Optional[int] = 2,
-    source_slot: Optional[int] = 1,
-    source_vial: Optional[int] = 1,
-    dest: Optional[str] = "LCInjector1",
-    volume_ul: Optional[int] = 25,
-    wash1: Optional[bool] = True,
-    wash2: Optional[bool] = True,
-    wash3: Optional[bool] = True,
-    wash4: Optional[bool] = False,
-    HPLC_analysis_time: Optional[float] = 1800,
+    # startGC: bool = None,
+    # sampletype: str = None,
+    tool: str = "LS 1",
+    source_tray: int = 2,
+    source_slot: int = 1,
+    source_vial: int = 1,
+    dest: str = "LCInjector1",
+    volume_ul: int = 25,
+    wash1: bool = True,
+    wash2: bool = True,
+    wash3: bool = True,
+    wash4: bool = False,
+    HPLC_analysis_time: float = 1800,
 ):
     """Sample headspace in cell1_we and inject into GC
 
@@ -1188,26 +1188,26 @@ def ANEC_sub_HPLCLiquid_analysis(
 def ANEC_sub_photo_LSV(
     experiment: Experiment,
     experiment_version: int = 1,
-    WE_versus: Optional[str] = "ref",
-    ref_type: Optional[str] = "leakless",
-    pH: Optional[float] = 6.8,
-    WE_potential_init__V: Optional[float] = 0.0,
-    WE_potential_apex1__V: Optional[float] = -1.0,
-    ScanRate_V_s: Optional[float] = 0.01,
-    SampleRate: Optional[float] = 0.01,
-    IErange: Optional[str] = "auto",
-    gamrychannelwait: Optional[int] = -1,
-    gamrychannelsend: Optional[int] = 1,
-    ref_offset__V: Optional[float] = 0.0,
-    illumination_source: Optional[str] = "Thorlab_led",
-    illumination_wavelength: Optional[float] = 450.0,
-    illumination_intensity: Optional[float] = 9.0,
-    illumination_intensity_date: Optional[str] = "n/a",
-    illumination_side: Optional[str] = "front",
-    toggle_dark_time_init: Optional[float] = 0.0,
-    toggle_illum_duty: Optional[float] = 0.5,
-    toggle_illum_period: Optional[float] = 2.0,
-    toggle_illum_time: Optional[float] = -1,
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 6.8,
+    WE_potential_init__V: float = 0.0,
+    WE_potential_apex1__V: float = -1.0,
+    ScanRate_V_s: float = 0.01,
+    SampleRate: float = 0.01,
+    IErange: str = "auto",
+    gamrychannelwait: int = -1,
+    gamrychannelsend: int = 1,
+    ref_offset__V: float = 0.0,
+    illumination_source: str = "Thorlab_led",
+    illumination_wavelength: float = 450.0,
+    illumination_intensity: float = 9.0,
+    illumination_intensity_date: str = "n/a",
+    illumination_side: str = "front",
+    toggle_dark_time_init: float = 0.0,
+    toggle_illum_duty: float = 0.5,
+    toggle_illum_period: float = 2.0,
+    toggle_illum_time: float = -1,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     CV_duration_sec = (
@@ -1302,24 +1302,24 @@ def ANEC_sub_photo_LSV(
 def ANEC_sub_photo_CP(
     experiment: Experiment,
     experiment_version: int = 1,
-    WE_versus: Optional[str] = "ref",
-    ref_type: Optional[str] = "leakless",
-    pH: Optional[float] = 6.8,
-    CP_current: Optional[float] = 0.0,
-    SampleRate: Optional[float] = 0.01,
-    CP_duration_sec: Optional[float] = 60,
-    IErange: Optional[str] = "auto",
-    gamrychannelwait: Optional[int] = -1,
-    gamrychannelsend: Optional[int] = 1,
-    illumination_source: Optional[str] = "Thorlab_led",
-    illumination_wavelength: Optional[float] = 450.0,
-    illumination_intensity: Optional[float] = 9.0,
-    illumination_intensity_date: Optional[str] = "n/a",
-    illumination_side: Optional[str] = "front",
-    toggle_dark_time_init: Optional[float] = 0.0,
-    toggle_illum_duty: Optional[float] = 0.5,
-    toggle_illum_period: Optional[float] = 2.0,
-    toggle_illum_time: Optional[float] = -1,
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 6.8,
+    CP_current: float = 0.0,
+    SampleRate: float = 0.01,
+    CP_duration_sec: float = 60,
+    IErange: str = "auto",
+    gamrychannelwait: int = -1,
+    gamrychannelsend: int = 1,
+    illumination_source: str = "Thorlab_led",
+    illumination_wavelength: float = 450.0,
+    illumination_intensity: float = 9.0,
+    illumination_intensity_date: str = "n/a",
+    illumination_side: str = "front",
+    toggle_dark_time_init: float = 0.0,
+    toggle_illum_duty: float = 0.5,
+    toggle_illum_period: float = 2.0,
+    toggle_illum_time: float = -1,
 ):
     """last functionality test: -"""
 

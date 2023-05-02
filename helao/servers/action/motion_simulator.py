@@ -44,7 +44,7 @@ class MotionSim:
             retxy = [float(firstmatch.x), float(firstmatch.y)]
         return {"platexy": retxy}
 
-    def move(self, d_mm: List[float], axis: List[str], speed: Optional[int] = None):
+    def move(self, d_mm: List[float], axis: List[str], speed: int = None):
         pass
     
     def shutdown(self):
@@ -66,10 +66,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/solid_get_samples_xy", tags=["action"])
     async def solid_get_samples_xy(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plate_id: Optional[int] = None,
-        sample_no: Optional[int] = None,
+        plate_id: int = None,
+        sample_no: int = None,
     ):
         active = await app.base.setup_and_contain_action()
         platexy = app.driver.solid_get_samples_xy(
@@ -81,11 +81,11 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/move", tags=["action"])
     async def move(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        d_mm: Optional[List[float]] = [0, 0],
-        axis: Optional[List[str]] = ["x", "y"],
-        speed: Optional[int] = None,
+        d_mm: List[float] = [0, 0],
+        axis: List[str] = ["x", "y"],
+        speed: int = None,
     ):
         """Move a apecified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
         Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.
