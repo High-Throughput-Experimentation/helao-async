@@ -383,13 +383,13 @@ def launcher(confArg, confDict, helao_root):
                                 {},
                                 "launcher",
                                 f"Could not find running bokeh server at {servHost}:{servPort}",
-                                error=True,
+                                warning=True,
                             )
                             print_message(
                                 {},
                                 "launcher",
                                 "Unable to manage bokeh action. See bokeh output for correct PID.",
-                                error=True,
+                                warning=True,
                             )
                             ppid = p.pid
                     else:
