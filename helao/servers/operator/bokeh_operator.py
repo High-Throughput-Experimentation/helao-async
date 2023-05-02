@@ -1198,7 +1198,7 @@ class Operator:
             param_layout.append(
                 layout(
                     [
-                        [param_input[item]],
+                    [param_input[item], Paragraph(text=argtypes[idx])],
                         Spacer(height=10),
                     ],
                     background=self.color_sq_param_inputs,
