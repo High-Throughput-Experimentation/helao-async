@@ -1203,7 +1203,11 @@ class Operator:
                         [
                             param_input[item],
                             Paragraph(
-                                text=str(argtypes[idx]).split()[-1].strip("'<>[]"),
+                                text=str(argtypes[idx])
+                                .split()[-1]
+                                .strip("'<>]")
+                                .split(".")[-1]
+                                .replace("[", " of "),
                                 align=("start", "end"),
                             ),
                         ],
