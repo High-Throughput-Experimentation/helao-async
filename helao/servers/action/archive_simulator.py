@@ -163,7 +163,7 @@ def makeApp(confPrefix, server_key, helao_root):
         return platespaces
 
     @app.post(f"/get_measured", tags=["private"])
-    def get_measured(start_idx: Optional[int] = 0):
+    def get_measured(start_idx: int = 0):
         measured = app.driver.get_acquired()
         if start_idx is None or start_idx==0:
             return measured
@@ -201,7 +201,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/load_space", tags=["action"])
     async def load_space(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
         plate_id: int = 0,
     ):
@@ -214,10 +214,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/query_plate", tags=["action"])
     async def query_plate(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        elements: Optional[List[str]] = ["Ni", "Fe", "La", "Ce", "Co", "Ta"],
-        ph: Optional[int] = 13,
+        elements: List[str] = ["Ni", "Fe", "La", "Ce", "Co", "Ta"],
+        ph: int = 13,
     ):
         active = await app.base.setup_and_contain_action()
         platespaces = app.driver.list_spaces()
@@ -240,9 +240,9 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/acquire", tags=["action"])
     async def acquire(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        element_fracs: Optional[List[int]] = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        element_fracs: List[int] = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
     ):
         active = await app.base.setup_and_contain_action()
         sample_no = app.driver.acquire(**active.action.action_params)

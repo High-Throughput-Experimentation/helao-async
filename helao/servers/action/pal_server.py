@@ -60,7 +60,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/stop", tags=["action"])
     async def stop(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
         """Stops measurement in a controlled way."""
@@ -71,7 +71,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/kill_PAL", tags=["action"])
     async def kill_PAL(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
         active = await app.base.setup_and_contain_action()
@@ -82,7 +82,7 @@ def makeApp(confPrefix, server_key, helao_root):
         return finished_action.as_dict()
 
     @app.post(f"/{server_key}/convert_v1DB", tags=["action"])
-    async def convert_v1DB(action: Optional[Action] = Body({}, embed=True)):
+    async def convert_v1DB(action: Action = Body({}, embed=True)):
         # await app.driver.convert_oldDB_to_sqllite()
         await app.driver.archive.unified_db.liquidAPI.old_jsondb_to_sqlitedb()
         return {}
@@ -91,9 +91,9 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/PAL_run_method", tags=["action"])
         async def PAL_run_method(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            micropal: Optional[list] = [
+            micropal: list = [
                 PalMicroCam(
                     **{
                         "method": "fillfixed",
@@ -149,12 +149,12 @@ def makeApp(confPrefix, server_key, helao_root):
                     }
                 ),
             ],
-            totalruns: Optional[int] = 1,
+            totalruns: int = 1,
             # its a necessary param, but as its the only dict, it partially breaks swagger
-            sampleperiod: Optional[List[float]] = [0.0],
-            spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
-            spacingfactor: Optional[float] = 1.0,
-            timeoffset: Optional[float] = 0.0,
+            sampleperiod: List[float] = [0.0],
+            spacingmethod: Spacingmethod = Spacingmethod.linear,
+            spacingfactor: float = 1.0,
+            timeoffset: float = 0.0,
         ):
             """universal pal action"""
             A = await app.base.setup_action()
@@ -171,17 +171,17 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/PAL_ANEC_aliquot", tags=["action"])
         async def PAL_ANEC_aliquot(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            toolGC: Optional[PALtools] = PALtools.HS2,
-            toolarchive: Optional[PALtools] = PALtools.LS3,
-            source: Optional[dev_customitems] = "cell1_we",
-            volume_ul_GC: Optional[int] = 300,
-            volume_ul_archive: Optional[int] = 500,
-            wash1: Optional[bool] = True,
-            wash2: Optional[bool] = True,
-            wash3: Optional[bool] = True,
-            wash4: Optional[bool] = False,
+            toolGC: PALtools = PALtools.HS2,
+            toolarchive: PALtools = PALtools.LS3,
+            source: dev_customitems = "cell1_we",
+            volume_ul_GC: int = 300,
+            volume_ul_archive: int = 500,
+            wash1: bool = True,
+            wash2: bool = True,
+            wash3: bool = True,
+            wash4: bool = False,
         ):
             A = await app.base.setup_action()
             A.action_abbr = "GC_injection"
@@ -197,11 +197,11 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/PAL_ANEC_GC", tags=["action"])
         async def PAL_ANEC_GC(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            toolGC: Optional[PALtools] = PALtools.HS2,
-            source: Optional[dev_customitems] = "cell1_we",
-            volume_ul_GC: Optional[int] = 300,
+            toolGC: PALtools = PALtools.HS2,
+            source: dev_customitems = "cell1_we",
+            volume_ul_GC: int = 300,
         ):
             A = await app.base.setup_action()
             A.action_abbr = "GC_injection"
@@ -217,20 +217,20 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/PAL_injection_tray_GC", tags=["action"])
         async def PAL_injection_tray_GC(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            startGC: Optional[bool] = True,
-            sampletype: Optional[GCsampletype] = "liquid",
-            tool: Optional[PALtools] = PALtools.LS1,
-            source_tray: Optional[int] = 1,
-            source_slot: Optional[int] = 1,
-            source_vial: Optional[int] = 1,
-            dest: Optional[dev_customitems] = None,
-            volume_ul: Optional[int] = 2,
-            wash1: Optional[bool] = True,
-            wash2: Optional[bool] = True,
-            wash3: Optional[bool] = True,
-            wash4: Optional[bool] = False,
+            startGC: bool = True,
+            sampletype: GCsampletype = "liquid",
+            tool: PALtools = PALtools.LS1,
+            source_tray: int = 1,
+            source_slot: int = 1,
+            source_vial: int = 1,
+            dest: dev_customitems = None,
+            volume_ul: int = 2,
+            wash1: bool = True,
+            wash2: bool = True,
+            wash3: bool = True,
+            wash4: bool = False,
         ):
             A = await app.base.setup_action()
             A.action_abbr = "GC_injection"
@@ -246,18 +246,18 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/PAL_injection_custom_GC", tags=["action"])
         async def PAL_injection_custom_GC(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            startGC: Optional[bool] = None,
-            sampletype: Optional[GCsampletype] = None,
-            tool: Optional[PALtools] = None,
-            source: Optional[dev_customitems] = None,
-            dest: Optional[dev_customitems] = None,
-            volume_ul: Optional[int] = 2,
-            wash1: Optional[bool] = True,
-            wash2: Optional[bool] = True,
-            wash3: Optional[bool] = True,
-            wash4: Optional[bool] = False,
+            startGC: bool = None,
+            sampletype: GCsampletype = None,
+            tool: PALtools = None,
+            source: dev_customitems = None,
+            dest: dev_customitems = None,
+            volume_ul: int = 2,
+            wash1: bool = True,
+            wash2: bool = True,
+            wash3: bool = True,
+            wash4: bool = False,
         ):
             A = await app.base.setup_action()
             A.action_abbr = "GC_injection"
@@ -268,16 +268,16 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/PAL_injection_custom_HPLC", tags=["action"])
         async def PAL_injection_custom_HPLC(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            tool: Optional[PALtools] = None,
-            source: Optional[dev_customitems] = None,
-            dest: Optional[dev_customitems] = None,
-            volume_ul: Optional[int] = 2,
-            wash1: Optional[bool] = True,
-            wash2: Optional[bool] = True,
-            wash3: Optional[bool] = True,
-            wash4: Optional[bool] = False,
+            tool: PALtools = None,
+            source: dev_customitems = None,
+            dest: dev_customitems = None,
+            volume_ul: int = 2,
+            wash1: bool = True,
+            wash2: bool = True,
+            wash3: bool = True,
+            wash4: bool = False,
         ):
             A = await app.base.setup_action()
             A.action_abbr = "HPLC_injection"
@@ -288,18 +288,18 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/PAL_injection_tray_HPLC", tags=["action"])
         async def PAL_injection_tray_HPLC(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            tool: Optional[PALtools] = PALtools.LS1,
-            source_tray: Optional[int] = 1,
-            source_slot: Optional[int] = 1,
-            source_vial: Optional[int] = 1,
-            dest: Optional[dev_customitems] = None,
-            volume_ul: Optional[int] = 25,
-            wash1: Optional[bool] = True,
-            wash2: Optional[bool] = True,
-            wash3: Optional[bool] = True,
-            wash4: Optional[bool] = False,
+            tool: PALtools = PALtools.LS1,
+            source_tray: int = 1,
+            source_slot: int = 1,
+            source_vial: int = 1,
+            dest: dev_customitems = None,
+            volume_ul: int = 25,
+            wash1: bool = True,
+            wash2: bool = True,
+            wash3: bool = True,
+            wash4: bool = False,
         ):
             A = await app.base.setup_action()
             A.action_abbr = "HPLC_injection"
@@ -311,24 +311,24 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/PAL_transfer_tray_tray", tags=["action"])
         async def PAL_transfer_tray_tray(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            sampleperiod: Optional[List[float]] = Body([0.0], embed=True),
-            spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
-            spacingfactor: Optional[float] = 1.0,
-            timeoffset: Optional[float] = 0.0,
-            tool: Optional[PALtools] = None,
-            volume_ul: Optional[int] = 2,
-            source_tray: Optional[int] = 1,
-            source_slot: Optional[int] = 1,
-            source_vial: Optional[int] = 1,
-            dest_tray: Optional[int] = 1,
-            dest_slot: Optional[int] = 1,
-            dest_vial: Optional[int] = 1,
-            wash1: Optional[bool] = True,
-            wash2: Optional[bool] = True,
-            wash3: Optional[bool] = True,
-            wash4: Optional[bool] = False,
+            sampleperiod: List[float] = Body([0.0], embed=True),
+            spacingmethod: Spacingmethod = Spacingmethod.linear,
+            spacingfactor: float = 1.0,
+            timeoffset: float = 0.0,
+            tool: PALtools = None,
+            volume_ul: int = 2,
+            source_tray: int = 1,
+            source_slot: int = 1,
+            source_vial: int = 1,
+            dest_tray: int = 1,
+            dest_slot: int = 1,
+            dest_vial: int = 1,
+            wash1: bool = True,
+            wash2: bool = True,
+            wash3: bool = True,
+            wash4: bool = False,
         ):
             A = await app.base.setup_action()
             A.action_abbr = "transfer"
@@ -340,22 +340,22 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/PAL_transfer_tray_custom", tags=["action"])
         async def PAL_transfer_tray_custom(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            sampleperiod: Optional[List[float]] = Body([0.0], embed=True),
-            spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
-            spacingfactor: Optional[float] = 1.0,
-            timeoffset: Optional[float] = 0.0,
-            tool: Optional[PALtools] = None,
-            volume_ul: Optional[int] = 2,
-            source_tray: Optional[int] = 1,
-            source_slot: Optional[int] = 1,
-            source_vial: Optional[int] = 1,
-            dest: Optional[dev_customitems] = None,
-            wash1: Optional[bool] = True,
-            wash2: Optional[bool] = True,
-            wash3: Optional[bool] = True,
-            wash4: Optional[bool] = False,
+            sampleperiod: List[float] = Body([0.0], embed=True),
+            spacingmethod: Spacingmethod = Spacingmethod.linear,
+            spacingfactor: float = 1.0,
+            timeoffset: float = 0.0,
+            tool: PALtools = None,
+            volume_ul: int = 2,
+            source_tray: int = 1,
+            source_slot: int = 1,
+            source_vial: int = 1,
+            dest: dev_customitems = None,
+            wash1: bool = True,
+            wash2: bool = True,
+            wash3: bool = True,
+            wash4: bool = False,
         ):
             A = await app.base.setup_action()
             A.action_abbr = "transfer"
@@ -367,22 +367,22 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/PAL_transfer_custom_tray", tags=["action"])
         async def PAL_transfer_custom_tray(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            sampleperiod: Optional[List[float]] = Body([0.0], embed=True),
-            spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
-            spacingfactor: Optional[float] = 1.0,
-            timeoffset: Optional[float] = 0.0,
-            tool: Optional[PALtools] = None,
-            volume_ul: Optional[int] = 2,
-            source: Optional[dev_customitems] = None,
-            dest_tray: Optional[int] = 1,
-            dest_slot: Optional[int] = 1,
-            dest_vial: Optional[int] = 1,
-            wash1: Optional[bool] = True,
-            wash2: Optional[bool] = True,
-            wash3: Optional[bool] = True,
-            wash4: Optional[bool] = False,
+            sampleperiod: List[float] = Body([0.0], embed=True),
+            spacingmethod: Spacingmethod = Spacingmethod.linear,
+            spacingfactor: float = 1.0,
+            timeoffset: float = 0.0,
+            tool: PALtools = None,
+            volume_ul: int = 2,
+            source: dev_customitems = None,
+            dest_tray: int = 1,
+            dest_slot: int = 1,
+            dest_vial: int = 1,
+            wash1: bool = True,
+            wash2: bool = True,
+            wash3: bool = True,
+            wash4: bool = False,
         ):
             A = await app.base.setup_action()
             A.action_abbr = "transfer"
@@ -393,20 +393,20 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/PAL_transfer_custom_custom", tags=["action"])
         async def PAL_transfer_custom_custom(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            sampleperiod: Optional[List[float]] = Body([0.0], embed=True),
-            spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
-            spacingfactor: Optional[float] = 1.0,
-            timeoffset: Optional[float] = 0.0,
-            tool: Optional[PALtools] = None,
-            volume_ul: Optional[int] = 2,
-            source: Optional[dev_customitems] = None,
-            dest: Optional[dev_customitems] = None,
-            wash1: Optional[bool] = True,
-            wash2: Optional[bool] = True,
-            wash3: Optional[bool] = True,
-            wash4: Optional[bool] = False,
+            sampleperiod: List[float] = Body([0.0], embed=True),
+            spacingmethod: Spacingmethod = Spacingmethod.linear,
+            spacingfactor: float = 1.0,
+            timeoffset: float = 0.0,
+            tool: PALtools = None,
+            volume_ul: int = 2,
+            source: dev_customitems = None,
+            dest: dev_customitems = None,
+            wash1: bool = True,
+            wash2: bool = True,
+            wash3: bool = True,
+            wash4: bool = False,
         ):
             A = await app.base.setup_action()
             A.action_abbr = "transfer"
@@ -417,19 +417,19 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/PAL_archive", tags=["action"])
         async def PAL_archive(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            tool: Optional[PALtools] = None,
-            source: Optional[dev_customitems] = None,
-            volume_ul: Optional[int] = 200,
-            sampleperiod: Optional[List[float]] = Body([0], embed=True),
-            spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
-            spacingfactor: Optional[float] = 1.0,
-            timeoffset: Optional[float] = 0.0,
-            wash1: Optional[bool] = False,
-            wash2: Optional[bool] = False,
-            wash3: Optional[bool] = False,
-            wash4: Optional[bool] = False,
+            tool: PALtools = None,
+            source: dev_customitems = None,
+            volume_ul: int = 200,
+            sampleperiod: List[float] = Body([0], embed=True),
+            spacingmethod: Spacingmethod = Spacingmethod.linear,
+            spacingfactor: float = 1.0,
+            timeoffset: float = 0.0,
+            wash1: bool = False,
+            wash2: bool = False,
+            wash3: bool = False,
+            wash4: bool = False,
         ):
             A = await app.base.setup_action()
             A.action_abbr = "archive"
@@ -439,16 +439,16 @@ def makeApp(confPrefix, server_key, helao_root):
     # if "fill" in _cams:
     #     @app.post(f"/{server_key}/PAL_fill", tags=["action"])
     #     async def PAL_fill(
-    #         action: Optional[Action] = \
+    #         action: Action = \
     #                 Body({}, embed=True),
-    #         tool: Optional[PALtools] = None,
-    #         source: Optional[dev_customitems] = None,
-    #         dest: Optional[dev_customitems] = None,
-    #         volume_ul: Optional[int] = 200,
-    #         wash1: Optional[bool] = False,
-    #         wash2: Optional[bool] = False,
-    #         wash3: Optional[bool] = False,
-    #         wash4: Optional[bool] = False,
+    #         tool: PALtools = None,
+    #         source: dev_customitems = None,
+    #         dest: dev_customitems = None,
+    #         volume_ul: int = 200,
+    #         wash1: bool = False,
+    #         wash2: bool = False,
+    #         wash3: bool = False,
+    #         wash4: bool = False,
     #     ):
     #         A = await app.base.setup_action()
     #         A.action_abbr = "fill"
@@ -458,16 +458,16 @@ def makeApp(confPrefix, server_key, helao_root):
     # if "fillfixed" in _cams:
     #     @app.post(f"/{server_key}/PAL_fillfixed", tags=["action"])
     #     async def PAL_fillfixed(
-    #         action: Optional[Action] = \
+    #         action: Action = \
     #                 Body({}, embed=True),
-    #         tool: Optional[PALtools] = None,
-    #         source: Optional[dev_customitems] = None,
-    #         dest: Optional[dev_customitems] = None,
-    #         volume_ul: Optional[int] = 200, # this value is only for exp, a fixed value is used
-    #         wash1: Optional[bool] = False,
-    #         wash2: Optional[bool] = False,
-    #         wash3: Optional[bool] = False,
-    #         wash4: Optional[bool] = False,
+    #         tool: PALtools = None,
+    #         source: dev_customitems = None,
+    #         dest: dev_customitems = None,
+    #         volume_ul: int = 200, # this value is only for exp, a fixed value is used
+    #         wash1: bool = False,
+    #         wash2: bool = False,
+    #         wash3: bool = False,
+    #         wash4: bool = False,
     #     ):
     #         A = await app.base.setup_action()
     #         A.action_abbr = "fillfixed"
@@ -478,16 +478,16 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/PAL_deepclean", tags=["action"])
         async def PAL_deepclean(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            tool: Optional[PALtools] = None,
+            tool: PALtools = None,
             volume_ul: Optional[
                 int
             ] = 200,  # this value is only for exp, a fixed value is used
-            wash1: Optional[bool] = True,
-            wash2: Optional[bool] = True,
-            wash3: Optional[bool] = True,
-            wash4: Optional[bool] = True,
+            wash1: bool = True,
+            wash2: bool = True,
+            wash3: bool = True,
+            wash4: bool = True,
         ):
             A = await app.base.setup_action()
             A.action_abbr = "deepclean"
@@ -498,22 +498,22 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/PAL_dilute", tags=["action"])
         async def PAL_dilute(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            tool: Optional[PALtools] = None,
-            source: Optional[dev_customitems] = None,
-            volume_ul: Optional[int] = 200,
-            dest_tray: Optional[int] = 0,
-            dest_slot: Optional[int] = 0,
-            dest_vial: Optional[int] = 0,
-            sampleperiod: Optional[List[float]] = Body([0.0], embed=True),
-            spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
-            spacingfactor: Optional[float] = 1.0,
-            timeoffset: Optional[float] = 0.0,
-            wash1: Optional[bool] = True,
-            wash2: Optional[bool] = True,
-            wash3: Optional[bool] = True,
-            wash4: Optional[bool] = True,
+            tool: PALtools = None,
+            source: dev_customitems = None,
+            volume_ul: int = 200,
+            dest_tray: int = 0,
+            dest_slot: int = 0,
+            dest_vial: int = 0,
+            sampleperiod: List[float] = Body([0.0], embed=True),
+            spacingmethod: Spacingmethod = Spacingmethod.linear,
+            spacingfactor: float = 1.0,
+            timeoffset: float = 0.0,
+            wash1: bool = True,
+            wash2: bool = True,
+            wash3: bool = True,
+            wash4: bool = True,
         ):
             A = await app.base.setup_action()
             A.action_abbr = "dilute"
@@ -524,19 +524,19 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post(f"/{server_key}/PAL_autodilute", tags=["action"])
         async def PAL_autodilute(
-            action: Optional[Action] = Body({}, embed=True),
+            action: Action = Body({}, embed=True),
             action_version: int = 1,
-            tool: Optional[PALtools] = None,
-            source: Optional[dev_customitems] = None,
-            volume_ul: Optional[int] = 200,
-            sampleperiod: Optional[List[float]] = Body([0.0], embed=True),
-            spacingmethod: Optional[Spacingmethod] = Spacingmethod.linear,
-            spacingfactor: Optional[float] = 1.0,
-            timeoffset: Optional[float] = 0.0,
-            wash1: Optional[bool] = True,
-            wash2: Optional[bool] = True,
-            wash3: Optional[bool] = True,
-            wash4: Optional[bool] = True,
+            tool: PALtools = None,
+            source: dev_customitems = None,
+            volume_ul: int = 200,
+            sampleperiod: List[float] = Body([0.0], embed=True),
+            spacingmethod: Spacingmethod = Spacingmethod.linear,
+            spacingfactor: float = 1.0,
+            timeoffset: float = 0.0,
+            wash1: bool = True,
+            wash2: bool = True,
+            wash3: bool = True,
+            wash4: bool = True,
         ):
             A = await app.base.setup_action()
             A.action_abbr = "autodilute"
@@ -545,11 +545,11 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/archive_tray_query_sample", tags=["action"])
     async def archive_tray_query_sample(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        tray: Optional[int] = None,
-        slot: Optional[int] = None,
-        vial: Optional[int] = None,
+        tray: int = None,
+        slot: int = None,
+        vial: int = None,
     ):
         active = await app.base.setup_and_contain_action(action_abbr="query_sample")
         error_code, sample = await app.driver.archive.tray_query_sample(
@@ -565,7 +565,7 @@ def makeApp(confPrefix, server_key, helao_root):
         return finished_action.as_dict()
 
     @app.post(f"/{server_key}/archive_tray_unloadall", tags=["action"])
-    async def archive_tray_unloadall(action: Optional[Action] = Body({}, embed=True)):
+    async def archive_tray_unloadall(action: Action = Body({}, embed=True)):
         """Resets app.driver vial table."""
         active = await app.base.setup_and_contain_action(action_abbr="unload_sample")
         (
@@ -584,14 +584,14 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/archive_tray_load", tags=["action"])
     async def archive_tray_load(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        load_sample_in: Optional[SampleUnion] = Body(
+        load_sample_in: SampleUnion = Body(
             LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}), embed=True
         ),
-        tray: Optional[int] = None,
-        slot: Optional[int] = None,
-        vial: Optional[int] = None,
+        tray: int = None,
+        slot: int = None,
+        vial: int = None,
     ):
         active = await app.base.setup_and_contain_action(
             action_abbr="load_sample",
@@ -610,10 +610,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/archive_tray_unload", tags=["action"])
     async def archive_tray_unload(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        tray: Optional[int] = None,
-        slot: Optional[int] = None,
+        tray: int = None,
+        slot: int = None,
     ):
         """Resets app.driver vial table."""
         active = await app.base.setup_and_contain_action(action_abbr="unload_sample")
@@ -633,9 +633,9 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/archive_tray_new_position", tags=["action"])
     async def archive_tray_new(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        req_vol: Optional[float] = None,
+        req_vol: float = None,
     ):
         """Returns an empty vial position for given max volume.
         For mixed vial sizes the req_vol helps to choose the proper vial for sample volume.
@@ -652,14 +652,14 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/archive_tray_update_position", tags=["action"])
     async def archive_tray_update_position(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        sample: Optional[SampleUnion] = Body(
+        sample: SampleUnion = Body(
             LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}), embed=True
         ),
-        tray: Optional[int] = None,
-        slot: Optional[int] = None,
-        vial: Optional[int] = None,
+        tray: int = None,
+        slot: int = None,
+        vial: int = None,
     ):
         """Updates app.driver vial Table. If sucessful (vial-slot was empty) returns True, else it returns False."""
         active = await app.base.setup_and_contain_action()
@@ -675,10 +675,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/archive_tray_export_json", tags=["action"])
     async def archive_tray_export_json(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        tray: Optional[int] = None,
-        slot: Optional[int] = None,
+        tray: int = None,
+        slot: int = None,
     ):
         active = await app.base.setup_and_contain_action(
             action_abbr="traytojson",
@@ -694,14 +694,14 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/archive_tray_export_icpms", tags=["action"])
     async def archive_tray_export_icpms(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        tray: Optional[int] = None,
-        slot: Optional[int] = None,
-        survey_runs: Optional[int] = None,
-        main_runs: Optional[int] = None,
-        rack: Optional[int] = None,
-        dilution_factor: Optional[float] = None,
+        tray: int = None,
+        slot: int = None,
+        survey_runs: int = None,
+        main_runs: int = None,
+        rack: int = None,
+        dilution_factor: float = None,
     ):
         active = await app.base.setup_and_contain_action(
             action_abbr="traytoicpms",
@@ -720,10 +720,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/archive_tray_export_csv", tags=["action"])
     async def archive_tray_export_csv(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        tray: Optional[int] = None,
-        slot: Optional[int] = None,
+        tray: int = None,
+        slot: int = None,
     ):
         active = await app.base.setup_and_contain_action(
             action_abbr="traytocsv",
@@ -739,11 +739,11 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/archive_custom_load_solid", tags=["action"])
     async def archive_custom_load_solid(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        custom: Optional[dev_customitems] = None,
-        sample_no: Optional[int] = 1,
-        plate_id: Optional[int] = 1,
+        custom: dev_customitems = None,
+        sample_no: int = 1,
+        plate_id: int = 1,
     ):
 
         active = await app.base.setup_and_contain_action(
@@ -765,10 +765,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/archive_custom_load", tags=["action"])
     async def archive_custom_load(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        custom: Optional[dev_customitems] = None,
-        load_sample_in: Optional[SampleUnion] = Body(
+        custom: dev_customitems = None,
+        load_sample_in: SampleUnion = Body(
             LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}), embed=True
         ),
     ):
@@ -788,15 +788,15 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/archive_custom_unload", tags=["action"])
     async def archive_custom_unload(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        custom: Optional[dev_customitems] = None,
-        destroy_liquid: Optional[bool] = False,
-        destroy_gas: Optional[bool] = False,
-        destroy_solid: Optional[bool] = False,
-        keep_liquid: Optional[bool] = False,
-        keep_solid: Optional[bool] = False,
-        keep_gas: Optional[bool] = False,
+        custom: dev_customitems = None,
+        destroy_liquid: bool = False,
+        destroy_gas: bool = False,
+        destroy_solid: bool = False,
+        keep_liquid: bool = False,
+        keep_solid: bool = False,
+        keep_gas: bool = False,
     ):
         active = await app.base.setup_and_contain_action(
             action_abbr="unload_sample",
@@ -819,14 +819,14 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/archive_custom_unloadall", tags=["action"])
     async def archive_custom_unloadall(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        destroy_liquid: Optional[bool] = False,
-        destroy_gas: Optional[bool] = False,
-        destroy_solid: Optional[bool] = False,
-        keep_liquid: Optional[bool] = False,
-        keep_solid: Optional[bool] = False,
-        keep_gas: Optional[bool] = False,
+        destroy_liquid: bool = False,
+        destroy_gas: bool = False,
+        destroy_solid: bool = False,
+        keep_liquid: bool = False,
+        keep_solid: bool = False,
+        keep_gas: bool = False,
     ):
         active = await app.base.setup_and_contain_action(
             action_abbr="unload_sample",
@@ -859,9 +859,9 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/archive_custom_query_sample", tags=["action"])
     async def archive_custom_query_sample(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        custom: Optional[dev_customitems] = None,
+        custom: dev_customitems = None,
     ):
         active = await app.base.setup_and_contain_action(
             action_abbr="query_sample",
@@ -880,10 +880,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/archive_custom_add_liquid", tags=["action"])
     async def archive_custom_add_liquid(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        custom: Optional[dev_customitems] = None,
-        source_liquid_in: Optional[LiquidSample] = Body(
+        custom: dev_customitems = None,
+        source_liquid_in: LiquidSample = Body(
             LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}), embed=True
         ),
         volume_ml: float = 0.0,
@@ -927,9 +927,9 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/db_get_samples", tags=["action"])
     async def db_get_samples(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        fast_samples_in: Optional[List[SampleUnion]] = Body(
+        fast_samples_in: List[SampleUnion] = Body(
             [LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()})],
             embed=True,
         ),
@@ -951,9 +951,9 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/db_new_samples", tags=["action"])
     async def db_new_samples(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        fast_samples_in: Optional[List[SampleUnion]] = Body(
+        fast_samples_in: List[SampleUnion] = Body(
             [
                 LiquidSample(
                     **{
@@ -995,17 +995,17 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/generate_plate_sample_no_list", tags=["action"])
     async def generate_plate_sample_no_list(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        plate_id: Optional[int] = 1,
-        sample_code: Optional[int] = Query(0, ge=0, le=2),
-        skip_n_samples: Optional[int] = Query(0, ge=0),
-        direction: Optional[ScanDirection] = None,
-        sample_nos: Optional[List[int]] = [],
-        sample_nos_operator: Optional[ScanOperator] = None,
-        # platemap_xys: Optional[List[Tuple[int, int]]] = [],
-        platemap_xys: Optional[list] = [],
-        platemap_xys_operator: Optional[ScanOperator] = None,
+        plate_id: int = 1,
+        sample_code: int = Query(0, ge=0, le=2),
+        skip_n_samples: int = Query(0, ge=0),
+        direction: ScanDirection = None,
+        sample_nos: List[int] = [],
+        sample_nos_operator: ScanOperator = None,
+        # platemap_xys: List[Tuple[int, int]] = [],
+        platemap_xys: list = [],
+        platemap_xys_operator: ScanOperator = None,
     ):
         active = await app.base.setup_and_contain_action()
         await app.driver.archive.generate_plate_sample_no_list(
@@ -1028,7 +1028,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/get_loaded_positions", tags=["action"])
     async def get_positions(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
         """Returns position dict under action_params['_positions']."""

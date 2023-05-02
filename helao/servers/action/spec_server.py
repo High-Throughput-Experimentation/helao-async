@@ -36,10 +36,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/acquire_spec", tags=["action"])
     async def acquire_spec(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
-        int_time_ms: Optional[int] = 35,
+        fast_samples_in: List[SampleUnion] = Body([], embed=True),
+        int_time_ms: int = 35,
         duration_sec: Optional[
             float
         ] = -1,  # measurements longer than HTTP timeout should use acquire_spec_extrig
@@ -66,15 +66,15 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/acquire_spec_adv", tags=["action"])
     async def acquire_spec_adv(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
-        int_time_ms: Optional[int] = 35,
+        fast_samples_in: List[SampleUnion] = Body([], embed=True),
+        int_time_ms: int = 35,
         duration_sec: Optional[
             float
         ] = -1,  # measurements longer than HTTP timeout should use acquire_spec_extrig
-        n_avg: Optional[int] = 1,
-        fft: Optional[int] = 0,
+        n_avg: int = 1,
+        fft: int = 0,
     ):
         """Acquire N spectra and average."""
         spec_header = {"wl": app.driver.pxwl}
@@ -96,14 +96,14 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/acquire_spec_extrig", tags=["action"])
     async def acquire_spec_extrig(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
-        edge_mode: Optional[TriggerType] = TriggerType.risingedge,
-        int_time: Optional[int] = 35,
-        n_avg: Optional[int] = 1,
-        fft: Optional[int] = 0,
-        duration: Optional[float] = -1,
+        fast_samples_in: List[SampleUnion] = Body([], embed=True),
+        edge_mode: TriggerType = TriggerType.risingedge,
+        int_time: int = 35,
+        n_avg: int = 1,
+        fft: int = 0,
+        duration: float = -1,
     ):
         """Acquire spectra based on external trigger."""
         A = await app.base.setup_action()
@@ -115,7 +115,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/stop_extrig_after", tags=["action"])
     async def stop_extrig(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
         delay: int = 0,
     ):

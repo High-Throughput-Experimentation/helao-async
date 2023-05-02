@@ -54,9 +54,9 @@ def UVIS_sub_unloadall_customs(experiment: Experiment):
 def UVIS_sub_load_solid(
     experiment: Experiment,
     experiment_version: int = 1,
-    solid_custom_position: Optional[str] = "cell1_we",
-    solid_plate_id: Optional[int] = 4534,
-    solid_sample_no: Optional[int] = 1,
+    solid_custom_position: str = "cell1_we",
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
 ):
     """Load solid sample onto measurement position."""
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -78,9 +78,9 @@ def UVIS_sub_load_solid(
 def UVIS_sub_startup(
     experiment: Experiment,
     experiment_version: int = 2,
-    solid_custom_position: Optional[str] = "cell1_we",
-    solid_plate_id: Optional[int] = 4534,
-    solid_sample_no: Optional[int] = 1,
+    solid_custom_position: str = "cell1_we",
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
 ):
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
@@ -135,8 +135,8 @@ def UVIS_sub_shutdown(experiment: Experiment):
 def UVIS_sub_movetosample(
     experiment: Experiment,
     experiment_version: int = 1,
-    solid_plate_id: Optional[int] = 4534,
-    solid_sample_no: Optional[int] = 1,
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
@@ -187,20 +187,20 @@ def UVIS_sub_relmove(
 def UVIS_sub_measure(
     experiment: Experiment,
     experiment_version: int = 1,
-    spec_type: Optional[SpecType] = "T",
-    spec_n_avg: Optional[int] = 1,
-    spec_int_time_ms: Optional[int] = 10,
-    duration_sec: Optional[float] = -1,
-    toggle_source: Optional[str] = "doric_wled",  # this could be a shutter
-    toggle_is_shutter: Optional[bool] = False,
-    illumination_wavelength: Optional[float] = -1,
-    illumination_intensity: Optional[float] = -1,
-    illumination_intensity_date: Optional[str] = "n/a",
-    illumination_side: Optional[str] = "front",
-    reference_mode: Optional[str] = "internal",
-    technique_name: Optional[str] = "T_UVVIS",
-    run_use: Optional[RunUse] = "data",
-    comment: Optional[str] = "",
+    spec_type: SpecType = "T",
+    spec_n_avg: int = 1,
+    spec_int_time_ms: int = 10,
+    duration_sec: float = -1,
+    toggle_source: str = "doric_wled",  # this could be a shutter
+    toggle_is_shutter: bool = False,
+    illumination_wavelength: float = -1,
+    illumination_intensity: float = -1,
+    illumination_intensity_date: str = "n/a",
+    illumination_side: str = "front",
+    reference_mode: str = "internal",
+    technique_name: str = "T_UVVIS",
+    run_use: RunUse = "data",
+    comment: str = "",
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
@@ -272,7 +272,7 @@ def UVIS_sub_setup_ref(
     experiment: Experiment,
     experiment_version: int = 1,
     reference_mode: str = "internal",
-    solid_custom_position: Optional[str] = "cell1_we",
+    solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 1,
     solid_sample_no: int = 2,
     specref_code: int = 1,
