@@ -28,11 +28,11 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/acquire_image", tags=["action"])
     async def acquire_image(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        duration: Optional[float] = -1,
-        acquisition_rate: Optional[float] = 1,
-        fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
+        duration: float = -1,
+        acquisition_rate: float = 1,
+        fast_samples_in: List[SampleUnion] = Body([], embed=True),
     ):
         """Record image stream from webcam."""
         active = await app.base.setup_and_contain_action()
@@ -47,7 +47,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/cancel_acquire_image", tags=["action"])
     async def cancel_acquire_image(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
         """Stop image aqcuisition."""

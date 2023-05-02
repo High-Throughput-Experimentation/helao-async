@@ -79,10 +79,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/run_CP", tags=["action"])
     async def run_CP(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        Ival: Optional[float] = 0.0,
-        Tval__s: Optional[float] = 10.0,
+        Ival: float = 0.0,
+        Tval__s: float = 10.0,
         AcqInterval__s: Optional[
             float
         ] = 1.0,  # Time between data acquisition samples in seconds.
