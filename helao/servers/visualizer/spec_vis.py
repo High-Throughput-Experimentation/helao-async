@@ -18,7 +18,7 @@ from bokeh.models import ColumnDataSource
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.data import DataPackageModel
 from helao.servers.vis import Vis
-from helao.helpers.dispatcher import async_private_dispatcher
+from helao.helpers.dispatcher import private_dispatcher
 
 
 valid_data_status = (
@@ -48,15 +48,14 @@ class C_specvis:
             f"ws://{specserv_config['host']}:{specserv_config['port']}/ws_data"
         )
 
-        self.wl = asyncio.create_task(
-            async_private_dispatcher(
-                self.vis.world_cfg,
-                self.spec_key,
-                "get_wl",
-                params_dict={},
-                json_dict={},
-            )
-        ).result()
+        self.wl = private_dispatcher(
+            self.vis.world_cfg,
+            self.spec_key,
+            "get_wl",
+            params_dict={},
+            json_dict={},
+        )[0]
+        self.vis.print_message(self.wl)
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
@@ -192,6 +191,7 @@ class C_specvis:
         self.vis.doc.add_next_tick_callback(
             partial(self.update_input_value, sender, f"{self.downsample}")
         )
+
     def update_input_value(self, sender, value):
         sender.value = value
 
@@ -255,7 +255,7 @@ class C_specvis:
                 deepcopy(key): deepcopy(val)
                 for key, val in self.datasource.data.items()
             }
-            self.data_dict = {"wl": self.wl[::self.downsample]}
+            self.data_dict = {"wl": self.wl[:: self.downsample]}
 
         # update self.data_dict with incoming data package
         for _, data_dict in datapackage.datamodel.data.items():
@@ -267,7 +267,7 @@ class C_specvis:
                 key=lambda x: int(x.split("_")[-1]),
             )
             ch_vals = [data_dict[k] for k in ch_keys]
-            self.data_dict.update({dtstr: ch_vals[::self.downsample]})
+            self.data_dict.update({dtstr: ch_vals[:: self.downsample]})
 
         # trim number of spectra being plotted
         if len(self.data_dict.keys()) > self.max_spectra:
@@ -305,9 +305,7 @@ class C_specvis:
                 legend_label=dt,
             )
 
-        dsp_keys = [
-            x for x in sorted(self.datasource_prev.data.keys()) if x != "wl"
-        ]
+        dsp_keys = [x for x in sorted(self.datasource_prev.data.keys()) if x != "wl"]
         for i, dt in enumerate(dsp_keys):
             self.plot_prev.line(
                 x="wl",

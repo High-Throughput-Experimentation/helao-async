@@ -1,7 +1,8 @@
-__all__ = ["async_action_dispatcher", "async_private_dispatcher"]
+__all__ = ["async_action_dispatcher", "async_private_dispatcher", "private_dispatcher"]
 
 import traceback
 import aiohttp
+import requests
 
 from helao.helpers.premodels import Action
 from helaocore.error import ErrorCodes
@@ -88,6 +89,47 @@ async def async_private_dispatcher(
                         actd,
                         "orchestrator",
                         f"{server}/{private_action} POST request returned status {resp.status}: '{response}', error={repr(error_code)}",
+                        error=True,
+                    )
+            except Exception as e:
+                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                print_message(
+                    actd,
+                    "orchestrator",
+                    f"{server}/{private_action} async_private_dispatcher could not decide response: '{resp}', error={repr(e), tb}",
+                    error=True,
+                )
+                response = None
+            return response, error_code
+
+def private_dispatcher(
+    world_config_dict: dict,
+    server: str,
+    private_action: str,
+    params_dict: dict,
+    json_dict: dict,
+):
+    actd = world_config_dict["servers"][server]
+    act_addr = actd["host"]
+    act_port = actd["port"]
+
+    url = f"http://{act_addr}:{act_port}/{private_action}"
+
+    with requests.Session() as session:
+        with session.post(
+            url,
+            params=params_dict,
+            json=json_dict,
+        ) as resp:
+            error_code = ErrorCodes.none
+            try:
+                response = resp.json()
+                if resp.status_code != 200:
+                    error_code = ErrorCodes.http
+                    print_message(
+                        actd,
+                        "orchestrator",
+                        f"{server}/{private_action} POST request returned status {resp.status_code}: '{response}', error={repr(error_code)}",
                         error=True,
                     )
             except Exception as e:
