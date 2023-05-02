@@ -28,11 +28,11 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/acquire_o2", tags=["action"])
     async def acquire_o2(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        duration: Optional[float] = -1,
-        acquisition_rate: Optional[float] = 0.2,
-        fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
+        duration: float = -1,
+        acquisition_rate: float = 0.2,
+        fast_samples_in: List[SampleUnion] = Body([], embed=True),
     ):
         """Record O2 ppm level."""
         active = await app.base.setup_and_contain_action()
@@ -47,7 +47,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/cancel_acquire_o2", tags=["action"])
     async def cancel_acquire_co2(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
         """Stop running O2 acquisition."""

@@ -28,11 +28,11 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/record_tec", tags=["action"])
     async def record_tec(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
-        duration: Optional[float] = -1,
-        acquisition_rate: Optional[float] = 0.2,
-        fast_samples_in: Optional[List[SampleUnion]] = Body([], embed=True),
+        duration: float = -1,
+        acquisition_rate: float = 0.2,
+        fast_samples_in: List[SampleUnion] = Body([], embed=True),
     ):
         """Record TEC values (does not affect setpoint or control)."""
         active = await app.base.setup_and_contain_action()
@@ -47,7 +47,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/cancel_record_tec", tags=["action"])
     async def cancel_acquire_co2(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
         """Stop recording TEC values (does not affect setpoint or control)."""
@@ -60,7 +60,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/set_temperature", tags=["action"])
     async def set_temperature(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
         target_temperature_degc: float = 25.0,
     ):
@@ -72,7 +72,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/enable_tec", tags=["action"])
     async def enable_tec(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
         "Enable TEC control."""
@@ -83,7 +83,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post(f"/{server_key}/disable_tec", tags=["action"])
     async def disable_tec(
-        action: Optional[Action] = Body({}, embed=True),
+        action: Action = Body({}, embed=True),
         action_version: int = 1,
     ):
         """Disable TEC control."""
