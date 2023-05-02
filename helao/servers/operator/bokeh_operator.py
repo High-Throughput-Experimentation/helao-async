@@ -1203,7 +1203,7 @@ class Operator:
                         [
                             param_input[item],
                             Paragraph(
-                                text=str(argtypes[idx]), align=("start", "center")
+                                text=argtypes[idx].__name__, align=("start", "end")
                             ),
                         ],
                         Spacer(height=10),
