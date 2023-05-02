@@ -22,7 +22,6 @@ from helao.drivers.io.enum import TriggerType
 
 
 def makeApp(confPrefix, server_key, helao_root):
-
     config = config_loader(confPrefix, helao_root)
 
     app = HelaoBase(
@@ -33,6 +32,11 @@ def makeApp(confPrefix, server_key, helao_root):
         version=0.1,
         driver_class=SM303,
     )
+
+    @app.post("/get_wl", tags=["private"])
+    def get_wl():
+        """Return spectrometer wavelength array; shape = (num_pixels)"""
+        return app.driver.pxwl
 
     @app.post(f"/{server_key}/acquire_spec", tags=["action"])
     async def acquire_spec(
