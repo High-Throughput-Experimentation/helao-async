@@ -1003,7 +1003,9 @@ class Operator:
         self.sequence.sequence_name = sequence.sequence_name
         self.sequence.sequence_label = sequence.sequence_label
         self.sequence.sequence_params = sequence.sequence_params
-        self.sequence.sequence_codehash = self.orch.get_sequence_codehash(selected_sequence)
+        self.sequence.sequence_codehash = self.orch.get_sequence_codehash(
+            selected_sequence
+        )
 
         return sequence
 
@@ -1198,7 +1200,12 @@ class Operator:
             param_layout.append(
                 layout(
                     [
-                    [param_input[item], Paragraph(text=str(argtypes[idx]))],
+                        [
+                            param_input[item],
+                            Paragraph(
+                                text=str(argtypes[idx]), align=("start", "center")
+                            ),
+                        ],
                         Spacer(height=10),
                     ],
                     background=self.color_sq_param_inputs,
