@@ -690,9 +690,7 @@ class Calc:
         seq_reldir = activeobj.action.get_sequence_dir()
         # seq_dict = self.get_seq_dict(seq_reldir)
 
-        max_loops = (
-            repeat_experiment_params.get("max_purge_iters", 5) + 1
-        )  # add original purge
+        max_repeats = repeat_experiment_params.get("max_repeats", 5)
 
         hlo_dict = self.gather_seq_data(seq_reldir, "acquire_co2")
         all_exps = self.gather_seq_exps(seq_reldir, "*")
@@ -754,9 +752,9 @@ class Calc:
             else:
                 break
 
-        if loop_condition and num_consecutive_repeats >= max_loops:
+        if loop_condition and num_consecutive_repeats > max_repeats:
             self.base.print_message(
-                f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition but max_purge_iters ({max_loops}) reached. Exiting."
+                f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition but max_repeats ({max_repeats}) reached. Exiting."
             )
         elif loop_condition:
             self.base.print_message(
