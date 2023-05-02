@@ -48,7 +48,7 @@ class C_specvis:
             f"ws://{specserv_config['host']}:{specserv_config['port']}/ws_data"
         )
 
-        self.wl = asyncio.gather(
+        self.wl = asyncio.create_task(
             async_private_dispatcher(
                 self.vis.world_cfg,
                 self.spec_key,
