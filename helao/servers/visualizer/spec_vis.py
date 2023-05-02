@@ -56,7 +56,7 @@ class C_specvis:
                 params_dict={},
                 json_dict={},
             )
-        )
+        ).result()
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
