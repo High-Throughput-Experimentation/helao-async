@@ -1,7 +1,7 @@
 __all__ = ["config"]
 
 
-hostip = "eche-06"
+hostip = "hte-eche-06.htejcap.caltech.edu"
 config = {}
 config["dummy"] = False
 config["simulation"] = False
