@@ -1,4 +1,4 @@
-hostip = "ccsi-01"
+hostip = "hte-ccsi-01.htejcap.caltech.edu"
 config = {}
 config["dummy"] = False
 config["simulation"] = False
