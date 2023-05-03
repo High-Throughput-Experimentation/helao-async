@@ -1,4 +1,4 @@
-hostip = "anec-03"
+hostip = "hte-anec-03.htejcap.caltech.edu"
 config = {}
 config["dummy"] = False
 config["simulation"] = False
