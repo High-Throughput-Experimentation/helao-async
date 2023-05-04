@@ -33,6 +33,7 @@ class C_potvis:
         self.vis = visServ
         self.config_dict = self.vis.server_cfg["params"]
         self.max_points = 500
+        self.max_prev = 4
 
         self.potentiostat_key = serv_key
         potserv_config = self.vis.world_cfg["servers"].get(self.potentiostat_key, None)
@@ -56,6 +57,7 @@ class C_potvis:
         self.datasource_prev = ColumnDataSource(data=deepcopy(self.data_dict))
         self.cur_action_uuid = ""
         self.prev_action_uuid = ""
+        self.prev_action_uuids = []
 
         # create visual elements
         self.layout = []
@@ -72,11 +74,22 @@ class C_potvis:
             partial(self.callback_input_max_points, sender=self.input_max_points),
         )
 
+        self.input_max_prev = TextInput(
+            value=f"{self.max_prev}",
+            title="max previous plots",
+            disabled=False,
+            width=150,
+            height=40,
+        )
+        self.input_max_prev.on_change(
+            "value",
+            partial(self.callback_input_max_prev, sender=self.input_max_prev),
+        )
         self.xaxis_selector_group = RadioButtonGroup(
             labels=self.data_dict_keys, active=0, width=500
         )
-        self.yaxis_selector_group = CheckboxButtonGroup(
-            labels=self.data_dict_keys, active=[1, 3], width=500
+        self.yaxis_selector_group = RadioButtonGroup(
+            labels=self.data_dict_keys, active=0, width=500
         )
 
         self.plot = figure(title="Title", height=300, width=500)
@@ -154,6 +167,29 @@ class C_potvis:
             partial(self.update_input_value, sender, f"{self.max_points}")
         )
 
+    def callback_input_max_prev(self, attr, old, new, sender):
+        """callback for input_max_prev"""
+
+        def to_int(val):
+            try:
+                return int(val)
+            except ValueError:
+                return None
+
+        newpts = to_int(new)
+        oldpts = to_int(old)
+
+        if newpts is None:
+            if oldpts is not None:
+                newpts = oldpts
+            else:
+                newpts = 4
+
+        self.max_prev = newpts
+
+        self.vis.doc.add_next_tick_callback(
+            partial(self.update_input_value, sender, f"{self.max_prev}")
+        )
     def update_input_value(self, sender, value):
         sender.value = value
 
@@ -236,102 +272,51 @@ class C_potvis:
         self.plot_prev.renderers = []
 
         self.plot.title.text = f"active action_uuid: {self.cur_action_uuid}"
-        self.plot_prev.title.text = f"previous action_uuid: {self.prev_action_uuid}"
-        xstr = ""
-        if self.xaxis_selector_group.active == 0:
-            xstr = "t_s"
-        elif self.xaxis_selector_group.active == 1:
-            xstr = "Ewe_V"
-        elif self.xaxis_selector_group.active == 2:
-            xstr = "Ach_V"
-        else:
-            xstr = "I_A"
+        self.plot_prev.title.text = f"last {len(self.prev_action_uuids)} actions"
+        xstr = self.data_dict_keys[self.xaxis_selector_group.active]
+        ystr = self.data_dict_keys[self.yaxis_selector_group.active]
         colors = ["red", "blue", "yellow", "green"]
-        color_count = 0
-        for i in self.yaxis_selector_group.active:
-            if i == 0:
-                self.plot.line(
-                    x=xstr,
-                    y="t_s",
-                    line_color=colors[color_count],
-                    source=self.datasource,
-                    name=self.cur_action_uuid,
-                    legend_label="t_s",
-                )
-                self.plot_prev.line(
-                    x=xstr,
-                    y="t_s",
-                    line_color=colors[color_count],
-                    source=self.datasource_prev,
-                    name=self.prev_action_uuid,
-                    legend_label="t_s",
-                )
-            elif i == 1:
-                self.plot.line(
-                    x=xstr,
-                    y="Ewe_V",
-                    line_color=colors[color_count],
-                    source=self.datasource,
-                    name=self.cur_action_uuid,
-                    legend_label="Ewe_V",
-                )
-                self.plot_prev.line(
-                    x=xstr,
-                    y="Ewe_V",
-                    line_color=colors[color_count],
-                    source=self.datasource_prev,
-                    name=self.prev_action_uuid,
-                    legend_label="Ewe_V",
-                )
-            elif i == 2:
-                self.plot.line(
-                    x=xstr,
-                    y="Ach_V",
-                    line_color=colors[color_count],
-                    source=self.datasource,
-                    name=self.cur_action_uuid,
-                    legend_label="Ach_V",
-                )
-                self.plot_prev.line(
-                    x=xstr,
-                    y="Ach_V",
-                    line_color=colors[color_count],
-                    source=self.datasource_prev,
-                    name=self.prev_action_uuid,
-                    legend_label="Ach_V",
-                )
-            else:
-                self.plot.line(
-                    x=xstr,
-                    y="I_A",
-                    line_color=colors[color_count],
-                    source=self.datasource,
-                    name=self.cur_action_uuid,
-                    legend_label="I_A",
-                )
-                self.plot_prev.line(
-                    x=xstr,
-                    y="I_A",
-                    line_color=colors[color_count],
-                    source=self.datasource_prev,
-                    name=self.prev_action_uuid,
-                    legend_label="I_A",
-                )
-            color_count += 1
+        self.plot.line(
+            x=xstr,
+            y=ystr,
+            line_color=colors[0],
+            source=self.datasource,
+            name=self.cur_action_uuid,
+            legend_label=ystr,
+        )
+        for i, puuid in enumerate(self.prev_action_uuids):
+            self.plot_prev.line(
+                x=xstr+f"__{puuid}",
+                y=ystr+f"__{puuid}",
+                line_color=colors[i%len(colors)],
+                source=self.datasource_prev,
+                name=puuid,
+                legend_label=puuid.split("-")[0],
+            )
 
     def reset_plot(self, new_action_uuid: UUID, forceupdate: bool = False):
         if (new_action_uuid != self.cur_action_uuid) or forceupdate:
             self.vis.print_message(" ... reseting Gamry graph")
             self.prev_action_uuid = self.cur_action_uuid
             self.cur_action_uuid = new_action_uuid
+            self.prev_action_uuids.append(self.prev_action_uuid)
+            
+            remove_prevs = []
+            while len(self.prev_action_uuids) > self.max_prev:
+                remove_prevs.append(self.prev_action_uuids.pop(0))
 
             # copy old data to "prev" plot
             self.datasource_prev.data = {
-                deepcopy(key): deepcopy(val)
+                key+f"__{self.prev_action_uuid}": val
                 for key, val in self.datasource.data.items()
             }
+            for rp in remove_prevs:
+                for k in self.datasource_prev.data.keys():
+                    if k.endswith(rp):
+                        self.datasource_prev.data.pop(k)
             self.data_dict = {key: [] for key in self.data_dict_keys}
             self.datasource.data = self.data_dict
+            
             self._add_plots()
 
         elif (self.xselect != self.xaxis_selector_group.active) or (
