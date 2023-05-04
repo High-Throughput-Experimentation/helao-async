@@ -18,7 +18,7 @@ from bokeh.models import ColumnDataSource
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.data import DataPackageModel
 from helao.servers.vis import Vis
-from helao.helpers.dispatcher import async_private_dispatcher
+from helao.helpers.dispatcher import private_dispatcher
 
 
 valid_data_status = (
@@ -34,6 +34,7 @@ class C_specvis:
         self.vis = visServ
         self.config_dict = self.vis.server_cfg["params"]
         self.max_spectra = 5
+        self.downsample = 2
         self.min_update_delay = 0.5  # drop plots if spectra come in too quickly
 
         self.spec_key = serv_key
@@ -47,15 +48,14 @@ class C_specvis:
             f"ws://{specserv_config['host']}:{specserv_config['port']}/ws_data"
         )
 
-        self.wl = asyncio.gather(
-            async_private_dispatcher(
-                self.vis.world_cfg,
-                self.spec_key,
-                "get_wl",
-                params_dict={},
-                json_dict={},
-            )
-        )
+        self.wl = private_dispatcher(
+            self.vis.world_cfg,
+            self.spec_key,
+            "get_wl",
+            params_dict={},
+            json_dict={},
+        )[0]
+        self.vis.print_message(self.wl)
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
@@ -82,6 +82,17 @@ class C_specvis:
             partial(self.callback_input_max_spectra, sender=self.input_max_spectra),
         )
 
+        self.input_downsample = TextInput(
+            value=f"{self.downsample}",
+            title="downsampling factor",
+            disabled=False,
+            width=150,
+            height=40,
+        )
+        self.input_downsample.on_change(
+            "value",
+            partial(self.callback_input_downsample, sender=self.input_downsample),
+        )
         # self.xaxis_selector_group = RadioButtonGroup(
         #     labels=self.data_dict_keys, active=0, width=500
         # )
@@ -105,12 +116,7 @@ class C_specvis:
                         height=15,
                     ),
                 ],
-                [self.input_max_spectra],
-                [
-                    Paragraph(text="""x-axis:""", width=500, height=15),
-                    Paragraph(text="""y-axis:""", width=500, height=15),
-                ],
-                # [self.xaxis_selector_group, self.yaxis_selector_group],
+                [self.input_max_spectra, Spacer(width=20), self.input_downsample],
                 Spacer(height=10),
                 [self.plot, Spacer(width=20), self.plot_prev],
                 Spacer(height=10),
@@ -162,6 +168,28 @@ class C_specvis:
 
         self.vis.doc.add_next_tick_callback(
             partial(self.update_input_value, sender, f"{self.max_spectra}")
+        )
+
+    def callback_input_downsample(self, attr, old, new, sender):
+        """callback for input_downsample"""
+
+        def to_int(val):
+            try:
+                return int(val)
+            except ValueError:
+                return None
+
+        newpts = to_int(new)
+        oldpts = to_int(old)
+        if newpts is None:
+            if oldpts is not None:
+                newpts = oldpts
+            else:
+                newpts = 2
+        self.downsample = newpts
+
+        self.vis.doc.add_next_tick_callback(
+            partial(self.update_input_value, sender, f"{self.downsample}")
         )
 
     def update_input_value(self, sender, value):
@@ -227,7 +255,7 @@ class C_specvis:
                 deepcopy(key): deepcopy(val)
                 for key, val in self.datasource.data.items()
             }
-            self.data_dict = {"channel": []}
+            self.data_dict = {"wl": self.wl[:: self.downsample]}
 
         # update self.data_dict with incoming data package
         for _, data_dict in datapackage.datamodel.data.items():
@@ -239,7 +267,7 @@ class C_specvis:
                 key=lambda x: int(x.split("_")[-1]),
             )
             ch_vals = [data_dict[k] for k in ch_keys]
-            self.data_dict.update({dtstr: ch_vals})
+            self.data_dict.update({dtstr: ch_vals[:: self.downsample]})
 
         # trim number of spectra being plotted
         if len(self.data_dict.keys()) > self.max_spectra:
@@ -248,8 +276,6 @@ class C_specvis:
             for key in datetime_keys[:delpts]:
                 self.data_dict.pop(key)
 
-        # add channel column and update datasource
-        self.data_dict.update({"channel": list(range(len(ch_vals)))})
         self.datasource.data = self.data_dict
         self._add_plots()
 
@@ -268,10 +294,10 @@ class C_specvis:
         self.plot.title.text = f"active action_uuid: {self.cur_action_uuid}"
         self.plot_prev.title.text = f"previous action_uuid: {self.prev_action_uuid}"
 
-        ds_keys = [x for x in sorted(self.datasource.data.keys()) if x != "channel"]
+        ds_keys = [x for x in sorted(self.datasource.data.keys()) if x != "wl"]
         for i, dt in enumerate(ds_keys):
             self.plot.line(
-                x="channel",
+                x="wl",
                 y=dt,
                 line_color="blue" if i != len(ds_keys) - 1 else "red",
                 source=self.datasource,
@@ -279,12 +305,10 @@ class C_specvis:
                 legend_label=dt,
             )
 
-        dsp_keys = [
-            x for x in sorted(self.datasource_prev.data.keys()) if x != "channel"
-        ]
+        dsp_keys = [x for x in sorted(self.datasource_prev.data.keys()) if x != "wl"]
         for i, dt in enumerate(dsp_keys):
             self.plot_prev.line(
-                x="channel",
+                x="wl",
                 y=dt,
                 line_color="blue" if i != len(dsp_keys) - 1 else "red",
                 source=self.datasource_prev,
