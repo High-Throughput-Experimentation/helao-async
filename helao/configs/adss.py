@@ -1,7 +1,7 @@
 __all__ = ["config"]
 
 
-hostip = "adss-01"
+hostip = "hte-adss-01.htejcap.caltech.edu"
 config = {}
 config["dummy"] = False
 config["simulation"] = False
