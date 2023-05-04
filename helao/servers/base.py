@@ -1200,6 +1200,7 @@ class Active:
             data_keys=json_data_keys,
             sample=file_sample_label,
             action_uuid=action.action_uuid,
+            run_use=action.run_use,
         )
 
         if header:
@@ -1925,6 +1926,7 @@ class Active:
             # data_keys = json_data_keys,
             sample=[sample.get_global_label() for sample in samples],
             action_uuid=action.action_uuid,
+            run_use=action.run_use,
         )
 
         action.files.append(file_info)
