@@ -436,7 +436,7 @@ class Base:
             url_list.append(routeD)
         return url_list
 
-    async def _get_action(self, frame) -> Action:
+    def _get_action(self, frame) -> Action:
         _args, _varargs, _keywords, _locals = inspect.getargvalues(frame)
         action = None
         paramdict = {}
@@ -521,8 +521,8 @@ class Base:
         action.action_codehash = get_filehash(sys._getframe(2).f_code.co_filename)
         return action
 
-    async def setup_action(self) -> Action:
-        return await self._get_action(frame=inspect.currentframe().f_back)
+    def setup_action(self) -> Action:
+        return self._get_action(frame=inspect.currentframe().f_back)
 
     async def setup_and_contain_action(
         self,
@@ -533,7 +533,7 @@ class Base:
     ):
         """This is a simple shortcut for very basic endpoints
         which just want to return some simple data"""
-        action = await self._get_action(frame=inspect.currentframe().f_back)
+        action = self._get_action(frame=inspect.currentframe().f_back)
         if action_abbr is not None:
             action.action_abbr = action_abbr
         active = await self.contain_action(

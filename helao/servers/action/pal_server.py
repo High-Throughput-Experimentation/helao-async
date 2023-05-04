@@ -157,7 +157,7 @@ def makeApp(confPrefix, server_key, helao_root):
             timeoffset: float = 0.0,
         ):
             """universal pal action"""
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             active_dict = await app.driver.method_arbitrary(A)
             return active_dict
 
@@ -183,7 +183,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "GC_injection"
             active_dict = await app.driver.method_ANEC_aliquot(A)
             return active_dict
@@ -203,7 +203,7 @@ def makeApp(confPrefix, server_key, helao_root):
             source: dev_customitems = "cell1_we",
             volume_ul_GC: int = 300,
         ):
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "GC_injection"
             active_dict = await app.driver.method_ANEC_GC(A)
             return active_dict
@@ -232,7 +232,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "GC_injection"
             active_dict = await app.driver.method_injection_tray_GC(A)
             return active_dict
@@ -259,7 +259,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "GC_injection"
             active_dict = await app.driver.method_injection_custom_GC(A)
             return active_dict
@@ -279,7 +279,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "HPLC_injection"
             active_dict = await app.driver.method_injection_custom_HPLC(A)
             return active_dict
@@ -301,7 +301,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "HPLC_injection"
             active_dict = await app.driver.method_injection_tray_HPLC(A)
             return active_dict
@@ -330,7 +330,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "transfer"
             active_dict = await app.driver.method_transfer_tray_tray(A)
             return active_dict
@@ -357,7 +357,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "transfer"
             active_dict = await app.driver.method_transfer_tray_custom(A)
             return active_dict
@@ -384,7 +384,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "transfer"
             active_dict = await app.driver.method_transfer_custom_tray(A)
             return active_dict
@@ -408,7 +408,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "transfer"
             active_dict = await app.driver.method_transfer_custom_custom(A)
             return active_dict
@@ -431,7 +431,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = False,
             wash4: bool = False,
         ):
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "archive"
             active_dict = await app.driver.method_archive(A)
             return active_dict
@@ -450,7 +450,7 @@ def makeApp(confPrefix, server_key, helao_root):
     #         wash3: bool = False,
     #         wash4: bool = False,
     #     ):
-    #         A = await app.base.setup_action()
+    #         A =  app.base.setup_action()
     #         A.action_abbr = "fill"
     #         active_dict = await app.driver.method_fill(A)
     #         return active_dict
@@ -469,7 +469,7 @@ def makeApp(confPrefix, server_key, helao_root):
     #         wash3: bool = False,
     #         wash4: bool = False,
     #     ):
-    #         A = await app.base.setup_action()
+    #         A =  app.base.setup_action()
     #         A.action_abbr = "fillfixed"
     #         active_dict = await app.driver.method_fillfixed(A)
     #         return active_dict
@@ -489,7 +489,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = True,
         ):
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "deepclean"
             active_dict = await app.driver.method_deepclean(A)
             return active_dict
@@ -515,7 +515,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = True,
         ):
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "dilute"
             active_dict = await app.driver.method_dilute(A)
             return active_dict
@@ -538,7 +538,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = True,
         ):
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "autodilute"
             active_dict = await app.driver.method_autodilute(A)
             return active_dict

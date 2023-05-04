@@ -85,7 +85,7 @@ async def galil_dyn_endpoints(app=None):
             plateid: int = 6353,  # None
         ):
             """starts the plate aligning process, matrix is return when fully done"""
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             active_dict = await app.driver.run_aligner(A)
             return active_dict
 
