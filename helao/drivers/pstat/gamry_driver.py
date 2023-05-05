@@ -134,6 +134,7 @@ class gamry:
         # for Dtaq
         self.dtaqsink = dummy_sink()
         self.dtaq = None
+        self.sample_rate = 0.1
 
         # for global IOloop
         # replaces while loop w/async trigger
@@ -753,6 +754,7 @@ class gamry:
             client.PumpEvents(0.001)
             sink_status = self.dtaqsink.status
             counter = 0
+            last_update = time.time()
 
             while (
                 # counter < len(self.dtaqsink.acquired_points)
@@ -797,10 +799,17 @@ class gamry:
                                     data=data, errors=[], status=HloStatus.active
                                 )
                             )
-                    counter = tmpc
+                    # counter = tmpc
+                    last_update = time.time()
 
-                sink_status = self.dtaqsink.status
-                self.base.print_message(f"sink_status: {sink_status}, tmpc: {tmpc}")
+                # if time.time() - last_update < 10 * self.sample_rate:
+                #     self.base.print_message(f"Pstat did not send additional data after 10 d_t intervals, ending measurement.")
+                #     sink_status = "done"
+                # else:
+                if 1:
+                    self.base.print_message(f"counter: {counter}, tmpc: {tmpc}}")
+                    counter = tmpc
+                    sink_status = self.dtaqsink.status
 
             self.close_pstat_connection()
             return {"measure": f"done_{self.IO_meas_mode}"}
@@ -948,6 +957,7 @@ class gamry:
     async def technique_wrapper(
         self, act, measmode, sigfunc, sigfunc_params, samplerate, eta=0.0, setupargs=[]
     ):
+        self.sample_rate = samplerate
         act.action_etc = eta
         act.error_code = ErrorCodes.none
         samples_in = await self.unified_db.get_samples(act.samples_in)
