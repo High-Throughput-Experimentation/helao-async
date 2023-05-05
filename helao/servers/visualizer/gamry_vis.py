@@ -309,7 +309,7 @@ class C_potvis:
             self.prev_datasources[self.prev_action_uuid] = ColumnDataSource(
                 data={key: val for key, val in self.datasource.data.items()}
             )
-            while len(self.prev_action_uuids) > self.max_prev + 1:
+            while len(self.prev_action_uuids) > self.max_prev:
                 rp = self.prev_action_uuids.pop(0)
                 self.prev_datasources.pop(rp)
             self.data_dict = {key: [] for key in self.data_dict_keys}
