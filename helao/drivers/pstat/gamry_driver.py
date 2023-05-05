@@ -807,7 +807,7 @@ class gamry:
                 #     sink_status = "done"
                 # else:
                 if 1:
-                    self.base.print_message(f"counter: {counter}, tmpc: {tmpc}}")
+                    self.base.print_message(f"counter: {counter}, tmpc: {tmpc}")
                     counter = tmpc
                     sink_status = self.dtaqsink.status
 
