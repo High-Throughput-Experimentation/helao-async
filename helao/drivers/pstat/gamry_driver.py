@@ -763,7 +763,7 @@ class gamry:
                 )
             ):
                 # need some await points
-                # await asyncio.sleep(0.001)
+                await asyncio.sleep(0.001)
                 client.PumpEvents(0.001)
                 tmpc = len(self.dtaqsink.acquired_points)
                 if counter < tmpc:
