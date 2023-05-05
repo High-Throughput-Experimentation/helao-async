@@ -287,14 +287,16 @@ class C_potvis:
             legend_label=ystr,
         )
         for i, puuid in enumerate(self.prev_action_uuids):
-            self.plot_prev.line(
-                x=xstr + f"__{puuid}",
-                y=ystr + f"__{puuid}",
-                line_color=colors[i % len(colors)],
-                source=self.datasource_prev,
-                name=puuid,
-                legend_label=puuid.split("-")[0],
-            )
+            if puuid != "":
+                self.vis.print_message(f"Adding {puuid} to previous plots")
+                self.plot_prev.line(
+                    x=xstr + f"__{puuid}",
+                    y=ystr + f"__{puuid}",
+                    line_color=colors[i % len(colors)],
+                    source=self.datasource_prev,
+                    name=puuid,
+                    legend_label=puuid.split("-")[0],
+                )
 
     def reset_plot(self, new_action_uuid: UUID, forceupdate: bool = False):
         if (new_action_uuid != self.cur_action_uuid) or forceupdate:
@@ -308,7 +310,7 @@ class C_potvis:
             self.data_prev.update(
                 {
                     key + f"__{self.prev_action_uuid}": val
-                    for key, val in self.data_dict.items()
+                    for key, val in self.datasource.data.items()
                 }
             )
             while len(self.prev_action_uuids) > self.max_prev + 1:
