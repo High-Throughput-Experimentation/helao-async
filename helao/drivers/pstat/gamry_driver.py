@@ -800,6 +800,7 @@ class gamry:
                     counter = tmpc
 
                 sink_status = self.dtaqsink.status
+                self.base.print_message(f"sink_status: {sink_status}, tmpc: {tmpc}")
 
             self.close_pstat_connection()
             return {"measure": f"done_{self.IO_meas_mode}"}
