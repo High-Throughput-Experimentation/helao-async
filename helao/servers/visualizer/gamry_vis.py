@@ -54,7 +54,7 @@ class C_potvis:
         self.data_dict = {key: [] for key in self.data_dict_keys}
 
         self.datasource = ColumnDataSource(data=self.data_dict)
-        self.data_prev = {}
+        self.data_prev = {key: [] for key in self.data_dict_keys}
         self.datasource_prev = ColumnDataSource(data=self.data_prev)
         self.cur_action_uuid = ""
         self.prev_action_uuid = ""
@@ -286,16 +286,15 @@ class C_potvis:
             name=self.cur_action_uuid,
             legend_label=ystr,
         )
-        if self.prev_action_uuids:
-            for i, puuid in enumerate(self.prev_action_uuids):
-                self.plot_prev.line(
-                    x=xstr + f"__{puuid}",
-                    y=ystr + f"__{puuid}",
-                    line_color=colors[i % len(colors)],
-                    source=self.datasource_prev,
-                    name=puuid,
-                    legend_label=puuid.split("-")[0],
-                )
+        for i, puuid in enumerate(self.prev_action_uuids):
+            self.plot_prev.line(
+                x=xstr + f"__{puuid}",
+                y=ystr + f"__{puuid}",
+                line_color=colors[i % len(colors)],
+                source=self.datasource_prev,
+                name=puuid,
+                legend_label=puuid.split("-")[0],
+            )
 
     def reset_plot(self, new_action_uuid: UUID, forceupdate: bool = False):
         if (new_action_uuid != self.cur_action_uuid) or forceupdate:
@@ -303,6 +302,7 @@ class C_potvis:
             self.prev_action_uuid = self.cur_action_uuid
             self.cur_action_uuid = new_action_uuid
             self.prev_action_uuids.append(self.prev_action_uuid)
+            self.vis.print_message(f"previous uuids: {self.prev_action_uuids}")
 
             # copy old data to "prev" plot
             self.data_prev.update(
@@ -311,6 +311,9 @@ class C_potvis:
                     for key, val in self.data_dict.items()
                 }
             )
+            for k in self.data_dict_keys:
+                if k in self.data_prev:
+                    self.data_prev.pop(k)
             while len(self.prev_action_uuids) > self.max_prev:
                 rp = self.prev_action_uuids.pop(0)
                 for k in self.data_prev:
