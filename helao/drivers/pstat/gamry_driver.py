@@ -805,7 +805,7 @@ class gamry:
                     self.base.print_message(f"Pstat did not send additional data after 5 d_t intervals, ending measurement.")
                     sink_status = "done"
                 else:
-                    self.base.print_message(f"counter: {counter}, tmpc: {tmpc}")
+                    # self.base.print_message(f"counter: {counter}, tmpc: {tmpc}")
                     counter = tmpc
                     sink_status = self.dtaqsink.status
 
