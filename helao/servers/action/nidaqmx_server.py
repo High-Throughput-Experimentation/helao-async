@@ -327,7 +327,7 @@ def makeApp(confPrefix, server_key, helao_root):
                  SampleRate: samples per second
                  Tval: time of measurement in seconds
                  TTLwait: trigger channel, -1 disables, else select TTL channel"""
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "multiCV"
             active_dict = await app.driver.run_cell_IV(A)
             return active_dict
@@ -404,7 +404,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
         @app.post("/monloop", tags=["private"])
         async def monloop():
-            # A = await app.base.setup_action()
+            # A =  app.base.setup_action()
             A = await app.driver.monitorloop()
 
         @app.post(f"/{server_key}/heatloop", tags=["action"])
@@ -417,7 +417,7 @@ def makeApp(confPrefix, server_key, helao_root):
             reservoir2_min_C: float = 84.5,
             reservoir2_max_C: float = 85.5,
         ):
-            # A = await app.base.setup_action()
+            # A =  app.base.setup_action()
             A = await app.driver.Heatloop(
                 duration_h=duration_hrs,
                 celltemp_min=celltemp_min_C,

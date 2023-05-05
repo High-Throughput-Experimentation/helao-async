@@ -134,6 +134,7 @@ class gamry:
         # for Dtaq
         self.dtaqsink = dummy_sink()
         self.dtaq = None
+        self.sample_rate = 0.1
 
         # for global IOloop
         # replaces while loop w/async trigger
@@ -753,6 +754,7 @@ class gamry:
             client.PumpEvents(0.001)
             sink_status = self.dtaqsink.status
             counter = 0
+            last_update = time.time()
 
             while (
                 # counter < len(self.dtaqsink.acquired_points)
@@ -797,9 +799,15 @@ class gamry:
                                     data=data, errors=[], status=HloStatus.active
                                 )
                             )
-                    counter = tmpc
+                    last_update = time.time()
 
-                sink_status = self.dtaqsink.status
+                if time.time() - last_update > 5 * self.sample_rate:
+                    self.base.print_message(f"Pstat did not send additional data after 5 d_t intervals, ending measurement.")
+                    sink_status = "done"
+                else:
+                    # self.base.print_message(f"counter: {counter}, tmpc: {tmpc}")
+                    counter = tmpc
+                    sink_status = self.dtaqsink.status
 
             self.close_pstat_connection()
             return {"measure": f"done_{self.IO_meas_mode}"}
@@ -947,6 +955,7 @@ class gamry:
     async def technique_wrapper(
         self, act, measmode, sigfunc, sigfunc_params, samplerate, eta=0.0, setupargs=[]
     ):
+        self.sample_rate = samplerate
         act.action_etc = eta
         act.error_code = ErrorCodes.none
         samples_in = await self.unified_db.get_samples(act.samples_in)
@@ -1047,9 +1056,10 @@ class gamry:
                 # clear old samples_in first
                 self.active.action.samples_in = []
                 # now add updated samples to sample_in again
-                await self.active.append_sample(
-                    samples=[sample_in for sample_in in self.samples_in], IO="in"
-                )
+                if self.samples_in:
+                    await self.active.append_sample(
+                        samples=[sample_in for sample_in in self.samples_in], IO="in"
+                    )
 
                 # signal the IOloop to start the measrurement
                 await self.set_IO_signalq(True)
@@ -1057,7 +1067,7 @@ class gamry:
                 # need to wait now for the activation of the meas routine
                 # and that the active object is activated and sets action status
                 while not self.IO_continue:
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(0.1)
 
                 # reset continue flag
                 self.IO_continue = False
