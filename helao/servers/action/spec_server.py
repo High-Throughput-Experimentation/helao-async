@@ -110,7 +110,7 @@ def makeApp(confPrefix, server_key, helao_root):
         duration: float = -1,
     ):
         """Acquire spectra based on external trigger."""
-        A = await app.base.setup_action()
+        A =  app.base.setup_action()
         A.action_abbr = "OPT"
         # app.base.print_message("Setting up external trigger.", info=True)
         active_dict = await app.driver.acquire_spec_extrig(A)

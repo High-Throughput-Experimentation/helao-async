@@ -54,7 +54,7 @@ class C_potvis:
         self.data_dict = {key: [] for key in self.data_dict_keys}
 
         self.datasource = ColumnDataSource(data=self.data_dict)
-        self.datasource_prev = ColumnDataSource(data=deepcopy(self.data_dict))
+        self.prev_datasources = {}
         self.cur_action_uuid = ""
         self.prev_action_uuid = ""
         self.prev_action_uuids = []
@@ -89,7 +89,7 @@ class C_potvis:
             labels=self.data_dict_keys, active=0, width=500
         )
         self.yaxis_selector_group = RadioButtonGroup(
-            labels=self.data_dict_keys, active=0, width=500
+            labels=self.data_dict_keys, active=3, width=500
         )
 
         self.plot = figure(title="Title", height=300, width=500)
@@ -106,7 +106,7 @@ class C_potvis:
                         height=15,
                     ),
                 ],
-                [self.input_max_points],
+                [self.input_max_points, Spacer(width=20), self.input_max_prev],
                 [
                     Paragraph(text="""x-axis:""", width=500, height=15),
                     Paragraph(text="""y-axis:""", width=500, height=15),
@@ -124,7 +124,7 @@ class C_potvis:
         self.xselect = self.xaxis_selector_group.active
         self.yselect = self.yaxis_selector_group.active
 
-        self.reset_plot(self.cur_action_uuid, forceupdate=True)
+        # self.reset_plot(self.cur_action_uuid, forceupdate=True)
 
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
@@ -190,6 +190,7 @@ class C_potvis:
         self.vis.doc.add_next_tick_callback(
             partial(self.update_input_value, sender, f"{self.max_prev}")
         )
+
     def update_input_value(self, sender, value):
         sender.value = value
 
@@ -285,14 +286,16 @@ class C_potvis:
             legend_label=ystr,
         )
         for i, puuid in enumerate(self.prev_action_uuids):
-            self.plot_prev.line(
-                x=xstr+f"__{puuid}",
-                y=ystr+f"__{puuid}",
-                line_color=colors[i%len(colors)],
-                source=self.datasource_prev,
-                name=puuid,
-                legend_label=puuid.split("-")[0],
-            )
+            if puuid != "":
+                self.vis.print_message(f"Adding {puuid} to previous plots")
+                self.plot_prev.line(
+                    x=xstr,
+                    y=ystr,
+                    line_color=colors[i % len(colors)],
+                    source=self.prev_datasources[puuid],
+                    name=puuid,
+                    legend_label=puuid.split("-")[0],
+                )
 
     def reset_plot(self, new_action_uuid: UUID, forceupdate: bool = False):
         if (new_action_uuid != self.cur_action_uuid) or forceupdate:
@@ -300,23 +303,18 @@ class C_potvis:
             self.prev_action_uuid = self.cur_action_uuid
             self.cur_action_uuid = new_action_uuid
             self.prev_action_uuids.append(self.prev_action_uuid)
-            
-            remove_prevs = []
-            while len(self.prev_action_uuids) > self.max_prev:
-                remove_prevs.append(self.prev_action_uuids.pop(0))
+            self.vis.print_message(f"previous uuids: {self.prev_action_uuids}")
 
             # copy old data to "prev" plot
-            self.datasource_prev.data = {
-                key+f"__{self.prev_action_uuid}": val
-                for key, val in self.datasource.data.items()
-            }
-            for rp in remove_prevs:
-                for k in self.datasource_prev.data.keys():
-                    if k.endswith(rp):
-                        self.datasource_prev.data.pop(k)
+            self.prev_datasources[self.prev_action_uuid] = ColumnDataSource(
+                data=deepcopy(self.datasource.data)
+            )
+            while len(self.prev_action_uuids) > self.max_prev:
+                rp = self.prev_action_uuids.pop(0)
+                self.prev_datasources.pop(rp)
             self.data_dict = {key: [] for key in self.data_dict_keys}
             self.datasource.data = self.data_dict
-            
+
             self._add_plots()
 
         elif (self.xselect != self.xaxis_selector_group.active) or (

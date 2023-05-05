@@ -73,7 +73,7 @@ async def gamry_dyn_endpoints(app=None):
             """Linear Sweep Voltammetry (unlike CV no backward scan is done)
             use 4bit bitmask for triggers
             IErange depends on gamry model used (test actual limit before using)"""
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "LSV"
             # A.save_data = True
             active_dict = await app.driver.technique_LSV(A)
@@ -99,7 +99,7 @@ async def gamry_dyn_endpoints(app=None):
             use 4bit bitmask for triggers
             IErange depends on gamry model used
             (test actual limit before using)"""
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "CA"
             # A.save_data = True
             active_dict = await app.driver.technique_CA(A)
@@ -124,7 +124,7 @@ async def gamry_dyn_endpoints(app=None):
             """Chronopotentiometry (Potential response on controlled current)
             use 4bit bitmask for triggers
             IErange depends on gamry model used (test actual limit before using)"""
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "CP"
             # A.save_data = True
             active_dict = await app.driver.technique_CP(A)
@@ -154,7 +154,7 @@ async def gamry_dyn_endpoints(app=None):
             for acquireing information about electrochemical reactions)
             use 4bit bitmask for triggers
             IErange depends on gamry model used (test actual limit before using)"""
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "CV"
             # A.save_data = True
             active_dict = await app.driver.technique_CV(A)
@@ -185,7 +185,7 @@ async def gamry_dyn_endpoints(app=None):
             NOT TESTED
             use 4bit bitmask for triggers
             IErange depends on gamry model used (test actual limit before using)"""
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "EIS"
             # A.save_data = True
             active_dict = await app.driver.technique_EIS(A)
@@ -209,7 +209,7 @@ async def gamry_dyn_endpoints(app=None):
             """mesasures open circuit potential
             use 4bit bitmask for triggers
             IErange depends on gamry model used (test actual limit before using)"""
-            A = await app.base.setup_action()
+            A =  app.base.setup_action()
             A.action_abbr = "OCV"
             # A.save_data = True
             active_dict = await app.driver.technique_OCV(A)
