@@ -307,7 +307,7 @@ class C_potvis:
 
             # copy old data to "prev" plot
             self.prev_datasources[self.prev_action_uuid] = ColumnDataSource(
-                data={key: val for key, val in self.datasource.data.items()}
+                data=deepcopy(self.datasource.data)
             )
             while len(self.prev_action_uuids) > self.max_prev:
                 rp = self.prev_action_uuids.pop(0)
