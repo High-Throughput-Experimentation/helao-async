@@ -54,8 +54,7 @@ class C_potvis:
         self.data_dict = {key: [] for key in self.data_dict_keys}
 
         self.datasource = ColumnDataSource(data=self.data_dict)
-        self.data_prev = {key: [] for key in self.data_dict_keys}
-        self.datasource_prev = ColumnDataSource(data=self.data_prev)
+        self.datasource_prev = ColumnDataSource(data=deepcopy(self.data_dict))
         self.cur_action_uuid = ""
         self.prev_action_uuid = ""
         self.prev_action_uuids = []
@@ -307,7 +306,7 @@ class C_potvis:
             self.vis.print_message(f"previous uuids: {self.prev_action_uuids}")
 
             # copy old data to "prev" plot
-            self.data_prev.update(
+            self.datasource_prev.data.update(
                 {
                     key + f"__{self.prev_action_uuid}": val
                     for key, val in self.datasource.data.items()
@@ -315,12 +314,11 @@ class C_potvis:
             )
             while len(self.prev_action_uuids) > self.max_prev + 1:
                 rp = self.prev_action_uuids.pop(0)
-                for k in self.data_prev:
+                for k in self.datasource_prev.data:
                     if k.endswith(rp):
-                        self.data_prev.pop(k)
+                        self.datasource_prev.data.pop(k)
             self.data_dict = {key: [] for key in self.data_dict_keys}
             self.datasource.data = self.data_dict
-            self.datasource_prev.data = self.data_prev
 
             self._add_plots()
 
