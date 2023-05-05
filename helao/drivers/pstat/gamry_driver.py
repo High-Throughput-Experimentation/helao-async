@@ -200,12 +200,11 @@ class gamry:
                 self.IO_continue = True
 
                 if self.active:
-                    async with self.base.aiolock:
-                        self.base.print_message("gamry finishes active action")
-                        _ = await self.active.finish()
-                        self.active = None
-                        self.action = None
-                        self.samples_in = []
+                    self.base.print_message("gamry finishes active action")
+                    _ = await self.active.finish()
+                    self.active = None
+                    self.action = None
+                    self.samples_in = []
 
         except asyncio.CancelledError:
             # endpoint can return even we got errors
