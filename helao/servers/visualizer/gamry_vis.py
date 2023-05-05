@@ -274,7 +274,7 @@ class C_potvis:
         self.plot_prev.renderers = []
 
         self.plot.title.text = f"active action_uuid: {self.cur_action_uuid}"
-        self.plot_prev.title.text = f"last {len(self.prev_action_uuids)} actions"
+        self.plot_prev.title.text = f"last {len(self.prev_action_uuids) - 1} actions"
         xstr = self.data_dict_keys[self.xaxis_selector_group.active]
         ystr = self.data_dict_keys[self.yaxis_selector_group.active]
         colors = ["red", "blue", "yellow", "green"]
@@ -311,10 +311,7 @@ class C_potvis:
                     for key, val in self.data_dict.items()
                 }
             )
-            for k in self.data_dict_keys:
-                if k in self.data_prev:
-                    self.data_prev.pop(k)
-            while len(self.prev_action_uuids) > self.max_prev:
+            while len(self.prev_action_uuids) > self.max_prev + 1:
                 rp = self.prev_action_uuids.pop(0)
                 for k in self.data_prev:
                     if k.endswith(rp):
