@@ -125,7 +125,7 @@ class C_potvis:
         self.xselect = self.xaxis_selector_group.active
         self.yselect = self.yaxis_selector_group.active
 
-        self.reset_plot(self.cur_action_uuid, forceupdate=True)
+        # self.reset_plot(self.cur_action_uuid, forceupdate=True)
 
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
@@ -286,7 +286,7 @@ class C_potvis:
             name=self.cur_action_uuid,
             legend_label=ystr,
         )
-        if self.data_prev:
+        if self.prev_action_uuids:
             for i, puuid in enumerate(self.prev_action_uuids):
                 self.plot_prev.line(
                     x=xstr + f"__{puuid}",
@@ -313,9 +313,9 @@ class C_potvis:
             )
             while len(self.prev_action_uuids) > self.max_prev:
                 rp = self.prev_action_uuids.pop(0)
-                for k in self.data_prev.keys():
+                for k in self.data_prev:
                     if k.endswith(rp):
-                        self.datasource_prev.data.pop(k)
+                        self.data_prev.pop(k)
             self.data_dict = {key: [] for key in self.data_dict_keys}
             self.datasource.data = self.data_dict
             self.datasource_prev.data = self.data_prev
