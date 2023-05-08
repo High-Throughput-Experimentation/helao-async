@@ -1107,7 +1107,7 @@ def CCSI_leaktest_co2(
             "acquisition_rate": apm.pars.co2measure_acqrate,
         },
     )
-    if recirculate:
+    if apm.pars.recirculate:
         apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
 
 
