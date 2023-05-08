@@ -28,6 +28,7 @@ __all__ = [
     "CCSI_debug_co2purge",
     "CCSI_sub_fill_syringe",
     "CCSI_sub_full_fill_syringe",
+    "CCSI_leaktest_co2",
 
 ]
 
@@ -1087,4 +1088,28 @@ def CCSI_debug_co2purge(
             },
         },
     )
+    return apm.action_list
+
+def CCSI_leaktest_co2(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    co2measure_duration: float = 600,
+    co2measure_acqrate: float = 1,
+    recirculate: bool = True,
+):
+    apm = ActionPlanMaker()
+   
+    apm.add(
+        CO2S_server,
+        "acquire_co2",
+        {
+            "duration": apm.pars.co2measure_duration,
+            "acquisition_rate": apm.pars.co2measure_acqrate,
+        },
+    )
+    if recirculate:
+        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
+
+
+
     return apm.action_list
