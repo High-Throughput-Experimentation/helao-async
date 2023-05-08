@@ -96,7 +96,6 @@ class dummy_sink:
 # action server to operate
 class gamry:
     def __init__(self, action_serv: Base):
-
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
         # signals the dynamic endpoints that init was done
@@ -640,7 +639,6 @@ class gamry:
             return {"measure": "not initialized"}
 
         else:
-
             # active object is set so we can set the continue flag
             self.IO_continue = True
 
@@ -750,7 +748,7 @@ class gamry:
                 )
 
             # dtaqsink.status might still be 'idle' if sleep is too short
-            await asyncio.sleep(0.04)
+            await asyncio.sleep(0.1)
             client.PumpEvents(0.001)
             sink_status = self.dtaqsink.status
             counter = 0
@@ -802,7 +800,14 @@ class gamry:
                     last_update = time.time()
 
                 if time.time() - last_update > 5 * self.sample_rate:
-                    self.base.print_message(f"Pstat did not send additional data after 5 d_t intervals, ending measurement.")
+                    self.base.print_message(
+                        f"Pstat did not send additional data after 5 d_t intervals, ending measurement."
+                    )
+                    await self.active.enqueue_data(
+                        datamodel=DataModel(
+                            data={}, errors=[], status=HloStatus.finished
+                        )
+                    )
                     sink_status = "done"
                 else:
                     # self.base.print_message(f"counter: {counter}, tmpc: {tmpc}")
