@@ -33,10 +33,11 @@ def makeApp(confPrefix, server_key, helao_root):
     @app.post(f"/{server_key}/acquire_flowrate", tags=["action"])
     async def acquire_flowrate(
         action: Action = Body({}, embed=True),
-        action_version: int = 1,
+        action_version: int = 2,
         device_name: str = dev_name,
         flowrate_sccm: float = None,
         ramp_sccm_sec: float = 0,
+        stay_open: bool = False,
         duration: float = -1,
         acquisition_rate: float = 0.2,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
@@ -55,10 +56,11 @@ def makeApp(confPrefix, server_key, helao_root):
     @app.post(f"/{server_key}/acquire_pressure", tags=["action"])
     async def acquire_pressure(
         action: Action = Body({}, embed=True),
-        action_version: int = 1,
+        action_version: int = 2,
         device_name: str = dev_name,
         pressure_psia: float = None,
         ramp_psi_sec: float = 0,
+        stay_open: bool = False,
         duration: float = -1,
         acquisition_rate: float = 0.2,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),

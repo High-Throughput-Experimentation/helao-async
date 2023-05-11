@@ -327,10 +327,13 @@ class MfcExec(Executor):
     async def _post_exec(self):
         "Restore valve hold."
         self.active.base.print_message("MFCExec running cleanup methods.")
-        closevlv_resp = self.active.base.fastapp.driver.hold_valve_closed(
-            device_name=self.device_name,
-        )
-        self.active.base.print_message(f"hold_valve_closed returned: {closevlv_resp}")
+        if not self.active.action.action_params.get("stay_open", False):
+            closevlv_resp = self.active.base.fastapp.driver.hold_valve_closed(
+                device_name=self.device_name,
+            )
+            self.active.base.print_message(f"hold_valve_closed returned: {closevlv_resp}")
+        else:
+            self.active.base.print_message("'stay_open' is True, skipping valve hold")
         return {"error": ErrorCodes.none}
 
 
