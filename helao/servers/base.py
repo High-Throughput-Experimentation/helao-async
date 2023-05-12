@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import sys
+import pickle
 from random import randint
 from socket import gethostname
 from time import ctime, time, time_ns, sleep
@@ -20,6 +21,7 @@ import colorama
 import ntplib
 import numpy as np
 import pyaml
+import pyzstd
 
 from fastapi import Body, WebSocket
 from fastapi.dependencies.utils import get_flat_params
@@ -710,7 +712,7 @@ class Base:
         await websocket.accept()
         try:
             async for status_msg in self.status_q.subscribe():
-                await websocket.send_text(json.dumps(status_msg.as_dict()))
+                await websocket.send_bytes(pyzstd.compress(pickle.dumps(status_msg.as_dict())))
         # except WebSocketDisconnect:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -725,7 +727,7 @@ class Base:
         await websocket.accept()
         try:
             async for data_msg in self.data_q.subscribe():
-                await websocket.send_text(json.dumps(data_msg.as_dict()))
+                await websocket.send_bytes(pyzstd.compress(pickle.dumps(data_msg.as_dict())))
         # except WebSocketDisconnect:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -740,7 +742,7 @@ class Base:
         await websocket.accept()
         try:
             async for live_msg in self.live_q.subscribe():
-                await websocket.send_text(json.dumps(live_msg))
+                await websocket.send_bytes(pyzstd.compress(pickle.dumps(live_msg)))
         # except WebSocketDisconnect:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
