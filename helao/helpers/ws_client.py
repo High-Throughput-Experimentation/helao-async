@@ -17,7 +17,7 @@ class WsSubscriber:
     def __init__(self, host, port, path, max_qlen=500):
         self.data_url = f"ws://{host}:{port}/{path}"
         self.recv_queue = collections.deque(maxlen=max_qlen)
-        self.subscriber_task = asyncio.create_task(self.subscriber_loop)
+        self.subscriber_task = asyncio.create_task(self.subscriber_loop())
 
     async def subscriber_loop(self):
         """Coroutine for receving broadcasted websocket messages."""
