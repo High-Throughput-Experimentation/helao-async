@@ -10,7 +10,7 @@ from bokeh.plotting import figure
 from bokeh.models.widgets import Div
 from bokeh.models.widgets import DataTable, TableColumn
 from bokeh.layouts import layout, Spacer
-from bokeh.models import ColumnDataSource
+from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 
 from helao.servers.vis import Vis
 from helao.helpers.ws_client import WsSubscriber as Wss
@@ -78,8 +78,14 @@ class C_simlivevis:
         # )
 
         self.plot = figure(height=300, width=500)
+        self.plot.xaxis.formatter = DatetimeTickFormatter(
+            hours=["%H:%m:%s"],
+            days=["%H:%m:%s"],
+            months=["%H:%m:%s"],
+            years=["%H:%m:%s"],
+        )
         self.plot.xaxis.axis_label = "Time (HH:MM:SS)"
-        self.plot.yaxis.axis_label = "Pressure (psi)"
+        self.plot.yaxis.axis_label = "value"
 
         self.table = DataTable(
             source=self.datasource_table,
@@ -217,9 +223,7 @@ class C_simlivevis:
         self.plot.renderers = []
 
         colors = ["red", "blue", "green", "orange"]
-        non_epoch_keys = [
-            x for x in self.data_dict_keys if x not in ["datetime"]
-        ]
+        non_epoch_keys = [x for x in self.data_dict_keys if x not in ["datetime"]]
         for pres_key, color in zip(non_epoch_keys, colors):
             self.plot.line(
                 x="datetime",
