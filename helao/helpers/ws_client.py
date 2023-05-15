@@ -39,5 +39,5 @@ class WsSubscriber:
         messages = []
         while self.recv_queue:
             messages.append(self.recv_queue.popleft())
-            asyncio.sleep(1e-4)
+            await asyncio.sleep(1e-4)
         return messages
