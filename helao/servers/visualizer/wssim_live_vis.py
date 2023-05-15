@@ -201,6 +201,9 @@ class C_simlivevis:
                     del self.data_dict[key][:delpts]
             latest_epoch = 0
             for datalab, (dataval, epochsec) in datapackage.items():
+                if datalab == "sim_dict":
+                    for k, v in dataval.items():
+                        self.data_dict[k].append(v)
                 if isinstance(dataval, list):
                     self.data_dict[datalab] += dataval
                 else:
