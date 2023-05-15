@@ -33,7 +33,6 @@ class WsSubscriber:
                 self.vis.print_message(
                     f"Could not connect, retrying {retry_idx+1}/{retry_limit}"
                 )
-        await ws.close()
 
     async def read_messages(self):
         """Empties recv_queue and returns messages."""
