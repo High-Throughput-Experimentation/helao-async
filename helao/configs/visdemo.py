@@ -8,6 +8,7 @@ config["experiment_libraries"] = ["simulate_exp"]
 config["sequence_libraries"] = []
 config["run_type"] = "simulation"
 config["root"] = "/mnt/STORAGE/INST_hlo"  # software log and run files saved here
+config["root"] = "c:/INST_hlo"  # software log and run files saved here
 
 
 # we define all the servers here so that the overview is a bit better
