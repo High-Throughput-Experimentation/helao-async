@@ -219,8 +219,9 @@ class C_simlivevis:
         self.vis.print_message(" ... Live visualizer receiving messages.")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
+                messages = await self.wss.read_messages()
                 self.vis.doc.add_next_tick_callback(
-                    partial(self.add_points, self.wss.read_messages())
+                    partial(self.add_points, messages)
                 )
                 self.last_update_time = time.time()
             await asyncio.sleep(0.001)
