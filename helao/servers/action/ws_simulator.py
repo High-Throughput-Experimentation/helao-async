@@ -33,7 +33,7 @@ class WsSim:
         self.event_loop = asyncio.get_event_loop()
         self.polling_task = self.event_loop.create_task(self.poll_data_loop())
 
-    async def poll_data_loop(self, frequency_hz: float = 1000):
+    async def poll_data_loop(self, frequency_hz: float = 10):
         waittime = 1.0 / frequency_hz
         self.base.print_message("Starting polling loop")
         while True:
