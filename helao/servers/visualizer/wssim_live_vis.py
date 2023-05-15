@@ -37,14 +37,12 @@ class C_simlivevis:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["datetime"] + [
-            f"series_{i}" for i in range(6)
-        ]
-        self.data_dict = {key: [] for key in self.data_dict_keys}
-        self.table_dict = {key: [] for key in self.data_dict_keys}
+        self.data_dict_keys = ["datetime"] + [f"series_{i}" for i in range(6)]
 
-        self.datasource = ColumnDataSource(data=self.data_dict)
-        self.datasource_table = ColumnDataSource(data=self.table_dict)
+        self.datasource = ColumnDataSource(data={k: [] for k in self.data_dict_keys})
+        self.datasource_table = ColumnDataSource(
+            data={k: [] for k in self.data_dict_keys}
+        )
 
         # create visual elements
         self.layout = []
@@ -128,7 +126,6 @@ class C_simlivevis:
         self.IOtask = asyncio.create_task(self.IOloop_data())
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
-
     def cleanup_session(self, session_context):
         self.vis.print_message(f"'{self.live_key}' Bokeh session closed", info=True)
         self.IOloop_data_run = False
@@ -185,7 +182,7 @@ class C_simlivevis:
 
     def add_points(self, datapackage_list: list):
         latest_epoch = 0
-        data_dict = {}
+        data_dict = {k: [] for k in self.data_dict_keys}
         for datapackage in datapackage_list:
             for datalab, (dataval, epochsec) in datapackage.items():
                 if datalab == "sim_dict":
@@ -207,9 +204,7 @@ class C_simlivevis:
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
                 messages = await self.wss.read_messages()
-                self.vis.doc.add_next_tick_callback(
-                    partial(self.add_points, messages)
-                )
+                self.vis.doc.add_next_tick_callback(partial(self.add_points, messages))
                 self.last_update_time = time.time()
             await asyncio.sleep(0.001)
 
@@ -223,7 +218,7 @@ class C_simlivevis:
 
         colors = ["red", "blue", "green", "orange"]
         non_epoch_keys = [
-            x for x in self.data_dict.keys() if x not in ["epoch_s", "time_now"]
+            x for x in self.data_dict_keys if x not in ["epoch_s", "time_now"]
         ]
         for pres_key, color in zip(non_epoch_keys, colors):
             self.plot.line(
