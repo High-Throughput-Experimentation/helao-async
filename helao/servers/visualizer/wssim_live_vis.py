@@ -204,7 +204,7 @@ class C_simlivevis:
                 if datalab == "sim_dict":
                     for k, v in dataval.items():
                         self.data_dict[k].append(v)
-                if isinstance(dataval, list):
+                elif isinstance(dataval, list):
                     self.data_dict[datalab] += dataval
                 else:
                     self.data_dict[datalab].append(dataval)
