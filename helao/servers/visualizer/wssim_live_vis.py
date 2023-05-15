@@ -77,7 +77,7 @@ class C_simlivevis:
         #     labels=self.data_dict_keys, active=[1, 3], width=500
         # )
 
-        self.plot = figure(height=300, width=500)
+        self.plot = figure(height=300, width=500, output_backend="webgl")
         self.plot.xaxis.formatter = DatetimeTickFormatter(
             minsec='%T',
             minutes='%T',
