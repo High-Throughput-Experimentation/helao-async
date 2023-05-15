@@ -1,5 +1,6 @@
 import time
 import asyncio
+from datetime import datetime
 from functools import partial
 
 from bokeh.models import (
@@ -36,15 +37,14 @@ class C_simlivevis:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["epoch_s", "time_now"] + [
+        self.data_dict_keys = ["datetime"] + [
             f"series_{i}" for i in range(6)
         ]
         self.data_dict = {key: [] for key in self.data_dict_keys}
+        self.table_dict = {key: [] for key in self.data_dict_keys}
 
         self.datasource = ColumnDataSource(data=self.data_dict)
-        self.table_dict = {}
         self.datasource_table = ColumnDataSource(data=self.table_dict)
-        self.update_table_data()
 
         # create visual elements
         self.layout = []
@@ -80,7 +80,7 @@ class C_simlivevis:
         # )
 
         self.plot = figure(height=300, width=500)
-        self.plot.xaxis.axis_label = "Time (seconds)"
+        self.plot.xaxis.axis_label = "Time (HH:MM:SS)"
         self.plot.yaxis.axis_label = "Pressure (psi)"
 
         self.table = DataTable(
@@ -128,16 +128,6 @@ class C_simlivevis:
         self.IOtask = asyncio.create_task(self.IOloop_data())
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
-    def update_table_data(self):
-        self.table_dict["name"] = self.data_dict_keys
-        vals = []
-        for k in self.data_dict_keys:
-            if self.data_dict[k] == []:
-                vals.append("")
-            else:
-                vals.append(self.data_dict[k][-1])
-        self.table_dict["value"] = vals
-        self.datasource_table.data = self.table_dict
 
     def cleanup_session(self, session_context):
         self.vis.print_message(f"'{self.live_key}' Bokeh session closed", info=True)
@@ -195,27 +185,21 @@ class C_simlivevis:
 
     def add_points(self, datapackage_list: list):
         latest_epoch = 0
+        data_dict = {}
         for datapackage in datapackage_list:
             for datalab, (dataval, epochsec) in datapackage.items():
                 if datalab == "sim_dict":
                     for k, v in dataval.items():
-                        self.data_dict[k].append(v)
+                        data_dict[k].append(v)
                 elif isinstance(dataval, list):
-                    self.data_dict[datalab] += dataval
+                    data_dict[datalab] += dataval
                 else:
-                    self.data_dict[datalab].append(dataval)
+                    data_dict[datalab].append(dataval)
                 latest_epoch = max([epochsec, latest_epoch])
-            self.data_dict["epoch_s"].append(latest_epoch)
-            self.data_dict["time_now"] = [
-                s - latest_epoch for s in self.data_dict["epoch_s"]
-            ]
+            data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
 
-        if len(self.data_dict[self.data_dict_keys[0]]) > self.max_points:
-            delpts = len(self.data_dict[self.data_dict_keys[0]]) - self.max_points
-            for key in self.data_dict_keys:
-                del self.data_dict[key][:delpts]
-        self.datasource.data = self.data_dict
-        self.update_table_data()
+        self.datasource.stream(data_dict, rollover=self.max_points)
+        self.datasource_table.stream(data_dict, rollover=1)
         self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
