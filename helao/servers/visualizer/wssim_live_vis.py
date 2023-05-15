@@ -13,7 +13,7 @@ from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 
 from helao.servers.vis import Vis
-from helao.helpers.ws_client import WsSubscriber as Wss
+from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
 
 class C_simlivevis:

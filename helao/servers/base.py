@@ -35,6 +35,7 @@ from helao.helpers.print_message import print_message
 from helao.helpers import async_copy
 from helao.helpers.yml_finisher import move_dir
 from helao.helpers.premodels import Action
+form helao.helpers.ws_publisher import WsPublisher
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.sample import (
     SampleType,
@@ -100,7 +101,7 @@ class HelaoBase(HelaoFastAPI):
             Args:
             websocket: a fastapi.WebSocket object
             """
-            await self.base.ws_status(websocket)
+            await self.base.status_publisher.connect(websocket)
 
         @self.websocket("/ws_data")
         async def websocket_data(websocket: WebSocket):
@@ -109,7 +110,7 @@ class HelaoBase(HelaoFastAPI):
             Args:
             websocket: a fastapi.WebSocket object
             """
-            await self.base.ws_data(websocket)
+            await self.base.data_publisher.connect(websocket)
 
         @self.websocket("/ws_live")
         async def websocket_live(websocket: WebSocket):
@@ -118,7 +119,7 @@ class HelaoBase(HelaoFastAPI):
             Args:
             websocket: a fastapi.WebSocket object
             """
-            await self.base.ws_live(websocket)
+            await self.base.live_publisher.connect(websocket)
 
         @self.post("/get_config", tags=["private"])
         def get_config():
@@ -348,6 +349,11 @@ class Base:
         self.live_q = MultisubscriberQueue()
         self.live_buffer = {}
         self.status_clients = set()
+
+        self.status_publisher = WsPublisher(self.status_q)
+        self.data_publisher = WsPublisher(self.data_q)
+        self.live_publisher = WsPublisher(self.live_q)
+        
         self.ntp_server = "time.nist.gov"
         self.ntp_response = None
         self.ntp_offset = None  # add to system time for correction
