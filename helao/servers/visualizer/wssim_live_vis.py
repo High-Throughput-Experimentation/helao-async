@@ -218,11 +218,11 @@ class C_simlivevis:
 
         colors = ["red", "blue", "green", "orange"]
         non_epoch_keys = [
-            x for x in self.data_dict_keys if x not in ["epoch_s", "time_now"]
+            x for x in self.data_dict_keys if x not in ["datetime"]
         ]
         for pres_key, color in zip(non_epoch_keys, colors):
             self.plot.line(
-                x="time_now",
+                x="datetime",
                 y=pres_key,
                 line_color=color,
                 source=self.datasource,
