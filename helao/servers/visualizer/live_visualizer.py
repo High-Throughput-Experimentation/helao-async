@@ -12,6 +12,7 @@ from helao.servers.visualizer.co2_vis import C_co2
 from helao.servers.visualizer.pressure_vis import C_pressure
 from helao.servers.visualizer.temp_vis import C_temperature
 from helao.servers.visualizer.mfc_vis import C_mfc
+from helao.servers.visualizer.wssim_live_vis import C_simlivevis
 
 
 def find_server_names(vis: Vis, fast_key: str) -> list:
@@ -60,6 +61,7 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
         "galil_io": C_pressure,
         "nidaqmx_server": C_temperature,
         "mfc_server": C_mfc,
+        "ws_simulator": C_simlivevis,
     }
     vis_dict = {}
 
