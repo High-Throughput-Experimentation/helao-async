@@ -79,10 +79,10 @@ class C_simlivevis:
 
         self.plot = figure(height=300, width=500)
         self.plot.xaxis.formatter = DatetimeTickFormatter(
-            hours=["%H:%m:%s"],
-            days=["%H:%m:%s"],
-            months=["%H:%m:%s"],
-            years=["%H:%m:%s"],
+            minsec='%T',
+            minutes='%T',
+            hourmin='%T',
+            hours='%T',
         )
         self.plot.xaxis.axis_label = "Time (HH:MM:SS)"
         self.plot.yaxis.axis_label = "value"
