@@ -205,7 +205,7 @@ class C_simlivevis:
         keys = list(data_dict.keys())
         values = [data_dict[k][-1] for k in keys]
         table_data_dict = {"name": keys, "value": values}
-        self.datasource_table.stream(table_data_dict, rollover=1)
+        self.datasource_table.stream(table_data_dict, rollover=len(keys))
         self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
