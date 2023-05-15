@@ -194,12 +194,8 @@ class C_simlivevis:
         )
 
     def add_points(self, datapackage_list: list):
+        latest_epoch = 0
         for datapackage in datapackage_list:
-            if len(self.data_dict[self.data_dict_keys[0]]) > self.max_points:
-                delpts = len(self.data_dict[self.data_dict_keys[0]]) - self.max_points
-                for key in self.data_dict_keys:
-                    del self.data_dict[key][:delpts]
-            latest_epoch = 0
             for datalab, (dataval, epochsec) in datapackage.items():
                 if datalab == "sim_dict":
                     for k, v in dataval.items():
@@ -214,6 +210,10 @@ class C_simlivevis:
                 s - latest_epoch for s in self.data_dict["epoch_s"]
             ]
 
+        if len(self.data_dict[self.data_dict_keys[0]]) > self.max_points:
+            delpts = len(self.data_dict[self.data_dict_keys[0]]) - self.max_points
+            for key in self.data_dict_keys:
+                del self.data_dict[key][:delpts]
         self.datasource.data = self.data_dict
         self.update_table_data()
         self._add_plots()
