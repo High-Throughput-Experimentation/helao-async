@@ -7,10 +7,10 @@ import websockets
 
 
 class WsSubscriber:
-    """ Generic subscriber class for websocket messages sent by helao servers.
+    """Generic subscriber class for websocket messages sent by helao servers.
 
     Subscriber receives compressed messages from /ws_data, /ws_live, /ws_status
-    endpoints, decompresses, then populates them into self.recv_queue. 
+    endpoints, decompresses, then populates them into self.recv_queue.
     The self.read_messages() method pops the entire queue.
     """
 
@@ -21,11 +21,19 @@ class WsSubscriber:
 
     async def subscriber_loop(self):
         """Coroutine for receving broadcasted websocket messages."""
-        while True:
-            async with websockets.connect(self.data_url) as ws:
-                recv_bytes = await ws.recv()
-                recv_data_dict = pickle.loads(pyzstd.decompress(recv_bytes))
-                self.recv_queue.append(recv_data_dict)
+        retry_limit = 5
+        for retry_idx in range(retry_limit):
+            try:
+                async with websockets.connect(self.data_url) as ws:
+                    while True:
+                        recv_bytes = await ws.recv()
+                        recv_data_dict = pickle.loads(pyzstd.decompress(recv_bytes))
+                        self.recv_queue.append(recv_data_dict)
+            except Exception:
+                self.vis.print_message(
+                    f"Could not connect, retrying {retry_idx+1}/{retry_limit}"
+                )
+        await ws.close()
 
     async def read_messages(self):
         """Empties recv_queue and returns messages."""
