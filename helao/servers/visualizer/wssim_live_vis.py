@@ -41,7 +41,7 @@ class C_simlivevis:
 
         self.datasource = ColumnDataSource(data={k: [] for k in self.data_dict_keys})
         self.datasource_table = ColumnDataSource(
-            data={k: [] for k in self.data_dict_keys}
+            data={k: [] for k in ['name', 'value']}
         )
 
         # create visual elements
@@ -77,7 +77,7 @@ class C_simlivevis:
         #     labels=self.data_dict_keys, active=[1, 3], width=500
         # )
 
-        self.plot = figure(height=300, width=500)
+        self.plot = figure(height=300, width=500, output_backend="webgl")
         self.plot.xaxis.formatter = DatetimeTickFormatter(
             minsec='%T',
             minutes='%T',
@@ -202,7 +202,10 @@ class C_simlivevis:
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
 
         self.datasource.stream(data_dict, rollover=self.max_points)
-        self.datasource_table.stream(data_dict, rollover=1)
+        keys = list(data_dict.keys())
+        values = [data_dict[k][-1] for k in keys]
+        table_data_dict = {"name": keys, "value": values}
+        self.datasource_table.stream(table_data_dict, rollover=1)
         self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
