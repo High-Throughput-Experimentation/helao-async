@@ -777,7 +777,8 @@ def ADSS_CA_NiSb_cell_1potential(
                 "solid_sample_no": plate_sample_no,
                 "liquid_custom_position": liquid_custom_position,
                 "liquid_sample_no": liquid_sample_no,            
-            }
+                "liquid_sample_volume_ul": liquid_sample_volume_ul,
+        }
         )
     else:    
         epm.add_experiment(
@@ -788,6 +789,7 @@ def ADSS_CA_NiSb_cell_1potential(
                 "solid_sample_no": plate_sample_no,
                 "liquid_custom_position": liquid_custom_position,
                 "liquid_sample_no": liquid_sample_no,
+                "liquid_sample_volume_ul": liquid_sample_volume_ul,
             },
         )
     # epm.add_experiment(
@@ -813,21 +815,21 @@ def ADSS_CA_NiSb_cell_1potential(
             "Syringe_rate_ulsec": Syringe_rate_ulsec,
         }
     )
-    epm.add_experiment( 
-        "ADSS_sub_load_liquid",
-        {
-            "liquid_custom_position": liquid_custom_position,
-            "liquid_sample_no": liquid_sample_no,
-        }
-    )
-    epm.add_experiment(
-        "ADSS_sub_load_solid",
-        {
-            "solid_custom_position": solid_custom_position,
-            "solid_plate_id": plate_id,
-            "solid_sample_no": plate_sample_no,
-        }
-    )
+    # epm.add_experiment( 
+    #     "ADSS_sub_load_liquid",
+    #     {
+    #         "liquid_custom_position": liquid_custom_position,
+    #         "liquid_sample_no": liquid_sample_no,
+    #     }
+    # )
+    # epm.add_experiment(
+    #     "ADSS_sub_load_solid",
+    #     {
+    #         "solid_custom_position": solid_custom_position,
+    #         "solid_plate_id": plate_id,
+    #         "solid_sample_no": plate_sample_no,
+    #     }
+    # )
     epm.add_experiment("ADSS_sub_recirculate",{})
 
     epm.add_experiment(
@@ -947,12 +949,12 @@ def ADSS_CA_NiSb_cell_1potential(
     return epm.experiment_plan_list  # returns complete experiment list
 
 def ADSS_CA_NiSb_cell_1potential_photo(
-    sequence_version: int = 3,
-    solid_custom_position: str = "cell1_we",
+    sequence_version: int = 5,
+    #solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no: int = 14050,  #  instead of map select
     same_sample: bool = False,
-    liquid_custom_position: str = "elec_res1",
+    #liquid_custom_position: str = "elec_res1",
     liquid_sample_no: int = 220,
     liquid_sample_volume_ul: float = 4000,
     CA_potential_vs: float = -0.2,
@@ -995,22 +997,24 @@ def ADSS_CA_NiSb_cell_1potential_photo(
         epm.add_experiment(
             "ADSS_sub_load",
             {
-                "solid_custom_position": solid_custom_position,
+                "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample_no,
-                "liquid_custom_position": liquid_custom_position,
+                "liquid_custom_position": "cell1_we",
                 "liquid_sample_no": liquid_sample_no,            
+                "liquid_sample_volume_ul": liquid_sample_volume_ul,
             }
         )
     else:    
         epm.add_experiment(
             "ADSS_sub_sample_start",
             {
-                "solid_custom_position": solid_custom_position,
+                "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample_no,
-                "liquid_custom_position": liquid_custom_position,
+                "liquid_custom_position": "cell1_we",
                 "liquid_sample_no": liquid_sample_no,
+                "liquid_sample_volume_ul": liquid_sample_volume_ul,
             },
         )
     # epm.add_experiment(
@@ -1044,21 +1048,22 @@ def ADSS_CA_NiSb_cell_1potential_photo(
             "Syringe_rate_ulsec": Syringe_rate_ulsec,
         }
     )
-    epm.add_experiment( 
-        "ADSS_sub_load_liquid",
-        {
-            "liquid_custom_position": liquid_custom_position,
-            "liquid_sample_no": liquid_sample_no,
-        }
-    )
-    epm.add_experiment(
-        "ADSS_sub_load_solid",
-        {
-            "solid_custom_position": solid_custom_position,
-            "solid_plate_id": plate_id,
-            "solid_sample_no": plate_sample_no,
-        }
-    )
+# redundant?
+    # epm.add_experiment(    
+    #     "ADSS_sub_load_liquid",
+    #     {
+    #         "liquid_custom_position": liquid_custom_position,
+    #         "liquid_sample_no": liquid_sample_no,
+    #     }
+    # )
+    # epm.add_experiment(
+    #     "ADSS_sub_load_solid",
+    #     {
+    #         "solid_custom_position": solid_custom_position,
+    #         "solid_plate_id": plate_id,
+    #         "solid_sample_no": plate_sample_no,
+    #     }
+    # )
     epm.add_experiment("ADSS_sub_recirculate",{})
 
     epm.add_experiment(

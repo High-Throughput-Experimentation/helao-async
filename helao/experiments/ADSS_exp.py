@@ -214,24 +214,28 @@ def ADSS_sub_load_solid(
 
 def ADSS_sub_load_liquid(
     experiment: Experiment,
-    experiment_version: int = 1,
-    liquid_custom_position: str = "elec_res1",
+    experiment_version: int = 2,  #v2 changes from archive_custom_load
+    liquid_custom_position: str = "cell1_we",
     liquid_sample_no: int = 1,
+    volume_ul_cell_liquid: int = 1000,
 ):
     """last functionality test: 11/29/2021"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
         PAL_server,
-        "archive_custom_load",
+        "archive_custom_add_liquid",
         {
             "custom": apm.pars.liquid_custom_position,
-            "load_sample_in": LiquidSample(
+            "source_liquid_in": LiquidSample(
                 **{
                     "sample_no": apm.pars.liquid_sample_no,
                     "machine_name": gethostname(),
                 }
             ).dict(),
+            "volume_ml": apm.pars.volume_ul_cell_liquid / 1000,
+            "combine_liquids": False,
+            "dilute_liquids": False,
         },
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
@@ -240,12 +244,13 @@ def ADSS_sub_load_liquid(
 
 def ADSS_sub_load(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
-    liquid_custom_position: str = "elec_res1",
+    liquid_custom_position: str = "cell1_we",
     liquid_sample_no: int = 1,
+    liquid_sample_volume_ul: float = 4000,
 ):
     apm = ActionPlanMaker()
 
@@ -267,6 +272,7 @@ def ADSS_sub_load(
             experiment=experiment,
             liquid_custom_position=apm.pars.liquid_custom_position,
             liquid_sample_no=apm.pars.liquid_sample_no,
+            volume_ul_cell_liquid=apm.pars.liquid_sample_volume_ul,
         )
     )
 
@@ -275,14 +281,15 @@ def ADSS_sub_load(
 
 def ADSS_sub_sample_start(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 4,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
     #    x_mm: float = 0.0,
     #    y_mm: float = 0.0,
-    liquid_custom_position: str = "elec_res1",
+    liquid_custom_position: str = "cell1_we",
     liquid_sample_no: int = 1,
+    liquid_sample_volume_ul: float = 4000,
 ):
     """Sub experiment
     (1) Unload all custom position samples
@@ -303,7 +310,8 @@ def ADSS_sub_sample_start(
             solid_sample_no=apm.pars.solid_sample_no,
             liquid_custom_position=apm.pars.liquid_custom_position,
             liquid_sample_no=apm.pars.liquid_sample_no,
-        )
+            liquid_sample_volume_ul=apm.pars.liquid_sample_volume_ul,
+    )
     )
 
     # turn pump off
@@ -697,7 +705,7 @@ def ADSS_sub_CA(
 
 def ADSS_sub_CA_photo(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     CA_potential: float = 0.0,
     ph: float = 9.53,
     potential_versus: str = "rhe",
@@ -707,6 +715,7 @@ def ADSS_sub_CA_photo(
     samplerate_sec: float = 0.05,
     CA_duration_sec: float = 1800,
     led_wavelength: str = "385",
+    toggle_illum_duty: float = 1,
     aliquot_volume_ul: int = 200,
     aliquot_times_sec: List[float] = [],
     aliquot_insitu: bool = True,
@@ -1068,7 +1077,7 @@ def ADSS_sub_OCV(
 
 def ADSS_sub_OCV_photo(
     experiment: Experiment,
-    experiment_version: int = 4,
+    experiment_version: int = 5,
     Tval__s: float = 60.0,
     gamry_i_range: str = "auto",
     samplerate_sec: float = 0.05,
@@ -1076,6 +1085,7 @@ def ADSS_sub_OCV_photo(
     ref_type: str = "inhouse",
     ref_offset__V: float = 0.0,
     led_wavelength: str = "385",
+    toggle_illum_duty: float = 1,
     aliquot_volume_ul: int = 200,
     aliquot_times_sec: List[float] = [],
     aliquot_insitu: bool = False,
