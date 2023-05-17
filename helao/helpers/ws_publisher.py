@@ -19,14 +19,13 @@ class WsPublisher:
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
-        connection = self.active_connections.append(websocket)
-        return connection
+        self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
         self.active_connections.remove(websocket)
 
-    async def broadcast(self, connection):
+    async def broadcast(self, websocket: WebSocket):
         async for source_msg in self.source_queue.subscribe():
-            await connection.send_bytes(
+            await websocket.send_bytes(
                 pyzstd.compress(pickle.dumps(self.xform_func(source_msg)))
             )
