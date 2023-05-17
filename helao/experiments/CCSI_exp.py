@@ -58,6 +58,7 @@ PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
 IO_server = MachineModel(server_name="IO", machine_name=ORCH_HOST).as_dict()
 CALC_server = MachineModel(server_name="CALC", machine_name=ORCH_HOST).as_dict()
 CO2S_server = MachineModel(server_name="CO2SENSOR", machine_name=ORCH_HOST).as_dict()
+MFC_server = MachineModel(server_name="MFC", machine_name=ORCH_HOST).as_dict()
 SOLUTIONPUMP_server = MachineModel(
     server_name="SYRINGE0", machine_name=ORCH_HOST
 ).as_dict()

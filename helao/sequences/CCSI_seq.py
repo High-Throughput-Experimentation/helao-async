@@ -10,6 +10,7 @@ __all__ = [
     "CCSI_Solution_testing",
     "CCSI_Solution_testing_fixed_cleans",
     "CCSI_priming",
+    "CCSI_leaktest",
     #"CCSI_debug_liquidloads",
 ]
 
