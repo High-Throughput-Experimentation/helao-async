@@ -254,7 +254,7 @@ class AliCatMFC:
         if device_name is None:
             resp = []
             for dev_name, fc in self.fcs.items():
-                tarev_resp = fc.tare_pressure()
+                tarev_resp = fc.tare_volumetric()
                 resp.append({dev_name: tarev_resp})
         else:
             resp = self.fcs[device_name].tare_volumetric()
