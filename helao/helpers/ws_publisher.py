@@ -2,6 +2,7 @@ import pickle
 from typing import List
 
 import pyzstd
+import websockets
 from fastapi import WebSocket
 
 
@@ -25,7 +26,10 @@ class WsPublisher:
         self.active_connections.remove(websocket)
 
     async def broadcast(self, websocket: WebSocket):
-        async for source_msg in self.source_queue.subscribe():
-            await websocket.send_bytes(
-                pyzstd.compress(pickle.dumps(self.xform_func(source_msg)))
-            )
+        try:
+            async for source_msg in self.source_queue.subscribe():
+                await websocket.send_bytes(
+                    pyzstd.compress(pickle.dumps(self.xform_func(source_msg)))
+                )
+        except websockets.ConnectionClosedError:
+            print("Client closed connection, but no close frame received or sent.")

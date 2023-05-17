@@ -30,7 +30,7 @@ class WsSubscriber:
                         recv_data_dict = pickle.loads(pyzstd.decompress(recv_bytes))
                         self.recv_queue.append(recv_data_dict)
             except Exception:
-                self.vis.print_message(
+                print(
                     f"Could not connect, retrying {retry_idx+1}/{retry_limit}"
                 )
 

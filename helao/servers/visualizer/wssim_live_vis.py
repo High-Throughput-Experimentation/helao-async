@@ -187,7 +187,6 @@ class C_simlivevis:
             values = [data_dict[k][-1] for k in keys]
             table_data_dict = {"name": keys, "value": values}
             self.datasource_table.stream(table_data_dict, rollover=len(keys))
-            # self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
         self.vis.print_message(" ... Live visualizer receiving messages.")
