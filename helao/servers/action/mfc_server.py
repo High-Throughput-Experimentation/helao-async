@@ -33,10 +33,11 @@ def makeApp(confPrefix, server_key, helao_root):
     @app.post(f"/{server_key}/acquire_flowrate", tags=["action"])
     async def acquire_flowrate(
         action: Action = Body({}, embed=True),
-        action_version: int = 1,
+        action_version: int = 2,
         device_name: str = dev_name,
         flowrate_sccm: float = None,
         ramp_sccm_sec: float = 0,
+        stay_open: bool = False,
         duration: float = -1,
         acquisition_rate: float = 0.2,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
@@ -55,10 +56,11 @@ def makeApp(confPrefix, server_key, helao_root):
     @app.post(f"/{server_key}/acquire_pressure", tags=["action"])
     async def acquire_pressure(
         action: Action = Body({}, embed=True),
-        action_version: int = 1,
+        action_version: int = 2,
         device_name: str = dev_name,
         pressure_psia: float = None,
         ramp_psi_sec: float = 0,
+        stay_open: bool = False,
         duration: float = -1,
         acquisition_rate: float = 0.2,
         fast_samples_in: List[SampleUnion] = Body([], embed=True),
@@ -109,8 +111,41 @@ def makeApp(confPrefix, server_key, helao_root):
         pressure_psia: float = None,
         ramp_psi_sec: float = 0,
     ):
-        active = await app.base.setup_and_contain_action(action_abbr="set_flow")
+        active = await app.base.setup_and_contain_action(action_abbr="set_pressure")
         app.driver.set_pressure(**active.action.action_params)
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+    @app.post(f"/{server_key}/hold_valve", tags=["action"])
+    async def hold_valve_action(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        device_name: str = dev_name,
+    ):
+        active = await app.base.setup_and_contain_action(action_abbr="hold_valve")
+        app.driver.hold_valve(active.action.action_params.get("device_name", None))
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+    @app.post(f"/{server_key}/cancel_hold", tags=["action"])
+    async def cancel_hold_action(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        device_name: str = dev_name,
+    ):
+        active = await app.base.setup_and_contain_action(action_abbr="cancel_hold")
+        app.driver.cancel_hold(active.action.action_params.get("device_name", None))
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+    @app.post(f"/{server_key}/hold_valve_closed", tags=["action"])
+    async def hold_valve_closed_action(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        device_name: str = dev_name,
+    ):
+        active = await app.base.setup_and_contain_action(action_abbr="close_valve")
+        app.driver.hold_valve_closed(active.action.action_params.get("device_name", None))
         finished_action = await active.finish()
         return finished_action.as_dict()
 
