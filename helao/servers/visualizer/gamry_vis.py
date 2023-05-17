@@ -249,7 +249,7 @@ class C_potvis:
         self.plot_prev.title.text = f"last {len(self.prev_action_uuids)} actions"
         xstr = self.data_dict_keys[self.xaxis_selector_group.active]
         ystr = self.data_dict_keys[self.yaxis_selector_group.active]
-        colors = ["red", "blue", "yellow", "green"]
+        colors = ["red", "blue", "orange", "green"]
         self.plot.line(
             x=xstr,
             y=ystr,
