@@ -30,8 +30,8 @@ valid_data_status = (
 class C_nidaqmxvis:
     """NImax visualizer module class"""
 
-    def __init__(self, visServ: Vis, serv_key: str):
-        self.vis = visServ
+    def __init__(self, vis_serv: Vis, serv_key: str):
+        self.vis = vis_serv
         self.config_dict = self.vis.server_cfg["params"]
         self.max_points = 500
         self.nidaqmx_key = serv_key

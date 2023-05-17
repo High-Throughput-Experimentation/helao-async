@@ -19,8 +19,8 @@ from helao.helpers.ws_subscriber import WsSubscriber as Wss
 class C_simlivevis:
     """potentiostat visualizer module class"""
 
-    def __init__(self, visServ: Vis, serv_key: str):
-        self.vis = visServ
+    def __init__(self, vis_serv: Vis, serv_key: str):
+        self.vis = vis_serv
         self.config_dict = self.vis.server_cfg["params"]
         self.update_rate = self.config_dict.get("update_rate", 0.5)
         self.max_points = 500
@@ -41,7 +41,7 @@ class C_simlivevis:
 
         self.datasource = ColumnDataSource(data={k: [] for k in self.data_dict_keys})
         self.datasource_table = ColumnDataSource(
-            data={k: [] for k in ['name', 'value']}
+            data={k: [] for k in ["name", "value"]}
         )
 
         # create visual elements
@@ -70,19 +70,13 @@ class C_simlivevis:
             "value",
             partial(self.callback_input_update_rate, sender=self.input_update_rate),
         )
-        # self.xaxis_selector_group = RadioButtonGroup(
-        #     labels=self.data_dict_keys, active=0, width=500
-        # )
-        # self.yaxis_selector_group = CheckboxButtonGroup(
-        #     labels=self.data_dict_keys, active=[1, 3], width=500
-        # )
 
         self.plot = figure(height=300, width=500, output_backend="webgl")
         self.plot.xaxis.formatter = DatetimeTickFormatter(
-            minsec='%T',
-            minutes='%T',
-            hourmin='%T',
-            hours='%T',
+            minsec="%T",
+            minutes="%T",
+            hourmin="%T",
+            hours="%T",
         )
         self.plot.xaxis.axis_label = "Time (HH:MM:SS)"
         self.plot.yaxis.axis_label = "value"
@@ -102,19 +96,8 @@ class C_simlivevis:
         headerbar = f"<b>Live vis module for server {server_link}</b>"
         self.layout = layout(
             [
-                [
-                    Div(
-                        text=headerbar,
-                        width=1004,
-                        height=15,
-                    ),
-                ],
+                [Div(text=headerbar, width=1004, height=15)],
                 [self.input_max_points, self.input_update_rate],
-                # [
-                #     Paragraph(text="x-axis selectors", width=500, height=15),
-                #     Paragraph(text="y-axis selectors", width=500, height=15),
-                # ],
-                # [self.xaxis_selector_group, self.yaxis_selector_group],
                 Spacer(height=10),
                 [self.plot, Spacer(width=20), self.table],
                 Spacer(height=10),
@@ -122,10 +105,6 @@ class C_simlivevis:
             background="#C0C0C0",
             width=1024,
         )
-
-        # to check if selection changed during ploting
-        # self.xselect = self.xaxis_selector_group.active
-        # self.yselect = self.yaxis_selector_group.active
 
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
@@ -239,6 +218,4 @@ class C_simlivevis:
             self.plot.legend.background_fill_alpha = 0.2
 
     def reset_plot(self, forceupdate: bool = False):
-        # self.xselect = self.xaxis_selector_group.active
-        # self.yselect = self.yaxis_selector_group.active
         self._add_plots()

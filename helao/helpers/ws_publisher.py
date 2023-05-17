@@ -1,4 +1,3 @@
-import asyncio
 import pickle
 from typing import List
 
@@ -11,9 +10,10 @@ class WsPublisher:
 
     Publisher sends compressed messages and handles subscriber disconnection.
     """
+    active_connections: List[WebSocket]
 
     def __init__(self, source_queue, xform_func=lambda x: x):
-        self.active_connections = List[WebSocket] = []
+        self.active_connections = []
         self.source_queue = source_queue
         self.xform_func = xform_func
 

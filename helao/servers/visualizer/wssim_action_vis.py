@@ -32,8 +32,8 @@ valid_data_status = (
 class C_simactvis:
     """spectrometer visualizer module class"""
 
-    def __init__(self, visServ: Vis, serv_key: str):
-        self.vis = visServ
+    def __init__(self, vis_serv: Vis, serv_key: str):
+        self.vis = vis_serv
         self.config_dict = self.vis.server_cfg["params"]
         self.max_spectra = 5
         self.downsample = 2

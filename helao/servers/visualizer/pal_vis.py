@@ -39,8 +39,8 @@ def async_partial(f, *args):
 class C_palvis:
     """PAL/archive visualizer module class"""
 
-    def __init__(self, visServ: Vis, serv_key: str):
-        self.vis = visServ
+    def __init__(self, vis_serv: Vis, serv_key: str):
+        self.vis = vis_serv
         self.config_dict = self.vis.server_cfg["params"]
         self.max_width = 1024
         self.max_smps = 10
