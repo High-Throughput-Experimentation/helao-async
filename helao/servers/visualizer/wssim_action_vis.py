@@ -1,3 +1,5 @@
+"""Action visualizer for the websocket simulator: WIP"""
+
 import time
 import websockets
 import asyncio
