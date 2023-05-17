@@ -180,12 +180,13 @@ class C_simlivevis:
                 latest_epoch = max([epochsec, latest_epoch])
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
 
-        self.datasource.stream(data_dict, rollover=self.max_points)
-        keys = list(data_dict.keys())
-        values = [data_dict[k][-1] for k in keys]
-        table_data_dict = {"name": keys, "value": values}
-        self.datasource_table.stream(table_data_dict, rollover=len(keys))
-        self._add_plots()
+        if latest_epoch != 0:
+            self.datasource.stream(data_dict, rollover=self.max_points)
+            keys = list(data_dict.keys())
+            values = [data_dict[k][-1] for k in keys]
+            table_data_dict = {"name": keys, "value": values}
+            self.datasource_table.stream(table_data_dict, rollover=len(keys))
+            self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
         self.vis.print_message(" ... Live visualizer receiving messages.")
