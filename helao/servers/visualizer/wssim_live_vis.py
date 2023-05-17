@@ -110,6 +110,7 @@ class C_simlivevis:
         self.vis.doc.add_root(Spacer(height=10))
         self.IOtask = asyncio.create_task(self.IOloop_data())
         self.vis.doc.on_session_destroyed(self.cleanup_session)
+        self._add_plots()
 
     def cleanup_session(self, session_context):
         self.vis.print_message(f"'{self.live_key}' Bokeh session closed", info=True)
@@ -186,7 +187,7 @@ class C_simlivevis:
             values = [data_dict[k][-1] for k in keys]
             table_data_dict = {"name": keys, "value": values}
             self.datasource_table.stream(table_data_dict, rollover=len(keys))
-            self._add_plots()
+            # self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
         self.vis.print_message(" ... Live visualizer receiving messages.")
@@ -217,6 +218,3 @@ class C_simlivevis:
             )
             self.plot.legend.border_line_alpha = 0.2
             self.plot.legend.background_fill_alpha = 0.2
-
-    def reset_plot(self, forceupdate: bool = False):
-        self._add_plots()
