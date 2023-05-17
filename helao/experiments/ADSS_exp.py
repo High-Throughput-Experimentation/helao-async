@@ -215,7 +215,7 @@ def ADSS_sub_load_solid(
 def ADSS_sub_load_liquid(
     experiment: Experiment,
     experiment_version: int = 2,  #v2 changes from archive_custom_load
-    liquid_custom_position: str = "elec_res1",
+    liquid_custom_position: str = "cell1_we",
     liquid_sample_no: int = 1,
     volume_ul_cell_liquid: int = 1000,
 ):
