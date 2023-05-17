@@ -35,7 +35,7 @@ from helao.helpers.print_message import print_message
 from helao.helpers import async_copy
 from helao.helpers.yml_finisher import move_dir
 from helao.helpers.premodels import Action
-form helao.helpers.ws_publisher import WsPublisher
+from helao.helpers.ws_publisher import WsPublisher
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.sample import (
     SampleType,
