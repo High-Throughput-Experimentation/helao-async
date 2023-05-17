@@ -23,7 +23,7 @@ import numpy as np
 import pyaml
 import pyzstd
 
-from fastapi import Body, WebSocket
+from fastapi import Body, WebSocket, WebSocketDisconnect
 from fastapi.dependencies.utils import get_flat_params
 
 from helao.helpers.server_api import HelaoFastAPI
@@ -102,7 +102,10 @@ class HelaoBase(HelaoFastAPI):
             websocket: a fastapi.WebSocket object
             """
             await self.base.status_publisher.connect(websocket)
-            await self.base.status_publisher.broadcast()
+            try:
+                await self.base.status_publisher.broadcast(websocket)
+            except WebSocketDisconnect:
+                self.base.status_publisher.disconnect(websocket)
 
         @self.websocket("/ws_data")
         async def websocket_data(websocket: WebSocket):
@@ -112,7 +115,11 @@ class HelaoBase(HelaoFastAPI):
             websocket: a fastapi.WebSocket object
             """
             await self.base.data_publisher.connect(websocket)
-            await self.base.data_publisher.broadcast()
+            try:
+                await self.base.data_publisher.broadcast(websocket)
+            except WebSocketDisconnect:
+                self.base.data_publisher.disconnect(websocket)
+                
 
         @self.websocket("/ws_live")
         async def websocket_live(websocket: WebSocket):
@@ -122,7 +129,10 @@ class HelaoBase(HelaoFastAPI):
             websocket: a fastapi.WebSocket object
             """
             await self.base.live_publisher.connect(websocket)
-            await self.base.live_publisher.broadcast()
+            try:
+                await self.base.live_publisher.broadcast(websocket)
+            except WebSocketDisconnect:
+                self.base.live_publisher.disconnect(websocket)
 
         @self.post("/get_config", tags=["private"])
         def get_config():
