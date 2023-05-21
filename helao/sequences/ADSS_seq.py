@@ -1197,6 +1197,7 @@ def ADSS_CA_NiSb_cell_1potential_either(
     plate_id: int = 5917,
     plate_sample_no: int = 14050,  #  instead of map select
     same_sample: bool = False,
+    stay_sample: bool = False,
     #liquid_custom_position: str = "elec_res1",
     liquid_sample_no: int = 220,
     liquid_sample_volume_ul: float = 4000,
@@ -1421,22 +1422,23 @@ def ADSS_CA_NiSb_cell_1potential_either(
             "ResidualWait_s": ResidualWait_s,
         }
     )
-    epm.add_experiment(
-        "ADSS_sub_cellfill_flush",
-        {
-            "Solution_volume_ul": flush_volume_ul,
-            "Syringe_rate_ulsec": Syringe_rate_ulsec,
-            "ReturnLineWait_s": ReturnLineWait_s,
-        }
-    )
-    epm.add_experiment(
-        "ADSS_sub_drain_cell",
-        {
-            "DrainWait_s": Cell_draintime_s,
-            "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-            "ResidualWait_s": ResidualWait_s,
-        }
-    )
+    if stay_sample:
+        epm.add_experiment(
+            "ADSS_sub_cellfill_flush",
+            {
+                "Solution_volume_ul": flush_volume_ul,
+                "Syringe_rate_ulsec": Syringe_rate_ulsec,
+                "ReturnLineWait_s": ReturnLineWait_s,
+            }
+        )
+        epm.add_experiment(
+            "ADSS_sub_drain_cell",
+            {
+                "DrainWait_s": Cell_draintime_s,
+                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+                "ResidualWait_s": ResidualWait_s,
+            }
+        )
     epm.add_experiment("ADSS_sub_unload_liquid",{})
 
     epm.add_experiment("ADSS_sub_unloadall_customs",{})
