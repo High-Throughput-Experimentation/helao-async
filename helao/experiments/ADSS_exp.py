@@ -982,7 +982,7 @@ def ADSS_sub_CV(
 
 def ADSS_sub_OCV(
     experiment: Experiment,
-    experiment_version: int = 4,
+    experiment_version: int = 5,
     Tval__s: float = 60.0,
     gamry_i_range: str = "auto",
     samplerate_sec: float = 0.05,
@@ -1045,6 +1045,7 @@ def ADSS_sub_OCV(
 
         for interval in intervals:
             apm.add(ORCH_server, "wait", {"waittime": interval}, waitcond)
+            apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0},ActionStartCondition.wait_for_orch)
             apm.add(
                 PAL_server,
                 "PAL_archive",
@@ -1072,6 +1073,9 @@ def ADSS_sub_OCV(
                     ProcessContrib.run_use,
                 ],
             )
+            apm.add(ORCH_server, "wait", {"waittime": 65}, ActionStartCondition.no_wait)
+            apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1},ActionStartCondition.wait_for_orch)
+
 
     return apm.action_list  # returns complete action list to orch
 
@@ -1144,6 +1148,7 @@ def ADSS_sub_OCV_photo(
 
         for interval in intervals:
             apm.add(ORCH_server, "wait", {"waittime": interval}, waitcond)
+            apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0},ActionStartCondition.wait_for_orch)
             apm.add(
                 PAL_server,
                 "PAL_archive",
@@ -1171,6 +1176,8 @@ def ADSS_sub_OCV_photo(
                     ProcessContrib.run_use,
                 ],
             )
+            apm.add(ORCH_server, "wait", {"waittime": 65}, ActionStartCondition.no_wait)
+            apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1},ActionStartCondition.wait_for_orch)
 
     return apm.action_list  # returns complete action list to orch
 
