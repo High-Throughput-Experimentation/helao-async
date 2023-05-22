@@ -1465,7 +1465,7 @@ def ADSS_sub_cellfill_flush(
 
 def ADSS_sub_drain_cell(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,  #v2 remove residual part
     DrainWait_s: float = 60,
     ReturnLineReverseWait_s: float = 5,
     ResidualWait_s: float = 15,
@@ -1482,12 +1482,12 @@ def ADSS_sub_drain_cell(
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})  # draining reservoir
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.DrainWait_s})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V5", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})  # draining cell
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.ResidualWait_s})
-    apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
+#    apm.add(NI_server, "gasvalve", {"gasvalve": "V5", "on": 1})
+#    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})  # draining cell
+#    apm.add(ORCH_server, "wait", {"waittime": apm.pars.ResidualWait_s})
+#    apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "V4", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V5", "on": 0})
+#    apm.add(NI_server, "gasvalve", {"gasvalve": "V5", "on": 0})
 
     return apm.action_list
 
