@@ -108,10 +108,10 @@ class C_potvis:
             labels=self.data_dict_keys, active=3, width=500
         )
         self.xaxis_selector_group.on_change(
-            "active", partial(self.reset_plot)
+            "active", partial(self.callback_selector_change)
         )
         self.yaxis_selector_group.on_change(
-            "active", partial(self.reset_plot)
+            "active", partial(self.callback_selector_change)
         )
 
         self.plot = figure(title="Title", height=300, width=500)
@@ -156,6 +156,9 @@ class C_potvis:
         )
         self.IOloop_data_run = False
         self.IOtask.cancel()
+    
+    def callback_selector_change(self, attr, old, new, sender):
+        self.reset_plot()
 
     def callback_input_max_points(self, attr, old, new, sender):
         """callback for input_max_points"""
