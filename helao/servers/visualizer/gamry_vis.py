@@ -226,7 +226,10 @@ class C_potvis:
                 for _, uuid_dict in data_package.datamodel.data.items():
                     for data_label, data_val in uuid_dict.items():
                         if data_label in self.data_dict_keys:
-                            data_dict[data_label].append(data_val)
+                            if isinstance(data_val, list):
+                                data_dict[data_label] += data_val
+                            else:
+                                data_dict[data_label].append(data_val)
             self.vis.print_message(f"streaming: {data_dict}")
             self.datasource.stream(data_dict, rollover=self.max_points)
 
@@ -255,8 +258,8 @@ class C_potvis:
 
         self.plot.title.text = f"active action_uuid: {self.cur_action_uuid}"
         self.plot_prev.title.text = f"last {len(self.prev_action_uuids)} actions"
-        xstr = self.data_dict_keys[self.xaxis_selector_group.active]
-        ystr = self.data_dict_keys[self.yaxis_selector_group.active]
+        xstr = self.data_dict_keys[self.xselect]
+        ystr = self.data_dict_keys[self.yselect]
         self.vis.print_message(f"{xstr}, {ystr}")
         colors = ["red", "blue", "orange", "green"]
         self.plot.line(
@@ -296,7 +299,7 @@ class C_potvis:
                 self.prev_datasources.pop(rp)
             self.datasource.data = {key: [] for key in self.data_dict_keys}
             self._add_plots()
-        elif (self.xselect != self.xaxis_selector_group.active) or (
+        if (self.xselect != self.xaxis_selector_group.active) or (
             self.yselect != self.yaxis_selector_group.active
         ):
             self.xselect = self.xaxis_selector_group.active
