@@ -9,21 +9,30 @@ from copy import deepcopy
 from bokeh.models import (
     TextInput,
 )
-from bokeh.models.widgets import Paragraph
 from bokeh.plotting import figure
 from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 
+import matplotlib.cm as cm
+
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.data import DataPackageModel
 from helao.servers.vis import Vis
 from helao.helpers.dispatcher import private_dispatcher
+from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
 
-valid_data_status = (
+VALID_DATA_STATUS = (
     None,
+    "active",
     HloStatus.active,
+)
+
+VALID_ACTION_NAME = (
+    "acquire_spec",
+    "acquire_spec_adv",
+    "acquire_spec_extrig",
 )
 
 
@@ -43,6 +52,10 @@ class C_specvis:
             return
         specserv_host = specserv_config.get("host", None)
         specserv_port = specserv_config.get("port", None)
+        self.wss = Wss(specserv_host, specserv_port, "ws_data")
+
+        self.cmap = cm.get_cmap("YlGnBu_r", self.max_spectra)
+        self.latest_coloridx = 0
 
         self.data_url = (
             f"ws://{specserv_config['host']}:{specserv_config['port']}/ws_data"
@@ -56,16 +69,21 @@ class C_specvis:
             json_dict={},
         )[0]
         self.vis.print_message(self.wl)
+        self.ev = [1239.8 / x for x in self.wl]
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict = {"channel": []}
-
-        self.datasource = ColumnDataSource(data=self.data_dict)
-        self.datasource_prev = ColumnDataSource(data=deepcopy(self.data_dict))
+        self.data_dict_keys = ["wl", "ev", "trans", "color", "epoch"]
+        self.datasource = ColumnDataSource(
+            data={key: [] for key in self.data_dict_keys}
+        )
 
         self.cur_action_uuid = ""
+
+        # prev_datasources aren't streamed, replot when axis or action_uuid changes
+        self.prev_datasources = {}
         self.prev_action_uuid = ""
+        self.prev_action_uuids = []
 
         # create visual elements
         self.layout = []
@@ -106,16 +124,12 @@ class C_specvis:
 
         self.plot_prev = figure(title="Title", height=300, width=500)
         # combine all sublayouts into a single one
+        docs_url = f"http://{specserv_host}:{specserv_port}/docs#/"
+        server_link = f'<a href="{docs_url}" target="_blank">\'{self.spec_key}\'</a>'
+        headerbar = f"<b>Potentiostat Visualizer module for server {server_link}</b>"
         self.layout = layout(
             [
-                [
-                    Spacer(width=20),
-                    Div(
-                        text=f'<b>Spectrometer Visualizer module for server <a href="http://{specserv_host}:{specserv_port}/docs#/" target="_blank">\'{self.spec_key}\'</a></b>',
-                        width=1004,
-                        height=15,
-                    ),
-                ],
+                [Spacer(width=20), Div(text=headerbar, width=1004, height=15)],
                 [self.input_max_spectra, Spacer(width=20), self.input_downsample],
                 Spacer(height=10),
                 [self.plot, Spacer(width=20), self.plot_prev],
@@ -128,13 +142,13 @@ class C_specvis:
         # to check if selection changed during ploting
         # self.xselect = self.xaxis_selector_group.active
         # self.yselect = self.yaxis_selector_group.active
-
-        self._add_plots()
+        # self._add_plots()
 
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
         self.IOtask = asyncio.create_task(self.IOloop_data())
         self.vis.doc.on_session_destroyed(self.cleanup_session)
+        self.reset_plot(self.cur_action_uuid, forceupdate=True)
 
     def cleanup_session(self, session_context):
         self.vis.print_message(f"'{self.spec_key}' Bokeh session closed", info=True)
@@ -199,82 +213,46 @@ class C_specvis:
         self.vis.print_message(
             f" ... spectrometer visualizer subscribing to: {self.data_url}"
         )
-        retry_limit = 5
-        for _ in range(retry_limit):
-            try:
-                async with websockets.connect(self.data_url) as ws:
-                    self.IOloop_data_run = True
-                    last_update = 0
-                    while self.IOloop_data_run:
-                        try:
-                            datapackage = DataPackageModel(
-                                **json.loads(await ws.recv())
-                            )
-                            if time.time() - last_update < self.min_update_delay:
-                                continue
-                            last_update = time.time()
-                            datastatus = datapackage.datamodel.status
-                            if (
-                                datapackage.action_name
-                                in (
-                                    "acquire_spec",
-                                    "acquire_spec_adv",
-                                    "acquire_spec_extrig",
-                                )
-                                and datastatus in valid_data_status
-                            ):
-                                self.vis.doc.add_next_tick_callback(
-                                    partial(self.add_points, datapackage)
-                                )
-                        except Exception:
-                            self.IOloop_data_run = False
-                    await ws.close()
-                    self.IOloop_data_run = False
-            except Exception:
-                self.vis.print_message(
-                    f"failed to subscribe to "
-                    f"{self.data_url}"
-                    "trying again in 1sec",
-                    info=True,
-                )
-                await asyncio.sleep(1)
-            if not self.IOloop_data_run:
-                self.vis.print_message("IOloop closed", info=True)
-                break
+        while True:
+            if time.time() - self.last_update_time >= self.update_rate:
+                messages = await self.wss.read_messages()
+                self.vis.doc.add_next_tick_callback(partial(self.add_points, messages))
+                self.last_update_time = time.time()
+            await asyncio.sleep(0.001)
 
-    def add_points(self, datapackage: DataPackageModel):
-        # check if uuid has changed
-        new_action_uuid = str(datapackage.action_uuid)
-        if new_action_uuid != self.cur_action_uuid:
-            self.vis.print_message(" ... reseting Spec graph")
-            self.prev_action_uuid = self.cur_action_uuid
-            self.cur_action_uuid = new_action_uuid
+    def add_points(self, datapackage_list: list):
+        for data_package in datapackage_list:
+            # only resets if axis selector or action_uuid changes
+            self.reset_plot(str(data_package.action_uuid))
+            if (
+                data_package.datamodel.status in VALID_DATA_STATUS
+                and data_package.action_name in VALID_ACTION_NAME
+            ):
+                for _, uuid_dict in data_package.datamodel.data.items():
+                    # unpack and sort epoch and channels
+                    epoch = uuid_dict["epoch_s"]
+                    dtstr = datetime.fromtimestamp(epoch).strftime(
+                        "%Y-%m-%d %H:%M:%S.%f"
+                    )
+                    ch_keys = sorted(
+                        [k for k in uuid_dict.keys() if k.startswith("ch_")],
+                        key=lambda x: int(x.split("_")[-1]),
+                    )
+                    data_dict = {
+                        "wl": [self.wl[:: self.downsample]],
+                        "ev": [self.ev[:: self.downsample]],
+                        "trans": [[uuid_dict[k] for k in ch_keys][:: self.downsample]],
+                        "color": self.cmap[0],
+                        "time": dtstr,
+                    }
 
-            # copy old data to "prev" plot
-            self.datasource_prev.data = {
-                deepcopy(key): deepcopy(val)
-                for key, val in self.datasource.data.items()
-            }
-            self.data_dict = {"wl": self.wl[:: self.downsample]}
-
-        # update self.data_dict with incoming data package
-        for _, data_dict in datapackage.datamodel.data.items():
-            # unpack and sort epoch and channels
-            epoch = data_dict["epoch_s"]
-            dtstr = datetime.fromtimestamp(epoch).strftime("%Y-%m-%d %H:%M:%S.%f")
-            ch_keys = sorted(
-                [k for k in data_dict.keys() if k.startswith("ch_")],
-                key=lambda x: int(x.split("_")[-1]),
-            )
-            ch_vals = [data_dict[k] for k in ch_keys]
-            self.data_dict.update({dtstr: ch_vals[:: self.downsample]})
-
-        # trim number of spectra being plotted
-        if len(self.data_dict.keys()) > self.max_spectra:
-            datetime_keys = sorted(self.data_dict.keys())
-            delpts = len(self.data_dict.keys()) - self.max_spectra
-            for key in datetime_keys[:delpts]:
-                self.data_dict.pop(key)
+                    current_colors = self.datasource.data["color"]
+                    current_idx = [self.cmap.index(x) for x in current_colors]
+                    new_colors = [
+                        self.cmap[i + 1 % len(self.cmap)] for i in current_idx
+                    ]
+                    self.datasource.patch({"color": (slice(None), new_colors)})
+                    self.datasource.stream(data_dict, rollover=self.max_spectra)
 
         self.datasource.data = self.data_dict
         self._add_plots()

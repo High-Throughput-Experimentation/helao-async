@@ -118,7 +118,7 @@ class C_potvis:
         server_link = (
             f'<a href="{docs_url}" target="_blank">\'{self.potentiostat_key}\'</a>'
         )
-        headerbar = f"<b>Live vis module for server {server_link}</b>"
+        headerbar = f"<b>Potentiostat Visualizer module for server {server_link}</b>"
         self.layout = layout(
             [
                 [Spacer(width=20), Div(text=headerbar, width=1004, height=15)],
