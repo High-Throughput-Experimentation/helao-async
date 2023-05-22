@@ -1,13 +1,10 @@
 import time
 import asyncio
-import json
 from datetime import datetime
 from functools import partial
-from uuid import UUID
 from copy import deepcopy
 
 from bokeh.models import (
-    CheckboxButtonGroup,
     RadioButtonGroup,
     TextInput,
 )
@@ -18,7 +15,6 @@ from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 
 from helaocore.models.hlostatus import HloStatus
-from helaocore.models.data import DataPackageModel
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
@@ -278,7 +274,8 @@ class C_potvis:
                 line_color=colors[i % len(colors)],
                 source=self.prev_datasources[puuid],
                 name=puuid,
-                legend_label=puuid.split("-")[0],
+                # legend_label=puuid.split("-")[0],
+                legend_label=f"{i+1}",
             )
 
     def reset_plot(self, new_action_uuid=None, forceupdate: bool = False):
