@@ -223,9 +223,10 @@ class C_potvis:
                 data_package.datamodel.status in VALID_DATA_STATUS
                 and data_package.action_name in VALID_ACTION_NAME
             ):
-                for data_label, data_val in data_package.datamodel.data.items():
-                    if data_label in self.data_dict_keys:
-                        data_dict[data_label].append(data_val)
+                for _, uuid_dict in data_package.datamodel.data.items():
+                    for data_label, data_val in uuid_dict.items():
+                        if data_label in self.data_dict_keys:
+                            data_dict[data_label].append(data_val)
             self.vis.print_message(f"streaming: {data_dict}")
             self.datasource.stream(data_dict, rollover=self.max_points)
 
