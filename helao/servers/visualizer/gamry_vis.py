@@ -270,24 +270,23 @@ class C_potvis:
             )
 
     def reset_plot(self, new_action_uuid=None, forceupdate: bool = False):
-        if (new_action_uuid is not None) or forceupdate:
+        if self.cur_action_uuid != new_action_uuid or forceupdate:
             self.vis.print_message(" ... reseting Gamry graph")
-            if self.cur_action_uuid != new_action_uuid:
-                if self.prev_action_uuid != "":
-                    self.prev_action_uuid = self.cur_action_uuid
-                    self.prev_action_uuids.append(self.prev_action_uuid)
-                    self.vis.print_message(f"previous uuids: {self.prev_action_uuids}")
-                    # copy old data to "prev" plot
-                    self.prev_datasources[self.prev_action_uuid] = ColumnDataSource(
-                        data=deepcopy(self.datasource.data)
-                    )
-                self.cur_action_uuid = new_action_uuid
-                # update prev_datasources
-                while len(self.prev_action_uuids) > self.max_prev:
-                    rp = self.prev_action_uuids.pop(0)
-                    self.prev_datasources.pop(rp)
-                self.datasource.data = {key: [] for key in self.data_dict_keys}
-                self._add_plots()
+            if self.prev_action_uuid != "":
+                self.prev_action_uuid = self.cur_action_uuid
+                self.prev_action_uuids.append(self.prev_action_uuid)
+                self.vis.print_message(f"previous uuids: {self.prev_action_uuids}")
+                # copy old data to "prev" plot
+                self.prev_datasources[self.prev_action_uuid] = ColumnDataSource(
+                    data=deepcopy(self.datasource.data)
+                )
+            self.cur_action_uuid = new_action_uuid
+            # update prev_datasources
+            while len(self.prev_action_uuids) > self.max_prev:
+                rp = self.prev_action_uuids.pop(0)
+                self.prev_datasources.pop(rp)
+            self.datasource.data = {key: [] for key in self.data_dict_keys}
+            self._add_plots()
         elif (self.xselect != self.xaxis_selector_group.active) or (
             self.yselect != self.yaxis_selector_group.active
         ):
