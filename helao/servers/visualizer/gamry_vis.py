@@ -216,6 +216,9 @@ class C_potvis:
             self.vis.print_message(
                 f"data_status: {data_package.datamodel.status}, action_name: {data_package.action_name}"
             )
+            self.vis.print_message(
+                f"processing received data: {data_package.datamodel.data}"
+            )
             if (
                 data_package.datamodel.status in VALID_DATA_STATUS
                 and data_package.action_name in VALID_ACTION_NAME
