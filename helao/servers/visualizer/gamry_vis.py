@@ -107,6 +107,12 @@ class C_potvis:
         self.yaxis_selector_group = RadioButtonGroup(
             labels=self.data_dict_keys, active=3, width=500
         )
+        self.xaxis_selector_group.on_change(
+            "active", partial(self.reset_plot, sender=self.xaxis_selector_group)
+        )
+        self.yaxis_selector_group.on_change(
+            "active", partial(self.reset_plot, sender=self.yaxis_selector_group)
+        )
 
         self.plot = figure(title="Title", height=300, width=500)
         self.plot_prev = figure(title="Title", height=300, width=500)
@@ -212,13 +218,6 @@ class C_potvis:
             data_dict = {k: [] for k in self.data_dict_keys}
             # only resets if axis selector or action_uuid changes
             self.reset_plot(str(data_package.action_uuid))
-
-            self.vis.print_message(
-                f"data_status: {data_package.datamodel.status}, action_name: {data_package.action_name}"
-            )
-            self.vis.print_message(
-                f"processing received data: {data_package.datamodel.data}"
-            )
             if (
                 data_package.datamodel.status in VALID_DATA_STATUS
                 and data_package.action_name in VALID_ACTION_NAME
@@ -230,7 +229,6 @@ class C_potvis:
                                 data_dict[data_label] += data_val
                             else:
                                 data_dict[data_label].append(data_val)
-            self.vis.print_message(f"streaming: {data_dict}")
             self.datasource.stream(data_dict, rollover=self.max_points)
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
@@ -271,7 +269,6 @@ class C_potvis:
             legend_label=ystr,
         )
         for i, puuid in enumerate(self.prev_action_uuids):
-            self.vis.print_message(f"Adding {puuid} to previous plots")
             self.plot_prev.line(
                 x=xstr,
                 y=ystr,
