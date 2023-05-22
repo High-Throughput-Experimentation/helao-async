@@ -271,8 +271,8 @@ class C_potvis:
     def reset_plot(self, new_action_uuid=None, forceupdate: bool = False):
         if self.cur_action_uuid != new_action_uuid or forceupdate:
             self.vis.print_message(" ... reseting Gamry graph")
+            self.prev_action_uuid = self.cur_action_uuid
             if self.prev_action_uuid != "":
-                self.prev_action_uuid = self.cur_action_uuid
                 self.prev_action_uuids.append(self.prev_action_uuid)
                 self.vis.print_message(f"previous uuids: {self.prev_action_uuids}")
                 # copy old data to "prev" plot
