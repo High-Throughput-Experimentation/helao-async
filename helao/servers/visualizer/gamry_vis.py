@@ -207,9 +207,8 @@ class C_potvis:
         sender.value = value
 
     def add_points(self, datapackage_list: list):
-        data_dict = {k: [] for k in self.data_dict_keys}
         for data_package in datapackage_list:
-
+            data_dict = {k: [] for k in self.data_dict_keys}
             # only resets if axis selector or action_uuid changes
             self.reset_plot(str(data_package.action_uuid))
 
