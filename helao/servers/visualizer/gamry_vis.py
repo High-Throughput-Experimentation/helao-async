@@ -108,10 +108,10 @@ class C_potvis:
             labels=self.data_dict_keys, active=3, width=500
         )
         self.xaxis_selector_group.on_change(
-            "active", partial(self.reset_plot, sender=self.xaxis_selector_group)
+            "active", partial(self.reset_plot)
         )
         self.yaxis_selector_group.on_change(
-            "active", partial(self.reset_plot, sender=self.yaxis_selector_group)
+            "active", partial(self.reset_plot)
         )
 
         self.plot = figure(title="Title", height=300, width=500)
