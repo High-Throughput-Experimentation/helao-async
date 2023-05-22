@@ -212,6 +212,9 @@ class C_potvis:
             # only resets if axis selector or action_uuid changes
             self.reset_plot(str(data_package.action_uuid))
 
+            self.vis.print_message(
+                f"data_status: {data_package.datamodel.status}, action_name: {data_package.action_name}"
+            )
             if (
                 data_package.datamodel.status in VALID_DATA_STATUS
                 and data_package.action_name in VALID_ACTION_NAME
