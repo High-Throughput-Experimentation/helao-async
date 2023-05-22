@@ -157,7 +157,7 @@ class C_potvis:
         self.IOloop_data_run = False
         self.IOtask.cancel()
     
-    def callback_selector_change(self, attr, old, new, sender):
+    def callback_selector_change(self, attr, old, new):
         self.reset_plot()
 
     def callback_input_max_points(self, attr, old, new, sender):
