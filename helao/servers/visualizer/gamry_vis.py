@@ -219,6 +219,7 @@ class C_potvis:
                 for data_label, data_val in data_package.datamodel.data.items():
                     if data_label in self.data_dict_keys:
                         data_dict[data_label].append(data_val)
+            self.vis.print_message(f"streaming: {data_dict}")
             self.datasource.stream(data_dict, rollover=self.max_points)
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
@@ -248,6 +249,7 @@ class C_potvis:
         self.plot_prev.title.text = f"last {len(self.prev_action_uuids)} actions"
         xstr = self.data_dict_keys[self.xaxis_selector_group.active]
         ystr = self.data_dict_keys[self.yaxis_selector_group.active]
+        self.vis.print_message(f"{xstr}, {ystr}")
         colors = ["red", "blue", "orange", "green"]
         self.plot.line(
             x=xstr,
