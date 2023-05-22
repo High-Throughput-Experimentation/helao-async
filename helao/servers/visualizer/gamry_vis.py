@@ -24,6 +24,7 @@ from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
 VALID_DATA_STATUS = (
     None,
+    "active",
     HloStatus.active,
 )
 
