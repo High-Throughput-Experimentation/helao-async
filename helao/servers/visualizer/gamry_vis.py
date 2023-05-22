@@ -211,7 +211,7 @@ class C_potvis:
         for data_package in datapackage_list:
 
             # only resets if axis selector or action_uuid changes
-            self.reset_plot(data_package.action_uuid)
+            self.reset_plot(str(data_package.action_uuid))
 
             if (
                 data_package.datamodel.status in VALID_DATA_STATUS
