@@ -251,7 +251,7 @@ class C_specvis:
                         for i, _ in enumerate(current_colors)
                     ]
                     self.datasource.patch(
-                        {"color": [(slice(None), new_colors)], "time": []}
+                        {"color": [(slice(len(new_colors)), new_colors)], "time": []}
                     )
                     self.datasource.stream(data_dict, rollover=self.max_spectra)
 
