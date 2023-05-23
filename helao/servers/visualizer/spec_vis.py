@@ -242,17 +242,17 @@ class C_specvis:
                         "wl": [self.wl[:: self.downsample]],
                         "ev": [self.ev[:: self.downsample]],
                         "trans": [[uuid_dict[k] for k in ch_keys][:: self.downsample]],
-                        "color": [mcolors.rgb2hex(self.cmap(0))],
-                        "time": [dtstr],
+                        "color": mcolors.rgb2hex(self.cmap(0)),
+                        "time": dtstr,
                     }
 
                     current_colors = self.datasource.data["color"]
                     new_colors = [
-                        [mcolors.rgb2hex(self.cmap((i + 1) % self.max_spectra))]
+                        mcolors.rgb2hex(self.cmap((i + 1) % self.max_spectra))
                         for i, _ in enumerate(current_colors)
                     ]
                     self.datasource.patch(
-                        {"color": [(slice(len(new_colors)), new_colors)], "time": []}
+                        {"color": [(slice(len(new_colors)), new_colors)]}
                     )
                     self.datasource.stream(data_dict, rollover=self.max_spectra)
 
