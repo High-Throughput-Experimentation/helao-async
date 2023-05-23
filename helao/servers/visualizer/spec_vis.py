@@ -254,6 +254,7 @@ class C_specvis:
                     self.datasource.patch(
                         {"color": [(slice(len(new_colors)), new_colors)]}
                     )
+                    self.vis.print_message({k: len(v) for k,v in data_dict.items()})
                     self.datasource.stream(data_dict, rollover=self.max_spectra)
 
     def _add_plots(self):
