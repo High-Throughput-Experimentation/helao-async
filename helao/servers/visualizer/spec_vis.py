@@ -1,10 +1,8 @@
 import time
-import websockets
 import asyncio
-import json
+from copy import deepcopy
 from datetime import datetime
 from functools import partial
-from copy import deepcopy
 
 from bokeh.models import (
     TextInput,
@@ -17,7 +15,7 @@ from bokeh.models import ColumnDataSource
 import matplotlib.cm as cm
 
 from helaocore.models.hlostatus import HloStatus
-from helaocore.models.data import DataPackageModel
+
 from helao.servers.vis import Vis
 from helao.helpers.dispatcher import private_dispatcher
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
@@ -44,7 +42,8 @@ class C_specvis:
         self.config_dict = self.vis.server_cfg["params"]
         self.max_spectra = 5
         self.downsample = 2
-        self.min_update_delay = 0.5  # drop plots if spectra come in too quickly
+        self.update_rate = 1e-3
+        self.last_update_time = time.time()
 
         self.spec_key = serv_key
         specserv_config = self.vis.world_cfg["servers"].get(self.spec_key, None)
@@ -77,13 +76,12 @@ class C_specvis:
         self.datasource = ColumnDataSource(
             data={key: [] for key in self.data_dict_keys}
         )
+        self.prev_datasource = ColumnDataSource(
+            data={key: [] for key in self.data_dict_keys}
+        )
 
         self.cur_action_uuid = ""
-
-        # prev_datasources aren't streamed, replot when axis or action_uuid changes
-        self.prev_datasources = {}
         self.prev_action_uuid = ""
-        self.prev_action_uuids = []
 
         # create visual elements
         self.layout = []
@@ -249,13 +247,10 @@ class C_specvis:
                     current_colors = self.datasource.data["color"]
                     current_idx = [self.cmap.index(x) for x in current_colors]
                     new_colors = [
-                        self.cmap[i + 1 % len(self.cmap)] for i in current_idx
+                        self.cmap[(i + 1) % len(self.cmap)] for i in current_idx
                     ]
                     self.datasource.patch({"color": (slice(None), new_colors)})
                     self.datasource.stream(data_dict, rollover=self.max_spectra)
-
-        self.datasource.data = self.data_dict
-        self._add_plots()
 
     def _add_plots(self):
         # clear legend
@@ -272,24 +267,31 @@ class C_specvis:
         self.plot.title.text = f"active action_uuid: {self.cur_action_uuid}"
         self.plot_prev.title.text = f"previous action_uuid: {self.prev_action_uuid}"
 
-        ds_keys = [x for x in sorted(self.datasource.data.keys()) if x != "wl"]
-        for i, dt in enumerate(ds_keys):
-            self.plot.line(
-                x="wl",
-                y=dt,
-                line_color="blue" if i != len(ds_keys) - 1 else "red",
-                source=self.datasource,
-                name=self.cur_action_uuid,
-                legend_label=dt,
-            )
+        self.plot.multi_line(
+            x="wl",
+            y="trans",
+            line_color="color",
+            source=self.datasource,
+            name=self.cur_action_uuid,
+        )
 
-        dsp_keys = [x for x in sorted(self.datasource_prev.data.keys()) if x != "wl"]
-        for i, dt in enumerate(dsp_keys):
-            self.plot_prev.line(
-                x="wl",
-                y=dt,
-                line_color="blue" if i != len(dsp_keys) - 1 else "red",
-                source=self.datasource_prev,
-                name=self.prev_action_uuid,
-                legend_label=dt,
-            )
+        self.plot_prev.multi_line(
+            x="wl",
+            y="trans",
+            line_color="color",
+            source=self.prev_datasource,
+            name=self.prev_action_uuid,
+        )
+
+    def reset_plot(self, new_action_uuid=None, forceupdate: bool = False):
+        """Clear current plot and move data to previous plot"""
+        if self.cur_action_uuid != new_action_uuid or forceupdate:
+            if new_action_uuid is not None:
+                self.vis.print_message(" ... reseting Gamry graph")
+                self.prev_action_uuid = self.cur_action_uuid
+                if self.prev_action_uuid != "":
+                    # copy old data to "prev" plot
+                    self.prev_datasource.data = deepcopy(self.datasource.data)
+                self.cur_action_uuid = new_action_uuid
+                self.datasource.data = {key: [] for key in self.data_dict_keys}
+            self._add_plots()
