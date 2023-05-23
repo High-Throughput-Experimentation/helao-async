@@ -273,7 +273,7 @@ class C_specvis:
         self.plot.multi_line(
             xs="wl",
             ys="trans",
-            line_color="color",
+            color="color",
             source=self.datasource,
             name=self.cur_action_uuid,
         )
@@ -281,7 +281,7 @@ class C_specvis:
         self.plot_prev.multi_line(
             xs="wl",
             ys="trans",
-            line_color="color",
+            color="color",
             source=self.prev_datasource,
             name=self.prev_action_uuid,
         )
