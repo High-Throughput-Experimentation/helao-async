@@ -289,9 +289,7 @@ class C_specvis:
             if new_action_uuid is not None:
                 self.vis.print_message(" ... reseting spectrometer graph")
                 self.prev_action_uuid = self.cur_action_uuid
-                if self.prev_action_uuid != "":
-                    # copy old data to "prev" plot
-                    self.prev_datasource.data = deepcopy(self.datasource.data)
+                self.prev_datasource.data = dict(deepcopy(self.datasource.data).items())
                 self.cur_action_uuid = new_action_uuid
                 self.datasource.data = {key: [] for key in self.data_dict_keys}
             self._add_plots()
