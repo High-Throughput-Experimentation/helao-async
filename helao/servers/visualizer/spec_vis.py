@@ -122,6 +122,8 @@ class C_specvis:
         self.plot.yaxis.axis_label = "Transmittance (counts/sec)"
 
         self.plot_prev = figure(title="Title", height=300, width=500)
+        self.plot_prev.xaxis.axis_label = "Wavelength (nm)"
+        self.plot_prev.yaxis.axis_label = "Transmittance (counts/sec)"
         # combine all sublayouts into a single one
         docs_url = f"http://{specserv_host}:{specserv_port}/docs#/"
         server_link = f'<a href="{docs_url}" target="_blank">\'{self.spec_key}\'</a>'
@@ -178,7 +180,7 @@ class C_specvis:
             newpts = 10000
 
         self.max_spectra = newpts
-        self.cmap = cm.get_cmap("YlGnBu_r", self.max_spectra)
+        self.cmap = cm.get_cmap("Reds_r", self.max_spectra)
 
         self.vis.doc.add_next_tick_callback(
             partial(self.update_input_value, sender, f"{self.max_spectra}")
@@ -247,12 +249,10 @@ class C_specvis:
                     }
 
                     current_colors = self.datasource.data["color"]
-                    self.vis.print_message(current_colors)
                     new_colors = [
                         mcolors.rgb2hex(self.cmap((i + 1) % self.max_spectra))
                         for i, _ in enumerate(current_colors)
                     ]
-                    self.vis.print_message(new_colors)
                     self.datasource.patch(
                         {"color": [(slice(len(new_colors)), new_colors)]}
                     )
