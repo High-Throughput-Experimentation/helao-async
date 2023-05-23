@@ -247,7 +247,8 @@ class C_specvis:
 
                     current_colors = self.datasource.data["color"]
                     new_colors = [
-                        [self.cmap((i + 1) % self.max_spectra)] for i in current_colors
+                        [self.cmap((i + 1) % self.max_spectra)]
+                        for i, _ in enumerate(current_colors)
                     ]
                     self.datasource.patch(
                         {"color": [(slice(None), new_colors)], "time": []}
