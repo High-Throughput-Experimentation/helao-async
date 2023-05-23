@@ -117,14 +117,14 @@ class C_specvis:
         # )
 
         self.plot = figure(title="Title", height=300, width=500)
-        self.plot.xaxis.axis_label = "Channel"  # "Epoch (seconds)"
+        self.plot.xaxis.axis_label = "Wavelength (nm)"
         self.plot.yaxis.axis_label = "Transmittance (counts/sec)"
 
         self.plot_prev = figure(title="Title", height=300, width=500)
         # combine all sublayouts into a single one
         docs_url = f"http://{specserv_host}:{specserv_port}/docs#/"
         server_link = f'<a href="{docs_url}" target="_blank">\'{self.spec_key}\'</a>'
-        headerbar = f"<b>Potentiostat Visualizer module for server {server_link}</b>"
+        headerbar = f"<b>Spectrometer Visualizer module for server {server_link}</b>"
         self.layout = layout(
             [
                 [Spacer(width=20), Div(text=headerbar, width=1004, height=15)],
@@ -253,12 +253,12 @@ class C_specvis:
                     self.datasource.stream(data_dict, rollover=self.max_spectra)
 
     def _add_plots(self):
-        # clear legend
-        if self.plot.renderers:
-            self.plot.legend.items = []
+        # # clear legend
+        # if self.plot.renderers:
+        #     self.plot.legend.items = []
 
-        if self.plot_prev.renderers:
-            self.plot_prev.legend.items = []
+        # if self.plot_prev.renderers:
+        #     self.plot_prev.legend.items = []
 
         # remove all old lines
         self.plot.renderers = []
@@ -287,7 +287,7 @@ class C_specvis:
         """Clear current plot and move data to previous plot"""
         if self.cur_action_uuid != new_action_uuid or forceupdate:
             if new_action_uuid is not None:
-                self.vis.print_message(" ... reseting Gamry graph")
+                self.vis.print_message(" ... reseting spectrometer graph")
                 self.prev_action_uuid = self.cur_action_uuid
                 if self.prev_action_uuid != "":
                     # copy old data to "prev" plot
