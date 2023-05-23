@@ -72,7 +72,7 @@ class C_specvis:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["wl", "ev", "trans", "color", "epoch"]
+        self.data_dict_keys = ["wl", "ev", "trans", "color", "time"]
         self.datasource = ColumnDataSource(
             data={key: [] for key in self.data_dict_keys}
         )
@@ -249,7 +249,7 @@ class C_specvis:
                     new_colors = [
                         self.cmap((i + 1) % len(self.cmap)) for i in current_idx
                     ]
-                    self.datasource.patch({"color": [(slice(None), new_colors)], "epoch": [], "time": []})
+                    self.datasource.patch({"color": [(slice(None), new_colors)], "time": []})
                     self.datasource.stream(data_dict, rollover=self.max_spectra)
 
     def _add_plots(self):
