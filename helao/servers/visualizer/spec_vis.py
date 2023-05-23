@@ -268,16 +268,16 @@ class C_specvis:
         self.plot_prev.title.text = f"previous action_uuid: {self.prev_action_uuid}"
 
         self.plot.multi_line(
-            x="wl",
-            y="trans",
+            xs="wl",
+            ys="trans",
             line_color="color",
             source=self.datasource,
             name=self.cur_action_uuid,
         )
 
         self.plot_prev.multi_line(
-            x="wl",
-            y="trans",
+            xs="wl",
+            ys="trans",
             line_color="color",
             source=self.prev_datasource,
             name=self.prev_action_uuid,

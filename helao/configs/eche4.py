@@ -119,13 +119,13 @@ config["servers"] = {
             "start_margin": 5,
         },
     },
-    "MFC": {
-        "host": hostip,
-        "port": 8009,
-        "group": "action",
-        "fast": "mfc_server",
-        "params": {"devices": {"N2": {"port": "COM6", "unit_id": "A"}}},
-    },
+    # "MFC": {
+    #     "host": hostip,
+    #     "port": 8009,
+    #     "group": "action",
+    #     "fast": "mfc_server",
+    #     "params": {"devices": {"N2": {"port": "COM6", "unit_id": "A"}}},
+    # },
     # "CALC": {
     #     "host": hostip,
     #     "port": 8012,
