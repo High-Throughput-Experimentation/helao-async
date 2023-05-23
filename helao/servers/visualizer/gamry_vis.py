@@ -1,6 +1,5 @@
 import time
 import asyncio
-from datetime import datetime
 from functools import partial
 from copy import deepcopy
 
@@ -212,6 +211,17 @@ class C_potvis:
     def update_input_value(self, sender, value):
         sender.value = value
 
+    async def IOloop_data(self):  # non-blocking coroutine, updates data source
+        self.vis.print_message(
+            f" ... potentiostat visualizer subscribing to: {self.data_url}"
+        )
+        while True:
+            if time.time() - self.last_update_time >= self.update_rate:
+                messages = await self.wss.read_messages()
+                self.vis.doc.add_next_tick_callback(partial(self.add_points, messages))
+                self.last_update_time = time.time()
+            await asyncio.sleep(0.001)
+
     def add_points(self, datapackage_list: list):
         for data_package in datapackage_list:
             data_dict = {k: [] for k in self.data_dict_keys}
@@ -229,17 +239,6 @@ class C_potvis:
                             else:
                                 data_dict[data_label].append(data_val)
             self.datasource.stream(data_dict, rollover=self.max_points)
-
-    async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        self.vis.print_message(
-            f" ... potentiostat visualizer subscribing to: {self.data_url}"
-        )
-        while True:
-            if time.time() - self.last_update_time >= self.update_rate:
-                messages = await self.wss.read_messages()
-                self.vis.doc.add_next_tick_callback(partial(self.add_points, messages))
-                self.last_update_time = time.time()
-            await asyncio.sleep(0.001)
 
     def _add_plots(self):
         # clear legend
