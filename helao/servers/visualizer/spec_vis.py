@@ -177,6 +177,7 @@ class C_specvis:
             newpts = 10000
 
         self.max_spectra = newpts
+        self.cmap = cm.get_cmap("YlGnBu_r", self.max_spectra)
 
         self.vis.doc.add_next_tick_callback(
             partial(self.update_input_value, sender, f"{self.max_spectra}")
@@ -245,11 +246,12 @@ class C_specvis:
                     }
 
                     current_colors = self.datasource.data["color"]
-                    current_idx = [self.cmap.index(x) for x in current_colors]
                     new_colors = [
-                        self.cmap((i + 1) % len(self.cmap)) for i in current_idx
+                        [self.cmap((i + 1) % self.max_spectra)] for i in current_colors
                     ]
-                    self.datasource.patch({"color": [(slice(None), new_colors)], "time": []})
+                    self.datasource.patch(
+                        {"color": [(slice(None), new_colors)], "time": []}
+                    )
                     self.datasource.stream(data_dict, rollover=self.max_spectra)
 
     def _add_plots(self):
