@@ -249,7 +249,7 @@ class C_specvis:
                     new_colors = [
                         self.cmap((i + 1) % len(self.cmap)) for i in current_idx
                     ]
-                    self.datasource.patch({"color": (slice(None), new_colors)})
+                    self.datasource.patch({"color": [(slice(None), new_colors)]})
                     self.datasource.stream(data_dict, rollover=self.max_spectra)
 
     def _add_plots(self):
