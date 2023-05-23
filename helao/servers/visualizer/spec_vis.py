@@ -13,6 +13,7 @@ from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 
 import matplotlib.cm as cm
+import matplotlib.colors as mcolors
 
 from helaocore.models.hlostatus import HloStatus
 
@@ -241,13 +242,13 @@ class C_specvis:
                         "wl": [self.wl[:: self.downsample]],
                         "ev": [self.ev[:: self.downsample]],
                         "trans": [[uuid_dict[k] for k in ch_keys][:: self.downsample]],
-                        "color": [self.cmap(0)],
+                        "color": [mcolors.rgb2hex(self.cmap(0))],
                         "time": [dtstr],
                     }
 
                     current_colors = self.datasource.data["color"]
                     new_colors = [
-                        [self.cmap((i + 1) % self.max_spectra)]
+                        [mcolors.rgb2hex(self.cmap((i + 1) % self.max_spectra))]
                         for i, _ in enumerate(current_colors)
                     ]
                     self.datasource.patch(
