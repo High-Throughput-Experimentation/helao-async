@@ -54,7 +54,7 @@ class C_specvis:
         specserv_port = specserv_config.get("port", None)
         self.wss = Wss(specserv_host, specserv_port, "ws_data")
 
-        self.cmap = cm.get_cmap("YlGnBu_r", self.max_spectra)
+        self.cmap = cm.get_cmap("Reds_r", self.max_spectra)
         self.latest_coloridx = 0
 
         self.data_url = (
