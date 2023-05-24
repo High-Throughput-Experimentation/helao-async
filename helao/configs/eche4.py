@@ -126,13 +126,13 @@ config["servers"] = {
     #     "fast": "mfc_server",
     #     "params": {"devices": {"N2": {"port": "COM6", "unit_id": "A"}}},
     # },
-    "CALC": {
-        "host": hostip,
-        "port": 8012,
-        "group": "action",
-        "fast": "calc_server",
-        "params": {},
-    },
+    # "CALC": {
+    #     "host": hostip,
+    #     "port": 8012,
+    #     "group": "action",
+    #     "fast": "calc_server",
+    #     "params": {},
+    # },
     "VIS": {
         "host": hostip,
         "port": 5001,
@@ -140,33 +140,33 @@ config["servers"] = {
         "bokeh": "action_visualizer",
         "params": {"doc_name": "ECHE4 Visualizer"},
     },
-    "LIVE": {
-        "host": hostip,
-        "port": 5004,
-        "group": "visualizer",
-        "bokeh": "live_visualizer",
-        "params": {"doc_name": "Sensor Visualizer"},
-    },
-    "DB": {
-        "host": hostip,
-        "port": 8010,
-        "group": "action",
-        "fast": "dbpack_server",
-        "params": {
-            "aws_config_path": "k:/users/hte/.credentials/aws_config.ini",
-            "aws_profile": "default",
-            "aws_bucket": "helao.data",
-            "api_host": "caltech-api.modelyst.com",
-            "testing": False,
-        },
-    },
-    "CAM": {
-        "host": hostip,
-        "port": 8013,
-        "group": "action",
-        "fast": "cam_server",
-        "params": {
-            "axis_ip": "192.168.200.210",
-        },
-    },
+    # "LIVE": {
+    #     "host": hostip,
+    #     "port": 5004,
+    #     "group": "visualizer",
+    #     "bokeh": "live_visualizer",
+    #     "params": {"doc_name": "Sensor Visualizer"},
+    # },
+    # "DB": {
+    #     "host": hostip,
+    #     "port": 8010,
+    #     "group": "action",
+    #     "fast": "dbpack_server",
+    #     "params": {
+    #         "aws_config_path": "k:/users/hte/.credentials/aws_config.ini",
+    #         "aws_profile": "default",
+    #         "aws_bucket": "helao.data",
+    #         "api_host": "caltech-api.modelyst.com",
+    #         "testing": False,
+    #     },
+    # },
+    # "CAM": {
+    #     "host": hostip,
+    #     "port": 8013,
+    #     "group": "action",
+    #     "fast": "cam_server",
+    #     "params": {
+    #         "axis_ip": "192.168.200.210",
+    #     },
+    # },
 }

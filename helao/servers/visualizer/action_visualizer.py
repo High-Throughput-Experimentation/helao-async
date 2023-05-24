@@ -66,6 +66,6 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
         vis_dict[fkey] = []
         fservnames = find_server_names(vis=app.vis, fast_key=fkey)
         for fsname in fservnames:
-            vis_dict[fkey].append(viscls(visServ=app.vis, serv_key=fsname))
+            vis_dict[fkey].append(viscls(vis_serv=app.vis, serv_key=fsname))
 
     return doc

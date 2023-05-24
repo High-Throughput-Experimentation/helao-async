@@ -57,8 +57,8 @@ class return_experiment_lib(BaseModel):
 
 
 class Operator:
-    def __init__(self, visServ: Vis, orch):
-        self.vis = visServ
+    def __init__(self, vis_serv: Vis, orch):
+        self.vis = vis_serv
         self.orch = orch
         self.dataAPI = HTELegacyAPI(self.vis)
 

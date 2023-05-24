@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import sys
+import pickle
 from random import randint
 from socket import gethostname
 from time import ctime, time, time_ns, sleep
@@ -20,8 +21,9 @@ import colorama
 import ntplib
 import numpy as np
 import pyaml
+import pyzstd
 
-from fastapi import Body, WebSocket
+from fastapi import Body, WebSocket, WebSocketDisconnect
 from fastapi.dependencies.utils import get_flat_params
 
 from helao.helpers.server_api import HelaoFastAPI
@@ -33,6 +35,7 @@ from helao.helpers.print_message import print_message
 from helao.helpers import async_copy
 from helao.helpers.yml_finisher import move_dir
 from helao.helpers.premodels import Action
+from helao.helpers.ws_publisher import WsPublisher
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.sample import (
     SampleType,
@@ -98,7 +101,11 @@ class HelaoBase(HelaoFastAPI):
             Args:
             websocket: a fastapi.WebSocket object
             """
-            await self.base.ws_status(websocket)
+            await self.base.status_publisher.connect(websocket)
+            try:
+                await self.base.status_publisher.broadcast(websocket)
+            except WebSocketDisconnect:
+                self.base.status_publisher.disconnect(websocket)
 
         @self.websocket("/ws_data")
         async def websocket_data(websocket: WebSocket):
@@ -107,7 +114,12 @@ class HelaoBase(HelaoFastAPI):
             Args:
             websocket: a fastapi.WebSocket object
             """
-            await self.base.ws_data(websocket)
+            await self.base.data_publisher.connect(websocket)
+            try:
+                await self.base.data_publisher.broadcast(websocket)
+            except WebSocketDisconnect:
+                self.base.data_publisher.disconnect(websocket)
+                
 
         @self.websocket("/ws_live")
         async def websocket_live(websocket: WebSocket):
@@ -116,7 +128,11 @@ class HelaoBase(HelaoFastAPI):
             Args:
             websocket: a fastapi.WebSocket object
             """
-            await self.base.ws_live(websocket)
+            await self.base.live_publisher.connect(websocket)
+            try:
+                await self.base.live_publisher.broadcast(websocket)
+            except WebSocketDisconnect:
+                self.base.live_publisher.disconnect(websocket)
 
         @self.post("/get_config", tags=["private"])
         def get_config():
@@ -346,6 +362,11 @@ class Base:
         self.live_q = MultisubscriberQueue()
         self.live_buffer = {}
         self.status_clients = set()
+
+        self.status_publisher = WsPublisher(self.status_q)
+        self.data_publisher = WsPublisher(self.data_q)
+        self.live_publisher = WsPublisher(self.live_q)
+        
         self.ntp_server = "time.nist.gov"
         self.ntp_response = None
         self.ntp_offset = None  # add to system time for correction
@@ -710,7 +731,7 @@ class Base:
         await websocket.accept()
         try:
             async for status_msg in self.status_q.subscribe():
-                await websocket.send_text(json.dumps(status_msg.as_dict()))
+                await websocket.send_bytes(pyzstd.compress(pickle.dumps(status_msg.as_dict())))
         # except WebSocketDisconnect:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -725,7 +746,7 @@ class Base:
         await websocket.accept()
         try:
             async for data_msg in self.data_q.subscribe():
-                await websocket.send_text(json.dumps(data_msg.as_dict()))
+                await websocket.send_bytes(pyzstd.compress(pickle.dumps(data_msg.as_dict())))
         # except WebSocketDisconnect:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -740,7 +761,7 @@ class Base:
         await websocket.accept()
         try:
             async for live_msg in self.live_q.subscribe():
-                await websocket.send_text(json.dumps(live_msg))
+                await websocket.send_bytes(pyzstd.compress(pickle.dumps(live_msg)))
         # except WebSocketDisconnect:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
