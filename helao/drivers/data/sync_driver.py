@@ -787,7 +787,9 @@ class HelaoSyncer:
             ] = exp_prog.yml.meta.get(
                 "technique_name", exp_prog.yml.meta["experiment_name"]
             )
-            exp_prog.dict["process_metas"][pidx]["process_uuid"] = str(gen_uuid())
+            process_list = exp_prog.yml.meta.get("process_list", [])
+            process_uuid = process_list[pidx] if process_list else str(gen_uuid())
+            exp_prog.dict["process_metas"][pidx]["process_uuid"] = process_uuid
             exp_prog.dict["process_metas"][pidx]["process_group_index"] = pidx
             exp_prog.dict["process_metas"][pidx]["action_list"] = []
 
