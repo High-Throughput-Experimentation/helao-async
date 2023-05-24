@@ -890,6 +890,8 @@ class Orch(Base):
                 process_count += 1
         if process_order_groups:
             self.active_experiment.process_order_groups = process_order_groups
+            process_list = [gen_uuid() for _ in process_order_groups]
+            self.active_experiment.process_list = process_list
 
         # self.print_message("adding unpacked actions to action_dq")
         self.print_message(f"got: {self.action_dq}")
