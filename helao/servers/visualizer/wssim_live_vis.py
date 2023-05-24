@@ -1,7 +1,7 @@
 import time
 import asyncio
-from functools import partial
 from datetime import datetime
+from functools import partial
 
 from bokeh.models import (
     TextInput,
@@ -16,8 +16,8 @@ from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
 
-class C_co2:
-    """CO2 sensor visualizer module class"""
+class C_simlivevis:
+    """potentiostat visualizer module class"""
 
     def __init__(self, vis_serv: Vis, serv_key: str):
         self.vis = vis_serv
@@ -27,22 +27,18 @@ class C_co2:
         self.last_update_time = time.time()
 
         self.live_key = serv_key
-        co2serv_config = self.vis.world_cfg["servers"].get(self.live_key, None)
-        if co2serv_config is None:
+        psrv_config = self.vis.world_cfg["servers"].get(self.live_key, None)
+        if psrv_config is None:
             return
-        co2serv_host = co2serv_config.get("host", None)
-        co2serv_port = co2serv_config.get("port", None)
-        self.wss = Wss(co2serv_host, co2serv_port, "ws_live")
-
-        self.data_url = (
-            f"ws://{co2serv_config['host']}:{co2serv_config['port']}/ws_live"
-        )
-        # self.stat_url = f"ws://{co2serv_config["host"]}:{co2serv_config["port"]}/ws_status"
+        host = psrv_config.get("host", None)
+        port = psrv_config.get("port", None)
+        self.wss = Wss(host, port, "ws_live")
 
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["datetime", "co2_ppm"]
+        self.data_dict_keys = ["datetime"] + [f"series_{i}" for i in range(6)]
+
         self.datasource = ColumnDataSource(data={k: [] for k in self.data_dict_keys})
         self.datasource_table = ColumnDataSource(
             data={k: [] for k in ["name", "value"]}
@@ -75,7 +71,7 @@ class C_co2:
             partial(self.callback_input_update_rate, sender=self.input_update_rate),
         )
 
-        self.plot = figure(height=300, width=500)
+        self.plot = figure(height=300, width=500, output_backend="webgl")
         self.plot.xaxis.formatter = DatetimeTickFormatter(
             minsec="%T",
             minutes="%T",
@@ -83,7 +79,7 @@ class C_co2:
             hours="%T",
         )
         self.plot.xaxis.axis_label = "Time (HH:MM:SS)"
-        self.plot.yaxis.axis_label = "CO2 (ppm)"
+        self.plot.yaxis.axis_label = "value"
 
         self.table = DataTable(
             source=self.datasource_table,
@@ -95,7 +91,7 @@ class C_co2:
             width=400,
         )
         # combine all sublayouts into a single one
-        docs_url = f"http://{co2serv_host}:{co2serv_port}/docs#/"
+        docs_url = f"http://{host}:{port}/docs#/"
         server_link = f'<a href="{docs_url}" target="_blank">\'{self.live_key}\'</a>'
         headerbar = f"<b>Live vis module for server {server_link}</b>"
         self.layout = layout(
@@ -109,10 +105,6 @@ class C_co2:
             background="#C0C0C0",
             width=1024,
         )
-
-        # to check if selection changed during ploting
-        # self.xselect = self.xaxis_selector_group.active
-        # self.yselect = self.yaxis_selector_group.active
 
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
@@ -189,16 +181,15 @@ class C_co2:
                 latest_epoch = max([epochsec, latest_epoch])
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
 
-        self.datasource.stream(data_dict, rollover=self.max_points)
-        keys = list(data_dict.keys())
-        values = [data_dict[k][-1] for k in keys]
-        table_data_dict = {"name": keys, "value": values}
-        self.datasource_table.stream(table_data_dict, rollover=len(keys))
+        if latest_epoch != 0:
+            self.datasource.stream(data_dict, rollover=self.max_points)
+            keys = list(data_dict.keys())
+            values = [data_dict[k][-1] for k in keys]
+            table_data_dict = {"name": keys, "value": values}
+            self.datasource_table.stream(table_data_dict, rollover=len(keys))
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        self.vis.print_message(
-            f" ... CO2 sensor visualizer subscribing to: {self.data_url}"
-        )
+        self.vis.print_message(" ... Live visualizer receiving messages.")
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
                 messages = await self.wss.read_messages()
@@ -214,15 +205,15 @@ class C_co2:
         # remove all old lines
         self.plot.renderers = []
 
-        self.plot.line(
-            x="datetime",
-            y="co2_ppm",
-            line_color="red",
-            legend_label="CO2 ppm (filtered)",
-            source=self.datasource,
-        )
-        self.plot.legend.border_line_alpha = 0.2
-        self.plot.legend.background_fill_alpha = 0.2
-
-    def reset_plot(self, forceupdate: bool = False):
-        self._add_plots()
+        colors = ["red", "blue", "green", "orange"]
+        non_epoch_keys = [x for x in self.data_dict_keys if x not in ["datetime"]]
+        for pres_key, color in zip(non_epoch_keys, colors):
+            self.plot.line(
+                x="datetime",
+                y=pres_key,
+                line_color=color,
+                source=self.datasource,
+                legend_label=pres_key,
+            )
+            self.plot.legend.border_line_alpha = 0.2
+            self.plot.legend.background_fill_alpha = 0.2

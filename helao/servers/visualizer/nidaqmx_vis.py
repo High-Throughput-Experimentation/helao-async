@@ -1,8 +1,6 @@
-import websockets
+import time
 import asyncio
-import json
 from functools import partial
-from uuid import UUID
 from copy import deepcopy
 
 from bokeh.models import (
@@ -17,29 +15,34 @@ from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 
 from helaocore.models.hlostatus import HloStatus
-from helaocore.models.data import DataPackageModel
 from helao.servers.vis import Vis
+from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
-
-valid_data_status = (
+VALID_DATA_STATUS = (
     None,
+    "active",
     HloStatus.active,
 )
+
+VALID_ACTION_NAME = ("cellIV",)
 
 
 class C_nidaqmxvis:
     """NImax visualizer module class"""
 
-    def __init__(self, visServ: Vis, serv_key: str):
-        self.vis = visServ
+    def __init__(self, vis_serv: Vis, serv_key: str):
+        self.vis = vis_serv
         self.config_dict = self.vis.server_cfg["params"]
         self.max_points = 500
+        self.update_rate = 1e-3
+        self.last_update_time = time.time()
         self.nidaqmx_key = serv_key
         nidaqmxserv_config = self.vis.world_cfg["servers"].get(self.nidaqmx_key, None)
         if nidaqmxserv_config is None:
             return
         nidaqmxserv_host = nidaqmxserv_config.get("host", None)
         nidaqmxserv_port = nidaqmxserv_config.get("port", None)
+        self.wss = Wss(nidaqmxserv_port, nidaqmxserv_host, "ws_data")
 
         self.data_url = (
             f"ws://{nidaqmxserv_config['host']}:{nidaqmxserv_config['port']}/ws_data"
@@ -72,10 +75,12 @@ class C_nidaqmxvis:
             "Ecell9_V",
         ]
 
-        self.data_dict = {key: [] for key in self.data_dict_keys}
-
-        self.sourceIV = ColumnDataSource(data=self.data_dict)
-        self.sourceIV_prev = ColumnDataSource(data=deepcopy(self.data_dict))
+        self.datasource = ColumnDataSource(
+            data={key: [] for key in self.data_dict_keys}
+        )
+        self.prev_datasource = ColumnDataSource(
+            data={key: [] for key in self.data_dict_keys}
+        )
 
         self.cur_action_uuid = ""
         self.prev_action_uuid = ""
@@ -97,7 +102,7 @@ class C_nidaqmxvis:
 
         self.paragraph1 = Paragraph(text="""cells:""", width=50, height=15)
         self.yaxis_selector_group = CheckboxButtonGroup(
-            labels=[f"{i+1}" for i in range(9)], active=[i for i in range(9)]
+            labels=[f"{i+1}" for i in range(9)], active=list(range(9))
         )
         # to check if selection changed during ploting
         self.yselect = self.yaxis_selector_group.active
@@ -113,16 +118,12 @@ class C_nidaqmxvis:
         self.reset_plot(self.cur_action_uuid, forceupdate=True)
 
         # combine all sublayouts into a single one
+        docs_url = f"http://{nidaqmxserv_host}:{nidaqmxserv_port}/docs#/"
+        server_link = f'<a href="{docs_url}" target="_blank">\'{self.nidaqmx_key}\'</a>'
+        headerbar = f"<b>NImax Visualizer module for server {server_link}</b>"
         self.layout = layout(
             [
-                [
-                    Spacer(width=20),
-                    Div(
-                        text=f'<b>NImax Visualizer module for server <a href="http://{nidaqmxserv_host}:{nidaqmxserv_port}/docs#/" target="_blank">\'{self.nidaqmx_key}\'</a></b>',
-                        width=1004,
-                        height=15,
-                    ),
-                ],
+                [Spacer(width=20), Div(text=headerbar, width=1004, height=15)],
                 [self.input_max_points],
                 [self.paragraph1],
                 [self.yaxis_selector_group],
@@ -178,78 +179,32 @@ class C_nidaqmxvis:
     def update_input_value(self, sender, value):
         sender.value = value
 
-    def add_points(self, datapackage: DataPackageModel):
-        def _add_helper(datadict, pointlist):
-            for pt in pointlist:
-                datadict.append(pt)
-
-        self.reset_plot(str(datapackage.action_uuid))
-        if len(self.data_dict[self.data_dict_keys[0]]) > self.max_points:
-            delpts = len(self.data_dict[self.data_dict_keys[0]]) - self.max_points
-            for key in self.data_dict_keys:
-                del self.data_dict[key][:delpts]
-
-        # they are all in sequence of cell1 to cell9 in the dict
-        cellnum = 1
-
-        for _, data_dict in datapackage.datamodel.data.items():
-            datalen = len(list(data_dict.values())[0])
-            for key in data_dict:
-                if key == "t_s" and cellnum == 1:
-                    _add_helper(
-                        datadict=self.data_dict[key],
-                        pointlist=data_dict.get(key, [0 for i in range(datalen)]),
-                    )
-                elif key == "Icell_A":
-                    _add_helper(
-                        datadict=self.data_dict[f"Icell{cellnum}_A"],
-                        pointlist=data_dict.get(key, [0 for i in range(datalen)]),
-                    )
-                elif key == "Ecell_V":
-                    _add_helper(
-                        datadict=self.data_dict[f"Ecell{cellnum}_V"],
-                        pointlist=data_dict.get(key, [0 for i in range(datalen)]),
-                    )
-
-            cellnum += 1
-
-        self.sourceIV.data = self.data_dict
-
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        self.vis.print_message(f" ... NI visualizer subscribing to: {self.data_url}")
-        retry_limit = 5
-        for _ in range(retry_limit):
-            try:
-                async with websockets.connect(self.data_url) as ws:
-                    self.IOloop_data_run = True
-                    while self.IOloop_data_run:
-                        try:
-                            datapackage = DataPackageModel(
-                                **json.loads(await ws.recv())
-                            )
-                            datastatus = datapackage.datamodel.status
-                            if (
-                                datapackage.action_name in ("cellIV")
-                                and datastatus in valid_data_status
-                            ):
-                                self.vis.doc.add_next_tick_callback(
-                                    partial(self.add_points, datapackage)
-                                )
-                        except Exception:
-                            self.IOloop_data_run = False
-                    await ws.close()
-                    self.IOloop_data_run = False
-            except Exception:
-                self.vis.print_message(
-                    f"failed to subscribe to "
-                    f"{self.data_url}"
-                    "trying again in 1sec",
-                    info=True,
-                )
-                await asyncio.sleep(1)
-            if not self.IOloop_data_run:
-                self.vis.print_message("IOloop closed", info=True)
-                break
+        self.vis.print_message(f" ... NImax visualizer subscribing to: {self.data_url}")
+        while True:
+            if time.time() - self.last_update_time >= self.update_rate:
+                messages = await self.wss.read_messages()
+                self.vis.doc.add_next_tick_callback(partial(self.add_points, messages))
+                self.last_update_time = time.time()
+            await asyncio.sleep(0.001)
+
+    def add_points(self, datapackage_list: list):
+        for data_package in datapackage_list:
+            data_dict = {k: [] for k in self.data_dict_keys}
+            # only resets if axis selector or action_uuid changes
+            self.reset_plot(str(data_package.action_uuid))
+            if (
+                data_package.datamodel.status in VALID_DATA_STATUS
+                and data_package.action_name in VALID_ACTION_NAME
+            ):
+                for _, uuid_dict in data_package.datamodel.data.items():
+                    for data_label, data_val in uuid_dict.items():
+                        if data_label in self.data_dict_keys:
+                            if isinstance(data_val, list):
+                                data_dict[data_label] += data_val
+                            else:
+                                data_dict[data_label].append(data_val)
+            self.datasource.stream(data_dict, rollover=self.max_points)
 
     def _add_plots(self):
         # remove all old lines and clear legend
@@ -273,15 +228,15 @@ class C_nidaqmxvis:
 
         self.plot_VOLT.title.text = f"action_uuid: {self.cur_action_uuid}"
         self.plot_CURRENT.title.text = f"action_uuid: {self.cur_action_uuid}"
-        # self.plot_VOLT_prev.title.text = ("action_uuid: "+self.prev_action_uuid)
-        # self.plot_VOLT_prev.title.text = ("action_uuid: "+self.prev_action_uuid)
+        self.plot_VOLT_prev.title.text = f"action_uuid: {self.prev_action_uuid}"
+        self.plot_CURRENT_prev.title.text = f"action_uuid: {self.prev_action_uuid}"
 
         colors = small_palettes["Category10"][9]
-        for i in self.yaxis_selector_group.active:
+        for i in self.yselect:
             _ = self.plot_VOLT.line(
                 x="t_s",
                 y=f"Ecell{i+1}_V",
-                source=self.sourceIV,
+                source=self.datasource,
                 name=f"Ecell{i+1}_V",
                 line_color=colors[i],
                 legend_label=f"Ecell{i+1}_V",
@@ -289,7 +244,7 @@ class C_nidaqmxvis:
             _ = self.plot_CURRENT.line(
                 x="t_s",
                 y=f"Icell{i+1}_A",
-                source=self.sourceIV,
+                source=self.datasource,
                 name=f"Icell{i+1}_A",
                 line_color=colors[i],
                 legend_label=f"Icell{i+1}_A",
@@ -297,7 +252,7 @@ class C_nidaqmxvis:
             _ = self.plot_VOLT_prev.line(
                 x="t_s",
                 y=f"Ecell{i+1}_V",
-                source=self.sourceIV_prev,
+                source=self.prev_datasource,
                 name=f"Ecell{i+1}_V",
                 line_color=colors[i],
                 legend_label=f"Ecell{i+1}_V",
@@ -305,26 +260,21 @@ class C_nidaqmxvis:
             _ = self.plot_CURRENT_prev.line(
                 x="t_s",
                 y=f"Icell{i+1}_A",
-                source=self.sourceIV_prev,
+                source=self.prev_datasource,
                 name=f"Icell{i+1}_A",
                 line_color=colors[i],
                 legend_label=f"Icell{i+1}_A",
             )
 
-    def reset_plot(self, new_action_uuid: UUID, forceupdate: bool = False):
-        if (new_action_uuid != self.cur_action_uuid) or forceupdate:
-            self.vis.print_message(" ... reseting NImax graph")
-            self.prev_action_uuid = self.cur_action_uuid
-            self.cur_action_uuid = new_action_uuid
-
-            # copy old data to "prev" plot
-            self.sourceIV_prev.data = {
-                deepcopy(key): deepcopy(val) for key, val in self.sourceIV.data.items()
-            }
-            self.data_dict = {key: [] for key in self.data_dict_keys}
-            self.sourceIV.data = self.data_dict
+    def reset_plot(self, new_action_uuid=None, forceupdate: bool = False):
+        if self.cur_action_uuid != new_action_uuid or forceupdate:
+            if new_action_uuid is not None:
+                self.vis.print_message(" ... reseting NImax graph")
+                self.prev_action_uuid = self.cur_action_uuid
+                self.prev_datasource.data = dict(deepcopy(self.datasource.data).items())
+                self.cur_action_uuid = new_action_uuid
+                self.datasource.data = {key: [] for key in self.data_dict_keys}
             self._add_plots()
-
-        elif self.yselect != self.yaxis_selector_group.active:
+        if self.yselect != self.yaxis_selector_group.active:
             self.yselect = self.yaxis_selector_group.active
             self._add_plots()

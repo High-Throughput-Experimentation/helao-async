@@ -32,6 +32,7 @@ dependencies:
   - pyfiglet
   - pyserial
   - python=3.8
+  - pyzstd
   - requests
   - ruamel.yaml
   - scikit-learn

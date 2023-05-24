@@ -36,8 +36,8 @@ from helao.drivers.motion.enum import MoveModes, TransformationModes
 
 
 class Aligner:
-    def __init__(self, visServ: Vis, motor):
-        self.vis = visServ
+    def __init__(self, vis_serv: Vis, motor):
+        self.vis = vis_serv
         self.motor = motor
         self.config_dict = self.vis.server_cfg["params"]
         self.dataAPI = HTELegacyAPI(self.vis)

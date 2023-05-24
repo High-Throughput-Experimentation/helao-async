@@ -1,30 +1,26 @@
 import time
-import websockets
 import asyncio
-import json
 from functools import partial
+from datetime import datetime
 
 from bokeh.models import (
-    CheckboxButtonGroup,
-    RadioButtonGroup,
     TextInput,
 )
-from bokeh.models.widgets import Paragraph
 from bokeh.plotting import figure
 from bokeh.models.widgets import Div
 from bokeh.models.widgets import DataTable, TableColumn
 from bokeh.layouts import layout, Spacer
-from bokeh.models import ColumnDataSource
-from bokeh.models.axes import Axis
+from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 
 from helao.servers.vis import Vis
+from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
 
 class C_temperature:
     """potentiostat visualizer module class"""
 
-    def __init__(self, visServ: Vis, serv_key: str):
-        self.vis = visServ
+    def __init__(self, vis_serv: Vis, serv_key: str):
+        self.vis = vis_serv
         self.config_dict = self.vis.server_cfg["params"]
         self.update_rate = self.config_dict.get("update_rate", 0.5)
         self.max_points = 500
@@ -36,21 +32,20 @@ class C_temperature:
             return
         tserv_host = tserv_config.get("host", None)
         tserv_port = tserv_config.get("port", None)
+        self.wss = Wss(tserv_host, tserv_port, "ws_live")
 
         self.data_url = f"ws://{tserv_config['host']}:{tserv_config['port']}/ws_live"
 
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["epoch_s","time_now"] + sorted(
+        self.data_dict_keys = ["datetime"] + sorted(
             tserv_config.get("params", {}).get("dev_monitor", {}).keys()
         )
-        self.data_dict = {key: [] for key in self.data_dict_keys}
-
-        self.datasource = ColumnDataSource(data=self.data_dict)
-        self.table_dict = {}
-        self.datasource_table = ColumnDataSource(data=self.table_dict)
-        self.update_table_data()
+        self.datasource = ColumnDataSource(data={k: [] for k in self.data_dict_keys})
+        self.datasource_table = ColumnDataSource(
+            data={k: [] for k in ["name", "value"]}
+        )
 
         # create visual elements
         self.layout = []
@@ -78,15 +73,15 @@ class C_temperature:
             "value",
             partial(self.callback_input_update_rate, sender=self.input_update_rate),
         )
-        # self.xaxis_selector_group = RadioButtonGroup(
-        #     labels=self.data_dict_keys, active=0, width=500
-        # )
-        # self.yaxis_selector_group = CheckboxButtonGroup(
-        #     labels=self.data_dict_keys, active=[1, 3], width=500
-        # )
 
         self.plot = figure(height=300, width=500)
-        self.plot.xaxis.axis_label = "Time (seconds)" #"Epoch (seconds)"
+        self.plot.xaxis.formatter = DatetimeTickFormatter(
+            minsec="%T",
+            minutes="%T",
+            hourmin="%T",
+            hours="%T",
+        )
+        self.plot.xaxis.axis_label = "Time (HH:MM:SS)"
         self.plot.yaxis.axis_label = "Temperature (C)"
 
         self.table = DataTable(
@@ -99,21 +94,13 @@ class C_temperature:
             width=400,
         )
         # combine all sublayouts into a single one
+        docs_url = f"http://{tserv_host}:{tserv_port}/docs#/"
+        server_link = f'<a href="{docs_url}" target="_blank">\'{self.live_key}\'</a>'
+        headerbar = f"<b>Live vis module for server {server_link}</b>"
         self.layout = layout(
             [
-                [
-                    Div(
-                        text=f'<b>Temperature Sensor module for server <a href="http://{tserv_host}:{tserv_port}/docs#/" target="_blank">\'{self.live_key}\'</a></b>',
-                        width=1004,
-                        height=15,
-                    ),
-                ],
+                [Div(text=headerbar, width=1004, height=15)],
                 [self.input_max_points, self.input_update_rate],
-                # [
-                #     Paragraph(text="x-axis selectors", width=500, height=15),
-                #     Paragraph(text="y-axis selectors", width=500, height=15),
-                # ],
-                # [self.xaxis_selector_group, self.yaxis_selector_group],
                 Spacer(height=10),
                 [self.plot, Spacer(width=20), self.table],
                 Spacer(height=10),
@@ -122,25 +109,11 @@ class C_temperature:
             width=1024,
         )
 
-        # to check if selection changed during ploting
-        # self.xselect = self.xaxis_selector_group.active
-        # self.yselect = self.yaxis_selector_group.active
-
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
         self.IOtask = asyncio.create_task(self.IOloop_data())
         self.vis.doc.on_session_destroyed(self.cleanup_session)
-
-    def update_table_data(self):
-        self.table_dict["name"] = self.data_dict_keys
-        vals = []
-        for k in self.data_dict_keys:
-            if self.data_dict[k] == []:
-                vals.append("")
-            else:
-                vals.append(self.data_dict[k][-1])
-        self.table_dict["value"] = vals
-        self.datasource_table.data = self.table_dict
+        self._add_plots()
 
     def cleanup_session(self, session_context):
         self.vis.print_message(f"'{self.live_key}' Bokeh session closed", info=True)
@@ -196,57 +169,37 @@ class C_temperature:
             partial(self.update_input_value, sender, f"{self.update_rate}")
         )
 
-    def add_points(self, datapackage: dict):
-        if len(self.data_dict[self.data_dict_keys[0]]) > self.max_points:
-            delpts = len(self.data_dict[self.data_dict_keys[0]]) - self.max_points
-            for key in self.data_dict_keys:
-                del self.data_dict[key][:delpts]
+    def add_points(self, datapackage_list: list):
         latest_epoch = 0
-        for datalab, (dataval, epochsec) in datapackage.items():
-            if isinstance(dataval, list):
-                self.data_dict[datalab] += dataval
-            else:
-                self.data_dict[datalab].append(dataval)
-            latest_epoch = max([epochsec, latest_epoch])
-        self.data_dict["epoch_s"].append(latest_epoch)
-        self.data_dict["time_now"] = [s- latest_epoch for s in self.data_dict["epoch_s"]]
+        data_dict = {k: [] for k in self.data_dict_keys}
+        for datapackage in datapackage_list:
+            for datalab, (dataval, epochsec) in datapackage.items():
+                if datalab == "sim_dict":
+                    for k, v in dataval.items():
+                        data_dict[k].append(v)
+                elif isinstance(dataval, list):
+                    data_dict[datalab] += dataval
+                else:
+                    data_dict[datalab].append(dataval)
+                latest_epoch = max([epochsec, latest_epoch])
+            data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
 
-        self.datasource.data = self.data_dict
-        self.update_table_data()
-        self._add_plots()
+        self.datasource.stream(data_dict, rollover=self.max_points)
+        keys = list(data_dict.keys())
+        values = [data_dict[k][-1] for k in keys]
+        table_data_dict = {"name": keys, "value": values}
+        self.datasource_table.stream(table_data_dict, rollover=len(keys))
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
         self.vis.print_message(
             f" ... Temperature sensor visualizer subscribing to: {self.data_url}"
         )
-        retry_limit = 5
-        for _ in range(retry_limit):
-            try:
-                async with websockets.connect(self.data_url) as ws:
-                    self.IOloop_data_run = True
-                    while self.IOloop_data_run:
-                        try:
-                            datapackage = json.loads(await ws.recv())
-                            if time.time() - self.last_update_time >= self.update_rate:
-                                self.vis.doc.add_next_tick_callback(
-                                    partial(self.add_points, datapackage)
-                                )
-                                self.last_update_time = time.time()
-                        except Exception:
-                            self.IOloop_data_run = False
-                    await ws.close()
-                    self.IOloop_data_run = False
-            except Exception:
-                self.vis.print_message(
-                    f"failed to subscribe to "
-                    f"{self.data_url}"
-                    "trying again in 1sec",
-                    info=True,
-                )
-                await asyncio.sleep(1)
-            if not self.IOloop_data_run:
-                self.vis.print_message("IOloop closed", info=True)
-                break
+        while True:
+            if time.time() - self.last_update_time >= self.update_rate:
+                messages = await self.wss.read_messages()
+                self.vis.doc.add_next_tick_callback(partial(self.add_points, messages))
+                self.last_update_time = time.time()
+            await asyncio.sleep(0.001)
 
     def _add_plots(self):
         # clear legend
@@ -257,10 +210,10 @@ class C_temperature:
         self.plot.renderers = []
 
         colors = ["red", "blue", "green", "orange"]
-        non_epoch_keys = [x for x in self.data_dict.keys() if x != "epoch_s"]
+        non_epoch_keys = [x for x in self.data_dict_keys if x not in ["datetime"]]
         for temp_key, color in zip(non_epoch_keys, colors):
             self.plot.line(
-                x="time_now",#"epoch_s",
+                x="datetime",
                 y=temp_key,
                 line_color=color,
                 source=self.datasource,
@@ -270,6 +223,4 @@ class C_temperature:
             self.plot.legend.background_fill_alpha = 0.2
 
     def reset_plot(self, forceupdate: bool = False):
-        # self.xselect = self.xaxis_selector_group.active
-        # self.yselect = self.yaxis_selector_group.active
         self._add_plots()
