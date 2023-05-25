@@ -10,6 +10,7 @@ __all__ = [
     "CCSI_Solution_testing",
     "CCSI_Solution_testing_fixed_cleans",
     "CCSI_priming",
+    "CCSI_leaktest",
     #"CCSI_debug_liquidloads",
 ]
 
@@ -925,5 +926,55 @@ def CCSI_priming(  #assumes initialization performed previously
                 "HSpurge_duration": HSpurge_duration,
                 "DeltaDilute1_duration": DeltaDilute1_duration,
                 })
+
+    return epm.experiment_plan_list
+
+def leaktest(
+    sequence_version: int = 1,
+    headspace_purge_cycles: int = 5,
+    HSpurge1_duration: float = 60,
+    Manpurge1_duration: float = 10,
+    Alphapurge1_duration: float = 10,
+    Probepurge1_duration: float = 10,
+    Sensorpurge1_duration: float = 15,
+    DeltaDilute1_duration: float = 10,
+    HSpurge_duration: float = 20, 
+ #   HSmeasure1_duration: float = 20,
+    CO2measure_duration: float = 600,
+    CO2measure_acqrate: float = 1,
+    recirculate: bool = True,
+):
+
+    epm = ExperimentPlanMaker()
+    
+   #purges
+    epm.add_experiment("CCSI_sub_initialization_firstpart", {
+        "HSpurge1_duration": HSpurge1_duration,
+        "Manpurge1_duration": Manpurge1_duration,
+        "Alphapurge1_duration": Alphapurge1_duration,
+        "Probepurge1_duration": Probepurge1_duration,
+        "Sensorpurge1_duration": Sensorpurge1_duration,
+        })
+
+    epm.add_experiment("CCSI_sub_drain", {
+        "HSpurge_duration": HSpurge_duration,
+        "DeltaDilute1_duration": DeltaDilute1_duration,
+        "initialization": True,
+        })
+    epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {
+        "HSpurge_duration": HSpurge_duration, 
+        "DeltaDilute1_duration": DeltaDilute1_duration,
+        "initialization": True,
+        "co2measure_duration": CO2measure_duration, 
+        "co2measure_acqrate": CO2measure_acqrate, 
+        })
+    epm.add_experiment("CCSI_sub_initialization_end_state", {})
+
+    epm.add_experiment("CCSI_leaktest_co2", {
+        "recirculate": recirculate,
+        "co2measure_duration": CO2measure_duration, 
+        "co2measure_acqrate": CO2measure_acqrate, 
+        })
+    epm.add_experiment("CCSI_sub_peripumpoff",{})
 
     return epm.experiment_plan_list

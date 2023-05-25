@@ -67,7 +67,7 @@ class AliCatMFC:
         # query pid settings with self.mfc.get_pid()
 
         self.aloop = asyncio.get_running_loop()
-        self.polling = False
+        self.polling = True
         self.poll_signalq = asyncio.Queue(1)
         self.poll_signal_task = self.aloop.create_task(self.poll_signal_loop())
         self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
@@ -102,7 +102,6 @@ class AliCatMFC:
             self.base.print_message("polling signal received")
 
     async def poll_sensor_loop(self, waittime: float = 0.05):
-        self.polling = True
         self.base.print_message("MFC background task has started")
         lastupdate = 0
         while True:
@@ -130,7 +129,7 @@ class AliCatMFC:
     def list_gases(self, device_name: str):
         return self.fcinfo.get(device_name, {}).get("gases", {})
 
-    def set_pressure(
+    async def set_pressure(
         self,
         device_name: str,
         pressure_psia: float,
@@ -140,11 +139,13 @@ class AliCatMFC:
     ):
         """Set control mode to pressure, set point = pressure_psi, ramping psi/sec or zero to disable."""
         resp = []
+        await self.stop_polling()
         resp.append(self._send(device_name, f"SR {ramp_psi_sec} 4"))
         resp.append(self.fcs[device_name].set_pressure(pressure_psia))
+        await self.start_polling()
         return resp
 
-    def set_flowrate(
+    async def set_flowrate(
         self,
         device_name: str,
         flowrate_sccm: float,
@@ -154,30 +155,37 @@ class AliCatMFC:
     ):
         """Set control mode to mass flow, set point = flowrate_scc, ramping flowrate_sccm or zero to disable."""
         resp = []
+        await self.stop_polling()
         resp.append(self._send(device_name, f"SR {ramp_sccm_sec} 4"))
         resp.append(self.fcs[device_name].set_flow_rate(flowrate_sccm))
+        await self.start_polling()
         return resp
 
-    def set_gas(self, device_name: str, gas: Union[int, str]):
+    async def set_gas(self, device_name: str, gas: Union[int, str]):
         "Set MFC to pure gas"
+        await self.stop_polling()
         resp = self.fcs[device_name].set_gas(gas)
+        await self.start_polling()
         return resp
 
-    def set_gas_mixture(self, device_name: str, gas_dict: dict):
+    async def set_gas_mixture(self, device_name: str, gas_dict: dict):
         "Set MFC to gas mixture defined in gas_dict {gasname: integer_pct}"
         if sum(gas_dict.values()) != 100:
             self.base.print_message("Gas mixture percentages do not add to 100.")
             return {}
         else:
+            await self.stop_polling()
             self.fcs[device_name].delete_mix(236)
             self.fcs[device_name].create_mix(
                 mix_no=236, name="HELAO_mix", gases=gas_dict
             )
             resp = self.fcs[device_name].set_gas(236)
+            await self.start_polling()
             return resp
 
-    def lock_display(self, device_name: Optional[str] = None):
+    async def lock_display(self, device_name: Optional[str] = None):
         """Lock the front display."""
+        await self.stop_polling()
         if device_name is None:
             resp = []
             for dev_name, fc in self.fcs.items():
@@ -185,10 +193,12 @@ class AliCatMFC:
                 resp.append({dev_name: lock_resp})
         else:
             resp = self.fcs[device_name].lock()
+        await self.start_polling()
         return resp
 
-    def unlock_display(self, device_name: Optional[str] = None):
+    async def unlock_display(self, device_name: Optional[str] = None):
         """Unlock the front display."""
+        await self.stop_polling()
         if device_name is None:
             resp = []
             for dev_name, fc in self.fcs.items():
@@ -196,10 +206,12 @@ class AliCatMFC:
                 resp.append({dev_name: unlock_resp})
         else:
             resp = self.fcs[device_name].unlock()
+        await self.start_polling()
         return resp
 
-    def hold_valve(self, device_name: Optional[str] = None):
+    async def hold_valve(self, device_name: Optional[str] = None):
         """Hold the valve in its current position."""
+        await self.stop_polling()
         if device_name is None:
             resp = []
             for dev_name, fc in self.fcs.items():
@@ -207,10 +219,12 @@ class AliCatMFC:
                 resp.append({dev_name: hold_resp})
         else:
             resp = self.fcs[device_name].hold()
+        await self.start_polling()
         return resp
 
-    def hold_valve_closed(self, device_name: Optional[str] = None):
+    async def hold_valve_closed(self, device_name: Optional[str] = None):
         """Close valve and hold."""
+        await self.stop_polling()
         if device_name is None:
             resp = []
             for dev_name, _ in self.fcs.items():
@@ -218,10 +232,12 @@ class AliCatMFC:
                 resp.append({dev_name: chold_resp})
         else:
             resp = self._send(device_name, "hc")
+        await self.start_polling()
         return resp
 
-    def hold_cancel(self, device_name: Optional[str] = None):
+    async def hold_cancel(self, device_name: Optional[str] = None):
         """Cancel the valve hold."""
+        await self.stop_polling()
         if device_name is None:
             resp = []
             for dev_name, fc in self.fcs.items():
@@ -229,21 +245,25 @@ class AliCatMFC:
                 resp.append({dev_name: cancel_resp})
         else:
             resp = self.fcs[device_name].cancel_hold()
+        await self.start_polling()
         return resp
 
-    def tare_volume(self, device_name: Optional[str] = None):
+    async def tare_volume(self, device_name: Optional[str] = None):
         """Tare volumetric flow. Ensure mfc is isolated."""
+        await self.stop_polling()
         if device_name is None:
             resp = []
             for dev_name, fc in self.fcs.items():
-                tarev_resp = fc.tare_pressure()
+                tarev_resp = fc.tare_volumetric()
                 resp.append({dev_name: tarev_resp})
         else:
             resp = self.fcs[device_name].tare_volumetric()
+        await self.start_polling()
         return resp
 
-    def tare_pressure(self, device_name: Optional[str] = None):
+    async def tare_pressure(self, device_name: Optional[str] = None):
         """Tare absolute pressure."""
+        await self.stop_polling()
         if device_name is None:
             resp = []
             for dev_name, fc in self.fcs.items():
@@ -251,6 +271,7 @@ class AliCatMFC:
                 resp.append({dev_name: tarep_resp})
         else:
             resp = self.fcs[device_name].tare_pressure()
+        await self.start_polling()
         return resp
 
     # def reset_totalizer(self, device_name: Optional[str] = None):
@@ -270,6 +291,7 @@ class AliCatMFC:
     def shutdown(self):
         # this gets called when the server is shut down or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
+        self.poll_signalq.put_nowait(False)
         self.base.print_message("closing MFC connections")
         for fc in self.fcs.values():
             fc.close()
@@ -277,8 +299,8 @@ class AliCatMFC:
 
 class MfcExec(Executor):
     def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.device_name = list(self.active.base.server_params["devices"].keys())[0]
-        super().__init__(*args, **kwargs, exec_id=self.device_name)
         # current plan is 1 flow controller per COM
         self.active.base.print_message("MFCExec initialized.")
         self.start_time = time.time()
@@ -290,7 +312,7 @@ class MfcExec(Executor):
         flowrate_sccm = self.active.action.action_params.get("flowrate_sccm", None)
         ramp_sccm_sec = self.active.action.action_params.get("ramp_sccm_sec", 0)
         if flowrate_sccm is not None:
-            rate_resp = self.active.base.fastapp.driver.set_flowrate(
+            rate_resp = await self.active.base.fastapp.driver.set_flowrate(
                 device_name=self.device_name,
                 flowrate_sccm=flowrate_sccm,
                 ramp_sccm_sec=ramp_sccm_sec,
@@ -301,7 +323,7 @@ class MfcExec(Executor):
     async def _exec(self):
         "Cancel valve hold."
         self.start_time = time.time()
-        openvlv_resp = self.active.base.fastapp.driver.hold_cancel(
+        openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
             device_name=self.device_name,
         )
         self.active.base.print_message(f"hold_cancel returned: {openvlv_resp}")
@@ -327,21 +349,24 @@ class MfcExec(Executor):
     async def _post_exec(self):
         "Restore valve hold."
         self.active.base.print_message("MFCExec running cleanup methods.")
-        closevlv_resp = self.active.base.fastapp.driver.hold_valve_closed(
-            device_name=self.device_name,
-        )
-        self.active.base.print_message(f"hold_valve_closed returned: {closevlv_resp}")
+        if not self.active.action.action_params.get("stay_open", False):
+            closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
+                device_name=self.device_name,
+            )
+            self.active.base.print_message(f"hold_valve_closed returned: {closevlv_resp}")
+        else:
+            self.active.base.print_message("'stay_open' is True, skipping valve hold")
         return {"error": ErrorCodes.none}
 
 
 class PfcExec(MfcExec):
     async def _pre_exec(self):
         "Set pressure."
-        self.active.base.print_message("MFCExec running setup methods.")
+        self.active.base.print_message("PFCExec running setup methods.")
         pressure_psia = self.active.action.action_params.get("pressure_psia", None)
         ramp_psi_sec = self.active.action.action_params.get("ramp_psi_sec", 0)
         if pressure_psia is not None:
-            rate_resp = self.active.base.fastapp.driver.set_pressure(
+            rate_resp = await self.active.base.fastapp.driver.set_pressure(
                 device_name=self.device_name,
                 pressure_psia=pressure_psia,
                 ramp_psi_sec=ramp_psi_sec,
