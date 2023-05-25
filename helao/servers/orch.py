@@ -875,6 +875,7 @@ class Orch(Base):
 
         process_order_groups = defaultdict(list)
         process_count = 0
+        init_process_uuids = [gen_uuid()]
         # self.print_message("setting action order")
         for i, act in enumerate(unpacked_acts):
             # init uuid now for tracking later
@@ -883,13 +884,18 @@ class Orch(Base):
             # actual order should be the same at the beginning
             # will be incremented as necessary
             act.orch_submit_order = int(i)
-            self.action_dq.append(act)
             if act.process_contrib:
                 process_order_groups[process_count].append(i)
+                act.process_uuid = init_process_uuids[process_count]
             if act.process_finish:
                 process_count += 1
+                init_process_uuids.append(gen_uuid())
+            self.action_dq.append(act)
         if process_order_groups:
             self.active_experiment.process_order_groups = process_order_groups
+            process_list = init_process_uuids[:len(process_order_groups)]
+            self.active_experiment.process_list = process_list
+        # loop through actions again
 
         # self.print_message("adding unpacked actions to action_dq")
         self.print_message(f"got: {self.action_dq}")
