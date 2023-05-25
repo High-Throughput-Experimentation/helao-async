@@ -28,6 +28,7 @@ __all__ = [
     "CCSI_debug_co2purge",
     "CCSI_sub_fill_syringe",
     "CCSI_sub_full_fill_syringe",
+    "CCSI_leaktest_co2",
 
 ]
 
@@ -57,6 +58,7 @@ PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
 IO_server = MachineModel(server_name="IO", machine_name=ORCH_HOST).as_dict()
 CALC_server = MachineModel(server_name="CALC", machine_name=ORCH_HOST).as_dict()
 CO2S_server = MachineModel(server_name="CO2SENSOR", machine_name=ORCH_HOST).as_dict()
+MFC_server = MachineModel(server_name="MFC", machine_name=ORCH_HOST).as_dict()
 SOLUTIONPUMP_server = MachineModel(
     server_name="SYRINGE0", machine_name=ORCH_HOST
 ).as_dict()
@@ -1087,4 +1089,28 @@ def CCSI_debug_co2purge(
             },
         },
     )
+    return apm.action_list
+
+def CCSI_leaktest_co2(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    co2measure_duration: float = 600,
+    co2measure_acqrate: float = 1,
+    recirculate: bool = True,
+):
+    apm = ActionPlanMaker()
+   
+    apm.add(
+        CO2S_server,
+        "acquire_co2",
+        {
+            "duration": apm.pars.co2measure_duration,
+            "acquisition_rate": apm.pars.co2measure_acqrate,
+        },
+    )
+    if apm.pars.recirculate:
+        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
+
+
+
     return apm.action_list
