@@ -98,6 +98,7 @@ class Operator:
         self.experiment_plan_list = {}
         self.experiment_plan_list["sequence_name"] = []
         self.experiment_plan_list["sequence_label"] = []
+        self.experiment_plan_list["sequence_comment"] = []
         self.experiment_plan_list["experiment_name"] = []
 
         self.sequence_list = {}
@@ -315,6 +316,28 @@ class Operator:
             "value", self.callback_copy_sequence_label2
         )
 
+        self.input_sequence_comment = TextInput(
+            value="",
+            title="sequence comment",
+            disabled=False,
+            width=300,
+            height=80,
+        )
+        self.input_sequence_comment.on_change(
+            "value", self.callback_copy_sequence_comment
+        )
+
+        self.input_sequence_comment2 = TextInput(
+            value="",
+            title="sequence comment",
+            disabled=False,
+            width=300,
+            height=80,
+        )
+        self.input_sequence_comment2.on_change(
+            "value", self.callback_copy_sequence_comment2
+        )
+
         self.orch_section = Div(
             text="<b>Orch:</b>",
             width=self.max_width - 20,
@@ -358,6 +381,7 @@ class Operator:
                             Spacer(width=20),
                             self.input_sequence_label,
                         ],
+                        [self.input_sequence_comment],
                         [
                             Spacer(width=10),
                             Div(
@@ -411,6 +435,7 @@ class Operator:
                             Spacer(width=20),
                             self.input_sequence_label2,
                         ],
+                        [self.input_sequence_comment2],
                         [
                             Spacer(width=10),
                             Div(
@@ -1651,5 +1676,23 @@ class Operator:
                 self.update_input_value,
                 self.input_sequence_label,
                 self.input_sequence_label2.value,
+            )
+        )
+
+    def callback_copy_sequence_comment(self, attr, old, new):
+        self.vis.doc.add_next_tick_callback(
+            partial(
+                self.update_input_value,
+                self.input_sequence_comment2,
+                self.input_sequence_comment.value,
+            )
+        )
+
+    def callback_copy_sequence_comment2(self, attr, old, new):
+        self.vis.doc.add_next_tick_callback(
+            partial(
+                self.update_input_value,
+                self.input_sequence_comment,
+                self.input_sequence_comment2.value,
             )
         )
