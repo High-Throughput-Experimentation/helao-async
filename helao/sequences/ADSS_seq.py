@@ -6,10 +6,10 @@ __all__ = [
  #   "ADSS_CV_nomove",
  #   "ADSS_CA_nomove",
 #    "ADSS_CombineEche",
-    "ADSS_CA_NiSb_validation",
-    "ADSS_CA_NiSb_cell_1potential",
-    "ADSS_CA_NiSb_cell_1potential_photo",
-    "ADSS_CA_NiSb_cell_1potential_either",
+#    "ADSS_CA_NiSb_validation",
+#    "ADSS_CA_NiSb_cell_1potential",
+#    "ADSS_CA_NiSb_cell_1potential_photo",
+    "ADSS_CA_cell_1potential",
 ]
 
 from typing import List
@@ -1191,8 +1191,8 @@ def ADSS_CA_NiSb_cell_1potential_photo(
     return epm.experiment_plan_list  # returns complete experiment list
 
 
-def ADSS_CA_NiSb_cell_1potential_either(
-    sequence_version: int = 1,
+def ADSS_CA_cell_1potential(
+    sequence_version: int = 2,
     #solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no: int = 14050,  #  instead of map select
@@ -1213,6 +1213,7 @@ def ADSS_CA_NiSb_cell_1potential_either(
     OCValiquot_times_sec: List[float] = [20],
     samplerate_sec: float = 1,
     led_illumination: bool = False,
+    led_dutycycle: float = 1,
     led_wavelength: str = "385",
     Syringe_rate_ulsec: float = 300,
     Cell_draintime_s: float = 60,
@@ -1307,6 +1308,7 @@ def ADSS_CA_NiSb_cell_1potential_either(
                 "ref_type": ref_type,
                 "ref_offset__V": ref_offset__V,
                 "led_wavelength": led_wavelength,
+                "toggle_illum_duty": led_dutycycle,
                 "aliquot_volume_ul": aliquot_volume_ul,
                 "aliquot_times_sec": OCValiquot_times_sec,
                 "aliquot_insitu": True,
@@ -1326,6 +1328,7 @@ def ADSS_CA_NiSb_cell_1potential_either(
                 "samplerate_sec": samplerate_sec,
                 "CA_duration_sec": CA_duration_sec,
                 "led_wavelength": led_wavelength,
+                "toggle_illum_duty": led_dutycycle,
                 "aliquot_volume_ul": aliquot_volume_ul,
                 "aliquot_times_sec": aliquot_times_sec,
                 "aliquot_insitu": True,
@@ -1342,6 +1345,7 @@ def ADSS_CA_NiSb_cell_1potential_either(
                 "ref_type": ref_type,
                 "ref_offset__V": ref_offset__V,
                 "led_wavelength": led_wavelength,
+                "toggle_illum_duty": led_dutycycle,
                 "aliquot_volume_ul": aliquot_volume_ul,
                 "aliquot_times_sec": OCValiquot_times_sec,
                 "aliquot_insitu": True,
