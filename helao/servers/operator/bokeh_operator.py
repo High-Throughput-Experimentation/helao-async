@@ -98,7 +98,6 @@ class Operator:
         self.experiment_plan_list = {}
         self.experiment_plan_list["sequence_name"] = []
         self.experiment_plan_list["sequence_label"] = []
-        self.experiment_plan_list["sequence_comment"] = []
         self.experiment_plan_list["experiment_name"] = []
 
         self.sequence_list = {}
@@ -897,10 +896,12 @@ class Operator:
             self.vis.print_message("Cannot start orch when not in a stopped state.")
 
     def callback_add_expplan(self, event):
-        """add experiment plan as new sequene to orch sequence_dq"""
+        """add experiment plan as new sequence to orch sequence_dq"""
         if self.sequence is not None:
             sellabel = self.input_sequence_label.value
             self.sequence.sequence_label = sellabel
+            if self.input_sequence_comment.value != "":
+                self.sequence.sequence_comment = self.input_sequence_comment.value
             self.vis.doc.add_next_tick_callback(
                 partial(self.orch.add_sequence, self.sequence)
             )
