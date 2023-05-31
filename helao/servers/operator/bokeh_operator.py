@@ -319,8 +319,9 @@ class Operator:
             value="",
             title="sequence comment",
             disabled=False,
-            width=300,
-            height=80,
+            width=470,
+            height=90,
+            rows=3,
         )
         self.input_sequence_comment.on_change(
             "value", self.callback_copy_sequence_comment
@@ -330,8 +331,9 @@ class Operator:
             value="",
             title="sequence comment",
             disabled=False,
-            width=300,
-            height=80,
+            width=470,
+            height=90,
+            rows=3,
         )
         self.input_sequence_comment2.on_change(
             "value", self.callback_copy_sequence_comment2
