@@ -28,7 +28,7 @@ from bokeh.models import Select
 from bokeh.models import Button
 from bokeh.models import CheckboxGroup
 from bokeh.models.widgets import Div
-from bokeh.models.widgets.inputs import TextInput
+from bokeh.models.widgets.inputs import TextInput, TextAreaInput
 from bokeh.plotting import figure, Figure
 from bokeh.events import ButtonClick, DoubleTap
 from bokeh.models.widgets import FileInput, Toggle
@@ -315,6 +315,30 @@ class Operator:
             "value", self.callback_copy_sequence_label2
         )
 
+        self.input_sequence_comment = TextAreaInput(
+            value="",
+            title="sequence comment",
+            disabled=False,
+            width=470,
+            height=90,
+            rows=3,
+        )
+        self.input_sequence_comment.on_change(
+            "value", self.callback_copy_sequence_comment
+        )
+
+        self.input_sequence_comment2 = TextAreaInput(
+            value="",
+            title="sequence comment",
+            disabled=False,
+            width=470,
+            height=90,
+            rows=3,
+        )
+        self.input_sequence_comment2.on_change(
+            "value", self.callback_copy_sequence_comment2
+        )
+
         self.orch_section = Div(
             text="<b>Orch:</b>",
             width=self.max_width - 20,
@@ -358,6 +382,7 @@ class Operator:
                             Spacer(width=20),
                             self.input_sequence_label,
                         ],
+                        [self.input_sequence_comment],
                         [
                             Spacer(width=10),
                             Div(
@@ -411,6 +436,7 @@ class Operator:
                             Spacer(width=20),
                             self.input_sequence_label2,
                         ],
+                        [self.input_sequence_comment2],
                         [
                             Spacer(width=10),
                             Div(
@@ -872,10 +898,12 @@ class Operator:
             self.vis.print_message("Cannot start orch when not in a stopped state.")
 
     def callback_add_expplan(self, event):
-        """add experiment plan as new sequene to orch sequence_dq"""
+        """add experiment plan as new sequence to orch sequence_dq"""
         if self.sequence is not None:
             sellabel = self.input_sequence_label.value
             self.sequence.sequence_label = sellabel
+            if self.input_sequence_comment.value != "":
+                self.sequence.sequence_comment = self.input_sequence_comment.value
             self.vis.doc.add_next_tick_callback(
                 partial(self.orch.add_sequence, self.sequence)
             )
@@ -1651,5 +1679,23 @@ class Operator:
                 self.update_input_value,
                 self.input_sequence_label,
                 self.input_sequence_label2.value,
+            )
+        )
+
+    def callback_copy_sequence_comment(self, attr, old, new):
+        self.vis.doc.add_next_tick_callback(
+            partial(
+                self.update_input_value,
+                self.input_sequence_comment2,
+                self.input_sequence_comment.value,
+            )
+        )
+
+    def callback_copy_sequence_comment2(self, attr, old, new):
+        self.vis.doc.add_next_tick_callback(
+            partial(
+                self.update_input_value,
+                self.input_sequence_comment,
+                self.input_sequence_comment2.value,
             )
         )

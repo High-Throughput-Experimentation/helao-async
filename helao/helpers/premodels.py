@@ -113,7 +113,7 @@ class Experiment(Sequence, ExperimentModel):
 
     def get_experiment_dir(self):
         """accepts action or experiment object"""
-        experiment_time = self.experiment_timestamp.strftime("%Y%m%d.%H%M%S%f")
+        experiment_time = self.experiment_timestamp.strftime("%Y%m%d.%H%M%S")
         sequence_dir = self.get_sequence_dir()
         return os.path.join(
             sequence_dir,
@@ -270,7 +270,6 @@ class Action(Experiment, ActionModel):
             experiment_dir,
             f"{self.orch_submit_order}__"
             f"{self.action_split}__"
-            f"{self.action_timestamp.strftime('%Y%m%d.%H%M%S%f')}__"
             f"{self.action_server.server_name}__{self.action_name}",
         )
 
