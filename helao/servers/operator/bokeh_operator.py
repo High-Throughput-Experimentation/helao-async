@@ -28,7 +28,7 @@ from bokeh.models import Select
 from bokeh.models import Button
 from bokeh.models import CheckboxGroup
 from bokeh.models.widgets import Div
-from bokeh.models.widgets.inputs import TextInput
+from bokeh.models.widgets.inputs import TextInput, TextAreaInput
 from bokeh.plotting import figure, Figure
 from bokeh.events import ButtonClick, DoubleTap
 from bokeh.models.widgets import FileInput, Toggle
@@ -315,7 +315,7 @@ class Operator:
             "value", self.callback_copy_sequence_label2
         )
 
-        self.input_sequence_comment = TextInput(
+        self.input_sequence_comment = TextAreaInput(
             value="",
             title="sequence comment",
             disabled=False,
@@ -326,7 +326,7 @@ class Operator:
             "value", self.callback_copy_sequence_comment
         )
 
-        self.input_sequence_comment2 = TextInput(
+        self.input_sequence_comment2 = TextAreaInput(
             value="",
             title="sequence comment",
             disabled=False,
