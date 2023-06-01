@@ -54,6 +54,7 @@ def helao_dirs(world_cfg: dict, server_name: str) -> HelaoDirs:
         # zip and remove old txt logs (start new log for every helao launch)
         old_log_txts = glob(os.path.join(log_root, server_name, "*.txt"))
         for old_log in old_log_txts:
+            print_message({}, "launcher", f"Compressing: {old_log}")
             try:
                 timestamp_found = False
                 with open(old_log, "r") as f:
