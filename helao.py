@@ -474,7 +474,9 @@ if __name__ == "__main__":
             [
                 s
                 for s in git_stat.split("\n")
-                if not s.strip().startswith("The system cannot find the path specified.")
+                if not s.strip().startswith(
+                    "The system cannot find the path specified."
+                )
             ]
         )
         cprint(git_stat, "yellow" if config["dummy"] else "cyan")
@@ -491,14 +493,20 @@ if __name__ == "__main__":
         old_log_txts = glob(os.path.join(log_root, server_name, "*.txt"))
         for old_log in old_log_txts:
             try:
-                with open(old_log) as f:
-                    line0 = f.readline()
-                timestamp = re.findall("[0-9]{2}:[0-9]{2}:[0-9]{2}", line0)[0].replace(
-                    ":", ""
-                )
+                timestamp_found = False
+                with open(old_log, "r") as f:
+                    while not timestamp_found:
+                        line0 = f.readline()
+                        if line0.strip().startswith("["):
+                            timestamp_found = True
+                            timestamp = re.findall("[0-9]{2}:[0-9]{2}:[0-9]{2}", line0)[
+                                0
+                            ].replace(":", "")
                 zipname = old_log.replace(".txt", f"{timestamp}.zip")
                 arcname = os.path.basename(old_log).replace(".txt", f"{timestamp}.txt")
-                with zipfile.ZipFile(zipname, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+                with zipfile.ZipFile(
+                    zipname, "w", compression=zipfile.ZIP_DEFLATED
+                ) as zf:
                     zf.write(old_log, arcname)
                 os.remove(old_log)
             except:
