@@ -26,7 +26,7 @@ config["servers"] = {
         "group": "orchestrator",
         "fast": "async_orch2",
         "params": {"enable_op": True, "bokeh_port": 5002},
-        "verbose": True,
+        "verbose": False,
     },
     "MOTOR": {
         "host": hostip,
@@ -132,7 +132,7 @@ config["servers"] = {
         "group": "visualizer",
         "bokeh": "live_visualizer",
         "params": {"doc_name": "Sensor Visualizer"},
-        "verbose": True,
+        "verbose": False,
     },
     "CO2SENSOR": {
         "host": hostip,
@@ -140,7 +140,7 @@ config["servers"] = {
         "group": "action",
         "fast": "co2sensor_server",
         "params": {"port": "COM3", "start_margin": 0},
-        "verbose": True,
+        "verbose": False,
     },
     "SYRINGE0": {
         "host": hostip,
@@ -162,7 +162,7 @@ config["servers"] = {
         "group": "action",
         "fast": "mfc_server",
         "params": {"devices": {"N2": {"port": "COM7", "unit_id": "A"}}},
-        "verbose": True,
+        "verbose": False,
 
     },
     "CALC": {
@@ -171,7 +171,7 @@ config["servers"] = {
         "group": "action",
         "fast": "calc_server",
         "params": {},
-        "verbose": True,
+        "verbose": False,
     },
 
     "DB": {
