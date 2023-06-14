@@ -740,8 +740,6 @@ class HelaoSyncer:
         exp_path = Path(act_yml.parent_path)
         exp_prog = self.get_progress(exp_path)
         act_idx = act_meta["action_order"]
-        # register finished action in process_actions_done {order: ymltargetname}
-        exp_prog.dict["process_actions_done"].update({act_idx: act_yml.target.name})
         # handle legacy experiments (no process list)
         if exp_prog.dict["legacy_experiment"]:
             # if action is a process finisher, add to exp progress
@@ -854,6 +852,8 @@ class HelaoSyncer:
                     ]
                 if deduped_samples:
                     exp_prog.dict["process_metas"][pidx][new_name] = deduped_samples
+        # register finished action in process_actions_done {order: ymltargetname}
+        exp_prog.dict["process_actions_done"].update({act_idx: act_yml.target.name})
         exp_prog.write_dict()
         return exp_prog
 
