@@ -480,7 +480,8 @@ class HelaoSyncer:
                     #     f"Creating sync task for {yml_target.name}."
                     # )
                     self.running_tasks[yml_target.name] = asyncio.create_task(
-                        self.sync_yml(yml_target, rank), name=yml_target.name
+                        self.sync_yml(yml_path=yml_target, rank=rank),
+                        name=yml_target.name,
                     )
                     self.running_tasks[yml_target.name].add_done_callback(
                         self.sync_exit_callback
@@ -1049,23 +1050,27 @@ class HelaoSyncer:
         elif os.path.isdir(sync_path):
             base_prgs = [
                 x
-                for x in glob(
-                    os.path.join(sync_path, "**", "*-*.pr*"), recursive=True
-                )
+                for x in glob(os.path.join(sync_path, "**", "*-*.pr*"), recursive=True)
                 if x.endswith(".progress") or x.endswith(".prg")
             ]
             seq_prgs = [x for x in base_prgs if "-seq.pr" in x]
             for x in seq_prgs:
-                base_prgs = [y for y in base_prgs if not y.startswith(os.path.dirname(x))]
+                base_prgs = [
+                    y for y in base_prgs if not y.startswith(os.path.dirname(x))
+                ]
             exp_prgs = [x for x in base_prgs if "-exp.pr" in x]
             for x in exp_prgs:
-                base_prgs = [y for y in base_prgs if not y.startswith(os.path.dirname(x))]
+                base_prgs = [
+                    y for y in base_prgs if not y.startswith(os.path.dirname(x))
+                ]
             act_prgs = [x for x in base_prgs if "-act.pr" in x]
             for x in act_prgs:
-                base_prgs = [y for y in base_prgs if not y.startswith(os.path.dirname(x))]
-            
+                base_prgs = [
+                    y for y in base_prgs if not y.startswith(os.path.dirname(x))
+                ]
+
             base_prgs = act_prgs + exp_prgs + seq_prgs
-            
+
             if not base_prgs:
                 self.base.print_message(
                     f"Did not find any .prg or .progress files in subdirectories of {sync_path}"
