@@ -8,30 +8,30 @@ __all__ = ["HelaoAnalysisSyncer"]
 
 import asyncio
 import os
-import shutil
 import traceback
+from copy import copy
 from datetime import datetime
-from glob import glob
 from pathlib import Path
-from typing import Union
-from zipfile import ZipFile
+from typing import Union, Optional, Tuple
+from uuid import UUID
 
 import aiohttp
 import boto3
 import botocore.exceptions
-import numpy as numpy
+import pandas as pd
 
 from helao.helpers.print_message import print_message
-from helao.helpers.zip_dir import zip_dir
 from helao.servers.base import Base
-from helao.drivers.data.analyses.echeuvis_stability import batch_calc_echeuvis
+from helao.drivers.data.sync_driver import dict2json
+from helao.drivers.data.analyses.echeuvis_stability import (
+    EcheUvisLoader,
+    EcheUvisAnalysis,
+    ANALYSIS_DEFAULTS as ECHEUVIS_DEFAULTS,
+)
 
 
-# batch_calc_echeuvis returns list of EcheUvisAnalysis using plate_id and params
-# for each EcheUvisAnalysis:
-    # populate HelaoAnalysis model
-    # write ana.outputs.json() to s3 bucket
-    # push HelaoAnalysis to API
+MAX_TASKS = 4
+
 
 class HelaoAnalysisSyncer:
     base: Base
@@ -51,98 +51,61 @@ class HelaoAnalysisSyncer:
         self.task_queue = asyncio.PriorityQueue()
         self.task_set = set()
         self.running_tasks = {}
-        # push happens via async task queue
-        # processes are checked after each action push
-        # pushing an exp before processes/actions have synced will first enqueue actions
-        # then enqueue processes, then enqueue the exp again
-        # exp progress must be in memory before actions are checked
 
         self.syncer_loop = asyncio.create_task(self.syncer(), name="syncer_loop")
-
-    def try_remove_empty(self, remove_target):
-        success = False
-        contents = glob(os.path.join(remove_target, "*"))
-        if len(contents) == 0:
-            try:
-                os.rmdir(remove_target)
-                success = True
-            except Exception as err:
-                tb = "".join(
-                    traceback.format_exception(type(err), err, err.__traceback__)
-                )
-                self.base.print_message(
-                    f"Directory {remove_target} is empty, but could not removed. {repr(err), tb,}",
-                    error=True,
-                )
-        else:
-            sub_dirs = [x for x in contents if os.path.isdir(x)]
-            sub_success = False
-            sub_removes = []
-            for subdir in sub_dirs:
-                sub_removes.append(self.try_remove_empty(subdir))
-            sub_success = all(sub_removes)
-            sub_files = [x for x in contents if os.path.isfile(x)]
-            if not sub_files and sub_success:
-                success = True
-        return success
-
-    def cleanup_root(self):
-        """Remove leftover empty directories."""
-        today = datetime.strptime(datetime.now().strftime("%Y%m%d"), "%Y%m%d")
-        chkdirs = ["RUNS_ACTIVE", "RUNS_FINISHED"]
-        for cd in chkdirs:
-            seq_dates = glob(os.path.join(self.world_config["root"], cd, "*", "*"))
-            for datedir in seq_dates:
-                try:
-                    dateonly = datetime.strptime(os.path.basename(datedir), "%Y%m%d")
-                except ValueError:
-                    dateonly = datetime.strptime(
-                        os.path.basename(datedir), "%Y%m%d.%H%M%S%f"
-                    )
-                if dateonly <= today:
-                    seq_dirs = glob(os.path.join(datedir, "*"))
-                    if len(seq_dirs) == 0:
-                        self.try_remove_empty(datedir)
-                    weekdir = os.path.dirname(datedir)
-                    if len(glob(os.path.join(weekdir, "*"))) == 0:
-                        self.try_remove_empty(weekdir)
 
     def sync_exit_callback(self, task: asyncio.Task):
         task_name = task.get_name()
         if task_name in self.running_tasks:
-            # self.base.print_message(f"Removing {task_name} from running_tasks.")
             self.running_tasks.pop(task_name)
             try:
                 self.task_set.remove(task_name)
             except KeyError:
                 pass
-        # else:
-        #     self.base.print_message(
-        #         f"{task_name} was already removed from running_tasks."
-        #     )
+
+    async def enqueue_calc(
+        self, calc_tup: Tuple[UUID, pd.DataFrame, dict], rank: int = 5
+    ):
+        """Adds (process_uuid, query_df, ana_params) tuple to calculation queue."""
+        self.task_set.add(calc_tup[0])
+        await self.task_queue.put((rank, calc_tup))
+        self.base.print_message(
+            f"Added {str(calc_tup[0])} to syncer queue with priority {rank}."
+        )
 
     async def syncer(self):
         """Syncer loop coroutine which consumes the task queue."""
         while True:
             if len(self.running_tasks) < MAX_TASKS:
-                # self.base.print_message("Getting next yml_target from queue.")
-                rank, yml_target = await self.task_queue.get()
-                # self.base.print_message(
-                #     f"Acquired {yml_target.name} with priority {rank}."
-                # )
-                if yml_target.name not in self.running_tasks:
-                    # self.base.print_message(
-                    #     f"Creating sync task for {yml_target.name}."
-                    # )
-                    self.running_tasks[yml_target.name] = asyncio.create_task(
-                        self.sync_yml(yml_target, rank), name=yml_target.name
+                rank, ana = await self.task_queue.get()
+                if ana.analysis_uuid not in self.running_tasks:
+                    self.running_tasks[ana.analysis_uuid] = asyncio.create_task(
+                        self.sync_ana(ana, rank), name=ana.analysis_uuid
                     )
-                    self.running_tasks[yml_target.name].add_done_callback(
+                    self.running_tasks[ana.analysis_uuid].add_done_callback(
                         self.sync_exit_callback
                     )
-                # else:
-                #     print_message(f"{yml_target} sync is already in progress.")
             await asyncio.sleep(0.1)
+
+    async def sync_ana(
+        self, calc_tup: Tuple[UUID, pd.DataFrame, dict], retries: int = 3, rank: int = 5
+    ):
+        eua = EcheUvisAnalysis(*calc_tup)
+        eua.calc_output()
+        model_dict, output_dict = eua.export_analysis()
+        s3_model_target = f"analysis/{eua.analysis_uuid}.json"
+        s3_output_target = f"analysis/{eua.analysis_uuid}_output.json"
+
+        s3_model_success = await self.to_s3(model_dict, s3_model_target)
+        s3_output_success = await self.to_s3(output_dict, s3_output_target)
+        api_success = await self.to_api(model_dict)
+
+        if s3_model_success and s3_output_success and api_success:
+            self.base.print_message(f"Successfully synced {eua.analysis_uuid}")
+            return True
+
+        self.base.print_message(f"Analysis {eua.analysis_uuid} sync failed.")
+        return False
 
     async def to_s3(self, msg: Union[dict, Path], target: str, retries: int = 3):
         """Uploads to S3: dict sent as json, path sent as file."""
@@ -169,16 +132,11 @@ class HelaoAnalysisSyncer:
         self.base.print_message(f"Did not upload {target} after {retries} tries.")
         return False
 
-    async def to_api(self, req_model: dict, meta_type: str, retries: int = 3):
+    async def to_api(self, req_model: dict, retries: int = 3):
         """POST/PATCH model via Modelyst API."""
-        req_url = f"https://{self.api_host}/{PLURALS[meta_type]}/"
-        # self.base.print_message(f"preparing API push to {req_url}")
-        # meta_name = req_model.get(
-        #     f"{meta_type.replace('process', 'technique')}_name",
-        #     req_model["experiment_name"],
-        # )
-        meta_uuid = req_model[f"{meta_type}_uuid"]
-        self.base.print_message(f"attempting API push for {meta_type}: {meta_uuid}")
+        req_url = f"https://{self.api_host}/analyses/"
+        meta_uuid = req_model["analysis_uuid"]
+        self.base.print_message(f"attempting API push for analysis: {meta_uuid}")
         try_create = True
         api_success = False
         last_status = 0
@@ -207,9 +165,9 @@ class HelaoAnalysisSyncer:
                             f"[{i+1}/{retries}] an exception occurred: {e}"
                         )
             if not api_success:
-                meta_s3_key = f"{meta_type}/{meta_uuid}.json"
+                meta_s3_key = f"analysis/{meta_uuid}.json"
                 fail_model = {
-                    "endpoint": f"https://{self.api_host}/{PLURALS[meta_type]}/",
+                    "endpoint": f"https://{self.api_host}/analysis/",
                     "method": "POST" if try_create else "PATCH",
                     "status_code": last_status,
                     "detail": last_response.get("detail", ""),
@@ -227,142 +185,52 @@ class HelaoAnalysisSyncer:
                         async with session.post(fail_url, json=fail_model) as resp:
                             if resp.status == 200:
                                 self.base.print_message(
-                                    f"successful debug API push for {meta_type}: {meta_uuid}"
+                                    f"successful debug API push for analysis: {meta_uuid}"
                                 )
                                 break
                             self.base.print_message(
-                                f"failed debug API push for {meta_type}: {meta_uuid}"
+                                f"failed debug API push for analysis: {meta_uuid}"
                             )
                             self.base.print_message(f"response: {await resp.json()}")
         return api_success
 
-    def list_pending(self, omit_manual_exps: bool = True):
-        """Finds and queues ymls form RUNS_FINISHED."""
-        finished_dir = str(self.base.helaodirs.save_root).replace(
-            "RUNS_ACTIVE", "RUNS_FINISHED"
+    async def batch_calc_echeuvis(
+        self,
+        plate_id: Optional[int] = None,
+        sequence_uuid: Optional[UUID] = None,
+        params: dict = {},
+    ):
+        """Generate list of EcheUvisAnalysis from sequence or plate_id (latest seq)."""
+        eul = EcheUvisLoader(
+            awscli_profile_name=self.config_dict["aws_profile"], cache_s3=True
         )
-        pending = glob(os.path.join(finished_dir, "**", "*-seq.yml"), recursive=True)
-        if omit_manual_exps:
-            pending = [x for x in pending if "manual_orch_seq" not in x]
-        self.base.print_message(
-            f"Found {len(pending)} pending sequences in RUNS_FINISHED."
+        df = eul.get_recent(
+            min_date=datetime.now().strftime("%Y-%m-%d"), plate_id=plate_id
         )
-        return pending
 
-    async def finish_pending(self, omit_manual_exps: bool = True):
-        """Finds and queues sequence ymls from RUNS_FINISHED."""
-        pending = self.list_pending(omit_manual_exps)
-        self.base.print_message(
-            f"Enqueueing {len(pending)} sequences from RUNS_FINISHED."
+        # all processes in sequence
+        pdf = df.sort_values(
+            ["sequence_timestamp", "process_timestamp"], ascending=False
         )
-        for pp in pending:
-            if os.path.exists(
-                pp.replace("RUNS_FINISHED", "RUNS_SYNCED").replace(".yml", ".progress")
-            ):
-                self.reset_sync(
-                    os.path.dirname(pp).replace("RUNS_FINISHED", "RUNS_SYNCED")
-                )
-            await self.enqueue_yml(pp)
-        return pending
+        if sequence_uuid is not None:
+            pdf = pdf.query("sequence_uuid==@sequence_uuid")
+        pdf = pdf.query("sequence_timestamp==sequence_timestamp.max()")
 
-    def reset_sync(self, sync_path: str):
-        """Resets a synced sequence zip or partially-synced sequence folder."""
-        if not os.path.exists(sync_path):
-            self.base.print_message(f"{sync_path} does not exist.")
-            return False
-        if "RUNS_SYNCED" not in sync_path:
-            self.base.print_message(
-                f"Cannot reset path that's not in RUNS_SYNCED: {sync_path}"
-            )
-            return False
-        ## if path is a zip
-        if sync_path.endswith(".zip"):
-            zf = ZipFile(sync_path)
-            if any(x.endswith("-seq.prg") for x in zf.namelist()):
-                seqzip_dir = os.path.dirname(sync_path)
-                dest = os.path.join(
-                    seqzip_dir.replace("RUNS_SYNCED", "RUNS_FINISHED"),
-                    os.path.basename(sync_path).replace(".zip", ""),
-                )
-                os.makedirs(dest, exist_ok=True)
-                zf.extractall(dest)
-                zf.close()
-                if not os.path.exists(sync_path.replace(".zip", ".orig")):
-                    shutil.move(sync_path, sync_path.replace(".zip", ".orig"))
-                self.base.print_message(f"Restored zip to {dest}")
-                return True
-            zf.close()
-            self.base.print_message("Zip does not contain a valid sequence.")
-            return False
-
-        ## if path is a directory
-        elif os.path.isdir(sync_path):
-            base_prgs = [
-                x
-                for x in glob(os.path.join(sync_path, "**", "*-*.pr*"), recursive=True)
-                if x.endswith(".progress") or x.endswith(".prg")
-            ]
-            seq_prgs = [x for x in base_prgs if "-seq.pr" in x]
-            for x in seq_prgs:
-                base_prgs = [
-                    y for y in base_prgs if not y.startswith(os.path.dirname(x))
-                ]
-            exp_prgs = [x for x in base_prgs if "-exp.pr" in x]
-            for x in exp_prgs:
-                base_prgs = [
-                    y for y in base_prgs if not y.startswith(os.path.dirname(x))
-                ]
-            act_prgs = [x for x in base_prgs if "-act.pr" in x]
-            for x in act_prgs:
-                base_prgs = [
-                    y for y in base_prgs if not y.startswith(os.path.dirname(x))
-                ]
-
-            base_prgs = act_prgs + exp_prgs + seq_prgs
-
-            if not base_prgs:
-                self.base.print_message(
-                    f"Did not find any .prg or .progress files in subdirectories of {sync_path}"
-                )
-            else:
-                self.base.print_message(
-                    f"Found {len(base_prgs)} .prg or .progress files in subdirectories of {sync_path}"
-                )
-                # remove all .prg files
-                for prg in base_prgs:
-                    base_dir = os.path.dirname(prg)
-                    sub_prgs = [
-                        x
-                        for x in glob(
-                            os.path.join(base_dir, "**", "*-*.pr*"), recursive=True
-                        )
-                        if x.endswith(".progress") or x.endswith(".prg")
-                    ]
-                    self.base.print_message(
-                        f"Removing {len(base_prgs)} prg and progress files in subdirectories of {base_dir}"
-                    )
-                    for sp in sub_prgs:
-                        os.remove(sp)
-                    # move path back to RUNS_FINISHED
-                    shutil.move(
-                        base_dir, base_dir.replace("RUNS_SYNCED", "RUNS_FINISHED")
-                    )
-                    self.base.print_message(f"Successfully reverted {base_dir}")
-
-            seq_zips = glob(os.path.join(sync_path, "**", "*.zip"), recursive=True)
-            if not seq_zips:
-                self.base.print_message(
-                    f"Did not find any zip files in subdirectories of {sync_path}"
-                )
-            else:
-                self.base.print_message(
-                    f"Found {len(seq_zips)} zip files in subdirectories of {sync_path}"
-                )
-                for seq_zip in seq_zips:
-                    self.reset_sync(seq_zip)
-            return True
-        self.base.print_message("Arg was not a sequence path or zip.")
-        return False
+        # only SPEC actions during CA
+        eudf = (
+            pdf.query("experiment_name=='ECHEUVIS_sub_CA_led'")
+            .query("run_use=='data'")
+            .query("action_name=='acquire_spec_extrig'")
+        )
+        ana_params = copy(ECHEUVIS_DEFAULTS)
+        for puuid in eudf.process_uuid:
+            await self.enqueue_calc((puuid, pdf, ana_params.update(params)))
 
     def shutdown(self):
         pass
+
+
+# for each EcheUvisAnalysis:
+# populate HelaoAnalysis model
+# write ana.outputs.json() to s3 bucket
+# push HelaoAnalysis to API

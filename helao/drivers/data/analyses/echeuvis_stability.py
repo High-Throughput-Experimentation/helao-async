@@ -1,4 +1,4 @@
-import os
+import sys
 from copy import copy
 from typing import List, Optional
 from uuid import UUID
@@ -11,6 +11,12 @@ from scipy.signal import savgol_filter
 from scipy.stats import binned_statistic
 from mps_client import run_raw_query
 
+from helaocore.models.analysis import (
+    AnalysisDataModel,
+    AnalysisOutputModel,
+    AnalysisModel,
+)
+from helaocore.version import get_filehash
 from helao.helpers.gen_uuid import gen_uuid
 from helao.drivers.data.loaders.pgs3 import HelaoLoader
 
@@ -233,22 +239,24 @@ class HelaoModel:
             query_df is not None
             and query_df.query(f"{helao_type}_uuid==@uuid").shape[0] > 1
         ):
-            row_dict = query_df.query(f"{helao_type}_uuid==@uuid").iloc[0].to_dict()
+            self.row_dict = (
+                query_df.query(f"{helao_type}_uuid==@uuid").iloc[0].to_dict()
+            )
         else:
-            row_dict = self.row_dict
-        self.timestamp = row_dict.get(
+            self.row_dict = self._row_dict
+        self.timestamp = self.row_dict.get(
             f"{helao_type}_timestamp",
             self.row_dict.get(f"{helao_type}_timestamp", None),
         )
-        self.params = row_dict.get(
+        self.params = self.row_dict.get(
             f"{helao_type}_params", self.row_dict.get(f"{helao_type}_params", {})
         )
         if helao_type == "process":
-            self.name = row_dict.get(
+            self.name = self.row_dict.get(
                 "technique_name", self.row_dict.get("technique_name", None)
             )
         else:
-            self.name = row_dict.get(
+            self.name = self.row_dict.get(
                 f"{helao_type}_name", self.row_dict.get(f"{helao_type}_name", None)
             )
 
@@ -258,7 +266,7 @@ class HelaoModel:
         return EUL.get_json(self.helao_type, self.uuid)
 
     @property
-    def row_dict(self):
+    def _row_dict(self):
         # retrieve row from API database via HelaoAccess
         return EUL.get_sql(self.helao_type, self.uuid)
 
@@ -275,6 +283,14 @@ class HelaoAction(HelaoModel):
         self.action_uuid = self.uuid
         self.action_timestamp = self.timestamp
         self.action_params = self.params
+        self.solid_samples = []
+        for sd in self.row_dict.get("samples_in", []):
+            if sd["sample_type"] == "solid":
+                self.solid_samples.append(sd["global_label"])
+            elif sd["sample_type"] == "assembly":
+                for ssd in sd["parts"]:
+                    if ssd["sample_type"] == "solid":
+                        self.solid_samples.append(sd["global_label"])
 
     @property
     def hlo_file(self):
@@ -514,6 +530,7 @@ class EcheUvisAnalysis:
     process_uuid: UUID
     inputs: EcheUvisInputs
     outputs: EcheUvisOutputs
+    analysis_codehash: str
 
     def __init__(
         self,
@@ -532,6 +549,7 @@ class EcheUvisAnalysis:
         )
         self.process_uuid = process_uuid
         self.ca_potential_vrhe = self.inputs.insitu.process_params["CA_potential_vsRHE"]
+        self.analysis_codehash = get_filehash(sys._getframe().f_code.co_filename)
 
     def calc_output(self):
         """Calculate stability FOMs and intermediate vectors."""
@@ -655,32 +673,39 @@ class EcheUvisAnalysis:
             mean_abs_omT_diff=np.mean(np.abs((1 - rscl_insitu) - (1 - rscl_baseline))),
         )
 
+    def export_analysis(self):
+        action_keys = [k for k in vars(self.inputs).keys() if "_act" in k]
+        inputs = []
 
-def batch_calc_echeuvis(
-    plate_id: Optional[int] = None,
-    sequence_uuid: Optional[UUID] = None,
-    params: dict = {},
-):
-    """Generate list of EcheUvisAnalysis from sequence or plate_id (latest seq)."""
-    eul = EcheUvisLoader(awscli_profile_name="htejcap", cache_s3=True)
-    df = eul.get_recent(min_date=datetime.now().strftime("%Y-%m-%d"), plate_id=plate_id)
+        for ak in action_keys:
+            euis = vars(self.inputs)[ak]
+            ru = ak.split("_spec")[0]
+            if not isinstance(euis, list):
+                euis = [euis]
+            for eui in euis:
+                raw_data_path = f"raw_data/{eui.action_uuid}/{eui.hlo_file}.json"
+                samples = eui.solid_samples
+                if samples:
+                    global_sample = sorted(set(samples))[0]
+                else:
+                    global_sample = None
+                adm = AnalysisDataModel(
+                    action_uuid=eui.action_uuid,
+                    run_use=ru,
+                    raw_data_path=raw_data_path,
+                    global_sample_label=global_sample,
+                )
+                inputs.append(adm)
 
-    # all processes in sequence
-    pdf = df.sort_values(["sequence_timestamp", "process_timestamp"], ascending=False)
-    if sequence_uuid is not None:
-        pdf = pdf.query("sequence_uuid==@sequence_uuid")
-    pdf = pdf.query("sequence_timestamp==sequence_timestamp.max()")
-
-    # only SPEC actions during CA
-    eudf = (
-        pdf.query("experiment_name=='ECHEUVIS_sub_CA_led'")
-        .query("run_use=='data'")
-        .query("action_name=='acquire_spec_extrig'")
-    )
-    ana_params = copy(ANALYSIS_DEFAULTS)
-    analist = []
-    for puuid in eudf.process_uuid:
-        ana = EcheUvisAnalysis(puuid, pdf, ana_params.update(params))
-        ana.calc_output()
-        analist.append(ana)
-    return analist
+        aom = AnalysisOutputModel(
+            analysis_output_path=f"analysis/{self.analysis_uuid}_output.json",
+            output_keys=list(self.outputs.dict().keys()),
+        )
+        ana_model = AnalysisModel(
+            analysis_name="ECHEUVIS_InsituOpticalStability",
+            analysis_params=self.analysis_params,
+            analysis_codehash=self.analysis_codehash,
+            inputs=inputs,
+            output=aom,
+        )
+        return ana_model.dict(), self.outputs.dict()
