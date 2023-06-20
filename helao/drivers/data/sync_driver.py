@@ -64,7 +64,6 @@ MOD_PATCH = {
     "exid": "exec_id",
 }
 YAML_LOADER = YAML(typ="safe")
-MAX_TASKS = 4
 
 
 def dict2json(input_dict: dict):
@@ -385,6 +384,7 @@ class HelaoSyncer:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
+        self.max_tasks = self.config_dict.get("max_tasks", 4)
         os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
         self.aws_session = boto3.Session(profile_name=self.config_dict["aws_profile"])
         self.s3 = self.aws_session.client("s3")
@@ -469,7 +469,7 @@ class HelaoSyncer:
     async def syncer(self):
         """Syncer loop coroutine which consumes the task queue."""
         while True:
-            if len(self.running_tasks) < MAX_TASKS:
+            if len(self.running_tasks) < self.max_tasks:
                 # self.base.print_message("Getting next yml_target from queue.")
                 rank, yml_target = await self.task_queue.get()
                 # self.base.print_message(

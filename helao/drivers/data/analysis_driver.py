@@ -30,8 +30,6 @@ from helao.drivers.data.analyses.echeuvis_stability import (
 )
 
 
-MAX_TASKS = 4
-
 
 class HelaoAnalysisSyncer:
     base: Base
@@ -42,6 +40,7 @@ class HelaoAnalysisSyncer:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
+        self.max_tasks = self.config_dict.get("max_tasks", 4)
         os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
         self.aws_session = boto3.Session(profile_name=self.config_dict["aws_profile"])
         self.s3 = self.aws_session.client("s3")
@@ -76,7 +75,7 @@ class HelaoAnalysisSyncer:
     async def syncer(self):
         """Syncer loop coroutine which consumes the task queue."""
         while True:
-            if len(self.running_tasks) < MAX_TASKS:
+            if len(self.running_tasks) < self.max_tasks:
                 rank, ana = await self.task_queue.get()
                 if ana.analysis_uuid not in self.running_tasks:
                     self.running_tasks[ana.analysis_uuid] = asyncio.create_task(
