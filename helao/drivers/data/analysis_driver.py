@@ -196,14 +196,14 @@ class HelaoAnalysisSyncer:
         plate_id: Optional[int] = None,
         sequence_uuid: Optional[UUID] = None,
         params: dict = {},
+        recent: bool = True,
     ):
         """Generate list of EcheUvisAnalysis from sequence or plate_id (latest seq)."""
         eul = EcheUvisLoader(
             awscli_profile_name=self.config_dict["aws_profile"], cache_s3=True
         )
-        df = eul.get_recent(
-            min_date=datetime.now().strftime("%Y-%m-%d"), plate_id=plate_id
-        )
+        min_date = datetime.now().strftime("%Y-%m-%d") if recent else None
+        df = eul.get_recent(min_date=min_date, plate_id=plate_id)
 
         # all processes in sequence
         pdf = df.sort_values(
@@ -211,7 +211,10 @@ class HelaoAnalysisSyncer:
         )
         if sequence_uuid is not None:
             pdf = pdf.query("sequence_uuid==@sequence_uuid")
-        pdf = pdf.query("sequence_timestamp==sequence_timestamp.max()")
+
+        pdf = pdf.query("sequence_timestamp==sequence_timestamp.max()").sort_values(
+            "process_timestamp"
+        )
 
         # only SPEC actions during CA
         eudf = (
