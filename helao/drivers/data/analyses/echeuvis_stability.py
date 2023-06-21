@@ -275,14 +275,6 @@ class HelaoAction(HelaoModel):
         self.action_uuid = self.uuid
         self.action_timestamp = self.timestamp
         self.action_params = self.params
-        self.solid_samples = []
-        for sd in self.row_dict.get("samples_in", []):
-            if sd["sample_type"] == "solid":
-                self.solid_samples.append(sd["global_label"])
-            elif sd["sample_type"] == "assembly":
-                for ssd in sd["parts"]:
-                    if ssd["sample_type"] == "solid":
-                        self.solid_samples.append(sd["global_label"])
 
     @property
     def hlo_file(self):
@@ -391,6 +383,7 @@ class EcheUvisInputs:
     insitu: HelaoProcess
     insitu_spec_act: HelaoAction
     insitu_ca_act: HelaoAction
+    # solid_samples: list
 
     def __init__(
         self,
@@ -460,6 +453,8 @@ class EcheUvisInputs:
             .action_uuid,
             query_df,
         )
+
+        # self.solid_samples = [f"legacy__solid__{plate_id}+{sample_no}"]
 
     @property
     def ref_dark_spec(self):
@@ -676,9 +671,8 @@ class EcheUvisAnalysis:
                 euis = [euis]
             for eui in euis:
                 raw_data_path = f"raw_data/{eui.action_uuid}/{eui.hlo_file}.json"
-                samples = eui.solid_samples
-                if samples:
-                    global_sample = sorted(set(samples))[0]
+                if ru in ["data", "baseline"]:
+                    global_sample = f"legacy__solid__{self.plate_id}_{self.sample_no}"
                 else:
                     global_sample = None
                 adm = AnalysisDataModel(
@@ -697,9 +691,9 @@ class EcheUvisAnalysis:
             analysis_name="ECHEUVIS_InsituOpticalStability",
             analysis_params=self.analysis_params,
             analysis_codehash=self.analysis_codehash,
-            analysis_uuid = self.analysis_uuid,
-            process_uuid = self.process_uuid,
-            process_params = self.inputs.insitu.process_params,
+            analysis_uuid=self.analysis_uuid,
+            process_uuid=self.process_uuid,
+            process_params=self.inputs.insitu.process_params,
             inputs=inputs,
             output=aom,
         )
