@@ -5,6 +5,7 @@ channels:
 dependencies:
   - pip:
     - aioshutil
+    - mps-client
   - aiofiles
   - aiohttp
   - bokeh=2
