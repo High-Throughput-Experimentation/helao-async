@@ -99,14 +99,6 @@ class EcheUvisLoader(HelaoLoader):
         conditions = []
         if min_date is not None:
             conditions.append(f"AND hp.process_timestamp >= '{min_date}'")
-        if plate_id is not None:
-            conditions.append(
-                f"AND hsmp.global_label LIKE 'legacy__solid__{plate_id}__%'"
-            )
-        if sample_no is not None:
-            conditions.append(
-                f"AND hsmp.global_label LIKE 'legacy__solid__%__{sample_no}'"
-            )
         recent_md = sorted(
             [md for md, pi, sn in self.recent_cache if pi is None and sn is None]
         )
@@ -389,8 +381,8 @@ def refadjust(v, min_mthd_allowed, max_mthd_allowed, min_limit, max_limit):
 
 
 class EcheUvisInputs:
-    ref_drks: List[HelaoProcess]
-    ref_drk_spec_acts: List[HelaoAction]
+    ref_darks: List[HelaoProcess]
+    ref_dark_spec_acts: List[HelaoAction]
     ref_lights: List[HelaoProcess]
     ref_light_spec_acts: List[HelaoAction]
     baseline: HelaoProcess
@@ -427,11 +419,11 @@ class EcheUvisInputs:
             query_df.query("process_uuid==@insitu_process_uuid").iloc[0].sequence_uuid
         )
         sdf = query_df.query("sequence_uuid==@suuid")
-        self.ref_drks = [
+        self.ref_darks = [
             HelaoProcess(x, query_df)
             for x in sdf.query("run_use=='ref_dark'").process_uuid
         ]
-        self.ref_drk_spec_acts = [
+        self.ref_dark_spec_acts = [
             HelaoAction(x, query_df)
             for x in sdf.query("run_use=='ref_dark'").action_uuid
         ]
@@ -471,7 +463,7 @@ class EcheUvisInputs:
 
     @property
     def ref_dark_spec(self):
-        return [x.hlo for x in self.ref_drk_spec_acts]
+        return [x.hlo for x in self.ref_dark_spec_acts]
 
     @property
     def ref_light_spec(self):
@@ -674,12 +666,12 @@ class EcheUvisAnalysis:
         )
 
     def export_analysis(self):
-        action_keys = [k for k in vars(self.inputs).keys() if "_act" in k]
+        action_keys = [k for k in vars(self.inputs).keys() if "spec_act" in k]
         inputs = []
 
         for ak in action_keys:
             euis = vars(self.inputs)[ak]
-            ru = ak.split("_spec")[0]
+            ru = ak.split("_spec")[0].replace("insitu", "data")
             if not isinstance(euis, list):
                 euis = [euis]
             for eui in euis:
@@ -705,6 +697,9 @@ class EcheUvisAnalysis:
             analysis_name="ECHEUVIS_InsituOpticalStability",
             analysis_params=self.analysis_params,
             analysis_codehash=self.analysis_codehash,
+            analysis_uuid = self.analysis_uuid,
+            process_uuid = self.process_uuid,
+            process_params = self.inputs.insitu.process_params,
             inputs=inputs,
             output=aom,
         )
