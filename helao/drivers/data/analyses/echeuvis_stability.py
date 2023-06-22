@@ -886,13 +886,13 @@ class DryUvisAnalysis:
             mean_ref_dark=list(mean_ref_dark),
             mean_ref_light=list(mean_ref_light),
             agg_method=ap["agg_method"],
-            agg_dry=list(agg_dry),
+            agg_spec=list(agg_dry),
             bin_wavelength=list(bin_wl),
-            bin_dry=list(bin_dry),
-            smth_dry=list(smth_dry),
-            rscl_dry=list(rscl_dry),
-            dry_min_rescaled=dry_min_rscl,
-            dry_max_rescaled=dry_max_rscl,
+            bin_spec=list(bin_dry),
+            smth_spec=list(smth_dry),
+            rscl_spec=list(rscl_dry),
+            spec_min_rescaled=dry_min_rscl,
+            spec_max_rescaled=dry_max_rscl,
         )
 
     def export_analysis(self):
