@@ -17,6 +17,7 @@ from helaocore.models.analysis import (
     AnalysisModel,
 )
 from helaocore.version import get_filehash
+from helaocore.models.s3locator import S3Locator
 from helao.helpers.gen_uuid import gen_uuid
 from helao.drivers.data.loaders.pgs3 import HelaoLoader
 
@@ -659,7 +660,7 @@ class EcheUvisAnalysis:
             mean_abs_omT_diff=np.mean(np.abs((1 - rscl_insitu) - (1 - rscl_baseline))),
         )
 
-    def export_analysis(self):
+    def export_analysis(self, analysis_name: str, bucket: str, region: str):
         action_keys = [k for k in vars(self.inputs).keys() if "spec_act" in k]
         inputs = []
 
@@ -683,18 +684,27 @@ class EcheUvisAnalysis:
                 inputs.append(adm)
 
         aom = AnalysisOutputModel(
-            analysis_output_path=f"analysis/{self.analysis_uuid}_output.json",
+            analysis_output_path=S3Locator(
+                bucket=bucket,
+                key=f"analysis/{self.analysis_uuid}_output.json",
+                region=region,
+            ),
+            content_type='application/json',
             output_keys=list(self.outputs.dict().keys()),
+            output_name=f"foms",
+            output={
+                k: v for k, v in self.outputs.dict().items() if not isinstance(v, list)
+            },
         )
         ana_model = AnalysisModel(
-            analysis_name="ECHEUVIS_InsituOpticalStability",
+            analysis_name=analysis_name,
             analysis_params=self.analysis_params,
             analysis_codehash=self.analysis_codehash,
             analysis_uuid=self.analysis_uuid,
             process_uuid=self.process_uuid,
             process_params=self.inputs.insitu.process_params,
             inputs=inputs,
-            output=aom,
+            outputs=[aom],
         )
         return ana_model.dict(), self.outputs.dict()
 
@@ -704,17 +714,19 @@ class DryUvisInputs:
     ref_dark_spec_acts: List[HelaoAction]
     ref_lights: List[HelaoProcess]
     ref_light_spec_acts: List[HelaoAction]
-    dry_spec: HelaoProcess
-    dry_spec_act: HelaoAction
+    insitu_spec: HelaoProcess
+    insitu_spec_act: HelaoAction
 
     def __init__(
         self,
-        dry_process_uuid: UUID,
+        insitu_process_uuid: UUID,
         plate_id: int,
         sample_no: int,
         query_df: pd.DataFrame,
     ):
-        suuid = query_df.query("process_uuid==@dry_process_uuid").iloc[0].sequence_uuid
+        suuid = (
+            query_df.query("process_uuid==@insitu_process_uuid").iloc[0].sequence_uuid
+        )
         sdf = query_df.query("sequence_uuid==@suuid")
         self.ref_darks = [
             HelaoProcess(x, query_df)
@@ -739,11 +751,11 @@ class DryUvisInputs:
             .query("plate_id==@plate_id")
             .query("sample_no==@sample_no")
         )
-        self.dry = HelaoProcess(
+        self.insitu = HelaoProcess(
             bdf.sort_values("action_timestamp").iloc[0].process_uuid,
             query_df,
         )
-        self.dry_spec_act = HelaoAction(
+        self.insitu_spec_act = HelaoAction(
             bdf.query("action_name=='acquire_spec_adv'")
             .sort_values("action_timestamp")
             .iloc[0]
@@ -760,27 +772,27 @@ class DryUvisInputs:
         return [x.hlo for x in self.ref_light_spec_acts]
 
     @property
-    def dry_spec(self):
-        return self.dry_spec_act.hlo
+    def insitu_spec(self):
+        return self.insitu_spec_act.hlo
 
 
 class DryUvisOutputs(BaseModel):
     wavelength: list
     lower_wl_idx: int
     upper_wl_idx: int
-    mean_ref_dark: list  # mean over start and end reference dark spectra
-    mean_ref_light: list  # mean over start and end reference light spectra
+    mean_ref_dark: list  # mean over start and end reference dark insitutra
+    mean_ref_light: list  # mean over start and end reference light insitutra
     agg_method: str
-    agg_spec: list  # mean over final t seconds of OCV
+    agg_insitu: list  # mean over final t seconds of OCV
     bin_wavelength: list
-    bin_spec: list
-    smth_spec: list
-    rscl_spec: list
-    spec_min_rescaled: bool
-    spec_max_rescaled: bool
+    bin_insitu: list
+    smth_insitu: list
+    rscl_insitu: list
+    insitu_min_rescaled: bool
+    insitu_max_rescaled: bool
 
 
-class DryUvisAnalysis:
+class DryUvisAnalysis(EcheUvisAnalysis):
     """Dry UVIS Analysis for GCLD demonstration."""
 
     analysis_timestamp: datetime
@@ -815,7 +827,7 @@ class DryUvisAnalysis:
         """Calculate stability FOMs and intermediate vectors."""
         rdtups = [parse_spechlo(x) for x in self.inputs.ref_dark_spec]
         rltups = [parse_spechlo(x) for x in self.inputs.ref_light_spec]
-        btup = parse_spechlo(self.inputs.dry_spec)
+        btup = parse_spechlo(self.inputs.insitu_spec)
 
         ap = self.analysis_params
         aggfunc = np.mean if ap["agg_method"] == "mean" else np.median
@@ -848,7 +860,7 @@ class DryUvisAnalysis:
         ).mean(axis=0)
 
         # aggregate baseline insitu OCV spectra over final t seconds, omitting first n
-        agg_dry = aggfunc(
+        agg_insitu = aggfunc(
             [
                 arr[
                     np.where(
@@ -862,16 +874,16 @@ class DryUvisAnalysis:
 
         inds = range(len(wl[wlindlo:wlindhi]))
         nbins = np.round(len(wl[wlindlo:wlindhi]) / ap["bin_width"]).astype(int)
-        refadj_dry = (
-            (agg_dry - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
+        refadj_insitu = (
+            (agg_insitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
         )[wlindlo:wlindhi]
         bin_wl = binned_statistic(inds, wl[wlindlo:wlindhi], "mean", nbins).statistic
-        bin_dry = binned_statistic(inds, refadj_dry, "mean", nbins).statistic
-        smth_dry = savgol_filter(
-            bin_dry, ap["window_length"], ap["poly_order"], delta=ap["delta"]
+        bin_insitu = binned_statistic(inds, refadj_insitu, "mean", nbins).statistic
+        smth_insitu = savgol_filter(
+            bin_insitu, ap["window_length"], ap["poly_order"], delta=ap["delta"]
         )
-        dry_min_rscl, dry_max_rscl, rscl_dry = refadjust(
-            smth_dry,
+        insitu_min_rscl, insitu_max_rscl, rscl_insitu = refadjust(
+            smth_insitu,
             ap["min_mthd_allowed"],
             ap["max_mthd_allowed"],
             ap["min_limit"],
@@ -886,50 +898,11 @@ class DryUvisAnalysis:
             mean_ref_dark=list(mean_ref_dark),
             mean_ref_light=list(mean_ref_light),
             agg_method=ap["agg_method"],
-            agg_spec=list(agg_dry),
+            agg_insitu=list(agg_insitu),
             bin_wavelength=list(bin_wl),
-            bin_spec=list(bin_dry),
-            smth_spec=list(smth_dry),
-            rscl_spec=list(rscl_dry),
-            spec_min_rescaled=dry_min_rscl,
-            spec_max_rescaled=dry_max_rscl,
+            bin_insitu=list(bin_insitu),
+            smth_insitu=list(smth_insitu),
+            rscl_insitu=list(rscl_insitu),
+            insitu_min_rescaled=insitu_min_rscl,
+            insitu_max_rescaled=insitu_max_rscl,
         )
-
-    def export_analysis(self):
-        action_keys = [k for k in vars(self.inputs).keys() if "spec_act" in k]
-        inputs = []
-
-        for ak in action_keys:
-            euis = vars(self.inputs)[ak]
-            ru = ak.split("_spec")[0].replace("dry", "data")
-            if not isinstance(euis, list):
-                euis = [euis]
-            for eui in euis:
-                raw_data_path = f"raw_data/{eui.action_uuid}/{eui.hlo_file}.json"
-                if ru in ["data"]:
-                    global_sample = f"legacy__solid__{self.plate_id}_{self.sample_no}"
-                else:
-                    global_sample = None
-                adm = AnalysisDataModel(
-                    action_uuid=eui.action_uuid,
-                    run_use=ru,
-                    raw_data_path=raw_data_path,
-                    global_sample_label=global_sample,
-                )
-                inputs.append(adm)
-
-        aom = AnalysisOutputModel(
-            analysis_output_path=f"analysis/{self.analysis_uuid}_output.json",
-            output_keys=list(self.outputs.dict().keys()),
-        )
-        ana_model = AnalysisModel(
-            analysis_name="UVIS_BkgSubNorm",
-            analysis_params=self.analysis_params,
-            analysis_codehash=self.analysis_codehash,
-            analysis_uuid=self.analysis_uuid,
-            process_uuid=self.process_uuid,
-            process_params=self.inputs.dry_spec.process_params,
-            inputs=inputs,
-            output=aom,
-        )
-        return ana_model.dict(), self.outputs.dict()

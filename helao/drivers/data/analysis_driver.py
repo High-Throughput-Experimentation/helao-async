@@ -97,7 +97,11 @@ class HelaoAnalysisSyncer:
     ):
         eua = self.ana_funcs[calc_tup[-1]](*calc_tup[:-1])
         eua.calc_output()
-        model_dict, output_dict = eua.export_analysis()
+        model_dict, output_dict = eua.export_analysis(
+            analysis_name=calc_tup[-1],
+            bucket=self.bucket,
+            region=self.aws_session.region_name,
+        )
         s3_model_target = f"analysis/{eua.analysis_uuid}.json"
         s3_output_target = f"analysis/{eua.analysis_uuid}_output.json"
 
