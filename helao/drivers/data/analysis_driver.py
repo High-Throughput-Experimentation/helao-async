@@ -25,7 +25,6 @@ from helao.drivers.data.sync_driver import dict2json
 from helao.drivers.data.analyses.echeuvis_stability import (
     EcheUvisLoader,
     EcheUvisAnalysis,
-    DryUvisLoader,
     DryUvisAnalysis,
     ANALYSIS_DEFAULTS as ECHEUVIS_DEFAULTS,
 )
@@ -53,8 +52,8 @@ class HelaoAnalysisSyncer:
 
         self.syncer_loop = asyncio.create_task(self.syncer(), name="syncer_loop")
         self.ana_funcs = {
-            "echeuvis_stability": EcheUvisAnalysis,
-            "dryuvis": DryUvisAnalysis,
+            "ECHEUVIS_InsituOpticalStability": EcheUvisAnalysis,
+            "UVIS_BkgSubNorm": DryUvisAnalysis,
         }
 
     def sync_exit_callback(self, task: asyncio.Task):
@@ -67,7 +66,7 @@ class HelaoAnalysisSyncer:
                 pass
 
     async def enqueue_calc(
-        self, calc_tup: Tuple[UUID, pd.DataFrame, dict], rank: int = 5
+        self, calc_tup: Tuple[UUID, pd.DataFrame, dict, str], rank: int = 5
     ):
         """Adds (process_uuid, query_df, ana_params) tuple to calculation queue."""
         self.task_set.add(calc_tup[0])
@@ -92,11 +91,11 @@ class HelaoAnalysisSyncer:
 
     async def sync_ana(
         self,
-        calc_tup: Tuple[UUID, pd.DataFrame, str, dict],
+        calc_tup: Tuple[UUID, pd.DataFrame, dict, str],
         retries: int = 3,
         rank: int = 5,
     ):
-        eua = self.ana_funcs[calc_tup[2]](*calc_tup)
+        eua = self.ana_funcs[calc_tup[-1]](*calc_tup[:-1])
         eua.calc_output()
         model_dict, output_dict = eua.export_analysis()
         s3_model_target = f"analysis/{eua.analysis_uuid}.json"
@@ -218,13 +217,12 @@ class HelaoAnalysisSyncer:
         pdf = df.sort_values(
             ["sequence_timestamp", "process_timestamp"], ascending=False
         )
+        pdf = pdf.query("sequence_name.str.startswith('ECHEUVIS')")
         if sequence_uuid is not None:
             pdf = pdf.query("sequence_uuid==@sequence_uuid")
-
         pdf = pdf.query("sequence_timestamp==sequence_timestamp.max()").sort_values(
             "process_timestamp"
         )
-
         # only SPEC actions during CA
         eudf = (
             pdf.query("experiment_name=='ECHEUVIS_sub_CA_led'")
@@ -234,7 +232,12 @@ class HelaoAnalysisSyncer:
         ana_params = copy(ECHEUVIS_DEFAULTS)
         for puuid in eudf.process_uuid:
             await self.enqueue_calc(
-                (puuid, pdf, "echeuvis_stability", ana_params.update(params))
+                (
+                    puuid,
+                    pdf,
+                    ana_params.update(params),
+                    "ECHEUVIS_InsituOpticalStability",
+                )
             )
 
     async def batch_calc_dryuvis(
@@ -243,7 +246,7 @@ class HelaoAnalysisSyncer:
         sequence_uuid: Optional[UUID] = None,
         params: dict = {},
     ):
-        """Generate list of EcheUvisAnalysis from sequence or plate_id (latest seq)."""
+        """Generate list of DryUvisAnalysis from sequence or plate_id (latest seq)."""
         eul = EcheUvisLoader(
             awscli_profile_name=self.config_dict["aws_profile"], cache_s3=True
         )
@@ -255,19 +258,26 @@ class HelaoAnalysisSyncer:
         pdf = df.sort_values(
             ["sequence_timestamp", "process_timestamp"], ascending=False
         )
+        pdf = pdf.query("sequence_name.str.startswith('UVIS')")
         if sequence_uuid is not None:
             pdf = pdf.query("sequence_uuid==@sequence_uuid")
         pdf = pdf.query("sequence_timestamp==sequence_timestamp.max()")
 
-        # only SPEC actions during CA
-        eudf = (
-            pdf.query("experiment_name=='ECHEUVIS_sub_CA_led'")
+        udf = (
+            pdf.query("experiment_name=='UVIS_sub_measure'")
             .query("run_use=='data'")
-            .query("action_name=='acquire_spec_extrig'")
+            .query("action_name=='acquire_spec_adv'")
         )
         ana_params = copy(ECHEUVIS_DEFAULTS)
-        for puuid in eudf.process_uuid:
-            await self.enqueue_calc((puuid, pdf, "dryuvis", ana_params.update(params)))
+        for puuid in udf.process_uuid:
+            await self.enqueue_calc(
+                (
+                    puuid,
+                    pdf,
+                    ana_params.update(params),
+                    "UVIS_BkgSubNorm",
+                )
+            )
 
     def shutdown(self):
         pass

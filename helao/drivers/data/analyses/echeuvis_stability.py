@@ -522,7 +522,6 @@ class EcheUvisAnalysis:
         self,
         process_uuid: UUID,
         query_df: pd.DataFrame,
-        analysis_func_str: str,
         analysis_params: dict,
     ):
         self.analysis_timestamp = datetime.now()
@@ -694,6 +693,242 @@ class EcheUvisAnalysis:
             analysis_uuid=self.analysis_uuid,
             process_uuid=self.process_uuid,
             process_params=self.inputs.insitu.process_params,
+            inputs=inputs,
+            output=aom,
+        )
+        return ana_model.dict(), self.outputs.dict()
+
+
+class DryUvisInputs:
+    ref_darks: List[HelaoProcess]
+    ref_dark_spec_acts: List[HelaoAction]
+    ref_lights: List[HelaoProcess]
+    ref_light_spec_acts: List[HelaoAction]
+    dry_spec: HelaoProcess
+    dry_spec_act: HelaoAction
+
+    def __init__(
+        self,
+        dry_process_uuid: UUID,
+        plate_id: int,
+        sample_no: int,
+        query_df: pd.DataFrame,
+    ):
+        suuid = query_df.query("process_uuid==@dry_process_uuid").iloc[0].sequence_uuid
+        sdf = query_df.query("sequence_uuid==@suuid")
+        self.ref_darks = [
+            HelaoProcess(x, query_df)
+            for x in sdf.query("run_use=='ref_dark'").process_uuid
+        ]
+        self.ref_dark_spec_acts = [
+            HelaoAction(x, query_df)
+            for x in sdf.query("run_use=='ref_dark'").action_uuid
+        ]
+        self.ref_lights = [
+            HelaoProcess(x, query_df)
+            for x in sdf.query("run_use=='ref_light'").process_uuid
+        ]
+        self.ref_light_spec_acts = [
+            HelaoAction(x, query_df)
+            for x in sdf.query("run_use=='ref_light'").action_uuid
+        ]
+
+        ddf = sdf.query("run_use=='data'")
+        bdf = (
+            ddf.query("experiment_name=='UVIS_sub_measure'")
+            .query("plate_id==@plate_id")
+            .query("sample_no==@sample_no")
+        )
+        self.dry = HelaoProcess(
+            bdf.sort_values("action_timestamp").iloc[0].process_uuid,
+            query_df,
+        )
+        self.dry_spec_act = HelaoAction(
+            bdf.query("action_name=='acquire_spec_adv'")
+            .sort_values("action_timestamp")
+            .iloc[0]
+            .action_uuid,
+            query_df,
+        )
+
+    @property
+    def ref_dark_spec(self):
+        return [x.hlo for x in self.ref_dark_spec_acts]
+
+    @property
+    def ref_light_spec(self):
+        return [x.hlo for x in self.ref_light_spec_acts]
+
+    @property
+    def dry_spec(self):
+        return self.dry_spec_act.hlo
+
+
+class DryUvisOutputs(BaseModel):
+    wavelength: list
+    lower_wl_idx: int
+    upper_wl_idx: int
+    mean_ref_dark: list  # mean over start and end reference dark spectra
+    mean_ref_light: list  # mean over start and end reference light spectra
+    agg_method: str
+    agg_spec: list  # mean over final t seconds of OCV
+    bin_wavelength: list
+    bin_spec: list
+    smth_spec: list
+    rscl_spec: list
+    spec_min_rescaled: bool
+    spec_max_rescaled: bool
+
+
+class DryUvisAnalysis:
+    """Dry UVIS Analysis for GCLD demonstration."""
+
+    analysis_timestamp: datetime
+    analysis_uuid: UUID
+    analysis_params: dict
+    plate_id: int
+    sample_no: int
+    process_uuid: UUID
+    inputs: DryUvisInputs
+    outputs: DryUvisOutputs
+    analysis_codehash: str
+
+    def __init__(
+        self,
+        process_uuid: UUID,
+        query_df: pd.DataFrame,
+        analysis_params: dict,
+    ):
+        self.analysis_timestamp = datetime.now()
+        self.analysis_uuid = gen_uuid()
+        self.analysis_params = analysis_params
+        pdf = query_df.query("process_uuid==@process_uuid")
+        self.plate_id = pdf.iloc[0].plate_id
+        self.sample_no = pdf.iloc[0].sample_no
+        self.inputs = DryUvisInputs(
+            process_uuid, self.plate_id, self.sample_no, query_df
+        )
+        self.process_uuid = process_uuid
+        self.analysis_codehash = get_filehash(sys._getframe().f_code.co_filename)
+
+    def calc_output(self):
+        """Calculate stability FOMs and intermediate vectors."""
+        rdtups = [parse_spechlo(x) for x in self.inputs.ref_dark_spec]
+        rltups = [parse_spechlo(x) for x in self.inputs.ref_light_spec]
+        btup = parse_spechlo(self.inputs.dry_spec)
+
+        ap = self.analysis_params
+        aggfunc = np.mean if ap["agg_method"] == "mean" else np.median
+        wl = btup[0]
+        wlindlo = np.where(wl > ap["lower_wl"])[0].min()
+        wlindhi = np.where(wl < ap["upper_wl"])[0].max()
+
+        # mean aggregate initial and final reference dark spectra
+        mean_ref_dark = np.vstack(
+            [
+                arr[
+                    np.where(
+                        (ep[ap["skip_first_n"] :] - ep.max()) >= -ap["agg_last_secs"]
+                    )[0].min() :
+                ]
+                for wl, ep, arr in rdtups
+            ]
+        ).mean(axis=0)
+
+        # mean aggregate initial and final reference light spectra
+        mean_ref_light = np.vstack(
+            [
+                arr[
+                    np.where(
+                        (ep[ap["skip_first_n"] :] - ep.max()) >= -ap["agg_last_secs"]
+                    )[0].min() :
+                ]
+                for wl, ep, arr in rltups
+            ]
+        ).mean(axis=0)
+
+        # aggregate baseline insitu OCV spectra over final t seconds, omitting first n
+        agg_dry = aggfunc(
+            [
+                arr[
+                    np.where(
+                        (ep[ap["skip_first_n"] :] - ep.max()) >= -ap["agg_last_secs"]
+                    )[0].min() :
+                ]
+                for wl, ep, arr in (btup,)
+            ][0],
+            axis=0,
+        )
+
+        inds = range(len(wl[wlindlo:wlindhi]))
+        nbins = np.round(len(wl[wlindlo:wlindhi]) / ap["bin_width"]).astype(int)
+        refadj_dry = (
+            (agg_dry - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
+        )[wlindlo:wlindhi]
+        bin_wl = binned_statistic(inds, wl[wlindlo:wlindhi], "mean", nbins).statistic
+        bin_dry = binned_statistic(inds, refadj_dry, "mean", nbins).statistic
+        smth_dry = savgol_filter(
+            bin_dry, ap["window_length"], ap["poly_order"], delta=ap["delta"]
+        )
+        dry_min_rscl, dry_max_rscl, rscl_dry = refadjust(
+            smth_dry,
+            ap["min_mthd_allowed"],
+            ap["max_mthd_allowed"],
+            ap["min_limit"],
+            ap["max_limit"],
+        )
+
+        # create output model
+        self.outputs = DryUvisOutputs(
+            wavelength=list(wl),
+            lower_wl_idx=wlindlo,
+            upper_wl_idx=wlindhi,
+            mean_ref_dark=list(mean_ref_dark),
+            mean_ref_light=list(mean_ref_light),
+            agg_method=ap["agg_method"],
+            agg_dry=list(agg_dry),
+            bin_wavelength=list(bin_wl),
+            bin_dry=list(bin_dry),
+            smth_dry=list(smth_dry),
+            rscl_dry=list(rscl_dry),
+            dry_min_rescaled=dry_min_rscl,
+            dry_max_rescaled=dry_max_rscl,
+        )
+
+    def export_analysis(self):
+        action_keys = [k for k in vars(self.inputs).keys() if "spec_act" in k]
+        inputs = []
+
+        for ak in action_keys:
+            euis = vars(self.inputs)[ak]
+            ru = ak.split("_spec")[0].replace("dry", "data")
+            if not isinstance(euis, list):
+                euis = [euis]
+            for eui in euis:
+                raw_data_path = f"raw_data/{eui.action_uuid}/{eui.hlo_file}.json"
+                if ru in ["data"]:
+                    global_sample = f"legacy__solid__{self.plate_id}_{self.sample_no}"
+                else:
+                    global_sample = None
+                adm = AnalysisDataModel(
+                    action_uuid=eui.action_uuid,
+                    run_use=ru,
+                    raw_data_path=raw_data_path,
+                    global_sample_label=global_sample,
+                )
+                inputs.append(adm)
+
+        aom = AnalysisOutputModel(
+            analysis_output_path=f"analysis/{self.analysis_uuid}_output.json",
+            output_keys=list(self.outputs.dict().keys()),
+        )
+        ana_model = AnalysisModel(
+            analysis_name="UVIS_BkgSubNorm",
+            analysis_params=self.analysis_params,
+            analysis_codehash=self.analysis_codehash,
+            analysis_uuid=self.analysis_uuid,
+            process_uuid=self.process_uuid,
+            process_params=self.inputs.dry_spec.process_params,
             inputs=inputs,
             output=aom,
         )
