@@ -74,7 +74,6 @@ WHERE
     AND hs.sequence_name in ('ECHEUVIS_multiCA_led', 'UVIS_T')
     AND hp.run_type='eche'
     AND ha.action_name in ('run_OCV', 'run_CA', 'acquire_spec_adv', 'acquire_spec_extrig')
-    AND hs.sequence_label LIKE '%insitu%'
 """
 
 
@@ -523,6 +522,7 @@ class EcheUvisAnalysis:
         self,
         process_uuid: UUID,
         query_df: pd.DataFrame,
+        analysis_func_str: str,
         analysis_params: dict,
     ):
         self.analysis_timestamp = datetime.now()
