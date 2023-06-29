@@ -1,6 +1,6 @@
 hostip = "hte-ccsi-01.htejcap.caltech.edu"
 config = {}
-config["dummy"] = False
+config["dummy"] = True
 config["simulation"] = False
 
 # action library provides generator functions which produce actions
@@ -28,29 +28,29 @@ config["servers"] = {
         "params": {"enable_op": True, "bokeh_port": 5002},
         "verbose": False,
     },
-    "MOTOR": {
-        "host": hostip,
-        "port": 8003,
-        "group": "action",
-        "fast": "galil_motion",
-        "params": {
-            "enable_aligner": True,
-            "bokeh_port": 5003,
-            "M_instr": [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
-            "count_to_mm": {
-                "A": 6.141664870229693e-05,
-                "B": 0.00015630959303234357,
-                "C": 0.00015727325914229457,
-            },
-            "galil_ip_str": "192.168.200.232",
-            "def_speed_count_sec": 10000,
-            "max_speed_count_sec": 25000,
-            "ipstr": "192.168.200.23",
-            "axis_id": {"x": "C", "y": "B", "z": "A"},
-            "axis_zero": {"A": 0.0, "B": 52.0, "C": 77.0},
-            "timeout": 600,
-        },
-    },
+    # "MOTOR": {
+    #     "host": hostip,
+    #     "port": 8003,
+    #     "group": "action",
+    #     "fast": "galil_motion",
+    #     "params": {
+    #         "enable_aligner": True,
+    #         "bokeh_port": 5003,
+    #         "M_instr": [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
+    #         "count_to_mm": {
+    #             "A": 6.141664870229693e-05,
+    #             "B": 0.00015630959303234357,
+    #             "C": 0.00015727325914229457,
+    #         },
+    #         "galil_ip_str": "192.168.200.232",
+    #         "def_speed_count_sec": 10000,
+    #         "max_speed_count_sec": 25000,
+    #         "ipstr": "192.168.200.23",
+    #         "axis_id": {"x": "C", "y": "B", "z": "A"},
+    #         "axis_zero": {"A": 0.0, "B": 52.0, "C": 77.0},
+    #         "timeout": 600,
+    #     },
+    # },
     # "PSTAT": {
     #     "host": hostip,
     #     "port": 8004,
@@ -156,15 +156,15 @@ config["servers"] = {
         "fast": "syringe_server",
         "params": {"port": "COM6", "pumps": {"one": {"address": 1, "diameter": 26.7}}},
     },
-    "MFC": {
-        "host": hostip,
-        "port": 8009,
-        "group": "action",
-        "fast": "mfc_server",
-        "params": {"devices": {"N2": {"port": "COM7", "unit_id": "A"}}},
-        "verbose": False,
+    # "MFC": {
+    #     "host": hostip,
+    #     "port": 8009,
+    #     "group": "action",
+    #     "fast": "mfc_server",
+    #     "params": {"devices": {"N2": {"port": "COM7", "unit_id": "A"}}},
+    #     "verbose": False,
 
-    },
+    # },
     "CALC": {
         "host": hostip,
         "port": 8011,
