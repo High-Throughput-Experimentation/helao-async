@@ -929,7 +929,7 @@ def CCSI_priming(  #assumes initialization performed previously
 
     return epm.experiment_plan_list
 
-def leaktest(
+def CCSI_leaktest(
     sequence_version: int = 1,
     headspace_purge_cycles: int = 5,
     HSpurge1_duration: float = 60,
