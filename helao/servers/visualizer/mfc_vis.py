@@ -204,6 +204,7 @@ class C_mfc:
                 latest_epoch = max([epochsec, latest_epoch])
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
 
+        print(data_dict)
         self.datasource.stream(data_dict, rollover=self.max_points)
         keys = list(data_dict.keys())
         values = [data_dict[k][-1] for k in keys]
@@ -218,7 +219,6 @@ class C_mfc:
             if time.time() - self.last_update_time >= self.update_rate:
                 messages = await self.wss.read_messages()
                 if messages:
-                    print(messages)
                     self.vis.doc.add_next_tick_callback(
                         partial(self.add_points, messages)
                     )
@@ -236,7 +236,6 @@ class C_mfc:
         colors = ["red", "blue", "green", "orange"]
         for dev_name, color in zip(self.devices, colors[: len(self.devices)]):
             if self.datasource.data["datetime"]:
-                print(self.datasource.data)
                 if (
                     self.datasource.data[f"{dev_name}__control_point"][-1].strip()
                     == "mass flow"
