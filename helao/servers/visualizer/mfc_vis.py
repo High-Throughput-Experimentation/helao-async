@@ -204,8 +204,8 @@ class C_mfc:
                 latest_epoch = max([epochsec, latest_epoch])
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
 
-        print(data_dict)
         self.datasource.stream(data_dict, rollover=self.max_points)
+        print(self.datasource.data)
         keys = list(data_dict.keys())
         values = [data_dict[k][-1] for k in keys]
         table_data_dict = {"name": keys, "value": values}
