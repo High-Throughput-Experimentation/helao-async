@@ -205,7 +205,6 @@ class C_mfc:
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
 
         self.datasource.stream(data_dict, rollover=self.max_points)
-        print(self.datasource.data)
         keys = list(data_dict.keys())
         values = [data_dict[k][-1] for k in keys]
         table_data_dict = {"name": keys, "value": values}
@@ -235,34 +234,33 @@ class C_mfc:
 
         colors = ["red", "blue", "green", "orange"]
         for dev_name, color in zip(self.devices, colors[: len(self.devices)]):
-            if self.datasource.data["datetime"]:
-                print(dev_name)
-                if (
-                    self.datasource.data[f"{dev_name}__control_point"][-1].strip()
-                    == "mass flow"
-                ):
-                    self.plot.yaxis.axis_label = "Flow rate (sccm)"
-                    yvar = "mass_flow"
-                else:
-                    self.plot.yaxis.axis_label = "Pressure (psia)"
-                    yvar = "pressure"
+            print(dev_name)
+            if (
+                self.datasource.data[f"{dev_name}__control_point"][-1].strip()
+                == "mass flow"
+            ):
+                self.plot.yaxis.axis_label = "Flow rate (sccm)"
+                yvar = "mass_flow"
+            else:
+                self.plot.yaxis.axis_label = "Pressure (psia)"
+                yvar = "pressure"
 
-                self.plot.line(
-                    x="datetime",
-                    y=f"{dev_name}__{yvar}",
-                    line_color=color,
-                    line_dash="solid",
-                    source=self.datasource,
-                    legend_label=f"{dev_name} actual",
-                )
-                self.plot.line(
-                    x="datetime",
-                    y=f"{dev_name}__setpoint",
-                    line_color=color,
-                    line_dash="dotted",
-                    source=self.datasource,
-                    legend_label=f"{dev_name} setpoint",
-                )
+            self.plot.line(
+                x="datetime",
+                y=f"{dev_name}__{yvar}",
+                line_color=color,
+                line_dash="solid",
+                source=self.datasource,
+                legend_label=f"{dev_name} actual",
+            )
+            self.plot.line(
+                x="datetime",
+                y=f"{dev_name}__setpoint",
+                line_color=color,
+                line_dash="dotted",
+                source=self.datasource,
+                legend_label=f"{dev_name} setpoint",
+            )
 
     def reset_plot(self, forceupdate: bool = False):
         # self.xselect = self.xaxis_selector_group.active
