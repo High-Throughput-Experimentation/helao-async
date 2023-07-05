@@ -5,7 +5,6 @@ channels:
 dependencies:
   - pip:
     - aioshutil
-    - mps-client
   - aiofiles
   - aiohttp
   - bokeh=2
@@ -41,6 +40,7 @@ dependencies:
   - shortuuid
   - sqlalchemy
   - sqlite
+  - sqlmodel
   - starlette
   - termcolor
   - uvicorn
