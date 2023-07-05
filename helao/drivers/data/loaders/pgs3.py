@@ -3,7 +3,8 @@ import json
 from uuid import UUID
 
 import boto3
-from mps_client import run_raw_query
+from sqlmodel import Session, text, create_engine
+
 
 
 class HelaoLoader:
@@ -27,9 +28,15 @@ class HelaoLoader:
         self.s3_cache = {}  # {s3_path: hlo_dict}
         self.sql_cache = {}  # {(uuid, type): json_dict}
         self.last_seq_uuid = ""
+        self.engine = create_engine(f"//postgresql://{user}:{pw}@{self.dbhost}:{self.dbport}/{self.dbname}")
 
     def __del__(self):
         self.cli.close()
+    
+    def run_raw_query(self, query: str):
+        with Session(self.engine) as session:
+            result = session.exec(text(query)).all()
+        return result
 
     def clear_cache(self):
         self.act_cache = {}  # {uuid: json_dict}
@@ -98,7 +105,7 @@ class HelaoLoader:
                 WHERE ht.{helao_type}_uuid = '{obj_uuid}'
                 LIMIT 1
             """
-            resp = run_raw_query(sql_command)
+            resp = self.run_raw_query(sql_command)
             self.sql_cache[
                 (
                     helao_type,
