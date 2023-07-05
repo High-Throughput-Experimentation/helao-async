@@ -236,6 +236,7 @@ class C_mfc:
         colors = ["red", "blue", "green", "orange"]
         for dev_name, color in zip(self.devices, colors[: len(self.devices)]):
             if self.datasource.data["datetime"]:
+                print(self.datasource.data)
                 if (
                     self.datasource.data[f"{dev_name}__control_point"][-1].strip()
                     == "mass flow"
