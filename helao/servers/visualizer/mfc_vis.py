@@ -214,8 +214,11 @@ class C_mfc:
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
                 messages = await self.wss.read_messages()
-                self.vis.doc.add_next_tick_callback(partial(self.add_points, messages))
-                self.last_update_time = time.time()
+                if messages:
+                    self.vis.doc.add_next_tick_callback(
+                        partial(self.add_points, messages)
+                    )
+                    self.last_update_time = time.time()
             await asyncio.sleep(0.001)
 
     def _add_plots(self):
@@ -228,32 +231,33 @@ class C_mfc:
 
         colors = ["red", "blue", "green", "orange"]
         for dev_name, color in zip(self.devices, colors[: len(self.devices)]):
-            if (
-                self.datasource.data[f"{dev_name}__control_point"][-1].strip()
-                == "mass flow"
-            ):
-                self.plot.yaxis.axis_label = "Flow rate (sccm)"
-                yvar = "mass_flow"
-            else:
-                self.plot.yaxis.axis_label = "Pressure (psia)"
-                yvar = "pressure"
+            if self.datasource.data[f"{dev_name}__time_now"]:
+                if (
+                    self.datasource.data[f"{dev_name}__control_point"][-1].strip()
+                    == "mass flow"
+                ):
+                    self.plot.yaxis.axis_label = "Flow rate (sccm)"
+                    yvar = "mass_flow"
+                else:
+                    self.plot.yaxis.axis_label = "Pressure (psia)"
+                    yvar = "pressure"
 
-            self.plot.line(
-                x=f"{dev_name}__time_now",
-                y=f"{dev_name}__{yvar}",
-                line_color=color,
-                line_dash="solid",
-                source=self.datasource,
-                legend_label=f"{dev_name} actual",
-            )
-            self.plot.line(
-                x=f"{dev_name}__time_now",
-                y=f"{dev_name}__setpoint",
-                line_color=color,
-                line_dash="dotted",
-                source=self.datasource,
-                legend_label=f"{dev_name} setpoint",
-            )
+                self.plot.line(
+                    x=f"{dev_name}__time_now",
+                    y=f"{dev_name}__{yvar}",
+                    line_color=color,
+                    line_dash="solid",
+                    source=self.datasource,
+                    legend_label=f"{dev_name} actual",
+                )
+                self.plot.line(
+                    x=f"{dev_name}__time_now",
+                    y=f"{dev_name}__setpoint",
+                    line_color=color,
+                    line_dash="dotted",
+                    source=self.datasource,
+                    legend_label=f"{dev_name} setpoint",
+                )
 
     def reset_plot(self, forceupdate: bool = False):
         # self.xselect = self.xaxis_selector_group.active
