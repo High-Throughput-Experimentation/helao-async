@@ -194,6 +194,9 @@ class C_mfc:
                 if datalab == "sim_dict":
                     for k, v in dataval.items():
                         data_dict[k].append(v)
+                elif isinstance(dataval, dict):
+                    for k, v in dataval.items():
+                        data_dict[f"{datalab}__{k}"].append(v)
                 elif isinstance(dataval, list):
                     data_dict[datalab] += dataval
                 else:
