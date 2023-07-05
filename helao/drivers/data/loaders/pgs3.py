@@ -87,22 +87,22 @@ class HelaoLoader:
             self.s3_cache[keystr] = jd
         return jd
 
-    def get_sql(self, helao_type: str, uuid: UUID):
+    def get_sql(self, helao_type: str, obj_uuid: UUID):
         if (
             helao_type,
-            uuid,
+            obj_uuid,
         ) not in self.sql_cache.keys():
             sql_command = f"""
                 SELECT *
                 FROM helao_{helao_type} ht
-                WHERE ht.{helao_type}_uuid = '{uuid}'
+                WHERE ht.{helao_type}_uuid = '{obj_uuid}'
                 LIMIT 1
             """
             resp = run_raw_query(sql_command)
             self.sql_cache[
                 (
                     helao_type,
-                    uuid,
+                    obj_uuid,
                 )
             ] = (
                 dict(resp[0]) if resp else {}
@@ -110,6 +110,6 @@ class HelaoLoader:
         return self.sql_cache[
             (
                 helao_type,
-                uuid,
+                obj_uuid,
             )
         ]
