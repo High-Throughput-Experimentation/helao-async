@@ -41,17 +41,17 @@ class C_mfc:
         self.IOloop_stat_run = False
 
         self.data_suffices = [
-            "epoch_s",
+            # "epoch_s",
             "setpoint",
             "control_point",
             "gas",
             "mass_flow",
             "pressure",
             "temperature",
-            "total_flow",
+            # "total_flow",
             "volumetric_flow",
             "hold_valve",
-            "time_now",
+            # "time_now",
         ]
 
         self.data_dict_keys = ["datetime"]
@@ -235,7 +235,7 @@ class C_mfc:
 
         colors = ["red", "blue", "green", "orange"]
         for dev_name, color in zip(self.devices, colors[: len(self.devices)]):
-            if self.datasource.data[f"{dev_name}__time_now"]:
+            if self.datasource.data["datetime"]:
                 if (
                     self.datasource.data[f"{dev_name}__control_point"][-1].strip()
                     == "mass flow"
@@ -247,7 +247,7 @@ class C_mfc:
                     yvar = "pressure"
 
                 self.plot.line(
-                    x=f"{dev_name}__time_now",
+                    x="datetime",
                     y=f"{dev_name}__{yvar}",
                     line_color=color,
                     line_dash="solid",
@@ -255,7 +255,7 @@ class C_mfc:
                     legend_label=f"{dev_name} actual",
                 )
                 self.plot.line(
-                    x=f"{dev_name}__time_now",
+                    x="datetime",
                     y=f"{dev_name}__setpoint",
                     line_color=color,
                     line_dash="dotted",
