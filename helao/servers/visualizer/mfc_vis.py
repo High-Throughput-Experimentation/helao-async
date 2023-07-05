@@ -60,9 +60,11 @@ class C_mfc:
             for suffix in self.data_suffices:
                 self.data_dict_keys.append(f"{device_name}__{suffix}")
         self.datasource = ColumnDataSource(data={k: [] for k in self.data_dict_keys})
+        print(self.datasource.data.keys())
         self.datasource_table = ColumnDataSource(
             data={k: [] for k in ["name", "value"]}
         )
+        print(self.datasource_table.data.keys())
 
         # create visual elements
         self.layout = []
