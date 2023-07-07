@@ -510,11 +510,14 @@ if __name__ == "__main__":
                             )
                             break
                 if not timestamp_found:
+                    while os.path.exists(
+                        old_log.replace(".txt", f"__{nots_counter}.zip")
+                    ):
+                        nots_counter += 1
                     zipname = old_log.replace(".txt", f"__{nots_counter}.zip")
                     arcname = os.path.basename(old_log).replace(
                         ".txt", f"__{nots_counter}.txt"
                     )
-                    nots_counter += 1
                 with zipfile.ZipFile(
                     zipname, "w", compression=zipfile.ZIP_DEFLATED
                 ) as zf:
