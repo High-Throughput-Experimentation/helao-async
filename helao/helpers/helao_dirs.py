@@ -61,7 +61,7 @@ def helao_dirs(world_cfg: dict, server_name: str) -> HelaoDirs:
                 timestamp = ""
                 with open(old_log, "r") as f:
                     for line in f:
-                        if line.strip().startswith("["):
+                        if line.replace("error_[", "[").strip().startswith("["):
                             timestamp_found = True
                             timestamp = re.findall("[0-9]{2}:[0-9]{2}:[0-9]{2}", line)[
                                 0
