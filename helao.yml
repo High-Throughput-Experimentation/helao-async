@@ -32,6 +32,7 @@ dependencies:
   - pyfiglet
   - pyserial
   - python=3.8
+  - python-dotenv
   - python-multipart
   - pyzstd
   - requests
