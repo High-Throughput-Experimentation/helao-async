@@ -9,7 +9,6 @@ import numpy as np
 from pydantic import BaseModel
 from scipy.signal import savgol_filter
 from scipy.stats import binned_statistic
-from mps_client import run_raw_query
 
 from helaocore.models.analysis import (
     AnalysisDataModel,
@@ -83,11 +82,11 @@ class EcheUvisLoader(HelaoLoader):
 
     def __init__(
         self,
-        awscli_profile_name: str = "default",
+        env_file: str = ".env",
         cache_s3: bool = False,
         cache_json: bool = True,
     ):
-        super().__init__(awscli_profile_name, cache_s3, cache_json)
+        super().__init__(env_file, cache_s3, cache_json)
         self.recent_cache = {}  # {'%Y-%m-%d': dataframe}
 
     def get_recent(
@@ -160,7 +159,7 @@ class EcheUvisLoader(HelaoLoader):
             plate_id,
             sample_no,
         ) not in self.recent_cache:
-            data = run_raw_query(SDCUVIS_QUERY + "\n".join(conditions))
+            data = self.run_raw_query(SDCUVIS_QUERY + "\n".join(conditions))
             pdf = pd.DataFrame(data)
             pdf["plate_id"] = pdf.global_label.apply(
                 lambda x: x.split("_")[-2] if "solid" in x else None
@@ -206,7 +205,6 @@ class EcheUvisLoader(HelaoLoader):
         ].reset_index(drop=True)
 
 
-EUL = EcheUvisLoader(awscli_profile_name="htejcap", cache_s3=True)
 
 
 class HelaoSolid:

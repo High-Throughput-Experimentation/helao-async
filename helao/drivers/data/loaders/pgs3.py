@@ -3,8 +3,9 @@ import json
 from uuid import UUID
 
 import boto3
+import sshtunnel
 from sqlmodel import Session, text, create_engine
-from pydantic import BaseSettings
+from helaocore.models.credentials import HelaoCredentials
 
 
 class HelaoLoader:
@@ -12,11 +13,23 @@ class HelaoLoader:
 
     def __init__(
         self,
-        awscli_profile_name: str = "default",
+        env_file: str = ".env",
         cache_s3: bool = False,
         cache_json: bool = True,
     ):
-        self.sess = boto3.Session(profile_name=awscli_profile_name)
+        self.hcred = HelaoCredentials(_env_file=env_file)
+        self.tunnel = sshtunnel.SSHTunnelForwarder(
+            self.hcred.JUMPBOX_HOST,
+            ssh_username=self.hcred.JUMPBOX_USER,
+            ssh_pkey=self.hcred.JUMPBOX_KEYFILE,
+            remote_bind_address=(self.hcred.API_HOST, int(self.hcred.API_PORT))
+        )
+        self.tunnel.start()
+        self.hcred.set_api_port(self.tunnel.local_bind_port)
+        self.sess = boto3.Session(
+            aws_access_key_id=self.hcred.AWS_ACCESS_KEY_ID.get_secret_value(),
+            aws_secret_access_key=self.hcred.AWS_SECRET_ACCESS_KEY.get_secret_value(),
+        )
         self.cli = self.sess.client("s3")
         self.res = self.sess.resource("s3")
         self.cache_s3 = cache_s3
@@ -28,11 +41,12 @@ class HelaoLoader:
         self.s3_cache = {}  # {s3_path: hlo_dict}
         self.sql_cache = {}  # {(uuid, type): json_dict}
         self.last_seq_uuid = ""
-        self.engine = create_engine(f"//postgresql://{user}:{pw}@{self.dbhost}:{self.dbport}/{self.dbname}")
+        self.engine = create_engine(self.hcred.api_dsn)
 
     def __del__(self):
         self.cli.close()
-    
+        self.tunnel.stop()
+
     def run_raw_query(self, query: str):
         with Session(self.engine) as session:
             result = session.exec(text(query)).all()
