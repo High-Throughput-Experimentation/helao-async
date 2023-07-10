@@ -15,18 +15,8 @@ from helao.drivers.data.analyses.echeuvis_stability import EcheUvisLoader
 from helao.helpers.config_loader import config_loader
 
 
-EUL = None
-
 def makeApp(confPrefix, server_key, helao_root):
     config = config_loader(confPrefix, helao_root)
-
-    # declare global loader for analysis models used by driver.batch_* methods
-    global EUL
-    EUL = EcheUvisLoader(
-        config["servers"][server_key]["params"]["env_file"],
-        cache_s3=True,
-        cache_json=True,
-    )
 
     app = HelaoBase(
         config=config,

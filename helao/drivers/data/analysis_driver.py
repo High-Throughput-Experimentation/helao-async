@@ -23,7 +23,7 @@ import pandas as pd
 from helao.servers.base import Base
 from helao.drivers.data.sync_driver import dict2json
 from helao.drivers.data.analyses.echeuvis_stability import (
-    # EcheUvisLoader,
+    EcheUvisLoader,
     EcheUvisAnalysis,
     DryUvisAnalysis,
     ANALYSIS_DEFAULTS as ECHEUVIS_DEFAULTS,
@@ -41,6 +41,13 @@ class HelaoAnalysisSyncer:
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
         self.max_tasks = self.config_dict.get("max_tasks", 4)
+        # declare global loader for analysis models used by driver.batch_* methods
+        global EUL
+        EUL = EcheUvisLoader(
+            self.config_dict["env_file"],
+            cache_s3=True,
+            cache_json=True,
+        )
         self.s3 = EUL.cli
         # os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
         # self.aws_session = boto3.Session(profile_name=self.config_dict["aws_profile"])
