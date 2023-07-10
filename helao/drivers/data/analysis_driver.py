@@ -29,7 +29,7 @@ from helao.drivers.data.analyses.echeuvis_stability import (
     ANALYSIS_DEFAULTS as ECHEUVIS_DEFAULTS,
 )
 
-
+EUL = None
 
 class HelaoAnalysisSyncer:
     base: Base
