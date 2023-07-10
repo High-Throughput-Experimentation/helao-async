@@ -4,7 +4,7 @@ from uuid import UUID
 
 import boto3
 from sqlmodel import Session, text, create_engine
-
+from pydantic import BaseSettings
 
 
 class HelaoLoader:
