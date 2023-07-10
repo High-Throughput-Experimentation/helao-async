@@ -16,6 +16,7 @@ from typing import Union, Optional, Tuple
 from uuid import UUID
 
 import aiohttp
+
 # import boto3
 import botocore.exceptions
 import pandas as pd
@@ -30,6 +31,7 @@ from helao.drivers.data.analyses.echeuvis_stability import (
 )
 
 EUL = None
+
 
 class HelaoAnalysisSyncer:
     base: Base
