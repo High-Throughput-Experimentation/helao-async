@@ -41,12 +41,12 @@ class HelaoAnalysisSyncer:
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
         self.max_tasks = self.config_dict.get("max_tasks", 4)
-        os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
+        self.s3 = EUL.cli
+        # os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
         # self.aws_session = boto3.Session(profile_name=self.config_dict["aws_profile"])
         # self.s3 = self.aws_session.client("s3")
-        self.s3 = EUL.cli
-        self.bucket = self.config_dict["aws_bucket"]
-        self.api_host = self.config_dict["api_host"]
+        # self.bucket = self.config_dict["aws_bucket"]
+        # self.api_host = self.config_dict["api_host"]
 
         self.task_queue = asyncio.PriorityQueue()
         self.task_set = set()
