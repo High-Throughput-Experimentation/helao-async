@@ -41,6 +41,7 @@ dependencies:
   - sqlalchemy
   - sqlite
   - sqlmodel
+  - sshtunnel
   - starlette
   - termcolor
   - uvicorn
