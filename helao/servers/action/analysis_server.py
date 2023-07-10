@@ -15,6 +15,8 @@ from helao.drivers.data.analyses.echeuvis_stability import EcheUvisLoader
 from helao.helpers.config_loader import config_loader
 
 
+EUL = None
+
 def makeApp(confPrefix, server_key, helao_root):
     config = config_loader(confPrefix, helao_root)
 
