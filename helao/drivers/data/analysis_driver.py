@@ -16,21 +16,20 @@ from typing import Union, Optional, Tuple
 from uuid import UUID
 
 import aiohttp
-import boto3
+# import boto3
 import botocore.exceptions
 import pandas as pd
 
 from helao.servers.base import Base
 from helao.drivers.data.sync_driver import dict2json
 from helao.drivers.data.analyses.echeuvis_stability import (
-    EcheUvisLoader,
+    # EcheUvisLoader,
     EcheUvisAnalysis,
     DryUvisAnalysis,
     ANALYSIS_DEFAULTS as ECHEUVIS_DEFAULTS,
 )
 
 
-global EUL
 
 class HelaoAnalysisSyncer:
     base: Base
@@ -43,8 +42,9 @@ class HelaoAnalysisSyncer:
         self.world_config = action_serv.world_cfg
         self.max_tasks = self.config_dict.get("max_tasks", 4)
         os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
-        self.aws_session = boto3.Session(profile_name=self.config_dict["aws_profile"])
-        self.s3 = self.aws_session.client("s3")
+        # self.aws_session = boto3.Session(profile_name=self.config_dict["aws_profile"])
+        # self.s3 = self.aws_session.client("s3")
+        self.s3 = EUL.cli
         self.bucket = self.config_dict["aws_bucket"]
         self.api_host = self.config_dict["api_host"]
 
@@ -57,9 +57,6 @@ class HelaoAnalysisSyncer:
             "ECHEUVIS_InsituOpticalStability": EcheUvisAnalysis,
             "UVIS_BkgSubNorm": DryUvisAnalysis,
         }
-        EUL = EcheUvisLoader(
-            self.config_dict["env_file"], cache_s3=True, cache_json=True
-        )
 
     def sync_exit_callback(self, task: asyncio.Task):
         task_name = task.get_name()
@@ -216,9 +213,9 @@ class HelaoAnalysisSyncer:
         recent: bool = True,
     ):
         """Generate list of EcheUvisAnalysis from sequence or plate_id (latest seq)."""
-        eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
+        # eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
         min_date = datetime.now().strftime("%Y-%m-%d") if recent else None
-        df = eul.get_recent(min_date=min_date, plate_id=plate_id)
+        df = EUL.get_recent(min_date=min_date, plate_id=plate_id)
 
         # all processes in sequence
         pdf = df.sort_values(
@@ -254,8 +251,8 @@ class HelaoAnalysisSyncer:
         params: dict = {},
     ):
         """Generate list of DryUvisAnalysis from sequence or plate_id (latest seq)."""
-        eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
-        df = eul.get_recent(
+        # eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
+        df = EUL.get_recent(
             min_date=datetime.now().strftime("%Y-%m-%d"), plate_id=plate_id
         )
 

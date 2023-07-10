@@ -11,7 +11,7 @@ from uuid import UUID
 
 from helao.servers.base import HelaoBase
 from helao.drivers.data.analysis_driver import HelaoAnalysisSyncer
-from helao.drviers.data.analysis.eche_uvis_stability import EcheUvisLoader
+from helao.drivers.data.analyses.echeuvis_stability import EcheUvisLoader
 from helao.helpers.config_loader import config_loader
 
 
