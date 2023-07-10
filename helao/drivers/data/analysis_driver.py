@@ -41,6 +41,7 @@ class HelaoAnalysisSyncer:
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
         self.max_tasks = self.config_dict.get("max_tasks", 4)
+        global EUL
         self.s3 = EUL.cli
         # os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
         # self.aws_session = boto3.Session(profile_name=self.config_dict["aws_profile"])
