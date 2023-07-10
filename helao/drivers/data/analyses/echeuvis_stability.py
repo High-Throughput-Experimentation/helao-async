@@ -205,8 +205,6 @@ class EcheUvisLoader(HelaoLoader):
         ].reset_index(drop=True)
 
 
-
-
 class HelaoSolid:
     sample_label: str
     # composition: dict
@@ -687,7 +685,7 @@ class EcheUvisAnalysis:
                 key=f"analysis/{self.analysis_uuid}_output.json",
                 region=region,
             ),
-            content_type='application/json',
+            content_type="application/json",
             output_keys=list(self.outputs.dict().keys()),
             output_name=f"foms",
             output={
