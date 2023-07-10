@@ -26,6 +26,7 @@ dependencies:
   - paramiko
   - pip
   - psutil
+  - psycopg2
   - pyaml
   - pybase64
   - pydantic=1
