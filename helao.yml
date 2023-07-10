@@ -28,7 +28,7 @@ dependencies:
   - psutil
   - pyaml
   - pybase64
-  - pydantic
+  - pydantic=1
   - pyfiglet
   - pyserial
   - python=3.8
