@@ -525,17 +525,22 @@ class EcheUvisAnalysis:
         query_df: pd.DataFrame,
         analysis_params: dict,
     ):
+        print("initializing EUA")
         self.analysis_timestamp = datetime.now()
         self.analysis_uuid = gen_uuid()
         self.analysis_params = analysis_params
+        print("filtering data")
         pdf = query_df.query("process_uuid==@process_uuid")
+        print("filtered data has shape:", pdf.shape)
         self.plate_id = pdf.iloc[0].plate_id
         self.sample_no = pdf.iloc[0].sample_no
+        print("assembling inputs")
         self.inputs = EcheUvisInputs(
             process_uuid, self.plate_id, self.sample_no, query_df
         )
         self.process_uuid = process_uuid
         self.ca_potential_vrhe = self.inputs.insitu.process_params["CA_potential_vsRHE"]
+        print("getting code hash")
         self.analysis_codehash = get_filehash(sys._getframe().f_code.co_filename)
 
     def calc_output(self):
