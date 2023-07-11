@@ -405,13 +405,9 @@ class EcheUvisAnalysis:
         self.plate_id = pdf.iloc[0].plate_id
         self.sample_no = pdf.iloc[0].sample_no
         print("assembling inputs")
-        try:
-            self.inputs = EcheUvisInputs(
-                process_uuid, self.plate_id, self.sample_no, query_df
-            )
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            print(tb)
+        self.inputs = EcheUvisInputs(
+            process_uuid, self.plate_id, self.sample_no, query_df
+        )
         self.process_uuid = process_uuid
         self.ca_potential_vrhe = self.inputs.insitu.process_params["CA_potential_vsRHE"]
         print("getting code hash")
