@@ -108,14 +108,17 @@ class HelaoAnalysisSyncer:
         retries: int = 3,
         rank: int = 5,
     ):
-        self.base.print_message(f"performing analysis {calc_tup[-1]}")
-        self.base.print_message(f"using params {calc_tup[2]}")
-        eua = self.ana_funcs[calc_tup[-1]](*calc_tup[:-1])
+        process_uuid, process_df, analysis_params, analysis_name = calc_tup
+        self.base.print_message(f"performing analysis {analysis_name}")
+        self.base.print_message(f"using params {analysis_params}")
+        if analysis_params is None:
+            analysis_params = {}
+        eua = self.ana_funcs[analysis_name](process_uuid, process_df, analysis_params)
         self.base.print_message("calculating analysis output")
         eua.calc_output()
         self.base.print_message("exporting analysis output")
         model_dict, output_dict = eua.export_analysis(
-            analysis_name=calc_tup[-1],
+            analysis_name=analysis_name,
             bucket=self.bucket,
             region=self.region,
         )
