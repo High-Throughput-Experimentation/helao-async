@@ -582,7 +582,7 @@ class EcheUvisAnalysis:
             inputs=inputs,
             outputs=[aom],
         )
-        return ana_model.dict(), self.outputs.dict()
+        return ana_model.clean_dict(), self.outputs.dict()
 
 
 class DryUvisInputs:
