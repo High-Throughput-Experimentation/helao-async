@@ -93,7 +93,7 @@ class HelaoAnalysisSyncer:
                 if calc_tup[0] not in self.running_tasks:
                     self.base.print_message(f"creating ana task for {calc_tup[0]}.")
                     self.running_tasks[calc_tup[0]] = asyncio.create_task(
-                        self.sync_ana(calc_tup, rank=rank), name=calc_tup[0]
+                        self.sync_ana(calc_tup, rank=rank), name=str(calc_tup[0])
                     )
                     self.running_tasks[calc_tup[0]].add_done_callback(
                         self.sync_exit_callback
@@ -139,6 +139,7 @@ class HelaoAnalysisSyncer:
             return True
 
         self.base.print_message(f"Analysis {eua.analysis_uuid} sync failed.")
+        self.running_tasks.pop(str(process_uuid))
         return False
 
     async def to_s3(self, msg: Union[dict, Path], target: str, retries: int = 3):
