@@ -21,14 +21,13 @@ import pandas as pd
 
 from helao.servers.base import Base
 from helao.drivers.data.sync_driver import dict2json
+from helao.drivers.data.loaders import pgs3
 from helao.drivers.data.analyses.echeuvis_stability import (
-    EcheUvisLoader,
     EcheUvisAnalysis,
     DryUvisAnalysis,
     ANALYSIS_DEFAULTS as ECHEUVIS_DEFAULTS,
+    SDCUVIS_QUERY,
 )
-
-EUL = None
 
 
 class HelaoAnalysisSyncer:
@@ -42,18 +41,17 @@ class HelaoAnalysisSyncer:
         self.world_config = action_serv.world_cfg
         self.max_tasks = self.config_dict.get("max_tasks", 4)
         # declare global loader for analysis models used by driver.batch_* methods
-        global EUL
-        EUL = EcheUvisLoader(
+        pgs3.LOADER = pgs3.EcheUvisLoader(
             self.config_dict["env_file"],
             cache_s3=True,
             cache_json=True,
         )
-        self.s3 = EUL.cli
+        self.s3 = pgs3.LOADER.cli
         # os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
         # self.aws_session = boto3.Session(profile_name=self.config_dict["aws_profile"])
         # self.s3 = self.aws_session.client("s3")
-        self.bucket = EUL.s3_bucket
-        self.region = EUL.s3_region
+        self.bucket = pgs3.LOADER.s3_bucket
+        self.region = pgs3.LOADER.s3_region
         # self.api_host = self.config_dict["api_host"]
 
         self.task_queue = asyncio.PriorityQueue()
@@ -235,7 +233,9 @@ class HelaoAnalysisSyncer:
         """Generate list of EcheUvisAnalysis from sequence or plate_id (latest seq)."""
         # eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
         min_date = datetime.now().strftime("%Y-%m-%d") if recent else None
-        df = EUL.get_recent(min_date=min_date, plate_id=plate_id)
+        df = pgs3.LOADER.get_recent(
+            query=SDCUVIS_QUERY, min_date=min_date, plate_id=plate_id
+        )
 
         # all processes in sequence
         pdf = df.sort_values(
@@ -274,7 +274,9 @@ class HelaoAnalysisSyncer:
         """Generate list of DryUvisAnalysis from sequence or plate_id (latest seq)."""
         # eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
         min_date = datetime.now().strftime("%Y-%m-%d") if recent else None
-        df = EUL.get_recent(min_date=min_date, plate_id=plate_id)
+        df = pgs3.LOADER.get_recent(
+            query=SDCUVIS_QUERY, min_date=min_date, plate_id=plate_id
+        )
 
         # all processes in sequence
         pdf = df.sort_values(

@@ -1,7 +1,7 @@
 import sys
 import traceback
 from copy import copy
-from typing import List, Optional
+from typing import List
 from uuid import UUID
 from datetime import datetime
 
@@ -19,7 +19,8 @@ from helaocore.models.analysis import (
 from helaocore.version import get_filehash
 from helaocore.models.s3locator import S3Locator
 from helao.helpers.gen_uuid import gen_uuid
-from helao.drivers.data.loaders.pgs3 import HelaoLoader
+
+from helao.drivers.data.loaders import pgs3
 
 ANALYSIS_DEFAULTS = {
     "ev_parts": [1.8, 2.2, 2.6, 3.0],
@@ -78,138 +79,6 @@ WHERE
 """
 
 
-class EcheUvisLoader(HelaoLoader):
-    """ECHEUVIS process dataloader"""
-
-    def __init__(
-        self,
-        env_file: str = ".env",
-        cache_s3: bool = False,
-        cache_json: bool = True,
-    ):
-        super().__init__(env_file, cache_s3, cache_json)
-        print("!!! using env_file:", env_file)
-        print("!!! postgresql dsn:", self.hcred.api_dsn)
-        self.recent_cache = {}  # {'%Y-%m-%d': dataframe}
-
-    def get_recent(
-        self,
-        min_date: Optional[str] = "2023-04-26",
-        plate_id: Optional[int] = None,
-        sample_no: Optional[int] = None,
-    ):
-        conditions = []
-        if min_date is not None:
-            conditions.append(f"    AND hp.process_timestamp >= '{min_date}'")
-        recent_md = sorted(
-            [md for md, pi, sn in self.recent_cache if pi is None and sn is None]
-        )
-        recent_mdpi = sorted(
-            [md for md, pi, sn in self.recent_cache if pi == plate_id and sn is None]
-        )
-        recent_mdsn = sorted(
-            [md for md, pi, sn in self.recent_cache if pi is None and sn == sample_no]
-        )
-        query_parts = ""
-        if plate_id is not None:
-            query_parts += f" & plate_id=={plate_id}"
-        if sample_no is not None:
-            query_parts += f" & sample_no=={sample_no}"
-        if recent_md and min_date >= recent_md[0]:
-            self.recent_cache[
-                (
-                    min_date,
-                    plate_id,
-                    sample_no,
-                )
-            ] = self.recent_cache[
-                (
-                    recent_md[0],
-                    None,
-                    None,
-                )
-            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
-        elif recent_mdpi and min_date >= recent_mdpi[0]:
-            self.recent_cache[
-                (
-                    min_date,
-                    plate_id,
-                    sample_no,
-                )
-            ] = self.recent_cache[
-                (
-                    recent_mdpi[0],
-                    plate_id,
-                    None,
-                )
-            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
-        elif recent_mdsn and min_date >= recent_mdsn[0]:
-            self.recent_cache[
-                (
-                    min_date,
-                    plate_id,
-                    sample_no,
-                )
-            ] = self.recent_cache[
-                (
-                    recent_mdsn[0],
-                    None,
-                    sample_no,
-                )
-            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
-        elif (
-            min_date,
-            plate_id,
-            sample_no,
-        ) not in self.recent_cache:
-            data = self.run_raw_query(SDCUVIS_QUERY + "\n".join(conditions))
-            pdf = pd.DataFrame(data)
-            print("!!! dataframe shape:", pdf.shape)
-            print("!!! dataframe cols:", pdf.columns)
-            pdf["plate_id"] = pdf.global_label.apply(
-                lambda x: x.split("_")[-2] if "solid" in x else None
-            )
-            pdf["sample_no"] = pdf.global_label.apply(
-                lambda x: x.split("_")[-1] if "solid" in x else None
-            )
-            # assign solid samples from sequence params
-            for suuid in set(pdf.query("sample_no.isna()").sequence_uuid):
-                subdf = pdf.query("sequence_uuid==@suuid")
-                spars = subdf.iloc[0]["sequence_params"]
-                pid = spars["plate_id"]
-                solid_samples = spars["plate_sample_no_list"]
-                assemblies = sorted(
-                    set(
-                        subdf.query(
-                            "global_label.str.contains('assembly')"
-                        ).global_label
-                    )
-                )
-                for slab, alab in zip(solid_samples, assemblies):
-                    pdf.loc[
-                        pdf.query("sequence_uuid==@suuid & global_label==@alab").index,
-                        "plate_id",
-                    ] = pid
-                    pdf.loc[
-                        pdf.query("sequence_uuid==@suuid & global_label==@alab").index,
-                        "sample_no",
-                    ] = slab
-            self.recent_cache[
-                (
-                    min_date,
-                    plate_id,
-                    sample_no,
-                )
-            ] = pdf.sort_values("process_timestamp")
-        return self.recent_cache[
-            (
-                min_date,
-                plate_id,
-                sample_no,
-            )
-        ].reset_index(drop=True)
-
-
 class HelaoSolid:
     sample_label: str
     # composition: dict
@@ -256,12 +125,12 @@ class HelaoModel:
     @property
     def json(self):
         # retrieve json metadata from S3 via HelaoAccess
-        return EUL.get_json(self.helao_type, self.uuid)
+        return pgs3.LOADER.get_json(self.helao_type, self.uuid)
 
     @property
     def _row_dict(self):
         # retrieve row from API database via HelaoAccess
-        return EUL.get_sql(self.helao_type, self.uuid)
+        return pgs3.LOADER.get_sql(self.helao_type, self.uuid)
 
 
 class HelaoAction(HelaoModel):
@@ -294,7 +163,7 @@ class HelaoAction(HelaoModel):
         hlo_file = self.hlo_file
         if not hlo_file:
             return {}
-        return EUL.get_hlo(self.action_uuid, hlo_file)
+        return pgs3.LOADER.get_hlo(self.action_uuid, hlo_file)
 
 
 class HelaoExperiment(HelaoModel):
@@ -701,7 +570,7 @@ class EcheUvisAnalysis:
             ),
             content_type="application/json",
             output_keys=list(self.outputs.dict().keys()),
-            output_name=f"foms",
+            output_name="foms",
             output={
                 k: v for k, v in self.outputs.dict().items() if not isinstance(v, list)
             },
