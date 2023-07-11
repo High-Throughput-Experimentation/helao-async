@@ -620,7 +620,7 @@ def CCSI_debug_liquidloads(  #assumes initialization performed previously
     return epm.experiment_plan_list
 
 def CCSI_Solution_testing(  #assumes initialization performed previously
-    sequence_version: int = 4, #4 new threshold criteria
+    sequence_version: int = 5, #4 new threshold criteria 5, sample purgetime
     gas_sample_no: int = 2,
     Solution_volume_ul: List[float] = [0,500, 50],
     Solution_reservoir_sample_no: int = 2,
@@ -636,7 +636,8 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
 #    liquid_purge_cycles: int = 1,
     headspace_co2measure_duration: float = 30,
     clean_co2measure_duration: float = 120,
-    LiquidCleanPurge_duration: float = 60,
+    SamplePurge_duration: float = 60,
+    LiquidCleanPurge_duration: float = 100,
     clean_co2_ppm_thresh: float = 51500,
     max_repeats: int = 5,
     purge_if: Union[str, float] = 0.03,
@@ -704,7 +705,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
             "co2measure_duration": co2measure_duration,
             "co2measure_acqrate": co2measure_acqrate,
         })
-        epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": LiquidCleanPurge_duration,"DeltaDilute1_duration": DeltaDilute1_duration,"recirculation":drainrecirc,})
+        epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": SamplePurge_duration,"DeltaDilute1_duration": DeltaDilute1_duration,"recirculation":drainrecirc,})
 
         epm.add_experiment("CCSI_sub_clean_inject", {
             "Waterclean_volume_ul": drainclean_volume_ul,
