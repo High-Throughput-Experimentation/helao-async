@@ -41,17 +41,17 @@ class C_mfc:
         self.IOloop_stat_run = False
 
         self.data_suffices = [
-            "epoch_s",
+            # "epoch_s",
             "setpoint",
             "control_point",
             "gas",
             "mass_flow",
             "pressure",
             "temperature",
-            "total_flow",
+            # "total_flow",
             "volumetric_flow",
             "hold_valve",
-            "time_now",
+            # "time_now",
         ]
 
         self.data_dict_keys = ["datetime"]
@@ -194,6 +194,9 @@ class C_mfc:
                 if datalab == "sim_dict":
                     for k, v in dataval.items():
                         data_dict[k].append(v)
+                elif isinstance(dataval, dict):
+                    for k, v in dataval.items():
+                        data_dict[f"{datalab}__{k}"].append(v)
                 elif isinstance(dataval, list):
                     data_dict[datalab] += dataval
                 else:
@@ -201,11 +204,14 @@ class C_mfc:
                 latest_epoch = max([epochsec, latest_epoch])
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
 
+            
         self.datasource.stream(data_dict, rollover=self.max_points)
         keys = list(data_dict.keys())
         values = [data_dict[k][-1] for k in keys]
         table_data_dict = {"name": keys, "value": values}
         self.datasource_table.stream(table_data_dict, rollover=len(keys))
+        if not self.plot.renderers:
+            self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
         self.vis.print_message(
@@ -214,8 +220,11 @@ class C_mfc:
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
                 messages = await self.wss.read_messages()
-                self.vis.doc.add_next_tick_callback(partial(self.add_points, messages))
-                self.last_update_time = time.time()
+                if messages:
+                    self.vis.doc.add_next_tick_callback(
+                        partial(self.add_points, messages)
+                    )
+                    self.last_update_time = time.time()
             await asyncio.sleep(0.001)
 
     def _add_plots(self):
@@ -228,32 +237,34 @@ class C_mfc:
 
         colors = ["red", "blue", "green", "orange"]
         for dev_name, color in zip(self.devices, colors[: len(self.devices)]):
-            if (
-                self.datasource.data[f"{dev_name}__control_point"][-1].strip()
-                == "mass flow"
-            ):
-                self.plot.yaxis.axis_label = "Flow rate (sccm)"
-                yvar = "mass_flow"
-            else:
-                self.plot.yaxis.axis_label = "Pressure (psia)"
-                yvar = "pressure"
+            modelist = self.datasource.data[f"{dev_name}__control_point"]
+            if modelist:
+                if (
+                    modelist[-1].strip()
+                    == "mass flow"
+                ):
+                    self.plot.yaxis.axis_label = "Flow rate (sccm)"
+                    yvar = "mass_flow"
+                else:
+                    self.plot.yaxis.axis_label = "Pressure (psia)"
+                    yvar = "pressure"
 
-            self.plot.line(
-                x=f"{dev_name}__time_now",
-                y=f"{dev_name}__{yvar}",
-                line_color=color,
-                line_dash="solid",
-                source=self.datasource,
-                legend_label=f"{dev_name} actual",
-            )
-            self.plot.line(
-                x=f"{dev_name}__time_now",
-                y=f"{dev_name}__setpoint",
-                line_color=color,
-                line_dash="dotted",
-                source=self.datasource,
-                legend_label=f"{dev_name} setpoint",
-            )
+                self.plot.line(
+                    x="datetime",
+                    y=f"{dev_name}__{yvar}",
+                    line_color=color,
+                    line_dash="solid",
+                    source=self.datasource,
+                    legend_label=f"{dev_name} actual",
+                )
+                self.plot.line(
+                    x="datetime",
+                    y=f"{dev_name}__setpoint",
+                    line_color=color,
+                    line_dash="dotted",
+                    source=self.datasource,
+                    legend_label=f"{dev_name} setpoint",
+                )
 
     def reset_plot(self, forceupdate: bool = False):
         # self.xselect = self.xaxis_selector_group.active

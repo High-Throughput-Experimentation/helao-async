@@ -729,7 +729,7 @@ class Calc:
             # repeat_experiment_params["purge_if"] = (
             #     abs(purge_if) * 2**0.5 * np.sign(purge_if)
             # )
-            ## new behavior: symmetric pct difference around thershold
+            ## new behavior: symmetric pct difference around threshold
             loop_condition = (
                 np.abs(mean_co2_ppm - co2_ppm_thresh) / co2_ppm_thresh > purge_if
             )
