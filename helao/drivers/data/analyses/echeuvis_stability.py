@@ -535,11 +535,13 @@ class EcheUvisAnalysis:
         print("filtered data has shape:", pdf.shape)
         self.plate_id = pdf.iloc[0].plate_id
         self.sample_no = pdf.iloc[0].sample_no
-        traceback.print_stack()
         print("assembling inputs")
-        self.inputs = EcheUvisInputs(
-            process_uuid, self.plate_id, self.sample_no, query_df
-        )
+        try:
+            self.inputs = EcheUvisInputs(
+                process_uuid, self.plate_id, self.sample_no, query_df
+            )
+        except:
+            traceback.print_stack()
         self.process_uuid = process_uuid
         self.ca_potential_vrhe = self.inputs.insitu.process_params["CA_potential_vsRHE"]
         print("getting code hash")
