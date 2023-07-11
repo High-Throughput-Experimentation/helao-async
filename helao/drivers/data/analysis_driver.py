@@ -89,15 +89,13 @@ class HelaoAnalysisSyncer:
         while True:
             if len(self.running_tasks) < self.max_tasks:
                 rank, calc_tup = await self.task_queue.get()
-                self.base.print_message(f"acquired process_uuid {calc_tup[0]}.")
-                if calc_tup[0] not in self.running_tasks:
-                    self.base.print_message(f"creating ana task for {calc_tup[0]}.")
-                    self.running_tasks[calc_tup[0]] = asyncio.create_task(
-                        self.sync_ana(calc_tup, rank=rank), name=str(calc_tup[0])
-                    )
-                    self.running_tasks[calc_tup[0]].add_done_callback(
-                        self.sync_exit_callback
-                    )
+                self.base.print_message(f"creating ana task for {calc_tup[0]}.")
+                self.running_tasks[str(calc_tup[0])] = asyncio.create_task(
+                    self.sync_ana(calc_tup, rank=rank), name=str(calc_tup[0])
+                )
+                self.running_tasks[str(calc_tup[0])].add_done_callback(
+                    self.sync_exit_callback
+                )
             await asyncio.sleep(0.1)
 
     async def sync_ana(
