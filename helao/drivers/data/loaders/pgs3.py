@@ -43,7 +43,7 @@ class HelaoLoader:
         self.last_seq_uuid = ""
         self.engine = create_engine(self.hcred.api_dsn)
 
-    def close(self):
+    def __del__(self):
         self.cli.close()
         self.tunnel.stop()
 
