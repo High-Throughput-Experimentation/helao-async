@@ -118,7 +118,8 @@ class HelaoAnalysisSyncer:
 
         s3_model_success = await self.to_s3(model_dict, s3_model_target)
         s3_output_success = await self.to_s3(output_dict, s3_output_target)
-        api_success = await self.to_api(model_dict)
+        # api_success = await self.to_api(model_dict)
+        api_success = True
 
         if s3_model_success and s3_output_success and api_success:
             self.base.print_message(f"Successfully synced {eua.analysis_uuid}")
