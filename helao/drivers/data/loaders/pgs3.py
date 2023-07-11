@@ -5,6 +5,7 @@ from typing import Optional
 
 import boto3
 import sshtunnel
+import pandas as pd
 from sqlmodel import Session, text, create_engine
 from helaocore.models.credentials import HelaoCredentials
 
