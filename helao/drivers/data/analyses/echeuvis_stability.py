@@ -1,4 +1,5 @@
 import sys
+import traceback
 from copy import copy
 from typing import List, Optional
 from uuid import UUID
@@ -534,6 +535,7 @@ class EcheUvisAnalysis:
         print("filtered data has shape:", pdf.shape)
         self.plate_id = pdf.iloc[0].plate_id
         self.sample_no = pdf.iloc[0].sample_no
+        traceback.print_stack()
         print("assembling inputs")
         self.inputs = EcheUvisInputs(
             process_uuid, self.plate_id, self.sample_no, query_df
