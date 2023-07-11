@@ -113,13 +113,7 @@ class HelaoAnalysisSyncer:
             analysis_params = {}
         eua = self.ana_funcs[analysis_name](process_uuid, process_df, analysis_params)
         self.base.print_message("calculating analysis output")
-
-        try:
-            eua.calc_output()
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            print(tb)
-            
+        eua.calc_output()
         self.base.print_message("exporting analysis output")
         model_dict, output_dict = eua.export_analysis(
             analysis_name=analysis_name,
@@ -130,8 +124,13 @@ class HelaoAnalysisSyncer:
         s3_output_target = f"analysis/{eua.analysis_uuid}_output.json"
 
         self.base.print_message("uploading outputs to S3 bucket")
-        s3_model_success = await self.to_s3(model_dict, s3_model_target)
-        s3_output_success = await self.to_s3(output_dict, s3_output_target)
+        try:
+            s3_model_success = await self.to_s3(model_dict, s3_model_target)
+            s3_output_success = await self.to_s3(output_dict, s3_output_target)
+        except Exception as e:
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            print(tb)
+
         # api_success = await self.to_api(model_dict)
         api_success = True
 
