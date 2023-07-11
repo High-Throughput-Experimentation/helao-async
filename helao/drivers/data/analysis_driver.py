@@ -259,12 +259,12 @@ class HelaoAnalysisSyncer:
         plate_id: Optional[int] = None,
         sequence_uuid: Optional[UUID] = None,
         params: dict = {},
+        recent: bool = True,
     ):
         """Generate list of DryUvisAnalysis from sequence or plate_id (latest seq)."""
         # eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
-        df = EUL.get_recent(
-            min_date=datetime.now().strftime("%Y-%m-%d"), plate_id=plate_id
-        )
+        min_date = datetime.now().strftime("%Y-%m-%d") if recent else None
+        df = EUL.get_recent(min_date=min_date, plate_id=plate_id)
 
         # all processes in sequence
         pdf = df.sort_values(

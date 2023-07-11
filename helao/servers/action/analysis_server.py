@@ -27,13 +27,17 @@ def makeApp(confPrefix, server_key, helao_root):
     )
 
     @app.post("/batch_calc_echeuvis", tags=["private"])
-    async def batch_calc_echeuvis(plate_id: int, sequence_uuid: str, params: dict):
+    async def batch_calc_echeuvis(
+        plate_id: int, sequence_uuid: str, recent: bool = True, params: dict = {}
+    ):
         """Generates ECHEUVIS stability analyses from sequence_uuid."""
         await app.driver.batch_calc_echeuvis(plate_id, UUID(sequence_uuid), params)
         return sequence_uuid
 
     @app.post("/batch_calc_echeuvis", tags=["private"])
-    async def batch_calc_dryuvis(plate_id: int, sequence_uuid: str, params: dict):
+    async def batch_calc_dryuvis(
+        plate_id: int, sequence_uuid: str, recent: bool = True, params: dict = {}
+    ):
         """Generates dry UVIS-T analyses from sequence_uuid."""
         await app.driver.batch_calc_dryuvis(plate_id, UUID(sequence_uuid), params)
         return sequence_uuid
