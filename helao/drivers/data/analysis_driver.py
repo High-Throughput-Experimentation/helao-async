@@ -93,8 +93,9 @@ class HelaoAnalysisSyncer:
                 rank, calc_tup = await self.task_queue.get()
                 self.base.print_message(f"acquired process_uuid {calc_tup[0]}.")
                 if calc_tup[0] not in self.running_tasks:
+                    self.base.print_message(f"creating ana task for {calc_tup[0]}.")
                     self.running_tasks[calc_tup[0]] = asyncio.create_task(
-                        self.sync_ana(calc_tup, rank), name=calc_tup[0]
+                        self.sync_ana(calc_tup, rank=rank), name=calc_tup[0]
                     )
                     self.running_tasks[calc_tup[0]].add_done_callback(
                         self.sync_exit_callback
@@ -107,6 +108,8 @@ class HelaoAnalysisSyncer:
         retries: int = 3,
         rank: int = 5,
     ):
+        self.base.print_message(f"performing analysis {calc_tup[-1]}")
+        self.base.print_message(f"using params {calc_tup[2]}")
         eua = self.ana_funcs[calc_tup[-1]](*calc_tup[:-1])
         self.base.print_message("calculating analysis output")
         eua.calc_output()
