@@ -64,7 +64,6 @@ MOD_PATCH = {
     "exid": "exec_id",
 }
 YAML_LOADER = YAML(typ="safe")
-MAX_TASKS = 4
 
 
 def dict2json(input_dict: dict):
@@ -385,6 +384,7 @@ class HelaoSyncer:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
+        self.max_tasks = self.config_dict.get("max_tasks", 4)
         os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
         self.aws_session = boto3.Session(profile_name=self.config_dict["aws_profile"])
         self.s3 = self.aws_session.client("s3")
@@ -469,7 +469,7 @@ class HelaoSyncer:
     async def syncer(self):
         """Syncer loop coroutine which consumes the task queue."""
         while True:
-            if len(self.running_tasks) < MAX_TASKS:
+            if len(self.running_tasks) < self.max_tasks:
                 # self.base.print_message("Getting next yml_target from queue.")
                 rank, yml_target = await self.task_queue.get()
                 # self.base.print_message(
@@ -480,7 +480,8 @@ class HelaoSyncer:
                     #     f"Creating sync task for {yml_target.name}."
                     # )
                     self.running_tasks[yml_target.name] = asyncio.create_task(
-                        self.sync_yml(yml_target, rank), name=yml_target.name
+                        self.sync_yml(yml_path=yml_target, rank=rank),
+                        name=yml_target.name,
                     )
                     self.running_tasks[yml_target.name].add_done_callback(
                         self.sync_exit_callback
@@ -1049,23 +1050,27 @@ class HelaoSyncer:
         elif os.path.isdir(sync_path):
             base_prgs = [
                 x
-                for x in glob(
-                    os.path.join(sync_path, "**", "*-*.pr*"), recursive=True
-                )
+                for x in glob(os.path.join(sync_path, "**", "*-*.pr*"), recursive=True)
                 if x.endswith(".progress") or x.endswith(".prg")
             ]
             seq_prgs = [x for x in base_prgs if "-seq.pr" in x]
             for x in seq_prgs:
-                base_prgs = [y for y in base_prgs if not y.startswith(os.path.dirname(x))]
+                base_prgs = [
+                    y for y in base_prgs if not y.startswith(os.path.dirname(x))
+                ]
             exp_prgs = [x for x in base_prgs if "-exp.pr" in x]
             for x in exp_prgs:
-                base_prgs = [y for y in base_prgs if not y.startswith(os.path.dirname(x))]
+                base_prgs = [
+                    y for y in base_prgs if not y.startswith(os.path.dirname(x))
+                ]
             act_prgs = [x for x in base_prgs if "-act.pr" in x]
             for x in act_prgs:
-                base_prgs = [y for y in base_prgs if not y.startswith(os.path.dirname(x))]
-            
+                base_prgs = [
+                    y for y in base_prgs if not y.startswith(os.path.dirname(x))
+                ]
+
             base_prgs = act_prgs + exp_prgs + seq_prgs
-            
+
             if not base_prgs:
                 self.base.print_message(
                     f"Did not find any .prg or .progress files in subdirectories of {sync_path}"

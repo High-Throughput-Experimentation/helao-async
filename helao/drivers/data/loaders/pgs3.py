@@ -1,0 +1,277 @@
+import io
+import json
+from uuid import UUID
+from typing import Optional
+
+import boto3
+import sshtunnel
+import pandas as pd
+from sqlmodel import Session, text, create_engine
+from helaocore.models.credentials import HelaoCredentials
+
+# initialize in driver
+LOADER = None
+
+
+class HelaoLoader:
+    """Provides cached access to S3 and SQL"""
+
+    def __init__(
+        self,
+        env_file: str = ".env",
+        cache_s3: bool = False,
+        cache_json: bool = True,
+    ):
+        self.hcred = HelaoCredentials(_env_file=env_file)
+        self.tunnel = sshtunnel.SSHTunnelForwarder(
+            self.hcred.JUMPBOX_HOST,
+            ssh_username=self.hcred.JUMPBOX_USER,
+            ssh_pkey=self.hcred.JUMPBOX_KEYFILE,
+            remote_bind_address=(self.hcred.API_HOST, int(self.hcred.API_PORT))
+        )
+        self.tunnel.start()
+        self.hcred.set_api_port(self.tunnel.local_bind_port)
+        self.sess = boto3.Session(
+            aws_access_key_id=self.hcred.AWS_ACCESS_KEY_ID.get_secret_value(),
+            aws_secret_access_key=self.hcred.AWS_SECRET_ACCESS_KEY.get_secret_value(),
+        )
+        self.s3_bucket = self.hcred.AWS_BUCKET.get_secret_value()
+        self.s3_region = self.hcred.AWS_REGION.get_secret_value()
+        self.cli = self.sess.client("s3")
+        self.res = self.sess.resource("s3")
+        self.cache_s3 = cache_s3
+        self.cache_json = cache_json
+        self.act_cache = {}  # {uuid: json_dict}
+        self.exp_cache = {}
+        self.seq_cache = {}
+        self.pro_cache = {}
+        self.s3_cache = {}  # {s3_path: hlo_dict}
+        self.sql_cache = {}  # {(uuid, type): json_dict}
+        self.last_seq_uuid = ""
+        self.engine = create_engine(self.hcred.api_dsn)
+
+    def __del__(self):
+        self.cli.close()
+        self.tunnel.stop()
+
+    def run_raw_query(self, query: str):
+        with Session(self.engine) as session:
+            result = session.exec(text(query)).all()
+        return result
+
+    def clear_cache(self):
+        self.act_cache = {}  # {uuid: json_dict}
+        self.exp_cache = {}
+        self.seq_cache = {}
+        self.pro_cache = {}
+        self.s3_cache = {}  # {s3_path: hlo_dict}
+        self.sql_cache = {}  # {(uuid, type): json_dict}
+
+    def get_json(self, helao_type: str, uuid: UUID):
+        obj = self.res.Object(
+            bucket_name="helao.data", key=f"{helao_type}/{str(uuid)}.json"
+        )
+        obytes = io.BytesIO(obj.get()["Body"].read())
+        md = json.load(obytes)
+        return md
+
+    def get_act(self, action_uuid: UUID):
+        jd = self.act_cache.get(action_uuid, self.get_json("action", action_uuid))
+        if self.cache_json:
+            self.act_cache[action_uuid] = jd
+        return jd
+
+    def get_exp(self, experiment_uuid: UUID):
+        jd = self.exp_cache.get(
+            experiment_uuid, self.get_json("experiment", experiment_uuid)
+        )
+        if self.cache_json:
+            self.exp_cache[experiment_uuid] = jd
+        return jd
+
+    def get_seq(self, sequence_uuid: UUID):
+        if sequence_uuid != self.last_seq_uuid:
+            self.clear_cache()
+            self.last_seq_uuid = sequence_uuid
+        jd = self.seq_cache.get(sequence_uuid, self.get_json("sequence", sequence_uuid))
+        if self.cache_json:
+            self.seq_cache[sequence_uuid] = jd
+        return jd
+
+    def get_pro(self, process_uuid: UUID):
+        jd = self.pro_cache.get(process_uuid, self.get_json("process", process_uuid))
+        if self.cache_json:
+            self.pro_cache[process_uuid] = jd
+        return jd
+
+    def get_hlo(self, action_uuid: UUID, hlo_fn: str):
+        keystr = f"raw_data/{str(action_uuid)}/{hlo_fn}.json"
+        if keystr in self.s3_cache:
+            return self.s3_cache[keystr]
+        obj = self.res.Object(bucket_name="helao.data", key=keystr)
+        obytes = io.BytesIO(obj.get()["Body"].read())
+        jd = json.load(obytes)
+        if self.cache_s3:
+            self.s3_cache[keystr] = jd
+        return jd
+
+    def get_sql(self, helao_type: str, obj_uuid: UUID):
+        if (
+            helao_type,
+            obj_uuid,
+        ) not in self.sql_cache.keys():
+            sql_command = f"""
+                SELECT *
+                FROM helao_{helao_type} ht
+                WHERE ht.{helao_type}_uuid = '{obj_uuid}'
+                LIMIT 1
+            """
+            resp = self.run_raw_query(sql_command)
+            self.sql_cache[
+                (
+                    helao_type,
+                    obj_uuid,
+                )
+            ] = (
+                dict(resp[0]) if resp else {}
+            )
+        return self.sql_cache[
+            (
+                helao_type,
+                obj_uuid,
+            )
+        ]
+
+
+class EcheUvisLoader(HelaoLoader):
+    """ECHEUVIS process dataloader"""
+
+    def __init__(
+        self,
+        env_file: str = ".env",
+        cache_s3: bool = False,
+        cache_json: bool = True,
+    ):
+        super().__init__(env_file, cache_s3, cache_json)
+        print("!!! using env_file:", env_file)
+        print("!!! postgresql dsn:", self.hcred.api_dsn)
+        self.recent_cache = {}  # {'%Y-%m-%d': dataframe}
+
+    def get_recent(
+        self,
+        query: str,
+        min_date: Optional[str] = "2023-04-26",
+        plate_id: Optional[int] = None,
+        sample_no: Optional[int] = None,
+    ):
+        conditions = []
+        if min_date is not None:
+            conditions.append(f"    AND hp.process_timestamp >= '{min_date}'")
+        recent_md = sorted(
+            [md for md, pi, sn in self.recent_cache if pi is None and sn is None]
+        )
+        recent_mdpi = sorted(
+            [md for md, pi, sn in self.recent_cache if pi == plate_id and sn is None]
+        )
+        recent_mdsn = sorted(
+            [md for md, pi, sn in self.recent_cache if pi is None and sn == sample_no]
+        )
+        query_parts = ""
+        if plate_id is not None:
+            query_parts += f" & plate_id=={plate_id}"
+        if sample_no is not None:
+            query_parts += f" & sample_no=={sample_no}"
+        if recent_md and min_date >= recent_md[0]:
+            self.recent_cache[
+                (
+                    min_date,
+                    plate_id,
+                    sample_no,
+                )
+            ] = self.recent_cache[
+                (
+                    recent_md[0],
+                    None,
+                    None,
+                )
+            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
+        elif recent_mdpi and min_date >= recent_mdpi[0]:
+            self.recent_cache[
+                (
+                    min_date,
+                    plate_id,
+                    sample_no,
+                )
+            ] = self.recent_cache[
+                (
+                    recent_mdpi[0],
+                    plate_id,
+                    None,
+                )
+            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
+        elif recent_mdsn and min_date >= recent_mdsn[0]:
+            self.recent_cache[
+                (
+                    min_date,
+                    plate_id,
+                    sample_no,
+                )
+            ] = self.recent_cache[
+                (
+                    recent_mdsn[0],
+                    None,
+                    sample_no,
+                )
+            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
+        elif (
+            min_date,
+            plate_id,
+            sample_no,
+        ) not in self.recent_cache:
+            data = self.run_raw_query(query + "\n".join(conditions))
+            pdf = pd.DataFrame(data)
+            print("!!! dataframe shape:", pdf.shape)
+            print("!!! dataframe cols:", pdf.columns)
+            pdf["plate_id"] = pdf.global_label.apply(
+                lambda x: x.split("_")[-2] if "solid" in x else None
+            )
+            pdf["sample_no"] = pdf.global_label.apply(
+                lambda x: x.split("_")[-1] if "solid" in x else None
+            )
+            # assign solid samples from sequence params
+            for suuid in set(pdf.query("sample_no.isna()").sequence_uuid):
+                subdf = pdf.query("sequence_uuid==@suuid")
+                spars = subdf.iloc[0]["sequence_params"]
+                pid = spars["plate_id"]
+                solid_samples = spars["plate_sample_no_list"]
+                assemblies = sorted(
+                    set(
+                        subdf.query(
+                            "global_label.str.contains('assembly')"
+                        ).global_label
+                    )
+                )
+                for slab, alab in zip(solid_samples, assemblies):
+                    pdf.loc[
+                        pdf.query("sequence_uuid==@suuid & global_label==@alab").index,
+                        "plate_id",
+                    ] = pid
+                    pdf.loc[
+                        pdf.query("sequence_uuid==@suuid & global_label==@alab").index,
+                        "sample_no",
+                    ] = slab
+            self.recent_cache[
+                (
+                    min_date,
+                    plate_id,
+                    sample_no,
+                )
+            ] = pdf.sort_values("process_timestamp")
+        return self.recent_cache[
+            (
+                min_date,
+                plate_id,
+                sample_no,
+            )
+        ].reset_index(drop=True)
+

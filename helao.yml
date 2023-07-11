@@ -26,12 +26,15 @@ dependencies:
   - paramiko
   - pip
   - psutil
+  - psycopg2
   - pyaml
   - pybase64
-  - pydantic
+  - pydantic=1
   - pyfiglet
   - pyserial
   - python=3.8
+  - python-dotenv
+  - python-multipart
   - pyzstd
   - requests
   - ruamel.yaml
@@ -40,6 +43,8 @@ dependencies:
   - shortuuid
   - sqlalchemy
   - sqlite
+  - sqlmodel
+  - sshtunnel
   - starlette
   - termcolor
   - uvicorn

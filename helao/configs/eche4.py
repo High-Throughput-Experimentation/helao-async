@@ -147,19 +147,26 @@ config["servers"] = {
     #     "bokeh": "live_visualizer",
     #     "params": {"doc_name": "Sensor Visualizer"},
     # },
-    # "DB": {
-    #     "host": hostip,
-    #     "port": 8010,
-    #     "group": "action",
-    #     "fast": "dbpack_server",
-    #     "params": {
-    #         "aws_config_path": "k:/users/hte/.credentials/aws_config.ini",
-    #         "aws_profile": "default",
-    #         "aws_bucket": "helao.data",
-    #         "api_host": "caltech-api.modelyst.com",
-    #         "testing": False,
-    #     },
-    # },
+    "DB": {
+        "host": hostip,
+        "port": 8010,
+        "group": "action",
+        "fast": "dbpack_server",
+        "params": {
+            "aws_config_path": "k:/users/hte/.credentials/aws_config.ini",
+            "aws_profile": "default",
+            "aws_bucket": "helao.data",
+            "api_host": "caltech-api.modelyst.com",
+            "testing": False,
+        },
+    },
+    "ANA": {
+        "host": hostip,
+        "port": 8014,
+        "group": "action",
+        "fast": "analysis_server",
+        "params": {"env_file": "k:/users/hte/.credentials/helao_data.env"},
+    }
     # "CAM": {
     #     "host": hostip,
     #     "port": 8013,
