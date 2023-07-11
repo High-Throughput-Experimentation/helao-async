@@ -97,7 +97,7 @@ class EcheUvisLoader(HelaoLoader):
     ):
         conditions = []
         if min_date is not None:
-            conditions.append(f"AND hp.process_timestamp >= '{min_date}'")
+            conditions.append(f"    AND hp.process_timestamp >= '{min_date}'")
         recent_md = sorted(
             [md for md, pi, sn in self.recent_cache if pi is None and sn is None]
         )
@@ -161,6 +161,8 @@ class EcheUvisLoader(HelaoLoader):
         ) not in self.recent_cache:
             data = self.run_raw_query(SDCUVIS_QUERY + "\n".join(conditions))
             pdf = pd.DataFrame(data)
+            print("!!! dataframe shape:", pdf.shape)
+            print("!!! dataframe cols:", pdf.columns)
             pdf["plate_id"] = pdf.global_label.apply(
                 lambda x: x.split("_")[-2] if "solid" in x else None
             )
