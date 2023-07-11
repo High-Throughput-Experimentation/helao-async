@@ -540,8 +540,9 @@ class EcheUvisAnalysis:
             self.inputs = EcheUvisInputs(
                 process_uuid, self.plate_id, self.sample_no, query_df
             )
-        except:
-            traceback.print_stack()
+        except Exception as e:
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            print(tb)
         self.process_uuid = process_uuid
         self.ca_potential_vrhe = self.inputs.insitu.process_params["CA_potential_vsRHE"]
         print("getting code hash")
