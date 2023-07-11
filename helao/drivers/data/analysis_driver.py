@@ -92,6 +92,7 @@ class HelaoAnalysisSyncer:
         while True:
             if len(self.running_tasks) < self.max_tasks:
                 rank, ana = await self.task_queue.get()
+                self.base.print_message(f"acquired task {ana.analysis_uuid}.")
                 if ana.analysis_uuid not in self.running_tasks:
                     self.running_tasks[ana.analysis_uuid] = asyncio.create_task(
                         self.sync_ana(ana, rank), name=ana.analysis_uuid
@@ -99,6 +100,8 @@ class HelaoAnalysisSyncer:
                     self.running_tasks[ana.analysis_uuid].add_done_callback(
                         self.sync_exit_callback
                     )
+            else:
+                self.base.print_message("Too many analysis tasks.")
             await asyncio.sleep(0.1)
 
     async def sync_ana(
