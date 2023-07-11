@@ -52,4 +52,12 @@ def makeApp(confPrefix, server_key, helao_root):
         )
         return sequence_uuid
 
+    @app.post("/list_running_tasks", tags=["private"])
+    def list_current_tasks():
+        return list(app.driver.running_tasks.keys())
+
+    @app.post("/list_queued_tasks", tags=["private"])
+    def list_queued_tasks():
+        return list(app.driver.task_set)
+    
     return app

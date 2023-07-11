@@ -88,6 +88,7 @@ class HelaoAnalysisSyncer:
 
     async def syncer(self):
         """Syncer loop coroutine which consumes the task queue."""
+        self.base.print_message("Starting syncer queue processor task.")
         while True:
             if len(self.running_tasks) < self.max_tasks:
                 rank, ana = await self.task_queue.get()
