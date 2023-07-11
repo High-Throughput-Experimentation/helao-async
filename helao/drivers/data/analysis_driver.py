@@ -91,13 +91,13 @@ class HelaoAnalysisSyncer:
         self.base.print_message("Starting syncer queue processor task.")
         while True:
             if len(self.running_tasks) < self.max_tasks:
-                rank, ana = await self.task_queue.get()
-                self.base.print_message(f"acquired task {ana.analysis_uuid}.")
-                if ana.analysis_uuid not in self.running_tasks:
-                    self.running_tasks[ana.analysis_uuid] = asyncio.create_task(
-                        self.sync_ana(ana, rank), name=ana.analysis_uuid
+                rank, calc_tup = await self.task_queue.get()
+                self.base.print_message(f"acquired process_uuid {calc_tup[0]}.")
+                if calc_tup[0] not in self.running_tasks:
+                    self.running_tasks[calc_tup[0]] = asyncio.create_task(
+                        self.sync_ana(calc_tup, rank), name=calc_tup[0]
                     )
-                    self.running_tasks[ana.analysis_uuid].add_done_callback(
+                    self.running_tasks[calc_tup[0]].add_done_callback(
                         self.sync_exit_callback
                     )
             else:
