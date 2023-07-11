@@ -736,7 +736,7 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
     return epm.experiment_plan_list
 
 def CCSI_Solution_testing_fixed_cleans(  #assumes initialization performed previously
-    sequence_version: int = 1,
+    sequence_version: int = 2, #v2 elim front refill
     gas_sample_no: int = 2,
     Solution_volume_ul: List[float] = [0,500, 50],
     Solution_reservoir_sample_no: int = 2,
@@ -775,11 +775,11 @@ def CCSI_Solution_testing_fixed_cleans(  #assumes initialization performed previ
             #  "HSpurge_duration": LiquidCleanPurge_duration,
         })
 
-    refill_volume = drainclean_volume_ul*(initcleans)
-    epm.add_experiment("CCSI_sub_refill_clean", {
-        "Waterclean_volume_ul": refill_volume ,
-        "Syringe_rate_ulsec": 1000,
-    })
+    # refill_volume = drainclean_volume_ul*(initcleans)
+    # epm.add_experiment("CCSI_sub_refill_clean", {
+    #     "Waterclean_volume_ul": refill_volume ,
+    #     "Syringe_rate_ulsec": 1000,
+    # })
 
     for solnvolume in Solution_volume_ul:
 
