@@ -30,6 +30,8 @@ class HelaoLoader:
             aws_access_key_id=self.hcred.AWS_ACCESS_KEY_ID.get_secret_value(),
             aws_secret_access_key=self.hcred.AWS_SECRET_ACCESS_KEY.get_secret_value(),
         )
+        self.s3_bucket = self.hcred.AWS_BUCKET.get_secret_value()
+        self.s3_region = self.hcred.AWS_REGION.get_secret_value()
         self.cli = self.sess.client("s3")
         self.res = self.sess.resource("s3")
         self.cache_s3 = cache_s3

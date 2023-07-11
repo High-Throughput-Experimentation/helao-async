@@ -7,7 +7,6 @@ Handles Helao analyses uploads to S3.
 __all__ = ["HelaoAnalysisSyncer"]
 
 import asyncio
-import os
 import traceback
 from copy import copy
 from datetime import datetime
@@ -17,7 +16,6 @@ from uuid import UUID
 
 import aiohttp
 
-# import boto3
 import botocore.exceptions
 import pandas as pd
 
@@ -54,7 +52,8 @@ class HelaoAnalysisSyncer:
         # os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
         # self.aws_session = boto3.Session(profile_name=self.config_dict["aws_profile"])
         # self.s3 = self.aws_session.client("s3")
-        # self.bucket = self.config_dict["aws_bucket"]
+        self.bucket = EUL.s3_bucket
+        self.region = EUL.s3_region
         # self.api_host = self.config_dict["api_host"]
 
         self.task_queue = asyncio.PriorityQueue()
@@ -100,8 +99,6 @@ class HelaoAnalysisSyncer:
                     self.running_tasks[calc_tup[0]].add_done_callback(
                         self.sync_exit_callback
                     )
-            else:
-                self.base.print_message("Too many analysis tasks.")
             await asyncio.sleep(0.1)
 
     async def sync_ana(
@@ -111,15 +108,18 @@ class HelaoAnalysisSyncer:
         rank: int = 5,
     ):
         eua = self.ana_funcs[calc_tup[-1]](*calc_tup[:-1])
+        self.base.print_message("calculating analysis output")
         eua.calc_output()
+        self.base.print_message("exporting analysis output")
         model_dict, output_dict = eua.export_analysis(
             analysis_name=calc_tup[-1],
             bucket=self.bucket,
-            region=self.aws_session.region_name,
+            region=self.region,
         )
         s3_model_target = f"analysis/{eua.analysis_uuid}.json"
         s3_output_target = f"analysis/{eua.analysis_uuid}_output.json"
 
+        self.base.print_message("uploading outputs to S3 bucket")
         s3_model_success = await self.to_s3(model_dict, s3_model_target)
         s3_output_success = await self.to_s3(output_dict, s3_output_target)
         # api_success = await self.to_api(model_dict)
