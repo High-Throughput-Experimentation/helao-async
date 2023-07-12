@@ -1002,9 +1002,9 @@ def CCSI_sub_refill_clean(
 
 def CCSI_sub_full_fill_syringe(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2, #v2 check volume of 15ml
     syringe: str = "waterclean",
-    target_volume_ul: float = 0,
+    target_volume_ul: float = 50000,
     Syringe_rate_ulsec: float = 1000,
 ):
     apm = ActionPlanMaker()
@@ -1013,7 +1013,7 @@ def CCSI_sub_full_fill_syringe(
         CALC_server,
         "fill_syringe_volume_check",
         {
-            "check_volume_ul": 0,
+            "check_volume_ul": 15000,
             "target_volume_ul": apm.pars.target_volume_ul,
             "repeat_experiment_name": "CCSI_sub_fill_syringe",
             "repeat_experiment_params": {
