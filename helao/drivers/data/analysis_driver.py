@@ -99,6 +99,7 @@ class HelaoAnalysisSyncer:
                 self.running_tasks[str(calc_tup[0])].add_done_callback(
                     self.sync_exit_callback
                 )
+                self.task_queue.task_done()
             await asyncio.sleep(0.1)
 
     async def sync_ana(
