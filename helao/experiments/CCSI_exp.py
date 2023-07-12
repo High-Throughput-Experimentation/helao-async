@@ -473,11 +473,12 @@ def CCSI_sub_headspace_purge_and_measure(
 
 def CCSI_sub_drain(
     experiment: Experiment,
-    experiment_version: int =4,  #v4 try new recirc path
+    experiment_version: int =5,  #remove recirc before, put after
     HSpurge_duration: float = 20,  # set before determining actual
     DeltaDilute1_duration: float = 0,
     initialization: bool = False,
-    recirculation: bool = True
+    recirculation: bool = False,
+    recirculation_duration: float = 20,
 ):
     # recirculation loop
 
@@ -500,26 +501,14 @@ def CCSI_sub_drain(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1}, asc.no_wait)
     apm.add(NI_server, "gasvalve", {"gasvalve": "7A", "on": 1}, asc.no_wait)
-    if apm.pars.recirculation:
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 1}, asc.no_wait)        
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 1}, asc.no_wait)
-        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
-        apm.add(ORCH_server, "wait", {"waittime": 10})
-        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0}, asc.no_wait)
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0}, asc.no_wait)                
-        #apm.add(NI_server, "liquidvalve", {"liquidvalve": "3", "on": 1}, asc.no_wait)
 
    #   apm.add(MFC---stuff Flow ON)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.HSpurge_duration})
     if apm.pars.recirculation:
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 1})        
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 1}, asc.no_wait)
-        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
-        apm.add(ORCH_server, "wait", {"waittime": 20})
+        apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": apm.pars.recirculation_duration})
         apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "4", "on": 0}, asc.no_wait)
-        apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A-cell", "on": 0}, asc.no_wait)                
+
     if apm.pars.initialization:
         apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": 0.5})
