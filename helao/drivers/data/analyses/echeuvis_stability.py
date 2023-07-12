@@ -469,6 +469,6 @@ class EcheUvisAnalysis:
             process_uuid=self.process_uuid,
             process_params=self.inputs.insitu.process_params,
             inputs=inputs,
-            outputs=[],
+            outputs=outputs,
         )
         return ana_model.clean_dict(), self.outputs.dict()
