@@ -108,14 +108,14 @@ class HelaoAnalysisSyncer:
         rank: int = 5,
     ):
         process_uuid, process_df, analysis_params, analysis_name = calc_tup
-        self.base.print_message(f"performing analysis {analysis_name}")
-        self.base.print_message(f"using params {analysis_params}")
+        # self.base.print_message(f"performing analysis {analysis_name}")
+        # self.base.print_message(f"using params {analysis_params}")
         if analysis_params is None:
             analysis_params = {}
         eua = self.ana_funcs[analysis_name](process_uuid, process_df, analysis_params)
-        self.base.print_message("calculating analysis output")
+        # self.base.print_message("calculating analysis output")
         eua.calc_output()
-        self.base.print_message("exporting analysis output")
+        # self.base.print_message("exporting analysis output")
         model_dict, output_dict = eua.export_analysis(
             analysis_name=analysis_name,
             bucket=self.bucket,
@@ -123,7 +123,7 @@ class HelaoAnalysisSyncer:
         )
         s3_model_target = f"analysis/{eua.analysis_uuid}.json"
 
-        self.base.print_message("uploading analysis model to S3 bucket")
+        # self.base.print_message("uploading analysis model to S3 bucket")
         try:
             s3_model_success = await self.to_s3(model_dict, s3_model_target)
         except Exception as e:
@@ -132,7 +132,7 @@ class HelaoAnalysisSyncer:
 
         outputs = model_dict.get("outputs", [])
         output_successes = []
-        self.base.print_message("uploading analysis outputs to S3 bucket")
+        # self.base.print_message("uploading analysis outputs to S3 bucket")
         for output in outputs:
             s3_dict_keys = output["output_keys"]
             s3_dict = {k: v for k, v in output_dict.items() if k in s3_dict_keys}

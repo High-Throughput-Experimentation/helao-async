@@ -270,16 +270,16 @@ class EcheUvisAnalysis:
         self.analysis_params = copy(ANALYSIS_DEFAULTS)
         self.analysis_params.update(analysis_params)
         pdf = query_df.query("process_uuid==@process_uuid")
-        print("filtered data has shape:", pdf.shape)
+        # print("filtered data has shape:", pdf.shape)
         self.plate_id = pdf.iloc[0].plate_id
         self.sample_no = pdf.iloc[0].sample_no
-        print("assembling inputs")
+        # print("assembling inputs")
         self.inputs = EcheUvisInputs(
             process_uuid, self.plate_id, self.sample_no, query_df
         )
         self.process_uuid = process_uuid
         self.ca_potential_vrhe = self.inputs.insitu.process_params["CA_potential_vsRHE"]
-        print("getting code hash")
+        # print("getting code hash")
         self.analysis_codehash = get_filehash(sys._getframe().f_code.co_filename)
 
     def calc_output(self):
