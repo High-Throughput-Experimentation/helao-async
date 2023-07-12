@@ -24,9 +24,12 @@ from helao.drivers.data.sync_driver import dict2json
 from helao.drivers.data.loaders import pgs3
 from helao.drivers.data.analyses.echeuvis_stability import (
     EcheUvisAnalysis,
-    DryUvisAnalysis,
     ANALYSIS_DEFAULTS as ECHEUVIS_DEFAULTS,
     SDCUVIS_QUERY,
+)
+from helao.drivers.data.analyses.uvis_bkgsubnorm import (
+    DryUvisAnalysis,
+    ANALYSIS_DEFAULTS as DRYUVIS_DEFAULTS,
 )
 
 
@@ -119,15 +122,24 @@ class HelaoAnalysisSyncer:
             region=self.region,
         )
         s3_model_target = f"analysis/{eua.analysis_uuid}.json"
-        s3_output_target = f"analysis/{eua.analysis_uuid}_output.json"
 
-        self.base.print_message("uploading outputs to S3 bucket")
+        self.base.print_message("uploading analysis model to S3 bucket")
         try:
             s3_model_success = await self.to_s3(model_dict, s3_model_target)
-            s3_output_success = await self.to_s3(output_dict, s3_output_target)
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             print(tb)
+
+        outputs = model_dict.get("outputs", [])
+        output_successes = []
+        self.base.print_message("uploading analysis outputs to S3 bucket")
+        for output in outputs:
+            s3_dict_keys = output["output_keys"]
+            s3_dict = {k: v for k, v in output_dict.items() if k in s3_dict_keys}
+            s3_output_target = output["analysis_output_path"]["key"]
+            s3_success = await self.to_s3(s3_dict, s3_output_target)
+            output_successes.append(s3_success)
+        s3_output_success = all(output_successes)
 
         # api_success = await self.to_api(model_dict)
         api_success = True
@@ -296,7 +308,7 @@ class HelaoAnalysisSyncer:
             .query("run_use=='data'")
             .query("action_name=='acquire_spec_adv'")
         )
-        ana_params = copy(ECHEUVIS_DEFAULTS)
+        ana_params = copy(DRYUVIS_DEFAULTS)
         for puuid in udf.process_uuid:
             await self.enqueue_calc(
                 (
