@@ -164,7 +164,7 @@ config["servers"] = {
         "params": {"devices": {"CO2": {"port": "COM7", "unit_id": "A"}}},
         "verbose": False,
 
-    # },
+    },
     "CALC": {
         "host": hostip,
         "port": 8011,
