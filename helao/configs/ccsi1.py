@@ -156,13 +156,13 @@ config["servers"] = {
         "fast": "syringe_server",
         "params": {"port": "COM6", "pumps": {"one": {"address": 1, "diameter": 26.7}}},
     },
-    # "MFC": {
-    #     "host": hostip,
-    #     "port": 8009,
-    #     "group": "action",
-    #     "fast": "mfc_server",
-    #     "params": {"devices": {"N2": {"port": "COM7", "unit_id": "A"}}},
-    #     "verbose": False,
+    "MFC": {
+        "host": hostip,
+        "port": 8009,
+        "group": "action",
+        "fast": "mfc_server",
+        "params": {"devices": {"CO2": {"port": "COM7", "unit_id": "A"}}},
+        "verbose": False,
 
     # },
     "CALC": {
