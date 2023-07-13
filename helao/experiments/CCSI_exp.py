@@ -857,7 +857,7 @@ def CCSI_sub_liquidfill_syringes(
 
 def CCSI_sub_cellfill_constantcotwo(
     experiment: Experiment,
-    experiment_version: int = 10, #ver 6to7 implements multivalve, #10 gas push between
+    experiment_version: int = 2,
     Solution_description: str = "KOH",
     Solution_reservoir_sample_no: int = 2,
     Solution_volume_ul: float = 500,
@@ -871,6 +871,7 @@ def CCSI_sub_cellfill_constantcotwo(
     co2measure_duration: float = 20,
     co2measure_acqrate: float = 0.5,
     atm_pressure: float = 14.27,
+    pressureramp: float = 2,
 ):
     # v2 v1ab open, sol inject clean inject
 
@@ -974,7 +975,7 @@ def CCSI_sub_cellfill_constantcotwo(
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(IO_server, "acquire_analog_in", {"duration":apm.pars.co2measure_duration + 1,"acquisition_rate": apm.pars.co2measure_acqrate, })
-    apm.add(MFC_server, "acquire_pressure", {"pressure_psia":apm.pars.atm_pressure,"ramp_psi_sec":0.1,"duration":apm.pars.co2measure_duration,"acquisition_rate": apm.pars.co2measure_acqrate,}, asc.no_wait)
+    apm.add(MFC_server, "acquire_pressure", {"pressure_psia":apm.pars.atm_pressure,"ramp_psi_sec":apm.pars.pressureramp,"duration":apm.pars.co2measure_duration,"acquisition_rate": apm.pars.co2measure_acqrate,}, asc.no_wait)
 #need to account for gas sample
     apm.add(
         CO2S_server,
