@@ -290,13 +290,12 @@ class EcheUvisLoader(HelaoLoader):
     def get_recent(
         self,
         query: str,
-        min_date: Optional[str] = "2023-04-26",
+        min_date: str = "2023-04-26",
         plate_id: Optional[int] = None,
         sample_no: Optional[int] = None,
     ):
         conditions = []
-        if min_date is not None:
-            conditions.append(f"    AND hp.process_timestamp >= '{min_date}'")
+        conditions.append(f"    AND hp.process_timestamp >= '{min_date}'")
         recent_md = sorted(
             [md for md, pi, sn in self.recent_cache if pi is None and sn is None]
         )
@@ -363,10 +362,14 @@ class EcheUvisLoader(HelaoLoader):
             print("!!! dataframe shape:", pdf.shape)
             print("!!! dataframe cols:", pdf.columns)
             pdf["plate_id"] = pdf.global_label.apply(
-                lambda x: int(x.split("_")[-2]) if "solid" in x else None
+                lambda x: int(x.split("_")[-2])
+                if "solid" in x and "None" not in x
+                else None
             )
             pdf["sample_no"] = pdf.global_label.apply(
-                lambda x: int(x.split("_")[-1]) if "solid" in x else None
+                lambda x: int(x.split("_")[-1])
+                if "solid" in x and "None" not in x
+                else None
             )
             # assign solid samples from sequence params
             for suuid in set(pdf.query("sample_no.isna()").sequence_uuid):
