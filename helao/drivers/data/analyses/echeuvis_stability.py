@@ -271,8 +271,8 @@ class EcheUvisAnalysis:
         self.analysis_params.update(analysis_params)
         pdf = query_df.query("process_uuid==@process_uuid")
         # print("filtered data has shape:", pdf.shape)
-        self.plate_id = pdf.iloc[0].plate_id
-        self.sample_no = pdf.iloc[0].sample_no
+        self.plate_id = int(pdf.iloc[0].plate_id)
+        self.sample_no = int(pdf.iloc[0].sample_no)
         # print("assembling inputs")
         self.inputs = EcheUvisInputs(
             process_uuid, self.plate_id, self.sample_no, query_df
