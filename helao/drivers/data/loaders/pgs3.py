@@ -363,10 +363,10 @@ class EcheUvisLoader(HelaoLoader):
             print("!!! dataframe shape:", pdf.shape)
             print("!!! dataframe cols:", pdf.columns)
             pdf["plate_id"] = pdf.global_label.apply(
-                lambda x: x.split("_")[-2] if "solid" in x else None
+                lambda x: int(x.split("_")[-2]) if "solid" in x else None
             )
             pdf["sample_no"] = pdf.global_label.apply(
-                lambda x: x.split("_")[-1] if "solid" in x else None
+                lambda x: int(x.split("_")[-1]) if "solid" in x else None
             )
             # assign solid samples from sequence params
             for suuid in set(pdf.query("sample_no.isna()").sequence_uuid):
