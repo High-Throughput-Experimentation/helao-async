@@ -121,6 +121,7 @@ class HelaoAnalysisSyncer:
             analysis_name=analysis_name,
             bucket=self.bucket,
             region=self.region,
+            dummy=self.world_config.get("dummy", True)
         )
         s3_model_target = f"analysis/{eua.analysis_uuid}.json"
 

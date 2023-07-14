@@ -404,7 +404,7 @@ class EcheUvisAnalysis:
             mean_abs_omT_diff=np.mean(np.abs((1 - rscl_insitu) - (1 - rscl_baseline))),
         )
 
-    def export_analysis(self, analysis_name: str, bucket: str, region: str):
+    def export_analysis(self, analysis_name: str, bucket: str, region: str, dummy: bool = True):
         action_keys = [k for k in vars(self.inputs).keys() if "spec_act" in k]
         inputs = []
 
@@ -417,7 +417,7 @@ class EcheUvisAnalysis:
                 raw_data_path = f"raw_data/{eui.action_uuid}/{eui.hlo_file}.json"
                 if ru in ["data", "baseline"]:
                     global_sample = (
-                        f"legacy__solid__{self.plate_id:d}_{self.sample_no:d}"
+                        f"legacy__solid__{int(self.plate_id):d}_{int(self.sample_no):d}"
                     )
                 else:
                     global_sample = None
@@ -472,5 +472,6 @@ class EcheUvisAnalysis:
             process_params=self.inputs.insitu.process_params,
             inputs=inputs,
             outputs=outputs,
+            dummy=dummy,
         )
         return ana_model.clean_dict(), self.outputs.dict()
