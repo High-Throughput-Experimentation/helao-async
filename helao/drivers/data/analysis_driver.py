@@ -254,6 +254,13 @@ class HelaoAnalysisSyncer:
             query=SDCUVIS_QUERY, min_date=min_date, plate_id=plate_id
         )
 
+        ## patch erroneous plate_ids here
+        idxs = df.query("sequence_label.str.startswith('ZnSbO') & plate_id==4014").index
+        df.loc[idxs, "global_label"] = df.loc[idxs].global_label.str.replace(
+            "solid__4014", "solid__2300"
+        )
+        df.loc[idxs, "plate_id"] = 2300
+
         # all processes in sequence
         pdf = df.sort_values(
             ["sequence_timestamp", "process_timestamp"], ascending=False
