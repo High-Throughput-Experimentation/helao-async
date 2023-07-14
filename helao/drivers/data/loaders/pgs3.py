@@ -283,8 +283,8 @@ class EcheUvisLoader(HelaoLoader):
         cache_json: bool = True,
     ):
         super().__init__(env_file, cache_s3, cache_json)
-        print("!!! using env_file:", env_file)
-        print("!!! postgresql dsn:", self.hcred.api_dsn)
+        # print("!!! using env_file:", env_file)
+        # print("!!! postgresql dsn:", self.hcred.api_dsn)
         self.recent_cache = {}  # {'%Y-%m-%d': dataframe}
 
     def get_recent(
