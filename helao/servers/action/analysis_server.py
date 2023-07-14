@@ -8,7 +8,7 @@ it differs from calc_server.py which does not produce Analysis models.
 __all__ = ["makeApp"]
 
 from uuid import UUID
-from typing import Optional
+from typing import Union
 
 from helao.servers.base import HelaoBase
 from helao.drivers.data.analysis_driver import HelaoAnalysisSyncer
@@ -29,7 +29,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post("/batch_calc_echeuvis", tags=["private"])
     async def batch_calc_echeuvis(
-        plate_id: Optional[int], sequence_uuid: str, recent: bool = True, params: dict = {}
+        sequence_uuid: str, plate_id: Union[int, None] = None, recent: bool = True, params: dict = {}
     ):
         """Generates ECHEUVIS stability analyses from sequence_uuid."""
         await app.driver.batch_calc_echeuvis(
@@ -42,7 +42,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post("/batch_calc_dryuvis", tags=["private"])
     async def batch_calc_dryuvis(
-        plate_id: Optional[int], sequence_uuid: str, recent: bool = True, params: dict = {}
+        sequence_uuid: str, plate_id: Union[int, None] = None, recent: bool = True, params: dict = {}
     ):
         """Generates dry UVIS-T analyses from sequence_uuid."""
         await app.driver.batch_calc_dryuvis(
