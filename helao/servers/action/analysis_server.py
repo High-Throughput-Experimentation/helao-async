@@ -39,7 +39,7 @@ def makeApp(confPrefix, server_key, helao_root):
         )
         return sequence_uuid
 
-    @app.post("/batch_calc_echeuvis", tags=["private"])
+    @app.post("/batch_calc_dryuvis", tags=["private"])
     async def batch_calc_dryuvis(
         plate_id: int, sequence_uuid: str, recent: bool = True, params: dict = {}
     ):
