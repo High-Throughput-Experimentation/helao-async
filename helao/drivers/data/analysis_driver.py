@@ -249,7 +249,7 @@ class HelaoAnalysisSyncer:
     ):
         """Generate list of EcheUvisAnalysis from sequence or plate_id (latest seq)."""
         # eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
-        min_date = datetime.now().strftime("%Y-%m-%d") if recent else None
+        min_date = datetime.now().strftime("%Y-%m-%d") if recent else "2023-04-26"
         df = pgs3.LOADER.get_recent(
             query=SDCUVIS_QUERY, min_date=min_date, plate_id=plate_id
         )
@@ -297,7 +297,7 @@ class HelaoAnalysisSyncer:
     ):
         """Generate list of DryUvisAnalysis from sequence or plate_id (latest seq)."""
         # eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
-        min_date = datetime.now().strftime("%Y-%m-%d") if recent else None
+        min_date = datetime.now().strftime("%Y-%m-%d") if recent else "2023-04-26"
         df = pgs3.LOADER.get_recent(
             query=SDCUVIS_QUERY, min_date=min_date, plate_id=plate_id
         )
