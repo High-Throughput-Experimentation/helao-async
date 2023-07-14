@@ -416,7 +416,9 @@ class EcheUvisAnalysis:
             for eui in euis:
                 raw_data_path = f"raw_data/{eui.action_uuid}/{eui.hlo_file}.json"
                 if ru in ["data", "baseline"]:
-                    global_sample = f"legacy__solid__{self.plate_id}_{self.sample_no}"
+                    global_sample = (
+                        f"legacy__solid__{self.plate_id:d}_{self.sample_no:d}"
+                    )
                 else:
                     global_sample = None
                 adm = AnalysisDataModel(
