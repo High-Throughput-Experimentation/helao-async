@@ -750,6 +750,7 @@ def CCSI_Solution_test_constantpressure(  #assumes initialization performed prev
     co2measure_duration: float = 300,
     co2measure_acqrate: float = 1,
     atm_pressure: float = 14.27,
+    pressureramp: float = 2,
     drainclean_volume_ul: float = 10000,
     headspace_purge_cycles: int = 2,
 #    liquid_purge_cycles: int = 1,
@@ -824,6 +825,7 @@ def CCSI_Solution_test_constantpressure(  #assumes initialization performed prev
             "co2measure_duration": co2measure_duration,
             "co2measure_acqrate": co2measure_acqrate,
             "atm_pressure" : atm_pressure,
+            "pressureramp": pressureramp,
         })
         epm.add_experiment("CCSI_sub_drain", {"HSpurge_duration": SamplePurge_duration,"DeltaDilute1_duration": DeltaDilute1_duration,"recirculation":drainrecirc,})
 
