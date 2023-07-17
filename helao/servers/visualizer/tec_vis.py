@@ -197,6 +197,7 @@ class C_tec:
             if time.time() - self.last_update_time >= self.update_rate:
                 messages = await self.wss.read_messages()
                 if messages:
+                    print(messages)
                     self.vis.doc.add_next_tick_callback(
                         partial(self.add_points, messages)
                     )
