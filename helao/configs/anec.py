@@ -149,4 +149,18 @@ config["servers"] = {
             "testing": False,
         },
     },
+    "TEC": {
+        "host": hostip,
+        "port": 8008,
+        "group": "action",
+        "fast": "tec_server",
+        "params": {"channel": 1, "port": "COM5"},
+    },
+    "LIVE": {
+        "host": hostip,
+        "port": 5004,
+        "group": "visualizer",
+        "bokeh": "live_visualizer",
+        "params": {"doc_name": "Sensor Visualizer"},
+    },
 }
