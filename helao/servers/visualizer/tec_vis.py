@@ -12,7 +12,7 @@ from bokeh.models.widgets import DataTable, TableColumn
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 
-from helao.drivers.temperature_control.mecom_driver import COMMAND_TABLE
+from helao.drivers.temperature_control.mecom_driver import DEFAULT_QUERIES
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
@@ -40,7 +40,7 @@ class C_tec:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["datetime"] + sorted(COMMAND_TABLE.keys())
+        self.data_dict_keys = ["datetime"] + DEFAULT_QUERIES)
         self.datasource = ColumnDataSource(data={k: [] for k in self.data_dict_keys})
         self.datasource_table = ColumnDataSource(
             data={k: [] for k in ["name", "value"]}
