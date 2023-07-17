@@ -24,9 +24,12 @@ from helao.drivers.data.sync_driver import dict2json
 from helao.drivers.data.loaders import pgs3
 from helao.drivers.data.analyses.echeuvis_stability import (
     EcheUvisAnalysis,
-    DryUvisAnalysis,
     ANALYSIS_DEFAULTS as ECHEUVIS_DEFAULTS,
     SDCUVIS_QUERY,
+)
+from helao.drivers.data.analyses.uvis_bkgsubnorm import (
+    DryUvisAnalysis,
+    ANALYSIS_DEFAULTS as DRYUVIS_DEFAULTS,
 )
 
 
@@ -96,6 +99,7 @@ class HelaoAnalysisSyncer:
                 self.running_tasks[str(calc_tup[0])].add_done_callback(
                     self.sync_exit_callback
                 )
+                self.task_queue.task_done()
             await asyncio.sleep(0.1)
 
     async def sync_ana(
@@ -105,29 +109,39 @@ class HelaoAnalysisSyncer:
         rank: int = 5,
     ):
         process_uuid, process_df, analysis_params, analysis_name = calc_tup
-        self.base.print_message(f"performing analysis {analysis_name}")
-        self.base.print_message(f"using params {analysis_params}")
+        # self.base.print_message(f"performing analysis {analysis_name}")
+        # self.base.print_message(f"using params {analysis_params}")
         if analysis_params is None:
             analysis_params = {}
         eua = self.ana_funcs[analysis_name](process_uuid, process_df, analysis_params)
-        self.base.print_message("calculating analysis output")
+        # self.base.print_message("calculating analysis output")
         eua.calc_output()
-        self.base.print_message("exporting analysis output")
+        # self.base.print_message("exporting analysis output")
         model_dict, output_dict = eua.export_analysis(
             analysis_name=analysis_name,
             bucket=self.bucket,
             region=self.region,
+            dummy=self.world_config.get("dummy", True)
         )
         s3_model_target = f"analysis/{eua.analysis_uuid}.json"
-        s3_output_target = f"analysis/{eua.analysis_uuid}_output.json"
 
-        self.base.print_message("uploading outputs to S3 bucket")
+        # self.base.print_message("uploading analysis model to S3 bucket")
         try:
             s3_model_success = await self.to_s3(model_dict, s3_model_target)
-            s3_output_success = await self.to_s3(output_dict, s3_output_target)
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             print(tb)
+
+        outputs = model_dict.get("outputs", [])
+        output_successes = []
+        # self.base.print_message("uploading analysis outputs to S3 bucket")
+        for output in outputs:
+            s3_dict_keys = output["output_keys"]
+            s3_dict = {k: v for k, v in output_dict.items() if k in s3_dict_keys}
+            s3_output_target = output["analysis_output_path"]["key"]
+            s3_success = await self.to_s3(s3_dict, s3_output_target)
+            output_successes.append(s3_success)
+        s3_output_success = all(output_successes)
 
         # api_success = await self.to_api(model_dict)
         api_success = True
@@ -236,10 +250,17 @@ class HelaoAnalysisSyncer:
     ):
         """Generate list of EcheUvisAnalysis from sequence or plate_id (latest seq)."""
         # eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
-        min_date = datetime.now().strftime("%Y-%m-%d") if recent else None
+        min_date = datetime.now().strftime("%Y-%m-%d") if recent else "2023-04-26"
         df = pgs3.LOADER.get_recent(
             query=SDCUVIS_QUERY, min_date=min_date, plate_id=plate_id
         )
+
+        ## patch erroneous plate_ids here
+        idxs = df.query("sequence_label.str.startswith('ZnSbO') & plate_id==4014").index
+        df.loc[idxs, "global_label"] = df.loc[idxs].global_label.str.replace(
+            "solid__4014", "solid__2300"
+        )
+        df.loc[idxs, "plate_id"] = 2300
 
         # all processes in sequence
         pdf = df.sort_values(
@@ -277,7 +298,7 @@ class HelaoAnalysisSyncer:
     ):
         """Generate list of DryUvisAnalysis from sequence or plate_id (latest seq)."""
         # eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
-        min_date = datetime.now().strftime("%Y-%m-%d") if recent else None
+        min_date = datetime.now().strftime("%Y-%m-%d") if recent else "2023-04-26"
         df = pgs3.LOADER.get_recent(
             query=SDCUVIS_QUERY, min_date=min_date, plate_id=plate_id
         )
@@ -296,7 +317,7 @@ class HelaoAnalysisSyncer:
             .query("run_use=='data'")
             .query("action_name=='acquire_spec_adv'")
         )
-        ana_params = copy(ECHEUVIS_DEFAULTS)
+        ana_params = copy(DRYUVIS_DEFAULTS)
         for puuid in udf.process_uuid:
             await self.enqueue_calc(
                 (
