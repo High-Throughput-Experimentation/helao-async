@@ -40,7 +40,7 @@ class C_tec:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["datetime"] + DEFAULT_QUERIES)
+        self.data_dict_keys = ["datetime"] + DEFAULT_QUERIES
         self.datasource = ColumnDataSource(data={k: [] for k in self.data_dict_keys})
         self.datasource_table = ColumnDataSource(
             data={k: [] for k in ["name", "value"]}
