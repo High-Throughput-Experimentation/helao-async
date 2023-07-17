@@ -12,12 +12,13 @@ from bokeh.models.widgets import DataTable, TableColumn
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 
+from helao.drivers.temperature_control.mecom_driver import COMMAND_TABLE
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
 
-class C_temperature:
-    """thermocouple visualizer module class"""
+class C_tec:
+    """TEC visualizer module class"""
 
     def __init__(self, vis_serv: Vis, serv_key: str):
         self.vis = vis_serv
@@ -39,9 +40,7 @@ class C_temperature:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["datetime"] + sorted(
-            tserv_config.get("params", {}).get("dev_monitor", {}).keys()
-        )
+        self.data_dict_keys = ["datetime"] + sorted(COMMAND_TABLE.keys())
         self.datasource = ColumnDataSource(data={k: [] for k in self.data_dict_keys})
         self.datasource_table = ColumnDataSource(
             data={k: [] for k in ["name", "value"]}
@@ -174,7 +173,7 @@ class C_temperature:
         data_dict = {k: [] for k in self.data_dict_keys}
         for datapackage in datapackage_list:
             for datalab, (dataval, epochsec) in datapackage.items():
-                if datalab == "sim_dict":
+                if datalab == "tec_vals":
                     for k, v in dataval.items():
                         data_dict[k].append(v)
                 elif isinstance(dataval, list):
@@ -212,18 +211,23 @@ class C_temperature:
         # remove all old lines
         self.plot.renderers = []
 
-        colors = ["red", "blue", "green", "orange"]
-        non_epoch_keys = [x for x in self.data_dict_keys if x not in ["datetime"]]
-        for temp_key, color in zip(non_epoch_keys, colors):
-            self.plot.line(
-                x="datetime",
-                y=temp_key,
-                line_color=color,
-                source=self.datasource,
-                legend_label=temp_key,
-            )
-            self.plot.legend.border_line_alpha = 0.2
-            self.plot.legend.background_fill_alpha = 0.2
+        self.plot.line(
+            x="datetime",
+            y="object_temperature",
+            line_color="red",
+            source=self.datasource,
+            legend_label="object_temperature",
+        )
+        self.plot.line(
+            x="datetime",
+            y="target_object_temperature",
+            line_color="red",
+            line_dash="dotted",
+            source=self.datasource,
+            legend_label="target_object_temperature",
+        )
+        self.plot.legend.border_line_alpha = 0.2
+        self.plot.legend.background_fill_alpha = 0.2
 
     def reset_plot(self, forceupdate: bool = False):
         self._add_plots()
