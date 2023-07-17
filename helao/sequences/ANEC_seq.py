@@ -1,6 +1,6 @@
 """Sequence library for ANEC"""
 
-__all__ = ["ANEC_sample_ready", "ANEC_series_CA", "ANEC_series_CAliquidOnly", "ANEC_OCV","ANEC_photo_CA", "ANEC_photo_CV", "ANEC_cleanup_disengage","ANEC_repeat_CA", "ANEC_repeat_CV", "ANEC_CA_pretreat", "ANEC_gasonly_CA", "GC_Archiveliquid_analysis", "HPLC_Archiveliquid_analysis"]
+__all__ = ["ANEC_sample_ready", "ANEC_series_CA", "ANEC_series_CAliquidOnly", "ANEC_OCV","ANEC_photo_CA", "ANEC_photo_CV", "ANEC_cleanup_disengage","ANEC_repeat_CA", "ANEC_repeat_CV", "ANEC_CA_pretreat", "ANEC_gasonly_CA", "ANEC_ferricyanide_simpleprotocol", "ANEC_ferricyanide_protocol", "GC_Archiveliquid_analysis", "HPLC_Archiveliquid_analysis"]
 
 from typing import List
 from typing import Optional
@@ -982,6 +982,198 @@ def ANEC_repeat_CV(
                 "ScanRate_V_s": ScanRate_V_s,
                 "Cycles": Cycles,
                 "SampleRate": SampleRate,
+                "IErange": IErange,
+            },
+        )
+
+        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
+
+    return epm.experiment_plan_list
+
+def ANEC_ferricyanide_simpleprotocol(
+    sequence_version: int = 1,
+    num_repeats: int = 1,
+    plate_id: int = 5740,
+    solid_sample_no: int = 1,
+    reservoir_liquid_sample_no: int = 1511,
+    volume_ul_cell_liquid: float = 1000,
+    WE_potential__V: float = -0.8,
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 6.8,
+    CA_duration_sec: float = 120.0,
+    SampleRate_CA: float = 0.5,
+    IErange: str = "3mA",
+    ref_offset__V: float = 0.0,
+    WE_potential_init__V: float = 0.5,
+    WE_potential_apex1__V: float = -1.0,
+    WE_potential_apex2__V: float = 0.5,
+    WE_potential_final__V: float = 0.5,
+    ScanRate_V_s: float = 0.1,
+    Cycles: int = 1,
+    SampleRate_CV: float = 0.1,
+    liquidDrain_time: float = 80.0,
+):
+    """Repeat CA and aliquot sampling at the cell1_we position.
+
+    Flush and fill cell, run CA, and drain.
+
+    (1) Fill cell with liquid for 90 seconds
+    (2) Equilibrate for 15 seconds
+    (3) run CA
+    (4) mix product
+    (5) Drain cell and purge with CO2 for 60 seconds
+
+    Args:
+        exp (Experiment): Active experiment object supplied by Orchestrator
+        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
+        volume_ul_GC: GC injection volume
+
+
+
+    """
+
+    epm = ExperimentPlanMaker()
+
+    # housekeeping
+    epm.add_experiment("ANEC_sub_unload_cell", {})
+
+    #epm.add_experiment("ANEC_sub_normal_state", {})
+
+    epm.add_experiment(
+        "ANEC_sub_load_solid",
+        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    )
+
+    for _ in range(num_repeats):
+        
+        epm.add_experiment(
+            "ANEC_sub_CV",
+            {
+                "WE_versus": WE_versus,
+                "ref_type": ref_type,
+                "pH": pH,
+                "WE_potential_init__V": WE_potential_init__V,
+                "WE_potential_apex1__V": WE_potential_apex1__V,
+                "WE_potential_apex2__V": WE_potential_apex2__V,
+                "WE_potential_final__V": WE_potential_final__V,
+                "ScanRate_V_s": ScanRate_V_s,
+                "Cycles": Cycles,
+                "SampleRate": SampleRate_CV,
+                "IErange": IErange,
+            },
+        )
+        epm.add_experiment(
+            "ANEC_sub_CA",
+            {
+                "WE_potential__V": WE_potential__V,
+                "WE_versus": WE_versus,
+                "ref_type": ref_type,
+                "pH": pH,
+                "ref_offset__V": ref_offset__V,
+                "CA_duration_sec": CA_duration_sec,
+                "SampleRate": SampleRate_CA,
+                "IErange": IErange,
+            },
+        )
+
+    return epm.experiment_plan_list
+
+
+def ANEC_ferricyanide_protocol(
+    sequence_version: int = 1,
+    num_repeats: int = 1,
+    plate_id: int = 5740,
+    solid_sample_no: int = 1,
+    reservoir_liquid_sample_no: int = 1511,
+    volume_ul_cell_liquid: float = 1000,
+    WE_potential__V: float = -0.8,
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 6.8,
+    CA_duration_sec: float = 120.0,
+    SampleRate_CA: float = 0.5,
+    IErange: str = "3mA",
+    ref_offset__V: float = 0.0,
+    WE_potential_init__V: float = 0.5,
+    WE_potential_apex1__V: float = -1.0,
+    WE_potential_apex2__V: float = 0.5,
+    WE_potential_final__V: float = 0.5,
+    ScanRate_V_s: float = 0.1,
+    Cycles: int = 1,
+    SampleRate_CV: float = 0.1,
+    liquidDrain_time: float = 80.0,
+):
+    """Repeat CA and aliquot sampling at the cell1_we position.
+
+    Flush and fill cell, run CA, and drain.
+
+    (1) Fill cell with liquid for 90 seconds
+    (2) Equilibrate for 15 seconds
+    (3) run CA
+    (4) mix product
+    (5) Drain cell and purge with CO2 for 60 seconds
+
+    Args:
+        exp (Experiment): Active experiment object supplied by Orchestrator
+        toolGC (str): PAL tool string enumeration (see pal_driver.PALTools)
+        volume_ul_GC: GC injection volume
+
+
+
+    """
+
+    epm = ExperimentPlanMaker()
+
+    # housekeeping
+    epm.add_experiment("ANEC_sub_unload_cell", {})
+
+    #epm.add_experiment("ANEC_sub_normal_state", {})
+
+    epm.add_experiment(
+        "ANEC_sub_load_solid",
+        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    )
+
+    for _ in range(num_repeats):
+
+        epm.add_experiment(
+            "ANEC_sub_flush_fill_cell",
+            {
+                "liquid_flush_time": 80,
+                "co2_purge_time": 15,
+                "equilibration_time": 1.0,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "volume_ul_cell_liquid": volume_ul_cell_liquid,
+            },
+        )
+        
+        epm.add_experiment(
+            "ANEC_sub_CV",
+            {
+                "WE_versus": WE_versus,
+                "ref_type": ref_type,
+                "pH": pH,
+                "WE_potential_init__V": WE_potential_init__V,
+                "WE_potential_apex1__V": WE_potential_apex1__V,
+                "WE_potential_apex2__V": WE_potential_apex2__V,
+                "WE_potential_final__V": WE_potential_final__V,
+                "ScanRate_V_s": ScanRate_V_s,
+                "Cycles": Cycles,
+                "SampleRate": SampleRate_CV,
+                "IErange": IErange,
+            },
+        )
+        epm.add_experiment(
+            "ANEC_sub_CA",
+            {
+                "WE_potential__V": WE_potential__V,
+                "WE_versus": WE_versus,
+                "ref_type": ref_type,
+                "pH": pH,
+                "ref_offset__V": ref_offset__V,
+                "CA_duration_sec": CA_duration_sec,
+                "SampleRate": SampleRate_CA,
                 "IErange": IErange,
             },
         )
