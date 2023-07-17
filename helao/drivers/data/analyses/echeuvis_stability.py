@@ -1,5 +1,4 @@
 import sys
-import traceback
 from copy import copy
 from typing import List
 from uuid import UUID
@@ -20,7 +19,7 @@ from helaocore.version import get_filehash
 from helaocore.models.s3locator import S3Locator
 from helao.helpers.gen_uuid import gen_uuid
 
-from helao.drivers.data.loaders import pgs3
+from helao.drivers.data.loaders.pgs3 import HelaoProcess, HelaoAction
 
 ANALYSIS_DEFAULTS = {
     "ev_parts": [1.8, 2.2, 2.6, 3.0],
@@ -77,135 +76,6 @@ WHERE
     AND hp.run_type='eche'
     AND ha.action_name in ('run_OCV', 'run_CA', 'acquire_spec_adv', 'acquire_spec_extrig')
 """
-
-
-class HelaoSolid:
-    sample_label: str
-    # composition: dict
-
-    def __init__(self, sample_label):
-        self.sample_label = sample_label
-
-
-class HelaoModel:
-    name: str
-    uuid: UUID
-    helao_type: str
-    timestamp: datetime
-    params: dict
-
-    def __init__(self, helao_type: str, uuid: UUID, query_df: pd.DataFrame = None):
-        self.uuid = uuid
-        self.helao_type = helao_type
-        if (
-            query_df is not None
-            and query_df.query(f"{helao_type}_uuid==@uuid").shape[0] > 1
-        ):
-            self.row_dict = (
-                query_df.query(f"{helao_type}_uuid==@uuid").iloc[0].to_dict()
-            )
-        else:
-            self.row_dict = self._row_dict
-        self.timestamp = self.row_dict.get(
-            f"{helao_type}_timestamp",
-            self.row_dict.get(f"{helao_type}_timestamp", None),
-        )
-        self.params = self.row_dict.get(
-            f"{helao_type}_params", self.row_dict.get(f"{helao_type}_params", {})
-        )
-        if helao_type == "process":
-            self.name = self.row_dict.get(
-                "technique_name", self.row_dict.get("technique_name", None)
-            )
-        else:
-            self.name = self.row_dict.get(
-                f"{helao_type}_name", self.row_dict.get(f"{helao_type}_name", None)
-            )
-
-    @property
-    def json(self):
-        # retrieve json metadata from S3 via HelaoAccess
-        return pgs3.LOADER.get_json(self.helao_type, self.uuid)
-
-    @property
-    def _row_dict(self):
-        # retrieve row from API database via HelaoAccess
-        return pgs3.LOADER.get_sql(self.helao_type, self.uuid)
-
-
-class HelaoAction(HelaoModel):
-    action_name: str
-    action_uuid: UUID
-    action_timestamp: datetime
-    action_params: dict
-
-    def __init__(self, uuid: UUID, query_df: pd.DataFrame = None):
-        super().__init__(helao_type="action", uuid=uuid, query_df=query_df)
-        self.action_name = self.name
-        self.action_uuid = self.uuid
-        self.action_timestamp = self.timestamp
-        self.action_params = self.params
-
-    @property
-    def hlo_file(self):
-        """Return primary .hlo filename for this action."""
-        meta = self.json
-        file_list = meta.get("files", [])
-        hlo_files = [x for x in file_list if x["file_name"].endswith(".hlo")]
-        if not hlo_files:
-            return ""
-        filename = hlo_files[0]["file_name"]
-        return filename
-
-    @property
-    def hlo(self):
-        """Retrieve json data from S3 via HelaoLoader."""
-        hlo_file = self.hlo_file
-        if not hlo_file:
-            return {}
-        return pgs3.LOADER.get_hlo(self.action_uuid, hlo_file)
-
-
-class HelaoExperiment(HelaoModel):
-    experiment_name: str
-    experiment_uuid: UUID
-    experiment_timestamp: datetime
-    experiment_params: dict
-
-    def __init__(self, uuid: UUID, query_df: pd.DataFrame = None):
-        super().__init__(helao_type="experiment", uuid=uuid, query_df=query_df)
-        self.experiment_name = self.name
-        self.experiment_uuid = self.uuid
-        self.experiment_timestamp = self.timestamp
-        self.experiment_params = self.params
-
-
-class HelaoSequence(HelaoModel):
-    sequence_name: str
-    sequence_uuid: UUID
-    sequence_timestamp: datetime
-    sequence_params: dict
-
-    def __init__(self, uuid: UUID, query_df: pd.DataFrame = None):
-        super().__init__(helao_type="sequence", uuid=uuid, query_df=query_df)
-        self.sequence_name = self.name
-        self.sequence_uuid = self.uuid
-        self.sequence_timestamp = self.timestamp
-        self.sequence_params = self.params
-
-
-class HelaoProcess(HelaoModel):
-    process_name: str
-    process_uuid: UUID
-    process_timestamp: datetime
-    process_params: dict
-
-    def __init__(self, uuid: UUID, query_df: pd.DataFrame = None):
-        super().__init__(helao_type="process", uuid=uuid, query_df=query_df)
-        self.technique_name = self.name
-        self.process_uuid = self.uuid
-        self.process_timestamp = self.timestamp
-        self.process_params = self.params
 
 
 def parse_spechlo(hlod: dict):
@@ -395,23 +265,21 @@ class EcheUvisAnalysis:
         query_df: pd.DataFrame,
         analysis_params: dict,
     ):
-        print("initializing EUA")
         self.analysis_timestamp = datetime.now()
         self.analysis_uuid = gen_uuid()
         self.analysis_params = copy(ANALYSIS_DEFAULTS)
         self.analysis_params.update(analysis_params)
-        print("filtering data")
         pdf = query_df.query("process_uuid==@process_uuid")
-        print("filtered data has shape:", pdf.shape)
-        self.plate_id = pdf.iloc[0].plate_id
-        self.sample_no = pdf.iloc[0].sample_no
-        print("assembling inputs")
+        # print("filtered data has shape:", pdf.shape)
+        self.plate_id = int(pdf.iloc[0].plate_id)
+        self.sample_no = int(pdf.iloc[0].sample_no)
+        # print("assembling inputs")
         self.inputs = EcheUvisInputs(
             process_uuid, self.plate_id, self.sample_no, query_df
         )
         self.process_uuid = process_uuid
         self.ca_potential_vrhe = self.inputs.insitu.process_params["CA_potential_vsRHE"]
-        print("getting code hash")
+        # print("getting code hash")
         self.analysis_codehash = get_filehash(sys._getframe().f_code.co_filename)
 
     def calc_output(self):
@@ -536,7 +404,7 @@ class EcheUvisAnalysis:
             mean_abs_omT_diff=np.mean(np.abs((1 - rscl_insitu) - (1 - rscl_baseline))),
         )
 
-    def export_analysis(self, analysis_name: str, bucket: str, region: str):
+    def export_analysis(self, analysis_name: str, bucket: str, region: str, dummy: bool = True):
         action_keys = [k for k in vars(self.inputs).keys() if "spec_act" in k]
         inputs = []
 
@@ -548,7 +416,9 @@ class EcheUvisAnalysis:
             for eui in euis:
                 raw_data_path = f"raw_data/{eui.action_uuid}/{eui.hlo_file}.json"
                 if ru in ["data", "baseline"]:
-                    global_sample = f"legacy__solid__{self.plate_id}_{self.sample_no}"
+                    global_sample = (
+                        f"legacy__solid__{int(self.plate_id):d}_{int(self.sample_no):d}"
+                    )
                 else:
                     global_sample = None
                 adm = AnalysisDataModel(
@@ -559,19 +429,40 @@ class EcheUvisAnalysis:
                 )
                 inputs.append(adm)
 
-        aom = AnalysisOutputModel(
-            analysis_output_path=S3Locator(
-                bucket=bucket,
-                key=f"analysis/{self.analysis_uuid}_output.json",
-                region=region,
-            ),
-            content_type="application/json",
-            output_keys=list(self.outputs.dict().keys()),
-            output_name="foms",
-            output={
-                k: v for k, v in self.outputs.dict().items() if not isinstance(v, list)
-            },
-        )
+        scalar_outputs = [
+            k for k, v in self.outputs.dict().items() if not isinstance(v, list)
+        ]
+        array_outputs = [
+            k for k in self.outputs.dict().keys() if k not in scalar_outputs
+        ]
+
+        outputs = []
+
+        for label, output_keys in [
+            ("scalar", scalar_outputs),
+            ("array", array_outputs),
+        ]:
+            if output_keys:
+                out_model = AnalysisOutputModel(
+                    analysis_output_path=S3Locator(
+                        bucket=bucket,
+                        key=f"analysis/{self.analysis_uuid}_output_{label}.json",
+                        region=region,
+                    ),
+                    content_type="application/json",
+                    output_keys=output_keys,
+                    output_name=label,
+                    output={
+                        k: self.outputs.dict()[k]
+                        for k in output_keys
+                        if not isinstance(self.outputs.dict()[k], list)  # only scalars
+                    },
+                )
+                outputs.append(out_model)
+
+        if not outputs:
+            print("!!! analysis does not contain any outputs")
+
         ana_model = AnalysisModel(
             analysis_name=analysis_name,
             analysis_params=self.analysis_params,
@@ -580,206 +471,7 @@ class EcheUvisAnalysis:
             process_uuid=self.process_uuid,
             process_params=self.inputs.insitu.process_params,
             inputs=inputs,
-            outputs=[aom],
+            outputs=outputs,
+            dummy=dummy,
         )
         return ana_model.clean_dict(), self.outputs.dict()
-
-
-class DryUvisInputs:
-    ref_darks: List[HelaoProcess]
-    ref_dark_spec_acts: List[HelaoAction]
-    ref_lights: List[HelaoProcess]
-    ref_light_spec_acts: List[HelaoAction]
-    insitu_spec: HelaoProcess
-    insitu_spec_act: HelaoAction
-
-    def __init__(
-        self,
-        insitu_process_uuid: UUID,
-        plate_id: int,
-        sample_no: int,
-        query_df: pd.DataFrame,
-    ):
-        suuid = (
-            query_df.query("process_uuid==@insitu_process_uuid").iloc[0].sequence_uuid
-        )
-        sdf = query_df.query("sequence_uuid==@suuid")
-        self.ref_darks = [
-            HelaoProcess(x, query_df)
-            for x in sdf.query("run_use=='ref_dark'").process_uuid
-        ]
-        self.ref_dark_spec_acts = [
-            HelaoAction(x, query_df)
-            for x in sdf.query("run_use=='ref_dark'").action_uuid
-        ]
-        self.ref_lights = [
-            HelaoProcess(x, query_df)
-            for x in sdf.query("run_use=='ref_light'").process_uuid
-        ]
-        self.ref_light_spec_acts = [
-            HelaoAction(x, query_df)
-            for x in sdf.query("run_use=='ref_light'").action_uuid
-        ]
-
-        ddf = sdf.query("run_use=='data'")
-        bdf = (
-            ddf.query("experiment_name=='UVIS_sub_measure'")
-            .query("plate_id==@plate_id")
-            .query("sample_no==@sample_no")
-        )
-        self.insitu = HelaoProcess(
-            bdf.sort_values("action_timestamp").iloc[0].process_uuid,
-            query_df,
-        )
-        self.insitu_spec_act = HelaoAction(
-            bdf.query("action_name=='acquire_spec_adv'")
-            .sort_values("action_timestamp")
-            .iloc[0]
-            .action_uuid,
-            query_df,
-        )
-
-    @property
-    def ref_dark_spec(self):
-        return [x.hlo for x in self.ref_dark_spec_acts]
-
-    @property
-    def ref_light_spec(self):
-        return [x.hlo for x in self.ref_light_spec_acts]
-
-    @property
-    def insitu_spec(self):
-        return self.insitu_spec_act.hlo
-
-
-class DryUvisOutputs(BaseModel):
-    wavelength: list
-    lower_wl_idx: int
-    upper_wl_idx: int
-    mean_ref_dark: list  # mean over start and end reference dark insitutra
-    mean_ref_light: list  # mean over start and end reference light insitutra
-    agg_method: str
-    agg_insitu: list  # mean over final t seconds of OCV
-    bin_wavelength: list
-    bin_insitu: list
-    smth_insitu: list
-    rscl_insitu: list
-    insitu_min_rescaled: bool
-    insitu_max_rescaled: bool
-
-
-class DryUvisAnalysis(EcheUvisAnalysis):
-    """Dry UVIS Analysis for GCLD demonstration."""
-
-    analysis_timestamp: datetime
-    analysis_uuid: UUID
-    analysis_params: dict
-    plate_id: int
-    sample_no: int
-    process_uuid: UUID
-    inputs: DryUvisInputs
-    outputs: DryUvisOutputs
-    analysis_codehash: str
-
-    def __init__(
-        self,
-        process_uuid: UUID,
-        query_df: pd.DataFrame,
-        analysis_params: dict,
-    ):
-        self.analysis_timestamp = datetime.now()
-        self.analysis_uuid = gen_uuid()
-        self.analysis_params = copy(ANALYSIS_DEFAULTS)
-        self.analysis_params.update(analysis_params)
-        pdf = query_df.query("process_uuid==@process_uuid")
-        self.plate_id = pdf.iloc[0].plate_id
-        self.sample_no = pdf.iloc[0].sample_no
-        self.inputs = DryUvisInputs(
-            process_uuid, self.plate_id, self.sample_no, query_df
-        )
-        self.process_uuid = process_uuid
-        self.analysis_codehash = get_filehash(sys._getframe().f_code.co_filename)
-
-    def calc_output(self):
-        """Calculate stability FOMs and intermediate vectors."""
-        rdtups = [parse_spechlo(x) for x in self.inputs.ref_dark_spec]
-        rltups = [parse_spechlo(x) for x in self.inputs.ref_light_spec]
-        btup = parse_spechlo(self.inputs.insitu_spec)
-
-        ap = self.analysis_params
-        aggfunc = np.mean if ap["agg_method"] == "mean" else np.median
-        wl = btup[0]
-        wlindlo = np.where(wl > ap["lower_wl"])[0].min()
-        wlindhi = np.where(wl < ap["upper_wl"])[0].max()
-
-        # mean aggregate initial and final reference dark spectra
-        mean_ref_dark = np.vstack(
-            [
-                arr[
-                    np.where(
-                        (ep[ap["skip_first_n"] :] - ep.max()) >= -ap["agg_last_secs"]
-                    )[0].min() :
-                ]
-                for wl, ep, arr in rdtups
-            ]
-        ).mean(axis=0)
-
-        # mean aggregate initial and final reference light spectra
-        mean_ref_light = np.vstack(
-            [
-                arr[
-                    np.where(
-                        (ep[ap["skip_first_n"] :] - ep.max()) >= -ap["agg_last_secs"]
-                    )[0].min() :
-                ]
-                for wl, ep, arr in rltups
-            ]
-        ).mean(axis=0)
-
-        # aggregate baseline insitu OCV spectra over final t seconds, omitting first n
-        agg_insitu = aggfunc(
-            [
-                arr[
-                    np.where(
-                        (ep[ap["skip_first_n"] :] - ep.max()) >= -ap["agg_last_secs"]
-                    )[0].min() :
-                ]
-                for wl, ep, arr in (btup,)
-            ][0],
-            axis=0,
-        )
-
-        inds = range(len(wl[wlindlo:wlindhi]))
-        nbins = np.round(len(wl[wlindlo:wlindhi]) / ap["bin_width"]).astype(int)
-        refadj_insitu = (
-            (agg_insitu - mean_ref_dark) / (mean_ref_light - mean_ref_dark)
-        )[wlindlo:wlindhi]
-        bin_wl = binned_statistic(inds, wl[wlindlo:wlindhi], "mean", nbins).statistic
-        bin_insitu = binned_statistic(inds, refadj_insitu, "mean", nbins).statistic
-        smth_insitu = savgol_filter(
-            bin_insitu, ap["window_length"], ap["poly_order"], delta=ap["delta"]
-        )
-        insitu_min_rscl, insitu_max_rscl, rscl_insitu = refadjust(
-            smth_insitu,
-            ap["min_mthd_allowed"],
-            ap["max_mthd_allowed"],
-            ap["min_limit"],
-            ap["max_limit"],
-        )
-
-        # create output model
-        self.outputs = DryUvisOutputs(
-            wavelength=list(wl),
-            lower_wl_idx=wlindlo,
-            upper_wl_idx=wlindhi,
-            mean_ref_dark=list(mean_ref_dark),
-            mean_ref_light=list(mean_ref_light),
-            agg_method=ap["agg_method"],
-            agg_insitu=list(agg_insitu),
-            bin_wavelength=list(bin_wl),
-            bin_insitu=list(bin_insitu),
-            smth_insitu=list(smth_insitu),
-            rscl_insitu=list(rscl_insitu),
-            insitu_min_rescaled=insitu_min_rscl,
-            insitu_max_rescaled=insitu_max_rscl,
-        )
