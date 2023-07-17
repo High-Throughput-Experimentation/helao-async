@@ -10,7 +10,7 @@ from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base import HelaoBase
 from helaocore.models.sample import SampleUnion
-from helao.drivers.temperature_control.mecom_driver import MeerstetterTEC, TECMonExec
+from helao.drivers.temperature_control.mecom_driver import MeerstetterTEC, TECMonExec, TECWaitExec
 from helao.helpers.config_loader import config_loader
 
 
@@ -92,4 +92,33 @@ def makeApp(confPrefix, server_key, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
+    @app.post(f"/{server_key}/wait_till_stable", tags=["action"])
+    async def wait_till_stable(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+    ):
+        """Wait until temperature_is_stable returns int 2 (stable)."""
+        active = await app.base.setup_and_contain_action()
+        active.action.action_abbr = "waitTEC"
+        executor = TECWaitExec(
+            active=active,
+            oneoff=False,
+            poll_rate=active.action.action_params["acquisition_rate"],
+        )
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
+
+    @app.post(f"/{server_key}/cancel_wait_till_stable", tags=["action"])
+    async def cancel_wait_till_stable(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+    ):
+        """Stop waiting for temperature_is_stable."""
+        active = await app.base.setup_and_contain_action()
+        for exec_id, executor in app.base.executors.items():
+            if exec_id.split()[0] == "wait_till_stable":
+                executor.stop_action_task()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+    
     return app

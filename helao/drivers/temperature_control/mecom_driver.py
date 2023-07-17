@@ -171,3 +171,43 @@ class TECMonExec(Executor):
             "status": status,
             "data": live_dict,
         }
+
+
+STABLE_ID_MAP = {
+    0: "Temperature regulation not active.",
+    1: "Temperature is not stable.",
+    2: "Temperature is stable.",
+}
+
+
+class TECWaitExec(Executor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.active.base.print_message("TECWaitExec initialized.")
+        self.start_time = time.time()
+        self.duration = -1
+        self.last_check = None
+
+    async def _poll(self):
+        """Read TEC values from live buffer."""
+        live_dict = {}
+        tec_vals, epoch_s = self.active.base.get_lbuf("tec_vals")
+        live_dict["epoch_s"] = epoch_s
+        for k, v in tec_vals.items():
+            live_dict[k] = v
+        stable_id = live_dict["temperature_is_stable"]
+        if (self.duration < 0) or (stable_id != 2):
+            status = HloStatus.active
+            if epoch_s - self.last_check > 5:
+                stab_msg = STABLE_ID_MAP.get(stable_id, "temperature state is unknown")
+                self.active.base.print_message(stab_msg)
+                self.last_check = epoch_s
+        else:
+            status = HloStatus.finished
+        await asyncio.sleep(0.001)
+
+        return {
+            "error": ErrorCodes.none,
+            "status": status,
+            "data": live_dict,
+        }
