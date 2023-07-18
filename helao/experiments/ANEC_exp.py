@@ -224,8 +224,7 @@ def ANEC_sub_heatoff(
     apm.add(
         TEC_server,
         "enable_tec",
-        {},
-        to_globalexp_params=["_fast_samples_in"],
+        {}
     )
 
     return apm.action_list
@@ -1011,7 +1010,6 @@ def ANEC_sub_HeatCV(
         TEC_server,
         "set_temperature",
         {"target_temperature_degc": target_temperature_degc},
-        to_globalexp_params=["_fast_samples_in"],
     )
     
     apm.add(
