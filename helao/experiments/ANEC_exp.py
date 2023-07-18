@@ -23,6 +23,7 @@ __all__ = [
     "ANEC_sub_liquidarchive",
     "ANEC_sub_aliquot",
     "ANEC_sub_alloff",
+    "ANEC_sub_heatoff",
     "ANEC_sub_CV",
     "ANEC_sub_HeatCV"
     "ANEC_sub_photo_CV",
@@ -209,6 +210,25 @@ def ANEC_sub_alloff(
 
     return apm.action_list
 
+def ANEC_sub_heatoff(
+    experiment: Experiment,
+    experiment_version: int = 1,
+):
+    """
+
+    Args:
+        experiment (Experiment): Experiment object provided by Orch
+    """
+
+    apm = ActionPlanMaker()
+    apm.add(
+        TEC_server,
+        "enable_tec",
+        {},
+        to_globalexp_params=["_fast_samples_in"],
+    )
+
+    return apm.action_list
 
 def ANEC_sub_normal_state(
     experiment: Experiment,
