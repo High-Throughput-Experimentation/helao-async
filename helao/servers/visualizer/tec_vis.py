@@ -11,6 +11,7 @@ from bokeh.models.widgets import Div
 from bokeh.models.widgets import DataTable, TableColumn
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource, DatetimeTickFormatter
+from bokeh.models import LinearAxis, Range1d
 
 from helao.drivers.temperature_control.mecom_driver import DEFAULT_QUERIES
 from helao.servers.vis import Vis
@@ -82,6 +83,10 @@ class C_tec:
         )
         self.plot.xaxis.axis_label = "Time (HH:MM:SS)"
         self.plot.yaxis.axis_label = "Temperature (C)"
+        self.plot.extra_y_ranges = {"current_A": Range1d(start=-4.5, end=4.5)}
+        self.plot.add_layout(
+            LinearAxis(y_range_name="current_A", axis_label="Current (A)"), "right"
+        )
 
         self.table = DataTable(
             source=self.datasource_table,
@@ -225,6 +230,14 @@ class C_tec:
             line_dash="dotted",
             source=self.datasource,
             legend_label="target_object_temperature",
+        )
+        self.plot.line(
+            x="datetime",
+            y="output_current",
+            line_color="blue",
+            source=self.datasource,
+            legend_label="output_current",
+            y_range_name="current_A",
         )
         self.plot.legend.border_line_alpha = 0.2
         self.plot.legend.background_fill_alpha = 0.2

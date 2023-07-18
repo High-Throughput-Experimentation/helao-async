@@ -14,6 +14,7 @@ DEFAULT_QUERIES = [
     "enabled_status",
     "object_temperature",
     "target_object_temperature",
+    "output_current",
 ]
 
 # syntax
