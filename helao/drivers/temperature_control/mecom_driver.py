@@ -197,7 +197,8 @@ class TECWaitExec(Executor):
         live_dict["epoch_s"] = epoch_s
         for k, v in tec_vals.items():
             live_dict[k] = v
-        stable_id = live_dict["temperature_is_stable"]
+        self.active.base.print_message([[f"{k}, {v}, {type(v)}" for k,v in live_dict.items()]])
+        stable_id = int(live_dict["temperature_is_stable"])
         if (self.duration < 0) or (stable_id != 2):
             status = HloStatus.active
             if epoch_s - self.last_check > 5:
