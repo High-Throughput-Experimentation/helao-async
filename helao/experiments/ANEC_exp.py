@@ -957,7 +957,7 @@ def ANEC_sub_HeatCV(
     SampleRate: float = 0.01,
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
-    target_temperature_degc: float =25.0
+    target_temperature_degc: float =30.0
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if apm.pars.WE_versus == "ref":
