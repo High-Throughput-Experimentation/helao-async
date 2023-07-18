@@ -24,6 +24,7 @@ __all__ = [
     "ANEC_sub_aliquot",
     "ANEC_sub_alloff",
     "ANEC_sub_CV",
+    "ANEC_sub_HeatCV"
     "ANEC_sub_photo_CV",
     "ANEC_sub_photo_CA",
     "ANEC_sub_GCLiquid_analysis",
@@ -56,6 +57,7 @@ NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).as_dict()
 ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
 IO_server = MachineModel(server_name="IO", machine_name=ORCH_HOST).as_dict()
+TEC_server = MachineModel(server_name="TEC", machine_name=ORCH_HOST).as_dict()
 
 toggle_triggertype = TriggerType.fallingedge
 
@@ -921,6 +923,111 @@ def ANEC_sub_CV(
 
     return apm.action_list
 
+def ANEC_sub_HeatCV(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 6.8,
+    WE_potential_init__V: float = 0.0,
+    WE_potential_apex1__V: float = -1.0,
+    WE_potential_apex2__V: float = -0.5,
+    WE_potential_final__V: float = -0.5,
+    ScanRate_V_s: float = 0.01,
+    Cycles: int = 1,
+    SampleRate: float = 0.01,
+    IErange: str = "auto",
+    ref_offset__V: float = 0.0,
+    target_temperature_degc: float =25.0
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    if apm.pars.WE_versus == "ref":
+        potential_init_vsRef = (
+            apm.pars.WE_potential_init__V - 1.0 * apm.pars.ref_offset__V
+        )
+        potential_apex1_vsRef = (
+            apm.pars.WE_potential_apex1__V - 1.0 * apm.pars.ref_offset__V
+        )
+        potential_apex2_vsRef = (
+            apm.pars.WE_potential_apex2__V - 1.0 * apm.pars.ref_offset__V
+        )
+        potential_final_vsRef = (
+            apm.pars.WE_potential_final__V - 1.0 * apm.pars.ref_offset__V
+        )
+    elif apm.pars.WE_versus == "rhe":
+        potential_init_vsRef = (
+            apm.pars.WE_potential_init__V
+            - 1.0 * apm.pars.ref_offset__V
+            - 0.059 * apm.pars.pH
+            - REF_TABLE[ref_type]
+        )
+        potential_apex1_vsRef = (
+            apm.pars.WE_potential_apex1__V
+            - 1.0 * apm.pars.ref_offset__V
+            - 0.059 * apm.pars.pH
+            - REF_TABLE[ref_type]
+        )
+        potential_apex2_vsRef = (
+            apm.pars.WE_potential_apex2__V
+            - 1.0 * apm.pars.ref_offset__V
+            - 0.059 * apm.pars.pH
+            - REF_TABLE[ref_type]
+        )
+        potential_final_vsRef = (
+            apm.pars.WE_potential_final__V
+            - 1.0 * apm.pars.ref_offset__V
+            - 0.059 * apm.pars.pH
+            - REF_TABLE[ref_type]
+        )
+
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {"custom": "cell1_we"},
+        to_globalexp_params=["_fast_samples_in"],
+    )
+
+    apm.add(
+        TEC_server,
+        "set_temperature",
+        {"target_temperature_degc": target_temperature_degc},
+        to_globalexp_params=["_fast_samples_in"],
+    )
+    
+    apm.add(
+        TEC_server,
+        "enable_tec",
+        {},
+        to_globalexp_params=["_fast_samples_in"],
+    )
+    
+    apm.add(
+        PSTAT_server,
+        "run_CV",
+        {
+            "Vinit__V": potential_init_vsRef,
+            "Vapex1__V": potential_apex1_vsRef,
+            "Vapex2__V": potential_apex2_vsRef,
+            "Vfinal__V": potential_final_vsRef,
+            "ScanRate__V_s": apm.pars.ScanRate_V_s,
+            "Cycles": apm.pars.Cycles,
+            "AcqInterval__s": apm.pars.SampleRate,
+            "IErange": apm.pars.IErange,
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        process_finish=True,
+        technique_name=["CV"],
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+
+    # apm.add(ORCH_server, "wait", {"waittime": 10})
+
+    return apm.action_list
 
 def ANEC_sub_photo_CV(
     experiment: Experiment,
