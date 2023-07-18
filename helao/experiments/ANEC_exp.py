@@ -19,11 +19,13 @@ __all__ = [
     "ANEC_sub_cleanup",
     "ANEC_sub_CP",
     "ANEC_sub_CA",
+    "ANEC_sub_HeatCA",
     "ANEC_sub_OCV",
     "ANEC_sub_liquidarchive",
     "ANEC_sub_aliquot",
     "ANEC_sub_alloff",
     "ANEC_sub_heatoff",
+    "ANEC_sub_setheat",
     "ANEC_sub_CV",
     "ANEC_sub_HeatCV",
     "ANEC_sub_photo_CV",
@@ -190,7 +192,7 @@ def ANEC_sub_load_solid(
 
 def ANEC_sub_alloff(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
 ):
     """
 
@@ -207,6 +209,11 @@ def ANEC_sub_alloff(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "up", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "liquid", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "atm", "on": 0})
+    apm.add(
+        TEC_server,
+        "disable_tec",
+        {}
+    )
 
     return apm.action_list
 
@@ -224,6 +231,32 @@ def ANEC_sub_heatoff(
     apm.add(
         TEC_server,
         "disable_tec",
+        {}
+    )
+
+    return apm.action_list
+
+def ANEC_sub_setheat(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    target_temperature_degc: float =25.0
+):
+    """
+
+    Args:
+        experiment (Experiment): Experiment object provided by Orch
+    """
+
+    apm = ActionPlanMaker()
+    apm.add(
+        TEC_server,
+        "set_temperature",
+        {"target_temperature_degc": apm.pars.target_temperature_degc}
+    )
+    
+    apm.add(
+        TEC_server,
+        "enable_tec",
         {}
     )
 
@@ -713,6 +746,75 @@ def ANEC_sub_CA(
 
     return apm.action_list
 
+def ANEC_sub_HeatCA(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    WE_potential__V: float = 0.0,
+    WE_versus: str = "ref",
+    CA_duration_sec: float = 0.1,
+    SampleRate: float = 0.01,
+    IErange: str = "auto",
+    ref_offset__V: float = 0.0,
+    ref_type: str = "leakless",
+    pH: float = 6.8,
+    target_temperature_degc: float =25.0
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    if apm.pars.WE_versus == "ref":
+        potential_vsRef = apm.pars.WE_potential__V - 1.0 * apm.pars.ref_offset__V
+    elif apm.pars.WE_versus == "rhe":
+        potential_vsRef = (
+            apm.pars.WE_potential__V
+            - 1.0 * apm.pars.ref_offset__V
+            - 0.059 * apm.pars.pH
+            - REF_TABLE[ref_type]
+        )
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {"custom": "cell1_we"},
+        to_globalexp_params=["_fast_samples_in"],
+    )
+    apm.add(
+        TEC_server,
+        "set_temperature",
+        {"target_temperature_degc": apm.pars.target_temperature_degc}
+    )
+    
+    apm.add(
+        TEC_server,
+        "enable_tec",
+        {}
+    )
+    
+    apm.add(
+        TEC_server,
+        "wait_till_stable",
+        {}
+    )
+    apm.add(
+        PSTAT_server,
+        "run_CA",
+        {
+            "Vval__V": potential_vsRef,
+            "Tval__s": apm.pars.CA_duration_sec,
+            "AcqInterval__s": apm.pars.SampleRate,
+            "IErange": apm.pars.IErange,
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        process_finish=True,
+        technique_name="CA",
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+
+    # apm.add(ORCH_server, "wait", {"waittime": 10})
+
+    return apm.action_list
 
 def ANEC_sub_OCV(
     experiment: Experiment,
@@ -957,7 +1059,7 @@ def ANEC_sub_HeatCV(
     SampleRate: float = 0.01,
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
-    target_temperature_degc: float =30.0
+    target_temperature_degc: float =25.0
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if apm.pars.WE_versus == "ref":
@@ -1015,6 +1117,12 @@ def ANEC_sub_HeatCV(
     apm.add(
         TEC_server,
         "enable_tec",
+        {}
+    )
+    
+    apm.add(
+        TEC_server,
+        "wait_till_stable",
         {}
     )
     
