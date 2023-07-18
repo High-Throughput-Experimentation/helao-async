@@ -132,7 +132,7 @@ class MeerstetterTEC(object):
         waittime = 1.0 / frequency
         self.base.print_message("Starting polling loop")
         while True:
-            tec_vals = self.get_data()
+            tec_vals = {k: v[0] for k,v in self.get_data()}
             if tec_vals:
                 msg_dict = {"tec_vals": tec_vals}
                 await self.base.put_lbuf(msg_dict)
@@ -159,7 +159,7 @@ class TECMonExec(Executor):
         tec_vals, epoch_s = self.active.base.get_lbuf("tec_vals")
         live_dict["epoch_s"] = epoch_s
         for k, v in tec_vals.items():
-            live_dict[k] = v[0]
+            live_dict[k] = v
         iter_time = time.time()
         elapsed_time = iter_time - self.start_time
         if (self.duration < 0) or (elapsed_time < self.duration):
@@ -188,7 +188,7 @@ class TECWaitExec(Executor):
         self.active.base.print_message("TECWaitExec initialized.")
         self.start_time = time.time()
         self.duration = -1
-        self.last_check = None
+        self.last_check = 0
 
     async def _poll(self):
         """Read TEC values from live buffer."""
@@ -196,7 +196,7 @@ class TECWaitExec(Executor):
         tec_vals, epoch_s = self.active.base.get_lbuf("tec_vals")
         live_dict["epoch_s"] = epoch_s
         for k, v in tec_vals.items():
-            live_dict[k] = v[0]
+            live_dict[k] = v
         stable_id = live_dict["temperature_is_stable"]
         if stable_id != 2:
             status = HloStatus.active
