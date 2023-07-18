@@ -96,6 +96,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def wait_till_stable(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
+        acquisition_rate: float = 0.2,
     ):
         """Wait until temperature_is_stable returns int 2 (stable)."""
         active = await app.base.setup_and_contain_action()
