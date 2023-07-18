@@ -133,7 +133,6 @@ class MeerstetterTEC(object):
         self.base.print_message("Starting polling loop")
         while True:
             tec_vals = {k: v[0] for k, v in self.get_data().items()}
-            print(tec_vals)
             if tec_vals:
                 msg_dict = {"tec_vals": tec_vals}
                 await self.base.put_lbuf(msg_dict)
