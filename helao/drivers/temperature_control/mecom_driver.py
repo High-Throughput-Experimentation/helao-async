@@ -198,7 +198,7 @@ class TECWaitExec(Executor):
         for k, v in tec_vals.items():
             live_dict[k] = v[0]
         stable_id = live_dict["temperature_is_stable"]
-        if (self.duration < 0) or (stable_id != 2):
+        if stable_id != 2:
             status = HloStatus.active
             if epoch_s - self.last_check > 5:
                 stab_msg = STABLE_ID_MAP.get(stable_id, "temperature state is unknown")
