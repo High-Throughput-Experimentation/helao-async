@@ -15,6 +15,7 @@ DEFAULT_QUERIES = [
     "object_temperature",
     "target_object_temperature",
     "output_current",
+    "temperature_is_stable",
 ]
 
 # syntax
