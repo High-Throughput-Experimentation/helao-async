@@ -180,7 +180,7 @@ class C_tec:
             for datalab, (dataval, epochsec) in datapackage.items():
                 if datalab == "tec_vals":
                     for k, v in dataval.items():
-                        data_dict[k].append(v[0])
+                        data_dict[k].append(v)
                 elif isinstance(dataval, list):
                     data_dict[datalab] += dataval
                 else:

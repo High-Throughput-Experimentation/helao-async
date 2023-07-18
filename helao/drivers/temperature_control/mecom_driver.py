@@ -159,7 +159,7 @@ class TECMonExec(Executor):
         tec_vals, epoch_s = self.active.base.get_lbuf("tec_vals")
         live_dict["epoch_s"] = epoch_s
         for k, v in tec_vals.items():
-            live_dict[k] = v
+            live_dict[k] = v[0]
         iter_time = time.time()
         elapsed_time = iter_time - self.start_time
         if (self.duration < 0) or (elapsed_time < self.duration):
@@ -196,9 +196,8 @@ class TECWaitExec(Executor):
         tec_vals, epoch_s = self.active.base.get_lbuf("tec_vals")
         live_dict["epoch_s"] = epoch_s
         for k, v in tec_vals.items():
-            live_dict[k] = v
-        self.active.base.print_message([[f"{k}, {v}, {type(v)}" for k,v in live_dict.items()]])
-        stable_id = int(live_dict["temperature_is_stable"])
+            live_dict[k] = v[0]
+        stable_id = live_dict["temperature_is_stable"]
         if (self.duration < 0) or (stable_id != 2):
             status = HloStatus.active
             if epoch_s - self.last_check > 5:
