@@ -223,7 +223,7 @@ def ANEC_sub_heatoff(
     apm = ActionPlanMaker()
     apm.add(
         TEC_server,
-        "enable_tec",
+        "disable_tec",
         {}
     )
 
