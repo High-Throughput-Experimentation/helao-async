@@ -1009,7 +1009,7 @@ def ANEC_sub_HeatCV(
     apm.add(
         TEC_server,
         "set_temperature",
-        {"target_temperature_degc": target_temperature_degc}
+        {"target_temperature_degc": apm.pars.target_temperature_degc}
     )
     
     apm.add(
