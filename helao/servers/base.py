@@ -781,6 +781,11 @@ class Base:
         new_dict = {k: (v, time()) for k, v in live_dict.items()}
         await self.live_q.put(new_dict)
 
+    def put_lbuf_nowait(self, live_dict):
+        """Convert dict values to tuples of (val, timestamp), enqueue to live_q."""
+        new_dict = {k: (v, time()) for k, v in live_dict.items()}
+        self.live_q.put_nowait(new_dict)
+
     def get_lbuf(self, live_key):
         return self.live_buffer[live_key]
 

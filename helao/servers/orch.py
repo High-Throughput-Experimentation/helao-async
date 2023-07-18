@@ -233,9 +233,7 @@ class HelaoOrch(HelaoFastAPI):
             return await self.orch.update_status(actionservermodel=actionservermodel)
 
         @self.post("/update_nonblocking", tags=["private"])
-        async def update_nonblocking(
-            actionmodel: ActionModel = Body({}, embed=True)
-        ):
+        async def update_nonblocking(actionmodel: ActionModel = Body({}, embed=True)):
             self.orch.print_message(
                 f"'{self.orch.server.server_name.upper()}' "
                 f"got nonblocking status from "
@@ -310,9 +308,7 @@ class HelaoOrch(HelaoFastAPI):
             return {"sequence_uuid": seq_uuid}
 
         @self.post("/append_experiment", tags=["private"])
-        async def append_experiment(
-            experiment: Experiment = Body({}, embed=True)
-        ):
+        async def append_experiment(experiment: Experiment = Body({}, embed=True)):
             """Add a experiment object to the end of the experiment queue."""
             exp_uuid = await self.orch.add_experiment(
                 seq=self.orch.seq_file, experimentmodel=experiment.get_exp()
@@ -320,9 +316,7 @@ class HelaoOrch(HelaoFastAPI):
             return {"experiment_uuid": exp_uuid}
 
         @self.post("/prepend_experiment", tags=["private"])
-        async def prepend_experiment(
-            experiment: Experiment = Body({}, embed=True)
-        ):
+        async def prepend_experiment(experiment: Experiment = Body({}, embed=True)):
             """Add a experiment object to the start of the experiment queue."""
             exp_uuid = await self.orch.add_experiment(
                 seq=self.orch.seq_file,
@@ -676,9 +670,7 @@ class Orch(Base):
             resp_tups.append((response, error_code))
         return resp_tups
 
-    async def update_status(
-        self, actionservermodel: ActionServerModel = None
-    ):
+    async def update_status(self, actionservermodel: ActionServerModel = None):
         """Dict update method for action server to push status messages."""
         if actionservermodel is None:
             return False
@@ -893,7 +885,7 @@ class Orch(Base):
             self.action_dq.append(act)
         if process_order_groups:
             self.active_experiment.process_order_groups = process_order_groups
-            process_list = init_process_uuids[:len(process_order_groups)]
+            process_list = init_process_uuids[: len(process_order_groups)]
             self.active_experiment.process_list = process_list
         # loop through actions again
 
@@ -1026,7 +1018,7 @@ class Orch(Base):
             self.print_message(
                 f"Action {A.action_name} dispatched with uuid: {result_uuid}"
             )
-            await self.put_lbuf(
+            self.put_lbuf_nowait(
                 {result_uuid: {"action_name": A.action_name, "status": "active"}}
             )
 
@@ -1045,7 +1037,10 @@ class Orch(Base):
                 actstats = resmod.action_status
                 srvkeys = self.globalstatusmodel.server_dict.keys()
                 srvkey = [k for k in srvkeys if k[0] == srvname][0]
-                if HloStatus.active in actstats:
+                if (
+                    HloStatus.active in actstats
+                    and resuuid not in self.globalstatusmodel.active_dict
+                ):
                     self.globalstatusmodel.active_dict[resuuid] = resmod
                     self.globalstatusmodel.server_dict[srvkey].endpoints[
                         actname
@@ -1053,13 +1048,17 @@ class Orch(Base):
                 else:
                     for actstat in actstats:
                         try:
+                            if (
+                                resuuid
+                                in self.globalstatusmodel.nonactive_dict[actstat]
+                            ):
+                                break
                             self.globalstatusmodel.nonactive_dict[actstat][
                                 resuuid
                             ] = resmod
                             self.globalstatusmodel.server_dict[srvkey].endpoints[
                                 actname
                             ].nonactive_dict[actstat][resuuid] = resmod
-                            break
                         except:
                             self.print_message(
                                 f"{actstat} not found in globalstatus.nonactive_dict"
@@ -1551,9 +1550,7 @@ class Orch(Base):
                 )
                 self.print_message(", ".join(self.error_uuids))
 
-    def remove_experiment(
-        self, by_index: int = None, by_uuid: UUID = None
-    ):
+    def remove_experiment(self, by_index: int = None, by_uuid: UUID = None):
         """Remove experiment in list by enumeration index or uuid."""
         if by_index is not None:
             i = by_index
