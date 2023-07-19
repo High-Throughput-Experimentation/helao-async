@@ -125,7 +125,7 @@ class C_mfc:
             background="#C0C0C0",
             width=1024,
         )
-        self.control_mode = 'mass flow'
+        self.control_mode = "mass flow"
 
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
@@ -205,7 +205,6 @@ class C_mfc:
                 latest_epoch = max([epochsec, latest_epoch])
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
 
-            
         self.datasource.stream(data_dict, rollover=self.max_points)
         keys = list(data_dict.keys())
         values = [data_dict[k][-1] for k in keys]
@@ -228,6 +227,13 @@ class C_mfc:
                     self.last_update_time = time.time()
             await asyncio.sleep(0.001)
 
+    def update_ylabel(self):
+        self.plot.yaxis.axis_label = (
+            "Flow rate (sccm)"
+            if self.control_mode == "mass flow"
+            else "Pressure (psia)"
+        )
+
     def _add_plots(self):
         # clear legend
         if self.plot.renderers:
@@ -247,10 +253,10 @@ class C_mfc:
                 else:
                     self.plot.yaxis.axis_label = "Pressure (psia)"
                     yvar = "pressure"
-                
+
                 if control_mode != self.control_mode:
                     self.control_mode = control_mode
-                    self.reset_plot()
+                    self.vis.doc.add_next_tick_callback(partial(self.update_ylabel))
 
                 else:
                     self.plot.line(
