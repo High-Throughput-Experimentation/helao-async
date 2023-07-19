@@ -320,7 +320,7 @@ class Progress:
         self.prglockpath = str(self.prg) + ".lock"
         self.prglock = FileLock(self.prglockpath)
         if not os.path.exists(self.prglockpath):
-            with open(self.prglock, "w") as _:
+            with open(self.prglockpath, "w") as _:
                 pass
         
         with self.prglock:
