@@ -991,7 +991,7 @@ def ANEC_repeat_CV(
     return epm.experiment_plan_list
 
 def ANEC_ferricyanide_simpleprotocol(
-    sequence_version: int = 1,
+    sequence_version: int = 2,
     num_repeats: int = 1,
     plate_id: int = 5740,
     solid_sample_no: int = 1,
@@ -1012,7 +1012,7 @@ def ANEC_ferricyanide_simpleprotocol(
     ScanRate_V_s: float = 0.1,
     Cycles: int = 1,
     SampleRate_CV: float = 0.1,
-    liquidDrain_time: float = 80.0,
+    target_temperature_degc: float =25.0,
 ):
     """Repeat CA and aliquot sampling at the cell1_we position.
 
@@ -1048,7 +1048,7 @@ def ANEC_ferricyanide_simpleprotocol(
     for _ in range(num_repeats):
         
         epm.add_experiment(
-            "ANEC_sub_CV",
+            "ANEC_sub_HeatCV",
             {
                 "WE_versus": WE_versus,
                 "ref_type": ref_type,
@@ -1061,10 +1061,11 @@ def ANEC_ferricyanide_simpleprotocol(
                 "Cycles": Cycles,
                 "SampleRate": SampleRate_CV,
                 "IErange": IErange,
+                "target_temperature_degc": target_temperature_degc
             },
         )
         epm.add_experiment(
-            "ANEC_sub_CA",
+            "ANEC_sub_HeatCA",
             {
                 "WE_potential__V": WE_potential__V,
                 "WE_versus": WE_versus,
@@ -1074,6 +1075,7 @@ def ANEC_ferricyanide_simpleprotocol(
                 "CA_duration_sec": CA_duration_sec,
                 "SampleRate": SampleRate_CA,
                 "IErange": IErange,
+                "target_temperature_degc": target_temperature_degc
             },
         )
 
@@ -1081,8 +1083,7 @@ def ANEC_ferricyanide_simpleprotocol(
 
 
 def ANEC_ferricyanide_protocol(
-    sequence_version: int = 1,
-    num_repeats: int = 1,
+    sequence_version: int = 2,
     plate_id: int = 5740,
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1511,
@@ -1103,6 +1104,8 @@ def ANEC_ferricyanide_protocol(
     Cycles: int = 1,
     SampleRate_CV: float = 0.1,
     liquidDrain_time: float = 80.0,
+    target_temperature_degc: List[float] =[25.0],
+    CV_only: str = "yes"
 ):
     """Repeat CA and aliquot sampling at the cell1_we position.
 
@@ -1135,7 +1138,7 @@ def ANEC_ferricyanide_protocol(
         {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
     )
 
-    for _ in range(num_repeats):
+    for cycle, temp in enumerate(target_temperature_degc):
 
         epm.add_experiment(
             "ANEC_sub_flush_fill_cell",
@@ -1149,7 +1152,7 @@ def ANEC_ferricyanide_protocol(
         )
         
         epm.add_experiment(
-            "ANEC_sub_CV",
+            "ANEC_sub_HeatCV",
             {
                 "WE_versus": WE_versus,
                 "ref_type": ref_type,
@@ -1162,22 +1165,25 @@ def ANEC_ferricyanide_protocol(
                 "Cycles": Cycles,
                 "SampleRate": SampleRate_CV,
                 "IErange": IErange,
+                "target_temperature_degc": temp
             },
         )
-        epm.add_experiment(
-            "ANEC_sub_CA",
-            {
-                "WE_potential__V": WE_potential__V,
-                "WE_versus": WE_versus,
-                "ref_type": ref_type,
-                "pH": pH,
-                "ref_offset__V": ref_offset__V,
-                "CA_duration_sec": CA_duration_sec,
-                "SampleRate": SampleRate_CA,
-                "IErange": IErange,
-            },
-        )
-
+        if CV_only== "no" or "No":
+            epm.add_experiment(
+                "ANEC_sub_HeatCA",
+                {
+                    "WE_potential__V": WE_potential__V,
+                    "WE_versus": WE_versus,
+                    "ref_type": ref_type,
+                    "pH": pH,
+                    "ref_offset__V": ref_offset__V,
+                    "CA_duration_sec": CA_duration_sec,
+                    "SampleRate": SampleRate_CA,
+                    "IErange": IErange,
+                    "target_temperature_degc": temp
+                },
+            )
+        epm.add_experiment("ANEC_sub_heatoff",{})
         epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
     return epm.experiment_plan_list
