@@ -227,13 +227,6 @@ class C_mfc:
                     self.last_update_time = time.time()
             await asyncio.sleep(0.001)
 
-    def update_ylabel(self):
-        self.plot.yaxis.axis_label = (
-            "Flow rate (sccm)"
-            if self.control_mode == "mass flow"
-            else "Pressure (psia)"
-        )
-
     def _add_plots(self):
         # clear legend
         if self.plot.renderers:
@@ -248,15 +241,14 @@ class C_mfc:
             if modelist:
                 control_mode = modelist[-1].strip()
                 if control_mode == "mass flow":
-                    self.plot.yaxis.axis_label = "Flow rate (sccm)"
                     yvar = "mass_flow"
+                    self.plot.yaxis.update(axis_label=("Flow rate (sccm)"))
                 else:
-                    self.plot.yaxis.axis_label = "Pressure (psia)"
                     yvar = "pressure"
+                    self.plot.yaxis.update(axis_label=("Pressure (psia)"))
 
                 if control_mode != self.control_mode:
                     self.control_mode = control_mode
-                    self.vis.doc.add_next_tick_callback(partial(self.update_ylabel))
 
                 else:
                     self.plot.line(
