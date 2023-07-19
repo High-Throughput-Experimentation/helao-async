@@ -207,15 +207,17 @@ class C_mfc:
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
 
         for dev_name in self.devices:
-            control_mode = data_dict[f"{dev_name}__control_point"].strip()
-            if self.control_mode != control_mode:
-                if control_mode == "mass flow":
-                    self.yvar = "mass_flow"
-                    self.plot.yaxis.axis_label = "Flow rate (sccm)"
-                else:
-                    self.yvar = "pressure"
-                    self.plot.yaxis.axis_label = "Pressure (psia)"
-                self.datasource.data = {k: [] for k in self.data_dict_keys}
+            control_modes = data_dict[f"{dev_name}__control_point"]
+            if control_modes:
+                control_mode = data_dict[f"{dev_name}__control_point"][-1].strip()
+                if self.control_mode != control_mode:
+                    if control_mode == "mass flow":
+                        self.yvar = "mass_flow"
+                        self.plot.yaxis.axis_label = "Flow rate (sccm)"
+                    else:
+                        self.yvar = "pressure"
+                        self.plot.yaxis.axis_label = "Pressure (psia)"
+                    self.datasource.data = {k: [] for k in self.data_dict_keys}
 
         self.datasource.stream(data_dict, rollover=self.max_points)
         keys = list(data_dict.keys())
