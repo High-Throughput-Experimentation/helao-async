@@ -761,10 +761,13 @@ class HelaoSyncer:
                     zip_target = yml.target.parent.parent.joinpath(
                         f"{yml.target.parent.name}.zip"
                     )
+                    self.base.print_message(f"Releasing lock: {prog.prglockpath}")
+                    prog.prglock.release()
+                    self.base.print_message(f"Releasing lock: {yml.filelockpath}")
+                    yml.filelock.release()
                     self.base.print_message(
                         f"Full sequence has synced, creating zip: {str(zip_target)}"
                     )
-                    prog.prglock.release()
                     zip_dir(yml.target.parent, zip_target)
                     self.cleanup_root()
                     # self.base.print_message(f"Removing sequence from progress.")
