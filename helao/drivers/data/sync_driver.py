@@ -975,13 +975,17 @@ class HelaoSyncer:
         api_success = False
         last_status = 0
         last_response = {}
+        self.base.print_message("creating async request session")
         async with aiohttp.ClientSession() as session:
             for i in range(retries):
+                self.base.print_message(f"session attempt {i}")
                 if not api_success:
                     req_method = session.post if try_create else session.patch
                     api_str = f"API {'POST' if try_create else 'PATCH'}"
                     try:
+                        self.base.print_message("trying request")
                         async with req_method(req_url, json=req_model) as resp:
+                            self.base.print_message("response received")
                             if resp.status == 200:
                                 api_success = True
                             elif resp.status == 400:
