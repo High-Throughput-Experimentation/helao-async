@@ -208,8 +208,8 @@ class C_mfc:
 
         for dev_name in self.devices:
             control_mode = data_dict[f"{dev_name}__control_point"]
-            if self.control_mode != control_mode:
-                self.control_mode = control_mode
+            if self.control_mode != control_mode.strip():
+                self.control_mode = control_mode.strip()
                 if self.control_mode == "mass flow":
                     self.yvar = "mass_flow"
                     self.plot.yaxis.axis_label = "Flow rate (sccm)"
