@@ -207,9 +207,10 @@ class C_mfc:
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
 
         for dev_name in self.devices:
-            control_mode = data_dict[f"{dev_name}__control_point"]
-            if self.control_mode != control_mode.strip():
-                self.control_mode = control_mode.strip()
+            control_mode = data_dict[f"{dev_name}__control_point"].strip()
+            if self.control_mode != control_mode:
+                self.vis.print_message(f"{self.control_mode} changed to {control_mode}")
+                self.control_mode = control_mode
                 if self.control_mode == "mass flow":
                     self.yvar = "mass_flow"
                     self.plot.yaxis.axis_label = "Flow rate (sccm)"
