@@ -157,6 +157,8 @@ class HelaoYml:
             raise ValueError(
                 f"{self.target} is not located with a Helao RUNS_* directory"
             )
+        self.filelockpath = str(self.target) + ".lock"
+        self.filelock = FileLock(self.filelockpath)
 
     @property
     def exists(self):
