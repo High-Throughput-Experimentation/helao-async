@@ -41,7 +41,6 @@ from helaocore.models.experiment import ExperimentModel
 from helaocore.models.sequence import SequenceModel
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.read_hlo import read_hlo
-from helao.helpers.print_message import print_message
 from helao.helpers.zip_dir import zip_dir
 
 
@@ -118,7 +117,11 @@ class HelaoYml:
             self.target = target
         self.parts = list(Path(target).parts)
         self.check_paths()
-        self.filelock = FileLock(str(self.target) + ".lock")
+        self.filelockpath = str(self.target) + ".lock"
+        self.filelock = FileLock(self.filelockpath)
+        if not os.path.exists(self.filelockpath):
+            with open(self.filelockpath, "w") as _:
+                pass
 
     def check_paths(self):
         if not self.exists:
@@ -279,7 +282,8 @@ class HelaoYml:
     def write_meta(self, meta_dict: dict):
         with self.filelock:
             self.target.write_text(
-                str(pyaml.dump(meta_dict, safe=True, sort_dicts=False)), encoding="utf-8"
+                str(pyaml.dump(meta_dict, safe=True, sort_dicts=False)),
+                encoding="utf-8",
             )
 
 
@@ -313,8 +317,12 @@ class Progress:
         if not hasattr(self, "prg"):
             self.prg = self.yml.synced_path.with_suffix(".prg")
 
-        self.prglock = FileLock(str(self.prg) + ".lock")
-
+        self.prglockpath = str(self.prg) + ".lock"
+        self.prglock = FileLock(self.prglockpath)
+        if not os.path.exists(self.prglockpath):
+            with open(self.prglock, "w") as _:
+                pass
+        
         with self.prglock:
             # first time, write progress dict
             if not self.prg.exists():
@@ -502,8 +510,12 @@ class HelaoSyncer:
 
     def get_progress(self, yml_path: Path):
         """Returns progress from global dict, updates yml_path if yml path not found."""
-        yml_lock = FileLock(str(yml_path) + ".lock")
-        with yml_lock:
+        ymllockpath = str(yml_path) + ".lock"
+        if not os.path.exists(ymllockpath):
+            with open(ymllockpath, "w") as _:
+                pass
+        ymllock = FileLock(ymllockpath)
+        with ymllock:
             if yml_path.name in self.progress:
                 prog = self.progress[yml_path.name]
                 if not prog.yml.exists:
@@ -619,7 +631,9 @@ class HelaoSyncer:
                             f"Pushing {str(fp)} to S3 for {yml.target.name}"
                         )
                         if fp.suffix == ".hlo":
-                            file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}.json"
+                            file_s3_key = (
+                                f"raw_data/{meta['action_uuid']}/{fp.name}.json"
+                            )
                             file_meta, file_data = read_hlo(str(fp))
                             msg = {"meta": file_meta, "data": file_data}
                         else:
@@ -665,7 +679,9 @@ class HelaoSyncer:
 
             # next push yml to S3
             if not prog.s3_done or force_s3:
-                self.base.print_message(f"Pushing yml->json to S3 for {yml.target.name}")
+                self.base.print_message(
+                    f"Pushing yml->json to S3 for {yml.target.name}"
+                )
                 uuid_key = patched_meta[f"{yml.type}_uuid"]
                 meta_s3_key = f"{yml.type}/{uuid_key}.json"
                 s3_success = await self.to_s3(yml_model, meta_s3_key)
@@ -712,7 +728,9 @@ class HelaoSyncer:
                 # pop children from progress dict
                 if yml.type in ["experiment", "sequence"]:
                     children = yml.children
-                    self.base.print_message(f"Removing children from progress: {children}.")
+                    self.base.print_message(
+                        f"Removing children from progress: {children}."
+                    )
                     for childyml in children:
                         # self.base.print_message(f"Clearing {childyml.target.name}")
                         finished_child_path = childyml.finished_path.parent

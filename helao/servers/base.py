@@ -379,7 +379,11 @@ class Base:
             self.ntp_last_sync_file = os.path.join(
                 self.helaodirs.states_root, "ntpLastSync.txt"
             )
-            self.ntplock = FileLock(str(self.ntp_last_sync_file) + '.lock')
+            self.ntplockpath = str(self.ntp_last_sync_file) + '.lock'
+            self.ntplock = FileLock(self.ntplockpath)
+            if not os.path.exists(self.ntplockpath):
+                with open(self.ntplockpath, "w") as _:
+                    pass
             if os.path.exists(self.ntp_last_sync_file):
                 with self.ntplock:
                     with open(self.ntp_last_sync_file, "r") as f:
