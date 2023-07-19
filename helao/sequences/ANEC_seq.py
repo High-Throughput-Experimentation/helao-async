@@ -1137,20 +1137,17 @@ def ANEC_ferricyanide_protocol(
         "ANEC_sub_load_solid",
         {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
     )
-
+    epm.add_experiment(
+        "ANEC_sub_flush_fill_cell",
+        {
+            "liquid_flush_time": 80,
+            "co2_purge_time": 15,
+            "equilibration_time": 1.0,
+            "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+            "volume_ul_cell_liquid": volume_ul_cell_liquid,
+        },
+    )
     for cycle, temp in enumerate(target_temperature_degc):
-
-        epm.add_experiment(
-            "ANEC_sub_flush_fill_cell",
-            {
-                "liquid_flush_time": 80,
-                "co2_purge_time": 15,
-                "equilibration_time": 1.0,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "volume_ul_cell_liquid": volume_ul_cell_liquid,
-            },
-        )
-        
         epm.add_experiment(
             "ANEC_sub_HeatCV",
             {
@@ -1183,8 +1180,8 @@ def ANEC_ferricyanide_protocol(
                     "target_temperature_degc": temp
                 },
             )
-        epm.add_experiment("ANEC_sub_heatoff",{})
-        epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
+    epm.add_experiment("ANEC_sub_heatoff",{})
+    epm.add_experiment("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
 
     return epm.experiment_plan_list
 
