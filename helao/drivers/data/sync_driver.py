@@ -305,16 +305,17 @@ class Progress:
                 self.prg = Path(path)
             else:
                 raise ValueError(f"{path} is not a valid Helao .yml or .prg file")
+
+        if not hasattr(self, "yml"):
+            self.read_dict()
+            self.yml = HelaoYml(self.dict["yml"])
+
+        if not hasattr(self, "prg"):
+            self.prg = self.yml.synced_path.with_suffix(".prg")
+
         self.prglock = FileLock(str(self.prg) + ".lock")
 
         with self.prglock:
-            if not hasattr(self, "yml"):
-                self.read_dict()
-                self.yml = HelaoYml(self.dict["yml"])
-
-            if not hasattr(self, "prg"):
-                self.prg = self.yml.synced_path.with_suffix(".prg")
-
             # first time, write progress dict
             if not self.prg.exists():
                 self.prg.parent.mkdir(parents=True, exist_ok=True)
