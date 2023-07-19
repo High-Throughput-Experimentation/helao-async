@@ -260,7 +260,7 @@ class HelaoYml:
         ]
 
     @property
-    def lock_files(self) --> List[Path]:
+    def lock_files(self) -> List[Path]:
         return [x for x in self.dir.glob("*") if x.is_file() and x.suffix == ".lock"]
 
     @property
