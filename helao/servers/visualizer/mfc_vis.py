@@ -125,6 +125,7 @@ class C_mfc:
             background="#C0C0C0",
             width=1024,
         )
+        self.control_mode = 'mass flow'
 
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
@@ -239,15 +240,17 @@ class C_mfc:
         for dev_name, color in zip(self.devices, colors[: len(self.devices)]):
             modelist = self.datasource.data[f"{dev_name}__control_point"]
             if modelist:
-                if (
-                    modelist[-1].strip()
-                    == "mass flow"
-                ):
+                control_mode = modelist[-1].strip()
+                if control_mode == "mass flow":
                     self.plot.yaxis.axis_label = "Flow rate (sccm)"
                     yvar = "mass_flow"
                 else:
                     self.plot.yaxis.axis_label = "Pressure (psia)"
                     yvar = "pressure"
+                
+                if control_mode != self.control_mode:
+                    self.control_mode = control_mode
+                    self.reset_plot()
 
                 self.plot.line(
                     x="datetime",
