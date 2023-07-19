@@ -1,6 +1,6 @@
 """Sequence library for ANEC"""
 
-__all__ = ["ANEC_sample_ready", "ANEC_series_CA", "ANEC_series_CAliquidOnly", "ANEC_OCV","ANEC_photo_CA", "ANEC_photo_CV", "ANEC_cleanup_disengage","ANEC_repeat_CA", "ANEC_repeat_CV", "ANEC_CA_pretreat", "ANEC_gasonly_CA", "ANEC_ferricyanide_simpleprotocol", "ANEC_ferricyanide_protocol", "GC_Archiveliquid_analysis", "HPLC_Archiveliquid_analysis"]
+__all__ = ["ANEC_sample_ready", "ANEC_series_CA", "ANEC_series_CAliquidOnly", "ANEC_OCV","ANEC_photo_CA", "ANEC_photo_CV", "ANEC_cleanup_disengage","ANEC_repeat_CA", "ANEC_repeat_HeatCA", "ANEC_repeat_CV", "ANEC_CA_pretreat", "ANEC_gasonly_CA", "ANEC_ferricyanide_simpleprotocol", "ANEC_ferricyanide_protocol", "GC_Archiveliquid_analysis", "HPLC_Archiveliquid_analysis"]
 
 from typing import List
 from typing import Optional
