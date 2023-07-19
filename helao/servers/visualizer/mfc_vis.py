@@ -252,22 +252,23 @@ class C_mfc:
                     self.control_mode = control_mode
                     self.reset_plot()
 
-                self.plot.line(
-                    x="datetime",
-                    y=f"{dev_name}__{yvar}",
-                    line_color=color,
-                    line_dash="solid",
-                    source=self.datasource,
-                    legend_label=f"{dev_name} actual",
-                )
-                self.plot.line(
-                    x="datetime",
-                    y=f"{dev_name}__setpoint",
-                    line_color=color,
-                    line_dash="dotted",
-                    source=self.datasource,
-                    legend_label=f"{dev_name} setpoint",
-                )
+                else:
+                    self.plot.line(
+                        x="datetime",
+                        y=f"{dev_name}__{yvar}",
+                        line_color=color,
+                        line_dash="solid",
+                        source=self.datasource,
+                        legend_label=f"{dev_name} actual",
+                    )
+                    self.plot.line(
+                        x="datetime",
+                        y=f"{dev_name}__setpoint",
+                        line_color=color,
+                        line_dash="dotted",
+                        source=self.datasource,
+                        legend_label=f"{dev_name} setpoint",
+                    )
 
     def reset_plot(self, forceupdate: bool = False):
         # self.xselect = self.xaxis_selector_group.active
