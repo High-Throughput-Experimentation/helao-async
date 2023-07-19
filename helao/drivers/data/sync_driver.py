@@ -516,27 +516,27 @@ class HelaoSyncer:
 
     def get_progress(self, yml_path: Path):
         """Returns progress from global dict, updates yml_path if yml path not found."""
-        ymllockpath = str(yml_path) + ".lock"
-        if not os.path.exists(ymllockpath):
-            os.makedirs(os.path.dirname(ymllockpath), exist_ok=True)
-            with open(ymllockpath, "w") as _:
-                pass
-        ymllock = FileLock(ymllockpath)
-        with ymllock:
-            if yml_path.name in self.progress:
-                prog = self.progress[yml_path.name]
-                if not prog.yml.exists:
-                    prog.yml.check_paths()
-                    prog.dict.update({"yml": str(prog.yml.target)})
-                    prog.write_dict()
+        # ymllockpath = str(yml_path) + ".lock"
+        # if not os.path.exists(ymllockpath):
+        #     os.makedirs(os.path.dirname(ymllockpath), exist_ok=True)
+        #     with open(ymllockpath, "w") as _:
+        #         pass
+        # ymllock = FileLock(ymllockpath)
+        # with ymllock:
+        if yml_path.name in self.progress:
+            prog = self.progress[yml_path.name]
+            if not prog.yml.exists:
+                prog.yml.check_paths()
+                prog.dict.update({"yml": str(prog.yml.target)})
+                prog.write_dict()
+        else:
+            if not yml_path.exists():
+                hy = HelaoYml(yml_path)
+                hy.check_paths()
+                prog = Progress(hy.target)
+                prog.write_dict()
             else:
-                if not yml_path.exists():
-                    hy = HelaoYml(yml_path)
-                    hy.check_paths()
-                    prog = Progress(hy.target)
-                    prog.write_dict()
-                else:
-                    prog = Progress(yml_path)
+                prog = Progress(yml_path)
         self.progress[yml_path.name] = prog
         return self.progress[yml_path.name]
 
@@ -570,7 +570,9 @@ class HelaoSyncer:
             # )
             return True
 
-        with prog.prglock:
+        # with prog.prglock:
+        prog.prglock.acquire()
+        try:
             yml = prog.yml
             meta = yml.meta
 
@@ -729,6 +731,7 @@ class HelaoSyncer:
                     result = yml.cleanup()
                     self.base.print_message(f"Cleanup {yml.target.name} {result}.")
                     if result == "success":
+                        self.base.print_message("yml_success")
                         prog.yml = HelaoYml(yml_success)
                         yml = prog.yml
                         prog.dict["yml"] = str(yml_success)
