@@ -256,8 +256,12 @@ class HelaoYml:
         return [
             x
             for x in self.dir.glob("*")
-            if x.is_file() and not x.suffix == ".yml" and not x.suffix == ".hlo"
+            if x.is_file() and not x.suffix == ".yml" and not x.suffix == ".hlo" and not x.suffix == ".lock"
         ]
+
+    @property
+    def lock_files(self) --> List[Path]:
+        return [x for x in self.dir.glob("*") if x.is_file() and x.suffix == ".lock"]
 
     @property
     def hlo_files(self) -> List[Path]:
@@ -708,6 +712,8 @@ class HelaoSyncer:
                 self.base.print_message(
                     f"Moving files to RUNS_SYNCED for {yml.target.name}"
                 )
+                for lock_path in yml.lock_files:
+                    lock_path.unlink()
                 for file_path in yml.misc_files + yml.hlo_files:
                     self.base.print_message(f"Moving {str(file_path)}")
                     move_success = move_to_synced(file_path)
