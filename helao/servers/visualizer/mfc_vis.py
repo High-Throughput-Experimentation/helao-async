@@ -126,6 +126,7 @@ class C_mfc:
             width=1024,
         )
         self.control_mode = "mass flow"
+        self.yvar = "mass_flow"
 
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
@@ -205,12 +206,27 @@ class C_mfc:
                 latest_epoch = max([epochsec, latest_epoch])
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
 
+        for dev_name in self.devices:
+            control_modes = data_dict[f"{dev_name}__control_point"]
+            if control_modes:
+                control_mode = data_dict[f"{dev_name}__control_point"][-1].strip()
+                if self.control_mode != control_mode:
+                    if control_mode == "mass flow":
+                        self.yvar = "mass_flow"
+                        self.plot.yaxis.axis_label = "Flow rate (sccm)"
+                    else:
+                        self.yvar = "pressure"
+                        self.plot.yaxis.axis_label = "Pressure (psia)"
+                    self.datasource.data = {k: [] for k in self.data_dict_keys}
+
         self.datasource.stream(data_dict, rollover=self.max_points)
         keys = list(data_dict.keys())
         values = [data_dict[k][-1] for k in keys]
         table_data_dict = {"name": keys, "value": values}
         self.datasource_table.stream(table_data_dict, rollover=len(keys))
-        if not self.plot.renderers:
+        if not self.plot.renderers or self.control_mode != control_mode:
+            self.vis.print_message(f"{self.control_mode} changed to {control_mode}")
+            self.control_mode = control_mode
             self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
@@ -237,36 +253,22 @@ class C_mfc:
 
         colors = ["red", "blue", "green", "orange"]
         for dev_name, color in zip(self.devices, colors[: len(self.devices)]):
-            modelist = self.datasource.data[f"{dev_name}__control_point"]
-            if modelist:
-                control_mode = modelist[-1].strip()
-                if control_mode == "mass flow":
-                    yvar = "mass_flow"
-                    self.plot.yaxis.update(axis_label=("Flow rate (sccm)"))
-                else:
-                    yvar = "pressure"
-                    self.plot.yaxis.update(axis_label=("Pressure (psia)"))
-
-                if control_mode != self.control_mode:
-                    self.control_mode = control_mode
-
-                else:
-                    self.plot.line(
-                        x="datetime",
-                        y=f"{dev_name}__{yvar}",
-                        line_color=color,
-                        line_dash="solid",
-                        source=self.datasource,
-                        legend_label=f"{dev_name} actual",
-                    )
-                    self.plot.line(
-                        x="datetime",
-                        y=f"{dev_name}__setpoint",
-                        line_color=color,
-                        line_dash="dotted",
-                        source=self.datasource,
-                        legend_label=f"{dev_name} setpoint",
-                    )
+            self.plot.line(
+                x="datetime",
+                y=f"{dev_name}__{self.yvar}",
+                line_color=color,
+                line_dash="solid",
+                source=self.datasource,
+                legend_label=f"{dev_name} actual",
+            )
+            self.plot.line(
+                x="datetime",
+                y=f"{dev_name}__setpoint",
+                line_color=color,
+                line_dash="dotted",
+                source=self.datasource,
+                legend_label=f"{dev_name} setpoint",
+            )
 
     def reset_plot(self, forceupdate: bool = False):
         # self.xselect = self.xaxis_selector_group.active
