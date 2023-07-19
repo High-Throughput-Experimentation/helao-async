@@ -298,7 +298,7 @@ def ANEC_sub_normal_state(
 def ANEC_sub_flush_fill_cell(
     experiment: Experiment,
     experiment_version: int = 1,
-    liquid_flush_time: float = 80,
+    liquid_flush_time: float = 70,
     co2_purge_time: float = 15,
     equilibration_time: float = 1.0,
     reservoir_liquid_sample_no: int = 1511,
@@ -379,7 +379,7 @@ def ANEC_sub_unload_liquid(
 def ANEC_sub_drain_cell(
     experiment: Experiment,
     experiment_version: int = 3,
-    drain_time: float = 70.0,
+    drain_time: float = 60.0,
 ):
     """Drain liquid from cell and unload liquid sample."""
 

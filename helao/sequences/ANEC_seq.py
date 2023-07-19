@@ -648,7 +648,8 @@ def ANEC_CA_pretreat(
     SampleRate: float = 0.01,
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
-    liquidDrain_time: float = 80.0,
+    liquid_flush_time: float = 70.0,
+    liquidDrain_time: float = 50.0,
 ):
     """Repeat CA and aliquot sampling at the cell1_we position.
 
@@ -685,7 +686,7 @@ def ANEC_CA_pretreat(
         epm.add_experiment(
             "ANEC_sub_flush_fill_cell",
             {
-                "liquid_flush_time": 90,
+                "liquid_flush_time": liquid_flush_time,
                 "co2_purge_time": 15,
                 "equilibration_time": 1.0,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
@@ -736,7 +737,8 @@ def ANEC_repeat_CA(
     wash2: bool = True,
     wash3: bool = True,
     wash4: bool = False,
-    liquidDrain_time: float = 80.0,
+    liquid_flush_time: float = 70.0,
+    liquidDrain_time: float = 60.0,
 ):
     """Repeat CA and aliquot sampling at the cell1_we position.
 
@@ -774,7 +776,7 @@ def ANEC_repeat_CA(
         epm.add_experiment(
             "ANEC_sub_flush_fill_cell",
             {
-                "liquid_flush_time": 80,
+                "liquid_flush_time": liquid_flush_time,
                 "co2_purge_time": 15,
                 "equilibration_time": 1.0,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
@@ -837,6 +839,7 @@ def ANEC_repeat_HeatCA(
     wash2: bool = True,
     wash3: bool = True,
     wash4: bool = False,
+    liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 80.0,
     target_temperature_degc: float =25.0,
 ):
@@ -876,7 +879,7 @@ def ANEC_repeat_HeatCA(
         epm.add_experiment(
             "ANEC_sub_flush_fill_cell",
             {
-                "liquid_flush_time": 80,
+                "liquid_flush_time": liquid_flush_time,
                 "co2_purge_time": 15,
                 "equilibration_time": 1.0,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
@@ -934,7 +937,8 @@ def ANEC_gasonly_CA(
     ref_offset__V: float = 0.0,
     toolGC: str = "HS 2",
     volume_ul_GC: int = 300,
-    liquidDrain_time: float = 80.0,
+    liquid_flush_time: float = 70.0,
+    liquidDrain_time: float = 60.0,
 ):
     """Repeat CA and aliquot sampling at the cell1_we position.
 
@@ -972,7 +976,7 @@ def ANEC_gasonly_CA(
         epm.add_experiment(
             "ANEC_sub_flush_fill_cell",
             {
-                "liquid_flush_time": 80,
+                "liquid_flush_time": liquid_flush_time,
                 "co2_purge_time": 15,
                 "equilibration_time": 1.0,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
