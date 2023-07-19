@@ -120,6 +120,7 @@ class HelaoYml:
         self.filelockpath = str(self.target) + ".lock"
         self.filelock = FileLock(self.filelockpath)
         if not os.path.exists(self.filelockpath):
+            os.makedirs(os.path.dirname(self.filelockpath), exist_ok=True)
             with open(self.filelockpath, "w") as _:
                 pass
 
@@ -320,9 +321,10 @@ class Progress:
         self.prglockpath = str(self.prg) + ".lock"
         self.prglock = FileLock(self.prglockpath)
         if not os.path.exists(self.prglockpath):
+            os.makedirs(os.path.dirname(self.prglockpath), exist_ok=True)
             with open(self.prglockpath, "w") as _:
                 pass
-        
+
         with self.prglock:
             # first time, write progress dict
             if not self.prg.exists():
@@ -512,6 +514,7 @@ class HelaoSyncer:
         """Returns progress from global dict, updates yml_path if yml path not found."""
         ymllockpath = str(yml_path) + ".lock"
         if not os.path.exists(ymllockpath):
+            os.makedirs(os.path.dirname(ymllockpath), exist_ok=True)
             with open(ymllockpath, "w") as _:
                 pass
         ymllock = FileLock(ymllockpath)
