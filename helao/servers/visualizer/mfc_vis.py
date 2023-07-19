@@ -209,23 +209,22 @@ class C_mfc:
         for dev_name in self.devices:
             control_mode = data_dict[f"{dev_name}__control_point"].strip()
             if self.control_mode != control_mode:
-                self.vis.print_message(f"{self.control_mode} changed to {control_mode}")
-                self.control_mode = control_mode
-                if self.control_mode == "mass flow":
+                if control_mode == "mass flow":
                     self.yvar = "mass_flow"
                     self.plot.yaxis.axis_label = "Flow rate (sccm)"
                 else:
                     self.yvar = "pressure"
                     self.plot.yaxis.axis_label = "Pressure (psia)"
                 self.datasource.data = {k: [] for k in self.data_dict_keys}
-                self.plot.renderers = []
 
         self.datasource.stream(data_dict, rollover=self.max_points)
         keys = list(data_dict.keys())
         values = [data_dict[k][-1] for k in keys]
         table_data_dict = {"name": keys, "value": values}
         self.datasource_table.stream(table_data_dict, rollover=len(keys))
-        if not self.plot.renderers:
+        if not self.plot.renderers or self.control_mode != control_mode:
+            self.vis.print_message(f"{self.control_mode} changed to {control_mode}")
+            self.control_mode = control_mode
             self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
