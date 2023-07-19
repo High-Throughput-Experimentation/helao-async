@@ -777,6 +777,8 @@ class HelaoSyncer:
                 exp_prog = self.update_process(yml, meta)
                 await self.sync_process(exp_prog)
 
+        finally:
+            prog.prglock.release()
         return_dict = {k: d for k, d in prog.dict.items() if k != "process_metas"}
         return return_dict
 
