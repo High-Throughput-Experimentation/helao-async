@@ -134,12 +134,12 @@ config["servers"] = {
         "params": {"doc_name": "Sensor Visualizer"},
         "verbose": False,
     },
-    "CO2SENSOR": {
+    "CO2SENSOR": {   #com3 com9 possibles
         "host": hostip,
         "port": 8012,
         "group": "action",
         "fast": "co2sensor_server",
-        "params": {"port": "COM9", "start_margin": 0},
+        "params": {"port": "COM3", "start_margin": 0},
         "verbose": False,
     },
     "SYRINGE0": {
