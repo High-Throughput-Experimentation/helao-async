@@ -189,6 +189,14 @@ class TECWaitExec(Executor):
         self.start_time = time.time()
         self.duration = -1
         self.last_check = 0
+        self.initial_sleep = 2
+
+    async def _pre_exec(self):
+        "Setup methods, return error state."
+        self.active.base.print_message(f"TECWait Executor sleeping for {self.initial_sleep} seconds.")
+        await asyncio.sleep(self.initial_sleep)
+        self.setup_err = ErrorCodes.none
+        return {"error": self.setup_err}
 
     async def _poll(self):
         """Read TEC values from live buffer."""
