@@ -259,6 +259,11 @@ def ANEC_sub_setheat(
         "enable_tec",
         {}
     )
+    apm.add(
+        TEC_server,
+        "wait_till_stable",
+        {}
+    )
 
     return apm.action_list
 
