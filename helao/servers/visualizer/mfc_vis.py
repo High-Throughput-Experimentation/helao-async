@@ -195,7 +195,7 @@ class C_mfc:
             partial(self.update_input_value, sender, f"{self.update_rate}")
         )
 
-    def add_points(self, datapackage_list: list, N: int = 5):
+    def add_points(self, datapackage_list: list):
         latest_epoch = 0
         data_dict = {k: [] for k in self.data_dict_keys}
         for datapackage in datapackage_list:
