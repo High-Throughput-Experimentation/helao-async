@@ -226,11 +226,11 @@ class C_mfc:
                     data_dict[f"{mvar}_mean"] = list(
                         roll_mean(mvec, N)[-len(data_dict[mvar]) :]
                     )
-                    self.vis.print_message(data_dict[mvar])
-                    self.vis.print_message(data_dict[f"{mvar}_mean"])
+                    # self.vis.print_message(data_dict[mvar])
+                    # self.vis.print_message(data_dict[f"{mvar}_mean"])
                 else:
                     data_dict[f"{mvar}_mean"] = data_dict[mvar]
-        self.vis.print_message([(k, len(v)) for k, v in data_dict.items()])
+        # self.vis.print_message([(k, len(v)) for k, v in data_dict.items()])
 
         for dev_name in self.devices:
             control_modes = data_dict[f"{dev_name}__control_point"]
