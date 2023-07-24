@@ -211,4 +211,16 @@ def makeApp(confPrefix, server_key, helao_root):
     def manual_query_state(device_name: str = dev_name):
         return app.driver.manual_query_status(device_name)
 
+    @app.post("/read_valve_register", tags=["private"])
+    def read_valve_register(device_name: str = dev_name):
+        return app.driver._send(device_name, "AR53")
+
+    @app.post("/write_valve_register", tags=["private"])
+    def write_valve_register(device_name: str = dev_name, value: int = 20000):
+        return app.driver._send(device_name, f"AW53={value}")
+
+    @app.post("/send_command", tags=["private"])
+    def send_command(device_name: str = dev_name, command: str = ''):
+        return app.driver._send(device_name, command)
+
     return app
