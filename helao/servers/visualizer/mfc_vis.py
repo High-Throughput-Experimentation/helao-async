@@ -3,6 +3,7 @@ import asyncio
 from functools import partial
 from datetime import datetime
 
+import numpy as np
 import scipy.ndimage as ndi
 
 from bokeh.models import (
@@ -213,11 +214,13 @@ class C_mfc:
                         if k in ("pressure", "mass_flow"):
                             mvar = k
                             dmvar = f"{datalab}__{mvar}"
-                            mvec = self.datasource.data[dmvar] + data_dict[dmvar]
+                            mvec = np.concat(
+                                (self.datasource.data[dmvar], data_dict[dmvar])
+                            )
                             if len(mvec) > N:
-                                data_dict[f"{dmvar}_mean"] += roll_mean(mvec, N)[
-                                    -len(data_dict[dmvar]) :
-                                ]
+                                data_dict[f"{dmvar}_mean"] += list(
+                                    roll_mean(mvec, N)[-len(data_dict[dmvar]) :]
+                                )
                             else:
                                 data_dict[f"{dmvar}_mean"] += data_dict[dmvar]
                 elif isinstance(dataval, list):
