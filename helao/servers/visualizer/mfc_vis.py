@@ -222,10 +222,12 @@ class C_mfc:
                 mvec = np.concatenate(
                     (self.datasource.data[mvar], data_dict[mvar])
                 )
-                if len(mvec) > N:
+                if len(mvec) >= N:
                     data_dict[f"{mvar}_mean"] = list(
                         roll_mean(mvec, N)[-len(data_dict[mvar]) :]
                     )
+                    self.vis.print_message(data_dict[mvar])
+                    self.vis.print_message(data_dict[f"{mvar}_mean"])
                 else:
                     data_dict[f"{mvar}_mean"] = data_dict[mvar]
         self.vis.print_message([(k, len(v)) for k, v in data_dict.items()])
