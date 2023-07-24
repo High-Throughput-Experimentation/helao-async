@@ -3,6 +3,8 @@ import asyncio
 from functools import partial
 from datetime import datetime
 
+import scipy.ndimage as ndi
+
 from bokeh.models import (
     TextInput,
 )
@@ -14,6 +16,13 @@ from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
+
+
+def roll_mean(x, N):
+    """Efficient rolling mean
+    https://stackoverflow.com/a/43200476
+    """
+    return ndi.uniform_filter1d(x, N, mode="constant", origin=-(N // 2))[: -(N - 1)]
 
 
 class C_mfc:
@@ -54,7 +63,7 @@ class C_mfc:
             # "time_now",
         ]
 
-        self.data_dict_keys = ["datetime"]
+        self.data_dict_keys = ["datetime", "mass_flow_mean", "pressure_mean"]
         self.devices = sorted(self.actsrv_cfg["devices"].keys())
         for device_name in self.devices:
             for suffix in self.data_suffices:
@@ -188,7 +197,7 @@ class C_mfc:
             partial(self.update_input_value, sender, f"{self.update_rate}")
         )
 
-    def add_points(self, datapackage_list: list):
+    def add_points(self, datapackage_list: list, N: int = 5):
         latest_epoch = 0
         data_dict = {k: [] for k in self.data_dict_keys}
         for datapackage in datapackage_list:
@@ -205,6 +214,12 @@ class C_mfc:
                     data_dict[datalab].append(dataval)
                 latest_epoch = max([epochsec, latest_epoch])
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
+        for mvar in ("pressure", "mass_flow"):
+            mvec = self.datasource.data[mvar] + data_dict[mvar]
+            if len(mvec) > N:
+                data_dict[f"{mvar}_mean"] = roll_mean(mvec, N)[-len(data_dict[mvar]) :]
+            else:
+                data_dict[f"{mvar}_mean"] = data_dict[mvar]
 
         for dev_name in self.devices:
             control_modes = data_dict[f"{dev_name}__control_point"]
@@ -251,7 +266,7 @@ class C_mfc:
         # remove all old lines
         self.plot.renderers = []
 
-        colors = ["red", "blue", "green", "orange"]
+        colors = ["red", "green", "orange", "purple", "cyan", "magenta"]
         for dev_name, color in zip(self.devices, colors[: len(self.devices)]):
             self.plot.line(
                 x="datetime",
@@ -268,6 +283,14 @@ class C_mfc:
                 line_dash="dotted",
                 source=self.datasource,
                 legend_label=f"{dev_name} setpoint",
+            )
+            self.plot.line(
+                x="datetime",
+                y=f"{dev_name}__{self.yvar}_mean",
+                line_color="blue",
+                line_dash="solid",
+                source=self.datasource,
+                legend_label=f"{dev_name} rolling mean",
             )
 
     def reset_plot(self, forceupdate: bool = False):

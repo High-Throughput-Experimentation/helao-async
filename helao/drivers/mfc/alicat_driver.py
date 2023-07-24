@@ -117,9 +117,9 @@ class AliCatMFC:
                     # self.base.print_message(f"Retrieving {dev_name} MFC status")
                     resp_dict = fc.get_status()
                     if resp_dict is not None:
-                        self.base.print_message(
-                            f"Received {dev_name} MFC status:\n{resp_dict}"
-                        )
+                        # self.base.print_message(
+                        #     f"Received {dev_name} MFC status:\n{resp_dict}"
+                        # )
                         status_dict = {dev_name: resp_dict}
                         lastupdate = time.time()
                         # self.base.print_message(f"Live buffer updated at {checktime}")
