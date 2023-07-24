@@ -19,11 +19,15 @@ __all__ = [
     "ANEC_sub_cleanup",
     "ANEC_sub_CP",
     "ANEC_sub_CA",
+    "ANEC_sub_HeatCA",
     "ANEC_sub_OCV",
     "ANEC_sub_liquidarchive",
     "ANEC_sub_aliquot",
     "ANEC_sub_alloff",
+    "ANEC_sub_heatoff",
+    "ANEC_sub_setheat",
     "ANEC_sub_CV",
+    "ANEC_sub_HeatCV",
     "ANEC_sub_photo_CV",
     "ANEC_sub_photo_CA",
     "ANEC_sub_GCLiquid_analysis",
@@ -56,6 +60,7 @@ NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).as_dict()
 ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
 IO_server = MachineModel(server_name="IO", machine_name=ORCH_HOST).as_dict()
+TEC_server = MachineModel(server_name="TEC", machine_name=ORCH_HOST).as_dict()
 
 toggle_triggertype = TriggerType.fallingedge
 
@@ -187,7 +192,7 @@ def ANEC_sub_load_solid(
 
 def ANEC_sub_alloff(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
 ):
     """
 
@@ -204,9 +209,63 @@ def ANEC_sub_alloff(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "up", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "liquid", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "atm", "on": 0})
+    apm.add(
+        TEC_server,
+        "disable_tec",
+        {}
+    )
 
     return apm.action_list
 
+def ANEC_sub_heatoff(
+    experiment: Experiment,
+    experiment_version: int = 1,
+):
+    """
+
+    Args:
+        experiment (Experiment): Experiment object provided by Orch
+    """
+
+    apm = ActionPlanMaker()
+    apm.add(
+        TEC_server,
+        "disable_tec",
+        {}
+    )
+
+    return apm.action_list
+
+def ANEC_sub_setheat(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    target_temperature_degc: float =25.0
+):
+    """
+
+    Args:
+        experiment (Experiment): Experiment object provided by Orch
+    """
+
+    apm = ActionPlanMaker()
+    apm.add(
+        TEC_server,
+        "set_temperature",
+        {"target_temperature_degc": apm.pars.target_temperature_degc}
+    )
+    
+    apm.add(
+        TEC_server,
+        "enable_tec",
+        {}
+    )
+    apm.add(
+        TEC_server,
+        "wait_till_stable",
+        {}
+    )
+
+    return apm.action_list
 
 def ANEC_sub_normal_state(
     experiment: Experiment,
@@ -244,7 +303,7 @@ def ANEC_sub_normal_state(
 def ANEC_sub_flush_fill_cell(
     experiment: Experiment,
     experiment_version: int = 1,
-    liquid_flush_time: float = 80,
+    liquid_flush_time: float = 70,
     co2_purge_time: float = 15,
     equilibration_time: float = 1.0,
     reservoir_liquid_sample_no: int = 1511,
@@ -325,7 +384,7 @@ def ANEC_sub_unload_liquid(
 def ANEC_sub_drain_cell(
     experiment: Experiment,
     experiment_version: int = 3,
-    drain_time: float = 70.0,
+    drain_time: float = 60.0,
 ):
     """Drain liquid from cell and unload liquid sample."""
 
@@ -692,6 +751,75 @@ def ANEC_sub_CA(
 
     return apm.action_list
 
+def ANEC_sub_HeatCA(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    WE_potential__V: float = 0.0,
+    WE_versus: str = "ref",
+    CA_duration_sec: float = 0.1,
+    SampleRate: float = 0.01,
+    IErange: str = "auto",
+    ref_offset__V: float = 0.0,
+    ref_type: str = "leakless",
+    pH: float = 6.8,
+    target_temperature_degc: float =25.0
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    if apm.pars.WE_versus == "ref":
+        potential_vsRef = apm.pars.WE_potential__V - 1.0 * apm.pars.ref_offset__V
+    elif apm.pars.WE_versus == "rhe":
+        potential_vsRef = (
+            apm.pars.WE_potential__V
+            - 1.0 * apm.pars.ref_offset__V
+            - 0.059 * apm.pars.pH
+            - REF_TABLE[ref_type]
+        )
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {"custom": "cell1_we"},
+        to_globalexp_params=["_fast_samples_in"],
+    )
+    apm.add(
+        TEC_server,
+        "set_temperature",
+        {"target_temperature_degc": apm.pars.target_temperature_degc}
+    )
+    
+    apm.add(
+        TEC_server,
+        "enable_tec",
+        {}
+    )
+    
+    apm.add(
+        TEC_server,
+        "wait_till_stable",
+        {}
+    )
+    apm.add(
+        PSTAT_server,
+        "run_CA",
+        {
+            "Vval__V": potential_vsRef,
+            "Tval__s": apm.pars.CA_duration_sec,
+            "AcqInterval__s": apm.pars.SampleRate,
+            "IErange": apm.pars.IErange,
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        process_finish=True,
+        technique_name="CA",
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+
+    # apm.add(ORCH_server, "wait", {"waittime": 10})
+
+    return apm.action_list
 
 def ANEC_sub_OCV(
     experiment: Experiment,
@@ -921,6 +1049,115 @@ def ANEC_sub_CV(
 
     return apm.action_list
 
+def ANEC_sub_HeatCV(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    WE_versus: str = "ref",
+    ref_type: str = "leakless",
+    pH: float = 6.8,
+    WE_potential_init__V: float = 0.0,
+    WE_potential_apex1__V: float = -1.0,
+    WE_potential_apex2__V: float = -0.5,
+    WE_potential_final__V: float = -0.5,
+    ScanRate_V_s: float = 0.01,
+    Cycles: int = 1,
+    SampleRate: float = 0.01,
+    IErange: str = "auto",
+    ref_offset__V: float = 0.0,
+    target_temperature_degc: float =25.0
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    if apm.pars.WE_versus == "ref":
+        potential_init_vsRef = (
+            apm.pars.WE_potential_init__V - 1.0 * apm.pars.ref_offset__V
+        )
+        potential_apex1_vsRef = (
+            apm.pars.WE_potential_apex1__V - 1.0 * apm.pars.ref_offset__V
+        )
+        potential_apex2_vsRef = (
+            apm.pars.WE_potential_apex2__V - 1.0 * apm.pars.ref_offset__V
+        )
+        potential_final_vsRef = (
+            apm.pars.WE_potential_final__V - 1.0 * apm.pars.ref_offset__V
+        )
+    elif apm.pars.WE_versus == "rhe":
+        potential_init_vsRef = (
+            apm.pars.WE_potential_init__V
+            - 1.0 * apm.pars.ref_offset__V
+            - 0.059 * apm.pars.pH
+            - REF_TABLE[ref_type]
+        )
+        potential_apex1_vsRef = (
+            apm.pars.WE_potential_apex1__V
+            - 1.0 * apm.pars.ref_offset__V
+            - 0.059 * apm.pars.pH
+            - REF_TABLE[ref_type]
+        )
+        potential_apex2_vsRef = (
+            apm.pars.WE_potential_apex2__V
+            - 1.0 * apm.pars.ref_offset__V
+            - 0.059 * apm.pars.pH
+            - REF_TABLE[ref_type]
+        )
+        potential_final_vsRef = (
+            apm.pars.WE_potential_final__V
+            - 1.0 * apm.pars.ref_offset__V
+            - 0.059 * apm.pars.pH
+            - REF_TABLE[ref_type]
+        )
+
+    apm.add(
+        PAL_server,
+        "archive_custom_query_sample",
+        {"custom": "cell1_we"},
+        to_globalexp_params=["_fast_samples_in"],
+    )
+
+    apm.add(
+        TEC_server,
+        "set_temperature",
+        {"target_temperature_degc": apm.pars.target_temperature_degc}
+    )
+    
+    apm.add(
+        TEC_server,
+        "enable_tec",
+        {}
+    )
+    
+    apm.add(
+        TEC_server,
+        "wait_till_stable",
+        {}
+    )
+    
+    apm.add(
+        PSTAT_server,
+        "run_CV",
+        {
+            "Vinit__V": potential_init_vsRef,
+            "Vapex1__V": potential_apex1_vsRef,
+            "Vapex2__V": potential_apex2_vsRef,
+            "Vfinal__V": potential_final_vsRef,
+            "ScanRate__V_s": apm.pars.ScanRate_V_s,
+            "Cycles": apm.pars.Cycles,
+            "AcqInterval__s": apm.pars.SampleRate,
+            "IErange": apm.pars.IErange,
+        },
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        process_finish=True,
+        technique_name=["CV"],
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+
+    # apm.add(ORCH_server, "wait", {"waittime": 10})
+
+    return apm.action_list
 
 def ANEC_sub_photo_CV(
     experiment: Experiment,

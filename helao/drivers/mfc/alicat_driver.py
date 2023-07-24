@@ -6,6 +6,9 @@ default gas list included in the module code differs from our MFC at G16 (i-C4H1
 G25 (He-25), and G26 (He-75). Update the gas list registers in case any of the 3 gases 
 are used.
 
+NOTE: Factory default control setpoint is analog and must be changed for driver operation.
+Setpoint setup (Menu-Control-Setpoint_setup-Setpoint_source) has to be set to serial. 
+
 """
 
 __all__ = ["AliCatMFC", "MfcExec", "PfcExec"]

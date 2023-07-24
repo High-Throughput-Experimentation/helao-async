@@ -14,6 +14,8 @@ DEFAULT_QUERIES = [
     "enabled_status",
     "object_temperature",
     "target_object_temperature",
+    "output_current",
+    "temperature_is_stable",
 ]
 
 # syntax
@@ -130,7 +132,7 @@ class MeerstetterTEC(object):
         waittime = 1.0 / frequency
         self.base.print_message("Starting polling loop")
         while True:
-            tec_vals = self.get_data()
+            tec_vals = {k: v[0] for k, v in self.get_data().items()}
             if tec_vals:
                 msg_dict = {"tec_vals": tec_vals}
                 await self.base.put_lbuf(msg_dict)
@@ -162,6 +164,54 @@ class TECMonExec(Executor):
         elapsed_time = iter_time - self.start_time
         if (self.duration < 0) or (elapsed_time < self.duration):
             status = HloStatus.active
+        else:
+            status = HloStatus.finished
+        await asyncio.sleep(0.001)
+
+        return {
+            "error": ErrorCodes.none,
+            "status": status,
+            "data": live_dict,
+        }
+
+
+STABLE_ID_MAP = {
+    0: "Temperature regulation not active.",
+    1: "Temperature is not stable.",
+    2: "Temperature is stable.",
+}
+
+
+class TECWaitExec(Executor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.active.base.print_message("TECWaitExec initialized.")
+        self.start_time = time.time()
+        self.duration = -1
+        self.last_check = 0
+        self.initial_sleep = 2
+
+    async def _pre_exec(self):
+        "Setup methods, return error state."
+        self.active.base.print_message(f"TECWait Executor sleeping for {self.initial_sleep} seconds.")
+        await asyncio.sleep(self.initial_sleep)
+        self.setup_err = ErrorCodes.none
+        return {"error": self.setup_err}
+
+    async def _poll(self):
+        """Read TEC values from live buffer."""
+        live_dict = {}
+        tec_vals, epoch_s = self.active.base.get_lbuf("tec_vals")
+        live_dict["epoch_s"] = epoch_s
+        for k, v in tec_vals.items():
+            live_dict[k] = v
+        stable_id = live_dict["temperature_is_stable"]
+        if stable_id != 2:
+            status = HloStatus.active
+            if epoch_s - self.last_check > 5:
+                stab_msg = STABLE_ID_MAP.get(stable_id, "temperature state is unknown")
+                self.active.base.print_message(stab_msg)
+                self.last_check = epoch_s
         else:
             status = HloStatus.finished
         await asyncio.sleep(0.001)

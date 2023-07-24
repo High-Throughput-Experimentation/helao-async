@@ -24,6 +24,8 @@ def zip_dir(dir: Union[Path, str], filename: Union[Path, str]):
     try:
         with zipfile.ZipFile(filename, "w", zipfile.ZIP_DEFLATED) as zip_file:
             for entry in dir.rglob("*"):
+                if entry.suffix == ".lock":
+                    continue
                 zip_file.write(entry, entry.relative_to(dir))
         success = True
     except Exception as e:
