@@ -116,14 +116,15 @@ class AliCatMFC:
                         await asyncio.sleep(waittime - (checktime - lastupdate))
                     # self.base.print_message(f"Retrieving {dev_name} MFC status")
                     resp_dict = fc.get_status()
-                    # self.base.print_message(
-                    #     f"Received {dev_name} MFC status:\n{resp_dict}"
-                    # )
-                    status_dict = {dev_name: resp_dict}
-                    lastupdate = time.time()
-                    # self.base.print_message(f"Live buffer updated at {checktime}")
-                    await self.base.put_lbuf(status_dict)
-                    # self.base.print_message("status sent to live buffer")
+                    if resp_dict is not None:
+                        self.base.print_message(
+                            f"Received {dev_name} MFC status:\n{resp_dict}"
+                        )
+                        status_dict = {dev_name: resp_dict}
+                        lastupdate = time.time()
+                        # self.base.print_message(f"Live buffer updated at {checktime}")
+                        await self.base.put_lbuf(status_dict)
+                        # self.base.print_message("status sent to live buffer")
                 await asyncio.sleep(waittime)
 
     def list_gases(self, device_name: str):
@@ -606,7 +607,7 @@ class FlowMeter(object):
                 )
             )
 
-    def get_status(self, retries=2):
+    def get_status(self, retries=5):
         """Get the current state of the flow controller.
 
         From the Alicat mass flow controller documentation, this data is:
@@ -894,7 +895,7 @@ class FlowController(FlowMeter):
         except Exception:
             self.control_point = None
 
-    def get_status(self, retries=2):
+    def get_status(self, retries=5):
         """Get the current state of the flow controller.
 
         From the Alicat mass flow controller documentation, this data is:
