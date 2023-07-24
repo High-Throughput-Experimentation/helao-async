@@ -214,7 +214,7 @@ class C_mfc:
                         if k in ("pressure", "mass_flow"):
                             mvar = k
                             dmvar = f"{datalab}__{mvar}"
-                            mvec = np.concat(
+                            mvec = np.concatenate(
                                 (self.datasource.data[dmvar], data_dict[dmvar])
                             )
                             if len(mvec) > N:
