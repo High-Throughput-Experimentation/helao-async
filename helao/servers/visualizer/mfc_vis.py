@@ -214,14 +214,20 @@ class C_mfc:
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
         for mvar in self.data_dict_keys:
             if mvar.endswith("pressure") or mvar.endswith("mass_flow"):
-                mvec = np.concatenate((self.datasource.data[mvar], data_dict[mvar]))
-                if len(mvec) >= FWIN:
-                    data_dict[f"{mvar}_mean"] = list(
-                        ndi.uniform_filter1d(mvec, FWIN, mode="nearest")[
-                            -len(data_dict[mvar]) :
-                        ]
-                    )
-                else:
+                try:
+                    mvec = np.concatenate((self.datasource.data[mvar], data_dict[mvar]))
+                    if len(mvec) >= FWIN:
+                        data_dict[f"{mvar}_mean"] = list(
+                            ndi.uniform_filter1d(mvec, FWIN, mode="nearest")[
+                                -len(data_dict[mvar]) :
+                            ]
+                        )
+                    else:
+                        data_dict[f"{mvar}_mean"] = data_dict[mvar]
+                except Exception as e:
+                    self.vis.print_message(e)
+                    self.vis.print_message(f"datasource {self.datasource.data[mvar]}")
+                    self.vis.print_message(f"data_dict {self.data_dict[mvar]}")
                     data_dict[f"{mvar}_mean"] = data_dict[mvar]
 
         for dev_name in self.devices:
