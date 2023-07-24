@@ -213,13 +213,16 @@ class C_mfc:
                 else:
                     data_dict[datalab].append(dataval)
                 latest_epoch = max([epochsec, latest_epoch])
+                for mvar in ("pressure", "mass_flow"):
+                    dmvar = f"{datalab}__{mvar}"
+                    mvec = self.datasource.data[dmvar] + data_dict[dmvar]
+                    if len(mvec) > N:
+                        data_dict[f"{dmvar}_mean"] = roll_mean(mvec, N)[
+                            -len(data_dict[dmvar]) :
+                        ]
+                    else:
+                        data_dict[f"{dmvar}_mean"] = data_dict[dmvar]
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
-        for mvar in ("pressure", "mass_flow"):
-            mvec = self.datasource.data[mvar] + data_dict[mvar]
-            if len(mvec) > N:
-                data_dict[f"{mvar}_mean"] = roll_mean(mvec, N)[-len(data_dict[mvar]) :]
-            else:
-                data_dict[f"{mvar}_mean"] = data_dict[mvar]
 
         for dev_name in self.devices:
             control_modes = data_dict[f"{dev_name}__control_point"]
