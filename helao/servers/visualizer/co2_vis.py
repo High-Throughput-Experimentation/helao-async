@@ -18,7 +18,7 @@ from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
-FWIN = 5
+FWIN = 20
 
 
 class C_co2:
