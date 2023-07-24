@@ -8,7 +8,7 @@ import pickle
 from random import randint
 from socket import gethostname
 from time import ctime, time, time_ns, sleep
-from typing import List, Optional, Dict
+from typing import List, Dict
 from types import MethodType
 from uuid import UUID, uuid1
 import hashlib
@@ -23,6 +23,7 @@ import numpy as np
 import pyaml
 import pyzstd
 
+from filelock import FileLock
 from fastapi import Body, WebSocket, WebSocketDisconnect
 from fastapi.dependencies.utils import get_flat_params
 
@@ -119,7 +120,6 @@ class HelaoBase(HelaoFastAPI):
                 await self.base.data_publisher.broadcast(websocket)
             except WebSocketDisconnect:
                 self.base.data_publisher.disconnect(websocket)
-                
 
         @self.websocket("/ws_live")
         async def websocket_live(websocket: WebSocket):
@@ -375,7 +375,7 @@ class Base:
         self.status_publisher = WsPublisher(self.status_q)
         self.data_publisher = WsPublisher(self.data_q)
         self.live_publisher = WsPublisher(self.live_q)
-        
+
         self.ntp_server = "time.nist.gov"
         self.ntp_response = None
         self.ntp_offset = None  # add to system time for correction
@@ -387,13 +387,19 @@ class Base:
             self.ntp_last_sync_file = os.path.join(
                 self.helaodirs.states_root, "ntpLastSync.txt"
             )
+            self.ntplockpath = str(self.ntp_last_sync_file) + ".lock"
+            self.ntplock = FileLock(self.ntplockpath)
+            if not os.path.exists(self.ntplockpath):
+                os.makedirs(os.path.dirname(self.ntplockpath), exist_ok=True)
+                with open(self.ntplockpath, "w") as _:
+                    pass
             if os.path.exists(self.ntp_last_sync_file):
-                sleep(randint(1, 5))
-                with open(self.ntp_last_sync_file, "r") as f:
-                    tmps = f.readline().strip().split(",")
-                    if len(tmps) == 2:
-                        self.ntp_last_sync, self.ntp_offset = tmps
-                        self.ntp_offset = float(self.ntp_offset)
+                with self.ntplock:
+                    with open(self.ntp_last_sync_file, "r") as f:
+                        tmps = f.readline().strip().split(",")
+                        if len(tmps) == 2:
+                            self.ntp_last_sync, self.ntp_offset = tmps
+                            self.ntp_offset = float(self.ntp_offset)
 
     def myinit(self):
         self.aloop = asyncio.get_running_loop()
@@ -612,8 +618,7 @@ class Base:
 
     async def get_ntp_time(self):
         """Check system clock against NIST clock for trigger operations."""
-        lock = asyncio.Lock()
-        async with lock:
+        with self.ntplock:
             c = ntplib.NTPClient()
             try:
                 response = c.request(self.ntp_server, version=3)
@@ -740,7 +745,9 @@ class Base:
         await websocket.accept()
         try:
             async for status_msg in self.status_q.subscribe():
-                await websocket.send_bytes(pyzstd.compress(pickle.dumps(status_msg.as_dict())))
+                await websocket.send_bytes(
+                    pyzstd.compress(pickle.dumps(status_msg.as_dict()))
+                )
         # except WebSocketDisconnect:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -755,7 +762,9 @@ class Base:
         await websocket.accept()
         try:
             async for data_msg in self.data_q.subscribe():
-                await websocket.send_bytes(pyzstd.compress(pickle.dumps(data_msg.as_dict())))
+                await websocket.send_bytes(
+                    pyzstd.compress(pickle.dumps(data_msg.as_dict()))
+                )
         # except WebSocketDisconnect:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -789,6 +798,11 @@ class Base:
         """Convert dict values to tuples of (val, timestamp), enqueue to live_q."""
         new_dict = {k: (v, time()) for k, v in live_dict.items()}
         await self.live_q.put(new_dict)
+
+    def put_lbuf_nowait(self, live_dict):
+        """Convert dict values to tuples of (val, timestamp), enqueue to live_q."""
+        new_dict = {k: (v, time()) for k, v in live_dict.items()}
+        self.live_q.put_nowait(new_dict)
 
     def get_lbuf(self, live_key):
         return self.live_buffer[live_key]

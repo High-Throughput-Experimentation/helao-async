@@ -1,14 +1,5 @@
 """Orchestrator class and FastAPI server templating function
 
-    TODO:
-    1. Create an additional "non-blocking" action queue for Executor-based actions which
-    will be ignored during ActionStartCondition checks and will be terminated after the
-    final action in an experiment using Executor's stop method. Orch will track non-blocking
-    Executor tasks in a dict of lists, keyed by server name, list values are active
-    executor identifiers.
-    2. Update Base class and server templating function with common endpoint to expose
-    Executor stopping method.
-
 """
 
 __all__ = ["Orch", "HelaoOrch"]
@@ -16,7 +7,7 @@ __all__ = ["Orch", "HelaoOrch"]
 import asyncio
 import sys
 from copy import deepcopy
-from typing import Optional, List
+from typing import List
 from uuid import UUID
 import json
 import traceback
@@ -233,9 +224,7 @@ class HelaoOrch(HelaoFastAPI):
             return await self.orch.update_status(actionservermodel=actionservermodel)
 
         @self.post("/update_nonblocking", tags=["private"])
-        async def update_nonblocking(
-            actionmodel: ActionModel = Body({}, embed=True)
-        ):
+        async def update_nonblocking(actionmodel: ActionModel = Body({}, embed=True)):
             self.orch.print_message(
                 f"'{self.orch.server.server_name.upper()}' "
                 f"got nonblocking status from "
@@ -310,9 +299,7 @@ class HelaoOrch(HelaoFastAPI):
             return {"sequence_uuid": seq_uuid}
 
         @self.post("/append_experiment", tags=["private"])
-        async def append_experiment(
-            experiment: Experiment = Body({}, embed=True)
-        ):
+        async def append_experiment(experiment: Experiment = Body({}, embed=True)):
             """Add a experiment object to the end of the experiment queue."""
             exp_uuid = await self.orch.add_experiment(
                 seq=self.orch.seq_file, experimentmodel=experiment.get_exp()
@@ -320,9 +307,7 @@ class HelaoOrch(HelaoFastAPI):
             return {"experiment_uuid": exp_uuid}
 
         @self.post("/prepend_experiment", tags=["private"])
-        async def prepend_experiment(
-            experiment: Experiment = Body({}, embed=True)
-        ):
+        async def prepend_experiment(experiment: Experiment = Body({}, embed=True)):
             """Add a experiment object to the start of the experiment queue."""
             exp_uuid = await self.orch.add_experiment(
                 seq=self.orch.seq_file,
@@ -676,47 +661,47 @@ class Orch(Base):
             resp_tups.append((response, error_code))
         return resp_tups
 
-    async def update_status(
-        self, actionservermodel: ActionServerModel = None
-    ):
+    async def update_status(self, actionservermodel: ActionServerModel = None):
         """Dict update method for action server to push status messages."""
         if actionservermodel is None:
             return False
-        # update GlobalStatusModel with new ActionServerModel
-        # and sort the new status dict
-        self.register_action_uuid(actionservermodel.last_action_uuid)
-        recent_nonactive = self.globalstatusmodel.update_global_with_acts(
-            actionservermodel=actionservermodel
-        )
-        for act_uuid, act_status in recent_nonactive:
-            await self.put_lbuf({act_uuid: {"status": act_status}})
+        
+        async with self.aiolock:
+            # update GlobalStatusModel with new ActionServerModel
+            # and sort the new status dict
+            self.register_action_uuid(actionservermodel.last_action_uuid)
+            recent_nonactive = self.globalstatusmodel.update_global_with_acts(
+                actionservermodel=actionservermodel
+            )
+            for act_uuid, act_status in recent_nonactive:
+                await self.put_lbuf({act_uuid: {"status": act_status}})
 
-        # check if one action is in estop in the error list:
-        estop_uuids = self.globalstatusmodel.find_hlostatus_in_finished(
-            hlostatus=HloStatus.estopped,
-        )
+            # check if one action is in estop in the error list:
+            estop_uuids = self.globalstatusmodel.find_hlostatus_in_finished(
+                hlostatus=HloStatus.estopped,
+            )
 
-        error_uuids = self.globalstatusmodel.find_hlostatus_in_finished(
-            hlostatus=HloStatus.errored,
-        )
+            error_uuids = self.globalstatusmodel.find_hlostatus_in_finished(
+                hlostatus=HloStatus.errored,
+            )
 
-        if estop_uuids and self.globalstatusmodel.loop_state == OrchStatus.started:
-            await self.estop_loop()
-        elif error_uuids and self.globalstatusmodel.loop_state == OrchStatus.started:
-            self.globalstatusmodel.orch_state = OrchStatus.error
-        elif not self.globalstatusmodel.active_dict:
-            # no uuids in active action dict
-            self.globalstatusmodel.orch_state = OrchStatus.idle
-        else:
-            self.globalstatusmodel.orch_state = OrchStatus.busy
-            self.print_message(f"running_states: {self.globalstatusmodel.active_dict}")
+            if estop_uuids and self.globalstatusmodel.loop_state == OrchStatus.started:
+                await self.estop_loop()
+            elif error_uuids and self.globalstatusmodel.loop_state == OrchStatus.started:
+                self.globalstatusmodel.orch_state = OrchStatus.error
+            elif not self.globalstatusmodel.active_dict:
+                # no uuids in active action dict
+                self.globalstatusmodel.orch_state = OrchStatus.idle
+            else:
+                self.globalstatusmodel.orch_state = OrchStatus.busy
+                self.print_message(f"running_states: {self.globalstatusmodel.active_dict}")
 
-        # now push it to the interrupt_q
-        await self.interrupt_q.put(self.globalstatusmodel)
-        await self.update_operator(True)
-        await self.globstat_q.put(self.globalstatusmodel.as_json())
+            # now push it to the interrupt_q
+            await self.interrupt_q.put(self.globalstatusmodel)
+            await self.update_operator(True)
+            await self.globstat_q.put(self.globalstatusmodel.as_json())
 
-        return True
+            return True
 
     async def ws_globstat(self, websocket: WebSocket):
         """Subscribe to global status queue and send messages to websocket client."""
@@ -893,7 +878,7 @@ class Orch(Base):
             self.action_dq.append(act)
         if process_order_groups:
             self.active_experiment.process_order_groups = process_order_groups
-            process_list = init_process_uuids[:len(process_order_groups)]
+            process_list = init_process_uuids[: len(process_order_groups)]
             self.active_experiment.process_list = process_list
         # loop through actions again
 
@@ -1008,96 +993,106 @@ class Orch(Base):
             ] += 1
 
             A.init_act(time_offset=self.ntp_offset)
-            try:
-                result_actiondict, error_code = await async_action_dispatcher(
-                    self.world_cfg, A
+            async with self.aiolock:
+                try:
+                    result_actiondict, error_code = await async_action_dispatcher(
+                        self.world_cfg, A
+                    )
+                except asyncio.exceptions.TimeoutError:
+                    result_actiondict, error_code = await async_private_dispatcher(
+                        self.world_cfg,
+                        A.action_server.server_name,
+                        "resend_active",
+                        params={"action_uuid": A.action_uuid},
+                    )
+
+                result_uuid = result_actiondict["action_uuid"]
+                self.last_action_uuid = result_uuid
+                self.track_action_uuid(UUID(result_uuid))
+                self.print_message(
+                    f"Action {A.action_name} dispatched with uuid: {result_uuid}"
                 )
-            except asyncio.exceptions.TimeoutError:
-                result_actiondict, error_code = await async_private_dispatcher(
-                    self.world_cfg,
-                    A.action_server.server_name,
-                    "resend_active",
-                    params={"action_uuid": A.action_uuid},
+                self.put_lbuf_nowait(
+                    {result_uuid: {"action_name": A.action_name, "status": "active"}}
                 )
 
-            result_uuid = result_actiondict["action_uuid"]
-            self.last_action_uuid = result_uuid
-            self.track_action_uuid(UUID(result_uuid))
-            self.print_message(
-                f"Action {A.action_name} dispatched with uuid: {result_uuid}"
-            )
-            await self.put_lbuf(
-                {result_uuid: {"action_name": A.action_name, "status": "active"}}
-            )
-
+                if not A.nonblocking:
+                    # orch gets back an active action dict, we can self-register the dispatched action in global status
+                    resmod = ActionModel(**result_actiondict)
+                    srvname = resmod.action_server.server_name
+                    actname = resmod.action_name
+                    resuuid = resmod.action_uuid
+                    actstats = resmod.action_status
+                    srvkeys = self.globalstatusmodel.server_dict.keys()
+                    srvkey = [k for k in srvkeys if k[0] == srvname][0]
+                    if (
+                        HloStatus.active in actstats
+                        and resuuid not in self.globalstatusmodel.active_dict
+                    ):
+                        self.globalstatusmodel.active_dict[resuuid] = resmod
+                        self.globalstatusmodel.server_dict[srvkey].endpoints[
+                            actname
+                        ].active_dict[resuuid] = resmod
+                    else:
+                        for actstat in actstats:
+                            try:
+                                if (
+                                    resuuid
+                                    in self.globalstatusmodel.nonactive_dict[actstat]
+                                ):
+                                    break
+                                self.globalstatusmodel.nonactive_dict[actstat][
+                                    resuuid
+                                ] = resmod
+                                self.globalstatusmodel.server_dict[srvkey].endpoints[
+                                    actname
+                                ].nonactive_dict[actstat][resuuid] = resmod
+                            except:
+                                self.print_message(
+                                    f"{actstat} not found in globalstatus.nonactive_dict"
+                                )
+            
             # this will recursively call the next no_wait action in queue, and return its error
             if self.action_dq:
                 nextA = self.action_dq[0]
                 if nextA.start_condition == ActionStartCondition.no_wait:
                     error_code = await self.loop_task_dispatch_action()
 
-            if not A.nonblocking:
-                # orch gets back an active action dict, we can self-register the dispatched action in global status
-                resmod = ActionModel(**result_actiondict)
-                srvname = resmod.action_server.server_name
-                actname = resmod.action_name
-                resuuid = resmod.action_uuid
-                actstats = resmod.action_status
-                srvkeys = self.globalstatusmodel.server_dict.keys()
-                srvkey = [k for k in srvkeys if k[0] == srvname][0]
-                if HloStatus.active in actstats:
-                    self.globalstatusmodel.active_dict[resuuid] = resmod
-                    self.globalstatusmodel.server_dict[srvkey].endpoints[
-                        actname
-                    ].active_dict[resuuid] = resmod
-                else:
-                    for actstat in actstats:
-                        try:
-                            self.globalstatusmodel.nonactive_dict[actstat][
-                                resuuid
-                            ] = resmod
-                            self.globalstatusmodel.server_dict[srvkey].endpoints[
-                                actname
-                            ].nonactive_dict[actstat][resuuid] = resmod
-                            break
-                        except:
-                            self.print_message(
-                                f"{actstat} not found in globalstatus.nonactive_dict"
-                            )
                 # await self.interrupt_q.put(self.globalstatusmodel)
                 # await self.update_operator(True)
                 # await self.globstat_q.put(self.globalstatusmodel.as_json())
 
-                endpoint_uuids = [
-                    str(k) for k in self.globalstatusmodel.active_dict.keys()
-                ] + [
-                    str(k)
-                    for k in self.globalstatusmodel.nonactive_dict.get(
-                        "finished", {}
-                    ).keys()
-                ]
-                self.print_message(
-                    f"Current {A.action_name} received uuids: {endpoint_uuids}"
-                )
-                while result_uuid not in endpoint_uuids:
-                    self.print_message(
-                        f"Waiting for dispatched {A.action_name}, {A.action_uuid} request to register in global status."
-                    )
-                    try:
-                        await asyncio.wait_for(self.wait_for_interrupt(), timeout=5.0)
-                    except asyncio.TimeoutError:
-                        print(
-                            "!!! Did not receive interrupt after 5 sec, retrying. !!!"
-                        )
-                    endpoint_uuids = [
-                        str(k) for k in self.globalstatusmodel.active_dict.keys()
-                    ] + [
-                        str(k)
-                        for k in self.globalstatusmodel.nonactive_dict.get(
-                            "finished", {}
-                        ).keys()
-                    ]
-                self.print_message(f"New status registered on {A.action_name}.")
+                # endpoint_uuids = [
+                #     str(k) for k in self.globalstatusmodel.active_dict.keys()
+                # ] + [
+                #     str(k)
+                #     for k in self.globalstatusmodel.nonactive_dict.get(
+                #         "finished", {}
+                #     ).keys()
+                # ]
+                # self.print_message(
+                #     f"Current {A.action_name} received uuids: {endpoint_uuids}"
+                # )
+                # while result_uuid not in endpoint_uuids:
+                #     self.print_message(
+                #         f"Waiting for dispatched {A.action_name}, {A.action_uuid} request to register in global status."
+                #     )
+                #     try:
+                #         await asyncio.wait_for(self.wait_for_interrupt(), timeout=5.0)
+                #     except asyncio.TimeoutError:
+                #         print(
+                #             "!!! Did not receive interrupt after 5 sec, retrying. !!!"
+                #         )
+                #     endpoint_uuids = [
+                #         str(k) for k in self.globalstatusmodel.active_dict.keys()
+                #     ] + [
+                #         str(k)
+                #         for k in self.globalstatusmodel.nonactive_dict.get(
+                #             "finished", {}
+                #         ).keys()
+                #     ]
+                # self.print_message(f"New status registered on {A.action_name}.")
+
             if error_code is not ErrorCodes.none:
                 return error_code
 
@@ -1551,9 +1546,7 @@ class Orch(Base):
                 )
                 self.print_message(", ".join(self.error_uuids))
 
-    def remove_experiment(
-        self, by_index: int = None, by_uuid: UUID = None
-    ):
+    def remove_experiment(self, by_index: int = None, by_uuid: UUID = None):
         """Remove experiment in list by enumeration index or uuid."""
         if by_index is not None:
             i = by_index

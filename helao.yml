@@ -15,6 +15,7 @@ dependencies:
   - databases
   - git
   - fastapi
+  - filelock
   - ipykernel
   - jupyterlab
   - matplotlib

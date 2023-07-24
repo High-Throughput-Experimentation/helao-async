@@ -7,6 +7,9 @@ FastAPI. The methods provided by this service are not device-specific. Appropria
 must be written in the driver class to ensure that the service methods are generic, i.e.
 calls to 'motion.*' are not device-specific. Currently inherits configuration from
 driver code, and hard-coded to use 'galil' class (see "__main__").
+
+TODO: motor calibration and plate calibration procedure
+
 """
 
 __all__ = ["makeApp"]
