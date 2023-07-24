@@ -229,7 +229,7 @@ class C_mfc:
                     data_dict[datalab].append(dataval)
                 latest_epoch = max([epochsec, latest_epoch])
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
-        print((k, len(v)) for k, v in data_dict.items())
+        self.vis.print_message((k, len(v)) for k, v in data_dict.items())
 
         for dev_name in self.devices:
             control_modes = data_dict[f"{dev_name}__control_point"]
