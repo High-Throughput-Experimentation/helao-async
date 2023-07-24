@@ -18,12 +18,7 @@ from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
-
-def roll_mean(x, N):
-    """Efficient rolling mean
-    https://stackoverflow.com/a/43200476
-    """
-    return ndi.uniform_filter1d(x, N, mode="nearest")
+FWIN = 5
 
 
 class C_mfc:
@@ -219,18 +214,15 @@ class C_mfc:
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
         for mvar in self.data_dict_keys:
             if mvar.endswith("pressure") or mvar.endswith("mass_flow"):
-                mvec = np.concatenate(
-                    (self.datasource.data[mvar], data_dict[mvar])
-                )
-                if len(mvec) >= N:
+                mvec = np.concatenate((self.datasource.data[mvar], data_dict[mvar]))
+                if len(mvec) >= FWIN:
                     data_dict[f"{mvar}_mean"] = list(
-                        roll_mean(mvec, N)[-len(data_dict[mvar]) :]
+                        ndi.uniform_filter1d(mvec, FWIN, mode="nearest")[
+                            -len(data_dict[mvar]) :
+                        ]
                     )
-                    # self.vis.print_message(data_dict[mvar])
-                    # self.vis.print_message(data_dict[f"{mvar}_mean"])
                 else:
                     data_dict[f"{mvar}_mean"] = data_dict[mvar]
-        # self.vis.print_message([(k, len(v)) for k, v in data_dict.items()])
 
         for dev_name in self.devices:
             control_modes = data_dict[f"{dev_name}__control_point"]

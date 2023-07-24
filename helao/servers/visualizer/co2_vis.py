@@ -3,6 +3,9 @@ import asyncio
 from functools import partial
 from datetime import datetime
 
+import numpy as np
+import scipy.ndimage as ndi
+
 from bokeh.models import (
     TextInput,
 )
@@ -14,6 +17,8 @@ from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
+
+FWIN = 5
 
 
 class C_co2:
@@ -42,7 +47,7 @@ class C_co2:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["datetime", "co2_ppm"]
+        self.data_dict_keys = ["datetime", "co2_ppm", "co2_ppm_mean"]
         self.datasource = ColumnDataSource(data={k: [] for k in self.data_dict_keys})
         self.datasource_table = ColumnDataSource(
             data={k: [] for k in ["name", "value"]}
@@ -188,6 +193,17 @@ class C_co2:
                     data_dict[datalab].append(dataval)
                 latest_epoch = max([epochsec, latest_epoch])
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
+        for mvar in self.data_dict_keys:
+            if mvar in ["co2_ppm"]:
+                mvec = np.concatenate((self.datasource.data[mvar], data_dict[mvar]))
+                if len(mvec) >= FWIN:
+                    data_dict[f"{mvar}_mean"] = list(
+                        ndi.uniform_filter1d(mvec, FWIN, mode="nearest")[
+                            -len(data_dict[mvar]) :
+                        ]
+                    )
+                else:
+                    data_dict[f"{mvar}_mean"] = data_dict[mvar]
 
         self.datasource.stream(data_dict, rollover=self.max_points)
         keys = list(data_dict.keys())
@@ -223,6 +239,12 @@ class C_co2:
             line_color="red",
             legend_label="CO2 ppm (filtered)",
             source=self.datasource,
+        )
+        self.plot.line(
+            x="datetime",
+            y="co2_ppm_mean",
+            line_color="blue",
+            legend_label="CO2 ppm rolling mean",
         )
         self.plot.legend.border_line_alpha = 0.2
         self.plot.legend.background_fill_alpha = 0.2
