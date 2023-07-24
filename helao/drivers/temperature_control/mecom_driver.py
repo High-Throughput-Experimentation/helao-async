@@ -40,7 +40,7 @@ class MeerstetterTEC(object):
         self.channel = self.config_dict["channel"]
         self.port = self.config_dict["port"]
 
-        self.queries = self.config_dict["queries"]
+        self.queries = self.config_dict.get("queries", DEFAULT_QUERIES)
         self._session = None
         self._connect()
         self.action = None

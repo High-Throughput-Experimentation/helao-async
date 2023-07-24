@@ -10,7 +10,7 @@ from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base import HelaoBase
 from helaocore.models.sample import SampleUnion
-from helao.drivers.sensor.mecom_driver import MeerstetterTEC, TECMonExec
+from helao.drivers.temperature_control.mecom_driver import MeerstetterTEC, TECMonExec
 from helao.helpers.config_loader import config_loader
 
 
