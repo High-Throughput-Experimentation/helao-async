@@ -188,13 +188,13 @@ class HelaoBase(HelaoFastAPI):
                 self.base.print_message("driver has shutdown function", info=True)
                 retvals["shutdown"] = shutdown()
             else:
-                self.base.print_message("driver has NO shutdown function", info=Truee)
+                self.base.print_message("driver has NO shutdown function", info=True)
                 retvals["shutdown"] = None
-            if shutdown is not None and callable(shutdown):
+            if async_shutdown is not None and callable(async_shutdown):
                 self.base.print_message("driver has async_shutdown function", info=True)
                 retvals["async_shutdown"] = await async_shutdown()
             else:
-                self.base.print_message("driver has NO shutdown function", info=True)
+                self.base.print_message("driver has NO async_shutdown function", info=True)
                 retvals["async_shutdown"] = None
             return retvals
 
