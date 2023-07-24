@@ -55,7 +55,9 @@ class C_mfc:
             "control_point",
             "gas",
             "mass_flow",
+            "mass_flow_mean",
             "pressure",
+            "pressure_mean",
             "temperature",
             # "total_flow",
             "volumetric_flow",
@@ -63,7 +65,7 @@ class C_mfc:
             # "time_now",
         ]
 
-        self.data_dict_keys = ["datetime", "mass_flow_mean", "pressure_mean"]
+        self.data_dict_keys = ["datetime"]
         self.devices = sorted(self.actsrv_cfg["devices"].keys())
         for device_name in self.devices:
             for suffix in self.data_suffices:
