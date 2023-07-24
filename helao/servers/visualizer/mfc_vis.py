@@ -217,17 +217,17 @@ class C_mfc:
                     data_dict[datalab].append(dataval)
                 latest_epoch = max([epochsec, latest_epoch])
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
-            for mvar in self.data_dict_keys:
-                if mvar.endswith("pressure") or mvar.endswith("mass_flow"):
-                    mvec = np.concatenate(
-                        (self.datasource.data[mvar], data_dict[mvar])
+        for mvar in self.data_dict_keys:
+            if mvar.endswith("pressure") or mvar.endswith("mass_flow"):
+                mvec = np.concatenate(
+                    (self.datasource.data[mvar], data_dict[mvar])
+                )
+                if len(mvec) > N:
+                    data_dict[f"{mvar}_mean"] = list(
+                        roll_mean(mvec, N)[-len(data_dict[mvar]) :]
                     )
-                    if len(mvec) > N:
-                        data_dict[f"{mvar}_mean"] += list(
-                            roll_mean(mvec, N)[-len(data_dict[mvar]) :]
-                        )
-                    else:
-                        data_dict[f"{mvar}_mean"] += data_dict[mvar]
+                else:
+                    data_dict[f"{mvar}_mean"] = data_dict[mvar]
         self.vis.print_message([(k, len(v)) for k, v in data_dict.items()])
 
         for dev_name in self.devices:
