@@ -211,24 +211,23 @@ class C_mfc:
                 elif isinstance(dataval, dict):
                     for k, v in dataval.items():
                         data_dict[f"{datalab}__{k}"].append(v)
-                        if k in ("pressure", "mass_flow"):
-                            mvar = k
-                            dmvar = f"{datalab}__{mvar}"
-                            mvec = np.concatenate(
-                                (self.datasource.data[dmvar], data_dict[dmvar])
-                            )
-                            if len(mvec) > N:
-                                data_dict[f"{dmvar}_mean"] += list(
-                                    roll_mean(mvec, N)[-len(data_dict[dmvar]) :]
-                                )
-                            else:
-                                data_dict[f"{dmvar}_mean"] += data_dict[dmvar]
                 elif isinstance(dataval, list):
                     data_dict[datalab] += dataval
                 else:
                     data_dict[datalab].append(dataval)
                 latest_epoch = max([epochsec, latest_epoch])
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
+            for mvar in self.data_dict_keys:
+                if mvar.endswith("pressure") or mvar.endswith("mass_flow"):
+                    mvec = np.concatenate(
+                        (self.datasource.data[mvar], data_dict[mvar])
+                    )
+                    if len(mvec) > N:
+                        data_dict[f"{mvar}_mean"] += list(
+                            roll_mean(mvec, N)[-len(data_dict[mvar]) :]
+                        )
+                    else:
+                        data_dict[f"{mvar}_mean"] += data_dict[mvar]
         self.vis.print_message([(k, len(v)) for k, v in data_dict.items()])
 
         for dev_name in self.devices:
