@@ -3,6 +3,9 @@ import asyncio
 from functools import partial
 from datetime import datetime
 
+import numpy as np
+import scipy.ndimage as ndi
+
 from bokeh.models import (
     TextInput,
 )
@@ -14,6 +17,8 @@ from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
+
+FWIN = 20
 
 
 class C_mfc:
@@ -46,7 +51,9 @@ class C_mfc:
             "control_point",
             "gas",
             "mass_flow",
+            "mass_flow_mean",
             "pressure",
+            "pressure_mean",
             "temperature",
             # "total_flow",
             "volumetric_flow",
@@ -125,6 +132,8 @@ class C_mfc:
             background="#C0C0C0",
             width=1024,
         )
+        self.control_mode = "mass flow"
+        self.yvar = "mass_flow"
 
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
@@ -186,7 +195,7 @@ class C_mfc:
             partial(self.update_input_value, sender, f"{self.update_rate}")
         )
 
-    def add_points(self, datapackage_list: list):
+    def add_points(self, datapackage_list: list, N: int = 5):
         latest_epoch = 0
         data_dict = {k: [] for k in self.data_dict_keys}
         for datapackage in datapackage_list:
@@ -203,14 +212,39 @@ class C_mfc:
                     data_dict[datalab].append(dataval)
                 latest_epoch = max([epochsec, latest_epoch])
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
+        for mvar in self.data_dict_keys:
+            if mvar.endswith("pressure") or mvar.endswith("mass_flow"):
+                mvec = np.concatenate((self.datasource.data[mvar], data_dict[mvar]))
+                if len(mvec) >= FWIN:
+                    data_dict[f"{mvar}_mean"] = list(
+                        ndi.uniform_filter1d(mvec, FWIN, mode="nearest")[
+                            -len(data_dict[mvar]) :
+                        ]
+                    )
+                else:
+                    data_dict[f"{mvar}_mean"] = data_dict[mvar]
 
-            
+        for dev_name in self.devices:
+            control_modes = data_dict[f"{dev_name}__control_point"]
+            if control_modes:
+                control_mode = data_dict[f"{dev_name}__control_point"][-1].strip()
+                if self.control_mode != control_mode:
+                    if control_mode == "mass flow":
+                        self.yvar = "mass_flow"
+                        self.plot.yaxis.axis_label = "Flow rate (sccm)"
+                    else:
+                        self.yvar = "pressure"
+                        self.plot.yaxis.axis_label = "Pressure (psia)"
+                    self.datasource.data = {k: [] for k in self.data_dict_keys}
+
         self.datasource.stream(data_dict, rollover=self.max_points)
         keys = list(data_dict.keys())
         values = [data_dict[k][-1] for k in keys]
         table_data_dict = {"name": keys, "value": values}
         self.datasource_table.stream(table_data_dict, rollover=len(keys))
-        if not self.plot.renderers:
+        if not self.plot.renderers or self.control_mode != control_mode:
+            self.vis.print_message(f"{self.control_mode} changed to {control_mode}")
+            self.control_mode = control_mode
             self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
@@ -235,36 +269,32 @@ class C_mfc:
         # remove all old lines
         self.plot.renderers = []
 
-        colors = ["red", "blue", "green", "orange"]
+        colors = ["red", "green", "orange", "purple", "cyan", "magenta"]
         for dev_name, color in zip(self.devices, colors[: len(self.devices)]):
-            modelist = self.datasource.data[f"{dev_name}__control_point"]
-            if modelist:
-                if (
-                    modelist[-1].strip()
-                    == "mass flow"
-                ):
-                    self.plot.yaxis.axis_label = "Flow rate (sccm)"
-                    yvar = "mass_flow"
-                else:
-                    self.plot.yaxis.axis_label = "Pressure (psia)"
-                    yvar = "pressure"
-
-                self.plot.line(
-                    x="datetime",
-                    y=f"{dev_name}__{yvar}",
-                    line_color=color,
-                    line_dash="solid",
-                    source=self.datasource,
-                    legend_label=f"{dev_name} actual",
-                )
-                self.plot.line(
-                    x="datetime",
-                    y=f"{dev_name}__setpoint",
-                    line_color=color,
-                    line_dash="dotted",
-                    source=self.datasource,
-                    legend_label=f"{dev_name} setpoint",
-                )
+            self.plot.line(
+                x="datetime",
+                y=f"{dev_name}__{self.yvar}",
+                line_color=color,
+                line_dash="solid",
+                source=self.datasource,
+                legend_label=f"{dev_name} actual",
+            )
+            self.plot.line(
+                x="datetime",
+                y=f"{dev_name}__setpoint",
+                line_color=color,
+                line_dash="dotted",
+                source=self.datasource,
+                legend_label=f"{dev_name} setpoint",
+            )
+            self.plot.line(
+                x="datetime",
+                y=f"{dev_name}__{self.yvar}_mean",
+                line_color="blue",
+                line_dash="solid",
+                source=self.datasource,
+                legend_label=f"{dev_name} rolling mean",
+            )
 
     def reset_plot(self, forceupdate: bool = False):
         # self.xselect = self.xaxis_selector_group.active
