@@ -289,10 +289,15 @@ class AliCatMFC:
     def manual_query_status(self, device_name: str):
         return self.base.get_lbuf(device_name)
 
+    async def async_shutdown(self):
+        """Await tasks prior to driver shutdown."""
+        await self.stop_polling()
+        await asyncio.sleep(0.5)
+
     def shutdown(self):
         # this gets called when the server is shut down or reloaded to ensure a clean
         # disconnect ... just restart or terminate the server
-        self.poll_signalq.put_nowait(False)
+        # self.poll_signalq.put_nowait(False)
         self.base.print_message("closing MFC connections")
         for fc in self.fcs.values():
             fc.close()

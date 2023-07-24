@@ -181,13 +181,22 @@ class HelaoBase(HelaoFastAPI):
             await self.base.shutdown()
 
             shutdown = getattr(self.driver, "shutdown", None)
+            async_shutdown = getattr(self.driver, "async_shutdown", None)
+
+            retvals = {}
             if shutdown is not None and callable(shutdown):
                 self.base.print_message("driver has shutdown function", info=True)
-                retval = shutdown()
+                retvals["shutdown"] = shutdown()
             else:
-                self.base.print_message("driver has NO shutdown function", error=True)
-                retval = {"shutdown"}
-            return retval
+                self.base.print_message("driver has NO shutdown function", info=Truee)
+                retvals["shutdown"] = None
+            if shutdown is not None and callable(shutdown):
+                self.base.print_message("driver has async_shutdown function", info=True)
+                retvals["async_shutdown"] = await async_shutdown()
+            else:
+                self.base.print_message("driver has NO shutdown function", info=True)
+                retvals["async_shutdown"] = None
+            return retvals
 
         @self.post(f"/{server_key}/estop", tags=["action"])
         async def estop(
