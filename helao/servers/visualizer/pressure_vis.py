@@ -3,6 +3,9 @@ import asyncio
 from functools import partial
 from datetime import datetime
 
+import numpy as np
+import scipy.ndimage as ndi
+
 from bokeh.models import (
     TextInput,
 )
@@ -14,6 +17,8 @@ from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
+
+FWIN = 20
 
 
 class C_pressure:
@@ -39,9 +44,9 @@ class C_pressure:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["datetime"] + sorted(
-            psrv_config.get("params", {}).get("dev_ai", {}).keys()
-        )
+        self.ai_keys = sorted(psrv_config.get("params", {}).get("dev_ai", {}).keys())
+        self.mean_ai_keys = [f"{x}_mean" for x in self.ai_keys]
+        self.data_dict_keys = ["datetime"] + self.ai_keys + self.mean_ai_keys
         self.datasource = ColumnDataSource(data={k: [] for k in self.data_dict_keys})
         self.datasource_table = ColumnDataSource(
             data={k: [] for k in ["name", "value"]}
@@ -183,6 +188,16 @@ class C_pressure:
                     data_dict[datalab].append(dataval)
                 latest_epoch = max([epochsec, latest_epoch])
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
+        for mvar in self.ai_keys:
+            mvec = np.concatenate((self.datasource.data[mvar], data_dict[mvar]))
+            if len(mvec) >= FWIN:
+                data_dict[f"{mvar}_mean"] = list(
+                    ndi.uniform_filter1d(mvec, FWIN, mode="nearest")[
+                        -len(data_dict[mvar]) :
+                    ]
+                )
+            else:
+                data_dict[f"{mvar}_mean"] = data_dict[mvar]
 
         self.datasource.stream(data_dict, rollover=self.max_points)
         keys = list(data_dict.keys())
@@ -212,15 +227,26 @@ class C_pressure:
         # remove all old lines
         self.plot.renderers = []
 
-        colors = ["red", "blue", "green", "orange"]
-        non_epoch_keys = [x for x in self.data_dict_keys if x not in ["datetime"]]
+        colors = ["red", "blue", "green", "orange", "purple", "cyan", "magenta"]
+        non_epoch_keys = [
+            x for x in self.data_dict_keys if x not in ["datetime"] + self.mean_ai_keys
+        ]
         for pres_key, color in zip(non_epoch_keys, colors):
             self.plot.line(
                 x="datetime",
                 y=pres_key,
                 line_color=color,
+                line_dash="dotted",
                 source=self.datasource,
                 legend_label=pres_key,
+            )
+            self.plot.line(
+                x="datetime",
+                y=f"{pres_key}_mean",
+                line_color=color,
+                line_dash="solid",
+                source=self.datasource,
+                legend_label=f"{pres_key} rolling mean",
             )
             self.plot.legend.border_line_alpha = 0.2
             self.plot.legend.background_fill_alpha = 0.2

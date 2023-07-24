@@ -24,7 +24,7 @@ def find_server_names(vis: Vis, fast_key: str) -> list:
             vis.print_message(
                 f"found server: '{fast_key}' under '{server_name}'", info=True
             )
-            server_names.append(server_name)
+            server_names.append((server_name, sorted(server_config.get("params", []))))
 
     return server_names
 
@@ -58,19 +58,22 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
 
     # create visualizer objects for defined instruments
     vis_map = {
-        "co2sensor_server": C_co2,
-        "galil_io": C_pressure,
-        "nidaqmx_server": C_temperature,
-        "mfc_server": C_mfc,
-        "ws_simulator": C_simlivevis,
-        "tec_server": C_tec,
+        "co2sensor_server": (C_co2, ["port"]),
+        "galil_io": (C_pressure, ["monitor_ai"]),
+        "nidaqmx_server": (C_temperature, ["dev_monitor"]),
+        "mfc_server": (C_mfc, ["devices"]),
+        "ws_simulator": (C_simlivevis, []),
+        "tec_server": (C_tec, []),
     }
     vis_dict = {}
 
-    for fkey, viscls in vis_map.items():
+    for fkey, (viscls, req_pars) in vis_map.items():
         vis_dict[fkey] = []
         fservnames = find_server_names(vis=app.vis, fast_key=fkey)
-        for fsname in fservnames:
+        for (fsname, conf_pars) in fservnames:
+            if req_pars:
+                if not all([x in conf_pars for x in req_pars]):
+                    continue
             vis_dict[fkey].append(viscls(vis_serv=app.vis, serv_key=fsname))
 
     return doc
