@@ -23,7 +23,7 @@ def roll_mean(x, N):
     """Efficient rolling mean
     https://stackoverflow.com/a/43200476
     """
-    return ndi.uniform_filter1d(x, N, mode="constant", origin=-(N // 2))[: -(N - 1)]
+    return ndi.uniform_filter1d(x, N, mode="nearest")
 
 
 class C_mfc:
