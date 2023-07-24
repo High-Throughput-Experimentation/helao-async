@@ -210,21 +210,23 @@ class C_mfc:
                 elif isinstance(dataval, dict):
                     for k, v in dataval.items():
                         data_dict[f"{datalab}__{k}"].append(v)
+                        if k in ("pressure", "mass_flow"):
+                            mvar = k
+                            dmvar = f"{datalab}__{mvar}"
+                            mvec = self.datasource.data[dmvar] + data_dict[dmvar]
+                            if len(mvec) > N:
+                                data_dict[f"{dmvar}_mean"] += roll_mean(mvec, N)[
+                                    -len(data_dict[dmvar]) :
+                                ]
+                            else:
+                                data_dict[f"{dmvar}_mean"] += data_dict[dmvar]
                 elif isinstance(dataval, list):
                     data_dict[datalab] += dataval
                 else:
                     data_dict[datalab].append(dataval)
                 latest_epoch = max([epochsec, latest_epoch])
-                for mvar in ("pressure", "mass_flow"):
-                    dmvar = f"{datalab}__{mvar}"
-                    mvec = self.datasource.data[dmvar] + data_dict[dmvar]
-                    if len(mvec) > N:
-                        data_dict[f"{dmvar}_mean"] = roll_mean(mvec, N)[
-                            -len(data_dict[dmvar]) :
-                        ]
-                    else:
-                        data_dict[f"{dmvar}_mean"] = data_dict[dmvar]
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
+        print((k, len(v)) for k, v in data_dict.items())
 
         for dev_name in self.devices:
             control_modes = data_dict[f"{dev_name}__control_point"]
