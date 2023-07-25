@@ -1,5 +1,6 @@
 __all__ = ["makeBokehApp"]
 
+from importlib import import_module
 from socket import gethostname
 
 from bokeh.models.widgets import Div
@@ -8,12 +9,6 @@ from bokeh.layouts import layout, Spacer
 from helao.servers.vis import HelaoVis
 from helao.servers.vis import Vis
 from helao.helpers.config_loader import config_loader
-from helao.servers.visualizer.co2_vis import C_co2
-from helao.servers.visualizer.pressure_vis import C_pressure
-from helao.servers.visualizer.temp_vis import C_temperature
-from helao.servers.visualizer.mfc_vis import C_mfc
-from helao.servers.visualizer.wssim_live_vis import C_simlivevis
-from helao.servers.visualizer.tec_vis import C_tec
 
 
 def find_server_names(vis: Vis, fast_key: str) -> list:
@@ -30,7 +25,6 @@ def find_server_names(vis: Vis, fast_key: str) -> list:
 
 
 def makeBokehApp(doc, confPrefix, server_key, helao_root):
-
     config = config_loader(confPrefix, helao_root)
 
     app = HelaoVis(
@@ -56,24 +50,29 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
     )
     app.vis.doc.add_root(Spacer(height=10))
 
+    vis_root = "helao.servers.visualizer"
+    vis_classes = {}
     # create visualizer objects for defined instruments
     vis_map = {
-        "co2sensor_server": (C_co2, ["port"]),
-        "galil_io": (C_pressure, ["monitor_ai"]),
-        "nidaqmx_server": (C_temperature, ["dev_monitor"]),
-        "mfc_server": (C_mfc, ["devices"]),
-        "ws_simulator": (C_simlivevis, []),
-        "tec_server": (C_tec, []),
+        "co2sensor_server": ("co2_vis", "C_co2", ["port"]),
+        "galil_io": ("pressure_vis", "C_pressure", ["monitor_ai"]),
+        "nidaqmx_server": ("temp_vis", "C_temperature", ["dev_monitor"]),
+        "mfc_server": ("mfc_vis", "C_mfc", ["devices"]),
+        "ws_simulator": ("wssim_live_vis", "C_simlivevis", []),
+        "tec_server": ("tec_vis", "C_tec", []),
     }
     vis_dict = {}
 
-    for fkey, (viscls, req_pars) in vis_map.items():
+    for fkey, (vismod, viscls, req_pars) in vis_map.items():
         vis_dict[fkey] = []
         fservnames = find_server_names(vis=app.vis, fast_key=fkey)
-        for (fsname, conf_pars) in fservnames:
+        for fsname, conf_pars in fservnames:
             if req_pars:
                 if not all([x in conf_pars for x in req_pars]):
                     continue
-            vis_dict[fkey].append(viscls(vis_serv=app.vis, serv_key=fsname))
+            vis_classes[viscls] = getattr(import_module(f"{vis_root}.{vismod}"), viscls)
+            vis_dict[fkey].append(
+                vis_classes[viscls](vis_serv=app.vis, serv_key=fsname)
+            )
 
     return doc
