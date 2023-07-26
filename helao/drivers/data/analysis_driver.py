@@ -122,9 +122,10 @@ class HelaoAnalysisSyncer:
             region=self.region,
             dummy=self.world_config.get("dummy", True),
         )
-        ana_ts = datetime.strptime(
-            "%Y-%m-%d %H:%M:%S.%f", model_dict.get("analysis_timestamp", set_time())
+        ana_tsstr = model_dict.get(
+            "analysis_timestamp", set_time().strftime("%Y-%m-%d %H:%M:%S.%f")
         )
+        ana_ts = datetime.strptime(ana_tsstr, "%Y-%m-%d %H:%M:%S.%f")
         HMS = ana_ts.strftime("%H%M%S")
         year_week = ana_ts.strftime("%y.%U")
         analysis_day = ana_ts.strftime("%Y%m%d")
