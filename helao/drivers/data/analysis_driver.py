@@ -24,12 +24,11 @@ from helao.drivers.data.sync_driver import dict2json
 from helao.drivers.data.loaders import pgs3
 from helao.drivers.data.analyses.echeuvis_stability import (
     EcheUvisAnalysis,
-    ANALYSIS_DEFAULTS as ECHEUVIS_DEFAULTS,
     SDCUVIS_QUERY,
 )
 from helao.drivers.data.analyses.uvis_bkgsubnorm import (
     DryUvisAnalysis,
-    ANALYSIS_DEFAULTS as DRYUVIS_DEFAULTS,
+    DRYUVIS_QUERY
 )
 
 
@@ -278,13 +277,12 @@ class HelaoAnalysisSyncer:
             .query("run_use=='data'")
             .query("action_name=='acquire_spec_extrig'")
         )
-        ana_params = copy(ECHEUVIS_DEFAULTS)
         for puuid in eudf.process_uuid:
             await self.enqueue_calc(
                 (
                     puuid,
                     pdf,
-                    ana_params.update(params),
+                    params,
                     "ECHEUVIS_InsituOpticalStability",
                 )
             )
@@ -300,7 +298,7 @@ class HelaoAnalysisSyncer:
         # eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
         min_date = datetime.now().strftime("%Y-%m-%d") if recent else "2023-04-26"
         df = pgs3.LOADER.get_recent(
-            query=SDCUVIS_QUERY, min_date=min_date, plate_id=plate_id
+            query=DRYUVIS_QUERY, min_date=min_date, plate_id=plate_id
         )
 
         # all processes in sequence
@@ -317,13 +315,12 @@ class HelaoAnalysisSyncer:
             .query("run_use=='data'")
             .query("action_name=='acquire_spec_adv'")
         )
-        ana_params = copy(DRYUVIS_DEFAULTS)
         for puuid in udf.process_uuid:
             await self.enqueue_calc(
                 (
                     puuid,
                     pdf,
-                    ana_params.update(params),
+                    params,
                     "UVIS_BkgSubNorm",
                 )
             )

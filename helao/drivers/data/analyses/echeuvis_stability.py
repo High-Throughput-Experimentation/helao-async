@@ -72,7 +72,7 @@ FROM
     JOIN helao_sample hsmp on hsmp.id = hsmpp.sample_id
 WHERE
     true
-    AND hs.sequence_name in ('ECHEUVIS_multiCA_led', 'UVIS_T')
+    AND hs.sequence_name in ('ECHEUVIS_multiCA_led')
     AND hp.run_type='eche'
     AND ha.action_name in ('run_OCV', 'run_CA', 'acquire_spec_adv', 'acquire_spec_extrig')
 """
