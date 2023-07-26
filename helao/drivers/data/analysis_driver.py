@@ -8,28 +8,27 @@ __all__ = ["HelaoAnalysisSyncer"]
 
 import asyncio
 import traceback
-from copy import copy
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Union, Optional, Tuple
 from uuid import UUID
 
 import aiohttp
-
+import json
+import pyaml
 import botocore.exceptions
 import pandas as pd
 
 from helao.servers.base import Base
+from helao.helpers.set_time import set_time
 from helao.drivers.data.sync_driver import dict2json
 from helao.drivers.data.loaders import pgs3
 from helao.drivers.data.analyses.echeuvis_stability import (
     EcheUvisAnalysis,
     SDCUVIS_QUERY,
 )
-from helao.drivers.data.analyses.uvis_bkgsubnorm import (
-    DryUvisAnalysis,
-    DRYUVIS_QUERY
-)
+from helao.drivers.data.analyses.uvis_bkgsubnorm import DryUvisAnalysis, DRYUVIS_QUERY
 
 
 class HelaoAnalysisSyncer:
@@ -41,6 +40,7 @@ class HelaoAnalysisSyncer:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
+        self.local_ana_root = os.path.join(self.world_config["root"], "ANALYSES")
         self.max_tasks = self.config_dict.get("max_tasks", 4)
         # declare global loader for analysis models used by driver.batch_* methods
         pgs3.LOADER = pgs3.EcheUvisLoader(
@@ -120,8 +120,19 @@ class HelaoAnalysisSyncer:
             analysis_name=analysis_name,
             bucket=self.bucket,
             region=self.region,
-            dummy=self.world_config.get("dummy", True)
+            dummy=self.world_config.get("dummy", True),
         )
+        ana_ts = model_dict.get("analysis_timestamp", set_time())
+        HMS = ana_ts.strftime("%H%M%S")
+        year_week = ana_ts.strftime("%y.%U")
+        analysis_day = ana_ts.strftime("%Y%m%d")
+        local_ana_dir = os.path.join(
+            self.local_ana_root, year_week, analysis_day, f"{HMS}__{analysis_name}"
+        )
+        os.makedirs(local_ana_dir, exist_ok=True)
+        with open(os.path.join(local_ana_dir, f"{eua.analysis_uuid}.yml"), "w") as f:
+            f.write(pyaml.dump(model_dict, sort_dicts=False))
+
         s3_model_target = f"analysis/{eua.analysis_uuid}.json"
 
         # self.base.print_message("uploading analysis model to S3 bucket")
@@ -138,6 +149,11 @@ class HelaoAnalysisSyncer:
             s3_dict_keys = output["output_keys"]
             s3_dict = {k: v for k, v in output_dict.items() if k in s3_dict_keys}
             s3_output_target = output["analysis_output_path"]["key"]
+            local_json_out = os.path.join(
+                local_ana_dir, os.path.basename(s3_output_target)
+            )
+            with open(local_json_out, "w") as f:
+                json.dump(s3_dict, f)
             s3_success = await self.to_s3(s3_dict, s3_output_target)
             output_successes.append(s3_success)
         s3_output_success = all(output_successes)

@@ -18,6 +18,7 @@ from helaocore.models.analysis import (
 from helaocore.version import get_filehash
 from helaocore.models.s3locator import S3Locator
 from helao.helpers.gen_uuid import gen_uuid
+from helao.helpers.set_time import set_time
 
 from helao.drivers.data.loaders.pgs3 import HelaoProcess, HelaoAction
 
@@ -465,6 +466,7 @@ class EcheUvisAnalysis:
 
         ana_model = AnalysisModel(
             analysis_name=analysis_name,
+            analysis_timestamp=set_time(),
             analysis_params=self.analysis_params,
             analysis_codehash=self.analysis_codehash,
             analysis_uuid=self.analysis_uuid,
