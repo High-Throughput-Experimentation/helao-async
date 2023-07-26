@@ -135,12 +135,18 @@ class HelaoAnalysisSyncer:
 
         s3_model_target = f"analysis/{eua.analysis_uuid}.json"
 
-        # self.base.print_message("uploading analysis model to S3 bucket")
-        try:
-            s3_model_success = await self.to_s3(model_dict, s3_model_target)
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            print(tb)
+        if not self.config_dict.get("local_only", False):
+            # self.base.print_message("uploading analysis model to S3 bucket")
+            try:
+                s3_model_success = await self.to_s3(model_dict, s3_model_target)
+            except Exception as e:
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+                print(tb)
+        else:
+            s3_model_success = True
+            self.base.print_message(
+                "Analysis server config set to local_only, skipping S3/API push."
+            )
 
         outputs = model_dict.get("outputs", [])
         output_successes = []
@@ -154,7 +160,10 @@ class HelaoAnalysisSyncer:
             )
             with open(local_json_out, "w") as f:
                 json.dump(s3_dict, f)
-            s3_success = await self.to_s3(s3_dict, s3_output_target)
+            if not self.config_dict.get("local_only", False):
+                s3_success = await self.to_s3(s3_dict, s3_output_target)
+            else:
+                s3_success = True
             output_successes.append(s3_success)
         s3_output_success = all(output_successes)
 

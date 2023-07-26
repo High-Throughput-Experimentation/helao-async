@@ -405,7 +405,9 @@ class EcheUvisAnalysis:
             mean_abs_omT_diff=np.mean(np.abs((1 - rscl_insitu) - (1 - rscl_baseline))),
         )
 
-    def export_analysis(self, analysis_name: str, bucket: str, region: str, dummy: bool = True):
+    def export_analysis(
+        self, analysis_name: str, bucket: str, region: str, dummy: bool = True
+    ):
         action_keys = [k for k in vars(self.inputs).keys() if "spec_act" in k]
         inputs = []
 
