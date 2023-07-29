@@ -94,6 +94,7 @@ class HelaoBase(HelaoFastAPI):
             self.base.myinit()
             if driver_class is not None:
                 self.driver = driver_class(self.base)
+            self.base.dyn_endpoints_init()
 
         @self.websocket("/ws_status")
         async def websocket_status(websocket: WebSocket):
@@ -194,7 +195,9 @@ class HelaoBase(HelaoFastAPI):
                 self.base.print_message("driver has async_shutdown function", info=True)
                 retvals["async_shutdown"] = await async_shutdown()
             else:
-                self.base.print_message("driver has NO async_shutdown function", info=True)
+                self.base.print_message(
+                    "driver has NO async_shutdown function", info=True
+                )
                 retvals["async_shutdown"] = None
             return retvals
 
@@ -410,14 +413,12 @@ class Base:
         self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
         self.bufferer = self.aloop.create_task(self.live_buffer_task())
 
-        # # if provided add more dynmaic endpoints after driver initialization
-        # if callable(dyn_endpoints):
-        #     asyncio.gather(dyn_endpoints(app=self.fastapp))
-
-        asyncio.gather(self.init_endpoint_status(self.dyn_endpoints))
-
         self.fast_urls = self.get_endpoint_urls()
         self.status_logger = self.aloop.create_task(self.log_status_task())
+
+    def dyn_endpoints_init(self):
+        if callable(self.dyn_endpoints):
+            asyncio.gather(self.init_endpoint_status(self.dyn_endpoints))
 
     def print_message(self, *args, **kwargs):
         print_message(
