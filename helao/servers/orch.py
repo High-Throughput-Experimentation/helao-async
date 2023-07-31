@@ -589,7 +589,7 @@ class Orch(Base):
         """Subscribe to all fastapi servers in config."""
         fails = []
         for serv_key, serv_dict in self.world_cfg["servers"].items():
-            if "fast" in serv_dict:
+            if "fast" in serv_dict or "demo" in serv_dict:
                 self.print_message(f"trying to subscribe to {serv_key} status")
 
                 success = False
