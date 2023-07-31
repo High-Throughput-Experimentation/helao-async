@@ -30,7 +30,6 @@ async def yml_finisher(yml_path: str, base: object = None, retry: int = 3):
         dbp_host = base.world_cfg["servers"]["DB"]["host"]
         dbp_port = base.world_cfg["servers"]["DB"]["port"]
     else:
-        print_msg("DB server not found in config. Cannot finish yml.")
         return False
 
     req_params = {"yml_path": yml_path}
