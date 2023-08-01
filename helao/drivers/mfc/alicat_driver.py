@@ -91,11 +91,13 @@ class AliCatMFC:
 
     async def start_polling(self):
         self.base.print_message("got 'start_polling' request, raising signal")
-        await self.poll_signalq.put(True)
+        async with self.aiolock:
+            await self.poll_signalq.put(True)
 
     async def stop_polling(self):
         self.base.print_message("got 'stop_polling' request, raising signal")
-        await self.poll_signalq.put(False)
+        async with self.aiolock:
+            await self.poll_signalq.put(False)
 
     async def poll_signal_loop(self):
         while True:
@@ -135,7 +137,8 @@ class AliCatMFC:
                             status_dict = {dev_name: resp_dict}
                             lastupdate = time.time()
                             # self.base.print_message(f"Live buffer updated at {checktime}")
-                            await self.base.put_lbuf(status_dict)
+                            async with self.aiolock:
+                                await self.base.put_lbuf(status_dict)
                             # self.base.print_message("status sent to live buffer")
                         else:
                             self.base.print_message(
