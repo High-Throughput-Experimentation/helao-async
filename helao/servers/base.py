@@ -417,8 +417,7 @@ class Base:
         self.status_logger = self.aloop.create_task(self.log_status_task())
 
     def dyn_endpoints_init(self):
-        if callable(self.dyn_endpoints):
-            asyncio.gather(self.init_endpoint_status(self.dyn_endpoints))
+        asyncio.gather(self.init_endpoint_status(self.dyn_endpoints))
 
     def print_message(self, *args, **kwargs):
         print_message(
