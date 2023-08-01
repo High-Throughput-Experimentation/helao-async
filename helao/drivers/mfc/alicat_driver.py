@@ -28,7 +28,6 @@ from helao.helpers.sample_api import UnifiedSampleDataAPI
 
 class AliCatMFC:
     def __init__(self, action_serv: Base):
-
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
 
@@ -38,7 +37,6 @@ class AliCatMFC:
         self.fcinfo = {}
 
         for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
-
             self.fcs[dev_name] = FlowController(
                 port=dev_dict["port"], address=dev_dict["unit_id"]
             )
@@ -123,11 +121,26 @@ class AliCatMFC:
                         # self.base.print_message(
                         #     f"Received {dev_name} MFC status:\n{resp_dict}"
                         # )
-                        status_dict = {dev_name: resp_dict}
-                        lastupdate = time.time()
-                        # self.base.print_message(f"Live buffer updated at {checktime}")
-                        await self.base.put_lbuf(status_dict)
-                        # self.base.print_message("status sent to live buffer")
+                        if all(
+                            [
+                                x in resp_dict
+                                for x in (
+                                    "mass_flow",
+                                    "pressure",
+                                    "setpoint",
+                                    "control_point",
+                                )
+                            ]
+                        ):
+                            status_dict = {dev_name: resp_dict}
+                            lastupdate = time.time()
+                            # self.base.print_message(f"Live buffer updated at {checktime}")
+                            await self.base.put_lbuf(status_dict)
+                            # self.base.print_message("status sent to live buffer")
+                        else:
+                            self.base.print_message(
+                                f"!!Received unexpected dict: {resp_dict}"
+                            )
                 await asyncio.sleep(waittime)
 
     def list_gases(self, device_name: str):
@@ -362,7 +375,9 @@ class MfcExec(Executor):
             closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
                 device_name=self.device_name,
             )
-            self.active.base.print_message(f"hold_valve_closed returned: {closevlv_resp}")
+            self.active.base.print_message(
+                f"hold_valve_closed returned: {closevlv_resp}"
+            )
         else:
             self.active.base.print_message("'stay_open' is True, skipping valve hold")
         return {"error": ErrorCodes.none}
