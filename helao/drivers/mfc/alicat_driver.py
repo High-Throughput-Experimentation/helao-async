@@ -14,6 +14,7 @@ Setpoint setup (Menu-Control-Setpoint_setup-Setpoint_source) has to be set to se
 __all__ = ["AliCatMFC", "MfcExec", "PfcExec"]
 
 import time
+import json
 import asyncio
 import serial
 from typing import Union, Optional
@@ -1093,8 +1094,6 @@ class FlowController(FlowMeter):
 
 def command_line(args):
     """CLI interface, accessible when installed through pip."""
-    import json
-    from time import time
 
     flow_controller = FlowController(port=args.port, address=args.address)
 
@@ -1120,11 +1119,11 @@ def command_line(args):
     if args.stream:
         try:
             print("time\t" + "\t".join(flow_controller.status_keys))
-            t0 = time()
+            t0 = time.time()
             while True:
                 state = flow_controller.get_status()
                 print(
-                    "{:.2f}\t".format(time() - t0)
+                    "{:.2f}\t".format(time.time() - t0)
                     + "\t\t".join(
                         "{:.2f}".format(state[key])
                         for key in flow_controller.status_keys[:-1]
