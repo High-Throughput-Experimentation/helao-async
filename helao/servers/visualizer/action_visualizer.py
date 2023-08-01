@@ -55,6 +55,7 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
 
     # create visualizer objects for defined instruments
     vis_map = {
+        "potentiostat_server": C_potvis,
         "gamry_server": C_potvis,
         "spec_server": C_specvis,
         "nidaqmx_server": C_nidaqmxvis,
