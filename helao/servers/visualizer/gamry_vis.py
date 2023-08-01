@@ -238,6 +238,13 @@ class C_potvis:
                                 data_dict[data_label] += data_val
                             else:
                                 data_dict[data_label].append(data_val)
+
+            # check for missing I_A in OCV
+            max_len = max([len(v) for v in data_dict.values()])
+            for k, v in data_dict.items():
+                if len(v) < max_len:
+                    pad_len = max_len - len(v)
+                    data_dict[k] += ["NaN"] * pad_len
             self.datasource.stream(data_dict, rollover=self.max_points)
 
     def _add_plots(self):

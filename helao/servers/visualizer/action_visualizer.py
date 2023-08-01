@@ -18,7 +18,7 @@ def find_server_names(vis: Vis, fast_key: str) -> list:
     """finds server name for a given fast driver"""
     server_names = []
     for server_name, server_config in vis.world_cfg["servers"].items():
-        if server_config.get("fast", "") == fast_key:
+        if server_config.get("fast", server_config.get("demo", "")) == fast_key:
             vis.print_message(
                 f"found server: '{fast_key}' under '{server_name}'", info=True
             )
@@ -55,6 +55,7 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
 
     # create visualizer objects for defined instruments
     vis_map = {
+        "potentiostat_server": C_potvis,
         "gamry_server": C_potvis,
         "spec_server": C_specvis,
         "nidaqmx_server": C_nidaqmxvis,
