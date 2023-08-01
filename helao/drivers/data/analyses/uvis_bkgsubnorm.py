@@ -32,6 +32,44 @@ ANALYSIS_DEFAULTS = {
     "agg_last_secs": 2,
     "agg_method": "mean",
 }
+DRYUVIS_QUERY = """
+SELECT
+    hp.dummy,
+    hp.run_type,
+    hp.sequence_uuid,
+    hp.experiment_uuid,
+    hp.process_uuid,
+    hp.process_group_index,
+    hp.process_params,
+    hp.technique_name,
+    hp.run_use,
+    hp.process_timestamp,
+    hs.sequence_params,
+    hs.sequence_name,
+    hs.sequence_label,
+    hs.sequence_timestamp,
+    hs.sequence_status,
+    he.experiment_params,
+    he.experiment_name,
+    he.experiment_status,
+    ha.action_uuid,
+    ha.action_params,
+    ha.action_name,
+    ha.action_timestamp,
+    hsmp.global_label
+FROM
+    helao_process hp
+    JOIN helao_sequence hs on hs.sequence_uuid = hp.sequence_uuid
+    JOIN helao_experiment he on he.experiment_uuid = hp.experiment_uuid
+    JOIN helao_action ha on ha.experiment_uuid = he.experiment_uuid
+    JOIN helao_sample_process hsmpp on hsmpp.process_id = hp.id
+    JOIN helao_sample hsmp on hsmp.id = hsmpp.sample_id
+WHERE
+    true
+    AND hs.sequence_name in ('UVIS_T')
+    AND hp.run_type='eche'
+    AND ha.action_name in ('acquire_spec_adv')
+"""
 
 
 class DryUvisInputs:

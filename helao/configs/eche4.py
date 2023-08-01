@@ -7,7 +7,13 @@ config["dummy"] = True
 config["simulation"] = False
 
 config["builtin_ref_motorxy"] = [110, 12]  # absolute plate coords
-config["experiment_libraries"] = ["samples_exp", "ECHE_exp", "ECHEUVIS_exp", "UVIS_exp", "TEST_exp"]
+config["experiment_libraries"] = [
+    "samples_exp",
+    "ECHE_exp",
+    "ECHEUVIS_exp",
+    "UVIS_exp",
+    "TEST_exp",
+]
 config["experiment_params"] = {
     "toggle_is_shutter": False,
     "gamrychannelwait": -1,
@@ -165,15 +171,18 @@ config["servers"] = {
         "port": 8014,
         "group": "action",
         "fast": "analysis_server",
-        "params": {"env_file": "k:/users/hte/.credentials/helao_data.env"},
-    }
-    # "CAM": {
-    #     "host": hostip,
-    #     "port": 8013,
-    #     "group": "action",
-    #     "fast": "cam_server",
-    #     "params": {
-    #         "axis_ip": "192.168.200.210",
-    #     },
-    # },
+        "params": {
+            "env_file": "k:/users/hte/.credentials/helao_data.env",
+            "local_only": True,
+        },
+    },
+    "CAM": {
+        "host": hostip,
+        "port": 8013,
+        "group": "action",
+        "fast": "cam_server",
+        "params": {
+            "axis_ip": "192.168.200.210",
+        },
+    },
 }

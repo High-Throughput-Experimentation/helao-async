@@ -18,6 +18,7 @@ from helaocore.models.analysis import (
 from helaocore.version import get_filehash
 from helaocore.models.s3locator import S3Locator
 from helao.helpers.gen_uuid import gen_uuid
+from helao.helpers.set_time import set_time
 
 from helao.drivers.data.loaders.pgs3 import HelaoProcess, HelaoAction
 
@@ -72,7 +73,7 @@ FROM
     JOIN helao_sample hsmp on hsmp.id = hsmpp.sample_id
 WHERE
     true
-    AND hs.sequence_name in ('ECHEUVIS_multiCA_led', 'UVIS_T')
+    AND hs.sequence_name in ('ECHEUVIS_multiCA_led')
     AND hp.run_type='eche'
     AND ha.action_name in ('run_OCV', 'run_CA', 'acquire_spec_adv', 'acquire_spec_extrig')
 """
@@ -404,7 +405,9 @@ class EcheUvisAnalysis:
             mean_abs_omT_diff=np.mean(np.abs((1 - rscl_insitu) - (1 - rscl_baseline))),
         )
 
-    def export_analysis(self, analysis_name: str, bucket: str, region: str, dummy: bool = True):
+    def export_analysis(
+        self, analysis_name: str, bucket: str, region: str, dummy: bool = True
+    ):
         action_keys = [k for k in vars(self.inputs).keys() if "spec_act" in k]
         inputs = []
 
@@ -465,6 +468,7 @@ class EcheUvisAnalysis:
 
         ana_model = AnalysisModel(
             analysis_name=analysis_name,
+            analysis_timestamp=set_time(),
             analysis_params=self.analysis_params,
             analysis_codehash=self.analysis_codehash,
             analysis_uuid=self.analysis_uuid,
