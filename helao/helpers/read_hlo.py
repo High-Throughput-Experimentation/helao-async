@@ -46,11 +46,11 @@ class HelaoData:
             ".zip"
         ):  # this will always be a zipped sequence, helao does not zip actions, experiments
             with ZipFile(target, "r") as zf:
-                if "zflist" in kwargs.keys():
+                if "zflist" in kwargs:
                     self.zflist = kwargs["zflist"]
                 else:
                     self.zflist = [p for p in zf.namelist() if not p.endswith("/")]
-                if "ztarget" in kwargs.keys():
+                if "ztarget" in kwargs:
                     self.ymlpath = kwargs["ztarget"]
                 else:
                     self.ymlpath = [p for p in self.zflist if p.endswith("-seq.yml")][0]
