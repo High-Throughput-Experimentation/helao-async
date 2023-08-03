@@ -76,33 +76,41 @@ class HelaoLoader:
         md = json.load(obytes)
         return md
 
-    def get_act(self, action_uuid: UUID):
+    def get_act(self, action_uuid: UUID, hmod: bool = True):
         jd = self.act_cache.get(action_uuid, self.get_json("action", action_uuid))
         if self.cache_json:
             self.act_cache[action_uuid] = jd
+        if hmod:
+            return HelaoAction(action_uuid)
         return jd
 
-    def get_exp(self, experiment_uuid: UUID):
+    def get_exp(self, experiment_uuid: UUID, hmod: bool = True):
         jd = self.exp_cache.get(
             experiment_uuid, self.get_json("experiment", experiment_uuid)
         )
         if self.cache_json:
             self.exp_cache[experiment_uuid] = jd
+        if hmod:
+            return HelaoExperiment(experiment_uuid)
         return jd
 
-    def get_seq(self, sequence_uuid: UUID):
+    def get_seq(self, sequence_uuid: UUID, hmod: bool = True):
         if sequence_uuid != self.last_seq_uuid:
             self.clear_cache()
             self.last_seq_uuid = sequence_uuid
         jd = self.seq_cache.get(sequence_uuid, self.get_json("sequence", sequence_uuid))
         if self.cache_json:
             self.seq_cache[sequence_uuid] = jd
+        if hmod:
+            return HelaoSequence(sequence_uuid)
         return jd
 
-    def get_pro(self, process_uuid: UUID):
+    def get_pro(self, process_uuid: UUID, hmod: bool = True):
         jd = self.pro_cache.get(process_uuid, self.get_json("process", process_uuid))
         if self.cache_json:
             self.pro_cache[process_uuid] = jd
+        if hmod:
+            return HelaoProcess(process_uuid)
         return jd
 
     def get_hlo(self, action_uuid: UUID, hlo_fn: str):
