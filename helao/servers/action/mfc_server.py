@@ -76,8 +76,22 @@ def makeApp(confPrefix, server_key, helao_root):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/cancel_acquire", tags=["action"])
+    @app.post(f"/{server_key}/cancel_acquire_flowrate", tags=["action"])
     async def cancel_acquire_flowrate(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        device_name: str = dev_name,
+    ):
+        """Stop flowrate & acquisition for given device_name."""
+        active = await app.base.setup_and_contain_action()
+        await app.base.executors[
+            active.action.action_params["device_name"]
+        ].stop_action_task()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+    @app.post(f"/{server_key}/cancel_acquire_pressure", tags=["action"])
+    async def cancel_acquire_pressure(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
         device_name: str = dev_name,
