@@ -174,25 +174,25 @@ class HelaoModel:
             query_df is not None
             and query_df.query(f"{helao_type}_uuid==@uuid").shape[0] > 1
         ):
-            self.row_dict = (
+            self.meta_dict = (
                 query_df.query(f"{helao_type}_uuid==@uuid").iloc[0].to_dict()
             )
         else:
-            self.row_dict = self._row_dict
-        self.timestamp = self.row_dict.get(
+            self.meta_dict = self._meta_dict
+        self.timestamp = self.meta_dict.get(
             f"{helao_type}_timestamp",
-            self.row_dict.get(f"{helao_type}_timestamp", None),
+            self.meta_dict.get(f"{helao_type}_timestamp", None),
         )
-        self.params = self.row_dict.get(
-            f"{helao_type}_params", self.row_dict.get(f"{helao_type}_params", {})
+        self.params = self.meta_dict.get(
+            f"{helao_type}_params", self.meta_dict.get(f"{helao_type}_params", {})
         )
         if helao_type == "process":
-            self.name = self.row_dict.get(
-                "technique_name", self.row_dict.get("technique_name", None)
+            self.name = self.meta_dict.get(
+                "technique_name", self.meta_dict.get("technique_name", None)
             )
         else:
-            self.name = self.row_dict.get(
-                f"{helao_type}_name", self.row_dict.get(f"{helao_type}_name", None)
+            self.name = self.meta_dict.get(
+                f"{helao_type}_name", self.meta_dict.get(f"{helao_type}_name", None)
             )
 
     @property
@@ -201,7 +201,7 @@ class HelaoModel:
         return LOADER.get_json(self.helao_type, self.uuid)
 
     @property
-    def _row_dict(self):
+    def _meta_dict(self):
         # retrieve row from API database via HelaoAccess
         return LOADER.get_sql(self.helao_type, self.uuid)
 
