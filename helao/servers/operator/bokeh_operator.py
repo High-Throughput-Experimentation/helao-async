@@ -102,6 +102,7 @@ class Operator:
 
         self.sequence_list = {}
         self.sequence_list["sequence_name"] = []
+        self.sequence_list["sequence_label"] = []
         self.sequence_list["sequence_uuid"] = []
 
         self.experiment_list = {}
@@ -722,6 +723,9 @@ class Operator:
             seqdict = seq.as_dict()
             self.sequence_list["sequence_name"].append(
                 seqdict.get("sequence_name", None)
+            )
+            self.sequence_list["sequence_label"].append(
+                seqdict.get("sequence_label", None)
             )
             self.sequence_list["sequence_uuid"].append(
                 seqdict.get("sequence_uuid", None)
