@@ -59,9 +59,9 @@ SELECT
     hsmp.global_label
 FROM
     helao_process hp
+    JOIN helao_action ha on ha.process_id = hp.id
     JOIN helao_sequence hs on hs.sequence_uuid = hp.sequence_uuid
     JOIN helao_experiment he on he.experiment_uuid = hp.experiment_uuid
-    JOIN helao_action ha on ha.experiment_uuid = he.experiment_uuid
     JOIN helao_sample_process hsmpp on hsmpp.process_id = hp.id
     JOIN helao_sample hsmp on hsmp.id = hsmpp.sample_id
 WHERE
