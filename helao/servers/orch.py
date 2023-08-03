@@ -665,7 +665,7 @@ class Orch(Base):
         """Dict update method for action server to push status messages."""
         if actionservermodel is None:
             return False
-        
+
         async with self.aiolock:
             # update GlobalStatusModel with new ActionServerModel
             # and sort the new status dict
@@ -687,14 +687,18 @@ class Orch(Base):
 
             if estop_uuids and self.globalstatusmodel.loop_state == OrchStatus.started:
                 await self.estop_loop()
-            elif error_uuids and self.globalstatusmodel.loop_state == OrchStatus.started:
+            elif (
+                error_uuids and self.globalstatusmodel.loop_state == OrchStatus.started
+            ):
                 self.globalstatusmodel.orch_state = OrchStatus.error
             elif not self.globalstatusmodel.active_dict:
                 # no uuids in active action dict
                 self.globalstatusmodel.orch_state = OrchStatus.idle
             else:
                 self.globalstatusmodel.orch_state = OrchStatus.busy
-                self.print_message(f"running_states: {self.globalstatusmodel.active_dict}")
+                self.print_message(
+                    f"running_states: {self.globalstatusmodel.active_dict}"
+                )
 
             # now push it to the interrupt_q
             await self.interrupt_q.put(self.globalstatusmodel)
@@ -1003,7 +1007,8 @@ class Orch(Base):
                         self.world_cfg,
                         A.action_server.server_name,
                         "resend_active",
-                        params={"action_uuid": A.action_uuid},
+                        params_dict={},
+                        json_dict={"action_uuid": A.action_uuid},
                     )
 
                 result_uuid = result_actiondict["action_uuid"]
@@ -1051,7 +1056,7 @@ class Orch(Base):
                                 self.print_message(
                                     f"{actstat} not found in globalstatus.nonactive_dict"
                                 )
-            
+
             # this will recursively call the next no_wait action in queue, and return its error
             if self.action_dq:
                 nextA = self.action_dq[0]
