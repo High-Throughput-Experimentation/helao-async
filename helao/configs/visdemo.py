@@ -1,4 +1,4 @@
-hostip = "hte-eche-04.htejcap.caltech.edu"
+hostip = "127.0.0.1"
 config = {}
 config["dummy"] = True
 config["simulation"] = True
@@ -34,17 +34,17 @@ config["servers"] = {
         "bokeh": "live_visualizer",
         "params": {"doc_name": "Websocket Live Visualizer"},
     },
-    "DB": {
-        "host": hostip,
-        "port": 8010,
-        "group": "action",
-        "fast": "dbpack_server",
-        "params": {
-            "aws_config_path": "k:/users/hte/.credentials/aws_config.ini",
-            "aws_profile": "default",
-            "aws_bucket": "helao.data",
-            "api_host": "caltech-api.modelyst.com",
-            "testing": True,
-        },
-    },
+    # "DB": {
+    #     "host": hostip,
+    #     "port": 8010,
+    #     "group": "action",
+    #     "fast": "dbpack_server",
+    #     "params": {
+    #         "aws_config_path": "k:/users/hte/.credentials/aws_config.ini",
+    #         "aws_profile": "default",
+    #         "aws_bucket": "helao.data",
+    #         "api_host": "caltech-api.modelyst.com",
+    #         "testing": True,
+    #     },
+    # },
 }
