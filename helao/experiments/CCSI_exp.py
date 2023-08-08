@@ -1168,7 +1168,7 @@ def CCSI_sub_flowflush(
     apm.add(CO2S_server, "acquire_co2",{"duration": apm.pars.co2measure_duration,"acquisition_rate": apm.pars.co2measure_acqrate,},asc.no_wait,)
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
 
-    cycles = co2measure_duration // 30,
+    cycles = int(co2measure_duration / 30),
     for t in range(cycles):
             apm.add(ORCH_server, "wait", {"waittime": 28})
             apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 1})
