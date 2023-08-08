@@ -31,6 +31,7 @@ __all__ = [
     "CCSI_sub_fill_syringe",
     "CCSI_sub_full_fill_syringe",
     "CCSI_leaktest_co2",
+    "CCSI_sub_flowflush",
 
 ]
 
@@ -1151,6 +1152,30 @@ def CCSI_sub_cellfill_masscotwo(
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
     return apm.action_list
+
+
+def CCSI_sub_flowflush(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    co2measure_duration: float = 300,
+    co2measure_acqrate: float = 0.5,
+    flowrate_sccm: float = 0.3,
+    flowramp_sccm: float = 0,
+):
+    apm = ActionPlanMaker()
+
+    apm.add(MFC_server, "acquire_flowrate", {"flowrate_sccm":0.5,"ramp_sccm_sec":apm.pars.flowramp_sccm,"duration":apm.pars.co2measure_duration,"acquisition_rate": apm.pars.co2measure_acqrate,})
+    apm.add(CO2S_server, "acquire_co2",{"duration": apm.pars.co2measure_duration,"acquisition_rate": apm.pars.co2measure_acqrate,},asc.no_wait,)
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
+
+    cycles = co2measure_duration // 30,
+    for t in range(cycles):
+            apm.add(ORCH_server, "wait", {"waittime": 28})
+            apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 1})
+            apm.add(ORCH_server, "wait", {"waittime": 2})
+            apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 0})
+
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
 
 
 
