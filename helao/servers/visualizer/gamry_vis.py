@@ -130,7 +130,13 @@ class C_potvis:
         self.layout = layout(
             [
                 [Spacer(width=20), Div(text=headerbar, width=1004, height=15)],
-                [self.input_max_points, Spacer(width=20), self.input_max_prev, Spacer(width=20), self.button_stop_measure],
+                [
+                    self.input_max_points,
+                    Spacer(width=20),
+                    self.input_max_prev,
+                    Spacer(width=20),
+                    self.button_stop_measure,
+                ],
                 [
                     Paragraph(text="""x-axis:""", width=500, height=15),
                     Paragraph(text="""y-axis:""", width=500, height=15),
@@ -157,7 +163,14 @@ class C_potvis:
     def callback_stop_measure(self, event):
         self.vis.print_message("stopping gamry measurement")
         self.vis.doc.add_next_tick_callback(
-            partial(async_private_dispatcher, self.vis.world_cfg, "PSTAT", {}, {})
+            partial(
+                async_private_dispatcher,
+                world_config_dict=self.vis.world_cfg,
+                server="PSTAT",
+                private_action="stop_nowait",
+                params_dict={},
+                json_dict={},
+            )
         )
 
     def cleanup_session(self, session_context):
