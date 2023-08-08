@@ -1164,12 +1164,12 @@ def CCSI_sub_flowflush(
 ):
     apm = ActionPlanMaker()
 
-    apm.add(MFC_server, "acquire_flowrate", {"flowrate_sccm":0.5,"ramp_sccm_sec":apm.pars.flowramp_sccm,"duration":apm.pars.co2measure_duration,"acquisition_rate": apm.pars.co2measure_acqrate,})
-    apm.add(CO2S_server, "acquire_co2",{"duration": apm.pars.co2measure_duration,"acquisition_rate": apm.pars.co2measure_acqrate,},asc.no_wait,)
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
+    apm.add(MFC_server, "acquire_flowrate", {"flowrate_sccm":0.5,"ramp_sccm_sec":apm.pars.flowramp_sccm,"duration":apm.pars.co2measure_duration,"acquisition_rate": apm.pars.co2measure_acqrate,},nonblocking=True)
+    apm.add(CO2S_server, "acquire_co2",{"duration": apm.pars.co2measure_duration,"acquisition_rate": apm.pars.co2measure_acqrate,},asc.no_wait,nonblocking=True)
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait,nonblocking=True)
 
-    cycles = int(co2measure_duration / 30),
-    for t in range(cycles):
+    #cycles = int(co2measure_duration / 30),
+    for t in range(60):
             apm.add(ORCH_server, "wait", {"waittime": 28})
             apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 1})
             apm.add(ORCH_server, "wait", {"waittime": 2})
