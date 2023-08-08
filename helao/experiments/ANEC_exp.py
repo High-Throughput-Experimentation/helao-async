@@ -192,7 +192,7 @@ def ANEC_sub_load_solid(
 
 def ANEC_sub_alloff(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 4,
 ):
     """
 
@@ -211,15 +211,21 @@ def ANEC_sub_alloff(
     apm.add(NI_server, "gasvalve", {"gasvalve": "atm", "on": 0})
     apm.add(
         TEC_server,
+        "cancel_record_tec",
+        {}
+    )
+    apm.add(
+        TEC_server,
         "disable_tec",
         {}
     )
+
 
     return apm.action_list
 
 def ANEC_sub_heatoff(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
 ):
     """
 
@@ -228,6 +234,12 @@ def ANEC_sub_heatoff(
     """
 
     apm = ActionPlanMaker()
+
+    apm.add(
+        TEC_server,
+        "cancel_record_tec",
+        {}
+    )
     apm.add(
         TEC_server,
         "disable_tec",
@@ -238,7 +250,7 @@ def ANEC_sub_heatoff(
 
 def ANEC_sub_setheat(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     target_temperature_degc: float =25.0
 ):
     """
@@ -253,7 +265,12 @@ def ANEC_sub_setheat(
         "set_temperature",
         {"target_temperature_degc": apm.pars.target_temperature_degc}
     )
-    
+    apm.add(
+        TEC_server,
+        "record_tec",
+        {"duration": -1,
+        "acquisition_rate": 0.2}
+    ) 
     apm.add(
         TEC_server,
         "enable_tec",
@@ -753,7 +770,7 @@ def ANEC_sub_CA(
 
 def ANEC_sub_HeatCA(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
     CA_duration_sec: float = 0.1,
@@ -785,6 +802,12 @@ def ANEC_sub_HeatCA(
         "set_temperature",
         {"target_temperature_degc": apm.pars.target_temperature_degc}
     )
+    apm.add(
+        TEC_server,
+        "record_tec",
+        {"duration": -1,
+        "acquisition_rate": 0.2}
+    ) 
     
     apm.add(
         TEC_server,
@@ -1051,7 +1074,7 @@ def ANEC_sub_CV(
 
 def ANEC_sub_HeatCV(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
@@ -1118,7 +1141,12 @@ def ANEC_sub_HeatCV(
         "set_temperature",
         {"target_temperature_degc": apm.pars.target_temperature_degc}
     )
-    
+    apm.add(
+        TEC_server,
+        "record_tec",
+        {"duration": -1,
+        "acquisition_rate": 0.2}
+    ) 
     apm.add(
         TEC_server,
         "enable_tec",
