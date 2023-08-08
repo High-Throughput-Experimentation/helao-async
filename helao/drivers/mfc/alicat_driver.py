@@ -14,6 +14,7 @@ Setpoint setup (Menu-Control-Setpoint_setup-Setpoint_source) has to be set to se
 __all__ = ["AliCatMFC", "MfcExec", "PfcExec"]
 
 import time
+import json
 import asyncio
 import serial
 from typing import Union, Optional
@@ -28,7 +29,6 @@ from helao.helpers.sample_api import UnifiedSampleDataAPI
 
 class AliCatMFC:
     def __init__(self, action_serv: Base):
-
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
 
@@ -38,7 +38,6 @@ class AliCatMFC:
         self.fcinfo = {}
 
         for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
-
             self.fcs[dev_name] = FlowController(
                 port=dev_dict["port"], address=dev_dict["unit_id"]
             )
@@ -93,11 +92,13 @@ class AliCatMFC:
 
     async def start_polling(self):
         self.base.print_message("got 'start_polling' request, raising signal")
-        await self.poll_signalq.put(True)
+        async with self.base.aiolock:
+            await self.poll_signalq.put(True)
 
     async def stop_polling(self):
         self.base.print_message("got 'stop_polling' request, raising signal")
-        await self.poll_signalq.put(False)
+        async with self.base.aiolock:
+            await self.poll_signalq.put(False)
 
     async def poll_signal_loop(self):
         while True:
@@ -123,11 +124,27 @@ class AliCatMFC:
                         # self.base.print_message(
                         #     f"Received {dev_name} MFC status:\n{resp_dict}"
                         # )
-                        status_dict = {dev_name: resp_dict}
-                        lastupdate = time.time()
-                        # self.base.print_message(f"Live buffer updated at {checktime}")
-                        await self.base.put_lbuf(status_dict)
-                        # self.base.print_message("status sent to live buffer")
+                        if all(
+                            [
+                                x in resp_dict
+                                for x in (
+                                    "mass_flow",
+                                    "pressure",
+                                    "setpoint",
+                                    "control_point",
+                                )
+                            ]
+                        ):
+                            status_dict = {dev_name: resp_dict}
+                            lastupdate = time.time()
+                            # self.base.print_message(f"Live buffer updated at {checktime}")
+                            async with self.base.aiolock:
+                                await self.base.put_lbuf(status_dict)
+                            # self.base.print_message("status sent to live buffer")
+                        else:
+                            self.base.print_message(
+                                f"!!Received unexpected dict: {resp_dict}"
+                            )
                 await asyncio.sleep(waittime)
 
     def list_gases(self, device_name: str):
@@ -362,7 +379,9 @@ class MfcExec(Executor):
             closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
                 device_name=self.device_name,
             )
-            self.active.base.print_message(f"hold_valve_closed returned: {closevlv_resp}")
+            self.active.base.print_message(
+                f"hold_valve_closed returned: {closevlv_resp}"
+            )
         else:
             self.active.base.print_message("'stay_open' is True, skipping valve hold")
         return {"error": ErrorCodes.none}
@@ -1075,8 +1094,6 @@ class FlowController(FlowMeter):
 
 def command_line(args):
     """CLI interface, accessible when installed through pip."""
-    import json
-    from time import time
 
     flow_controller = FlowController(port=args.port, address=args.address)
 
@@ -1102,11 +1119,11 @@ def command_line(args):
     if args.stream:
         try:
             print("time\t" + "\t".join(flow_controller.status_keys))
-            t0 = time()
+            t0 = time.time()
             while True:
                 state = flow_controller.get_status()
                 print(
-                    "{:.2f}\t".format(time() - t0)
+                    "{:.2f}\t".format(time.time() - t0)
                     + "\t\t".join(
                         "{:.2f}".format(state[key])
                         for key in flow_controller.status_keys[:-1]
