@@ -59,8 +59,8 @@ async def async_private_dispatcher(
     world_config_dict: dict,
     server: str,
     private_action: str,
-    params_dict: dict,
-    json_dict: dict,
+    params_dict: dict = {},
+    json_dict: dict = {},
 ):
     """Request non-blocking private action which may run concurrently.
 
