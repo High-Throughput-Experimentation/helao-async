@@ -250,9 +250,9 @@ def makeApp(confPrefix, server_key, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post("/stop_nowait", tags=["private"])
-    def stop_nowait():
+    @app.post("/stop_private", tags=["private"])
+    async def stop_private():
         """Stops measurement."""
-        app.driver.stop_nowait()
+        await app.driver.stop()
 
     return app

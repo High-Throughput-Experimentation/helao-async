@@ -167,7 +167,7 @@ class C_potvis:
                 async_private_dispatcher,
                 world_config_dict=self.vis.world_cfg,
                 server="PSTAT",
-                private_action="stop_nowait",
+                private_action="stop_private",
                 params_dict={},
                 json_dict={},
             )

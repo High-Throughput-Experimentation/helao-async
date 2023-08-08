@@ -844,9 +844,6 @@ class gamry:
                     await self.active.set_estop()
         return switch
 
-    def stop_nowait(self):
-        self.set_IO_signalq_nowait(False)
-
     def shutdown(self):
         # close all connection and objects to gamry
         self.base.print_message("shutting down gamry")
