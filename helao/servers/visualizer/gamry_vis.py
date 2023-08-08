@@ -130,7 +130,7 @@ class C_potvis:
         self.layout = layout(
             [
                 [Spacer(width=20), Div(text=headerbar, width=1004, height=15)],
-                [self.input_max_points, Spacer(width=20), self.input_max_prev],
+                [self.input_max_points, Spacer(width=20), self.input_max_prev, Spacer(width=20), self.button_stop_measure],
                 [
                     Paragraph(text="""x-axis:""", width=500, height=15),
                     Paragraph(text="""y-axis:""", width=500, height=15),
