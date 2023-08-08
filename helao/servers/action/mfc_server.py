@@ -84,7 +84,7 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         """Stop flowrate & acquisition for given device_name."""
         active = await app.base.setup_and_contain_action()
-        await app.base.executors[
+        app.base.executors[
             active.action.action_params["device_name"]
         ].stop_action_task()
         finished_action = await active.finish()
@@ -98,7 +98,7 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         """Stop flowrate & acquisition for given device_name."""
         active = await app.base.setup_and_contain_action()
-        await app.base.executors[
+        app.base.executors[
             active.action.action_params["device_name"]
         ].stop_action_task()
         finished_action = await active.finish()
