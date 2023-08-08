@@ -246,8 +246,13 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         """Stops measurement in a controlled way."""
         active = await app.base.setup_and_contain_action(action_abbr="stop")
-        await active.enqueue_data_dflt(datadict={"stop": await app.driver.stop()})
+        await app.driver.stop()
         finished_action = await active.finish()
         return finished_action.as_dict()
+
+    @app.post("/stop_nowait", tags=["private"])
+    def stop_nowait():
+        """Stops measurement."""
+        app.driver.stop_nowait()
 
     return app
