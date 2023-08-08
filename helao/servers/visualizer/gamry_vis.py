@@ -12,10 +12,13 @@ from bokeh.plotting import figure
 from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
-
+from bokeh.models import Button
+from bokeh.events import ButtonClick
 from helaocore.models.hlostatus import HloStatus
+from helao.helpers.premodels import Action
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
+from helao.helpers.dispatcher import async_private_dispatcher
 
 VALID_DATA_STATUS = (
     None,
@@ -96,6 +99,15 @@ class C_potvis:
             "value",
             partial(self.callback_input_max_prev, sender=self.input_max_prev),
         )
+
+        self.button_stop_measure = Button(
+            label="Stop measurement",
+            button_type="danger",
+            width=70,
+            align="end",
+        )
+        self.button_stop_measure.on_event(ButtonClick, self.callback_stop_measure)
+
         self.xaxis_selector_group = RadioButtonGroup(
             labels=self.data_dict_keys, active=0, width=500
         )
@@ -121,7 +133,13 @@ class C_potvis:
         self.layout = layout(
             [
                 [Spacer(width=20), Div(text=headerbar, width=1004, height=15)],
-                [self.input_max_points, Spacer(width=20), self.input_max_prev],
+                [
+                    self.input_max_points,
+                    Spacer(width=20),
+                    self.input_max_prev,
+                    Spacer(width=20),
+                    self.button_stop_measure,
+                ],
                 [
                     Paragraph(text="""x-axis:""", width=500, height=15),
                     Paragraph(text="""y-axis:""", width=500, height=15),
@@ -145,13 +163,26 @@ class C_potvis:
         self.vis.doc.on_session_destroyed(self.cleanup_session)
         self.reset_plot(self.cur_action_uuid, forceupdate=True)
 
+    def callback_stop_measure(self, event):
+        self.vis.print_message("stopping gamry measurement")
+        self.vis.doc.add_next_tick_callback(
+            partial(
+                async_private_dispatcher,
+                world_config_dict=self.vis.world_cfg,
+                server="PSTAT",
+                private_action="stop_private",
+                params_dict={},
+                json_dict={},
+            )
+        )
+
     def cleanup_session(self, session_context):
         self.vis.print_message(
             f"'{self.potentiostat_key}' Bokeh session closed", info=True
         )
         self.IOloop_data_run = False
         self.IOtask.cancel()
-    
+
     def callback_selector_change(self, attr, old, new):
         self.reset_plot()
 
