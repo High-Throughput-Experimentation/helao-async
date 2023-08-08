@@ -362,7 +362,7 @@ def makeApp(confPrefix, server_key, helao_root):
             active = await app.base.setup_and_contain_action()
             for exec_id, executor in app.base.executors.items():
                 if exec_id.split()[0] == "acquire_monitors":
-                    await executor.stop_action_task()
+                    executor.stop_action_task()
             finished_action = await active.finish()
             return finished_action.as_dict()
 
