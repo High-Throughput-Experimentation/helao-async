@@ -387,7 +387,7 @@ class HelaoOrch(HelaoFastAPI):
             active = await self.orch.setup_and_contain_action()
             for exec_id, executor in self.orch.executors.items():
                 if exec_id.split()[0] == "wait":
-                    await executor.stop_action_task()
+                    executor.stop_action_task()
             finished_action = await active.finish()
             return finished_action.as_dict()
 

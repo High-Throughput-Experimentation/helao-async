@@ -52,7 +52,7 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         """Stop image aqcuisition."""
         active = await app.base.setup_and_contain_action()
-        await app.base.executors["axis"].stop_action_task()
+        app.base.executors["axis"].stop_action_task()
         finished_action = await active.finish()
         return finished_action.as_dict()
 
