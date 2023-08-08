@@ -101,7 +101,10 @@ class C_potvis:
         )
 
         self.button_stop_measure = Button(
-            label="Stop measurement", button_type="default", width=70, align="end"
+            label="Stop measurement",
+            button_type="default",
+            width=70,
+            background="red",
         )
         self.button_stop_measure.on_event(ButtonClick, self.callback_stop_measure)
 
