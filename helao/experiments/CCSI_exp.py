@@ -1156,8 +1156,8 @@ def CCSI_sub_cellfill_masscotwo(
 
 def CCSI_sub_flowflush(
     experiment: Experiment,
-    experiment_version: int = 1,
-    co2measure_duration: float = 300,
+    experiment_version: int = 3,
+    co2measure_duration: float = 3600,
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.3,
     flowramp_sccm: float = 0,
@@ -1174,8 +1174,16 @@ def CCSI_sub_flowflush(
             apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 1})
             apm.add(ORCH_server, "wait", {"waittime": 2})
             apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 0})
+            apm.add(ORCH_server, "wait", {"waittime": 28})
+            apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1})
+            apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1}, asc.no_wait)
+            apm.add(ORCH_server, "wait", {"waittime": 2})
+            apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
+            apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 0}, asc.no_wait)
+
 
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
+    return apm.action_list
 
 
 
