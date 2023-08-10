@@ -365,7 +365,7 @@ class _BaseSampleAPI:
                 """,
                 con=self._con,
             )
-            print(retdf)
+            retdf.fillna('')
             retsample_list = self._df_to_samples(retdf)
             for retsample in retsample_list:
                 if retsample.sample_type is not None:
