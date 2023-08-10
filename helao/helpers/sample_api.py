@@ -354,7 +354,7 @@ class _BaseSampleAPI:
             retdf = pd.read_sql_query(
                 f"""
                 SELECT 
-                    sample_type, global_label, sample_creation_timecode, comment, volume_ml, ph, electrolyte
+                    *
                 FROM
                     {self._sample_type}
                 {inherit}

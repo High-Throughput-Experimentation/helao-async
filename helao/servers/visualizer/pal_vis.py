@@ -66,7 +66,7 @@ class C_palvis:
             "global_label",
             "sample_creation_timecode",
             "comment",
-            "volume",
+            "volume_ml",
             "ph",
             "electrolyte",
         ]
