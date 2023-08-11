@@ -264,11 +264,11 @@ class Operator:
 
         if self.orch.step_thru_experiments:
             self.orch_stepseq_button = Toggle(
-                label="STEP-THRU asequences", button_type="danger", width=70
+                label="STEP-THRU sequences", button_type="danger", width=70
             )
         else:
             self.orch_stepseq_button = Toggle(
-                label="RUN-THRU asequences", button_type="success", width=70
+                label="RUN-THRU sequences", button_type="success", width=70
             )
         self.orch_stepseq_button.on_event(ButtonClick, self.callback_toggle_stepseq)
 
@@ -1143,7 +1143,7 @@ class Operator:
         sender.value = value
 
     def update_stepwise_toggle(self, sender):
-        sender_type = sender.label.split("")[-1]
+        sender_type = sender.label.split()[-1]
         sender_map = {
             "actions": (self.orch_stepact_button, self.orch.step_thru_actions),
             "experiments": (self.orch_stepexp_button, self.orch.step_thru_experiments),
