@@ -1156,8 +1156,8 @@ class Operator:
             sbutton.button_type = "success"
         else:
             sender_map[sender_type][1] = True
-            sbutton.label = f"RUN-THRU\n{sender_type}"
-            sbutton.button_type = "success"
+            sbutton.label = f"STEP-THRU\n{sender_type}"
+            sbutton.button_type = "danger"
 
     def update_seq_param_layout(self, idx):
         args = self.sequences[idx]["args"]
