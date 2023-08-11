@@ -521,7 +521,7 @@ class Operator:
                             Spacer(width=10),
                             self.orch_status_button,
                         ],
-                        Spacer(height=10),
+                        Spacer(height=4),
                         [
                             self.orch_stepact_button,
                             Spacer(width=10),
@@ -529,7 +529,7 @@ class Operator:
                             Spacer(width=10),
                             self.orch_stepseq_button,
                         ],
-                        Spacer(height=5),
+                        Spacer(height=10),
                         [
                             Spacer(width=10),
                             Div(
@@ -954,34 +954,19 @@ class Operator:
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_toggle_stepact(self, event):
-        if self.orch.step_thru_actions:
-            self.orch.step_thru_actions = False
-            self.orch_stepact_button.label = "RUN-THRU\nactions"
-            self.orch_stepact_button.button_type = "success"
-        else:
-            self.orch.step_thru_actions = True
-            self.orch_stepact_button.label = "STEP-THRU\nactions"
-            self.orch_stepact_button.button_type = "danger"
+        self.vis.doc.add_next_tick_callback(
+            partial(self.update_stepwise_toggle, self.orch_stepact_button)
+        )
 
     def callback_toggle_stepexp(self, event):
-        if self.orch.step_thru_experiments:
-            self.orch.step_thru_experiments = False
-            self.orch_stepexp_button.label = "RUN-THRU\nexperiments"
-            self.orch_stepexp_button.button_type = "success"
-        else:
-            self.orch.step_thru_experiments = True
-            self.orch_stepexp_button.label = "STEP-THRU\nexperiments"
-            self.orch_stepexp_button.button_type = "danger"
+        self.vis.doc.add_next_tick_callback(
+            partial(self.update_stepwise_toggle, self.orch_stepexp_button)
+        )
 
     def callback_toggle_stepseq(self, event):
-        if self.orch.step_thru_sequences:
-            self.orch.step_thru_sequences = False
-            self.orch_stepseq_button.label = "RUN-THRU\nsequences"
-            self.orch_stepseq_button.button_type = "success"
-        else:
-            self.orch.step_thru_sequences = True
-            self.orch_stepseq_button.label = "STEP-THRU\nsequences"
-            self.orch_stepseq_button.button_type = "danger"
+        self.vis.doc.add_next_tick_callback(
+            partial(self.update_stepwise_toggle, self.orch_stepseq_button)
+        )
 
     def callback_stop_orch(self, event):
         self.vis.print_message("stopping operator orch")
@@ -1156,6 +1141,23 @@ class Operator:
 
     def update_input_value(self, sender, value):
         sender.value = value
+
+    def update_stepwise_toggle(self, sender):
+        sender_type = sender.label.split("")[-1]
+        sender_map = {
+            "actions": (self.orch_stepact_button, self.orch.step_thru_actions),
+            "experiments": (self.orch_stepexp_button, self.orch.step_thru_experiments),
+            "sequences": (self.orch_stepseq_button, self.orch.step_thru_sequences),
+        }
+        sbutton, sval = sender_map[sender_type]
+        if sval:
+            sender_map[sender_type][1] = False
+            sbutton.label = f"RUN-THRU\n{sender_type}"
+            sbutton.button_type = "success"
+        else:
+            sender_map[sender_type][1] = True
+            sbutton.label = f"RUN-THRU\n{sender_type}"
+            sbutton.button_type = "success"
 
     def update_seq_param_layout(self, idx):
         args = self.sequences[idx]["args"]
@@ -1769,4 +1771,9 @@ class Operator:
                 self.input_sequence_comment,
                 self.input_sequence_comment2.value,
             )
+        )
+
+    def callback_stepwisetoggle(self, sender):
+        self.vis.doc.add_next_tick_callback(
+            partial(self.update_stepwise_toggle, sender)
         )
