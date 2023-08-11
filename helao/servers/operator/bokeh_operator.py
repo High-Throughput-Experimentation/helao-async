@@ -242,6 +242,36 @@ class Operator:
             label="Disabled", disabled=True, button_type="danger", width=400
         )  # success: green, danger: red
 
+        if self.orch.step_thru_actions:
+            self.orch_stepact_button = Toggle(
+                label="STEP-THRU\nactions", button_type="danger", width=70
+            )
+        else:
+            self.orch_stepact_button = Toggle(
+                label="RUN-THRU\nactions", button_type="success", width=70
+            )
+        self.orch.stepact_button.on_event(ButtonClick, self.callback_toggle_stepact)
+
+        if self.orch.step_thru_experiments:
+            self.orch_stepexp_button = Toggle(
+                label="STEP-THRU\nexperiments", button_type="danger", width=70
+            )
+        else:
+            self.orch_stepexp_button = Toggle(
+                label="RUN-THRU\nexperiments", button_type="success", width=70
+            )
+        self.orch.stepexp_button.on_event(ButtonClick, self.callback_toggle_stepexp)
+
+        if self.orch.step_thru_experiments:
+            self.orch_stepseq_button = Toggle(
+                label="STEP-THRU\nasequences", button_type="danger", width=70
+            )
+        else:
+            self.orch_stepseq_button = Toggle(
+                label="RUN-THRU\nasequences", button_type="success", width=70
+            )
+        self.orch.stepseq_button.on_event(ButtonClick, self.callback_toggle_stepseq)
+
         self.button_clear_seqs = Button(
             label="Clear seqs", button_type="danger", width=100
         )
@@ -492,6 +522,14 @@ class Operator:
                             self.orch_status_button,
                         ],
                         Spacer(height=10),
+                        [
+                            self.orch_stepact_button,
+                            Spacer(width=10),
+                            self.orch_stepexp_button,
+                            Spacer(width=10),
+                            self.orch_stepseq_button,
+                        ],
+                        Spacer(height=5),
                         [
                             Spacer(width=10),
                             Div(
@@ -914,6 +952,36 @@ class Operator:
             # clear current experiment_plan (sequence in operator)
             self.sequence = None
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
+    def callback_toggle_stepact(self, event):
+        if self.orch.step_thru_actions:
+            self.orch.step_thru_actions = False
+            self.orch_stepact_button.label = "RUN-THRU\nactions"
+            self.orch_stepact_button.button_type = "success"
+        else:
+            self.orch.step_thru_actions = True
+            self.orch_stepact_button.label = "STEP-THRU\nactions"
+            self.orch_stepact_button.button_type = "danger"
+
+    def callback_toggle_stepexp(self, event):
+        if self.orch.step_thru_experiments:
+            self.orch.step_thru_experiments = False
+            self.orch_stepexp_button.label = "RUN-THRU\nexperiments"
+            self.orch_stepexp_button.button_type = "success"
+        else:
+            self.orch.step_thru_experiments = True
+            self.orch_stepexp_button.label = "STEP-THRU\nexperiments"
+            self.orch_stepexp_button.button_type = "danger"
+
+    def callback_toggle_stepseq(self, event):
+        if self.orch.step_thru_sequences:
+            self.orch.step_thru_sequences = False
+            self.orch_stepseq_button.label = "RUN-THRU\nsequences"
+            self.orch_stepseq_button.button_type = "success"
+        else:
+            self.orch.step_thru_sequences = True
+            self.orch_stepseq_button.label = "STEP-THRU\nsequences"
+            self.orch_stepseq_button.button_type = "danger"
 
     def callback_stop_orch(self, event):
         self.vis.print_message("stopping operator orch")
@@ -1643,9 +1711,8 @@ class Operator:
         self.IOloop_run = True
         while self.IOloop_run:
             try:
-                await asyncio.sleep(0.1)
-                self.vis.doc.add_next_tick_callback(partial(self.update_tables))
                 _ = await self.update_q.get()
+                self.vis.doc.add_next_tick_callback(partial(self.update_tables))
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 self.vis.print_message(
