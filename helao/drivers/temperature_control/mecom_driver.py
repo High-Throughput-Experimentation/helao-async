@@ -61,7 +61,7 @@ class MeerstetterTEC(object):
 
     def _connect(self):
         # open session
-        self._session = MeCom(serialport=self.port)
+        self._session = MeCom(serialport=self.port, timeout=5)
         # get device address
         self.address = self._session.identify()
         logging.info("connected to {}".format(self.address))
