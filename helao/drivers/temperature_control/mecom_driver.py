@@ -4,6 +4,7 @@ import time
 import asyncio
 import logging
 from mecom import MeCom, ResponseException, WrongChecksum
+from mecom.exceptions import ResponseTimeout
 
 from helaocore.error import ErrorCodes
 from helaocore.models.hlostatus import HloStatus
@@ -50,7 +51,7 @@ class MeerstetterTEC(object):
             try:
                 self._connect()
                 break
-            except TimeoutError:
+            except ResponseTimeout:
                 self.base.print_message(f"connection timeout, retrying attempt {i+1}")
         self.action = None
         self.active = None
