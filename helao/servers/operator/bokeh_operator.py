@@ -244,31 +244,31 @@ class Operator:
 
         if self.orch.step_thru_actions:
             self.orch_stepact_button = Toggle(
-                label="STEP-THRU\nactions", button_type="danger", width=70
+                label="STEP-THRU actions", button_type="danger", width=70
             )
         else:
             self.orch_stepact_button = Toggle(
-                label="RUN-THRU\nactions", button_type="success", width=70
+                label="RUN-THRU actions", button_type="success", width=70
             )
         self.orch_stepact_button.on_event(ButtonClick, self.callback_toggle_stepact)
 
         if self.orch.step_thru_experiments:
             self.orch_stepexp_button = Toggle(
-                label="STEP-THRU\nexperiments", button_type="danger", width=70
+                label="STEP-THRU experiments", button_type="danger", width=70
             )
         else:
             self.orch_stepexp_button = Toggle(
-                label="RUN-THRU\nexperiments", button_type="success", width=70
+                label="RUN-THRU experiments", button_type="success", width=70
             )
         self.orch_stepexp_button.on_event(ButtonClick, self.callback_toggle_stepexp)
 
         if self.orch.step_thru_experiments:
             self.orch_stepseq_button = Toggle(
-                label="STEP-THRU\nasequences", button_type="danger", width=70
+                label="STEP-THRU asequences", button_type="danger", width=70
             )
         else:
             self.orch_stepseq_button = Toggle(
-                label="RUN-THRU\nasequences", button_type="success", width=70
+                label="RUN-THRU asequences", button_type="success", width=70
             )
         self.orch_stepseq_button.on_event(ButtonClick, self.callback_toggle_stepseq)
 
@@ -1152,11 +1152,11 @@ class Operator:
         sbutton, sval = sender_map[sender_type]
         if sval:
             sender_map[sender_type][1] = False
-            sbutton.label = f"RUN-THRU\n{sender_type}"
+            sbutton.label = f"RUN-THRU {sender_type}"
             sbutton.button_type = "success"
         else:
             sender_map[sender_type][1] = True
-            sbutton.label = f"STEP-THRU\n{sender_type}"
+            sbutton.label = f"STEP-THRU {sender_type}"
             sbutton.button_type = "danger"
 
     def update_seq_param_layout(self, idx):
