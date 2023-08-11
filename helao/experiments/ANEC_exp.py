@@ -271,11 +271,13 @@ def ANEC_sub_setheat(
         {"duration": -1,
         "acquisition_rate": 0.2}
     ) 
-    apm.add(
-        TEC_server,
-        "enable_tec",
-        {}
-    )
+# =============================================================================
+#     apm.add(
+#         TEC_server,
+#         "enable_tec",
+#         {}
+#     )
+# =============================================================================
     apm.add(
         TEC_server,
         "wait_till_stable",
@@ -809,11 +811,13 @@ def ANEC_sub_HeatCA(
         "acquisition_rate": 0.2}
     ) 
     
-    apm.add(
-        TEC_server,
-        "enable_tec",
-        {}
-    )
+# =============================================================================
+#     apm.add(
+#         TEC_server,
+#         "enable_tec",
+#         {}
+#     )
+# =============================================================================
     
     apm.add(
         TEC_server,
@@ -1147,11 +1151,13 @@ def ANEC_sub_HeatCV(
         {"duration": -1,
         "acquisition_rate": 0.2}
     ) 
-    apm.add(
-        TEC_server,
-        "enable_tec",
-        {}
-    )
+# =============================================================================
+#     apm.add(
+#         TEC_server,
+#         "enable_tec",
+#         {}
+#     )
+# =============================================================================
     
     apm.add(
         TEC_server,
