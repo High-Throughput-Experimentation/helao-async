@@ -42,10 +42,17 @@ class MeerstetterTEC(object):
         self.config_dict = action_serv.server_cfg["params"]
         self.channel = self.config_dict["channel"]
         self.port = self.config_dict["port"]
+        connection_retries = self.config_dict.get("retries", 15)
 
         self.queries = self.config_dict.get("queries", DEFAULT_QUERIES)
         self._session = None
-        self._connect()
+
+        for i in range(connection_retries):
+            try:
+                self._connect()
+                break
+            except TimeoutError:
+                self.base.print_message(f"connection timeout, retrying attempt {i+1}")
         self.action = None
         self.active = None
         self.start_margin = self.config_dict.get("start_margin", 0)
@@ -62,7 +69,7 @@ class MeerstetterTEC(object):
 
     def _connect(self):
         # open session
-        self._session = MeCom(serialport=self.port, timeout=15)
+        self._session = MeCom(serialport=self.port, timeout=1)
         # get device address
         self.address = self._session.identify()
         logging.info("connected to {}".format(self.address))
