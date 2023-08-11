@@ -250,7 +250,7 @@ class Operator:
             self.orch_stepact_button = Toggle(
                 label="RUN-THRU\nactions", button_type="success", width=70
             )
-        self.orch.stepact_button.on_event(ButtonClick, self.callback_toggle_stepact)
+        self.orch_stepact_button.on_event(ButtonClick, self.callback_toggle_stepact)
 
         if self.orch.step_thru_experiments:
             self.orch_stepexp_button = Toggle(
@@ -260,7 +260,7 @@ class Operator:
             self.orch_stepexp_button = Toggle(
                 label="RUN-THRU\nexperiments", button_type="success", width=70
             )
-        self.orch.stepexp_button.on_event(ButtonClick, self.callback_toggle_stepexp)
+        self.orch_stepexp_button.on_event(ButtonClick, self.callback_toggle_stepexp)
 
         if self.orch.step_thru_experiments:
             self.orch_stepseq_button = Toggle(
@@ -270,7 +270,7 @@ class Operator:
             self.orch_stepseq_button = Toggle(
                 label="RUN-THRU\nasequences", button_type="success", width=70
             )
-        self.orch.stepseq_button.on_event(ButtonClick, self.callback_toggle_stepseq)
+        self.orch_stepseq_button.on_event(ButtonClick, self.callback_toggle_stepseq)
 
         self.button_clear_seqs = Button(
             label="Clear seqs", button_type="danger", width=100
