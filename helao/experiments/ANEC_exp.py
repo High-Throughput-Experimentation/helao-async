@@ -209,21 +209,17 @@ def ANEC_sub_alloff(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "up", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "liquid", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "atm", "on": 0})
-# =============================================================================
-#     apm.add(
-#         TEC_server,
-#         "cancel_record_tec",
-#         {}
-#     )
-# =============================================================================
-    apm.add(
-        TEC_server,
-        "disable_tec",
-        {}
-    )
-
+    # =============================================================================
+    #     apm.add(
+    #         TEC_server,
+    #         "cancel_record_tec",
+    #         {}
+    #     )
+    # =============================================================================
+    apm.add(TEC_server, "disable_tec", {})
 
     return apm.action_list
+
 
 def ANEC_sub_heatoff(
     experiment: Experiment,
@@ -237,25 +233,22 @@ def ANEC_sub_heatoff(
 
     apm = ActionPlanMaker()
 
-# =============================================================================
-#     apm.add(
-#         TEC_server,
-#         "cancel_record_tec",
-#         {}
-#     )
-# =============================================================================
-    apm.add(
-        TEC_server,
-        "disable_tec",
-        {}
-    )
+    # =============================================================================
+    #     apm.add(
+    #         TEC_server,
+    #         "cancel_record_tec",
+    #         {}
+    #     )
+    # =============================================================================
+    apm.add(TEC_server, "disable_tec", {})
 
     return apm.action_list
+
 
 def ANEC_sub_setheat(
     experiment: Experiment,
     experiment_version: int = 2,
-    target_temperature_degc: float =25.0
+    target_temperature_degc: float = 25.0,
 ):
     """
 
@@ -267,28 +260,21 @@ def ANEC_sub_setheat(
     apm.add(
         TEC_server,
         "set_temperature",
-        {"target_temperature_degc": apm.pars.target_temperature_degc}
+        {"target_temperature_degc": apm.pars.target_temperature_degc},
     )
-# =============================================================================
-#     apm.add(
-#         TEC_server,
-#         "record_tec",
-#         {"duration": -1,
-#         "acquisition_rate": 0.2}
-#     ) 
-# =============================================================================
-    apm.add(
-        TEC_server,
-        "enable_tec",
-        {}
-    )
-    apm.add(
-        TEC_server,
-        "wait_till_stable",
-        {}
-    )
+    # =============================================================================
+    #     apm.add(
+    #         TEC_server,
+    #         "record_tec",
+    #         {"duration": -1,
+    #         "acquisition_rate": 0.2}
+    #     )
+    # =============================================================================
+    apm.add(TEC_server, "enable_tec", {})
+    apm.add(TEC_server, "wait_till_stable", {})
 
     return apm.action_list
+
 
 def ANEC_sub_normal_state(
     experiment: Experiment,
@@ -573,6 +559,7 @@ def ANEC_sub_load_solid_and_clean_cell(
     apm.add_action_list(ANEC_sub_drain_cell(experiment))
     return apm.action_list
 
+
 def ANEC_sub_liquidarchive(
     experiment: Experiment,
     experiment_version: int = 1,
@@ -615,6 +602,7 @@ def ANEC_sub_liquidarchive(
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
 
     return apm.action_list
+
 
 def ANEC_sub_aliquot(
     experiment: Experiment,
@@ -672,6 +660,7 @@ def ANEC_sub_aliquot(
 
     return apm.action_list
 
+
 def ANEC_sub_CP(
     experiment: Experiment,
     experiment_version: int = 1,
@@ -717,7 +706,6 @@ def ANEC_sub_CP(
             ProcessContrib.samples_out,
         ],
     )
-
 
     return apm.action_list  # returns complete action list to orch
 
@@ -774,6 +762,7 @@ def ANEC_sub_CA(
 
     return apm.action_list
 
+
 def ANEC_sub_HeatCA(
     experiment: Experiment,
     experiment_version: int = 2,
@@ -785,7 +774,7 @@ def ANEC_sub_HeatCA(
     ref_offset__V: float = 0.0,
     ref_type: str = "leakless",
     pH: float = 6.8,
-    target_temperature_degc: float =25.0
+    target_temperature_degc: float = 25.0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if apm.pars.WE_versus == "ref":
@@ -806,28 +795,16 @@ def ANEC_sub_HeatCA(
     apm.add(
         TEC_server,
         "set_temperature",
-        {"target_temperature_degc": apm.pars.target_temperature_degc}
+        {"target_temperature_degc": apm.pars.target_temperature_degc},
     )
-# =============================================================================
-#     apm.add(
-#         TEC_server,
-#         "record_tec",
-#         {"duration": -1,
-#         "acquisition_rate": 0.2}
-#     ) 
-# =============================================================================
-    
     apm.add(
         TEC_server,
-        "enable_tec",
-        {}
+        "record_tec",
+        {"duration": -1, "acquisition_rate": 0.2},
+        nonblocking=True,
     )
-    
-    apm.add(
-        TEC_server,
-        "wait_till_stable",
-        {}
-    )
+    apm.add(TEC_server, "enable_tec", {})
+    apm.add(TEC_server, "wait_till_stable", {})
     apm.add(
         PSTAT_server,
         "run_CA",
@@ -847,10 +824,11 @@ def ANEC_sub_HeatCA(
             ProcessContrib.samples_out,
         ],
     )
-
     # apm.add(ORCH_server, "wait", {"waittime": 10})
+    apm.add(TEC_server, "cancel_record_tec", {})
 
     return apm.action_list
+
 
 def ANEC_sub_OCV(
     experiment: Experiment,
@@ -1080,6 +1058,7 @@ def ANEC_sub_CV(
 
     return apm.action_list
 
+
 def ANEC_sub_HeatCV(
     experiment: Experiment,
     experiment_version: int = 2,
@@ -1095,7 +1074,7 @@ def ANEC_sub_HeatCV(
     SampleRate: float = 0.01,
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
-    target_temperature_degc: float =25.0
+    target_temperature_degc: float = 25.0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if apm.pars.WE_versus == "ref":
@@ -1147,28 +1126,18 @@ def ANEC_sub_HeatCV(
     apm.add(
         TEC_server,
         "set_temperature",
-        {"target_temperature_degc": apm.pars.target_temperature_degc}
+        {"target_temperature_degc": apm.pars.target_temperature_degc},
     )
-# =============================================================================
-#     apm.add(
-#         TEC_server,
-#         "record_tec",
-#         {"duration": -1,
-#         "acquisition_rate": 0.2}
-#     ) 
-# =============================================================================
     apm.add(
         TEC_server,
-        "enable_tec",
-        {}
+        "record_tec",
+        {"duration": -1, "acquisition_rate": 0.2},
+        nonblocking=True,
     )
-    
-    apm.add(
-        TEC_server,
-        "wait_till_stable",
-        {}
-    )
-    
+    apm.add(TEC_server, "enable_tec", {})
+
+    apm.add(TEC_server, "wait_till_stable", {})
+
     apm.add(
         PSTAT_server,
         "run_CV",
@@ -1194,8 +1163,10 @@ def ANEC_sub_HeatCV(
     )
 
     # apm.add(ORCH_server, "wait", {"waittime": 10})
+    apm.add(TEC_server, "cancel_record_tec", {})
 
     return apm.action_list
+
 
 def ANEC_sub_photo_CV(
     experiment: Experiment,
