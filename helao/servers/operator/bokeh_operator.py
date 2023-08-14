@@ -524,9 +524,9 @@ class Operator:
                         Spacer(height=4),
                         [
                             self.orch_stepact_button,
-                            Spacer(width=10),
+                            Spacer(width=50),
                             self.orch_stepexp_button,
-                            Spacer(width=10),
+                            Spacer(width=50),
                             self.orch_stepseq_button,
                         ],
                         Spacer(height=10),
@@ -1158,7 +1158,6 @@ class Operator:
             "sequences": self.orch_stepseq_button,
         }
         sbutton = sender_map[sender_type]
-        print("update_stepwise_toggle called on", sbutton.label)
         self.flip_stepwise_flag(sender_type)
         if sbutton.button_type == "danger":
             sbutton.label = f"RUN-THRU {sender_type}"
