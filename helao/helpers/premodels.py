@@ -163,7 +163,6 @@ class Experiment(Sequence, ExperimentModel):
                     exp.samples_in[identical].action_uuid.append(actm.action_uuid)
 
             for _sample in actm.samples_out:
-
                 identical = self._check_sample(
                     new_sample=_sample, sample_list=exp.samples_out
                 )
@@ -249,10 +248,11 @@ class Action(Experiment, ActionModel):
             self.manual_action = True
             self.access = "manual"
             # -- (1) -- set missing sequence parameters
-            self.sequence_name = "manual_seq"
+            manual_suffix = f"{self.action_server.server_name}-{self.action_name}"
+            self.sequence_name = f"mseq-ACT_{manual_suffix}"
             self.init_seq(time_offset=time_offset)
             # -- (2) -- set missing experiment parameters
-            self.experiment_name = "MANUAL"
+            self.experiment_name = f"mexp-ACT_{manual_suffix}"
             self.init_exp(time_offset=time_offset)
 
         if force or self.action_timestamp is None:
