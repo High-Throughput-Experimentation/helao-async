@@ -354,7 +354,7 @@ class _BaseSampleAPI:
             retdf = pd.read_sql_query(
                 f"""
                 SELECT 
-                    * 
+                    *
                 FROM
                     {self._sample_type}
                 {inherit}
@@ -365,6 +365,7 @@ class _BaseSampleAPI:
                 """,
                 con=self._con,
             )
+            retdf.fillna('')
             retsample_list = self._df_to_samples(retdf)
             for retsample in retsample_list:
                 if retsample.sample_type is not None:
