@@ -1143,6 +1143,8 @@ class Operator:
         sender.value = value
 
     def update_stepwise_toggle(self, sender):
+        print(sender)
+        print(sender.label, ",", type(sender.label))
         sender_type = sender.label.split()[-1]
         sender_map = {
             "actions": (self.orch_stepact_button, self.orch.step_thru_actions),
@@ -1150,6 +1152,7 @@ class Operator:
             "sequences": (self.orch_stepseq_button, self.orch.step_thru_sequences),
         }
         sbutton, sval = sender_map[sender_type]
+        print("update_stepwise_toggle called on", sbutton.label, sval)
         if sval:
             sender_map[sender_type][1] = False
             sbutton.label = f"RUN-THRU {sender_type}"
@@ -1771,9 +1774,4 @@ class Operator:
                 self.input_sequence_comment,
                 self.input_sequence_comment2.value,
             )
-        )
-
-    def callback_stepwisetoggle(self, sender):
-        self.vis.doc.add_next_tick_callback(
-            partial(self.update_stepwise_toggle, sender)
         )
