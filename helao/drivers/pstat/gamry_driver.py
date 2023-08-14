@@ -787,6 +787,7 @@ class gamry:
                             self.dtaq.Init(self.pstat, Dtaqtype, *argv)
                         else:
                             self.dtaq.Init(self.pstat, *argv)
+                        self.base.print_message(f"applying {len(dtaq_lims)} limits")
                         for limfn in dtaq_lims:
                             limfn(self.dtaq)
 
