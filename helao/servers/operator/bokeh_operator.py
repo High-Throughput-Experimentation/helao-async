@@ -1142,23 +1142,28 @@ class Operator:
     def update_input_value(self, sender, value):
         sender.value = value
 
+    def flip_stepwise_flag(self, sender_type):
+        if sender_type == "actions":
+            self.orch.step_thru_actions = not self.orch.step_thru_actions
+        elif sender_type == "experiments":
+            self.orch.step_thru_experiments = not self.orch.step_thru_experiments
+        elif sender_type == "sequences":
+            self.orch.step_thru_sequences = not self.orch.step_thru_sequences
+
     def update_stepwise_toggle(self, sender):
-        print(sender)
-        print(sender.label, ",", type(sender.label))
         sender_type = sender.label.split()[-1]
         sender_map = {
-            "actions": (self.orch_stepact_button, self.orch.step_thru_actions),
-            "experiments": (self.orch_stepexp_button, self.orch.step_thru_experiments),
-            "sequences": (self.orch_stepseq_button, self.orch.step_thru_sequences),
+            "actions": self.orch_stepact_button,
+            "experiments": self.orch_stepexp_button,
+            "sequences": self.orch_stepseq_button,
         }
-        sbutton, sval = sender_map[sender_type]
-        print("update_stepwise_toggle called on", sbutton.label, sval)
-        if sval:
-            sender_map[sender_type][1] = False
+        sbutton = sender_map[sender_type]
+        print("update_stepwise_toggle called on", sbutton.label)
+        self.flip_stepwise_flag(sender_type)
+        if sbutton.button_type == "danger":
             sbutton.label = f"RUN-THRU {sender_type}"
             sbutton.button_type = "success"
         else:
-            sender_map[sender_type][1] = True
             sbutton.label = f"STEP-THRU {sender_type}"
             sbutton.button_type = "danger"
 
