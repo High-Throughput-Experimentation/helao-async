@@ -787,6 +787,8 @@ class gamry:
                             self.dtaq.Init(self.pstat, Dtaqtype, *argv)
                         else:
                             self.dtaq.Init(self.pstat, *argv)
+                        for limfn in dtaq_lims:
+                            limfn(self.dtaq)
 
                     except Exception as e:
                         tb = "".join(
