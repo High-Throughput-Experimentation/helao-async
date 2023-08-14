@@ -243,31 +243,31 @@ class Operator:
         )  # success: green, danger: red
 
         if self.orch.step_thru_actions:
-            self.orch_stepact_button = Toggle(
+            self.orch_stepact_button = Button(
                 label="STEP-THRU actions", button_type="danger", width=70
             )
         else:
-            self.orch_stepact_button = Toggle(
+            self.orch_stepact_button = Button(
                 label="RUN-THRU actions", button_type="success", width=70
             )
         self.orch_stepact_button.on_event(ButtonClick, self.callback_toggle_stepact)
 
         if self.orch.step_thru_experiments:
-            self.orch_stepexp_button = Toggle(
+            self.orch_stepexp_button = Button(
                 label="STEP-THRU experiments", button_type="danger", width=70
             )
         else:
-            self.orch_stepexp_button = Toggle(
+            self.orch_stepexp_button = Button(
                 label="RUN-THRU experiments", button_type="success", width=70
             )
         self.orch_stepexp_button.on_event(ButtonClick, self.callback_toggle_stepexp)
 
         if self.orch.step_thru_experiments:
-            self.orch_stepseq_button = Toggle(
+            self.orch_stepseq_button = Button(
                 label="STEP-THRU sequences", button_type="danger", width=70
             )
         else:
-            self.orch_stepseq_button = Toggle(
+            self.orch_stepseq_button = Button(
                 label="RUN-THRU sequences", button_type="success", width=70
             )
         self.orch_stepseq_button.on_event(ButtonClick, self.callback_toggle_stepseq)
