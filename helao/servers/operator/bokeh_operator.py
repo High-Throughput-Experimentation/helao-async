@@ -524,9 +524,9 @@ class Operator:
                         Spacer(height=4),
                         [
                             self.orch_stepact_button,
-                            Spacer(width=50),
+                            Spacer(width=100),
                             self.orch_stepexp_button,
-                            Spacer(width=50),
+                            Spacer(width=100),
                             self.orch_stepseq_button,
                         ],
                         Spacer(height=10),
