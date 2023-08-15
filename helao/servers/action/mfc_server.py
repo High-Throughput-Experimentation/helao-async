@@ -200,7 +200,7 @@ def makeApp(confPrefix, server_key, helao_root):
         executor = MfcConstPresExec(
             active=active,
             oneoff=False,
-            poll_rate=0.01,
+            poll_rate=0.05,
         )
         active_action_dict = active.start_executor(executor)
         return active_action_dict
