@@ -7,7 +7,7 @@ import sys
 import pickle
 from random import randint
 from socket import gethostname
-from time import ctime, time, time_ns, sleep
+from time import ctime, time, time_ns
 from typing import List, Dict
 from uuid import UUID, uuid1
 import hashlib
@@ -95,7 +95,7 @@ class Base:
     """
 
     # TODO: add world_cfg: dict parameter for BaseAPI to pass config instead of fastapp
-    def __init__(self, fastapp: BaseAPI, dyn_endpoints=None):
+    def __init__(self, fastapp, dyn_endpoints=None):
         self.server = MachineModel(
             server_name=fastapp.helao_srv, machine_name=gethostname().lower()
         )

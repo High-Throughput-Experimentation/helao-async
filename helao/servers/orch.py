@@ -66,7 +66,7 @@ class Orch(Base):
     by a self-subscriber task to update the action server status dict and log changes.
     """
 
-    def __init__(self, fastapp: OrchAPI):
+    def __init__(self, fastapp):
         super().__init__(fastapp)
         self.experiment_lib, self.experiment_codehash_lib = import_experiments(
             world_config_dict=self.world_cfg,
