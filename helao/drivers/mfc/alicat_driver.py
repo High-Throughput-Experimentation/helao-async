@@ -470,7 +470,7 @@ class MfcConstPresExec(MfcExec):
             and iter_time - self.last_fill >= self.refill_freq
         ):
             self.active.base.print_message(
-                f"pressure below 1 atm, filling {fill_scc} scc over {fill_time} seconds"
+                f"pressure below {self.target_pressure}, filling {fill_scc} scc over {fill_time} seconds"
             )
             self.filling = True
             openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
