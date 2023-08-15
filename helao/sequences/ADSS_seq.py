@@ -1192,7 +1192,7 @@ def ADSS_CA_NiSb_cell_1potential_photo(
 
 
 def ADSS_CA_cell_1potential(
-    sequence_version: int = 2,
+    sequence_version: int = 3, #v3 move led off to exp
     #solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no: int = 14050,  #  instead of map select
@@ -1263,15 +1263,15 @@ def ADSS_CA_cell_1potential(
                 "liquid_sample_volume_ul": liquid_sample_volume_ul,
             },
         )
-    if led_illumination:
-        epm.add_experiment(
-            "ADSS_sub_cell_illumination",
-            {
-                "led_wavelength": led_wavelength,
-                "illumination_on": led_illumination,
-            }
+    # if led_illumination:
+    #     epm.add_experiment(
+    #         "ADSS_sub_cell_illumination",
+    #         {
+    #             "led_wavelength": led_wavelength,
+    #             "illumination_on": led_illumination,
+    #         }
             
-        )
+    #     )
     epm.add_experiment(
         "ADSS_sub_cellfill_prefilled",
         {
