@@ -343,13 +343,13 @@ class MfcExec(Executor):
     async def _pre_exec(self):
         "Set flow rate."
         self.active.base.print_message("MFCExec running setup methods.")
-        flowrate_sccm = self.active.action.action_params.get("flowrate_sccm", None)
-        ramp_sccm_sec = self.active.action.action_params.get("ramp_sccm_sec", 0)
-        if flowrate_sccm is not None:
+        self.flowrate_sccm = self.active.action.action_params.get("flowrate_sccm", None)
+        self.ramp_sccm_sec = self.active.action.action_params.get("ramp_sccm_sec", 0)
+        if self.flowrate_sccm is not None:
             rate_resp = await self.active.base.fastapp.driver.set_flowrate(
                 device_name=self.device_name,
-                flowrate_sccm=flowrate_sccm,
-                ramp_sccm_sec=ramp_sccm_sec,
+                flowrate_sccm=self.flowrate_sccm,
+                ramp_sccm_sec=self.ramp_sccm_sec,
             )
             self.active.base.print_message(f"set_flowrate returned: {rate_resp}")
         return {"error": ErrorCodes.none}
@@ -357,10 +357,11 @@ class MfcExec(Executor):
     async def _exec(self):
         "Cancel valve hold."
         self.start_time = time.time()
-        openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
-            device_name=self.device_name,
-        )
-        self.active.base.print_message(f"hold_cancel returned: {openvlv_resp}")
+        if self.flowrate_sccm is not None:
+            openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
+                device_name=self.device_name,
+            )
+            self.active.base.print_message(f"hold_cancel returned: {openvlv_resp}")
         return {"error": ErrorCodes.none}
 
     async def _poll(self):
@@ -399,15 +400,25 @@ class PfcExec(MfcExec):
     async def _pre_exec(self):
         "Set pressure."
         self.active.base.print_message("PFCExec running setup methods.")
-        pressure_psia = self.active.action.action_params.get("pressure_psia", None)
-        ramp_psi_sec = self.active.action.action_params.get("ramp_psi_sec", 0)
-        if pressure_psia is not None:
+        self.pressure_psia = self.active.action.action_params.get("pressure_psia", None)
+        self.ramp_psi_sec = self.active.action.action_params.get("ramp_psi_sec", 0)
+        if self.pressure_psia is not None:
             rate_resp = await self.active.base.fastapp.driver.set_pressure(
                 device_name=self.device_name,
-                pressure_psia=pressure_psia,
-                ramp_psi_sec=ramp_psi_sec,
+                pressure_psia=self.pressure_psia,
+                ramp_psi_sec=self.ramp_psi_sec,
             )
             self.active.base.print_message(f"set_pressure returned: {rate_resp}")
+        return {"error": ErrorCodes.none}
+
+    async def _exec(self):
+        "Cancel valve hold."
+        self.start_time = time.time()
+        if self.pressure_psia is not None:
+            openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
+                device_name=self.device_name,
+            )
+            self.active.base.print_message(f"hold_cancel returned: {openvlv_resp}")
         return {"error": ErrorCodes.none}
 
 
