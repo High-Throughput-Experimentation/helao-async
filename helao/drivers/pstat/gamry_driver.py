@@ -541,6 +541,10 @@ class gamry:
                     ierangeval = self.pstat.TestIERange(setpointie)
                     self.pstat.SetIERange(ierangeval)
                     # subset of stop conditions
+                    
+                    self.base.print_message(
+                        f"Using vmin threshold = {act_params['stop_vmin']}, {type(act_params['stop_vmin'])}"
+                    )
                     if act_params.get("stop_vmin", None) is not None:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopXMin(True, act_params["stop_vmin"])
@@ -606,9 +610,6 @@ class gamry:
                     self.pstat.SetVchRange(vchrangeval)
                     # subset of stop conditions
                     if act_params.get("stop_imin", None) is not None:
-                        self.base.print_message(
-                            f"Using imin threshold = {act_params['stop_imin']}"
-                        )
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopIMin(True, act_params["stop_imin"])
                         )
