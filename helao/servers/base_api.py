@@ -78,7 +78,7 @@ class BaseAPI(HelaoFastAPI):
                 reqd = await request.json()
                 self.base.print_message(reqd)
             response = await call_next(request)
-            return response
+            return response, reqd
 
         @self.post("/get_config", tags=["private"])
         def get_config():
