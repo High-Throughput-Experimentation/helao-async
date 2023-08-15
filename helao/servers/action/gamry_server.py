@@ -69,6 +69,18 @@ async def gamry_dyn_endpoints(app=None):
                 -1, ge=-1, le=3
             ),  # -1 disables, else select TTL 0-3
             IErange: app.driver.gamry_range_enum = "auto",
+            stop_imin: Optional[float] = None,
+            stop_imax: Optional[float] = None,
+            stop_dimin: Optional[float] = None,
+            stop_dimax: Optional[float] = None,
+            stop_adimin: Optional[float] = None,
+            stop_adimax: Optional[float] = None,
+            stopdelay_imin: Optional[int] = None,
+            stopdelay_imax: Optional[int] = None,
+            stopdelay_dimin: Optional[int] = None,
+            stopdelay_dimax: Optional[int] = None,
+            stopdelay_adimin: Optional[int] = None,
+            stopdelay_adimax: Optional[int] = None,
         ):
             """Linear Sweep Voltammetry (unlike CV no backward scan is done)
             use 4bit bitmask for triggers
@@ -94,6 +106,10 @@ async def gamry_dyn_endpoints(app=None):
                 -1, ge=-1, le=3
             ),  # -1 disables, else select TTL 0-3
             IErange: app.driver.gamry_range_enum = "auto",
+            stop_imin: Optional[float] = None,
+            stop_imax: Optional[float] = None,
+            stopdelay_imin: Optional[int] = None,
+            stopdelay_imax: Optional[int] = None,
         ):
             """Chronoamperometry (current response on amplied potential)
             use 4bit bitmask for triggers
@@ -120,6 +136,10 @@ async def gamry_dyn_endpoints(app=None):
                 -1, ge=-1, le=3
             ),  # -1 disables, else select TTL 0-3
             IErange: app.driver.gamry_range_enum = "auto",
+            stop_vmin: Optional[float] = None,
+            stop_vmax: Optional[float] = None,
+            stopdelay_vmin: Optional[int] = None,
+            stopdelay_vmax: Optional[int] = None,
         ):
             """Chronopotentiometry (Potential response on controlled current)
             use 4bit bitmask for triggers
@@ -149,6 +169,10 @@ async def gamry_dyn_endpoints(app=None):
                 -1, ge=-1, le=3
             ),  # -1 disables, else select TTL 0-3
             IErange: app.driver.gamry_range_enum = "auto",
+            stop_imin: Optional[float] = None,
+            stop_imax: Optional[float] = None,
+            stopdelay_imin: Optional[int] = None,
+            stopdelay_imax: Optional[int] = None,
         ):
             """Cyclic Voltammetry (most widely used technique
             for acquireing information about electrochemical reactions)
@@ -205,6 +229,8 @@ async def gamry_dyn_endpoints(app=None):
                 -1, ge=-1, le=3
             ),  # -1 disables, else select TTL 0-3
             IErange: app.driver.gamry_range_enum = "auto",
+            stop_advmin: Optional[float] = None,
+            stop_advmax: Optional[float] = None,
         ):
             """mesasures open circuit potential
             use 4bit bitmask for triggers

@@ -505,6 +505,10 @@ class Orch(Base):
         self.globstat_clients = set()
         self.current_stop_message = ""
 
+        self.step_thru_actions = False
+        self.step_thru_experiments = False
+        self.step_thru_sequences = False
+
     def myinit(self):
         self.aloop = asyncio.get_running_loop()
         if self.ntp_last_sync is None:
@@ -1058,7 +1062,7 @@ class Orch(Base):
                                 )
 
             # this will recursively call the next no_wait action in queue, and return its error
-            if self.action_dq:
+            if self.action_dq and not self.step_thru_actions:
                 nextA = self.action_dq[0]
                 if nextA.start_condition == ActionStartCondition.no_wait:
                     error_code = await self.loop_task_dispatch_action()
@@ -1197,6 +1201,10 @@ class Orch(Base):
                         not in self.last_50_action_uuids
                     ):
                         await asyncio.sleep(0.001)
+                    if self.action_dq and self.step_thru_actions:
+                        self.current_stop_message = "Step-thru actions is enabled, use 'Start Orch' to dispatch next action."
+                        await self.stop()
+                        await self.update_operator(True)
                 elif self.experiment_dq:
                     self.print_message(
                         "!!!waiting for all actions to finish before dispatching next experiment",
@@ -1205,6 +1213,10 @@ class Orch(Base):
                     await self.orch_wait_for_all_actions()
                     self.print_message("!!!dispatching next experiment", info=True)
                     error_code = await self.loop_task_dispatch_experiment()
+                    if self.experiment_dq and self.step_thru_experiments:
+                        self.current_stop_message = "Step-thru experiments is enabled, use 'Start Orch' to dispatch next experiment."
+                        await self.stop()
+                        await self.update_operator(True)
                 # if no acts and no exps, disptach next sequence
                 elif self.sequence_dq:
                     self.print_message(
@@ -1214,6 +1226,10 @@ class Orch(Base):
                     await self.orch_wait_for_all_actions()
                     self.print_message("!!!dispatching next sequence", info=True)
                     error_code = await self.loop_task_dispatch_sequence()
+                    if self.sequence_dq and self.step_thru_sequences:
+                        self.current_stop_message = "Step-thru sequences is enabled, use 'Start Orch' to dispatch next sequence."
+                        await self.stop()
+                        await self.update_operator(True)
 
                 if error_code is not ErrorCodes.none:
                     self.print_message(
