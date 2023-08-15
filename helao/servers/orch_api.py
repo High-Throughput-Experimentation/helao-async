@@ -46,7 +46,7 @@ class OrchAPI(HelaoFastAPI):
         
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
-            await set_body(request, request.body())
+            await set_body(request, await request.body())
             print(await get_body(request))
             response = await call_next(request)
             return response
