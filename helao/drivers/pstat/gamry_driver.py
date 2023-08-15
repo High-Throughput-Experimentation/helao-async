@@ -484,14 +484,18 @@ class gamry:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopIMin(True, act_params["stop_imin"])
                         )
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMin(True, 0.0))
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopIMin(False, 0.0))
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMin(False, 0.0))
                     if act_params.get("stop_imax", None) is not None:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopIMax(True, act_params["stop_imax"])
                         )
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMax(True, 0.0))
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopIMax(False, 0.0))
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMax(False, 0.0))
                     if act_params.get("stopdelay_imin", None) is not None:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopAtDelayIMin(
@@ -533,14 +537,18 @@ class gamry:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopVMin(True, act_params["stop_vmin"])
                         )
+                        dtaq_lims.append(lambda dtaq: dtaq.SetTreshVMin(True, 0.0))
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopVMin(False, 0.0))
+                        dtaq_lims.append(lambda dtaq: dtaq.SetTreshVMin(False, 0.0))
                     if act_params.get("stop_vmax", None) is not None:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopVMax(True, act_params["stop_vmax"])
                         )
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshVMax(True, 0.0))
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopVMax(False, 0.0))
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshVMax(False, 0.0))
                     if act_params.get("stopdelay_vmin", None) is not None:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopAtDelayVMin(
@@ -582,17 +590,24 @@ class gamry:
                     self.pstat.SetVchRange(vchrangeval)
                     # subset of stop conditions
                     if act_params.get("stop_imin", None) is not None:
+                        self.base.print_message(
+                            f"Using imin threshold = {act_params['stop_imin']}"
+                        )
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopIMin(True, act_params["stop_imin"])
                         )
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMin(True, 0.0))
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopIMin(False, 0.0))
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMin(False, 0.0))
                     if act_params.get("stop_imax", None) is not None:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopIMax(True, act_params["stop_imax"])
                         )
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMax(True, 0.0))
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopIMax(False, 0.0))
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMax(False, 0.0))
                     if act_params.get("stopdelay_imin", None) is not None:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopAtDelayIMin(
@@ -635,46 +650,58 @@ class gamry:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopIMin(True, act_params["stop_imin"])
                         )
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMin(True, 0.0))
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopIMin(False, 0.0))
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMin(False, 0.0))
                     if act_params.get("stop_imax", None) is not None:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopIMax(True, act_params["stop_imax"])
                         )
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMax(True, 0.0))
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopIMax(False, 0.0))
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMax(False, 0.0))
                     if act_params.get("stop_dimin", None) is not None:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopDIMin(
                                 True, act_params["stop_dimin"]
                             )
                         )
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshDIMin(True, 0.0))
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopDIMin(False, 0.0))
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshDIMin(False, 0.0))
                     if act_params.get("stop_dimax", None) is not None:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopDIMax(
                                 True, act_params["stop_dimax"]
                             )
                         )
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshDIMax(True, 0.0))
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopDIMax(False, 0.0))
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshDIMax(False, 0.0))
                     if act_params.get("stop_adimin", None) is not None:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopADIMin(
                                 True, act_params["stop_adimin"]
                             )
                         )
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshADIMin(True, 0.0))
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopADIMin(False, 0.0))
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshADIMin(False, 0.0))
                     if act_params.get("stop_adimax", None) is not None:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopADIMax(
                                 True, act_params["stop_adimax"]
                             )
                         )
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshADIMax(True, 0.0))
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopADIMax(False, 0.0))
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshADIMax(False, 0.0))
                     if act_params.get("stopdelay_imin", None) is not None:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopAtDelayIMin(
@@ -763,16 +790,24 @@ class gamry:
                     # subset of stop conditions
                     if act_params.get("stop_advmin", None) is not None:
                         dtaq_lims.append(
-                            lambda dtaq: dtaq.SetStopADVMin(True, act_params["stop_advmin"])
+                            lambda dtaq: dtaq.SetStopADVMin(
+                                True, act_params["stop_advmin"]
+                            )
                         )
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshADVMin(True, 0.0))
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopADVMin(False, 0.0))
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshADVMin(False, 0.0))
                     if act_params.get("stop_advmax", None) is not None:
                         dtaq_lims.append(
-                            lambda dtaq: dtaq.SetStopADVMax(True, act_params["stop_advmax"])
+                            lambda dtaq: dtaq.SetStopADVMax(
+                                True, act_params["stop_advmax"]
+                            )
                         )
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshADVMax(True, 0.0))
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopADVMax(False, 0.0))
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshADVMax(False, 0.0))
                 else:
                     self.base.print_message(f"'mode {mode} not supported'", error=True)
                     error = ErrorCodes.not_available
@@ -1026,6 +1061,7 @@ class gamry:
         if self.IO_measuring:
             # file and Gamry connection will be closed with the meas loop
             self.IO_do_meas = False  # will stop meas loop
+            self.dtaq.Stop()
             await self.set_IO_signalq(False)
 
     async def estop(self, switch: bool, *args, **kwargs):
@@ -1036,6 +1072,7 @@ class gamry:
         if self.IO_measuring:
             if switch:
                 self.IO_do_meas = False  # will stop meas loop
+                self.dtaq.Stop()
                 await self.set_IO_signalq(False)
                 if self.active:
                     # add estop status to active.status
