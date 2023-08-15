@@ -3,7 +3,7 @@ import os
 import pickle
 import asyncio
 
-from fastapi import WebSocket, Body
+from fastapi import Body, WebSocket, Request
 from helao.helpers.server_api import HelaoFastAPI
 from helao.servers.orch import Orch
 from helaocore.models.server import ActionServerModel
@@ -33,6 +33,14 @@ class OrchAPI(HelaoFastAPI):
             version=version,
         )
         self.driver = None
+
+        @self.middleware("http")
+        async def check_resource(request: Request, call_next):
+            async with self.orch.aiolock:
+                reqd = await request.json()
+                self.orch.print_message(reqd)
+            response = await call_next(request)
+            return response
 
         @self.on_event("startup")
         async def startup_event():

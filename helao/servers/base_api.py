@@ -4,7 +4,6 @@ from helao.helpers.premodels import Action
 from fastapi import Body, WebSocket, WebSocketDisconnect, Request
 from helaocore.models.hlostatus import HloStatus
 
-from starlette.types import Message
 
 class BaseAPI(HelaoFastAPI):
     def __init__(
@@ -26,29 +25,11 @@ class BaseAPI(HelaoFastAPI):
         )
         self.driver = None
 
-        # @self.middleware("http")
-        # async def check_resource(request: Request, call_next):
-        #     async with self.base.aiolock:
-        #         reqd = await request.json()
-        #         self.base.print_message(reqd)
-        #     response = await call_next(request)
-        #     response.content["reqd"] = reqd
-        #     return response
-
-        async def set_body(request: Request, body: bytes):
-            async def receive() -> Message:
-                return {"type": "http.request", "body": body}
-            request._receive = receive
-        
-        async def get_body(request: Request) -> bytes:
-            body = await request.body()
-            await set_body(request, body)
-            return body
-        
         @self.middleware("http")
-        async def app_entry(request: Request, call_next):
-            await set_body(request, await request.body())
-            print(await get_body(request))
+        async def check_resource(request: Request, call_next):
+            async with self.base.aiolock:
+                reqd = await request.json()
+                self.base.print_message(reqd)
             response = await call_next(request)
             return response
 
