@@ -436,7 +436,7 @@ class MfcConstPresExec(MfcExec):
         self.fill_end = self.start_time
 
     def eval_pressure(self, pressure):
-        if pressure > 14.7:
+        if pressure > self.target_pressure:
             return False
         else:
             fill_scc = self.total_gas_scc * (1 - pressure / self.target_pressure)
