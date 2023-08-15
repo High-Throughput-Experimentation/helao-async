@@ -37,7 +37,7 @@ class OrchAPI(HelaoFastAPI):
         @self.middleware("http")
         async def check_resource(request: Request, call_next):
             async with self.orch.aiolock:
-                reqd = await request.json()
+                reqd = await request.body()
                 self.orch.print_message(reqd)
             response = await call_next(request)
             return response
