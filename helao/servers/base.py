@@ -14,6 +14,7 @@ import hashlib
 from copy import deepcopy, copy
 import inspect
 import traceback
+from queue import PriorityQueue
 
 import aiofiles
 import colorama
@@ -147,6 +148,7 @@ class Base:
         self.ntp_offset = None  # add to system time for correction
         self.ntp_last_sync = None
         self.aiolock = asyncio.Lock()
+        self.endpoint_queues = {}
 
         self.ntp_last_sync_file = None
         if self.helaodirs.root is not None:
@@ -181,6 +183,9 @@ class Base:
 
     def dyn_endpoints_init(self):
         asyncio.gather(self.init_endpoint_status(self.dyn_endpoints))
+        for urld in self.fast_urls:
+            if urld.get("path", "").startswith(f"/{self.server.server_name}/"):
+                self.endpoint_queues[urld["name"]] = PriorityQueue()
 
     def print_message(self, *args, **kwargs):
         print_message(

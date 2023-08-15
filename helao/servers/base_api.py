@@ -1,7 +1,7 @@
 from helao.servers.base import Base
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.premodels import Action
-from fastapi import Body, WebSocket, WebSocketDisconnect
+from fastapi import Body, WebSocket, WebSocketDisconnect, Request
 from helaocore.models.hlostatus import HloStatus
 
 
@@ -72,6 +72,14 @@ class BaseAPI(HelaoFastAPI):
             except WebSocketDisconnect:
                 self.base.live_publisher.disconnect(websocket)
 
+        @self.middleware("http")
+        async def check_resource(request: Request, call_next):
+            async with self.base.aiolock:
+                reqd = await request.json()
+                print(reqd)
+            response = await call_next(request)
+            return response
+
         @self.post("/get_config", tags=["private"])
         def get_config():
             return self.base.world_cfg
@@ -91,7 +99,7 @@ class BaseAPI(HelaoFastAPI):
         @self.post("/endpoints", tags=["private"])
         def get_all_urls():
             """Return a list of all endpoints on this server."""
-            return self.base.get_endpoint_urls()
+            return self.base.fast_urls
 
         @self.post("/get_lbuf", tags=["private"])
         def get_lbuf():
