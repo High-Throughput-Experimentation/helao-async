@@ -76,7 +76,7 @@ class BaseAPI(HelaoFastAPI):
         async def check_resource(request: Request, call_next):
             async with self.base.aiolock:
                 reqd = await request.json()
-                print(reqd)
+                self.base.print_message(reqd)
             response = await call_next(request)
             return response
 
