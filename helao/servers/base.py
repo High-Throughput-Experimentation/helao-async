@@ -213,7 +213,6 @@ class Base:
         """Return a list of all endpoints on this server."""
         url_list = []
         for route in self.fastapp.routes:
-            print(route)
             routeD = {"path": route.path, "name": route.name}
             if "dependant" in dir(route):
                 flatParams = get_flat_params(route.dependant)
@@ -235,7 +234,6 @@ class Base:
             else:
                 routeD["params"] = []
             url_list.append(routeD)
-            print(url_list)
         return url_list
 
     def _get_action(self, frame) -> Action:
