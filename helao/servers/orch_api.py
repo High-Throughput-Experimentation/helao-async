@@ -13,7 +13,7 @@ from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.helpers.executor import Executor
 from helaocore.error import ErrorCodes
 from helaocore.models.hlostatus import HloStatus
-
+from starlette.types import Message
 
 class OrchAPI(HelaoFastAPI):
     def __init__(
@@ -34,11 +34,20 @@ class OrchAPI(HelaoFastAPI):
         )
         self.driver = None
 
+        async def set_body(request: Request, body: bytes):
+            async def receive() -> Message:
+                return {"type": "http.request", "body": body}
+            request._receive = receive
+        
+        async def get_body(request: Request) -> bytes:
+            body = await request.body()
+            await set_body(request, body)
+            return body
+        
         @self.middleware("http")
-        async def check_resource(request: Request, call_next):
-            async with self.orch.aiolock:
-                reqd = await request.body()
-                self.orch.print_message(reqd)
+        async def app_entry(request: Request, call_next):
+            await set_body(request, request.body())
+            print(await get_body(request))
             response = await call_next(request)
             return response
 
