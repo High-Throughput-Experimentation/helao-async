@@ -1894,6 +1894,14 @@ class Active:
         # post-action operations
         cleanup_state = await executor._post_exec()
         cleanup_error = cleanup_state.get("error", {})
+        data = cleanup_state.get("data", {})
+        if data:
+            datamodel = DataModel(
+                data={self.action.file_conn_keys[0]: data},
+                errors=[],
+                status=HloStatus.active,
+            )
+            self.enqueue_data_nowait(datamodel)  # write and broadcast
         if cleanup_error != ErrorCodes.none:
             self.base.print_message("Error encountered during executor cleanup.")
 
