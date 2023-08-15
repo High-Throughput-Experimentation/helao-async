@@ -20,7 +20,8 @@ import serial
 from typing import Union, Optional
 
 from helaocore.error import ErrorCodes
-from helao.servers.base import Base, Executor
+from helao.servers.base import Base
+from helao.helpers.executor import Executor
 from helaocore.models.hlostatus import HloStatus
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 

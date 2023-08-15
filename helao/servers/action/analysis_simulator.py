@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from helao.servers.base import Base
-from helao.servers.base import HelaoBase
+from helao.servers.base_api import BaseAPI
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
 from helaocore.error import ErrorCodes
@@ -72,7 +72,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     config = config_loader(confPrefix, helao_root)
 
-    app = HelaoBase(
+    app = BaseAPI(
         config=config,
         server_key=server_key,
         server_title=server_key,

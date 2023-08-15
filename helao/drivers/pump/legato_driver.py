@@ -14,7 +14,8 @@ from typing import Optional
 
 from helaocore.models.hlostatus import HloStatus
 from helaocore.error import ErrorCodes
-from helao.servers.base import Base, Executor
+from helao.servers.base import Base
+from helao.helpers.executor import Executor
 
 # from helao.helpers.sample_api import UnifiedSampleDataAPI
 
@@ -85,9 +86,9 @@ ulmap = {
     "ml": 1000.0,
 }
 
+
 class KDS100:
     def __init__(self, action_serv: Base):
-
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
         # self.unified_db = UnifiedSampleDataAPI(self.base)

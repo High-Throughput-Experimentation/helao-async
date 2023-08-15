@@ -16,7 +16,7 @@ from helaocore.error import ErrorCodes
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.sample import SampleUnion
 
-from helao.servers.base import Base, HelaoBase, Executor
+from helao.servers.base import Base, BaseAPI, Executor
 from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
 
@@ -73,7 +73,7 @@ class WsExec(Executor):
 def makeApp(confPrefix, server_key, helao_root):
     config = config_loader(confPrefix, helao_root)
 
-    app = HelaoBase(
+    app = BaseAPI(
         config=config,
         server_key=server_key,
         server_title=server_key,
