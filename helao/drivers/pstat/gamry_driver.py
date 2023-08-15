@@ -484,7 +484,11 @@ class gamry:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopIMin(True, act_params["stop_imin"])
                         )
-                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMin(True, 0.0))
+                        dtaq_lims.append(
+                            lambda dtaq: dtaq.SetThreshIMin(
+                                True, act_params["stop_imin"]
+                            )
+                        )
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopIMin(False, 0.0))
                         dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMin(False, 0.0))
@@ -492,7 +496,11 @@ class gamry:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopIMax(True, act_params["stop_imax"])
                         )
-                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMax(True, 0.0))
+                        dtaq_lims.append(
+                            lambda dtaq: dtaq.SetThreshIMax(
+                                True, act_params["stop_imax"]
+                            )
+                        )
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopIMax(False, 0.0))
                         dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMax(False, 0.0))
@@ -537,7 +545,11 @@ class gamry:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopVMin(True, act_params["stop_vmin"])
                         )
-                        dtaq_lims.append(lambda dtaq: dtaq.SetTreshVMin(True, 0.0))
+                        dtaq_lims.append(
+                            lambda dtaq: dtaq.SetTreshVMin(
+                                True, act_params["stop_vmin"]
+                            )
+                        )
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopVMin(False, 0.0))
                         dtaq_lims.append(lambda dtaq: dtaq.SetTreshVMin(False, 0.0))
@@ -545,7 +557,11 @@ class gamry:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopVMax(True, act_params["stop_vmax"])
                         )
-                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshVMax(True, 0.0))
+                        dtaq_lims.append(
+                            lambda dtaq: dtaq.SetThreshVMax(
+                                True, act_params["stop_vmax"]
+                            )
+                        )
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopVMax(False, 0.0))
                         dtaq_lims.append(lambda dtaq: dtaq.SetThreshVMax(False, 0.0))
@@ -596,7 +612,11 @@ class gamry:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopIMin(True, act_params["stop_imin"])
                         )
-                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMin(True, 0.0))
+                        dtaq_lims.append(
+                            lambda dtaq: dtaq.SetThreshIMin(
+                                True, act_params["stop_imin"]
+                            )
+                        )
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopIMin(False, 0.0))
                         dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMin(False, 0.0))
@@ -604,7 +624,11 @@ class gamry:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopIMax(True, act_params["stop_imax"])
                         )
-                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMax(True, 0.0))
+                        dtaq_lims.append(
+                            lambda dtaq: dtaq.SetThreshIMax(
+                                True, act_params["stop_imax"]
+                            )
+                        )
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopIMax(False, 0.0))
                         dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMax(False, 0.0))
@@ -650,7 +674,11 @@ class gamry:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopIMin(True, act_params["stop_imin"])
                         )
-                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMin(True, 0.0))
+                        dtaq_lims.append(
+                            lambda dtaq: dtaq.SetThreshIMin(
+                                True, act_params["stop_imin"]
+                            )
+                        )
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopIMin(False, 0.0))
                         dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMin(False, 0.0))
@@ -658,7 +686,11 @@ class gamry:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopIMax(True, act_params["stop_imax"])
                         )
-                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMax(True, 0.0))
+                        dtaq_lims.append(
+                            lambda dtaq: dtaq.SetThreshIMax(
+                                True, act_params["stop_imax"]
+                            )
+                        )
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopIMax(False, 0.0))
                         dtaq_lims.append(lambda dtaq: dtaq.SetThreshIMax(False, 0.0))
@@ -668,7 +700,11 @@ class gamry:
                                 True, act_params["stop_dimin"]
                             )
                         )
-                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshDIMin(True, 0.0))
+                        dtaq_lims.append(
+                            lambda dtaq: dtaq.SetThreshDIMin(
+                                True, act_params["stop_dimin"]
+                            )
+                        )
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopDIMin(False, 0.0))
                         dtaq_lims.append(lambda dtaq: dtaq.SetThreshDIMin(False, 0.0))
@@ -678,7 +714,11 @@ class gamry:
                                 True, act_params["stop_dimax"]
                             )
                         )
-                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshDIMax(True, 0.0))
+                        dtaq_lims.append(
+                            lambda dtaq: dtaq.SetThreshDIMax(
+                                True, act_params["stop_dimax"]
+                            )
+                        )
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopDIMax(False, 0.0))
                         dtaq_lims.append(lambda dtaq: dtaq.SetThreshDIMax(False, 0.0))
@@ -688,7 +728,11 @@ class gamry:
                                 True, act_params["stop_adimin"]
                             )
                         )
-                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshADIMin(True, 0.0))
+                        dtaq_lims.append(
+                            lambda dtaq: dtaq.SetThreshADIMin(
+                                True, act_params["stop_adimin"]
+                            )
+                        )
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopADIMin(False, 0.0))
                         dtaq_lims.append(lambda dtaq: dtaq.SetThreshADIMin(False, 0.0))
@@ -794,7 +838,11 @@ class gamry:
                                 True, act_params["stop_advmin"]
                             )
                         )
-                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshADVMin(True, 0.0))
+                        dtaq_lims.append(
+                            lambda dtaq: dtaq.SetThreshADVMin(
+                                True, act_params["stop_advmin"]
+                            )
+                        )
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopADVMin(False, 0.0))
                         dtaq_lims.append(lambda dtaq: dtaq.SetThreshADVMin(False, 0.0))
@@ -804,7 +852,11 @@ class gamry:
                                 True, act_params["stop_advmax"]
                             )
                         )
-                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshADVMax(True, 0.0))
+                        dtaq_lims.append(
+                            lambda dtaq: dtaq.SetThreshADVMax(
+                                True, act_params["stop_advmax"]
+                            )
+                        )
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopADVMax(False, 0.0))
                         dtaq_lims.append(lambda dtaq: dtaq.SetThreshADVMax(False, 0.0))
