@@ -546,13 +546,13 @@ class gamry:
                             lambda dtaq: dtaq.SetStopXMin(True, act_params["stop_vmin"])
                         )
                         dtaq_lims.append(
-                            lambda dtaq: dtaq.SetTreshVMin(
+                            lambda dtaq: dtaq.SetThreshVMin(
                                 True, act_params["stop_vmin"]
                             )
                         )
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopXMin(False, 0.0))
-                        dtaq_lims.append(lambda dtaq: dtaq.SetTreshVMin(False, 0.0))
+                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshVMin(False, 0.0))
                     if act_params.get("stop_vmax", None) is not None:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopXMax(True, act_params["stop_vmax"])
