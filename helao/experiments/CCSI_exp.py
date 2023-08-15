@@ -1284,18 +1284,20 @@ def CCSI_sub_cellfill_massdose(
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0}, asc.no_wait)
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(IO_server, "acquire_analog_in", {"duration":apm.pars.co2measure_duration + 1,"acquisition_rate": apm.pars.co2measure_acqrate, }, nonblocking=True)
+    apm.add(MFC_server, "acquire_flowrate", {"flowrate_sccm":None,"ramp_sccm_sec":apm.pars.flowramp_sccm,"duration":apm.pars.co2measure_duration+300,"acquisition_rate": apm.pars.co2measure_acqrate,}, nonblocking=True)
     apm.add(
         MFC_server, 
         "maintain_pressure", 
         {
             "flowrate_sccm":apm.pars.flowrate_sccm,
             "ramp_sccm_sec":apm.pars.flowramp_sccm,
-            "duration":apm.pars.co2measure_duration + 30,
+            "duration":apm.pars.co2measure_duration + 60,
             "target_pressure": apm.pars.target_pressure,
             "total_gas_scc": apm.pars.total_gas_scc,
             "refill_freq_sec": apm.pars.refill_freq_sec,
         }, 
-        )
+        nonblocking=True
+    )
 #need to account for gas sample
     apm.add(
         CO2S_server,
@@ -1304,8 +1306,8 @@ def CCSI_sub_cellfill_massdose(
             "duration": apm.pars.co2measure_duration,
             "acquisition_rate": apm.pars.co2measure_acqrate,
         },
-        asc.no_wait,
-        nonblocking=True,
+        #asc.no_wait,
+        #nonblocking=True,
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="Recirculate_headspace",
         process_finish=True,
