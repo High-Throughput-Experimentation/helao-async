@@ -705,7 +705,7 @@ def ADSS_sub_CA(
 
 def ADSS_sub_CA_photo(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     CA_potential: float = 0.0,
     ph: float = 9.53,
     potential_versus: str = "rhe",
@@ -840,6 +840,7 @@ def ADSS_sub_CA_photo(
             apm.add(ORCH_server, "wait", {"waittime": vwait}, waitcond)
             apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1},ActionStartCondition.wait_for_orch)
 
+    apm.add(NI_server, "led", {"led": "led", "on": 0})
 
     return apm.action_list  # returns complete action list to orch
 
@@ -1081,7 +1082,7 @@ def ADSS_sub_OCV(
 
 def ADSS_sub_OCV_photo(
     experiment: Experiment,
-    experiment_version: int = 5,
+    experiment_version: int = 6,
     Tval__s: float = 60.0,
     gamry_i_range: str = "auto",
     samplerate_sec: float = 0.05,
@@ -1178,6 +1179,8 @@ def ADSS_sub_OCV_photo(
             )
             apm.add(ORCH_server, "wait", {"waittime": 65}, ActionStartCondition.no_wait)
             apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1},ActionStartCondition.wait_for_orch)
+
+    apm.add(NI_server, "led", {"led": "led", "on": 0})
 
     return apm.action_list  # returns complete action list to orch
 
