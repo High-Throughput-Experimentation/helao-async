@@ -411,6 +411,97 @@ class PfcExec(MfcExec):
         return {"error": ErrorCodes.none}
 
 
+class MfcConstPresExec(MfcExec):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.last_fill = self.start_time
+        action_params = self.active.action.action_params
+        self.total_gas_scc = action_params.get("total_gas_scc", 7)
+        self.flowrate_sccm = action_params.get("flowrate_sccm", 0.5)
+        self.ramp_sccm_sec = action_params.get("ramp_sccm_sec", 0)
+        self.refill_freq = action_params.get("refill_freq_sec", 10)
+        self.filling = False
+        self.fill_end = self.start_time
+
+    def eval_pressure(self, pressure):
+        if pressure > 14.7:
+            return False
+        else:
+            fill_scc = self.total_gas_scc * (1 - pressure / 14.7)
+            fill_time = fill_scc / self.flowrate_sccm
+            return fill_time, fill_scc
+
+    async def _pre_exec(self):
+        "Set flow rate."
+        self.active.base.print_message("MfcConstPresExec running setup methods.")
+        rate_resp = await self.active.base.fastapp.driver.set_flowrate(
+            device_name=self.device_name,
+            flowrate_sccm=self.flowrate_sccm,
+            ramp_sccm_sec=self.ramp_sccm_sec,
+        )
+        self.active.base.print_message(f"set_flowrate returned: {rate_resp}")
+        return {"error": ErrorCodes.none}
+
+    async def _exec(self):
+        "Cancel valve hold."
+        self.start_time = time.time()
+        return {"error": ErrorCodes.none}
+
+    async def _poll(self):
+        """Read flow from live buffer."""
+        iter_time = time.time()
+        live_dict, _ = self.active.base.get_lbuf(self.device_name)
+        fill_time, fill_scc = self.eval_pressure(live_dict["pressure"])
+        if (
+            fill_time
+            and not self.filling
+            and iter_time - self.last_fill >= self.refill_freq
+        ):
+            self.active.base.print_message(
+                f"pressure below 1 atm, filling {fill_scc} scc over {fill_time} seconds"
+            )
+            self.filling = True
+            openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
+                device_name=self.device_name,
+            )
+            self.active.base.print_message(f"hold_cancel returned: {openvlv_resp}")
+            self.fill_end = iter_time + fill_time
+        elif self.filling and iter_time >= self.fill_end:
+            self.active.base.print_message("target volume filled, closing mfc valve")
+            closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
+                device_name=self.device_name,
+            )
+            self.active.base.print_message(
+                f"hold_valve_closed returned: {closevlv_resp}"
+            )
+            self.filling = False
+            self.last_fill = iter_time
+        elapsed_time = iter_time - self.start_time
+        if (self.duration < 0) or (elapsed_time < self.duration):
+            status = HloStatus.active
+        else:
+            status = HloStatus.finished
+        await asyncio.sleep(0.001)
+        return {
+            "error": ErrorCodes.none,
+            "status": status,
+        }
+
+    async def _post_exec(self):
+        "Restore valve hold."
+        self.active.base.print_message("MFCExec running cleanup methods.")
+        if not self.active.action.action_params.get("stay_open", False):
+            closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
+                device_name=self.device_name,
+            )
+            self.active.base.print_message(
+                f"hold_valve_closed returned: {closevlv_resp}"
+            )
+        else:
+            self.active.base.print_message("'stay_open' is True, skipping valve hold")
+        return {"error": ErrorCodes.none}
+
+
 """Notes:
 
 Register diffs at G16,25,26
