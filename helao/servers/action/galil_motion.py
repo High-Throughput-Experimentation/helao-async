@@ -8,7 +8,27 @@ must be written in the driver class to ensure that the service methods are gener
 calls to 'motion.*' are not device-specific. Currently inherits configuration from
 driver code, and hard-coded to use 'galil' class (see "__main__").
 
-TODO: motor calibration and plate calibration procedure
+Motor calibration procedure for new instrument alignment:
+Place alignment plate onto stage. 
+In c:\inst_hlo\database\plate_calib, delete the instrument_calib.json 
+---
+Open the MOTOR bokeh
+----
+In MOTOR swagger:
+After performing setmotionref, verify/edit the x-y offsets in the config file.
+Execute run_aligner.
+----
+In MOTOR bokeh, click on green "go" button.
+On the map click on the samples, move to the corresponding positions and "Add Pt"
+After 3 points, click "Calc" and then "Sub"mit
+---
+Exit helao, in the plat_calib directory, rename the plate_6353_calib.json to instrument_calib.json.
+
+Back in helao, redo the alignment for 6353 plate or any 4x6 plate or round.
+
+For rounds, type any map 57 plate number and align to the sample numbers on the round alignment plate.
+
+Exit helao and restart.
 
 """
 
