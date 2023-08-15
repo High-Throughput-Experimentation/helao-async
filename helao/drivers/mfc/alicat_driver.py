@@ -11,7 +11,7 @@ Setpoint setup (Menu-Control-Setpoint_setup-Setpoint_source) has to be set to se
 
 """
 
-__all__ = ["AliCatMFC", "MfcExec", "PfcExec"]
+__all__ = ["AliCatMFC", "MfcExec", "PfcExec", "MfcConstPresExec"]
 
 import time
 import json
@@ -416,10 +416,11 @@ class MfcConstPresExec(MfcExec):
         super().__init__(*args, **kwargs)
         self.last_fill = self.start_time
         action_params = self.active.action.action_params
-        self.total_gas_scc = action_params.get("total_gas_scc", 7)
+        self.target_pressure = action_params.get("target_pressure", 14.7)
+        self.total_gas_scc = action_params.get("total_gas_scc", 7.0)
         self.flowrate_sccm = action_params.get("flowrate_sccm", 0.5)
         self.ramp_sccm_sec = action_params.get("ramp_sccm_sec", 0)
-        self.refill_freq = action_params.get("refill_freq_sec", 10)
+        self.refill_freq = action_params.get("refill_freq_sec", 10.0)
         self.filling = False
         self.fill_end = self.start_time
 
@@ -427,8 +428,8 @@ class MfcConstPresExec(MfcExec):
         if pressure > 14.7:
             return False
         else:
-            fill_scc = self.total_gas_scc * (1 - pressure / 14.7)
-            fill_time = fill_scc / self.flowrate_sccm
+            fill_scc = self.total_gas_scc * (1 - pressure / self.target_pressure)
+            fill_time = 60.0 * fill_scc / self.flowrate_sccm
             return fill_time, fill_scc
 
     async def _pre_exec(self):
