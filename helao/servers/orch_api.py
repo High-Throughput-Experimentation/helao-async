@@ -81,11 +81,15 @@ class OrchAPI(HelaoFastAPI):
             return self.orch.actionservermodel
 
         @self.post("/attach_client", tags=["private"])
-        async def attach_client(client_servkey: str):
+        async def attach_client(client_servkey: str = ""):
+            if client_servkey == "":
+                return {"error": "client key was not specified"}
             return await self.orch.attach_client(client_servkey)
 
         @self.post("/stop_executor", tags=["private"])
-        def stop_executor(executor_id: str):
+        def stop_executor(executor_id: str = ""):
+            if executor_id == "":
+                return {"error": "executor_id was not specified"}
             return self.orch.stop_executor(executor_id)
 
         @self.post("/endpoints", tags=["private"])
