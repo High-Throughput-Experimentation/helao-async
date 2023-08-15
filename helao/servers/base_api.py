@@ -72,13 +72,22 @@ class BaseAPI(HelaoFastAPI):
             except WebSocketDisconnect:
                 self.base.live_publisher.disconnect(websocket)
 
+        # @self.middleware("http")
+        # async def check_resource(request: Request, call_next):
+        #     async with self.base.aiolock:
+        #         reqd = await request.json()
+        #         self.base.print_message(reqd)
+        #     response = await call_next(request)
+        #     response.content["reqd"] = reqd
+        #     return response
+
         @self.middleware("http")
-        async def check_resource(request: Request, call_next):
-            async with self.base.aiolock:
-                reqd = await request.json()
-                self.base.print_message(reqd)
+        async def TestCustomMiddleware(request: Request, call_next):
+            the_headers = request.headers
+            the_body = await request.json()
+            print(the_headers)
+            print(the_body)
             response = await call_next(request)
-            response.content["reqd"] = reqd
             return response
 
         @self.post("/get_config", tags=["private"])
