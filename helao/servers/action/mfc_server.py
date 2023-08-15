@@ -181,7 +181,7 @@ def makeApp(confPrefix, server_key, helao_root):
         return finished_action.as_dict()
 
     @app.post(f"/{server_key}/maintain_pressure", tags=["action"])
-    async def maintain_pressure_fill(
+    async def maintain_pressure(
         action: Action = Body({}, embed=True),
         action_version: int = 2,
         device_name: dev_mfcs = dev_names[0],
