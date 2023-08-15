@@ -249,6 +249,7 @@ class AliCatMFC:
         if device_name is None:
             resp = []
             for dev_name, _ in self.fcs.items():
+                await self.set_flowrate(dev_name, 0)
                 chold_resp = self._send(dev_name, "hc")
                 resp.append({dev_name: chold_resp})
         else:
@@ -313,6 +314,13 @@ class AliCatMFC:
         """Await tasks prior to driver shutdown."""
         await self.stop_polling()
         await asyncio.sleep(0.5)
+        self.base.print_message("stopping MFC flows")
+        await self.hold_valve_closed()
+
+    async def estop(self, *args, **kwargs):
+        self.base.print_message("stopping MFC flows")
+        await self.hold_valve_closed()
+        return True
 
     def shutdown(self):
         # this gets called when the server is shut down or reloaded to ensure a clean
@@ -326,7 +334,7 @@ class AliCatMFC:
 class MfcExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.device_name = list(self.active.base.server_params["devices"].keys())[0]
+        self.device_name = self.active.action.action_params["device_name"]
         # current plan is 1 flow controller per COM
         self.active.base.print_message("MFCExec initialized.")
         self.start_time = time.time()

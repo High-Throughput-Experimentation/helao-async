@@ -1088,6 +1088,18 @@ class Base:
             self.print_message(f"Could not find {executor_id} among active executors.")
             return {"signal_stop": False}
 
+    def stop_all_executor_prefix(self, action_name: str, match_vars: dict = {}):
+        matching_execs = [k for k in self.executors if k.startswith(action_name)]
+        if match_vars:
+            matching_execs = [
+                ek
+                for ek, ex in self.executors.items()
+                if any([vars(ex).get(vk, "") == vv for vk, vv in match_vars.items()])
+                and ek in matching_execs
+            ]
+        for exec_key in matching_execs:
+            self.stop_executor(exec_key)
+
 
 class Active:
     """Active action holder which wraps data queing and exp writing."""
