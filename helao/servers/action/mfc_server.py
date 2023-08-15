@@ -10,7 +10,7 @@ from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base import HelaoBase
 from helaocore.models.sample import SampleUnion
-from helao.drivers.mfc.alicat_driver import AliCatMFC, MfcExec, PfcExec
+from helao.drivers.mfc.alicat_driver import AliCatMFC, MfcExec, PfcExec, MfcConstPresExec
 from helao.helpers.config_loader import config_loader
 from helao.helpers.make_str_enum import make_str_enum
 
@@ -55,6 +55,26 @@ def makeApp(confPrefix, server_key, helao_root):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
+    @app.post(f"/{server_key}/cancel_acquire_flowrate", tags=["action"])
+    async def cancel_acquire_flowrate(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        device_name: Optional[str] = None,
+        exec_id: Optional[str] = None,
+    ):
+        """Stop flowrate & acquisition for given device_name."""
+        active = await app.base.setup_and_contain_action()
+        if active.action.action_params["exec_id"] is not None:
+            app.base.stop_executor(active.action.action_params["exec_id"])
+        else:
+            if active.action.action_params["device_name"] is None:
+                dev_dict = {}
+            else:
+                dev_dict = {"device_name": active.action.action_params["device_name"]}
+            app.base.stop_all_executor_prefix("acquire_flowrate", dev_dict)
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
     @app.post(f"/{server_key}/acquire_pressure", tags=["action"])
     async def acquire_pressure(
         action: Action = Body({}, embed=True),
@@ -78,26 +98,6 @@ def makeApp(confPrefix, server_key, helao_root):
         )
         active_action_dict = active.start_executor(executor)
         return active_action_dict
-
-    @app.post(f"/{server_key}/cancel_acquire_flowrate", tags=["action"])
-    async def cancel_acquire_flowrate(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
-        device_name: Optional[str] = None,
-        exec_id: Optional[str] = None,
-    ):
-        """Stop flowrate & acquisition for given device_name."""
-        active = await app.base.setup_and_contain_action()
-        if active.action.action_params["exec_id"] is not None:
-            app.base.stop_executor(active.action.action_params["exec_id"])
-        else:
-            if active.action.action_params["device_name"] is None:
-                dev_dict = {}
-            else:
-                dev_dict = {"device_name": active.action.action_params["device_name"]}
-            app.base.stop_all_executor_prefix("acquire_flowrate", dev_dict)
-        finished_action = await active.finish()
-        return finished_action.as_dict()
 
     @app.post(f"/{server_key}/cancel_acquire_pressure", tags=["action"])
     async def cancel_acquire_pressure(
@@ -177,6 +177,51 @@ def makeApp(confPrefix, server_key, helao_root):
         app.driver.hold_valve_closed(
             active.action.action_params.get("device_name", None)
         )
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+    @app.post(f"/{server_key}/maintain_pressure", tags=["action"])
+    async def maintain_pressure_fill(
+        action: Action = Body({}, embed=True),
+        action_version: int = 2,
+        device_name: dev_mfcs = dev_names[0],
+        target_pressure: float = 14.7,
+        total_gas_scc: float = 7.0,
+        refill_freq_sec: float = 10.0,
+        flowrate_sccm: float = None,
+        ramp_sccm_sec: float = 0,
+        stay_open: bool = False,
+        duration: float = -1,
+        exec_id: Optional[str] = None,
+    ):
+        """Check pressure at refill freq and dose to target pressure."""
+        active = await app.base.setup_and_contain_action()
+        active.action.action_abbr = "hold_pres"
+        executor = MfcConstPresExec(
+            active=active,
+            oneoff=False,
+            poll_rate=0.01,
+        )
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
+
+    @app.post(f"/{server_key}/cancel_maintain_pressure", tags=["action"])
+    async def cancel_maintain_pressure(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        device_name: Optional[str] = None,
+        exec_id: Optional[str] = None,
+    ):
+        """Stop flowrate & acquisition for given device_name."""
+        active = await app.base.setup_and_contain_action()
+        if active.action.action_params["exec_id"] is not None:
+            app.base.stop_executor(active.action.action_params["exec_id"])
+        else:
+            if active.action.action_params["device_name"] is None:
+                dev_dict = {}
+            else:
+                dev_dict = {"device_name": active.action.action_params["device_name"]}
+            app.base.stop_all_executor_prefix("maintain_pressure", dev_dict)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
