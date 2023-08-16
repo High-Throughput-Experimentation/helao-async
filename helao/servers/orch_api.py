@@ -108,7 +108,6 @@ class OrchAPI(HelaoFastAPI):
                     )
                     self.orch.aiolock.release()
             else:
-                self.orch.aiolock.release()
                 response = await call_next(request)
             return response
 
