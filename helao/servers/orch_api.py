@@ -67,18 +67,18 @@ class OrchAPI(HelaoFastAPI):
                 start_cond = action_dict.get("action_start_condition", ASC.wait_for_all)
                 if start_cond == ASC.no_wait:
                     # self.orch.aiolock.release()
-                    response = await call_next(request)
+                    response = await call_next(original_req)
                 elif start_cond == ASC.wait_for_server and all(
                     [q.qsize() == 0 for q in self.orch.endpoint_queues.values()]
                 ):
                     # self.orch.aiolock.release()
-                    response = await call_next(request)
+                    response = await call_next(original_req)
                 elif (
                     start_cond == ASC.wait_for_endpoint
                     and self.orch.endpoint_queues[endpoint_name].qsize() == 0
                 ):
                     # self.orch.aiolock.release()
-                    response = await call_next(request)
+                    response = await call_next(original_req)
                 else:  # collision between two orch requests for one resource, queue
                     action_dict["action_params"] = action_dict.get("action_params", {})
                     for d in (
@@ -104,7 +104,7 @@ class OrchAPI(HelaoFastAPI):
                     return_dict["action_status"].append("queued")
                     response = JSONResponse(return_dict)
                     self.orch.endpoint_queues[endpoint_name].put(
-                        (action_dict.get("orch_priority", 1), (original_req, call_next))
+                        (action_dict.get("orch_priority", 1), (original_req, call_next,))
                     )
                     # self.orch.aiolock.release()
             else:
