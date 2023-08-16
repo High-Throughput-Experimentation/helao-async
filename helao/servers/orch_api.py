@@ -72,7 +72,7 @@ class OrchAPI(HelaoFastAPI):
                 body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
                 action_dict = body_dict.get("action", {})
                 start_cond = action_dict.get("action_start_condition", ASC.wait_for_all)
-                start_cond = ASC.no_wait
+                # start_cond = ASC.no_wait
                 if start_cond == ASC.no_wait:
                     # self.orch.aiolock.release()
                     response = await call_next(request)
