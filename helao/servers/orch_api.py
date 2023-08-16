@@ -57,12 +57,11 @@ class OrchAPI(HelaoFastAPI):
                 body_bytes = await get_body(request)
                 body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
                 body_dict["action"] = body_dict.get("action", {})
-                body_dict["action"]["action_params"] = (
-                    body_dict["action"]
-                    .get("action_params", {})
-                    .update(request.query_params)
-                    .update(request.path_params)
+                body_dict["action"]["action_params"] = body_dict["action"].get(
+                    "action_params", {}
                 )
+                body_dict["action"]["action_params"].update(request.query_params)
+                body_dict["action"]["action_params"].update(request.path_params)
 
                 print(body_dict)
                 response = JSONResponse(body_dict)
