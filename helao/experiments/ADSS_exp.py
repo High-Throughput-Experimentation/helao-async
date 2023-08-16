@@ -872,8 +872,8 @@ def ADSS_sub_CA_photo(
                     ActionStartCondition.wait_for_orch,
                 )
             elif mtup[0] == "electrolyte":
-                apm.add(ORCH_server, "wait", {"waittime": interval}, waitcond)
                 if apm.pars.insert_electrolyte_yn:
+                    apm.add(ORCH_server, "wait", {"waittime": interval}, waitcond)
                     apm.add_action_list(
                         ADSS_sub_cellfill_prefilled(
                             experiment=experiment,
