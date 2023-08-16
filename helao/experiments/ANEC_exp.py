@@ -209,13 +209,11 @@ def ANEC_sub_alloff(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "up", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "liquid", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "atm", "on": 0})
-    # =============================================================================
-    #     apm.add(
-    #         TEC_server,
-    #         "cancel_record_tec",
-    #         {}
-    #     )
-    # =============================================================================
+    apm.add(
+        TEC_server,
+        "cancel_record_tec",
+        {}
+    )
     apm.add(TEC_server, "disable_tec", {})
 
     return apm.action_list
@@ -233,13 +231,11 @@ def ANEC_sub_heatoff(
 
     apm = ActionPlanMaker()
 
-    # =============================================================================
-    #     apm.add(
-    #         TEC_server,
-    #         "cancel_record_tec",
-    #         {}
-    #     )
-    # =============================================================================
+    apm.add(
+        TEC_server,
+        "cancel_record_tec",
+        {}
+    )
     apm.add(TEC_server, "disable_tec", {})
 
     return apm.action_list
@@ -262,13 +258,12 @@ def ANEC_sub_setheat(
         "set_temperature",
         {"target_temperature_degc": apm.pars.target_temperature_degc},
     )
-    # =============================================================================
-    #     apm.add(
-    #         TEC_server,
-    #         "record_tec",
-    #         {"duration": -1,
-    #         "acquisition_rate": 0.2}
-    #     )
+    apm.add(
+        TEC_server,
+        "record_tec",
+        {"duration": -1,"acquisition_rate": 0.2},
+        nonblocking=True,
+    )
     # =============================================================================
     apm.add(TEC_server, "enable_tec", {})
     apm.add(TEC_server, "wait_till_stable", {})
