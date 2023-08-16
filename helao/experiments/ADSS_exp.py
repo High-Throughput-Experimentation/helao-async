@@ -705,7 +705,7 @@ def ADSS_sub_CA(
 
 def ADSS_sub_CA_photo(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 4, #v4 add electrolyte add
     CA_potential: float = 0.0,
     ph: float = 9.53,
     potential_versus: str = "rhe",
@@ -716,6 +716,9 @@ def ADSS_sub_CA_photo(
     CA_duration_sec: float = 1800,
     led_wavelength: str = "385",
     toggle_illum_duty: float = 1,
+    insert_electrolyte_yn: bool = False,
+    insert_electrolyte_ul: int = 0,
+    insert_electrolyte_time_sec: float = 1800,
     aliquot_volume_ul: int = 200,
     aliquot_times_sec: List[float] = [],
     aliquot_insitu: bool = True,
