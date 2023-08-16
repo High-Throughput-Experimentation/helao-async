@@ -17,6 +17,7 @@ from helaocore.models.hlostatus import HloStatus
 from starlette.types import Message
 from starlette.responses import JSONResponse
 
+
 class OrchAPI(HelaoFastAPI):
     def __init__(
         self,
@@ -39,21 +40,30 @@ class OrchAPI(HelaoFastAPI):
         async def set_body(request: Request, body: bytes):
             async def receive() -> Message:
                 return {"type": "http.request", "body": body}
+
             request._receive = receive
-        
+
         async def get_body(request: Request) -> bytes:
             body = await request.body()
             await set_body(request, body)
             return body
-        
+
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
-            if str(request.url).strip("/").split("/")[-2] == server_key:
+            if request.url.path.strip("/").split("/")[-2] == server_key:
                 await set_body(request, await request.body())
 
                 # do stuff
                 body_bytes = await get_body(request)
-                body_dict = json.loads(body_bytes.decode('utf8').replace("'", '"'))
+                body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
+                body_dict["action"] = body_dict.get("action", {})
+                body_dict["action"]["action_params"] = (
+                    body_dict["action"]
+                    .get("action_params", {})
+                    .update(request.query_params)
+                    .update(request.path_params)
+                )
+
                 print(body_dict)
                 response = JSONResponse(body_dict)
 
