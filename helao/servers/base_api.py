@@ -49,7 +49,7 @@ class BaseAPI(HelaoFastAPI):
             endpoint_name = request.url.path.strip("/").split("/")[-1]
             if request.url.path.strip("/").startswith(f"{server_key}/"):
                 # copy original request for queuing
-                self.base.aiolock.acquire()
+                await self.base.aiolock.acquire()
                 original_req = copy(request)
                 await set_body(request, await request.body())
                 body_bytes = await get_body(request)
