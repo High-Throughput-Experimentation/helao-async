@@ -48,7 +48,7 @@ class OrchAPI(HelaoFastAPI):
         
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
-            if request.url.strip("/").split("/")[-2] == server_key:
+            if str(request.url).strip("/").split("/")[-2] == server_key:
                 await set_body(request, await request.body())
 
                 # do stuff
