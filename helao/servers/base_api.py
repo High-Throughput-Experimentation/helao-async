@@ -1,9 +1,17 @@
+import json
+from copy import copy
+from socket import gethostname
 from helao.servers.base import Base
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.premodels import Action
+from helao.helpers.active_params import ActiveParams
+from helaocore.models.machine import MachineModel
 from fastapi import Body, WebSocket, WebSocketDisconnect, Request
 from helaocore.models.hlostatus import HloStatus
+from helaocore.models.action_start_condition import ActionStartCondition as ASC
 from starlette.types import Message
+from starlette.responses import JSONResponse
+
 
 class BaseAPI(HelaoFastAPI):
     def __init__(
@@ -28,18 +36,70 @@ class BaseAPI(HelaoFastAPI):
         async def set_body(request: Request, body: bytes):
             async def receive() -> Message:
                 return {"type": "http.request", "body": body}
+
             request._receive = receive
-        
+
         async def get_body(request: Request) -> bytes:
             body = await request.body()
             await set_body(request, body)
             return body
-        
+
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
-            await set_body(request, await request.body())
-            print(await get_body(request))
-            response = await call_next(request)
+            endpoint_name = request.url.path.strip("/").split("/")[-1]
+            if request.url.path.strip("/").startswith(f"{server_key}/"):
+                # copy original request for queuing
+                self.base.aiolock.acquire()
+                original_req = copy(request)
+                await set_body(request, await request.body())
+                body_bytes = await get_body(request)
+                body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
+                action_dict = body_dict.get("action", {})
+                start_cond = action_dict.get("action_start_condition", ASC.wait_for_all)
+                if start_cond == ASC.no_wait:
+                    self.base.aiolock.release()
+                    response = await call_next(request)
+                elif start_cond == ASC.wait_for_server and all(
+                    [q.qsize() == 0 for q in self.base.endpoint_queues.values()]
+                ):
+                    self.base.aiolock.release()
+                    response = await call_next(request)
+                elif (
+                    start_cond == ASC.wait_for_endpoint
+                    and self.base.endpoint_queues[endpoint_name].qsize() == 0
+                ):
+                    self.base.aiolock.release()
+                    response = await call_next(request)
+                else:  # collision between two orch requests for one resource, queue
+                    action_dict["action_params"] = action_dict.get("action_params", {})
+                    for d in (
+                        request.query_params,
+                        request.path_params,
+                    ):
+                        for k, v in d.items():
+                            if k == "action_version":
+                                action_dict[k] = v
+                            else:
+                                action_dict["action_params"][k] = v
+
+                    action = Action(**action_dict)
+                    action.action_name = request.url.path.strip("/").split("/")[-1]
+                    action.action_server = MachineModel(
+                        server_name=server_key, machine_name=gethostname().lower()
+                    )
+                    # activate a placeholder action while queued
+                    active = await self.base.contain_action(
+                        activeparams=ActiveParams(action=action)
+                    )
+                    return_dict = active.action.as_dict()
+                    return_dict["action_status"].append("queued")
+                    response = JSONResponse(return_dict)
+                    self.base.endpoint_queues[endpoint_name].put(
+                        (action_dict.get("orch_priority", 1), (original_req, call_next))
+                    )
+                    self.base.aiolock.release()
+            else:
+                response = await call_next(request)
             return response
 
         @self.on_event("startup")
