@@ -61,9 +61,9 @@ class OrchAPI(HelaoFastAPI):
                 # await self.orch.aiolock.acquire()
                 original_req = copy(request)
                 response = await call_next(original_req)
-                # await set_body(request, await request.body())
-                # body_bytes = await get_body(request)
-                # body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
+                await set_body(request, await request.body())
+                body_bytes = await get_body(request)
+                body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
                 # action_dict = body_dict.get("action", {})
                 # start_cond = action_dict.get("action_start_condition", ASC.wait_for_all)
                 # if start_cond == ASC.no_wait:
