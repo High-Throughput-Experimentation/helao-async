@@ -78,8 +78,10 @@ class OrchAPI(HelaoFastAPI):
                 action.action_server = MachineModel(
                     server_name=server_key, machine_name=gethostname().lower()
                 )
-                # activate a placeholder action while queued 
-                active = await self.orch.contain_action(ActiveParams(action))
+                # activate a placeholder action while queued
+                active = await self.orch.contain_action(
+                    activeparams=ActiveParams(action=action)
+                )
                 return_dict = active.as_dict()
                 response = JSONResponse(return_dict)
             else:
