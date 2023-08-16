@@ -816,9 +816,7 @@ def ADSS_sub_CA_photo(
 
     vwait = 0
     if mlist:
-        intervals = [mlist[0][1]] + [
-            x[1] - y[1] for x, y in zip(mlist[1:], mlist[:-1])
-        ]
+        intervals = [mlist[0][1]] + [x[1] - y[1] for x, y in zip(mlist[1:], mlist[:-1])]
         print(mlist)
         print(intervals)
 
@@ -876,11 +874,13 @@ def ADSS_sub_CA_photo(
             elif mtup[0] == "electrolyte":
                 apm.add(ORCH_server, "wait", {"waittime": interval}, waitcond)
                 if apm.pars.insert_electrolyte_yn:
-                    apm.add_action_list(ADSS_sub_cellfill_prefilled(
-                        experiment=experiment,
-                        Solution_volume_ul=apm.pars.insert_electrolyte_ul,
-                        Syringe_rate_ulsec=300))
-                
+                    apm.add_action_list(
+                        ADSS_sub_cellfill_prefilled(
+                            experiment=experiment,
+                            Solution_volume_ul=apm.pars.insert_electrolyte_ul,
+                            Syringe_rate_ulsec=300,
+                        )
+                    )
 
     apm.add(NI_server, "led", {"led": "led", "on": 0})
 
@@ -1449,9 +1449,14 @@ def ADSS_sub_cellfill_prefilled(
         to_globalexp_params=[
             "_fast_samples_in"
         ],  # save new liquid_sample_no of eche cell to globals,
-        start_condition=ActionStartCondition.no_wait
+        start_condition=ActionStartCondition.no_wait,
     )
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0}, start_condition=ActionStartCondition.wait_for_orch)
+    apm.add(
+        NI_server,
+        "gasvalve",
+        {"gasvalve": "V1", "on": 0},
+        start_condition=ActionStartCondition.wait_for_orch,
+    )
     # apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
     # apm.add(
     #     SOLUTIONPUMP_server,
@@ -1476,13 +1481,33 @@ def ADSS_sub_cellfill_prefilled(
             ProcessContrib.action_params,
             ProcessContrib.samples_in,
         ],
-        start_condition=ActionStartCondition.wait_for_orch
+        start_condition=ActionStartCondition.wait_for_orch,
     )
     if apm.pars.ReturnLineWait_s != 0:
-        apm.add(NI_server, "pump", {"pump": "direction", "on": 0}, start_condition=ActionStartCondition.wait_for_previous)
-        apm.add(NI_server, "pump", {"pump": "peripump", "on": 1}, start_condition=ActionStartCondition.wait_for_previous)
-        apm.add(ORCH_server, "wait", {"waittime": apm.pars.ReturnLineWait_s}, start_condition=ActionStartCondition.wait_for_previous)
-        apm.add(NI_server, "pump", {"pump": "peripump", "on": 0}, start_condition=ActionStartCondition.wait_for_previous)
+        apm.add(
+            NI_server,
+            "pump",
+            {"pump": "direction", "on": 0},
+            start_condition=ActionStartCondition.wait_for_previous,
+        )
+        apm.add(
+            NI_server,
+            "pump",
+            {"pump": "peripump", "on": 1},
+            start_condition=ActionStartCondition.wait_for_previous,
+        )
+        apm.add(
+            ORCH_server,
+            "wait",
+            {"waittime": apm.pars.ReturnLineWait_s},
+            start_condition=ActionStartCondition.wait_for_previous,
+        )
+        apm.add(
+            NI_server,
+            "pump",
+            {"pump": "peripump", "on": 0},
+            start_condition=ActionStartCondition.wait_for_previous,
+        )
 
     #    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
 
