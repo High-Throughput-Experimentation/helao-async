@@ -58,7 +58,7 @@ class OrchAPI(HelaoFastAPI):
             endpoint_name = request.url.path.strip("/").split("/")[-1]
             if request.url.path.strip("/").startswith(f"{server_key}/"):
                 # copy original request for queuing
-                await self.orch.aiolock.acquire()
+                # await self.orch.aiolock.acquire()
                 original_req = copy(request)
                 await set_body(request, await request.body())
                 body_bytes = await get_body(request)
@@ -66,18 +66,18 @@ class OrchAPI(HelaoFastAPI):
                 action_dict = body_dict.get("action", {})
                 start_cond = action_dict.get("action_start_condition", ASC.wait_for_all)
                 if start_cond == ASC.no_wait:
-                    self.orch.aiolock.release()
+                    # self.orch.aiolock.release()
                     response = await call_next(request)
                 elif start_cond == ASC.wait_for_server and all(
                     [q.qsize() == 0 for q in self.orch.endpoint_queues.values()]
                 ):
-                    self.orch.aiolock.release()
+                    # self.orch.aiolock.release()
                     response = await call_next(request)
                 elif (
                     start_cond == ASC.wait_for_endpoint
                     and self.orch.endpoint_queues[endpoint_name].qsize() == 0
                 ):
-                    self.orch.aiolock.release()
+                    # self.orch.aiolock.release()
                     response = await call_next(request)
                 else:  # collision between two orch requests for one resource, queue
                     action_dict["action_params"] = action_dict.get("action_params", {})
@@ -106,7 +106,7 @@ class OrchAPI(HelaoFastAPI):
                     self.orch.endpoint_queues[endpoint_name].put(
                         (action_dict.get("orch_priority", 1), (original_req, call_next))
                     )
-                    self.orch.aiolock.release()
+                    # self.orch.aiolock.release()
             else:
                 response = await call_next(request)
             return response
