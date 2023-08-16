@@ -82,7 +82,7 @@ class OrchAPI(HelaoFastAPI):
                 active = await self.orch.contain_action(
                     activeparams=ActiveParams(action=action)
                 )
-                return_dict = active.as_dict()
+                return_dict = active.action.as_dict()
                 response = JSONResponse(return_dict)
             else:
                 response = await call_next(request)
