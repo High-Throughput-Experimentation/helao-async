@@ -59,13 +59,13 @@ class OrchAPI(HelaoFastAPI):
             if request.url.path.strip("/").startswith(f"{server_key}/"):
                 # copy original request for queuing
                 # await self.orch.aiolock.acquire()
-                original_req = copy(request)
-                body = await request.json()
+                copied_request = copy(request)
+                body = await copied_request.json()
                 print(body)
                 # await set_body(request, await request.body())
                 # body_bytes = await get_body(request)
                 # body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
-                response = await call_next(original_req)
+                response = await call_next(request)
                 # action_dict = body_dict.get("action", {})
                 # start_cond = action_dict.get("action_start_condition", ASC.wait_for_all)
                 # if start_cond == ASC.no_wait:
