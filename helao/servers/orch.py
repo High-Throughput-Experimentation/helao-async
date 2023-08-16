@@ -829,6 +829,14 @@ class Orch(Base):
                         self.current_stop_message = "Step-thru actions is enabled, use 'Start Orch' to dispatch next action."
                         await self.stop()
                         await self.update_operator(True)
+                    if not self.action_dq and self.experiment_dq and self.step_thru_experiments:
+                        self.current_stop_message = "Step-thru experiments is enabled, use 'Start Orch' to dispatch next experiment."
+                        await self.stop()
+                        await self.update_operator(True)
+                    if not self.action_dq and not self.experiment_dq and self.sequence_dq and self.step_thru_sequences:
+                        self.current_stop_message = "Step-thru sequences is enabled, use 'Start Orch' to dispatch next sequence."
+                        await self.stop()
+                        await self.update_operator(True)
                 elif self.experiment_dq:
                     self.print_message(
                         "!!!waiting for all actions to finish before dispatching next experiment",
@@ -837,10 +845,6 @@ class Orch(Base):
                     await self.orch_wait_for_all_actions()
                     self.print_message("!!!dispatching next experiment", info=True)
                     error_code = await self.loop_task_dispatch_experiment()
-                    if self.experiment_dq and self.step_thru_experiments:
-                        self.current_stop_message = "Step-thru experiments is enabled, use 'Start Orch' to dispatch next experiment."
-                        await self.stop()
-                        await self.update_operator(True)
                 # if no acts and no exps, disptach next sequence
                 elif self.sequence_dq:
                     self.print_message(
@@ -850,10 +854,6 @@ class Orch(Base):
                     await self.orch_wait_for_all_actions()
                     self.print_message("!!!dispatching next sequence", info=True)
                     error_code = await self.loop_task_dispatch_sequence()
-                    if self.sequence_dq and self.step_thru_sequences:
-                        self.current_stop_message = "Step-thru sequences is enabled, use 'Start Orch' to dispatch next sequence."
-                        await self.stop()
-                        await self.update_operator(True)
 
                 if error_code is not ErrorCodes.none:
                     self.print_message(
