@@ -1,3 +1,4 @@
+import json
 import time
 import os
 import pickle
@@ -14,6 +15,7 @@ from helao.helpers.executor import Executor
 from helaocore.error import ErrorCodes
 from helaocore.models.hlostatus import HloStatus
 from starlette.types import Message
+from starlette.responses import JSONResponse
 
 class OrchAPI(HelaoFastAPI):
     def __init__(
@@ -46,11 +48,17 @@ class OrchAPI(HelaoFastAPI):
         
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
-            print(request.url)
-            print(request.base_url)
-            await set_body(request, await request.body())
-            print(await get_body(request))
-            response = await call_next(request)
+            if request.url.strip("/").split("/")[-2] == server_key:
+                await set_body(request, await request.body())
+
+                # do stuff
+                body_bytes = await get_body(request)
+                body_dict = json.loads(body_bytes.decode('utf8').replace("'", '"'))
+                print(body_dict)
+                response = JSONResponse(body_dict)
+
+            else:
+                response = await call_next(request)
             return response
 
         @self.on_event("startup")
