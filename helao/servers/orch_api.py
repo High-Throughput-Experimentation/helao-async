@@ -3,12 +3,16 @@ import time
 import os
 import pickle
 import asyncio
+import sys
+from socket import gethostname
 
 from fastapi import Body, WebSocket, Request
 from helao.helpers.server_api import HelaoFastAPI
+from helaocore.version import get_filehash
 from helao.servers.orch import Orch
 from helaocore.models.server import ActionServerModel
 from helaocore.models.action import ActionModel
+from helaocore.models.machine import MachineModel
 from helaocore.models.orchstatus import OrchStatus
 from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.helpers.executor import Executor
@@ -60,10 +64,41 @@ class OrchAPI(HelaoFastAPI):
                 body_dict["action"]["action_params"] = body_dict["action"].get(
                     "action_params", {}
                 )
-                body_dict["action"]["action_params"].update(request.query_params)
-                body_dict["action"]["action_params"].update(request.path_params)
+                for d in (
+                    request.query_params,
+                    request.path_params,
+                ):
+                    for k, v in d.items():
+                        if k == "action_version":
+                            body_dict["action"][k] = v
+                        else:
+                            body_dict["action"]["action_params"][k] = v
 
-                print(body_dict)
+                action = Action(**body_dict["action"])
+                action.action_name = request.url.path.strip("/").split("/")[-1]
+                action.action_server = MachineModel(
+                    server_name=server_key, machine_name=gethostname().lower()
+                )
+                if action.action_abbr is None:
+                    action.action_abbr = action.action_name
+
+                # setting some default values if action was not submitted via orch
+                if action.run_type is None:
+                    action.run_type = self.orch.run_type
+                    action.orchestrator = MachineModel(
+                        server_name="MANUAL", machine_name=gethostname().lower()
+                    )
+                    
+                self.orch.print_message(
+                    f"this code's filename was: {sys._getframe(0).f_code.co_filename}"
+                )
+                self.orch.print_message(
+                    f"caller's filename was: {sys._getframe(1).f_code.co_filename}"
+                )
+                self.orch.print_message(
+                    f"callercaller's filename was: {sys._getframe(2).f_code.co_filename}"
+                )
+                action.action_codehash = get_filehash(sys._getframe(2).f_code.co_filename)
                 response = JSONResponse(body_dict)
 
             else:
