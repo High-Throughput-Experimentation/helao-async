@@ -15,6 +15,7 @@ import traceback
 import time
 from functools import partial
 from collections import defaultdict
+from queue import PriorityQueue
 
 import aiohttp
 import colorama
@@ -144,6 +145,11 @@ class Orch(Base):
             self.start_operator()
         self.status_subscriber = asyncio.create_task(self.subscribe_all())
         self.globstat_broadcaster = asyncio.create_task(self.globstat_broadcast_task())
+
+    def endpoint_queues_init(self):
+        for urld in self.fast_urls:
+            if urld.get("path", "").startswith(f"/{self.server.server_name}/"):
+                self.endpoint_queues[urld["name"]] = PriorityQueue()
 
     def register_action_uuid(self, action_uuid):
         while len(self.last_50_action_uuids) >= 50:

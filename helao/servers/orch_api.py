@@ -124,6 +124,7 @@ class OrchAPI(HelaoFastAPI):
             self.orch.myinit()
             if driver_class:
                 self.driver = driver_class(self.orch)
+            self.orch.endpoint_queues_init()
 
         # --- BASE endpoints ---
         @self.websocket("/ws_status")

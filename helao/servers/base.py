@@ -183,6 +183,8 @@ class Base:
 
     def dyn_endpoints_init(self):
         asyncio.gather(self.init_endpoint_status(self.dyn_endpoints))
+
+    def endpoint_queues_init(self):
         for urld in self.fast_urls:
             if urld.get("path", "").startswith(f"/{self.server.server_name}/"):
                 self.endpoint_queues[urld["name"]] = PriorityQueue()
