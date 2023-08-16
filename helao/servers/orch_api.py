@@ -14,6 +14,7 @@ from helaocore.models.machine import MachineModel
 from helaocore.models.orchstatus import OrchStatus
 from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.helpers.executor import Executor
+from helao.helpers.active_params import ActiveParams
 from helaocore.error import ErrorCodes
 from helaocore.models.hlostatus import HloStatus
 from starlette.types import Message
@@ -78,7 +79,7 @@ class OrchAPI(HelaoFastAPI):
                     server_name=server_key, machine_name=gethostname().lower()
                 )
                 # activate a placeholder action while queued 
-                active = await self.orch.setup_and_contain_action(action)
+                active = await self.orch.contain_action(ActiveParams(action))
                 return_dict = active.as_dict()
                 response = JSONResponse(return_dict)
             else:
