@@ -14,7 +14,7 @@ import hashlib
 from copy import deepcopy, copy
 import inspect
 import traceback
-from queue import PriorityQueue
+from queue import Queue
 
 import aiofiles
 import colorama
@@ -187,7 +187,7 @@ class Base:
     def endpoint_queues_init(self):
         for urld in self.fast_urls:
             if urld.get("path", "").startswith(f"/{self.server.server_name}/"):
-                self.endpoint_queues[urld["name"]] = PriorityQueue()
+                self.endpoint_queues[urld["name"]] = Queue()
 
     def print_message(self, *args, **kwargs):
         print_message(

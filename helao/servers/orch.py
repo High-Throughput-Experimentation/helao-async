@@ -15,7 +15,7 @@ import traceback
 import time
 from functools import partial
 from collections import defaultdict
-from queue import PriorityQueue
+from queue import Queue
 
 import aiohttp
 import colorama
@@ -149,7 +149,7 @@ class Orch(Base):
     def endpoint_queues_init(self):
         for urld in self.fast_urls:
             if urld.get("path", "").startswith(f"/{self.server.server_name}/"):
-                self.endpoint_queues[urld["name"]] = PriorityQueue()
+                self.endpoint_queues[urld["name"]] = Queue()
 
     def register_action_uuid(self, action_uuid):
         while len(self.last_50_action_uuids) >= 50:

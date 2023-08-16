@@ -103,9 +103,8 @@ class OrchAPI(HelaoFastAPI):
                     return_dict = active.action.as_dict()
                     return_dict["action_status"].append("queued")
                     response = JSONResponse(return_dict)
-                    self.orch.endpoint_queues[endpoint_name].put(
-                        (action_dict.get("orch_priority", 1), (original_req, call_next,))
-                    )
+                    self.orch.endpoint_queues[endpoint_name].put((original_req, call_next,))
+                    
                     # self.orch.aiolock.release()
             else:
                 response = await call_next(request)
