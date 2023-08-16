@@ -872,7 +872,12 @@ def ADSS_sub_CA_photo(
                     ActionStartCondition.wait_for_orch,
                 )
             elif mtup[0] == "electrolyte":
-               pass 
+               if apm.pars.insert_electrolyte_yn:
+                    apm.add_action_list(ADSS_sub_cellfill_prefilled(
+                        experiment=experiment,
+                        Solution_volume_ul=apm.pars.insert_electrolyte_ul,
+                        Syringe_rate_ulsec=300))
+                
 
     apm.add(NI_server, "led", {"led": "led", "on": 0})
 
