@@ -60,7 +60,7 @@ class OrchAPI(HelaoFastAPI):
                 # copy original request for queuing
                 original_req = copy(request)
                 # await self.orch.aiolock.acquire()
-                await set_body(request, await request.body())
+                # await set_body(request, await request.body())
                 body_bytes = await get_body(request)
                 body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
                 action_dict = body_dict.get("action", {})
