@@ -3,12 +3,10 @@ import time
 import os
 import pickle
 import asyncio
-import sys
 from socket import gethostname
 
 from fastapi import Body, WebSocket, Request
 from helao.helpers.server_api import HelaoFastAPI
-from helaocore.version import get_filehash
 from helao.servers.orch import Orch
 from helaocore.models.server import ActionServerModel
 from helaocore.models.action import ActionModel
@@ -79,28 +77,10 @@ class OrchAPI(HelaoFastAPI):
                 action.action_server = MachineModel(
                     server_name=server_key, machine_name=gethostname().lower()
                 )
-                if action.action_abbr is None:
-                    action.action_abbr = action.action_name
-
-                # setting some default values if action was not submitted via orch
-                if action.run_type is None:
-                    action.run_type = self.orch.run_type
-                    action.orchestrator = MachineModel(
-                        server_name="MANUAL", machine_name=gethostname().lower()
-                    )
-                    
-                self.orch.print_message(
-                    f"this code's filename was: {sys._getframe(0).f_code.co_filename}"
-                )
-                self.orch.print_message(
-                    f"caller's filename was: {sys._getframe(1).f_code.co_filename}"
-                )
-                self.orch.print_message(
-                    f"callercaller's filename was: {sys._getframe(2).f_code.co_filename}"
-                )
-                action.action_codehash = get_filehash(sys._getframe(2).f_code.co_filename)
-                response = JSONResponse(body_dict)
-
+                # activate a placeholder action while queued 
+                active = self.orch.setup_and_contain_action(action)
+                return_dict = active.as_dict()
+                response = JSONResponse(return_dict)
             else:
                 response = await call_next(request)
             return response
