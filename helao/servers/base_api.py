@@ -94,7 +94,6 @@ class BaseAPI(HelaoFastAPI):
             if driver_class is not None:
                 self.driver = driver_class(self.base)
             self.base.dyn_endpoints_init()
-            self.base.endpoint_queues_init()
 
         @self.websocket("/ws_status")
         async def websocket_status(websocket: WebSocket):

@@ -212,11 +212,11 @@ class Base:
                 self.actionservermodel.endpoints.update(
                     {route.name: EndpointModel(endpoint_name=route.name)}
                 )
-
         self.print_message(
             f"Found {len(self.actionservermodel.endpoints.keys())} endpoints "
             f"for status monitoring on {self.server.server_name}."
         )
+        self.endpoint_queues_init()
 
     def get_endpoint_urls(self):
         """Return a list of all endpoints on this server."""
