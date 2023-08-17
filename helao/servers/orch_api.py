@@ -57,7 +57,8 @@ class OrchAPI(HelaoFastAPI):
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
-            print("call_next", call_next.__name__)
+            func = [d for d in self.orch.fast_urls if d["path"]==request.url.path][0]["name"]
+            print(func)
             if request.url.path.strip("/").startswith(f"{server_key}/"):
                 await self.orch.aiolock.acquire()
                 await set_body(request, await request.body())
@@ -102,8 +103,8 @@ class OrchAPI(HelaoFastAPI):
                     )
                     self.orch.endpoint_queues[endpoint].put(
                         (
-                            request,
-                            call_next,
+                            action,
+                            vars(self)[func],
                         )
                     )
             else:
