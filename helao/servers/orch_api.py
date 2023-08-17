@@ -57,6 +57,8 @@ class OrchAPI(HelaoFastAPI):
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
+            print("query_params", request.query_params)
+            print("path_params", request.path_params)
             if request.url.path.strip("/").startswith(f"{server_key}/"):
                 # await set_body(request, await request.body())
                 body_dict = await request.json()
