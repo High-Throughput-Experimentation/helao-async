@@ -64,8 +64,8 @@ class OrchAPI(HelaoFastAPI):
                 action_dict = body_dict.get("action", {})
                 start_cond = action_dict.get("start_condition", ASC.wait_for_all)
                 if (
-                    not self.orch.actionservermodel.endpoints[endpoint].active_dict
-                    and start_cond == ASC.no_wait
+                    len(self.orch.actionservermodel.endpoints[endpoint].active_dict)==0
+                    or start_cond == ASC.no_wait
                 ):
                     self.orch.aiolock.release()
                     response = await call_next(request)
