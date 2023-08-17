@@ -9,6 +9,7 @@ from socket import gethostname
 from fastapi import Body, WebSocket, Request
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.gen_uuid import gen_uuid
+from helao.helpers.eval import eval_val
 from helao.servers.orch import Orch
 from helaocore.models.server import ActionServerModel
 from helaocore.models.action import ActionModel
@@ -79,7 +80,7 @@ class OrchAPI(HelaoFastAPI):
                         request.path_params,
                     ):
                         for k, v in d.items():
-                            extra_params[k] = v
+                            extra_params[k] = eval_val(v)
                     print(extra_params)
                     action = Action(**action_dict)
                     action.action_name = request.url.path.strip("/").split("/")[-1]
@@ -88,17 +89,11 @@ class OrchAPI(HelaoFastAPI):
                     )
                     # send active status but don't create active object
                     await self.orch.status_q.put(action.get_actmodel())
-                    # activate a placeholder action while queued
-                    # active = await self.orch.contain_action(
-                    #     activeparams=ActiveParams(action=action)
-                    # )
-                    # return_dict = active.action.as_dict()
-                    # return_dict["action_status"].append("queued")
                     response = JSONResponse(action.as_dict())
                     self.orch.print_message(
                         f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
                     )
-                    self.orch.endpoint_queues[endpoint].put(action, extra_params)
+                    self.orch.endpoint_queues[endpoint].put((action, extra_params,))
             else:
                 response = await call_next(request)
             return response

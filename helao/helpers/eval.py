@@ -20,6 +20,12 @@ def eval_val(x):
                 nv = float(x)
             else:
                 nv = int(x)
+        elif x == "NaN":
+            nv = float(x)
+        elif x.lower() == "true":
+            nv = True
+        elif x.lower() == "false":
+            nv = False
         else:
             nv = x
     else:
