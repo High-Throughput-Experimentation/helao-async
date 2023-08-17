@@ -221,11 +221,12 @@ class Base:
     def get_endpoint_urls(self):
         """Return a list of all endpoints on this server."""
         url_list = []
-        print(self.fastapp.routes)
         for route in self.fastapp.routes:
             routeD = {"path": route.path, "name": route.name}
+            print(routeD)
             if "dependant" in dir(route):
                 flatParams = get_flat_params(route.dependant)
+                print(flatParams)
                 paramD = {
                     par.name: {
                         "outer_type": str(par.outer_type_).split("'")[1]
