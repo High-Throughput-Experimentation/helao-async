@@ -87,13 +87,15 @@ class OrchAPI(HelaoFastAPI):
                     action.action_server = MachineModel(
                         server_name=server_key, machine_name=gethostname().lower()
                     )
+                    # send active status but don't create active object
+                    await self.orch.status_q.put(action.get_actmodel())
                     # activate a placeholder action while queued
-                    active = await self.orch.contain_action(
-                        activeparams=ActiveParams(action=action)
-                    )
-                    return_dict = active.action.as_dict()
-                    return_dict["action_status"].append("queued")
-                    response = JSONResponse(return_dict)
+                    # active = await self.orch.contain_action(
+                    #     activeparams=ActiveParams(action=action)
+                    # )
+                    # return_dict = active.action.as_dict()
+                    # return_dict["action_status"].append("queued")
+                    response = JSONResponse(action.as_dict())
                     self.orch.print_message(
                         f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
                     )
