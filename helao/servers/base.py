@@ -1734,7 +1734,7 @@ class Active:
             # since all sub-actions of active are finished process endpoint queue
             if self.base.endpoint_queues[action.action_name].qsize() > 0:
                 self.base.print_message(f"{action.action_name} was previously queued, running")
-                req, caller = self.base.endpoint_queues.get()
+                req, caller = self.base.endpoint_queues[action.action_name].get()
                 await caller(req)
 
         # always returns the most recent action of active
