@@ -100,7 +100,7 @@ class OrchAPI(HelaoFastAPI):
                     )
                     self.orch.endpoint_queues[endpoint].put(
                         (
-                            orig_request,
+                            orig_req,
                             call_next,
                         )
                     )
