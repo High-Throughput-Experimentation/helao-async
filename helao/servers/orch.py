@@ -825,15 +825,14 @@ class Orch(Base):
                 elif self.action_dq:
                     self.print_message("!!!dispatching next action", info=True)
                     error_code = await self.loop_task_dispatch_action()
-                    while (
+                    if (
                         self.last_dispatched_action_uuid
                         not in self.last_50_action_uuids
                     ):
-                        await asyncio.sleep(0.001)
+                        await asyncio.sleep(0.2)
                     if self.action_dq and self.step_thru_actions:
                         self.current_stop_message = "Step-thru actions is enabled, use 'Start Orch' to dispatch next action."
                         await self.stop()
-                        await self.update_operator(True)
                     if (
                         not self.action_dq
                         and self.experiment_dq
@@ -841,7 +840,6 @@ class Orch(Base):
                     ):
                         self.current_stop_message = "Step-thru experiments is enabled, use 'Start Orch' to dispatch next experiment."
                         await self.stop()
-                        await self.update_operator(True)
                     if (
                         not self.action_dq
                         and not self.experiment_dq
@@ -850,7 +848,6 @@ class Orch(Base):
                     ):
                         self.current_stop_message = "Step-thru sequences is enabled, use 'Start Orch' to dispatch next sequence."
                         await self.stop()
-                        await self.update_operator(True)
                 elif self.experiment_dq:
                     self.print_message(
                         "!!!waiting for all actions to finish before dispatching next experiment",
