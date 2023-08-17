@@ -862,7 +862,7 @@ def ADSS_sub_CA_photo(
                         ProcessContrib.run_use,
                     ],
                 )
-                vwait = 65
+                vwait = 61 #orig 65
                 washmod += 1
                 apm.add(ORCH_server, "wait", {"waittime": vwait}, waitcond)
                 apm.add(
