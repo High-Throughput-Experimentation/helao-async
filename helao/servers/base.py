@@ -238,7 +238,7 @@ class Base:
                         else str(par.type_),
                         "required": par.required,
                         "shape": par.shape,
-                        "default": par.default,
+                        "default": par.default if par.default is not ... else None,
                     }
                     for par in flatParams
                 }
