@@ -104,7 +104,7 @@ class OrchAPI(HelaoFastAPI):
                     self.orch.endpoint_queues[endpoint].put(
                         (
                             action,
-                            eval(func),
+                            wait,
                         )
                     )
             else:
