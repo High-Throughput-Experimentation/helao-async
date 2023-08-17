@@ -1732,7 +1732,7 @@ class Active:
                 self.base.aloop.create_task(move_dir(action, base=self.base))
 
             # since all sub-actions of active are finished process endpoint queue
-            if self.base.endpoint_queues[action.action_name]:
+            if self.base.endpoint_queues[action.action_name].qsize() > 0:
                 self.base.print_message(f"{action.action_name} was previously queued, running")
                 req, caller = self.base.endpoint_queues.get()
                 await caller(req)

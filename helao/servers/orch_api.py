@@ -55,43 +55,44 @@ class OrchAPI(HelaoFastAPI):
 
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
-            endpoint_name = request.url.path.strip("/").split("/")[-1]
-            if request.url.path.strip("/").startswith(f"{server_key}/"):
-                await set_body(request, await request.body())
-                body_bytes = await get_body(request)
-                body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
-                action_dict = body_dict.get("action", {})
-                if self.orch.endpoint_queues[endpoint_name].qsize() == 0:
-                    response = await call_next(request)
-                else:  # collision between two orch requests for one resource, queue
-                    action_dict["action_params"] = action_dict.get("action_params", {})
-                    for d in (
-                        request.query_params,
-                        request.path_params,
-                    ):
-                        for k, v in d.items():
-                            if k == "action_version":
-                                action_dict[k] = v
-                            else:
-                                action_dict["action_params"][k] = v
+            async with self.orch.aiolock:
+                endpoint_name = request.url.path.strip("/").split("/")[-1]
+                if request.url.path.strip("/").startswith(f"{server_key}/"):
+                    await set_body(request, await request.body())
+                    body_bytes = await get_body(request)
+                    body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
+                    action_dict = body_dict.get("action", {})
+                    if self.orch.endpoint_queues[endpoint_name].qsize() == 0:
+                        response = await call_next(request)
+                    else:  # collision between two orch requests for one resource, queue
+                        action_dict["action_params"] = action_dict.get("action_params", {})
+                        for d in (
+                            request.query_params,
+                            request.path_params,
+                        ):
+                            for k, v in d.items():
+                                if k == "action_version":
+                                    action_dict[k] = v
+                                else:
+                                    action_dict["action_params"][k] = v
 
-                    action = Action(**action_dict)
-                    action.action_name = request.url.path.strip("/").split("/")[-1]
-                    action.action_server = MachineModel(
-                        server_name=server_key, machine_name=gethostname().lower()
-                    )
-                    # activate a placeholder action while queued
-                    active = await self.orch.contain_action(
-                        activeparams=ActiveParams(action=action)
-                    )
-                    return_dict = active.action.as_dict()
-                    return_dict["action_status"].append("queued")
-                    response = JSONResponse(return_dict)
-                    self.orch.print_message(f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}")
-                    self.orch.endpoint_queues[endpoint_name].put((request, call_next,))
-            else:
-                response = await call_next(request)
-            return response
+                        action = Action(**action_dict)
+                        action.action_name = request.url.path.strip("/").split("/")[-1]
+                        action.action_server = MachineModel(
+                            server_name=server_key, machine_name=gethostname().lower()
+                        )
+                        # activate a placeholder action while queued
+                        active = await self.orch.contain_action(
+                            activeparams=ActiveParams(action=action)
+                        )
+                        return_dict = active.action.as_dict()
+                        return_dict["action_status"].append("queued")
+                        response = JSONResponse(return_dict)
+                        self.orch.print_message(f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}")
+                        self.orch.endpoint_queues[endpoint_name].put((request, call_next,))
+                else:
+                    response = await call_next(request)
+                return response
 
         @self.on_event("startup")
         async def startup_event():
