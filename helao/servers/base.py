@@ -187,8 +187,9 @@ class Base:
 
     def endpoint_queues_init(self):
         for urld in self.fast_urls:
-            if urld.get("path", "").startswith(f"/{self.server.server_name}/"):
-                self.endpoint_queues[urld["name"]] = Queue()
+            if urld.get("path", "").strip("/").startswith(self.server.server_name):
+                endpoint_name = urld["path"].strip("/").split("/")[-1]
+                self.endpoint_queues[endpoint_name] = Queue()
 
     def print_message(self, *args, **kwargs):
         print_message(
