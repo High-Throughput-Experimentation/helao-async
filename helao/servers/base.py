@@ -1662,6 +1662,10 @@ class Active:
             # write final act meta file (overwrite existing one)
             await self.base.write_act(action=finish_action)
 
+            # send the last status
+            await self.add_status(action=finish_action)
+        
+
         # check if all actions are fininshed
         # if yes close datalogger etc
         all_finished = True
@@ -1732,10 +1736,6 @@ class Active:
                 req, caller = self.base.endpoint_queues.get()
                 await caller(req)
 
-        for finish_action in finish_action_list:
-            # send the last status
-            await self.add_status(action=finish_action)
-        
         # always returns the most recent action of active
         return self.action
 
