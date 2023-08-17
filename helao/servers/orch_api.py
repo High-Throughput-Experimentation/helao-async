@@ -18,7 +18,6 @@ from helaocore.models.orchstatus import OrchStatus
 from helaocore.models.action_start_condition import ActionStartCondition as ASC
 from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.helpers.executor import Executor
-from helao.helpers.active_params import ActiveParams
 from helaocore.error import ErrorCodes
 from helaocore.models.hlostatus import HloStatus
 from starlette.types import Message
@@ -81,7 +80,6 @@ class OrchAPI(HelaoFastAPI):
                     ):
                         for k, v in d.items():
                             extra_params[k] = eval_val(v)
-                    print(extra_params)
                     action = Action(**action_dict)
                     action.action_name = request.url.path.strip("/").split("/")[-1]
                     action.action_server = MachineModel(

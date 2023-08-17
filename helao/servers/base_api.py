@@ -1,10 +1,11 @@
 import json
 from copy import copy
 from socket import gethostname
+from helao.helpers.gen_uuid import gen_uuid
+from helao.helpers.eval import eval_val
 from helao.servers.base import Base
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.premodels import Action
-from helao.helpers.active_params import ActiveParams
 from helaocore.models.machine import MachineModel
 from fastapi import Body, WebSocket, WebSocketDisconnect, Request
 from helaocore.models.hlostatus import HloStatus
@@ -49,6 +50,7 @@ class BaseAPI(HelaoFastAPI):
             endpoint = request.url.path.strip("/").split("/")[-1]
             if request.url.path.strip("/").startswith(f"{server_key}/"):
                 await set_body(request, await request.body())
+                # body_dict = await request.json()
                 body_bytes = await get_body(request)
                 body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
                 action_dict = body_dict.get("action", {})
@@ -62,32 +64,25 @@ class BaseAPI(HelaoFastAPI):
                     response = await call_next(request)
                 else:  # collision between two base requests for one resource, queue
                     action_dict["action_params"] = action_dict.get("action_params", {})
+                    extra_params = {}
                     for d in (
                         request.query_params,
                         request.path_params,
                     ):
                         for k, v in d.items():
-                            if k == "action_version":
-                                action_dict[k] = v
-                            else:
-                                action_dict["action_params"][k] = v
-
+                            extra_params[k] = eval_val(v)
                     action = Action(**action_dict)
                     action.action_name = request.url.path.strip("/").split("/")[-1]
                     action.action_server = MachineModel(
                         server_name=server_key, machine_name=gethostname().lower()
                     )
-                    # activate a placeholder action while queued
-                    active = await self.base.contain_action(
-                        activeparams=ActiveParams(action=action)
-                    )
-                    return_dict = active.action.as_dict()
-                    return_dict["action_status"].append("queued")
-                    response = JSONResponse(return_dict)
+                    # send active status but don't create active object
+                    await self.base.status_q.put(action.get_actmodel())
+                    response = JSONResponse(action.as_dict())
                     self.base.print_message(
                         f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
                     )
-                    self.base.endpoint_queues[endpoint].put(action)
+                    self.base.endpoint_queues[endpoint].put((action, extra_params,))
             else:
                 response = await call_next(request)
             return response
