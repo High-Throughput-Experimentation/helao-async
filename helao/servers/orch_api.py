@@ -8,6 +8,7 @@ from socket import gethostname
 
 from fastapi import Body, WebSocket, Request
 from helao.helpers.server_api import HelaoFastAPI
+from helao.helpers.gen_uuid import gen_uuid
 from helao.servers.orch import Orch
 from helaocore.models.server import ActionServerModel
 from helaocore.models.action import ActionModel
@@ -55,7 +56,6 @@ class OrchAPI(HelaoFastAPI):
 
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
-            orig_req = copy(request)
             endpoint = request.url.path.strip("/").split("/")[-1]
             if request.url.path.strip("/").startswith(f"{server_key}/"):
                 await self.orch.aiolock.acquire()
@@ -64,6 +64,7 @@ class OrchAPI(HelaoFastAPI):
                 body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
                 action_dict = body_dict.get("action", {})
                 start_cond = action_dict.get("start_condition", ASC.wait_for_all)
+                action_dict["action_uuid"] = action_dict.get("action_uuid", gen_uuid())
                 if (
                     len(self.orch.actionservermodel.endpoints[endpoint].active_dict)==0
                     or start_cond == ASC.no_wait
@@ -100,7 +101,7 @@ class OrchAPI(HelaoFastAPI):
                     )
                     self.orch.endpoint_queues[endpoint].put(
                         (
-                            orig_req,
+                            request,
                             call_next,
                         )
                     )
