@@ -828,7 +828,7 @@ def ADSS_sub_CA_photo(
         washmod = 0
         for mtup, interval in zip(mlist, intervals):
             if mtup[0] == "aliquot":
-                apm.add(ORCH_server, "wait", {"waittime": interval - vwait}, waitcond)
+                apm.add(ORCH_server, "wait", {"waittime": interval - vwait - 4}, waitcond)
                 apm.add(
                     NI_server,
                     "gasvalve",
@@ -862,7 +862,7 @@ def ADSS_sub_CA_photo(
                         ProcessContrib.run_use,
                     ],
                 )
-                vwait = 61 #orig 65
+                vwait = 65
                 washmod += 1
                 apm.add(ORCH_server, "wait", {"waittime": vwait}, waitcond)
                 apm.add(
@@ -881,7 +881,7 @@ def ADSS_sub_CA_photo(
                             Syringe_rate_ulsec=300,
                         )
                     )
-                    apm.add(ORCH_server, "wait", {"waittime": vwait - 4}, waitcond)
+                    apm.add(ORCH_server, "wait", {"waittime": vwait - 2}, waitcond)
                     apm.add(ORCH_server, "wait", {"waittime": 0.1},ActionStartCondition.wait_for_orch)
 
 
