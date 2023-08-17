@@ -221,6 +221,7 @@ class Base:
     def get_endpoint_urls(self):
         """Return a list of all endpoints on this server."""
         url_list = []
+        print(self.fastapp.routes)
         for route in self.fastapp.routes:
             routeD = {"path": route.path, "name": route.name}
             if "dependant" in dir(route):
