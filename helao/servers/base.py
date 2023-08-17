@@ -1742,10 +1742,10 @@ class Active:
             # since all sub-actions of active are finished process endpoint queue
             if self.base.endpoint_queues[action.action_name].qsize() > 0:
                 self.base.print_message(f"{action.action_name} was previously queued")
-                qact = self.base.endpoint_queues[action.action_name].get()
+                qact, qpars = self.base.endpoint_queues[action.action_name].get()
                 self.base.print_message(f"running queued {action.action_name}")
                 qact.start_condition = ASC.no_wait
-                await async_action_dispatcher(self.base.world_cfg, qact)
+                await async_action_dispatcher(self.base.world_cfg, qact, qpars)
 
         # always returns the most recent action of active
         return self.action

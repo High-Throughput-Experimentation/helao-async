@@ -57,8 +57,6 @@ class OrchAPI(HelaoFastAPI):
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
-            print("query_params", request.query_params)
-            print("path_params", request.path_params)
             if request.url.path.strip("/").startswith(f"{server_key}/"):
                 # await set_body(request, await request.body())
                 body_dict = await request.json()
@@ -76,16 +74,13 @@ class OrchAPI(HelaoFastAPI):
                     response = await call_next(request)
                 else:  # collision between two orch requests for one resource, queue
                     action_dict["action_params"] = action_dict.get("action_params", {})
+                    extra_params = {}
                     for d in (
                         request.query_params,
                         request.path_params,
                     ):
                         for k, v in d.items():
-                            if k == "action_version":
-                                action_dict[k] = v
-                            else:
-                                action_dict["action_params"][k] = v
-
+                            extra_params[k] = v
                     action = Action(**action_dict)
                     action.action_name = request.url.path.strip("/").split("/")[-1]
                     action.action_server = MachineModel(
@@ -103,7 +98,7 @@ class OrchAPI(HelaoFastAPI):
                     self.orch.print_message(
                         f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
                     )
-                    self.orch.endpoint_queues[endpoint].put(action)
+                    self.orch.endpoint_queues[endpoint].put(action, extra_params)
             else:
                 response = await call_next(request)
             return response
@@ -408,6 +403,7 @@ class OrchAPI(HelaoFastAPI):
         @self.post(f"/{server_key}/wait", tags=["action"])
         async def wait(
             action: Action = Body({}, embed=True),
+            action_version: int = 1,
             waittime: float = 10.0,
         ):
             """Sleep action"""
@@ -436,6 +432,7 @@ class OrchAPI(HelaoFastAPI):
         @self.post(f"/{server_key}/interrupt", tags=["action"])
         async def interrupt(
             action: Action = Body({}, embed=True),
+            action_version: int = 1,
             reason: str = "wait",
         ):
             """Stop dispatch loop for planned manual intervention."""
@@ -449,6 +446,7 @@ class OrchAPI(HelaoFastAPI):
         @self.post(f"/{server_key}/estop", tags=["action"])
         async def act_estop(
             action: Action = Body({}, embed=True),
+            action_version: int = 1,
             switch: bool = True,
         ):
             active = await self.orch.setup_and_contain_action(

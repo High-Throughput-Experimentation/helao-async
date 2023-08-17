@@ -10,7 +10,7 @@ from helaocore.error import ErrorCodes
 from helao.helpers.print_message import print_message
 
 
-async def async_action_dispatcher(world_config_dict: dict, A: Action):
+async def async_action_dispatcher(world_config_dict: dict, A: Action, params={}):
     """Request non-blocking action_dq which may run concurrently.
 
     Send action object to action server for experimenting.
@@ -29,7 +29,7 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action):
     async with aiohttp.ClientSession() as session:
         async with session.post(
             url,
-            params={},
+            params=params,
             json={"action": A.as_dict()},
         ) as resp:
             error_code = ErrorCodes.none
