@@ -367,6 +367,8 @@ class Base:
         file_conn_keys:
         header: header for data file
         """
+        if activeparams.action.action_uuid in self.actives:
+            await self.actives[activeparams.action.action_uuid].substitute()
         self.actives[activeparams.action.action_uuid] = Active(
             self, activeparams=activeparams
         )
@@ -1620,6 +1622,11 @@ class Active:
             await self.finish(finish_uuid_list=uuid_list)
 
         return new_file_conn_keys
+
+    async def substitute(self):
+        for filekey in self.file_conn_dict:
+            if self.file_conn_dict[filekey].file:
+                await self.file_conn_dict[filekey].file.close()
 
     async def finish(
         self,
