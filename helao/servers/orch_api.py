@@ -101,12 +101,7 @@ class OrchAPI(HelaoFastAPI):
                     self.orch.print_message(
                         f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
                     )
-                    self.orch.endpoint_queues[endpoint].put(
-                        (
-                            action,
-                            wait,
-                        )
-                    )
+                    self.orch.endpoint_queues[endpoint].put(action)
             else:
                 response = await call_next(request)
             return response

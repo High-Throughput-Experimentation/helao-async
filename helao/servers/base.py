@@ -27,7 +27,7 @@ from filelock import FileLock
 from fastapi import WebSocket
 from fastapi.dependencies.utils import get_flat_params
 
-from helao.helpers.dispatcher import async_private_dispatcher
+from helao.helpers.dispatcher import async_private_dispatcher, async_action_dispatcher
 from helao.helpers.executor import Executor
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
@@ -35,6 +35,7 @@ from helao.helpers.print_message import print_message
 from helao.helpers import async_copy
 from helao.helpers.yml_finisher import move_dir
 from helao.helpers.premodels import Action
+from helaocore.models.action_start_condition import ActionStartCondition as ASC
 from helao.helpers.ws_publisher import WsPublisher
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.sample import (
@@ -1734,14 +1735,10 @@ class Active:
             # since all sub-actions of active are finished process endpoint queue
             if self.base.endpoint_queues[action.action_name].qsize() > 0:
                 self.base.print_message(f"{action.action_name} was previously queued")
-                req, caller = self.base.endpoint_queues[action.action_name].get()
+                qact = self.base.endpoint_queues[action.action_name].get()
                 self.base.print_message(f"running queued {action.action_name}")
-                if inspect.iscoroutinefunction(caller):
-                    await caller(req)
-                else:
-                    caller(req)
-                print(caller)
-                print(req)
+                qact.start_cond = ASC.no_wait
+                await async_action_dispatcher(self.base.world_cfg, qact)
 
         # always returns the most recent action of active
         return self.action
