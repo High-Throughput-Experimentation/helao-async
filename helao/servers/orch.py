@@ -833,14 +833,14 @@ class Orch(Base):
                     if self.action_dq and self.step_thru_actions:
                         self.current_stop_message = "Step-thru actions is enabled, use 'Start Orch' to dispatch next action."
                         await self.stop()
-                    if (
+                    elif (
                         not self.action_dq
                         and self.experiment_dq
                         and self.step_thru_experiments
                     ):
                         self.current_stop_message = "Step-thru experiments is enabled, use 'Start Orch' to dispatch next experiment."
                         await self.stop()
-                    if (
+                    elif (
                         not self.action_dq
                         and not self.experiment_dq
                         and self.sequence_dq
