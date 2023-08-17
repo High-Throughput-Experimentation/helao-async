@@ -48,29 +48,13 @@ class BaseAPI(HelaoFastAPI):
         async def app_entry(request: Request, call_next):
             endpoint_name = request.url.path.strip("/").split("/")[-1]
             if request.url.path.strip("/").startswith(f"{server_key}/"):
-                # copy original request for queuing
-                await self.base.aiolock.acquire()
-                original_req = copy(request)
                 await set_body(request, await request.body())
                 body_bytes = await get_body(request)
                 body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
                 action_dict = body_dict.get("action", {})
-                start_cond = action_dict.get("action_start_condition", ASC.wait_for_all)
-                if start_cond == ASC.no_wait:
-                    self.base.aiolock.release()
+                if self.base.endpoint_queues[endpoint_name].qsize() == 0:
                     response = await call_next(request)
-                elif start_cond == ASC.wait_for_server and all(
-                    [q.qsize() == 0 for q in self.base.endpoint_queues.values()]
-                ):
-                    self.base.aiolock.release()
-                    response = await call_next(request)
-                elif (
-                    start_cond == ASC.wait_for_endpoint
-                    and self.base.endpoint_queues[endpoint_name].qsize() == 0
-                ):
-                    self.base.aiolock.release()
-                    response = await call_next(request)
-                else:  # collision between two orch requests for one resource, queue
+                else:  # collision between two base requests for one resource, queue
                     action_dict["action_params"] = action_dict.get("action_params", {})
                     for d in (
                         request.query_params,
@@ -94,10 +78,7 @@ class BaseAPI(HelaoFastAPI):
                     return_dict = active.action.as_dict()
                     return_dict["action_status"].append("queued")
                     response = JSONResponse(return_dict)
-                    self.base.endpoint_queues[endpoint_name].put(
-                        (action_dict.get("orch_priority", 1), (original_req, call_next))
-                    )
-                    self.base.aiolock.release()
+                    self.base.endpoint_queues[endpoint_name].put((request, call_next,))
             else:
                 response = await call_next(request)
             return response

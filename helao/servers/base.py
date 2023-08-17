@@ -1727,6 +1727,11 @@ class Active:
             for action in self.action_list:
                 self.base.aloop.create_task(move_dir(action, base=self.base))
 
+            # since all sub-actions of active are finished process endpoint queue
+            if self.base.endpoint_queues[action.action_name]:
+                req, caller = self.base.endpoint_queues.get()
+                await caller(req)
+
         for finish_action in finish_action_list:
             # send the last status
             await self.add_status(action=finish_action)
