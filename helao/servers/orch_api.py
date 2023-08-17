@@ -87,6 +87,7 @@ class OrchAPI(HelaoFastAPI):
                     return_dict = active.action.as_dict()
                     return_dict["action_status"].append("queued")
                     response = JSONResponse(return_dict)
+                    self.orch.print_message(f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}")
                     self.orch.endpoint_queues[endpoint_name].put((request, call_next,))
             else:
                 response = await call_next(request)

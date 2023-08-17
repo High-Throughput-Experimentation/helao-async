@@ -1733,6 +1733,7 @@ class Active:
 
             # since all sub-actions of active are finished process endpoint queue
             if self.base.endpoint_queues[action.action_name]:
+                self.base.print_message(f"{action.action_name} was previously queued, running")
                 req, caller = self.base.endpoint_queues.get()
                 await caller(req)
 
