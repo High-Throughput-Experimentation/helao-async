@@ -57,8 +57,6 @@ class OrchAPI(HelaoFastAPI):
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
-            func = [d for d in self.orch.fast_urls if d["path"]==request.url.path][0]["name"]
-            print(func)
             if request.url.path.strip("/").startswith(f"{server_key}/"):
                 await self.orch.aiolock.acquire()
                 await set_body(request, await request.body())
@@ -487,7 +485,8 @@ class WaitExec(Executor):
         """Read analog inputs from live buffer."""
         check_time = time.time()
         elapsed_time = check_time - self.start_time
-        if check_time - self.last_print_time > self.print_every_secs - 0.01:
+        # if check_time - self.last_print_time > self.print_every_secs - 0.01:
+        if 1:
             self.active.base.print_message(
                 f" ... orch waited {elapsed_time:.1f} sec / {self.duration:.1f} sec"
             )
