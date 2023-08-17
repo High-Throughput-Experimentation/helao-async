@@ -58,7 +58,6 @@ class OrchAPI(HelaoFastAPI):
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
             if request.url.path.strip("/").startswith(f"{server_key}/"):
-                # await self.orch.aiolock.acquire()
                 await set_body(request, await request.body())
                 body_bytes = await get_body(request)
                 body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
@@ -66,10 +65,10 @@ class OrchAPI(HelaoFastAPI):
                 start_cond = action_dict.get("start_condition", ASC.wait_for_all)
                 action_dict["action_uuid"] = action_dict.get("action_uuid", gen_uuid())
                 if (
-                    len(self.orch.actionservermodel.endpoints[endpoint].active_dict)==0
+                    len(self.orch.actionservermodel.endpoints[endpoint].active_dict)
+                    == 0
                     or start_cond == ASC.no_wait
                 ):
-                    # self.orch.aiolock.release()
                     response = await call_next(request)
                 else:  # collision between two orch requests for one resource, queue
                     action_dict["action_params"] = action_dict.get("action_params", {})
@@ -89,7 +88,6 @@ class OrchAPI(HelaoFastAPI):
                         server_name=server_key, machine_name=gethostname().lower()
                     )
                     # activate a placeholder action while queued
-                    # self.orch.aiolock.release()
                     active = await self.orch.contain_action(
                         activeparams=ActiveParams(action=action)
                     )

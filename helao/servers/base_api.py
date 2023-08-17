@@ -46,13 +46,19 @@ class BaseAPI(HelaoFastAPI):
 
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
-            endpoint_name = request.url.path.strip("/").split("/")[-1]
+            endpoint = request.url.path.strip("/").split("/")[-1]
             if request.url.path.strip("/").startswith(f"{server_key}/"):
                 await set_body(request, await request.body())
                 body_bytes = await get_body(request)
                 body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
                 action_dict = body_dict.get("action", {})
-                if self.base.endpoint_queues[endpoint_name].qsize() == 0:
+                start_cond = action_dict.get("start_condition", ASC.wait_for_all)
+                action_dict["action_uuid"] = action_dict.get("action_uuid", gen_uuid())
+                if (
+                    len(self.base.actionservermodel.endpoints[endpoint].active_dict)
+                    == 0
+                    or start_cond == ASC.no_wait
+                ):
                     response = await call_next(request)
                 else:  # collision between two base requests for one resource, queue
                     action_dict["action_params"] = action_dict.get("action_params", {})
@@ -78,7 +84,10 @@ class BaseAPI(HelaoFastAPI):
                     return_dict = active.action.as_dict()
                     return_dict["action_status"].append("queued")
                     response = JSONResponse(return_dict)
-                    self.base.endpoint_queues[endpoint_name].put((request, call_next,))
+                    self.base.print_message(
+                        f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
+                    )
+                    self.base.endpoint_queues[endpoint].put(action)
             else:
                 response = await call_next(request)
             return response
