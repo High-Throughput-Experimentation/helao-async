@@ -150,6 +150,7 @@ class Base:
         self.ntp_last_sync = None
         self.aiolock = asyncio.Lock()
         self.endpoint_queues = {}
+        self.fast_urls = []
 
         self.ntp_last_sync_file = None
         if self.helaodirs.root is not None:
@@ -179,7 +180,6 @@ class Base:
         self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
         self.bufferer = self.aloop.create_task(self.live_buffer_task())
 
-        self.fast_urls = self.get_endpoint_urls()
         self.status_logger = self.aloop.create_task(self.log_status_task())
 
     def dyn_endpoints_init(self):
@@ -216,6 +216,7 @@ class Base:
             f"Found {len(self.actionservermodel.endpoints.keys())} endpoints "
             f"for status monitoring on {self.server.server_name}."
         )
+        self.fast_urls = self.get_endpoint_urls()
         self.endpoint_queues_init()
 
     def get_endpoint_urls(self):
