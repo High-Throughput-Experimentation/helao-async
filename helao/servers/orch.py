@@ -48,6 +48,7 @@ from helao.helpers.zdeque import zdeque
 # strip colors if stdout is redirected
 colorama.init(strip=not sys.stdout.isatty())
 
+
 class Orch(Base):
     """Base class for async orchestrator with trigger support and pushed status update.
 
@@ -807,11 +808,6 @@ class Orch(Base):
             while self.globalstatusmodel.loop_state == OrchStatus.started and (
                 self.action_dq or self.experiment_dq or self.sequence_dq
             ):
-                if (
-                    self.globalstatusmodel.loop_state == OrchStatus.estop
-                    or self.globalstatusmodel.loop_intent == OrchStatus.estop
-                ):
-                    await self.estop_loop()
                 self.print_message(
                     f"current content of action_dq: {[self.action_dq[i] for i in range(min(len(self.action_dq), 5))]}... ({len(self.action_dq)})"
                 )
@@ -821,7 +817,11 @@ class Orch(Base):
                 self.print_message(
                     f"current content of sequence_dq: {[self.sequence_dq[i] for i in range(min(len(self.sequence_dq), 5))]}... ({len(self.sequence_dq)})"
                 )
-
+                if (
+                    self.globalstatusmodel.loop_state == OrchStatus.estop
+                    or self.globalstatusmodel.loop_intent == OrchStatus.estop
+                ):
+                    await self.estop_loop()
                 elif self.action_dq:
                     self.print_message("!!!dispatching next action", info=True)
                     error_code = await self.loop_task_dispatch_action()
@@ -834,11 +834,20 @@ class Orch(Base):
                         self.current_stop_message = "Step-thru actions is enabled, use 'Start Orch' to dispatch next action."
                         await self.stop()
                         await self.update_operator(True)
-                    if not self.action_dq and self.experiment_dq and self.step_thru_experiments:
+                    if (
+                        not self.action_dq
+                        and self.experiment_dq
+                        and self.step_thru_experiments
+                    ):
                         self.current_stop_message = "Step-thru experiments is enabled, use 'Start Orch' to dispatch next experiment."
                         await self.stop()
                         await self.update_operator(True)
-                    if not self.action_dq and not self.experiment_dq and self.sequence_dq and self.step_thru_sequences:
+                    if (
+                        not self.action_dq
+                        and not self.experiment_dq
+                        and self.sequence_dq
+                        and self.step_thru_sequences
+                    ):
                         self.current_stop_message = "Step-thru sequences is enabled, use 'Start Orch' to dispatch next sequence."
                         await self.stop()
                         await self.update_operator(True)
@@ -859,18 +868,17 @@ class Orch(Base):
                     await self.orch_wait_for_all_actions()
                     self.print_message("!!!dispatching next sequence", info=True)
                     error_code = await self.loop_task_dispatch_sequence()
-
+                else:
+                    self.print_message("all queues are empty")
+                    self.print_message("--- stopping operator orch ---", info=True)
+                # check error responses from dispatching this loop iter
                 if error_code is not ErrorCodes.none:
                     self.print_message(
                         f"stopping orch with error code: {error_code}", error=True
                     )
                     # await self.intend_stop()
                     await self.intend_estop()
-
                 await self.update_operator(True)
-                else:
-                    self.print_message("all queues are empty")
-                    self.print_message("--- stopping operator orch ---", info=True)
 
             # finish the last exp
             # this wait for all actions in active experiment
@@ -1422,4 +1430,3 @@ class Orch(Base):
         finished_action = await active.finish()
         self.last_wait_ts = check_time
         return finished_action
-
