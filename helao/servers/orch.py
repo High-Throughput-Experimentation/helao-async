@@ -820,7 +820,7 @@ class Orch(Base):
                 if self.action_dq:
                     self.print_message("!!!dispatching next action", info=True)
                     error_code = await self.loop_task_dispatch_action()
-                    if (
+                    while (
                         self.last_dispatched_action_uuid
                         not in self.last_50_action_uuids
                     ):
