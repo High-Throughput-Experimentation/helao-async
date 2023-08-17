@@ -807,6 +807,11 @@ class Orch(Base):
             while self.globalstatusmodel.loop_state == OrchStatus.started and (
                 self.action_dq or self.experiment_dq or self.sequence_dq
             ):
+                if (
+                    self.globalstatusmodel.loop_state == OrchStatus.estop
+                    or self.globalstatusmodel.loop_intent == OrchStatus.estop
+                ):
+                    await self.estop_loop()
                 self.print_message(
                     f"current content of action_dq: {[self.action_dq[i] for i in range(min(len(self.action_dq), 5))]}... ({len(self.action_dq)})"
                 )
@@ -817,7 +822,7 @@ class Orch(Base):
                     f"current content of sequence_dq: {[self.sequence_dq[i] for i in range(min(len(self.sequence_dq), 5))]}... ({len(self.sequence_dq)})"
                 )
 
-                if self.action_dq:
+                elif self.action_dq:
                     self.print_message("!!!dispatching next action", info=True)
                     error_code = await self.loop_task_dispatch_action()
                     while (
@@ -863,15 +868,9 @@ class Orch(Base):
                     await self.intend_estop()
 
                 await self.update_operator(True)
-
-            if (
-                self.globalstatusmodel.loop_state == OrchStatus.estop
-                or self.globalstatusmodel.loop_intent == OrchStatus.estop
-            ):
-                await self.estop_loop()
-
-            self.print_message("all queues are empty")
-            self.print_message("--- stopping operator orch ---", info=True)
+                else:
+                    self.print_message("all queues are empty")
+                    self.print_message("--- stopping operator orch ---", info=True)
 
             # finish the last exp
             # this wait for all actions in active experiment
