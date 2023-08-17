@@ -224,10 +224,8 @@ class Base:
         url_list = []
         for route in self.fastapp.routes:
             routeD = {"path": route.path, "name": route.name}
-            print(routeD)
             if "dependant" in dir(route):
                 flatParams = get_flat_params(route.dependant)
-                print(flatParams)
                 paramD = {
                     par.name: {
                         "outer_type": str(par.outer_type_).split("'")[1]
