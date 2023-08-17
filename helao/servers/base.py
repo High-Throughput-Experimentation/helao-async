@@ -1736,7 +1736,7 @@ class Active:
                 self.base.print_message(f"{action.action_name} was previously queued")
                 req, caller = self.base.endpoint_queues[action.action_name].get()
                 self.base.print_message(f"running queued {action.action_name}")
-                await caller(req)
+                asyncio.create_task(caller(req))
                 print(caller)
                 print(req)
 
