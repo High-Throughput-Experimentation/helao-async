@@ -55,14 +55,18 @@ class OrchAPI(HelaoFastAPI):
 
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
-            endpoint_name = request.url.path.strip("/").split("/")[-1]
+            endpoint = request.url.path.strip("/").split("/")[-1]
             if request.url.path.strip("/").startswith(f"{server_key}/"):
                 await self.orch.aiolock.acquire()
                 await set_body(request, await request.body())
                 body_bytes = await get_body(request)
                 body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
                 action_dict = body_dict.get("action", {})
-                if self.orch.endpoint_queues[endpoint_name].qsize() == 0:
+                start_cond = action_dict.get("start_condition", ASC.wait_for_all)
+                if (
+                    not self.orch.actionservermodel.endpoints[endpoint].active_dict()
+                    and start_cond == ASC.no_wait
+                ):
                     self.orch.aiolock.release()
                     response = await call_next(request)
                 else:  # collision between two orch requests for one resource, queue
@@ -90,8 +94,15 @@ class OrchAPI(HelaoFastAPI):
                     return_dict = active.action.as_dict()
                     return_dict["action_status"].append("queued")
                     response = JSONResponse(return_dict)
-                    self.orch.print_message(f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}")
-                    self.orch.endpoint_queues[endpoint_name].put((request, call_next,))
+                    self.orch.print_message(
+                        f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
+                    )
+                    self.orch.endpoint_queues[endpoint].put(
+                        (
+                            request,
+                            call_next,
+                        )
+                    )
             else:
                 response = await call_next(request)
             return response
