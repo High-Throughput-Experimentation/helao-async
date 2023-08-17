@@ -1351,8 +1351,8 @@ def ADSS_CA_cell_1potential(
                 "aliquot_insitu": True,
                 "PAL_Injector": PAL_Injector,
                 "PAL_Injector_id": PAL_Injector_id,
-                "rinse_1": 0,
-                "rinse_4": 1,
+                "rinse_1": 1,
+                #"rinse_4": 1,
 
             },
         )
