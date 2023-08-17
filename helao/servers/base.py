@@ -1737,6 +1737,8 @@ class Active:
                 req, caller = self.base.endpoint_queues[action.action_name].get()
                 self.base.print_message(f"running queued {action.action_name}")
                 await caller(req)
+                print(caller)
+                print(req)
 
         # always returns the most recent action of active
         return self.action
