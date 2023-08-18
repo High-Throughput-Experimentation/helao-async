@@ -1,9 +1,7 @@
 """Action visualizer for the websocket simulator: WIP"""
 
 import time
-import websockets
 import asyncio
-import json
 from datetime import datetime
 from functools import partial
 from copy import deepcopy
@@ -11,22 +9,23 @@ from copy import deepcopy
 from bokeh.models import (
     TextInput,
 )
-from bokeh.models.widgets import Paragraph
 from bokeh.plotting import figure
-from bokeh.models.widgets import Div
+from bokeh.models.widgets import Div, Paragraph
 from bokeh.layouts import layout, Spacer
-from bokeh.models import ColumnDataSource, DatetimeTickFormatter
+from bokeh.models import ColumnDataSource
 
 from helaocore.models.hlostatus import HloStatus
-from helaocore.models.data import DataPackageModel
 from helao.servers.vis import Vis
-from helao.helpers.dispatcher import private_dispatcher
+from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
 
-valid_data_status = (
+VALID_DATA_STATUS = (
     None,
+    "active",
     HloStatus.active,
 )
+
+VALID_ACTION_NAME = ("measure_cp",)
 
 
 class C_echesimvis:
@@ -35,12 +34,12 @@ class C_echesimvis:
     def __init__(self, vis_serv: Vis, serv_key: str):
         self.vis = vis_serv
         self.config_dict = self.vis.server_cfg["params"]
-        self.max_spectra = 5
-        self.downsample = 2
-        self.min_update_delay = 0.5  # drop plots if spectra come in too quickly
+        self.max_points = 500
+        self.update_rate = 1e-3
+        self.last_update_time = time.time()
 
-        self.ws_data_key = serv_key
-        actserv_config = self.vis.world_cfg["servers"].get(self.ws_data_key, None)
+        self.server_key = serv_key
+        actserv_config = self.vis.world_cfg["servers"].get(self.server_key, None)
         if actserv_config is None:
             return
         actserv_host = actserv_config.get("host", None)
@@ -48,18 +47,24 @@ class C_echesimvis:
         self.wss = Wss(actserv_host, actserv_port, "ws_data")
 
         self.data_url = (
-            f"ws://{actserv_host}:{actserv_port}/ws_data"
+            f"ws://{actserv_config['host']}:{actserv_config['port']}/ws_data"
         )
 
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["datetime"] + [f"series_{i}" for i in range(6)]
-        self.datasource = ColumnDataSource(data={k: [] for k in self.data_dict_keys})
-        self.datasource_prev = ColumnDataSource(data=deepcopy(self.datasource.data))
-
+        self.data_dict_keys = ["t_s", "erhe_v"]
+        self.datasource = ColumnDataSource(
+            data={key: [] for key in self.data_dict_keys}
+        )
         self.cur_action_uuid = ""
+        self.cur_comp = ""
+
+        # prev_datasources aren't streamed, replot when axis or action_uuid changes
+        self.prev_datasources = {}
         self.prev_action_uuid = ""
+        self.prev_comp = ""
+        self.prev_action_uuids = []
 
         # create visual elements
         self.layout = []
@@ -76,52 +81,23 @@ class C_echesimvis:
             partial(self.callback_input_max_points, sender=self.input_max_points),
         )
 
-        self.input_update_rate = TextInput(
-            value=f"{self.update_rate}",
-            title="update sec",
-            disabled=False,
-            width=150,
-            height=40,
-        )
-        self.input_update_rate.on_change(
-            "value",
-            partial(self.callback_input_update_rate, sender=self.input_update_rate),
-        )
+        self.plot = figure(title="Title", height=300, width=500)
+        self.plot_prev = figure(title="Title", height=300, width=500)
 
-        self.plot = figure(title="Title", height=300, width=500, output_backend="webgl")
-        self.plot.xaxis.formatter = DatetimeTickFormatter(
-            minsec='%T',
-            minutes='%T',
-            hourmin='%T',
-            hours='%T',
-        )
-        self.plot.xaxis.axis_label = "Time (HH:MM:SS)"
-        self.plot.yaxis.axis_label = "value"
-
-        self.plot_prev = figure(title="Title", height=300, width=500, output_backend="webgl")
-        self.plot_prev.xaxis.formatter = DatetimeTickFormatter(
-            minsec='%T',
-            minutes='%T',
-            hourmin='%T',
-            hours='%T',
-        )
-        self.plot_prev.xaxis.axis_label = "Time (HH:MM:SS)"
-        self.plot_prev.yaxis.axis_label = "value"
         # combine all sublayouts into a single one
-        docs_url = f"http://{host}:{port}/docs#/"
-        server_link = f'<a href="{docs_url}" target="_blank">\'{self.live_key}\'</a>'
-        headerbar = f"<b>Live vis module for server {server_link}</b>"
+        docs_url = f"http://{actserv_host}:{actserv_port}/docs#/"
+        server_link = f'<a href="{docs_url}" target="_blank">\'{self.server_key}\'</a>'
+        headerbar = f"<b>CP measurement simulator for server {server_link}</b>"
         self.layout = layout(
             [
+                [Spacer(width=20), Div(text=headerbar, width=1004, height=15)],
                 [
-                    Spacer(width=20),
-                    Div(
-                        text=headerbar,
-                        width=1004,
-                        height=15,
-                    ),
+                    self.input_max_points,
                 ],
-                [self.input_max_points, self.input_update_rate],
+                [
+                    Paragraph(text="""x-axis:""", width=500, height=15),
+                    Paragraph(text="""y-axis:""", width=500, height=15),
+                ],
                 Spacer(height=10),
                 [self.plot, Spacer(width=20), self.plot_prev],
                 Spacer(height=10),
@@ -130,19 +106,14 @@ class C_echesimvis:
             width=1024,
         )
 
-        # to check if selection changed during ploting
-        # self.xselect = self.xaxis_selector_group.active
-        # self.yselect = self.yaxis_selector_group.active
-
-        self._add_plots()
-
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
         self.IOtask = asyncio.create_task(self.IOloop_data())
         self.vis.doc.on_session_destroyed(self.cleanup_session)
+        self.reset_plot(self.cur_action_uuid, forceupdate=True)
 
     def cleanup_session(self, session_context):
-        self.vis.print_message(f"'{self.ws_data_key}' Bokeh session closed", info=True)
+        self.vis.print_message(f"'{self.server_key}' Bokeh session closed", info=True)
         self.IOloop_data_run = False
         self.IOtask.cancel()
 
@@ -178,25 +149,10 @@ class C_echesimvis:
     def update_input_value(self, sender, value):
         sender.value = value
 
-    def callback_input_update_rate(self, attr, old, new, sender):
-        """callback for input_update_rate"""
-
-        def to_float(val):
-            try:
-                return float(val)
-            except ValueError:
-                return 0.5
-
-        newpts = to_float(new)
-
-        self.update_rate = newpts
-
-        self.vis.doc.add_next_tick_callback(
-            partial(self.update_input_value, sender, f"{self.update_rate}")
-        )
-
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
-        self.vis.print_message(" ... Live visualizer receiving messages.")
+        self.vis.print_message(
+            f" ... potentiostat visualizer subscribing to: {self.data_url}"
+        )
         while True:
             if time.time() - self.last_update_time >= self.update_rate:
                 messages = await self.wss.read_messages()
@@ -205,39 +161,41 @@ class C_echesimvis:
             await asyncio.sleep(0.001)
 
     def add_points(self, datapackage_list: list):
-        for datapackage in datapackage_list:
-            # check if uuid has changed
-            new_action_uuid = str(datapackage.action_uuid)
-            if new_action_uuid != self.cur_action_uuid:
-                self.vis.print_message(" ... reseting Spec graph")
-                self.prev_action_uuid = self.cur_action_uuid
-                self.cur_action_uuid = new_action_uuid
+        for data_package in datapackage_list:
+            data_dict = {k: [] for k in self.data_dict_keys}
+            # only resets if axis selector or action_uuid changes
+            self.reset_plot(str(data_package.action_uuid))
+            if (
+                data_package.datamodel.status in VALID_DATA_STATUS
+                and data_package.action_name in VALID_ACTION_NAME
+            ):
+                for _, uuid_dict in data_package.datamodel.data.items():
+                    for data_label, data_val in uuid_dict.items():
+                        if data_label in self.data_dict_keys:
+                            if isinstance(data_val, list):
+                                data_dict[data_label] += data_val
+                            else:
+                                data_dict[data_label].append(data_val)
+                        elif data_label == "elements":
+                            compstr = "-".join(
+                                [
+                                    f"{x}{y:.2f}"
+                                    for x, y in zip(
+                                        data_dict[data_label], data_dict["atfracs"]
+                                    )
+                                ]
+                            )
+                            if self.cur_comp != compstr:
+                                self.prev_comp = self.cur_comp
+                                self.cur_comp = compstr
 
-                # copy old data to "prev" plot
-                self.datasource_prev.data = deepcopy(self.datasource.data)
-                self.datasource.data = {k: [] for k in self.data_dict_keys}
-
-            # update self.data_dict with incoming data package
-            for _, data_dict in datapackage.datamodel.data.items():
-                # unpack and sort epoch and channels
-                epoch = data_dict["epoch_s"]
-                dtstr = datetime.fromtimestamp(epoch).strftime("%Y-%m-%d %H:%M:%S.%f")
-                ch_keys = sorted(
-                    [k for k in data_dict.keys() if k.startswith("ch_")],
-                    key=lambda x: int(x.split("_")[-1]),
-                )
-                ch_vals = [data_dict[k] for k in ch_keys]
-                self.data_dict.update({dtstr: ch_vals[:: self.downsample]})
-
-            # trim number of spectra being plotted
-            if len(self.data_dict.keys()) > self.max_spectra:
-                datetime_keys = sorted(self.data_dict.keys())
-                delpts = len(self.data_dict.keys()) - self.max_spectra
-                for key in datetime_keys[:delpts]:
-                    self.data_dict.pop(key)
-
-            self.datasource.data = self.data_dict
-            self._add_plots()
+            # check for missing I_A in OCV
+            max_len = max([len(v) for v in data_dict.values()])
+            for k, v in data_dict.items():
+                if len(v) < max_len:
+                    pad_len = max_len - len(v)
+                    data_dict[k] += ["NaN"] * pad_len
+            self.datasource.stream(data_dict, rollover=self.max_points)
 
     def _add_plots(self):
         # clear legend
@@ -252,26 +210,42 @@ class C_echesimvis:
         self.plot_prev.renderers = []
 
         self.plot.title.text = f"active action_uuid: {self.cur_action_uuid}"
-        self.plot_prev.title.text = f"previous action_uuid: {self.prev_action_uuid}"
-
-        ds_keys = [x for x in sorted(self.datasource.data.keys()) if x != "wl"]
-        for i, dt in enumerate(ds_keys):
-            self.plot.line(
-                x="wl",
-                y=dt,
-                line_color="blue" if i != len(ds_keys) - 1 else "red",
-                source=self.datasource,
-                name=self.cur_action_uuid,
-                legend_label=dt,
-            )
-
-        dsp_keys = [x for x in sorted(self.datasource_prev.data.keys()) if x != "wl"]
-        for i, dt in enumerate(dsp_keys):
+        self.plot_prev.title.text = f"last {len(self.prev_action_uuids)} actions"
+        colors = ["red", "blue", "orange", "green"]
+        self.plot.line(
+            x="t_s",
+            y="erhe_v",
+            line_color=colors[0],
+            source=self.datasource,
+            name=self.cur_action_uuid,
+            legend_label=self.cur_comp,
+        )
+        for i, puuid in enumerate(self.prev_action_uuids):
             self.plot_prev.line(
-                x="wl",
-                y=dt,
-                line_color="blue" if i != len(dsp_keys) - 1 else "red",
-                source=self.datasource_prev,
-                name=self.prev_action_uuid,
-                legend_label=dt,
+                x="t_s",
+                y="erhe_v",
+                line_color=colors[i % len(colors)],
+                source=self.prev_datasources[puuid],
+                name=puuid,
+                legend_label=self.prev_comp,
             )
+
+    def reset_plot(self, new_action_uuid=None, forceupdate: bool = False):
+        if self.cur_action_uuid != new_action_uuid or forceupdate:
+            if new_action_uuid is not None:
+                self.vis.print_message(" ... reseting CP graph")
+                self.prev_action_uuid = self.cur_action_uuid
+                if self.prev_action_uuid != "":
+                    self.prev_action_uuids.append(self.prev_action_uuid)
+                    self.vis.print_message(f"previous uuids: {self.prev_action_uuids}")
+                    # copy old data to "prev" plot
+                    self.prev_datasources[self.prev_action_uuid] = ColumnDataSource(
+                        data=deepcopy(self.datasource.data)
+                    )
+                self.cur_action_uuid = new_action_uuid
+                # update prev_datasources
+                while len(self.prev_action_uuids) > 1:
+                    rp = self.prev_action_uuids.pop(0)
+                    self.prev_datasources.pop(rp)
+                self.datasource.data = {key: [] for key in self.data_dict_keys}
+            self._add_plots()

@@ -59,25 +59,23 @@ class EcheSimExec(Executor):
         self.last_idx = 0
         self.start_time = time.time()  # instantiation time
         self.duration = self.active.action.action_params.get("duration", -1)
-        self.cp = self.active.base.driver.data[
+        self.sample_data = self.active.base.driver.data[
             tuple(self.active.action_params["comp_vec"])
-        ]["CP3"]
-        self.cached = {}
+        ]
+        self.cp = self.sample_data["CP3"]
+        self.els = self.sample_data["el_str"].split("-")
+        self.fracs = [self.sample_data[el] for el in self.els]
 
     async def _exec(self):
         self.start_time = time.time()  # pre-polling iteration time
-        return {"data": {}, "error": ErrorCodes.none}
+        data = {"elements": self.els, "atfracs": self.fracs}
+        return {"data": data, "error": ErrorCodes.none}
 
     async def _poll(self):
         """Read data from live buffer."""
         elapsed_time = time.time() - self.start_time
         new_idx = max([i for i, v in enumerate(self.cp["t_s"]) if v < elapsed_time])
         live_dict = {k: v[self.last_idx : new_idx] for k, v in self.cp.items()}
-        for k, v in live_dict.items():
-            if k in self.cached:
-                self.cached[k] += v
-            else:
-                self.cached[k] = v
         self.last_idx = new_idx
         if self.last_idx == new_idx:
             status = HloStatus.finished
