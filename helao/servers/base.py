@@ -1923,7 +1923,7 @@ class Active:
             datamodel = DataModel(
                 data={self.action.file_conn_keys[0]: data},
                 errors=[],
-                status=HloStatus.active,
+                status=HloStatus.finished,
             )
             self.enqueue_data_nowait(datamodel)  # write and broadcast
         if cleanup_error != ErrorCodes.none:
