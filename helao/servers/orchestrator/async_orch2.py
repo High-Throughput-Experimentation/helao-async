@@ -36,14 +36,14 @@ a OrchHandler class object, the core functionality of an async orchestrator.
 
 __all__ = ["makeApp"]
 
-from helao.servers.orch import HelaoOrch
+from helao.servers.orch_api import OrchAPI
 from helao.helpers.config_loader import config_loader
 
 
 def makeApp(confPrefix, server_key, helao_root):
     config = config_loader(confPrefix, helao_root)
 
-    app = HelaoOrch(
+    app = OrchAPI(
         config,
         server_key,
         server_key,

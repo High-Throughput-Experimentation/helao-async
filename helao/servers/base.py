@@ -1,4 +1,4 @@
-__all__ = ["Base", "ActiveParams", "HelaoBase", "Active", "Executor", "DummyBase"]
+__all__ = ["Base", "ActiveParams", "Active", "DummyBase"]
 
 import asyncio
 import json
@@ -7,14 +7,14 @@ import sys
 import pickle
 from random import randint
 from socket import gethostname
-from time import ctime, time, time_ns, sleep
+from time import ctime, time, time_ns
 from typing import List, Dict
-from types import MethodType
 from uuid import UUID, uuid1
 import hashlib
 from copy import deepcopy, copy
 import inspect
 import traceback
+from queue import Queue
 
 import aiofiles
 import colorama
@@ -24,18 +24,18 @@ import pyaml
 import pyzstd
 
 from filelock import FileLock
-from fastapi import Body, WebSocket, WebSocketDisconnect
+from fastapi import WebSocket
 from fastapi.dependencies.utils import get_flat_params
 
-from helao.helpers.server_api import HelaoFastAPI
-from helao.helpers.dispatcher import async_private_dispatcher
-
+from helao.helpers.dispatcher import async_private_dispatcher, async_action_dispatcher
+from helao.helpers.executor import Executor
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.print_message import print_message
 from helao.helpers import async_copy
 from helao.helpers.yml_finisher import move_dir
 from helao.helpers.premodels import Action
+from helaocore.models.action_start_condition import ActionStartCondition as ASC
 from helao.helpers.ws_publisher import WsPublisher
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.sample import (
@@ -67,241 +67,6 @@ from helaocore.error import ErrorCodes
 colorama.init(strip=not sys.stdout.isatty())
 
 
-# TODO: HelaoBase will return FastAPI app to replace "makeApp" func
-class HelaoBase(HelaoFastAPI):
-    def __init__(
-        self,
-        config,
-        server_key,
-        server_title,
-        description,
-        version,
-        driver_class=None,
-        dyn_endpoints=None,
-    ):
-        super().__init__(
-            helao_cfg=config,
-            helao_srv=server_key,
-            title=server_title,
-            description=description,
-            version=version,
-        )
-        self.driver = None
-
-        @self.on_event("startup")
-        def startup_event():
-            self.base = Base(fastapp=self, dyn_endpoints=dyn_endpoints)
-            self.base.myinit()
-            if driver_class is not None:
-                self.driver = driver_class(self.base)
-            self.base.dyn_endpoints_init()
-
-        @self.websocket("/ws_status")
-        async def websocket_status(websocket: WebSocket):
-            """Broadcast status messages.
-
-            Args:
-            websocket: a fastapi.WebSocket object
-            """
-            await self.base.status_publisher.connect(websocket)
-            try:
-                await self.base.status_publisher.broadcast(websocket)
-            except WebSocketDisconnect:
-                self.base.status_publisher.disconnect(websocket)
-
-        @self.websocket("/ws_data")
-        async def websocket_data(websocket: WebSocket):
-            """Broadcast status dicts.
-
-            Args:
-            websocket: a fastapi.WebSocket object
-            """
-            await self.base.data_publisher.connect(websocket)
-            try:
-                await self.base.data_publisher.broadcast(websocket)
-            except WebSocketDisconnect:
-                self.base.data_publisher.disconnect(websocket)
-
-        @self.websocket("/ws_live")
-        async def websocket_live(websocket: WebSocket):
-            """Broadcast live buffer dicts.
-
-            Args:
-            websocket: a fastapi.WebSocket object
-            """
-            await self.base.live_publisher.connect(websocket)
-            try:
-                await self.base.live_publisher.broadcast(websocket)
-            except WebSocketDisconnect:
-                self.base.live_publisher.disconnect(websocket)
-
-        @self.post("/get_config", tags=["private"])
-        def get_config():
-            return self.base.world_cfg
-
-        @self.post("/get_status", tags=["private"])
-        def get_status():
-            return self.base.actionservermodel
-
-        @self.post("/attach_client", tags=["private"])
-        async def attach_client(client_servkey: str):
-            return await self.base.attach_client(client_servkey)
-
-        @self.post("/stop_executor", tags=["private"])
-        def stop_executor(executor_id: str):
-            return self.base.stop_executor(executor_id)
-
-        @self.post("/endpoints", tags=["private"])
-        def get_all_urls():
-            """Return a list of all endpoints on this server."""
-            return self.base.get_endpoint_urls()
-
-        @self.post("/get_lbuf", tags=["private"])
-        def get_lbuf():
-            return self.base.live_buffer
-
-        @self.post("/list_executors", tags=["private"])
-        def list_executors():
-            return list(self.base.executors.keys())
-
-        @self.post("/resend_active", tags=["private"])
-        def resend_active(action_uuid: str):
-            l10 = [y for x, y in self.base.last_10_active]
-            if l10:
-                return l10[0].action.as_dict()
-            else:
-                return Action(action_uuid=action_uuid).as_dict()
-
-        @self.post("/shutdown", tags=["private"])
-        async def post_shutdown():
-            await shutdown_event()
-
-        @self.on_event("shutdown")
-        async def shutdown_event():
-            self.base.print_message("action shutdown", info=True)
-            await self.base.shutdown()
-
-            shutdown = getattr(self.driver, "shutdown", None)
-            async_shutdown = getattr(self.driver, "async_shutdown", None)
-
-            retvals = {}
-            if shutdown is not None and callable(shutdown):
-                self.base.print_message("driver has shutdown function", info=True)
-                retvals["shutdown"] = shutdown()
-            else:
-                self.base.print_message("driver has NO shutdown function", info=True)
-                retvals["shutdown"] = None
-            if async_shutdown is not None and callable(async_shutdown):
-                self.base.print_message("driver has async_shutdown function", info=True)
-                retvals["async_shutdown"] = await async_shutdown()
-            else:
-                self.base.print_message(
-                    "driver has NO async_shutdown function", info=True
-                )
-                retvals["async_shutdown"] = None
-            return retvals
-
-        @self.post(f"/{server_key}/estop", tags=["action"])
-        async def estop(
-            action: Action = Body({}, embed=True),
-            switch: bool = True,
-        ):
-            active = await self.base.setup_and_contain_action(
-                json_data_keys=["estop"], action_abbr="estop"
-            )
-            has_estop = getattr(self.driver, "estop", None)
-            if has_estop is not None and callable(has_estop):
-                self.base.print_message("driver has estop function", info=True)
-                await active.enqueue_data_dflt(
-                    datadict={
-                        "estop": await self.driver.estop(**active.action.action_params)
-                    }
-                )
-            else:
-                self.base.print_message("driver has NO estop function", info=True)
-                self.base.actionservermodel.estop = switch
-            if switch:
-                active.action.action_status.append(HloStatus.estopped)
-            finished_action = await active.finish()
-            return finished_action.as_dict()
-
-
-class Executor:
-    """Generic template for action executor (steps 5-6 of action_loop_task).
-
-    Hooks
-    1. Device setup calls (optional)
-        a. Suspend live polling task (optional)
-    2. Execute action start, return {"data": ..., "error": ...}
-    3. Polling (optional)
-        a. Standard return dict has {"data": ..., "status": ..., "error": ...}
-        b. Error handling
-        c. Check for external stop if looping.
-    4. Resume live polling task (optional)
-        a. Cleanup calls (optional)
-    """
-
-    def __init__(
-        self,
-        active,
-        poll_rate: float = 0.2,
-        oneoff: bool = True,
-        exec_id: str = None,
-    ):
-        self.active = active
-        self.oneoff = oneoff
-        self.poll_rate = poll_rate
-        if exec_id is None:
-            self.exec_id = f"{active.action.action_name} {active.action.action_uuid}"
-        else:
-            self.exec_id = exec_id
-        self.active.action.exec_id = self.exec_id
-
-    async def _pre_exec(self):
-        "Setup methods, return error state."
-        self.active.base.print_message("generic Executor running setup methods.")
-        self.setup_err = ErrorCodes.none
-        return {"error": self.setup_err}
-
-    def set_pre_exec(self, pre_exec_func):
-        "Override the generic setup method."
-        self._pre_exec = MethodType(pre_exec_func, self)
-
-    async def _exec(self):
-        "Perform device read/write."
-        return {"data": {}, "error": ErrorCodes.none}
-
-    def set_exec(self, exec_func):
-        "Override the generic execute method."
-        self._exec = MethodType(exec_func, self)
-
-    async def _poll(self):
-        "Perform one polling iteration."
-        return {"data": {}, "error": ErrorCodes.none, "status": HloStatus.finished}
-
-    def set_poll(self, poll_func):
-        "Override the generic execute method."
-        self._poll = MethodType(poll_func, self)
-
-    async def _post_exec(self):
-        "Cleanup methods, return error state."
-        self.cleanup_err = ErrorCodes.none
-        return {"error": self.cleanup_err}
-
-    def set_post_exec(self, post_exec_func):
-        "Override the generic cleanup method."
-        self._post_exec = MethodType(post_exec_func, self)
-
-    async def _manual_stop(self):
-        "Perform device manual stop, return error state."
-        self.stop_err = ErrorCodes.none
-        return {"error": self.stop_err}
-
-    def set_manual_stop(self, manual_stop_func):
-        "Override the generic manual stop method."
-        self._manual_stop = MethodType(manual_stop_func, self)
-
-
 class Base:
     """Base class for all HELAO servers.
 
@@ -330,8 +95,8 @@ class Base:
     and folders will be written as follows: TBD
     """
 
-    # TODO: add world_cfg: dict parameter for HelaoBase to pass config instead of fastapp
-    def __init__(self, fastapp: HelaoBase, dyn_endpoints=None):
+    # TODO: add world_cfg: dict parameter for BaseAPI to pass config instead of fastapp
+    def __init__(self, fastapp, dyn_endpoints=None):
         self.server = MachineModel(
             server_name=fastapp.helao_srv, machine_name=gethostname().lower()
         )
@@ -384,6 +149,8 @@ class Base:
         self.ntp_offset = None  # add to system time for correction
         self.ntp_last_sync = None
         self.aiolock = asyncio.Lock()
+        self.endpoint_queues = {}
+        self.fast_urls = []
 
         self.ntp_last_sync_file = None
         if self.helaodirs.root is not None:
@@ -413,11 +180,16 @@ class Base:
         self.ntp_syncer = self.aloop.create_task(self.sync_ntp_task())
         self.bufferer = self.aloop.create_task(self.live_buffer_task())
 
-        self.fast_urls = self.get_endpoint_urls()
         self.status_logger = self.aloop.create_task(self.log_status_task())
 
     def dyn_endpoints_init(self):
         asyncio.gather(self.init_endpoint_status(self.dyn_endpoints))
+
+    def endpoint_queues_init(self):
+        for urld in self.fast_urls:
+            if urld.get("path", "").strip("/").startswith(self.server.server_name):
+                endpoint_name = urld["path"].strip("/").split("/")[-1]
+                self.endpoint_queues[endpoint_name] = Queue()
 
     def print_message(self, *args, **kwargs):
         print_message(
@@ -428,7 +200,7 @@ class Base:
             **kwargs,
         )
 
-    # TODO: add app: FastAPI parameter for HelaoBase to pass app
+    # TODO: add app: FastAPI parameter for BaseAPI to pass app
     async def init_endpoint_status(self, dyn_endpoints=None):
         """Populate status dict
         with FastAPI server endpoints for monitoring."""
@@ -440,11 +212,12 @@ class Base:
                 self.actionservermodel.endpoints.update(
                     {route.name: EndpointModel(endpoint_name=route.name)}
                 )
-
         self.print_message(
             f"Found {len(self.actionservermodel.endpoints.keys())} endpoints "
             f"for status monitoring on {self.server.server_name}."
         )
+        self.fast_urls = self.get_endpoint_urls()
+        self.endpoint_queues_init()
 
     def get_endpoint_urls(self):
         """Return a list of all endpoints on this server."""
@@ -463,7 +236,7 @@ class Base:
                         else str(par.type_),
                         "required": par.required,
                         "shape": par.shape,
-                        "default": par.default,
+                        "default": par.default if par.default is not ... else None,
                     }
                     for par in flatParams
                 }
@@ -515,15 +288,15 @@ class Base:
 
         # name of the caller function
         calname = sys._getframe().f_back.f_back.f_code.co_name
-        self.print_message(
-            f"this code's filename was: {sys._getframe(0).f_code.co_filename}"
-        )
-        self.print_message(
-            f"caller's filename was: {sys._getframe(1).f_code.co_filename}"
-        )
-        self.print_message(
-            f"callercaller's filename was: {sys._getframe(2).f_code.co_filename}"
-        )
+        # self.print_message(
+        #     f"this code's filename was: {sys._getframe(0).f_code.co_filename}"
+        # )
+        # self.print_message(
+        #     f"caller's filename was: {sys._getframe(1).f_code.co_filename}"
+        # )
+        # self.print_message(
+        #     f"callercaller's filename was: {sys._getframe(2).f_code.co_filename}"
+        # )
         # TODO: build calname: urlname dict mapping during init_endpoint_status
         # fastapi url for caller function
         urlname = self.fastapp.url_path_for(calname)
@@ -596,6 +369,8 @@ class Base:
         file_conn_keys:
         header: header for data file
         """
+        if activeparams.action.action_uuid in self.actives:
+            await self.actives[activeparams.action.action_uuid].substitute()
         self.actives[activeparams.action.action_uuid] = Active(
             self, activeparams=activeparams
         )
@@ -1850,6 +1625,11 @@ class Active:
 
         return new_file_conn_keys
 
+    async def substitute(self):
+        for filekey in self.file_conn_dict:
+            if self.file_conn_dict[filekey].file:
+                await self.file_conn_dict[filekey].file.close()
+
     async def finish(
         self,
         finish_uuid_list: List[UUID] = None
@@ -1894,6 +1674,7 @@ class Active:
 
             # send the last status
             await self.add_status(action=finish_action)
+        
 
         # check if all actions are fininshed
         # if yes close datalogger etc
@@ -1959,6 +1740,14 @@ class Active:
             # DB server call to finish_yml if DB exists
             for action in self.action_list:
                 self.base.aloop.create_task(move_dir(action, base=self.base))
+
+            # since all sub-actions of active are finished process endpoint queue
+            if self.base.endpoint_queues[action.action_name].qsize() > 0:
+                self.base.print_message(f"{action.action_name} was previously queued")
+                qact, qpars = self.base.endpoint_queues[action.action_name].get()
+                self.base.print_message(f"running queued {action.action_name}")
+                qact.start_condition = ASC.no_wait
+                await async_action_dispatcher(self.base.world_cfg, qact, qpars)
 
         # always returns the most recent action of active
         return self.action
@@ -2079,7 +1868,7 @@ class Active:
         self.base.executors[executor.exec_id] = self
 
         # action operations
-        self.base.print_message(f"Running executor._exec() method")
+        self.base.print_message("Running executor._exec() method")
         result = await executor._exec()
         error = result.get("error", ErrorCodes.none)
         data = result.get("data", {})
@@ -2129,6 +1918,14 @@ class Active:
         # post-action operations
         cleanup_state = await executor._post_exec()
         cleanup_error = cleanup_state.get("error", {})
+        data = cleanup_state.get("data", {})
+        if data:
+            datamodel = DataModel(
+                data={self.action.file_conn_keys[0]: data},
+                errors=[],
+                status=HloStatus.active,
+            )
+            self.enqueue_data_nowait(datamodel)  # write and broadcast
         if cleanup_error != ErrorCodes.none:
             self.base.print_message("Error encountered during executor cleanup.")
 

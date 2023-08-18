@@ -20,7 +20,8 @@ import serial
 from typing import Union, Optional
 
 from helaocore.error import ErrorCodes
-from helao.servers.base import Base, Executor
+from helao.servers.base import Base
+from helao.helpers.executor import Executor
 from helaocore.models.hlostatus import HloStatus
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 
@@ -343,13 +344,13 @@ class MfcExec(Executor):
     async def _pre_exec(self):
         "Set flow rate."
         self.active.base.print_message("MFCExec running setup methods.")
-        flowrate_sccm = self.active.action.action_params.get("flowrate_sccm", None)
-        ramp_sccm_sec = self.active.action.action_params.get("ramp_sccm_sec", 0)
-        if flowrate_sccm is not None:
+        self.flowrate_sccm = self.active.action.action_params.get("flowrate_sccm", None)
+        self.ramp_sccm_sec = self.active.action.action_params.get("ramp_sccm_sec", 0)
+        if self.flowrate_sccm is not None:
             rate_resp = await self.active.base.fastapp.driver.set_flowrate(
                 device_name=self.device_name,
-                flowrate_sccm=flowrate_sccm,
-                ramp_sccm_sec=ramp_sccm_sec,
+                flowrate_sccm=self.flowrate_sccm,
+                ramp_sccm_sec=self.ramp_sccm_sec,
             )
             self.active.base.print_message(f"set_flowrate returned: {rate_resp}")
         return {"error": ErrorCodes.none}
@@ -357,10 +358,11 @@ class MfcExec(Executor):
     async def _exec(self):
         "Cancel valve hold."
         self.start_time = time.time()
-        openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
-            device_name=self.device_name,
-        )
-        self.active.base.print_message(f"hold_cancel returned: {openvlv_resp}")
+        if self.flowrate_sccm is not None:
+            openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
+                device_name=self.device_name,
+            )
+            self.active.base.print_message(f"hold_cancel returned: {openvlv_resp}")
         return {"error": ErrorCodes.none}
 
     async def _poll(self):
@@ -399,15 +401,25 @@ class PfcExec(MfcExec):
     async def _pre_exec(self):
         "Set pressure."
         self.active.base.print_message("PFCExec running setup methods.")
-        pressure_psia = self.active.action.action_params.get("pressure_psia", None)
-        ramp_psi_sec = self.active.action.action_params.get("ramp_psi_sec", 0)
-        if pressure_psia is not None:
+        self.pressure_psia = self.active.action.action_params.get("pressure_psia", None)
+        self.ramp_psi_sec = self.active.action.action_params.get("ramp_psi_sec", 0)
+        if self.pressure_psia is not None:
             rate_resp = await self.active.base.fastapp.driver.set_pressure(
                 device_name=self.device_name,
-                pressure_psia=pressure_psia,
-                ramp_psi_sec=ramp_psi_sec,
+                pressure_psia=self.pressure_psia,
+                ramp_psi_sec=self.ramp_psi_sec,
             )
             self.active.base.print_message(f"set_pressure returned: {rate_resp}")
+        return {"error": ErrorCodes.none}
+
+    async def _exec(self):
+        "Cancel valve hold."
+        self.start_time = time.time()
+        if self.pressure_psia is not None:
+            openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(
+                device_name=self.device_name,
+            )
+            self.active.base.print_message(f"hold_cancel returned: {openvlv_resp}")
         return {"error": ErrorCodes.none}
 
 
@@ -425,8 +437,8 @@ class MfcConstPresExec(MfcExec):
         self.fill_end = self.start_time
 
     def eval_pressure(self, pressure):
-        if pressure > 14.7:
-            return False
+        if pressure > self.target_pressure:
+            return False, False
         else:
             fill_scc = self.total_gas_scc * (1 - pressure / self.target_pressure)
             fill_time = 60.0 * fill_scc / self.flowrate_sccm
@@ -459,7 +471,7 @@ class MfcConstPresExec(MfcExec):
             and iter_time - self.last_fill >= self.refill_freq
         ):
             self.active.base.print_message(
-                f"pressure below 1 atm, filling {fill_scc} scc over {fill_time} seconds"
+                f"pressure below {self.target_pressure}, filling {fill_scc} scc over {fill_time} seconds"
             )
             self.filling = True
             openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(

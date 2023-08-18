@@ -21,7 +21,7 @@ from typing import Optional, List
 from socket import gethostname
 
 
-from helao.servers.base import HelaoBase
+from helao.servers.base_api import BaseAPI
 from helao.drivers.io.nidaqmx_driver import cNIMAX, DevMonExec
 from helaocore.models.sample import LiquidSample, SampleUnion
 from helao.helpers.make_str_enum import make_str_enum
@@ -34,7 +34,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     config = config_loader(confPrefix, helao_root)
 
-    app = HelaoBase(
+    app = BaseAPI(
         config=config,
         server_key=server_key,
         server_title=server_key,

@@ -12,14 +12,14 @@ from fastapi import Body
 
 from helaocore.models.file import HloHeaderModel, HloFileGroup
 from helao.helpers.premodels import Action
-from helao.servers.base import HelaoBase
+from helao.servers.base_api import BaseAPI
 from helao.drivers.data.calc_driver import Calc
 from helao.helpers.config_loader import config_loader
 
 
 def makeApp(confPrefix, server_key, helao_root):
     config = config_loader(confPrefix, helao_root)
-    app = HelaoBase(
+    app = BaseAPI(
         config=config,
         server_key=server_key,
         server_title=server_key,

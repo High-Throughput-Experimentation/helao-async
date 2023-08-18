@@ -33,7 +33,7 @@ import asyncio
 from typing import Optional, List
 from fastapi import Body, Query
 
-from helao.servers.base import HelaoBase
+from helao.servers.base_api import BaseAPI
 from helaocore.models.sample import SampleUnion
 from helao.helpers.premodels import Action
 from helao.drivers.pstat.gamry_driver import gamry
@@ -246,7 +246,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     config = config_loader(confPrefix, helao_root)
 
-    app = HelaoBase(
+    app = BaseAPI(
         config=config,
         server_key=server_key,
         server_title=server_key,

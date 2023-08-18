@@ -10,7 +10,7 @@ from typing import Optional
 from fastapi import Body
 
 from helao.drivers.pump.legato_driver import KDS100, PumpExec
-from helao.servers.base import HelaoBase
+from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
 from helaocore.models.data import DataModel
 from helaocore.error import ErrorCodes
@@ -20,7 +20,7 @@ from helao.helpers.config_loader import config_loader
 def makeApp(confPrefix, server_key, helao_root):
     config = config_loader(confPrefix, helao_root)
 
-    app = HelaoBase(
+    app = BaseAPI(
         config=config,
         server_key=server_key,
         server_title=server_key,

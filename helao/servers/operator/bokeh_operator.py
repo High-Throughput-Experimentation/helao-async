@@ -588,6 +588,17 @@ class Operator:
                             ),
                         ],
                         [self.active_action_table],
+                        [
+                            self.button_add_expplan,
+                            Spacer(width=10),
+                            self.button_start_orch,
+                            Spacer(width=10),
+                            self.button_stop_orch,
+                            Spacer(width=10),
+                            self.button_clear_expplan,
+                            Spacer(width=10),
+                            self.orch_status_button,
+                        ],
                         Spacer(height=10),
                         [
                             self.button_skip_exp,
