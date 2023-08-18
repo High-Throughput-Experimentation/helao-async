@@ -25,8 +25,8 @@ config["servers"] = {
         "host": hostip,
         "port": 8002,
         "group": "action",
-        "fast": "ws_simulator",
-        "params": {},
+        "fast": "eche_simulator",
+        "params": {"plate_id": 2750},
     },
     "VIS": {
         "host": hostip,

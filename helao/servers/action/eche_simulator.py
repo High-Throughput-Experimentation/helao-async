@@ -43,8 +43,8 @@ class EcheSim:
             "data",
             "oer13_cps.pzstd",
         )
-        data = decompress_pzstd(self.data_file)
-        self.data = data[self.loaded_plate]
+        self.all_data = decompress_pzstd(self.data_file)
+        self.data = self.all_data[self.loaded_plate]
 
         self.event_loop = asyncio.get_event_loop()
 

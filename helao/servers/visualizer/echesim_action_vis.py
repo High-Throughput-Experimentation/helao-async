@@ -2,7 +2,6 @@
 
 import time
 import asyncio
-from datetime import datetime
 from functools import partial
 from copy import deepcopy
 
