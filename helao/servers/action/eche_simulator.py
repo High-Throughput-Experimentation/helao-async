@@ -26,20 +26,9 @@ class EcheSim:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
-        self.scale_map = {
-            f"series_{i}": v for i, v in enumerate([1, 2, 5, 10, 50, 100])
-        }
+        self.loaded_plate = self.config_dict["plate_id"]
 
         self.event_loop = asyncio.get_event_loop()
-        self.polling_task = self.event_loop.create_task(self.poll_data_loop())
-
-    async def poll_data_loop(self, frequency_hz: float = 10):
-        waittime = 1.0 / frequency_hz
-        self.base.print_message("Starting polling loop")
-        while True:
-            data_msg = {k: v * np.random.uniform() for k, v in self.scale_map.items()}
-            await self.base.put_lbuf({"sim_dict": data_msg})
-            await asyncio.sleep(waittime)
 
     def shutdown(self):
         pass
@@ -79,10 +68,10 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="Websocket simulator",
         version=1.0,
-        driver_class=WsSim,
+        driver_class=EcheSim,
     )
 
-    @app.post(f"/{server_key}/acquire_data", tags=["action"])
+    @app.post(f"/{server_key}/measure_cp", tags=["action"])
     async def acquire_data(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
