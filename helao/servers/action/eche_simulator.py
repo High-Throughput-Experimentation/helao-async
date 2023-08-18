@@ -11,6 +11,7 @@ __all__ = ["makeApp"]
 import os
 import time
 import asyncio
+import functools
 from typing import List
 from fastapi import Body
 
@@ -48,6 +49,32 @@ class EcheSim:
         self.data = self.all_data[self.loaded_plate]
 
         self.event_loop = asyncio.get_event_loop()
+
+    def change_plate(self, plate_id):
+        if plate_id in self.all_data:
+            self.data = self.all_data[plate_id]
+            self.base.print_message(f"loaded plate_id: {plate_id}")
+        else:
+            self.base.print_message(f"plate_id: {plate_id} does not exist in dataset")
+
+    def list_plates(self):
+        plate_els = [
+            (
+                pid,
+                functools.reduce(
+                    lambda x, y: set(x).union(y),
+                    [compd["el_str"].split("-") for compd in plated.values()],
+                ),
+            )
+            for pid, plated in self.all_data.items()
+            if pid != "els"
+        ]
+        return {k: sorted(v) for k, v in plate_els}
+    
+    def list_addressable(self):
+        plate_comps = list(self.data.keys())
+        el_vecs = list(zip(*plate_comps))
+        return {k: v for k, v in zip(self.all_data["els"], el_vecs)}
 
     def shutdown(self):
         pass
@@ -141,5 +168,7 @@ def makeApp(confPrefix, server_key, helao_root):
                 executor.stop_action_task()
         finished_action = await active.finish()
         return finished_action.as_dict()
+
+    
 
     return app
