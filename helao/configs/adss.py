@@ -3,7 +3,7 @@ __all__ = ["config"]
 
 hostip = "hte-adss-01.htejcap.caltech.edu"
 config = {}
-config["dummy"] = False
+config["dummy"] = True
 config["simulation"] = False
 
 # action library provides generator functions which produce actions

@@ -8,7 +8,7 @@ __all__ = ["makeApp"]
 from typing import Optional, List, Union
 from fastapi import Body
 from helao.helpers.premodels import Action
-from helao.servers.base import HelaoBase
+from helao.servers.base_api import BaseAPI
 from helaocore.models.sample import SampleUnion
 from helao.drivers.mfc.alicat_driver import AliCatMFC, MfcExec, PfcExec, MfcConstPresExec
 from helao.helpers.config_loader import config_loader
@@ -22,7 +22,7 @@ def makeApp(confPrefix, server_key, helao_root):
     dev_names = list(config["servers"][server_key]["params"]["devices"].keys())
     dev_mfcs = make_str_enum("dev_mfcs", {k: k for k in dev_names})
 
-    app = HelaoBase(
+    app = BaseAPI(
         config=config,
         server_key=server_key,
         server_title=server_key,
@@ -181,7 +181,7 @@ def makeApp(confPrefix, server_key, helao_root):
         return finished_action.as_dict()
 
     @app.post(f"/{server_key}/maintain_pressure", tags=["action"])
-    async def maintain_pressure_fill(
+    async def maintain_pressure(
         action: Action = Body({}, embed=True),
         action_version: int = 2,
         device_name: dev_mfcs = dev_names[0],
@@ -200,7 +200,7 @@ def makeApp(confPrefix, server_key, helao_root):
         executor = MfcConstPresExec(
             active=active,
             oneoff=False,
-            poll_rate=0.01,
+            poll_rate=0.05,
         )
         active_action_dict = active.start_executor(executor)
         return active_action_dict

@@ -7,7 +7,8 @@ import minimalmodbus
 
 from helaocore.error import ErrorCodes
 from helaocore.models.hlostatus import HloStatus
-from helao.servers.base import Base, Executor
+from helao.servers.base import Base
+from helao.helpers.executor import Executor
 
 
 class CM0134:

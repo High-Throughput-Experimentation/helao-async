@@ -1,13 +1,15 @@
-__all__ = ["MeerstetterTEC", "TECExec"]
+__all__ = ["MeerstetterTEC", "TECMonExec", "TECWaitExec"]
 
 import time
 import asyncio
 import logging
 from mecom import MeCom, ResponseException, WrongChecksum
+from mecom.exceptions import ResponseTimeout
 
 from helaocore.error import ErrorCodes
 from helaocore.models.hlostatus import HloStatus
-from helao.servers.base import Base, Executor
+from helao.servers.base import Base
+from helao.helpers.executor import Executor
 
 # default queries from command table below
 DEFAULT_QUERIES = [
@@ -41,10 +43,17 @@ class MeerstetterTEC(object):
         self.config_dict = action_serv.server_cfg["params"]
         self.channel = self.config_dict["channel"]
         self.port = self.config_dict["port"]
+        connection_retries = self.config_dict.get("retries", 15)
 
         self.queries = self.config_dict.get("queries", DEFAULT_QUERIES)
         self._session = None
-        self._connect()
+
+        for i in range(connection_retries):
+            try:
+                self._connect()
+                break
+            except ResponseTimeout:
+                self.base.print_message(f"connection timeout, retrying attempt {i+1}")
         self.action = None
         self.active = None
         self.start_margin = self.config_dict.get("start_margin", 0)
@@ -61,7 +70,7 @@ class MeerstetterTEC(object):
 
     def _connect(self):
         # open session
-        self._session = MeCom(serialport=self.port)
+        self._session = MeCom(serialport=self.port, timeout=1)
         # get device address
         self.address = self._session.identify()
         logging.info("connected to {}".format(self.address))
@@ -193,7 +202,9 @@ class TECWaitExec(Executor):
 
     async def _pre_exec(self):
         "Setup methods, return error state."
-        self.active.base.print_message(f"TECWait Executor sleeping for {self.initial_sleep} seconds.")
+        self.active.base.print_message(
+            f"TECWait Executor sleeping for {self.initial_sleep} seconds."
+        )
         await asyncio.sleep(self.initial_sleep)
         self.setup_err = ErrorCodes.none
         return {"error": self.setup_err}

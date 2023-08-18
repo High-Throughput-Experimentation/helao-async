@@ -11,7 +11,8 @@ import asyncio
 import serial
 
 from helaocore.error import ErrorCodes
-from helao.servers.base import Base, Executor
+from helao.servers.base import Base
+from helao.helpers.executor import Executor
 from helaocore.models.data import DataModel
 from helaocore.models.file import FileConnParams, HloHeaderModel
 from helaocore.models.sample import SampleInheritance, SampleStatus

@@ -621,7 +621,7 @@ def CCSI_debug_liquidloads(  #assumes initialization performed previously
     return epm.experiment_plan_list
 
 def CCSI_Solution_testing(  #assumes initialization performed previously
-    sequence_version: int = 5, #4 new threshold criteria 5, sample purgetime
+    sequence_version: int = 6, #6 split of liquidfill to cellfill and co2monitoring exps
     gas_sample_no: int = 2,
     Solution_volume_ul: List[float] = [0,500, 50],
     Solution_reservoir_sample_no: int = 2,
@@ -698,11 +698,13 @@ def CCSI_Solution_testing(  #assumes initialization performed previously
                 "water_True_False": True,
             })
 
-        epm.add_experiment("CCSI_sub_liquidfill_syringes", {
+        epm.add_experiment("CCSI_sub_cellfill", {
             "Solution_volume_ul": solnvolume,
             "Waterclean_volume_ul": watervolume,
             "Syringe_rate_ulsec": syringe_rate_ulsec,
             "LiquidFillWait_s": LiquidFillWait_s,
+        })
+        epm.add_experiment("CCSI_sub_co2monitoring", {
             "co2measure_duration": co2measure_duration,
             "co2measure_acqrate": co2measure_acqrate,
         })
