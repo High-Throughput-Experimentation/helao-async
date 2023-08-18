@@ -881,7 +881,7 @@ def ADSS_sub_CA_photo(
                             Syringe_rate_ulsec=300,
                         )
                     )
-                    apm.add(ORCH_server, "wait", {"waittime": vwait - 2}, waitcond)
+                    apm.add(ORCH_server, "wait", {"waittime": vwait - 3}, waitcond)
                     apm.add(ORCH_server, "wait", {"waittime": 0.1},ActionStartCondition.wait_for_orch)
 
 
