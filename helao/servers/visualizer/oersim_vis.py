@@ -187,6 +187,7 @@ class C_oersimvis:
                             if self.cur_comp != compstr:
                                 self.prev_comp = self.cur_comp
                                 self.cur_comp = compstr
+                                self._add_plots()
 
             # check for missing I_A in OCV
             max_len = max([len(v) for v in data_dict.values()])
