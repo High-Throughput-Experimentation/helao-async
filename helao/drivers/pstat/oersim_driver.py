@@ -96,6 +96,7 @@ class OerSimExec(Executor):
         """Read data from live buffer."""
         elapsed_time = time.time() - self.start_time
         new_idxs = [i for i, v in enumerate(self.cp["t_s"]) if v < elapsed_time]
+        print(new_idxs)
         status = HloStatus.active
         if new_idxs:
             newest_idx = max(new_idxs)
