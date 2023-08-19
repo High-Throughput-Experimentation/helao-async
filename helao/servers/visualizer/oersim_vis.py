@@ -180,7 +180,7 @@ class C_oersimvis:
                                 [
                                     f"{x}{y:.2f}"
                                     for x, y in zip(
-                                        data_dict[data_label], data_dict["atfracs"]
+                                        data_val, uuid_dict["atfracs"]
                                     )
                                 ]
                             )
