@@ -82,6 +82,12 @@ class C_oersimvis:
 
         self.plot = figure(title="Title", height=300, width=500)
         self.plot_prev = figure(title="Title", height=300, width=500)
+        self.plot.xaxis.axis_label = "Time (seconds)"
+        self.plot.yaxis.axis_label = "E vs RHE (V)"
+        self.plot.legend.location = "bottom_right"
+        self.plot_prev.xaxis.axis_label = "Time (seconds)"
+        self.plot_prev.yaxis.axis_label = "E vs RHE (V)"
+        self.plot_prev.legend.location = "bottom_right"
 
         # combine all sublayouts into a single one
         docs_url = f"http://{actserv_host}:{actserv_port}/docs#/"
