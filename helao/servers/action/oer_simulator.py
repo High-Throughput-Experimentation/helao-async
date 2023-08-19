@@ -60,15 +60,15 @@ def makeApp(confPrefix, server_key, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post("/list_plates")
+    @app.post("/list_plates", tags=["private"])
     def list_plates():
         return app.driver.list_plates()
 
-    @app.post("/list_addressable")
+    @app.post("/list_addressable", tags=["private"])
     def list_addressable(limit: int = 10, by_el: bool = False):
         return app.driver.list_addressable()
 
-    @app.post("/change_plate")
+    @app.post("/change_plate", tags=["private"])
     def change_plate(plate_id: int):
         return app.driver.change_plate(plate_id)
 

@@ -78,7 +78,7 @@ class OerSimExec(Executor):
         self.last_idx = 0
         self.start_time = time.time()  # instantiation time
         self.duration = self.active.action.action_params.get("duration", -1)
-        self.sample_data = self.active.base.driver.data[
+        self.sample_data = self.active.base.fastapp.driver.data[
             tuple(self.active.action_params["comp_vec"])
         ]
         self.cp = self.sample_data["CP3"]
