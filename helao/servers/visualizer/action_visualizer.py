@@ -12,7 +12,7 @@ from helao.servers.visualizer.gamry_vis import C_potvis
 from helao.servers.visualizer.nidaqmx_vis import C_nidaqmxvis
 from helao.servers.visualizer.pal_vis import C_palvis
 from helao.servers.visualizer.spec_vis import C_specvis
-from helao.servers.visualizer.echesim_action_vis import C_echesimvis
+from helao.servers.visualizer.oersim_vis import C_oersimvis
 
 
 def find_server_names(vis: Vis, fast_key: str) -> list:
@@ -61,7 +61,7 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
         "spec_server": C_specvis,
         "nidaqmx_server": C_nidaqmxvis,
         "pal_server": C_palvis,
-        "eche_simulator": C_echesimvis
+        "oer_simulator": C_oersimvis
     }
     vis_dict = {}
 

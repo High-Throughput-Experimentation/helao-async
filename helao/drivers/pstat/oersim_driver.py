@@ -1,19 +1,7 @@
-""" CP simulation server
-
-FastAPI server host for the OER screening simulator.
-
-Loads a subset of 3 mA/cm2 CP measurement data from https://doi.org/10.1039/C8MH01641K
-
-"""
-
-__all__ = ["makeApp"]
-
 import os
 import time
 import asyncio
 import functools
-from typing import List
-from fastapi import Body
 
 import pyzstd
 import _pickle as cPickle
@@ -22,9 +10,6 @@ from helaocore.error import ErrorCodes
 from helaocore.models.hlostatus import HloStatus
 
 from helao.servers.base import Base, Executor
-from helao.servers.base_api import BaseAPI
-from helao.helpers.premodels import Action
-from helao.helpers.config_loader import config_loader
 
 
 def decompress_pzstd(fpath):
@@ -33,7 +18,7 @@ def decompress_pzstd(fpath):
     return data
 
 
-class EcheSim:
+class OerSim:
     def __init__(self, action_serv: Base):
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
@@ -54,8 +39,10 @@ class EcheSim:
         if plate_id in self.all_data:
             self.data = self.all_data[plate_id]
             self.base.print_message(f"loaded plate_id: {plate_id}")
+            return True
         else:
             self.base.print_message(f"plate_id: {plate_id} does not exist in dataset")
+            return False
 
     def list_plates(self):
         plate_els = [
@@ -70,7 +57,7 @@ class EcheSim:
             if pid != "els"
         ]
         return {k: sorted(v) for k, v in plate_els}
-    
+
     def list_addressable(self):
         plate_comps = list(self.data.keys())
         el_vecs = list(zip(*plate_comps))
@@ -80,7 +67,7 @@ class EcheSim:
         pass
 
 
-class EcheSimExec(Executor):
+class OerSimExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.active.base.print_message("EcheSimExec initialized.")
@@ -124,51 +111,3 @@ class EcheSimExec(Executor):
         eta_mean = sum(erhes) / len(erhes) - 1.23
         self.active.action.action_params["mean_eta_vrhe"] = eta_mean
         return {"error": ErrorCodes.none}
-
-
-def makeApp(confPrefix, server_key, helao_root):
-    config = config_loader(confPrefix, helao_root)
-
-    app = BaseAPI(
-        config=config,
-        server_key=server_key,
-        server_title=server_key,
-        description="OER CP simulator",
-        version=1.0,
-        driver_class=EcheSim,
-    )
-
-    @app.post(f"/{server_key}/measure_cp", tags=["action"])
-    async def measure_cp(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
-        comp_vec: List[float] = [],
-        acquisition_rate: float = 0.2,
-    ):
-        """Record simulated data."""
-        active = await app.base.setup_and_contain_action()
-        active.action.action_abbr = "EcheCPSim"
-        executor = EcheSimExec(
-            active=active,
-            oneoff=False,
-            poll_rate=active.action.action_params["acquisition_rate"],
-        )
-        active_action_dict = active.start_executor(executor)
-        return active_action_dict
-
-    @app.post(f"/{server_key}/cancel_measure_cp", tags=["action"])
-    async def cancel_measure_cp(
-        action: Action = Body({}, embed=True),
-        action_version: int = 1,
-    ):
-        """Stop running measure_cp."""
-        active = await app.base.setup_and_contain_action()
-        for exec_id, executor in app.base.executors.items():
-            if exec_id.split()[0] == "measure_cp":
-                executor.stop_action_task()
-        finished_action = await active.finish()
-        return finished_action.as_dict()
-
-    
-
-    return app

@@ -27,7 +27,7 @@ VALID_DATA_STATUS = (
 VALID_ACTION_NAME = ("measure_cp",)
 
 
-class C_echesimvis:
+class C_oersimvis:
     """spectrometer visualizer module class"""
 
     def __init__(self, vis_serv: Vis, serv_key: str):
@@ -86,7 +86,7 @@ class C_echesimvis:
         # combine all sublayouts into a single one
         docs_url = f"http://{actserv_host}:{actserv_port}/docs#/"
         server_link = f'<a href="{docs_url}" target="_blank">\'{self.server_key}\'</a>'
-        headerbar = f"<b>CP measurement simulator for server {server_link}</b>"
+        headerbar = f"<b>OER CP simulator for server {server_link}</b>"
         self.layout = layout(
             [
                 [Spacer(width=20), Div(text=headerbar, width=1004, height=15)],
