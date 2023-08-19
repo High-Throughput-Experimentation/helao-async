@@ -3,7 +3,7 @@
 import time
 import asyncio
 from functools import partial
-from copy import deepcopy, copy
+from copy import deepcopy
 
 from bokeh.models import (
     TextInput,
@@ -185,7 +185,6 @@ class C_oersimvis:
                                 ]
                             )
                             if self.cur_comp != compstr:
-                                self.prev_comp = copy(self.cur_comp)
                                 self.cur_comp = compstr
                                 self._add_plots()
 
@@ -210,7 +209,7 @@ class C_oersimvis:
         self.plot_prev.renderers = []
 
         self.plot.title.text = f"active action_uuid: {self.cur_action_uuid}"
-        self.plot_prev.title.text = f"last {len(self.prev_action_uuids)} actions"
+        self.plot_prev.title.text = f"previous actoin_uuid: {self.prev_action_uuid}"
         colors = ["red", "blue", "orange", "green"]
         self.plot.line(
             x="t_s",
@@ -237,6 +236,7 @@ class C_oersimvis:
             if new_action_uuid is not None:
                 self.vis.print_message(" ... reseting CP graph")
                 self.prev_action_uuid = self.cur_action_uuid
+                self.prev_comp = self.cur_comp
                 if self.prev_action_uuid != "":
                     self.prev_action_uuids.append(self.prev_action_uuid)
                     self.vis.print_message(f"previous uuids: {self.prev_action_uuids}")

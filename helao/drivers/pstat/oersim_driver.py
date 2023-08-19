@@ -89,7 +89,6 @@ class OerSimExec(Executor):
         self.start_time = time.time()  # pre-polling iteration time
         data = {"elements": self.els, "atfracs": self.fracs}
         data.update({k: [] for k in self.cp})
-        print("will be sending:", self.cp)
         return {"data": data, "error": ErrorCodes.none}
 
     async def _poll(self):
