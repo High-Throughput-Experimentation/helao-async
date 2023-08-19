@@ -84,10 +84,8 @@ class C_oersimvis:
         self.plot_prev = figure(title="Title", height=300, width=500)
         self.plot.xaxis.axis_label = "Time (seconds)"
         self.plot.yaxis.axis_label = "E vs RHE (V)"
-        self.plot.legend.location = "bottom_right"
         self.plot_prev.xaxis.axis_label = "Time (seconds)"
         self.plot_prev.yaxis.axis_label = "E vs RHE (V)"
-        self.plot_prev.legend.location = "bottom_right"
 
         # combine all sublayouts into a single one
         docs_url = f"http://{actserv_host}:{actserv_port}/docs#/"
@@ -226,6 +224,7 @@ class C_oersimvis:
             name=self.cur_action_uuid,
             legend_label=self.cur_comp,
         )
+        self.plot.legend.location = "bottom_right"
         for i, puuid in enumerate(self.prev_action_uuids):
             self.plot_prev.line(
                 x="t_s",
@@ -235,6 +234,7 @@ class C_oersimvis:
                 name=puuid,
                 legend_label=self.prev_comp,
             )
+            self.plot_prev.legend.location = "bottom_right"
 
     def reset_plot(self, new_action_uuid=None, forceupdate: bool = False):
         if self.cur_action_uuid != new_action_uuid or forceupdate:
