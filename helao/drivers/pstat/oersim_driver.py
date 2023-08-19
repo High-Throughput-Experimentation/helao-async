@@ -88,6 +88,7 @@ class OerSimExec(Executor):
     async def _exec(self):
         self.start_time = time.time()  # pre-polling iteration time
         data = {"elements": self.els, "atfracs": self.fracs}
+        data.update({k: [] for k in self.cp})
         return {"data": data, "error": ErrorCodes.none}
 
     async def _poll(self):
@@ -96,7 +97,7 @@ class OerSimExec(Executor):
         new_idx = max([i for i, v in enumerate(self.cp["t_s"]) if v < elapsed_time])
         live_dict = {k: v[self.last_idx : new_idx] for k, v in self.cp.items()}
         self.last_idx = new_idx
-        if self.last_idx == new_idx:
+        if new_idx == len(self.cp["t_s"]) - 1:
             status = HloStatus.finished
         else:
             status = HloStatus.active
