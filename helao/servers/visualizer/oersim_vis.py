@@ -221,15 +221,16 @@ class C_oersimvis:
             legend_label=self.cur_comp,
         )
         self.plot.legend.location = "bottom_right"
-        self.plot_prev.line(
-            x="t_s",
-            y="erhe_v",
-            line_color=colors[1],
-            source=self.prev_datasources[self.prev_action_uuid],
-            name=self.prev_action_uuid,
-            legend_label=self.prev_comp,
-        )
-        self.plot_prev.legend.location = "bottom_right"
+        for puuid in self.prev_action_uuids:
+            self.plot_prev.line(
+                x="t_s",
+                y="erhe_v",
+                line_color=colors[1],
+                source=self.prev_datasources[puuid],
+                name=puuid,
+                legend_label=self.prev_comp,
+            )
+            self.plot_prev.legend.location = "bottom_right"
 
     def reset_plot(self, new_action_uuid=None, forceupdate: bool = False):
         if self.cur_action_uuid != new_action_uuid or forceupdate:
