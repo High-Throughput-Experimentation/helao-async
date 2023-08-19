@@ -89,12 +89,15 @@ class OerSimExec(Executor):
         self.start_time = time.time()  # pre-polling iteration time
         data = {"elements": self.els, "atfracs": self.fracs}
         data.update({k: [] for k in self.cp})
+        print("will be sending:", self.cp)
         return {"data": data, "error": ErrorCodes.none}
 
     async def _poll(self):
         """Read data from live buffer."""
         elapsed_time = time.time() - self.start_time
         new_idx = max([i for i, v in enumerate(self.cp["t_s"]) if v < elapsed_time])
+        print("new_idx", new_idx)
+        print("elapsed_time", elapsed_time)
         live_dict = {k: v[self.last_idx : new_idx] for k, v in self.cp.items()}
         self.last_idx = new_idx
         if new_idx == len(self.cp["t_s"]) - 1:
