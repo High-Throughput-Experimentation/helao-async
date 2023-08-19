@@ -25,7 +25,7 @@ config["servers"] = {
         "host": hostip,
         "port": 8002,
         "group": "action",
-        "fast": "eche_simulator",
+        "fast": "oer_simulator",
         "params": {"plate_id": 2750},
     },
     "VIS": {
