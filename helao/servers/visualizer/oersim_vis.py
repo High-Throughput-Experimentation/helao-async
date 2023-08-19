@@ -9,7 +9,7 @@ from bokeh.models import (
     TextInput,
 )
 from bokeh.plotting import figure
-from bokeh.models.widgets import Div, Paragraph
+from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 
@@ -209,7 +209,7 @@ class C_oersimvis:
         self.plot_prev.renderers = []
 
         self.plot.title.text = f"active action_uuid: {self.cur_action_uuid}"
-        self.plot_prev.title.text = f"previous actoin_uuid: {self.prev_action_uuid}"
+        self.plot_prev.title.text = f"previous action_uuid: {self.prev_action_uuid}"
         colors = ["red", "blue", "orange", "green"]
         self.plot.line(
             x="t_s",
