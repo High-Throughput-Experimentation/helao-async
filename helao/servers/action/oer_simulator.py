@@ -65,7 +65,7 @@ def makeApp(confPrefix, server_key, helao_root):
         return app.driver.list_plates()
 
     @app.post("/list_addressable")
-    def list_addressable():
+    def list_addressable(limit: int = 10, by_el: bool = False):
         return app.driver.list_addressable()
 
     @app.post("/change_plate")

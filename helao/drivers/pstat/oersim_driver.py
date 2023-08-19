@@ -58,10 +58,14 @@ class OerSim:
         ]
         return {k: sorted(v) for k, v in plate_els}
 
-    def list_addressable(self):
-        plate_comps = list(self.data.keys())
-        el_vecs = list(zip(*plate_comps))
-        return {k: v for k, v in zip(self.all_data["els"], el_vecs)}
+    def list_addressable(self, limit: int = 10, by_el: bool = False):
+        plate_comps = list(self.data.keys())[:limit]
+        if by_el:
+            el_vecs = list(zip(*plate_comps))
+            return {k: v for k, v in zip(self.all_data["els"], el_vecs)}
+        else:
+            return [self.all_data["els"]] + plate_comps
+
 
     def shutdown(self):
         pass
