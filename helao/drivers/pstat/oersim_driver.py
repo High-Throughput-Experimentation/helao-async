@@ -98,6 +98,7 @@ class OerSimExec(Executor):
         new_idxs = [i for i, v in enumerate(self.cp["t_s"]) if v < elapsed_time]
         print(new_idxs)
         status = HloStatus.active
+        live_dict = {}
         if new_idxs:
             newest_idx = max(new_idxs)
             print("new_idx", newest_idx)
