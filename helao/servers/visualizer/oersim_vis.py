@@ -3,7 +3,7 @@
 import time
 import asyncio
 from functools import partial
-from copy import deepcopy
+from copy import deepcopy, copy
 
 from bokeh.models import (
     TextInput,
@@ -97,10 +97,6 @@ class C_oersimvis:
                 [
                     self.input_max_points,
                 ],
-                [
-                    Paragraph(text="""x-axis:""", width=500, height=15),
-                    Paragraph(text="""y-axis:""", width=500, height=15),
-                ],
                 Spacer(height=10),
                 [self.plot, Spacer(width=20), self.plot_prev],
                 Spacer(height=10),
@@ -189,7 +185,7 @@ class C_oersimvis:
                                 ]
                             )
                             if self.cur_comp != compstr:
-                                self.prev_comp = self.cur_comp
+                                self.prev_comp = copy(self.cur_comp)
                                 self.cur_comp = compstr
                                 self._add_plots()
 
@@ -225,16 +221,15 @@ class C_oersimvis:
             legend_label=self.cur_comp,
         )
         self.plot.legend.location = "bottom_right"
-        for i, puuid in enumerate(self.prev_action_uuids):
-            self.plot_prev.line(
-                x="t_s",
-                y="erhe_v",
-                line_color=colors[i % len(colors)],
-                source=self.prev_datasources[puuid],
-                name=puuid,
-                legend_label=self.prev_comp,
-            )
-            self.plot_prev.legend.location = "bottom_right"
+        self.plot_prev.line(
+            x="t_s",
+            y="erhe_v",
+            line_color=colors[1],
+            source=self.prev_datasources[self.prev_action_uuid],
+            name=self.prev_action_uuid,
+            legend_label=self.prev_comp,
+        )
+        self.plot_prev.legend.location = "bottom_right"
 
     def reset_plot(self, new_action_uuid=None, forceupdate: bool = False):
         if self.cur_action_uuid != new_action_uuid or forceupdate:
