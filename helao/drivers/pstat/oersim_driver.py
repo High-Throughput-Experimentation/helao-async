@@ -95,15 +95,16 @@ class OerSimExec(Executor):
     async def _poll(self):
         """Read data from live buffer."""
         elapsed_time = time.time() - self.start_time
-        new_idx = max([i for i, v in enumerate(self.cp["t_s"]) if v < elapsed_time])
-        print("new_idx", new_idx)
-        print("elapsed_time", elapsed_time)
-        live_dict = {k: v[self.last_idx : new_idx] for k, v in self.cp.items()}
-        self.last_idx = new_idx
-        if new_idx == len(self.cp["t_s"]) - 1:
-            status = HloStatus.finished
-        else:
-            status = HloStatus.active
+        new_idxs = [i for i, v in enumerate(self.cp["t_s"]) if v < elapsed_time]
+        status = HloStatus.active
+        if new_idxs:
+            newest_idx = max(new_idxs)
+            print("new_idx", newest_idx)
+            print("elapsed_time", elapsed_time)
+            live_dict = {k: v[self.last_idx : newest_idx] for k, v in self.cp.items()}
+            self.last_idx = newest_idx
+            if newest_idx == len(self.cp["t_s"]) - 1:
+                status = HloStatus.finished
         await asyncio.sleep(0.001)
         return {
             "error": ErrorCodes.none,
