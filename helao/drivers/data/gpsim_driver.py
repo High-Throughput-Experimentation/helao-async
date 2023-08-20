@@ -5,7 +5,10 @@ import time
 from helaocore.error import ErrorCodes
 from helaocore.models.hlostatus import HloStatus
 from helao.helpers.zstd_io import unzpickle
-from helao.servers.base import Base, Executor
+from helao.servers.base import Base, Active
+from helao.helpers.executor import Executor
+from helao.helpers.premodels import Experiment
+from helao.helpers.dispatcher import async_private_dispatcher
 
 import numpy as np
 import gpflow
@@ -249,6 +252,74 @@ class GPSim:
         self.avail_step[plate_id] = []
         self.progress[plate_id] = []
         self.initialized[plate_id] = False
+
+    async def check_condition(self, activeobj: Active):
+        params = activeobj.action.action_params
+        plate_id = params["plate_id"]
+        stop_condition = params["stop_condition"]
+        thresh_value = params["thresh_value"]
+        repeat_experiment_name = params["repeat_experiment_name"]
+        repeat_experiment_params = params["repeat_experiment_params"]
+        kwargs = params["repeat_experiment_kwargs"]
+
+        repeat_measure_acquire = False
+        progress = self.progress[plate_id]
+        repeat_map = {
+            # search full plate
+            "none": len(self.acquired[plate_id] + self.acq_fromglobal[plate_id])
+            < self.features[plate_id].shape[0],
+            # below maximum iterations per plate
+            "max_iters": progress["plate_step"] < thresh_value,
+            # max model uncertainty
+            "max_stdev": max(
+                self.avail_step[plate_id][len(self.acquired[plate_id])][2] ** 2
+            )
+            > thresh_value,
+            # maximum expected improvement
+            "max_ei": progress["expected_improvement"] > thresh_value,
+        }
+        if repeat_map[stop_condition] and repeat_map["none"]:
+            repeat_measure_acquire = True
+
+        if repeat_measure_acquire:
+            # add experiment to orchestrator
+            world_config = self.base.fastapp.helao_cfg
+            orch_name = [
+                k
+                for k, d in world_config.get("servers", {}).items()
+                if d["group"] == "orchestrator"
+            ][0]
+            rep_exp = Experiment(
+                experiment_name=repeat_experiment_name,
+                experiment_params=repeat_experiment_params,
+                **kwargs,
+            )
+            self.base.print_message("queueing repeat experiment request on Orch")
+            resp, error = await async_private_dispatcher(
+                world_config,
+                orch_name,
+                "insert_experiment",
+                params_dict={},
+                json_dict={
+                    "idx": 0,
+                    "experiment": rep_exp.clean_dict(),
+                },
+            )
+            self.base.print_message(f"insert_experiment got response: {resp}")
+            self.base.print_message(f"insert_experiment returned error: {error}")
+        else:
+            self.base.print_message(
+                f"Threshold condition {stop_condition} {thresh_value} has been met."
+            )
+        return_dict = progress
+        return_dict.update(
+            {
+                "max_prediction_stdev": max(
+                    self.avail_step[plate_id][len(self.acquired[plate_id])][2] ** 2
+                ),
+            }
+        )
+        return return_dict
 
 
 class GPSimExec(Executor):

@@ -103,34 +103,13 @@ def makeApp(confPrefix, server_key, helao_root):
         plate_id: int = 0,
         stop_condition: str = "max_iters",
         thresh_value: Union[float, int] = 10,
+        repeat_experiment_name: str = "OERSIM_sub_activelearn",
+        repeat_experiment_params: dict = {},
+        repeat_experiment_kwargs: dict = {},
     ):
         active = await app.base.setup_and_contain_action()
-        pid = active.action.action_params["plate_id"]
-        repeat_measure_acquire = False
-        progress = app.driver.progress[pid]
-        stop_cond = active.action.action_params["stop_condition"]
-        thresh_val = active.action.action_params["thresh_value"]
-
-        repeat_map = {
-            # below maximum iterations per plate
-            "max_iters": progress["plate_step"] < thresh_val,
-            # search full plate
-            "none": len(app.driver.acquired[pid] + app.driver.acq_fromglobal[pid])
-            < self.features[pid].shape[0],
-            # minimum model uncertainty
-            "min_stdev": min(
-                app.driver.avail_step[pid][len(app.driver.acquired[pid])][2] ** 2
-            )
-            > thresh_val,
-            # minimum expected improvement
-            "min_ei": progress["expected_improvement"] > thresh_val,
-        }
-        if repeat_map[stop_cond] and repeat_map["none"]:
-            repeat_measure_acquire = True
-        if repeat_measure_acquire:
-            # add experiment to orchestrator
-            pass
-
+        return_dict = await app.driver.check_condition(active)
+        await active.enqueue_data_dflt(datadict=return_dict)
         finished_action = await active.finish()
         return finished_action.as_dict()
 

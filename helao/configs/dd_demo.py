@@ -6,8 +6,8 @@ config["dummy"] = True
 config["simulation"] = True
 
 # action library provides generator functions which produce actions
-config["experiment_libraries"] = ["TEST_exp"]
-config["sequence_libraries"] = ["TEST_seq"]
+config["experiment_libraries"] = ["OERSIM_exp"]
+config["sequence_libraries"] = ["OERSIM_seq"]
 config["run_type"] = "simulation"
 config["root"] = "/mnt/STORAGE/INST_hlo"  # software log and run files saved here
 

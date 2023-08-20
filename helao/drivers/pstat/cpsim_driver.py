@@ -6,7 +6,8 @@ import functools
 from helaocore.error import ErrorCodes
 from helaocore.models.hlostatus import HloStatus
 from helao.helpers.zstd_io import unzpickle
-from helao.servers.base import Base, Executor
+from helao.servers.base import Base
+from helao.helpers.executor import Executor
 from helao.drivers.data.gpsim_driver import calc_eta
 
 
