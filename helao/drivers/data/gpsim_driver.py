@@ -225,12 +225,14 @@ class GPSim:
         best_avail = list(self.features[plate_id][availinds[best_idx]])
         total_mae = self.total_step[plate_id][latest_step][0]
         data = {
-            "expected_improvement": best_ei,
+            "expected_improvement": float(best_ei),
             "feature": best_avail,
-            "total_plate_mae": total_mae,
+            "total_plate_mae": float(total_mae),
             "plate_step": latest_step,
             "global_step": self.global_step,
         }
+        for k, v in data.items():
+            print(k, v, type(v))
         self.progress[plate_id] = data
         return data
 
@@ -316,8 +318,8 @@ class GPSim:
         return_dict = progress
         return_dict.update(
             {
-                "max_prediction_stdev": max(
-                    self.avail_step[plate_id][len(self.acquired[plate_id])][2] ** 2
+                "max_prediction_stdev": float(
+                    max(self.avail_step[plate_id][len(self.acquired[plate_id])][2] ** 2)
                 ),
             }
         )
@@ -343,7 +345,6 @@ class GPSimExec(Executor):
 
     async def _post_exec(self):
         data = self.active.base.fastapp.driver.progress[self.plate_id]
-        print(data)
         return {
             "data": data,
             "error": ErrorCodes.none,
