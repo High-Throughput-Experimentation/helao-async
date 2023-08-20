@@ -546,7 +546,7 @@ class Progress(UserDict):
     def write(self):
         self.progress_path.parent.mkdir(parents=True, exist_ok=True)
         self.progress_path.write_text(
-            pyaml.dump(self.data, safe=True, sort_dicts=False)
+            pyaml.dump(self.data, safe=True, sort_dicts=False, vspacing=False)
         )
 
     def __setitem__(self, key, item):
@@ -632,7 +632,7 @@ class DBPack:
         self.log_dict = {}
         if not self.log_path.exists():
             self.log_path.write_text(
-                pyaml.dump(self.log_dict, safe=True, sort_dicts=False)
+                pyaml.dump(self.log_dict, safe=True, sort_dicts=False, vspacing=False)
             )
         else:
             self.read_log()
@@ -721,7 +721,7 @@ class DBPack:
         self.log_dict = yaml.load(self.log_path)
 
     def write_log(self):
-        self.log_path.write_text(pyaml.dump(self.log_dict, safe=True, sort_dicts=False))
+        self.log_path.write_text(pyaml.dump(self.log_dict, safe=True, sort_dicts=False, vspacing=False))
 
     def update_log(self, yml_path: str, flag_dict: dict):
         if yml_path not in self.log_dict.keys():

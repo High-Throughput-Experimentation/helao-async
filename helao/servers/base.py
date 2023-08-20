@@ -736,10 +736,9 @@ class Base:
             if not os.path.exists(output_path):
                 os.makedirs(output_path, exist_ok=True)
 
-            async with aiofiles.open(output_file, mode="w") as f:
-                output_dict = {"file_type": "action"}
-                output_dict.update(act_dict)
-                await f.write(pyaml.dump(output_dict, sort_dicts=False))
+            async with aiofiles.open(output_file, mode="w+") as f:
+                await f.write(pyaml.dump({"file_type": "action"}, vspacing=False))
+                await f.write(pyaml.dump(act_dict, sort_dicts=False, vspacing=False))
         else:
             self.print_message(
                 f"writing meta file for action '{action.action_name}' is disabled.",
@@ -759,13 +758,13 @@ class Base:
         )
 
         self.print_message(f"writing to exp meta file: {output_file}")
-        output_str = pyaml.dump(exp_dict, sort_dicts=False)
+        output_str = pyaml.dump(exp_dict, sort_dicts=False, vspacing=False)
 
         if not os.path.exists(output_path):
             os.makedirs(output_path, exist_ok=True)
 
         async with aiofiles.open(output_file, mode="w+") as f:
-            await f.write(pyaml.dump({"file_type": "experiment"}))
+            await f.write(pyaml.dump({"file_type": "experiment"}, vspacing=False))
             if not output_str.endswith("\n"):
                 output_str += "\n"
             await f.write(output_str)
@@ -784,13 +783,13 @@ class Base:
         )
 
         self.print_message(f"writing to seq meta file: {output_file}")
-        output_str = pyaml.dump(seq_dict, sort_dicts=False)
+        output_str = pyaml.dump(seq_dict, sort_dicts=False, vspacing=False)
 
         if not os.path.exists(output_path):
             os.makedirs(output_path, exist_ok=True)
 
         async with aiofiles.open(output_file, mode="w+") as f:
-            await f.write(pyaml.dump({"file_type": "sequence"}))
+            await f.write(pyaml.dump({"file_type": "sequence"}, vspacing=False))
             if not output_str.endswith("\n"):
                 output_str += "\n"
             await f.write(output_str)
@@ -802,7 +801,12 @@ class Base:
             "experiment_output_dir": exp.experiment_output_dir,
         }
         append_str = (
-            "\n".join(["  " + x for x in pyaml.dump([append_dict]).split("\n")][:-1])
+            "\n".join(
+                [
+                    "  " + x
+                    for x in pyaml.dump([append_dict], vspacing=False).split("\n")
+                ][:-1]
+            )
             + "\n"
         )
         sequence_dir = seq.get_sequence_dir()
@@ -999,7 +1003,7 @@ class Active:
         if isinstance(header, dict):
             # {} is "{}\n" if not filtered
             if header:
-                header = pyaml.dump(header, sort_dicts=False)
+                header = pyaml.dump(header, sort_dicts=False, vspacing=False)
             else:
                 header = ""
         elif isinstance(header, list):
@@ -1923,7 +1927,7 @@ class Active:
             datamodel = DataModel(
                 data={self.action.file_conn_keys[0]: data},
                 errors=[],
-                status=HloStatus.active,
+                status=HloStatus.active,  # must be active for data writer to write
             )
             self.enqueue_data_nowait(datamodel)  # write and broadcast
         if cleanup_error != ErrorCodes.none:
