@@ -61,7 +61,7 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
         "spec_server": C_specvis,
         "nidaqmx_server": C_nidaqmxvis,
         "pal_server": C_palvis,
-        "oer_simulator": C_oersimvis
+        "oer_cpsim": C_oersimvis
     }
     vis_dict = {}
 

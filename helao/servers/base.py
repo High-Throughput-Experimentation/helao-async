@@ -736,9 +736,10 @@ class Base:
             if not os.path.exists(output_path):
                 os.makedirs(output_path, exist_ok=True)
 
-            async with aiofiles.open(output_file, mode="w+") as f:
-                await f.write(pyaml.dump({"file_type": "action"}))
-                await f.write(pyaml.dump(act_dict, sort_dicts=False))
+            async with aiofiles.open(output_file, mode="w") as f:
+                output_dict = {"file_type": "action"}
+                output_dict.update(act_dict)
+                await f.write(pyaml.dump(output_dict, sort_dicts=False))
         else:
             self.print_message(
                 f"writing meta file for action '{action.action_name}' is disabled.",
@@ -1674,7 +1675,6 @@ class Active:
 
             # send the last status
             await self.add_status(action=finish_action)
-        
 
         # check if all actions are fininshed
         # if yes close datalogger etc
@@ -1923,7 +1923,7 @@ class Active:
             datamodel = DataModel(
                 data={self.action.file_conn_keys[0]: data},
                 errors=[],
-                status=HloStatus.finished,
+                status=HloStatus.active,
             )
             self.enqueue_data_nowait(datamodel)  # write and broadcast
         if cleanup_error != ErrorCodes.none:

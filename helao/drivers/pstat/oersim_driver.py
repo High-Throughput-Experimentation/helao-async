@@ -3,19 +3,11 @@ import time
 import asyncio
 import functools
 
-import pyzstd
-import _pickle as cPickle
-
 from helaocore.error import ErrorCodes
 from helaocore.models.hlostatus import HloStatus
-
+from helao.helpers.zstd_io import unzpickle
 from helao.servers.base import Base, Executor
-
-
-def decompress_pzstd(fpath):
-    data = pyzstd.ZstdFile(fpath, "rb")
-    data = cPickle.load(data)
-    return data
+from helao.drivers.data.oergpsim_driver import calc_eta
 
 
 class OerSim:
@@ -30,7 +22,7 @@ class OerSim:
             "data",
             "oer13_cps.pzstd",
         )
-        self.all_data = decompress_pzstd(self.data_file)
+        self.all_data = unzpickle(self.data_file)
         self.data = self.all_data[self.loaded_plate]
 
         self.event_loop = asyncio.get_event_loop()
@@ -65,7 +57,6 @@ class OerSim:
             return {k: v for k, v in zip(self.all_data["els"], el_vecs)}
         else:
             return [self.all_data["els"]] + plate_comps
-
 
     def shutdown(self):
         pass
@@ -112,9 +103,5 @@ class OerSimExec(Executor):
 
     async def _post_exec(self):
         # calculate final 4-second eta mean and pass to params
-        thresh_ts = max(self.cp["t_s"]) - 4
-        thresh_idx = min([i for i, v in enumerate(self.cp["t_s"]) if v > thresh_ts])
-        erhes = self.cp["erhe_v"][thresh_idx:]
-        eta_mean = sum(erhes) / len(erhes) - 1.23
-        self.active.action.action_params["mean_eta_vrhe"] = eta_mean
+        self.active.action.action_params["mean_eta_vrhe"] = calc_eta(self.cp)
         return {"error": ErrorCodes.none}

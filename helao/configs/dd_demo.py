@@ -9,7 +9,7 @@ config["simulation"] = True
 config["experiment_libraries"] = ["TEST_exp"]
 config["sequence_libraries"] = ["TEST_seq"]
 config["run_type"] = "simulation"
-config["root"] = "c:/INST_hlo"  # software log and run files saved here
+config["root"] = "/mnt/STORAGE/INST_hlo"  # software log and run files saved here
 
 
 # we define all the servers here so that the overview is a bit better
@@ -25,7 +25,7 @@ config["servers"] = {
         "host": hostip,
         "port": 8002,
         "group": "action",
-        "fast": "oer_simulator",
+        "fast": "oer_cpsim",
         "params": {"plate_id": 2750},
     },
     "VIS": {
@@ -34,5 +34,12 @@ config["servers"] = {
         "group": "visualizer",
         "bokeh": "action_visualizer",
         "params": {"doc_name": "OER Simulation Visualizer"},
+    },
+    "GPSIM": {
+        "host": hostip,
+        "port": 8003,
+        "group": "action",
+        "fast": "oer_gpsim",
+        "params": {}
     },
 }

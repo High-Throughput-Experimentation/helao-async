@@ -1,0 +1,273 @@
+import os
+import asyncio
+import time
+
+from helaocore.error import ErrorCodes
+from helaocore.models.hlostatus import HloStatus
+from helao.helpers.zstd_io import unzpickle
+from helao.servers.base import Base, Executor
+
+import numpy as np
+import gpflow
+from scipy.stats import norm
+from sklearn.metrics import mean_absolute_error
+
+
+def calc_eta(cp_dict):
+    thresh_ts = max(cp_dict["t_s"]) - 4
+    thresh_idx = min([i for i, v in enumerate(cp_dict["t_s"]) if v > thresh_ts])
+    erhes = cp_dict["erhe_v"][thresh_idx:]
+    return sum(erhes) / len(erhes) - 1.23
+
+
+
+class OerGPSim:
+    def __init__(self, action_serv: Base):
+        self.base = action_serv
+        self.config_dict = action_serv.server_cfg["params"]
+        self.world_config = action_serv.world_cfg
+        self.data_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "demos",
+            "data",
+            "oer13_cps.pzstd",
+        )
+        self.all_data = unzpickle(self.data_file)
+        self.els = self.all_data["els"]
+        self.all_data.pop("els")
+        self.features = {
+            k: np.array(sorted(d.keys())) for k, d in self.all_data.items()
+        }
+        self.all_plate_feats = np.vstack([arr for arr in self.features.values()])
+        self.targets = {
+            k: np.array(
+                [calc_eta(self.all_data[k][tuple(cvec)]["CP3"]) for cvec in arr]
+            ).reshape(-1, 1)
+            for k, arr in self.features.items()
+        }
+        # precalculated for simulation only
+        self.lib_pcts = {
+            k: {p: np.percentile(etas, p) for p in (1, 2, 5, 10)}
+            for k, etas in self.targets.items()
+        }
+        # acquired indices per library
+        self.acquired = {k: [] for k in self.all_data}
+        self.acq_fromglobal = {k: [] for k in self.all_data}
+
+        # global acquired and available
+        self.g_acq = set()
+        self.g_avl = set([tuple(x) for x in self.all_plate_feats])
+
+        # inverse map of all comps to libraries
+        self.invfeats = {
+            feat: [
+                plate_id
+                for plate_id, feat_dict in self.all_data.items()
+                if feat in feat_dict
+            ]
+            for feat in self.g_avl
+        }
+
+        # gpflow model
+        self.kernel_func = lambda: gpflow.kernels.Constant() * gpflow.kernels.Matern32(
+            lengthscales=0.5
+        ) + gpflow.kernels.White(variance=0.015**2)
+        self.kernel = None
+        self.model = None
+        self.opt = gpflow.optimizers.Scipy()
+        self.opt_logs = {k: {} for k in self.all_data}
+        self.total_step = {k: {} for k in self.all_data}
+        self.ei_step = {k: {} for k in self.all_data}
+        self.avail_step = {k: {} for k in self.all_data}
+        self.progress = {k: {} for k in self.all_data}
+
+        self.acq_fun, self.acq_fom, self.long_acq_fom = (
+            self.calc_ei,
+            "EI",
+            "Expected Improvement",
+        )
+
+        self.global_step = 0
+        self.event_loop = asyncio.get_event_loop()
+        self.init_priors_random()
+
+    def init_priors_random(self, seed=9999, num_points=10):
+        rng = np.random.default_rng(seed=seed)
+        for plate_id, arr in self.features.items():
+            ridxs = rng.choice(
+                range(arr.shape[0]),
+                num_points,
+                replace=False,
+                shuffle=False,
+            )
+            print(f"!!! initial indices for plate {plate_id} are: {ridxs}")
+            for ridx in ridxs:
+                self.acquire_point(arr[ridx], plate_id)
+
+    def calc_ei(self, plate_id, xi=0.001, noise=True):
+        """
+        Computes the EI at points X based on existing samples X_sample
+        and Y_sample using a Gaussian process surrogate model.
+
+        Args:
+            X: Points at which EI shall be computed (m x d).
+            X_sample: Sample locations (n x d).
+            Y_sample: Sample values (n x 1).
+            gpr: A GaussianProcessRegressor fitted to samples.
+            xi: Exploitation-exploration trade-off parameter.
+
+        Returns:
+            Expected improvements at points X.
+        """
+        acqinds = self.acquired[plate_id] + self.acq_fromglobal[plate_id]
+        X = self.features[plate_id][
+            np.array(
+                [i for i in range(self.features[plate_id].shape[0]) if i not in acqinds]
+            )
+        ]
+        X_sample = self.features[plate_id][np.array(acqinds)]
+        Y_sample = self.targets[plate_id][np.array(acqinds)]
+        mu, variance = (r.numpy() for r in self.model.predict_f(X))
+        mu_sample, variance_sample = (r.numpy() for r in self.model.predict_f(X_sample))
+
+        sigma = variance**0.5
+
+        if noise:
+            mu_sample_opt = np.max(mu_sample)
+        else:
+            mu_sample_opt = np.max(Y_sample)
+
+        with np.errstate(divide="warn"):
+            imp = mu - mu_sample_opt - xi
+            Z = imp / sigma
+            ei = imp * norm.cdf(Z) + sigma * norm.pdf(Z)
+            ei[sigma == 0.0] = 0.0
+
+        return ei, mu, variance
+
+    def acquire_point(self, feat, plate_id: int):
+        """Adds eta result to acquired list and returns next composition."""
+        self.g_acq.add(tuple(feat))
+        self.g_avl.remove(tuple(feat))
+        for other_plate_id in self.invfeats[tuple(feat)]:
+            plate_feature_idxs = np.where(
+                (self.features[other_plate_id] == feat).all(axis=1)
+            )[0]
+            if plate_feature_idxs:
+                plate_feature_idx = plate_feature_idxs[0]
+                if other_plate_id != plate_id:
+                    self.acq_fromglobal[other_plate_id].append(plate_feature_idx)
+                elif plate_id in self.acquired:
+                    self.acquired[plate_id].append(plate_feature_idx)
+        self.global_step += 1
+
+    def fit_model(self, plate_id):
+        """Assemble acquired etas per plate and predict loaded space."""
+        inds = self.acquired[plate_id] + self.acq_fromglobal[plate_id]
+        X = self.features[plate_id][np.array(inds).astype(int)]
+        y = self.targets[plate_id][np.array(inds).astype(int)]
+        self.kernel = self.kernel_func()
+        try:
+            self.model = gpflow.models.GPR(
+                data=(X, y), kernel=self.kernel, mean_function=None
+            )
+        except Exception as e:
+            print(e)
+        self.opt_logs[plate_id][len(self.acquired[plate_id])] = self.opt.minimize(
+            self.model.training_loss,
+            self.model.trainable_variables,
+            options={"maxiter": 100},
+        )
+        total_pred, total_var = (
+            r.numpy() for r in self.model.predict_f(self.features[plate_id])
+        )
+        total_mae = mean_absolute_error(total_pred, self.targets[plate_id])
+        self.total_step[plate_id][len(self.acquired[plate_id])] = (
+            total_mae,
+            total_pred,
+            total_var,
+            np.array(inds),
+        )
+
+        avail_ei, avail_pred, avail_var = self.acq_fun(plate_id, 0.001, True)
+        self.ei_step[plate_id][len(self.acquired[plate_id])] = avail_ei
+
+        avail_inds = [
+            i for i in range(self.features[plate_id].shape[0]) if i not in inds
+        ]
+        avail_mae = mean_absolute_error(
+            avail_pred, self.targets[plate_id][np.array(avail_inds)]
+        )
+        self.avail_step[plate_id][len(self.acquired[plate_id])] = (
+            avail_mae,
+            avail_pred,
+            avail_var,
+            np.array(avail_inds),
+        )
+        latest_step = max(self.ei_step[plate_id].keys())
+        latest_ei = self.ei_step[plate_id][latest_step]
+        best_idx = latest_ei.argmax()
+        best_ei = latest_ei[best_idx][0]
+        acqinds = self.acquired[plate_id] + self.acq_fromglobal[plate_id]
+        availinds = np.array(
+            [i for i in range(self.features[plate_id].shape[0]) if i not in acqinds]
+        )
+        best_avail = list(self.features[plate_id][availinds[best_idx]])
+        total_mae = self.total_step[plate_id][latest_step][0]
+        data = {
+            "expected_improvement": best_ei,
+            "feature": best_avail,
+            "total_plate_mae": total_mae,
+            "plate_step": latest_step,
+            "global_step": self.global_step,
+        }
+        self.progress[plate_id] = data
+        return data
+
+    def clear_global(self):
+        self.acquired = {k: [] for k in self.all_data}
+        self.acq_fromglobal = {k: [] for k in self.all_data}
+        self.opt_logs = {k: {} for k in self.all_data}
+        self.total_step = {k: {} for k in self.all_data}
+        self.ei_step = {k: {} for k in self.all_data}
+        self.avail_step = {k: {} for k in self.all_data}
+        self.progress = {k: {} for k in self.all_data}
+        self.g_acq = set()
+        self.g_avl = set([tuple(x) for x in self.all_plate_feats])
+        self.init_priors_random()
+
+    def clear_plate(self, plate_id):
+        self.acquired[plate_id] = []
+        self.acq_fromglobal[plate_id] = []
+        self.opt_logs[plate_id] = []
+        self.total_step[plate_id] = []
+        self.ei_step[plate_id] = []
+        self.avail_step[plate_id] = []
+        self.progress[plate_id] = []
+
+
+class OerGPExec(Executor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.active.base.print_message("OerGPExec initialized.")
+        self.start_time = time.time()  # instantiation time
+        self.duration = self.active.action.action_params.get("duration", -1)
+        self.feat = self.active.action.action_params["comp_vec"]
+        self.plate_id = self.active.action.action_params["plate_id"]
+
+    async def _exec(self):
+        self.active.base.fastapp.driver.acquire_point(self.feat, self.plate_id)
+        self.active.base.fastapp.driver.fit_model(self.plate_id)
+        return {
+            "error": ErrorCodes.none,
+            "status": HloStatus.active,
+        }
+
+    async def _post_exec(self):
+        data = self.active.base.fastapp.driver.progress[self.plate_id]
+        print(data)
+        return {
+            "data": data,
+            "error": ErrorCodes.none,
+            "status": HloStatus.finished,
+        }
