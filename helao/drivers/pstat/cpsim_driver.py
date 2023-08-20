@@ -93,7 +93,7 @@ class CPSimExec(Executor):
             newest_idx = max(new_idxs)
             live_dict = {k: v[self.last_idx : newest_idx] for k, v in self.cp.items()}
             self.last_idx = newest_idx
-            if newest_idx == len(self.cp["t_s"]) - 1:
+            if newest_idx == len(self.cp["t_s"]) - 1 or newest_idx > 5:
                 status = HloStatus.finished
         await asyncio.sleep(0.001)
         return {
