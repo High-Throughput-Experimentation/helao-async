@@ -109,7 +109,7 @@ class GPSim:
         self.clear_plate(plate_id)
         print(f"!!! initial indices for plate {plate_id} are: {ridxs}")
         for ridx in ridxs:
-            self.acquire_point(arr[ridx], plate_id)
+            self.acquire_point(arr[ridx], plate_id, init_points=True)
         self.initialized[plate_id] = True
 
     def calc_ei(self, plate_id, xi=0.001, noise=True):
