@@ -67,7 +67,7 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         active = await app.base.setup_and_contain_action()
         plate_id = app.driver.loaded_plate
-        active.action.action_params["loaded_plate_id"] = plate_id
+        active.action.action_params["_loaded_plate_id"] = plate_id
         await active.enqueue_data_dflt(datadict={"loaded_plate_id": plate_id})
         finished_action = await active.finish()
         return finished_action.as_dict()
