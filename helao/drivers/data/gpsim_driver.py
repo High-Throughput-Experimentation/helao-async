@@ -167,7 +167,7 @@ class GPSim:
                     self.acq_fromglobal[other_plate_id].append(plate_feature_idx)
                 elif init_points:
                     self.acq_fromglobal[plate_id].append(plate_feature_idx)
-                elif plate_id in self.acquired:
+                else:
                     self.acquired[plate_id].append(plate_feature_idx)
         self.global_step += 1
 
@@ -248,11 +248,11 @@ class GPSim:
     def clear_plate(self, plate_id):
         self.acquired[plate_id] = []
         self.acq_fromglobal[plate_id] = []
-        self.opt_logs[plate_id] = []
-        self.total_step[plate_id] = []
-        self.ei_step[plate_id] = []
-        self.avail_step[plate_id] = []
-        self.progress[plate_id] = []
+        self.opt_logs[plate_id] = {}
+        self.total_step[plate_id] = {}
+        self.ei_step[plate_id] = {}
+        self.avail_step[plate_id] = {}
+        self.progress[plate_id] = {}
         self.initialized[plate_id] = False
 
     async def check_condition(self, activeobj: Active):
