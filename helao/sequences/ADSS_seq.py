@@ -1192,7 +1192,7 @@ def ADSS_CA_NiSb_cell_1potential_photo(
 
 
 def ADSS_CA_cell_1potential(
-    sequence_version: int = 3, #v3 move led off to exp
+    sequence_version: int = 4, #v3 move led off to exp v4 electrolyte insertion
     #solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no: int = 14050,  #  instead of map select
@@ -1209,6 +1209,9 @@ def ADSS_CA_cell_1potential(
     CA_duration_sec: float = 1320,
     aliquot_times_sec: List[float] = [60, 600, 1140],
     aliquot_volume_ul: int = 200,
+    insert_electrolyte_yn: bool = False,
+    insert_electrolyte_ul: int = 0,
+    insert_electrolyte_time_sec: float = 1800,
     OCV_duration: float = 60,
     OCValiquot_times_sec: List[float] = [20],
     samplerate_sec: float = 1,
@@ -1329,6 +1332,9 @@ def ADSS_CA_cell_1potential(
                 "CA_duration_sec": CA_duration_sec,
                 "led_wavelength": led_wavelength,
                 "toggle_illum_duty": led_dutycycle,
+                "insert_electrolyte_yn":insert_electrolyte_yn,
+                "insert_electrolyte_ul":insert_electrolyte_ul,
+                "insert_electrolyte_time_sec":insert_electrolyte_time_sec,             
                 "aliquot_volume_ul": aliquot_volume_ul,
                 "aliquot_times_sec": aliquot_times_sec,
                 "aliquot_insitu": True,
