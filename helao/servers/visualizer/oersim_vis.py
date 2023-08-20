@@ -162,12 +162,12 @@ class C_oersimvis:
     def add_points(self, datapackage_list: list):
         for data_package in datapackage_list:
             data_dict = {k: [] for k in self.data_dict_keys}
-            # only resets if axis selector or action_uuid changes
-            self.reset_plot(str(data_package.action_uuid))
             if (
                 data_package.datamodel.status in VALID_DATA_STATUS
                 and data_package.action_name in VALID_ACTION_NAME
             ):
+                # only resets if axis selector or action_uuid changes
+                self.reset_plot(str(data_package.action_uuid))
                 for _, uuid_dict in data_package.datamodel.data.items():
                     for data_label, data_val in uuid_dict.items():
                         if data_label in self.data_dict_keys:
