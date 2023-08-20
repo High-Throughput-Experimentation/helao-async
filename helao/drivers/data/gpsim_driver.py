@@ -163,13 +163,14 @@ class GPSim:
             )[0]
             if plate_feature_idxs:
                 plate_feature_idx = plate_feature_idxs[0]
-                if other_plate_id != plate_id:
+                if other_plate_id != plate_id or init_points:
                     self.acq_fromglobal[other_plate_id].append(plate_feature_idx)
-                elif init_points:
-                    self.acq_fromglobal[plate_id].append(plate_feature_idx)
-                else:
+                elif plate_id in self.acquired:
                     self.acquired[plate_id].append(plate_feature_idx)
         self.global_step += 1
+        self.base.print_message(
+            f"plate_id {plate_id} has acquired {len(self.acquired[plate_id])} points"
+        )
 
     def fit_model(self, plate_id):
         """Assemble acquired etas per plate and predict loaded space."""
