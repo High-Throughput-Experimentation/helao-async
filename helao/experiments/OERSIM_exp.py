@@ -3,7 +3,7 @@ Experiment library for Orchestrator testing
 server_key must be a FastAPI action server defined in config
 """
 
-__all__ = ["TEST_sub_noblocking"]
+__all__ = ["OERSIM_sub_load_plate", "OERSIM_sub_measure_CP", "OERSIM_sub_decision"]
 
 
 from typing import Optional, Union
@@ -39,8 +39,7 @@ def OERSIM_sub_load_plate(
 def OERSIM_sub_measure_CP(
     experiment: Experiment,
     experiment_version: int = 1,
-    plate_id: int = 0,
-    num_random_points: int = 5,
+    init_random_points: int = 5,
 ):
     apm = ActionPlanMaker()
     apm.add(
@@ -50,7 +49,7 @@ def OERSIM_sub_measure_CP(
         GPSIM_server,
         "initialize_plate",
         {
-            "num_random_points": apm.pars.num_random_points,
+            "num_random_points": apm.pars.init_random_points,
             "reinitialize": False,
         },
         from_globalexp_params={"_loaded_plate_id": "plate_id"},
@@ -104,5 +103,29 @@ def OERSIM_sub_decision(
             "thresh_value": apm.pars.thresh_value,
         },
         from_globalexp_params={"_loaded_plate_id": "plate_id"},
+    )
+    return apm.action_list
+
+
+def OERSIM_sub_activelearn(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    init_random_points: int = 5,
+    stop_condition: str = "max_iters",  # {"none", "max_iters", "min_stdev", "min_ei"}
+    thresh_value: Union[float, int] = 10,
+):
+    apm = ActionPlanMaker()
+    apm.add_action_list(
+        OERSIM_sub_measure_CP(
+            experiment=experiment,
+            init_random_points=apm.pars.init_random_points,
+        )
+    )
+    apm.add_action_list(
+        OERSIM_sub_decision(
+            experiment=experiment,
+            stop_condition=apm.pars.stop_condition,
+            thresh_value=apm.pars.thresh_value,
+        )
     )
     return apm.action_list
