@@ -33,7 +33,7 @@ def OERSIM_sub_load_plate(
     apm = ActionPlanMaker()
     apm.add(CPSIM_server, "change_plate", {"plate_id": apm.pars.plate_id})
     apm.add(
-        CPSIM_server, "get_loaded_plate", {}, to_global_exp_params=["_loaded_plate_id"]
+        CPSIM_server, "get_loaded_plate", {}, to_globalexp_params=["_loaded_plate_id"]
     )
 
 
@@ -44,7 +44,7 @@ def OERSIM_sub_measure_CP(
 ):
     apm = ActionPlanMaker()
     apm.add(
-        CPSIM_server, "get_loaded_plate", {}, to_global_exp_params=["_loaded_plate_id"]
+        CPSIM_server, "get_loaded_plate", {}, to_globalexp_params=["_loaded_plate_id"]
     )
     apm.add(
         GPSIM_server,
@@ -60,7 +60,7 @@ def OERSIM_sub_measure_CP(
         "get_progress",
         {},
         from_globalexp_params={"_loaded_plate_id": "plate_id"},
-        to_global_exp_params=[
+        to_globalexp_params=[
             "_expected_improvement",
             "_feature",
             "_plate_step",
@@ -90,7 +90,7 @@ def OERSIM_sub_decision(
 ):
     apm = ActionPlanMaker()
     apm.add(
-        CPSIM_server, "get_loaded_plate", {}, to_global_exp_params=["_loaded_plate_id"]
+        CPSIM_server, "get_loaded_plate", {}, to_globalexp_params=["_loaded_plate_id"]
     )
     # call progress action to force model fit if nothing has been measured
     apm.add(
