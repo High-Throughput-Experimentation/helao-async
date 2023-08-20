@@ -20,11 +20,11 @@ def calc_eta(cp_dict):
     return sum(erhes) / len(erhes) - 1.23
 
 
-
-class OerGPSim:
+class GPSim:
     def __init__(self, action_serv: Base):
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
+        self.rng = np.random.default_rng(seed=self.config_dict["random_seed"])
         self.world_config = action_serv.world_cfg
         self.data_file = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
@@ -80,6 +80,7 @@ class OerGPSim:
         self.ei_step = {k: {} for k in self.all_data}
         self.avail_step = {k: {} for k in self.all_data}
         self.progress = {k: {} for k in self.all_data}
+        self.initialized = {k: False for k in self.all_data}
 
         self.acq_fun, self.acq_fom, self.long_acq_fom = (
             self.calc_ei,
@@ -89,20 +90,24 @@ class OerGPSim:
 
         self.global_step = 0
         self.event_loop = asyncio.get_event_loop()
-        self.init_priors_random()
 
-    def init_priors_random(self, seed=9999, num_points=10):
-        rng = np.random.default_rng(seed=seed)
-        for plate_id, arr in self.features.items():
-            ridxs = rng.choice(
-                range(arr.shape[0]),
-                num_points,
-                replace=False,
-                shuffle=False,
-            )
-            print(f"!!! initial indices for plate {plate_id} are: {ridxs}")
-            for ridx in ridxs:
-                self.acquire_point(arr[ridx], plate_id)
+    def init_all_plates(self, num_points: int):
+        for plate_id in self.features:
+            self.init_priors_random(plate_id, num_points)
+
+    def init_priors_random(self, plate_id: int, num_points: int):
+        arr = self.features[plate_id]
+        ridxs = self.rng.choice(
+            range(arr.shape[0]),
+            num_points,
+            replace=False,
+            shuffle=False,
+        )
+        self.clear_plate(plate_id)
+        print(f"!!! initial indices for plate {plate_id} are: {ridxs}")
+        for ridx in ridxs:
+            self.acquire_point(arr[ridx], plate_id)
+        self.initialized[plate_id] = True
 
     def calc_ei(self, plate_id, xi=0.001, noise=True):
         """
@@ -234,7 +239,6 @@ class OerGPSim:
         self.progress = {k: {} for k in self.all_data}
         self.g_acq = set()
         self.g_avl = set([tuple(x) for x in self.all_plate_feats])
-        self.init_priors_random()
 
     def clear_plate(self, plate_id):
         self.acquired[plate_id] = []
@@ -244,12 +248,13 @@ class OerGPSim:
         self.ei_step[plate_id] = []
         self.avail_step[plate_id] = []
         self.progress[plate_id] = []
+        self.initialized[plate_id] = False
 
 
-class OerGPExec(Executor):
+class GPSimExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.active.base.print_message("OerGPExec initialized.")
+        self.active.base.print_message("GPSimExec initialized.")
         self.start_time = time.time()  # instantiation time
         self.duration = self.active.action.action_params.get("duration", -1)
         self.feat = self.active.action.action_params["comp_vec"]

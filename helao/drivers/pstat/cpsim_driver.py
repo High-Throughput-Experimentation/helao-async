@@ -7,10 +7,10 @@ from helaocore.error import ErrorCodes
 from helaocore.models.hlostatus import HloStatus
 from helao.helpers.zstd_io import unzpickle
 from helao.servers.base import Base, Executor
-from helao.drivers.data.oergpsim_driver import calc_eta
+from helao.drivers.data.gpsim_driver import calc_eta
 
 
-class OerSim:
+class CPSim:
     def __init__(self, action_serv: Base):
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
@@ -62,7 +62,7 @@ class OerSim:
         pass
 
 
-class OerSimExec(Executor):
+class CPSimExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.active.base.print_message("EcheSimExec initialized.")

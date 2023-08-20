@@ -1,6 +1,6 @@
 """Helao instrument configuration for OER measurement simulator"""
 
-hostip = "127.0.0.1"
+HOSTIP = "127.0.0.1"
 config = {}
 config["dummy"] = True
 config["simulation"] = True
@@ -15,31 +15,31 @@ config["root"] = "/mnt/STORAGE/INST_hlo"  # software log and run files saved her
 # we define all the servers here so that the overview is a bit better
 config["servers"] = {
     "ORCH": {
-        "host": hostip,
+        "host": HOSTIP,
         "port": 8001,
         "group": "orchestrator",
         "fast": "async_orch2",
         "params": {"enable_op": True, "bokeh_port": 5001},
     },
-    "OERSIM": {
-        "host": hostip,
+    "CPSIM": {
+        "host": HOSTIP,
         "port": 8002,
         "group": "action",
-        "fast": "oer_cpsim",
+        "fast": "cpsim_server",
         "params": {"plate_id": 2750},
     },
     "VIS": {
-        "host": hostip,
+        "host": HOSTIP,
         "port": 5002,
         "group": "visualizer",
         "bokeh": "action_visualizer",
         "params": {"doc_name": "OER Simulation Visualizer"},
     },
     "GPSIM": {
-        "host": hostip,
+        "host": HOSTIP,
         "port": 8003,
         "group": "action",
-        "fast": "oer_gpsim",
+        "fast": "gpsim_server",
         "params": {}
     },
 }

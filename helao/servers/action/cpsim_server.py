@@ -14,7 +14,7 @@ from fastapi import Body
 from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
-from helao.drivers.pstat.oersim_driver import OerSim, OerSimExec
+from helao.drivers.pstat.cpsim_driver import CPSim, CPSimExec
 
 
 def makeApp(confPrefix, server_key, helao_root):
@@ -26,7 +26,7 @@ def makeApp(confPrefix, server_key, helao_root):
         server_title=server_key,
         description="OER CP simulator",
         version=1.0,
-        driver_class=OerSim,
+        driver_class=CPSim,
     )
 
     @app.post(f"/{server_key}/measure_cp", tags=["action"])
@@ -38,8 +38,8 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         """Record simulated data."""
         active = await app.base.setup_and_contain_action()
-        active.action.action_abbr = "SIMCP"
-        executor = OerSimExec(
+        active.action.action_abbr = "CPSIM"
+        executor = CPSimExec(
             active=active,
             oneoff=False,
             poll_rate=active.action.action_params["acquisition_rate"],
@@ -60,16 +60,38 @@ def makeApp(confPrefix, server_key, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
+    @app.post(f"/{server_key}/get_loaded_plate", tags=["action"])
+    async def get_loaded_plate(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+    ):
+        active = await app.base.setup_and_contain_action()
+        plate_id = app.driver.loaded_plate
+        active.action.action_params["loaded_plate_id"] = plate_id
+        await active.enqueue_data_dflt(datadict={"loaded_plate_id": plate_id})
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+    @app.post(f"/{server_key}/change_plate", tags=["action"])
+    async def change_plate(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        plate_id: int = 0,
+    ):
+        active = await app.base.setup_and_contain_action()
+        app.driver.change_plate(active.action.action_params["plate_id"])
+        loaded_plate_id = app.driver.loaded_plate
+        active.action.action_params["_loaded_plate_id"] = loaded_plate_id
+        await active.enqueue_data_dflt(datadict={"loaded_plate_id": loaded_plate_id})
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
     @app.post("/list_plates", tags=["private"])
     def list_plates():
         return app.driver.list_plates()
 
     @app.post("/list_addressable", tags=["private"])
     def list_addressable(limit: int = 10, by_el: bool = False):
-        return app.driver.list_addressable()
-
-    @app.post("/change_plate", tags=["private"])
-    def change_plate(plate_id: int):
-        return app.driver.change_plate(plate_id)
+        return app.driver.list_addressable(limit, by_el)
 
     return app
