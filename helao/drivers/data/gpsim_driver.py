@@ -153,7 +153,7 @@ class GPSim:
 
         return ei, mu, variance
 
-    def acquire_point(self, feat, plate_id: int):
+    def acquire_point(self, feat, plate_id: int, init_points: bool = False):
         """Adds eta result to acquired list and returns next composition."""
         self.g_acq.add(tuple(feat))
         self.g_avl.remove(tuple(feat))
@@ -165,6 +165,8 @@ class GPSim:
                 plate_feature_idx = plate_feature_idxs[0]
                 if other_plate_id != plate_id:
                     self.acq_fromglobal[other_plate_id].append(plate_feature_idx)
+                elif init_points:
+                    self.acq_fromglobal[plate_id].append(plate_feature_idx)
                 elif plate_id in self.acquired:
                     self.acquired[plate_id].append(plate_feature_idx)
         self.global_step += 1
