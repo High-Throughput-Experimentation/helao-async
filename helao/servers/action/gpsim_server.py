@@ -63,7 +63,7 @@ def makeApp(confPrefix, server_key, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post("/get_progress", tags=["action"])
+    @app.post(f"/{server_key}/get_progress", tags=["action"])
     async def get_progress(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
