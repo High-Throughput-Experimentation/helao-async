@@ -42,9 +42,10 @@ class GPSim:
             k: np.array(sorted(d.keys())) for k, d in self.all_data.items()
         }
         self.all_plate_feats = np.vstack([arr for arr in self.features.values()])
+        sign = -1.0 if self.config_dict.get("minimize", True) else 1.0
         self.targets = {
             k: np.array(
-                [calc_eta(self.all_data[k][tuple(cvec)]["CP3"]) for cvec in arr]
+                [sign * calc_eta(self.all_data[k][tuple(cvec)]["CP3"]) for cvec in arr]
             ).reshape(-1, 1)
             for k, arr in self.features.items()
         }
@@ -117,13 +118,6 @@ class GPSim:
         Computes the EI at points X based on existing samples X_sample
         and Y_sample using a Gaussian process surrogate model.
 
-        Args:
-            X: Points at which EI shall be computed (m x d).
-            X_sample: Sample locations (n x d).
-            Y_sample: Sample values (n x 1).
-            gpr: A GaussianProcessRegressor fitted to samples.
-            xi: Exploitation-exploration trade-off parameter.
-
         Returns:
             Expected improvements at points X.
         """
@@ -174,6 +168,7 @@ class GPSim:
 
     def fit_model(self, plate_id):
         """Assemble acquired etas per plate and predict loaded space."""
+        plate_step = len(self.acquired[plate_id])
         inds = self.acquired[plate_id] + self.acq_fromglobal[plate_id]
         X = self.features[plate_id][np.array(inds).astype(int)]
         y = self.targets[plate_id][np.array(inds).astype(int)]
@@ -184,7 +179,7 @@ class GPSim:
             )
         except Exception as e:
             print(e)
-        self.opt_logs[plate_id][len(self.acquired[plate_id])] = self.opt.minimize(
+        self.opt_logs[plate_id][plate_step] = self.opt.minimize(
             self.model.training_loss,
             self.model.trainable_variables,
             options={"maxiter": 100},
@@ -193,7 +188,7 @@ class GPSim:
             r.numpy() for r in self.model.predict_f(self.features[plate_id])
         )
         total_mae = mean_absolute_error(total_pred, self.targets[plate_id])
-        self.total_step[plate_id][len(self.acquired[plate_id])] = (
+        self.total_step[plate_id][plate_step] = (
             total_mae,
             total_pred,
             total_var,
@@ -201,35 +196,28 @@ class GPSim:
         )
 
         avail_ei, avail_pred, avail_var = self.acq_fun(plate_id, 0.001, True)
-        self.ei_step[plate_id][len(self.acquired[plate_id])] = avail_ei
+        self.ei_step[plate_id][plate_step] = avail_ei
 
-        avail_inds = [
-            i for i in range(self.features[plate_id].shape[0]) if i not in inds
-        ]
-        avail_mae = mean_absolute_error(
-            avail_pred, self.targets[plate_id][np.array(avail_inds)]
+        avail_inds = np.array(
+            [i for i in range(self.features[plate_id].shape[0]) if i not in inds]
         )
-        self.avail_step[plate_id][len(self.acquired[plate_id])] = (
+        avail_mae = mean_absolute_error(avail_pred, self.targets[plate_id][avail_inds])
+        self.avail_step[plate_id][plate_step] = (
             avail_mae,
             avail_pred,
             avail_var,
-            np.array(avail_inds),
+            avail_inds,
         )
-        latest_step = max(self.ei_step[plate_id].keys())
-        latest_ei = self.ei_step[plate_id][latest_step]
+        latest_ei = self.ei_step[plate_id][plate_step]
         best_idx = latest_ei.argmax()
-        best_ei = latest_ei[best_idx][0]
-        acqinds = self.acquired[plate_id] + self.acq_fromglobal[plate_id]
-        availinds = np.array(
-            [i for i in range(self.features[plate_id].shape[0]) if i not in acqinds]
-        )
-        best_avail = list(self.features[plate_id][availinds[best_idx]])
-        total_mae = self.total_step[plate_id][latest_step][0]
+        best_ei = max(latest_ei)
+        best_avail = list(self.features[plate_id][avail_inds[best_idx]])
+        total_mae = self.total_step[plate_id][plate_step][0]
         data = {
             "expected_improvement": float(best_ei),
             "feature": best_avail,
             "total_plate_mae": float(total_mae),
-            "plate_step": latest_step,
+            "plate_step": plate_step,
             "global_step": self.global_step,
         }
         for k, v in data.items():
