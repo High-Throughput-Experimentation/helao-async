@@ -67,6 +67,7 @@ class Calc:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
         self.yaml = YAML(typ="safe")
+        self.world_config = self.base.fastapp.helao_cfg
 
     def gather_seq_data(self, seq_reldir: str, action_name: str):
         """Get all files using FileMapper to traverse ACTIVE/FINISHED/SYNCED."""
@@ -760,12 +761,6 @@ class Calc:
             self.base.print_message(
                 f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition. Looping."
             )
-            world_config = self.base.fastapp.helao_cfg
-            orch_name = [
-                k
-                for k, d in world_config.get("servers", {}).items()
-                if d["group"] == "orchestrator"
-            ][0]
             rep_exp = Experiment(
                 experiment_name=repeat_experiment_name,
                 experiment_params=repeat_experiment_params,
@@ -773,8 +768,9 @@ class Calc:
             )
             self.base.print_message("queueing repeat experiment request on Orch")
             resp, error = await async_private_dispatcher(
-                world_config,
-                orch_name,
+                self.base.orch_key,
+                self.base.orch_host,
+                self.base.orch_port,
                 "insert_experiment",
                 params_dict={},
                 json_dict={
@@ -825,12 +821,6 @@ class Calc:
             )
 
         if fill_needed:
-            world_config = self.base.fastapp.helao_cfg
-            orch_name = [
-                k
-                for k, d in world_config.get("servers", {}).items()
-                if d["group"] == "orchestrator"
-            ][0]
             rep_exp = Experiment(
                 experiment_name=repeat_experiment_name,
                 experiment_params=repeat_experiment_params,
@@ -838,8 +828,9 @@ class Calc:
             )
             self.base.print_message("queueing repeat experiment request on Orch")
             resp, error = await async_private_dispatcher(
-                world_config,
-                orch_name,
+                self.base.orch_key,
+                self.base.orch_host,
+                self.base.orch_port,
                 "insert_experiment",
                 params_dict={},
                 json_dict={

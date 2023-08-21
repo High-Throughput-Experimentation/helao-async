@@ -108,6 +108,13 @@ class Base:
             self.server.server_name
         ].get("params", {})
         self.world_cfg = self.fastapp.helao_cfg
+        self.orch_key = [
+            k
+            for k, d in self.world_cfg.get("servers", {}).items()
+            if d["group"] == "orchestrator"
+        ][0]
+        self.orch_host = self.world_cfg["servers"][self.orch_key]["host"]
+        self.orch_port = self.world_cfg["servers"][self.orch_key]["port"]
         self.run_type = None
 
         self.helaodirs = helao_dirs(self.world_cfg, self.server.server_name)
@@ -423,6 +430,8 @@ class Base:
     async def send_statuspackage(
         self,
         client_servkey: str,
+        client_host: str,
+        client_port: int,
         action_name: str = None,
     ):
         # needs private dispatcher
@@ -432,8 +441,9 @@ class Base:
             )
         }
         response, error_code = await async_private_dispatcher(
-            world_config_dict=self.world_cfg,
-            server=client_servkey,
+            server_key=client_servkey,
+            host=client_host,
+            port=client_port,
             private_action="update_status",
             params_dict={},
             json_dict=json_dict,
@@ -443,14 +453,21 @@ class Base:
     async def send_nbstatuspackage(
         self,
         client_servkey: str,
+        client_host: str,
+        client_port: int,
         actionmodel: ActionModel,
     ):
         # needs private dispatcher
-        json_dict = {"actionmodel": actionmodel.as_dict()}
+        json_dict = {
+            "actionmodel": actionmodel.as_dict(),
+            "server_host": self.server_cfg["host"],
+            "server_port": self.server_cfg["port"],
+        }
         self.print_message(f"sending non-blocking status: {json_dict}")
         response, error_code = await async_private_dispatcher(
-            world_config_dict=self.world_cfg,
-            server=client_servkey,
+            server_key=client_servkey,
+            host=client_host,
+            port=client_port,
             private_action="update_nonblocking",
             params_dict={},
             json_dict=json_dict,
@@ -458,45 +475,50 @@ class Base:
         self.print_message(f"update_nonblocking request got response: {response}")
         return response, error_code
 
-    async def attach_client(self, client_servkey: str, retry_limit=5):
+    async def attach_client(
+        self, client_servkey: str, client_host: str, client_port: int, retry_limit=5
+    ):
         """Add client for pushing status updates via HTTP POST."""
         success = False
 
-        if client_servkey in self.world_cfg["servers"]:
-            if client_servkey in self.status_clients:
+        combo_key = f"{client_servkey}__{client_host}__{client_port}"
+        if combo_key in self.world_cfg["servers"]:
+            if combo_key in self.status_clients:
                 self.print_message(
-                    f"Client {client_servkey} is already subscribed to "
+                    f"Client {combo_key} is already subscribed to "
                     f"{self.server.server_name} status updates."
                 )
-                self.detach_client(client_servkey)
-
-            self.status_clients.add(client_servkey)
+                self.detach_client(client_servkey, client_host, client_port)  # refresh
+            self.status_clients.add(combo_key)
 
             # sends current status of all endpoints (action_name = None)
             for _ in range(retry_limit):
                 response, error_code = await self.send_statuspackage(
-                    action_name=None, client_servkey=client_servkey
+                    action_name=None,
+                    client_servkey=client_servkey,
+                    client_host=client_host,
+                    client_port=client_port,
                 )
                 if response is not None and error_code == ErrorCodes.none:
                     self.print_message(
-                        f"Added {client_servkey} to {self.server.server_name} status subscriber list."
+                        f"Added {combo_key} to {self.server.server_name} status subscriber list."
                     )
                     success = True
                     break
                 else:
                     self.print_message(
-                        f"Failed to add {client_servkey} to "
+                        f"Failed to add {combo_key} to "
                         f"{self.server.server_name} status subscriber list.",
                         error=True,
                     )
 
             if success:
                 self.print_message(
-                    f"Attached {client_servkey} to status ws on {self.server.server_name}."
+                    f"Attached {combo_key} to status ws on {self.server.server_name}."
                 )
             else:
                 self.print_message(
-                    f"failed to attach {client_servkey} to status ws "
+                    f"failed to attach {combo_key} to status ws "
                     f"on {self.server.server_name} "
                     f"after {retry_limit} attempts.",
                     error=True,
@@ -504,15 +526,16 @@ class Base:
 
         return success
 
-    def detach_client(self, client_servkey: str):
+    def detach_client(self, client_servkey: str, client_host: str, client_port: int):
         """Remove client from receiving status updates via HTTP POST"""
-        if client_servkey in self.status_clients:
-            self.status_clients.remove(client_servkey)
+        combo_key = f"{client_servkey}__{client_host}__{client_port}"
+        if combo_key in self.status_clients:
+            self.status_clients.remove(combo_key)
             self.print_message(
-                f"Client {client_servkey} will no longer receive status updates."
+                f"Client {combo_key} will no longer receive status updates."
             )
         else:
-            self.print_message(f"Client {client_servkey} is not subscribed.")
+            self.print_message(f"Client {combo_key} is not subscribed.")
 
     async def ws_status(self, websocket: WebSocket):
         "Subscribe to status queue and send message to websocket client."

@@ -46,16 +46,16 @@ class C_palvis:
         self.max_smps = 10
 
         self.pal_key = serv_key
-        palserv_config = self.vis.world_cfg["servers"].get(self.pal_key, None)
-        if palserv_config is None:
+        self.palserv_config = self.vis.world_cfg["servers"].get(self.pal_key, None)
+        if self.palserv_config is None:
             return
-        palserv_host = palserv_config.get("host", None)
-        palserv_port = palserv_config.get("port", None)
+        self.palserv_host = self.palserv_config.get("host", None)
+        self.palserv_port = self.palserv_config.get("port", None)
 
         self.data_url = (
-            f"ws://{palserv_config['host']}:{palserv_config['port']}/ws_data"
+            f"ws://{self.palserv_config['host']}:{self.palserv_config['port']}/ws_data"
         )
-        # self.stat_url = f"ws://{palserv_config["host"]}:{palserv_config["port"]}/ws_status"
+        # self.stat_url = f"ws://{self.palserv_config["host"]}:{self.palserv_config["port"]}/ws_status"
 
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
@@ -126,7 +126,7 @@ class C_palvis:
                 [
                     Spacer(width=20),
                     Div(
-                        text=f'<b>PAL Visualizer module for server <a href="http://{palserv_host}:{palserv_port}/docs#/" target="_blank">\'{self.pal_key}\'</a></b>',
+                        text=f'<b>PAL Visualizer module for server <a href="http://{self.palserv_host}:{self.palserv_port}/docs#/" target="_blank">\'{self.pal_key}\'</a></b>',
                         width=1004,
                         height=15,
                     ),
@@ -214,8 +214,9 @@ class C_palvis:
         # pull latest sample lists from PAL server and populate self.datasource.data
         # keep global_label, sample_creation_timecode, comment, volume, ph, electrolyte
         resp, err = await async_private_dispatcher(
-            self.vis.world_cfg,
-            "PAL",
+            self.pal_key,
+            self.palserv_host,
+            self.palserv_port,
             "list_new_samples",
             {
                 "num_smps": self.max_smps,

@@ -28,7 +28,6 @@ class GPSim:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
         self.rng = np.random.default_rng(seed=self.config_dict["random_seed"])
-        self.world_config = action_serv.world_cfg
         self.data_file = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
             "demos",
@@ -290,12 +289,6 @@ class GPSim:
 
         if repeat_measure_acquire:
             # add experiment to orchestrator
-            world_config = self.base.fastapp.helao_cfg
-            orch_name = [
-                k
-                for k, d in world_config.get("servers", {}).items()
-                if d["group"] == "orchestrator"
-            ][0]
             rep_exp = Experiment(
                 experiment_name=repeat_experiment_name,
                 experiment_params=repeat_experiment_params,
@@ -303,8 +296,9 @@ class GPSim:
             )
             self.base.print_message("queueing repeat experiment request on Orch")
             resp, error = await async_private_dispatcher(
-                world_config,
-                orch_name,
+                self.base.orch_key,
+                self.base.orch_host,
+                self.base.orch_port,
                 "insert_experiment",
                 params_dict={},
                 json_dict={

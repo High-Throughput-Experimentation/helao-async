@@ -91,7 +91,12 @@ class OrchAPI(HelaoFastAPI):
                     self.orch.print_message(
                         f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
                     )
-                    self.orch.endpoint_queues[endpoint].put((action, extra_params,))
+                    self.orch.endpoint_queues[endpoint].put(
+                        (
+                            action,
+                            extra_params,
+                        )
+                    )
             else:
                 response = await call_next(request)
             return response
@@ -144,10 +149,12 @@ class OrchAPI(HelaoFastAPI):
             return self.orch.actionservermodel
 
         @self.post("/attach_client", tags=["private"])
-        async def attach_client(client_servkey: str = ""):
-            if client_servkey == "":
-                return {"error": "client key was not specified"}
-            return await self.orch.attach_client(client_servkey)
+        async def attach_client(
+            client_servkey: str, client_host: str, client_port: int
+        ):
+            return await self.orch.attach_client(
+                client_servkey, client_host, client_port
+            )
 
         @self.post("/stop_executor", tags=["private"])
         def stop_executor(executor_id: str = ""):
@@ -254,14 +261,20 @@ class OrchAPI(HelaoFastAPI):
             return await self.orch.update_status(actionservermodel=actionservermodel)
 
         @self.post("/update_nonblocking", tags=["private"])
-        async def update_nonblocking(actionmodel: ActionModel = Body({}, embed=True)):
+        async def update_nonblocking(
+            actionmodel: ActionModel = Body({}, embed=True),
+            server_host: str = "",
+            server_port: int = 9000,
+        ):
             self.orch.print_message(
                 f"'{self.orch.server.server_name.upper()}' "
                 f"got nonblocking status from "
                 f"'{actionmodel.action_server.server_name}': "
                 f"exec_id: {actionmodel.exec_id} -- status: {actionmodel.action_status}"
             )
-            result_dict = self.orch.update_nonblocking(actionmodel)
+            result_dict = self.orch.update_nonblocking(
+                actionmodel, server_host, server_port
+            )
             return result_dict
 
         @self.post("/start", tags=["private"])

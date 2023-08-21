@@ -218,7 +218,7 @@ class Orch(Base):
         """Subscribe to all fastapi servers in config."""
         fails = []
         for serv_key, serv_dict in self.world_cfg["servers"].items():
-            if "fast" in serv_dict or "demo" in serv_dict:
+            if "bokeh" not in serv_dict:
                 self.print_message(f"trying to subscribe to {serv_key} status")
 
                 success = False
@@ -227,8 +227,9 @@ class Orch(Base):
                 for _ in range(retry_limit):
                     try:
                         response, error_code = await async_private_dispatcher(
-                            world_config_dict=self.world_cfg,
-                            server=serv_key,
+                            server_key=serv_key,
+                            host=serv_addr,
+                            port=serv_port,
                             private_action="attach_client",
                             params_dict={"client_servkey": self.server.server_name},
                             json_dict={},
@@ -264,11 +265,13 @@ class Orch(Base):
                 "all FastAPI servers in config file are accessible."
             )
 
-    def update_nonblocking(self, actionmodel: ActionModel):
+    def update_nonblocking(
+        self, actionmodel: ActionModel, server_host: str, server_port: int
+    ):
         """Update method for action server to push non-blocking action ids."""
         print(actionmodel.clean_dict())
         server_key = actionmodel.action_server.server_name
-        server_exec_id = (server_key, actionmodel.exec_id)
+        server_exec_id = (server_key, actionmodel.exec_id, server_host, server_port)
         if "active" in actionmodel.action_status:
             self.nonblocking.append(server_exec_id)
         else:
@@ -278,11 +281,12 @@ class Orch(Base):
     async def clear_nonblocking(self):
         """Clear method for orch to purge non-blocking action ids."""
         resp_tups = []
-        for server_key, exec_id in self.nonblocking:
-            print(server_key, exec_id)
+        for server_key, exec_id, server_host, server_port in self.nonblocking:
+            print(server_key, exec_id, server_host, server_port)
             response, error_code = await async_private_dispatcher(
-                world_config_dict=self.world_cfg,
-                server=server_key,
+                server_key=server_key,
+                host=server_host,
+                port=server_port,
                 private_action="stop_executor",
                 params_dict={"executor_id": exec_id},
                 json_dict={},

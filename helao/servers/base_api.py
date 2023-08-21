@@ -82,7 +82,12 @@ class BaseAPI(HelaoFastAPI):
                     self.base.print_message(
                         f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
                     )
-                    self.base.endpoint_queues[endpoint].put((action, extra_params,))
+                    self.base.endpoint_queues[endpoint].put(
+                        (
+                            action,
+                            extra_params,
+                        )
+                    )
             else:
                 response = await call_next(request)
             return response
@@ -143,8 +148,12 @@ class BaseAPI(HelaoFastAPI):
             return self.base.actionservermodel
 
         @self.post("/attach_client", tags=["private"])
-        async def attach_client(client_servkey: str):
-            return await self.base.attach_client(client_servkey)
+        async def attach_client(
+            client_servkey: str, client_host: str, client_port: int
+        ):
+            return await self.base.attach_client(
+                client_servkey, client_host, client_port
+            )
 
         @self.post("/stop_executor", tags=["private"])
         def stop_executor(executor_id: str):
