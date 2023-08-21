@@ -440,6 +440,7 @@ class Base:
                 action_name=action_name
             )
         }
+        print("!!! dispatching update status to client subscriber")
         response, error_code = await async_private_dispatcher(
             server_key=client_servkey,
             host=client_host,
@@ -448,6 +449,8 @@ class Base:
             params_dict={},
             json_dict=json_dict,
         )
+        print("!!! response is not None", response is not None)
+        print("!!! error_code == ErrorCodes.none", error_code == ErrorCodes.none)
         return response, error_code
 
     async def send_nbstatuspackage(
@@ -480,37 +483,37 @@ class Base:
     ):
         """Add client for pushing status updates via HTTP POST."""
         success = False
+        combo_key = (client_servkey, client_host, client_port,)
+        self.print_message("attaching status subscriber", combo_key)
 
-        combo_key = f"{client_servkey}__{client_host}__{client_port}"
-        if combo_key in self.world_cfg["servers"]:
-            if combo_key in self.status_clients:
+        if combo_key in self.status_clients:
+            self.print_message(
+                f"Client {combo_key} is already subscribed to "
+                f"{self.server.server_name} status updates."
+            )
+            self.detach_client(client_servkey, client_host, client_port)  # refresh
+        self.status_clients.add(combo_key)
+
+        # sends current status of all endpoints (action_name = None)
+        for _ in range(retry_limit):
+            response, error_code = await self.send_statuspackage(
+                client_servkey=client_servkey,
+                client_host=client_host,
+                client_port=client_port,
+                action_name=None,
+            )
+            if response is not None and error_code == ErrorCodes.none:
                 self.print_message(
-                    f"Client {combo_key} is already subscribed to "
-                    f"{self.server.server_name} status updates."
+                    f"Added {combo_key} to {self.server.server_name} status subscriber list."
                 )
-                self.detach_client(client_servkey, client_host, client_port)  # refresh
-            self.status_clients.add(combo_key)
-
-            # sends current status of all endpoints (action_name = None)
-            for _ in range(retry_limit):
-                response, error_code = await self.send_statuspackage(
-                    action_name=None,
-                    client_servkey=client_servkey,
-                    client_host=client_host,
-                    client_port=client_port,
+                success = True
+                break
+            else:
+                self.print_message(
+                    f"Failed to add {combo_key} to "
+                    f"{self.server.server_name} status subscriber list.",
+                    error=True,
                 )
-                if response is not None and error_code == ErrorCodes.none:
-                    self.print_message(
-                        f"Added {combo_key} to {self.server.server_name} status subscriber list."
-                    )
-                    success = True
-                    break
-                else:
-                    self.print_message(
-                        f"Failed to add {combo_key} to "
-                        f"{self.server.server_name} status subscriber list.",
-                        error=True,
-                    )
 
             if success:
                 self.print_message(
@@ -528,7 +531,7 @@ class Base:
 
     def detach_client(self, client_servkey: str, client_host: str, client_port: int):
         """Remove client from receiving status updates via HTTP POST"""
-        combo_key = f"{client_servkey}__{client_host}__{client_port}"
+        combo_key = (client_servkey, client_host, client_port,)
         if combo_key in self.status_clients:
             self.status_clients.remove(combo_key)
             self.print_message(
@@ -634,7 +637,8 @@ class Base:
                     f"{status_msg.action_server.disp_name()} "
                     f"to subscribers ({self.status_clients})."
                 )
-                for client_servkey in self.status_clients:
+                for combo_key in self.status_clients:
+                    client_servkey, client_host, client_port = combo_key
                     self.print_message(
                         f"log_status_task trying to send status to {client_servkey}."
                     )
@@ -643,6 +647,8 @@ class Base:
                         response, error_code = await self.send_statuspackage(
                             action_name=status_msg.action_name,
                             client_servkey=client_servkey,
+                            client_host=client_host,
+                            client_port=client_port,
                         )
 
                         if response and error_code == ErrorCodes.none:

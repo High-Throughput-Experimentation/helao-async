@@ -238,14 +238,16 @@ class Orch(Base):
                             },
                             json_dict={},
                         )
-                        if response and error_code == ErrorCodes.none:
+                        print(response)
+                        print(error_code)
+                        if response is not None and error_code == ErrorCodes.none:
                             success = True
                             break
-                    except aiohttp.client_exceptions.ClientConnectorError:
+                    except aiohttp.client_exceptions.ClientConnectorError as err:
                         self.print_message(
                             f"failed to subscribe to "
                             f"{serv_key} at "
-                            f"{serv_addr}:{serv_port}, "
+                            f"{serv_addr}:{serv_port}, {err}"
                             "trying again in 1sec",
                             info=True,
                         )
@@ -300,6 +302,11 @@ class Orch(Base):
 
     async def update_status(self, actionservermodel: ActionServerModel = None):
         """Dict update method for action server to push status messages."""
+
+        self.print_message(
+            "received status from server:", actionservermodel.action_server.server_name
+        )
+
         if actionservermodel is None:
             return False
 
