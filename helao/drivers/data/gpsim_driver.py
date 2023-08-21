@@ -198,7 +198,7 @@ class GPSim:
             inds,
         )
 
-        avail_ei, avail_pred, avail_var = self.acq_fun(plate_id, 0.001, True)
+        avail_ei, avail_pred, avail_var = self.acq_fun(plate_id, 0.01, True)
         self.ei_step[plate_id][plate_step] = avail_ei
 
         avail_inds = np.array(self.available[plate_id]).astype(int)
@@ -242,14 +242,23 @@ class GPSim:
 
     def clear_plate(self, plate_id):
         self.acquired[plate_id] = []
-        self.acq_fromglobal[plate_id] = []
+        self.acq_fromglobal[plate_id] = [
+            idx
+            for tup in self.g_acq
+            for pid, idx in self.invfeats[tup]
+            if plate_id == pid
+        ]
         self.opt_logs[plate_id] = {}
         self.total_step[plate_id] = {}
         self.ei_step[plate_id] = {}
         self.avail_step[plate_id] = {}
         self.progress[plate_id] = {}
         self.initialized[plate_id] = False
-        self.available[plate_id] = list(range(self.features[plate_id].shape[0]))
+        self.available[plate_id] = [
+            i
+            for i in range(self.features[plate_id].shape[0])
+            if i not in self.acq_fromglobal[plate_id]
+        ]
 
     async def check_condition(self, activeobj: Active):
         params = activeobj.action.action_params
