@@ -394,8 +394,8 @@ class Orch(Base):
 
     async def loop_task_dispatch_sequence(self) -> ErrorCodes:
         if self.sequence_dq:
-            self.print_message("finishing last sequence")
-            await self.finish_active_sequence()
+            # self.print_message("finishing last sequence")
+            # await self.finish_active_sequence()
             self.print_message("getting new sequence from sequence_dq")
             self.active_sequence = self.sequence_dq.popleft()
             self.print_message(
@@ -449,8 +449,8 @@ class Orch(Base):
     async def loop_task_dispatch_experiment(self) -> ErrorCodes:
         self.print_message("action_dq is empty, getting new actions")
         # wait for all actions in last/active experiment to finish
-        self.print_message("finishing last active experiment first")
-        await self.finish_active_experiment()
+        # self.print_message("finishing last active experiment first")
+        # await self.finish_active_experiment()
 
         # self.print_message("getting new experiment to fill action_dq")
         # generate uids when populating,
@@ -848,7 +848,7 @@ class Orch(Base):
                 elif self.action_dq:
                     self.print_message("!!!dispatching next action", info=True)
                     error_code = await self.loop_task_dispatch_action()
-                    if (
+                    while (
                         self.last_dispatched_action_uuid
                         not in self.last_50_action_uuids
                     ):

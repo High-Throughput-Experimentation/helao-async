@@ -489,8 +489,7 @@ class Base:
                 f"{self.server.server_name} status updates."
             )
             # self.detach_client(client_servkey, client_host, client_port)  # refresh
-        async with self.aiolock:
-            self.status_clients.add(combo_key)
+        self.status_clients.add(combo_key)
 
         # sends current status of all endpoints (action_name = None)
         for _ in range(retry_limit):

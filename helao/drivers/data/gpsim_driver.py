@@ -184,27 +184,24 @@ class GPSim:
                 "global_step": self.global_step,
             }
             self.progress[plate_id] = data
-
-            async with self.base.aiolock:
-                self.g_acq.add(tuple(best_avail))
-                for plate_key, idx in self.invfeats[tuple(best_avail)]:
-                    if plate_key == plate_id:
-                        self.acquired[plate_key].append(idx)
-                    else:
-                        self.acq_fromglobal[plate_key].append(idx)
-                    if idx in self.available[plate_key]:
-                        self.available[plate_key].remove(idx)
-                self.global_step += 1
+            self.g_acq.add(tuple(best_avail))
+            for plate_key, idx in self.invfeats[tuple(best_avail)]:
+                if plate_key == plate_id:
+                    self.acquired[plate_key].append(idx)
+                else:
+                    self.acq_fromglobal[plate_key].append(idx)
+                if idx in self.available[plate_key]:
+                    self.available[plate_key].remove(idx)
+            self.global_step += 1
         else:
             data = {}
-            async with self.base.aiolock:
-                self.g_acq.add(tuple(init_point))
-                for plate_key, idx in self.invfeats[tuple(init_point)]:
-                    if idx not in self.acq_fromglobal[plate_key]:
-                        self.acq_fromglobal[plate_key].append(idx)
-                    if idx in self.available[plate_key]:
-                        self.available[plate_key].remove(idx)
-                self.global_step += 1
+            self.g_acq.add(tuple(init_point))
+            for plate_key, idx in self.invfeats[tuple(init_point)]:
+                if idx not in self.acq_fromglobal[plate_key]:
+                    self.acq_fromglobal[plate_key].append(idx)
+                if idx in self.available[plate_key]:
+                    self.available[plate_key].remove(idx)
+            self.global_step += 1
         self.base.print_message(
             f"plate_id {plate_id} has acquired {len(self.acquired[plate_id])} points"
         )

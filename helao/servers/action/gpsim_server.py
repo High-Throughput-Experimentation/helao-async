@@ -73,9 +73,7 @@ def makeApp(confPrefix, server_key, helao_root):
         active = await app.base.setup_and_contain_action()
         progress = app.driver.progress[active.action.action_params["plate_id"]]
         if not progress:
-            await app.base.aiolock.acquire()
             app.driver.fit_model(active.action.action_params["plate_id"])
-            app.base.aiolock.release()
         progress = app.driver.progress[active.action.action_params["plate_id"]]
         active.action.action_params.update({f"_{k}": v for k, v in progress.items()})
         await active.enqueue_data_dflt(datadict=progress)
@@ -89,10 +87,12 @@ def makeApp(confPrefix, server_key, helao_root):
         plate_id: int = 0,
     ):
         active = await app.base.setup_and_contain_action()
-        data = await app.driver.acquire_point(
-            plate_id=active.action.action_params["plate_id"],
-            init_point=[]
-        )
+        data = {}
+        while data.get("feature", []) == []:
+            data = await app.driver.acquire_point(
+                plate_id=active.action.action_params["plate_id"],
+                init_point=[]
+            )
         await active.enqueue_data_dflt(datadict=data)
         active.action.action_params["_feature"] = data["feature"]
         finished_action = await active.finish()
