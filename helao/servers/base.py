@@ -489,7 +489,8 @@ class Base:
                 f"{self.server.server_name} status updates."
             )
             # self.detach_client(client_servkey, client_host, client_port)  # refresh
-        self.status_clients.add(combo_key)
+        async with self.aiolock:
+            self.status_clients.add(combo_key)
 
         # sends current status of all endpoints (action_name = None)
         for _ in range(retry_limit):
@@ -634,42 +635,41 @@ class Base:
                     f"{status_msg.action_server.disp_name()} "
                     f"to subscribers ({self.status_clients})."
                 )
-                async with self.aiolock:
-                    for combo_key in self.status_clients:
-                        client_servkey, client_host, client_port = combo_key
-                        self.print_message(
-                            f"log_status_task trying to send status to {client_servkey}."
+                for combo_key in self.status_clients.copy():
+                    client_servkey, client_host, client_port = combo_key
+                    self.print_message(
+                        f"log_status_task trying to send status to {client_servkey}."
+                    )
+                    success = False
+                    for _ in range(retry_limit):
+                        response, error_code = await self.send_statuspackage(
+                            action_name=status_msg.action_name,
+                            client_servkey=client_servkey,
+                            client_host=client_host,
+                            client_port=client_port,
                         )
-                        success = False
-                        for _ in range(retry_limit):
-                            response, error_code = await self.send_statuspackage(
-                                action_name=status_msg.action_name,
-                                client_servkey=client_servkey,
-                                client_host=client_host,
-                                client_port=client_port,
-                            )
 
-                            if response and error_code == ErrorCodes.none:
-                                success = True
-                                break
+                        if response and error_code == ErrorCodes.none:
+                            success = True
+                            break
 
-                        if success:
-                            self.print_message(
-                                f"Pushed status message to {client_servkey}."
-                            )
-                        else:
-                            self.print_message(
-                                f"Failed to push status message to "
-                                f"{client_servkey} after {retry_limit} attempts.",
-                                error=True,
-                            )
-                    # now delete the errored and finsihed statuses after
-                    # all are send to the subscribers
-                    self.actionservermodel.endpoints[
-                        status_msg.action_name
-                    ].clear_finished()
-                    # TODO:write to log if save_root exists
-                    self.print_message("all log_status_task messages send.")
+                    if success:
+                        self.print_message(
+                            f"Pushed status message to {client_servkey}."
+                        )
+                    else:
+                        self.print_message(
+                            f"Failed to push status message to "
+                            f"{client_servkey} after {retry_limit} attempts.",
+                            error=True,
+                        )
+                # now delete the errored and finsihed statuses after
+                # all are send to the subscribers
+                self.actionservermodel.endpoints[
+                    status_msg.action_name
+                ].clear_finished()
+                # TODO:write to log if save_root exists
+                self.print_message("all log_status_task messages send.")
 
             self.print_message("log_status_task done.")
 
