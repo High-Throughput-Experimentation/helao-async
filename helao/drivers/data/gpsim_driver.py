@@ -156,7 +156,7 @@ class GPSim:
         """Adds eta result to acquired list and returns next composition."""
         self.g_acq.add(tuple(feat))
         for plate_key, idx in self.invfeats[tuple(feat)]:
-            if plate_key == plate_id:
+            if plate_key == plate_id and not init_points:
                 self.acquired[plate_key].append(idx)
             else:
                 self.acq_fromglobal[plate_key].append(idx)
