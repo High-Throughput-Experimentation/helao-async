@@ -188,7 +188,8 @@ class GPSim:
             options={"maxiter": 100},
         )
         total_pred, total_var = (
-            r.numpy() for r in self.model.predict_f(self.features[plate_id])
+            r.numpy()
+            for r in self.model.predict_f(self.features[plate_id].astype(float))
         )
         total_mae = mean_absolute_error(total_pred, self.targets[plate_id])
         self.total_step[plate_id][plate_step] = (
