@@ -766,7 +766,11 @@ class Orch(Base):
                 )
                 return result_action.error_code
 
-            if result_action.to_globalexp_params:
+            if (
+                result_action.to_globalexp_params
+                and result_action.orch_host == self.orch_host
+                and result_action.orch_port == self.orch_port
+            ):
                 if isinstance(result_action.to_globalexp_params, list):
                     # self.print_message(
                     #     f"copying global vars {', '.join(result_action.to_globalexp_params)} back to experiment"
@@ -1125,6 +1129,8 @@ class Orch(Base):
         Ddict = experimentmodel.dict()
         Ddict.update(seq.dict())
         D = Experiment(**Ddict)
+        D.orch_host = self.orch_host
+        D.orch_port = self.orch_port
 
         # init uuid now for tracking later
         D.experiment_uuid = gen_uuid()
@@ -1351,7 +1357,11 @@ class Orch(Base):
                 deepcopy(self.active_experiment.get_exp())
             )
 
-            if self.active_experiment.to_globalseq_params:
+            if (
+                self.active_experiment.to_globalseq_params
+                and self.active_experiment.orch_host == self.orch_host
+                and self.active_experiment.orch_port == self.orch_port
+            ):
                 if isinstance(self.active_experiment.to_globalseq_params, list):
                     # self.print_message(
                     #     f"copying global vars {', '.join(self.active_experiment.to_globalseq_params)} back to sequence"
