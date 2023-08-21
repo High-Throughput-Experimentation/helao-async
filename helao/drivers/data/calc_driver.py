@@ -1,3 +1,13 @@
+""" Local data calculation server
+
+This server performs calculations on locally saved data for in-situ amendment of running
+sequences, i.e. repeated experiment looping, thresholding, etc.
+
+TODO:
+Calc.fill_syringe_volume_check() and Calc.check_co2_purge_level() need to be updated to
+handle orchestrator requests originating outside of the config launch group.
+
+"""
 import time
 import os
 import numpy as np
