@@ -260,7 +260,7 @@ class GPSim:
         ]
 
     async def check_condition(
-        self, activeobj: Active, orch_key: str, orch_host: str, orch_port: int
+        self, activeobj: Active
     ):
         params = activeobj.action.action_params
         plate_id = params["plate_id"]
@@ -269,6 +269,9 @@ class GPSim:
         repeat_experiment_name = params["repeat_experiment_name"]
         repeat_experiment_params = params["repeat_experiment_params"]
         kwargs = params["repeat_experiment_kwargs"]
+        orch_key = params["orch_key"]
+        orch_host = params["orch_host"]
+        orch_port = params["orch_port"]
 
         repeat_measure_acquire = False
         progress = self.progress[plate_id]

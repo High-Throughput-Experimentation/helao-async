@@ -37,7 +37,7 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
             [
                 Spacer(width=20),
                 Div(
-                    text=f"<b>Action visualizer on {gethostname().lower()} -- config: {confPrefix}</b>",
+                    text=f"<b>Action visualizer on {gethostname().lower()} -- config: {confPrefix}.py</b>",
                     width=1004,
                     height=32,
                     style={"font-size": "200%", "color": "red"},
