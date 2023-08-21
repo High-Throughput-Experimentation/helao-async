@@ -120,6 +120,9 @@ def makeApp(confPrefix, server_key, helao_root):
         repeat_experiment_name: str = "OERSIM_sub_activelearn",
         repeat_experiment_params: dict = {},
         repeat_experiment_kwargs: dict = {},
+        orch_key: str = "",
+        orch_host: str = "",
+        orch_port: int = 0,
     ):
         active = await app.base.setup_and_contain_action()
         return_dict = await app.driver.check_condition(active)

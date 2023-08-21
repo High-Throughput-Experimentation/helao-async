@@ -96,7 +96,15 @@ def OERSIM_sub_decision(
 ):
     apm = ActionPlanMaker()
     apm.add(
-        CPSIM_server, "get_loaded_plate", {}, to_globalexp_params=["_loaded_plate_id"]
+        CPSIM_server,
+        "get_loaded_plate",
+        {},
+        to_globalexp_params=[
+            "_loaded_plate_id",
+            "_orch_key",
+            "_orch_host",
+            "_orch_port",
+        ],
     )
     # call progress action to force model fit if nothing has been measured
     apm.add(
@@ -115,7 +123,12 @@ def OERSIM_sub_decision(
             "repeat_experiment_params": apm.pars.repeat_experiment_params,
             "repeat_experiment_kwargs": apm.pars.repeat_experiment_kwargs,
         },
-        from_globalexp_params={"_loaded_plate_id": "plate_id"},
+        from_globalexp_params={
+            "_loaded_plate_id": "plate_id",
+            "_orch_key": "orch_key",
+            "_orch_host": "orch_host",
+            "_orch_port": "orch_port",
+        },
     )
     return apm.action_list
 

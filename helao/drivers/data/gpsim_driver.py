@@ -259,7 +259,9 @@ class GPSim:
             if i not in self.acq_fromglobal[plate_id]
         ]
 
-    async def check_condition(self, activeobj: Active):
+    async def check_condition(
+        self, activeobj: Active, orch_key: str, orch_host: str, orch_port: int
+    ):
         params = activeobj.action.action_params
         plate_id = params["plate_id"]
         stop_condition = params["stop_condition"]
@@ -296,9 +298,9 @@ class GPSim:
             )
             self.base.print_message("queueing repeat experiment request on Orch")
             resp, error = await async_private_dispatcher(
-                self.base.orch_key,
-                self.base.orch_host,
-                self.base.orch_port,
+                orch_key,
+                orch_host,
+                orch_port,
                 "insert_experiment",
                 params_dict={},
                 json_dict={

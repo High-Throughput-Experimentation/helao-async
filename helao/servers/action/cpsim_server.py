@@ -67,8 +67,14 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         active = await app.base.setup_and_contain_action()
         plate_id = app.driver.loaded_plate
-        active.action.action_params["_loaded_plate_id"] = plate_id
-        await active.enqueue_data_dflt(datadict={"loaded_plate_id": plate_id})
+        data_dict = {
+            "loaded_plate_id": plate_id,
+            "orch_key": app.base.orch_key,
+            "orch_host": app.base.orch_host,
+            "orch_port": app.base.orch_port,
+        }
+        active.action.action_params.update({f"_{k}": v for k, v in data_dict.items()})
+        await active.enqueue_data_dflt(datadict=data_dict)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
