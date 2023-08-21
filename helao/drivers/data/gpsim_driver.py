@@ -210,28 +210,21 @@ class GPSim:
             avail_var,
             avail_inds,
         )
-        latest_ei = list(self.ei_step[plate_id][plate_step])
+        latest_ei = self.ei_step[plate_id][plate_step]
 
-        best_idx, best_ei = [
-            (i, v) for i, v in enumerate(latest_ei) if v == max(latest_ei)
-        ][0]
-        best_avail = tuple(self.features[plate_id][avail_inds[best_idx]])
-        # hack retry for now
-        while best_avail in self.g_acq:
-            latest_ei.pop(best_idx)
-            best_idx, best_ei = [
-                (i, v) for i, v in enumerate(latest_ei) if v == max(latest_ei)
-            ][0]
-            best_avail = tuple(self.features[plate_id][avail_inds[best_idx]])
+        best_ei = latest_ei.max()
+        best_idx = latest_ei.argmax()
+        best_avail = list(self.features[plate_id][avail_inds[best_idx]])
 
         total_mae = self.total_step[plate_id][plate_step][0]
         data = {
             "expected_improvement": float(best_ei),
-            "feature": best_avail,
+            "feature": [int(x) for x in best_avail],
             "total_plate_mae": float(total_mae),
             "plate_step": plate_step,
             "global_step": self.global_step,
         }
+        print(data)
         self.progress[plate_id] = data
         return data
 
