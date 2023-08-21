@@ -336,8 +336,6 @@ class Base:
                 server_name="MANUAL", machine_name=gethostname().lower()
             )
         action.action_codehash = get_filehash(sys._getframe(2).f_code.co_filename)
-        action.orch_host = self.orch_host
-        action.orch_port = self.orch_port
         return action
 
     def setup_action(self) -> Action:

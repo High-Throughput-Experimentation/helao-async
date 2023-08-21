@@ -456,6 +456,8 @@ class Orch(Base):
         # generate uids when populating,
         # generate timestamp when acquring
         self.active_experiment = self.experiment_dq.popleft()
+        self.active_experiment.orch_host = self.orch_host
+        self.active_experiment.orch_port = self.orch_port
         self.active_seq_exp_counter += 1
 
         # self.print_message("copying global vars to experiment")
@@ -514,6 +516,8 @@ class Orch(Base):
             # init uuid now for tracking later
             act.action_uuid = gen_uuid()
             act.action_order = int(i)
+            act.orch_host = self.orch_host
+            act.orch_port = self.orch_port
             # actual order should be the same at the beginning
             # will be incremented as necessary
             act.orch_submit_order = int(i)
@@ -769,7 +773,7 @@ class Orch(Base):
             if (
                 result_action.to_globalexp_params
                 and result_action.orch_host == self.orch_host
-                and result_action.orch_port == self.orch_port
+                and int(result_action.orch_port) == int(self.orch_port)
             ):
                 if isinstance(result_action.to_globalexp_params, list):
                     # self.print_message(
@@ -1129,8 +1133,6 @@ class Orch(Base):
         Ddict = experimentmodel.dict()
         Ddict.update(seq.dict())
         D = Experiment(**Ddict)
-        D.orch_host = self.orch_host
-        D.orch_port = self.orch_port
 
         # init uuid now for tracking later
         D.experiment_uuid = gen_uuid()
