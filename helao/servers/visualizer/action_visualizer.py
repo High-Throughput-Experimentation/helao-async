@@ -1,5 +1,6 @@
 __all__ = ["makeBokehApp"]
 
+from importlib import import_module
 from socket import gethostname
 
 from bokeh.models.widgets import Div
@@ -8,11 +9,6 @@ from bokeh.layouts import layout, Spacer
 from helao.servers.vis import HelaoVis
 from helao.servers.vis import Vis
 from helao.helpers.config_loader import config_loader
-from helao.servers.visualizer.gamry_vis import C_potvis
-from helao.servers.visualizer.nidaqmx_vis import C_nidaqmxvis
-from helao.servers.visualizer.pal_vis import C_palvis
-from helao.servers.visualizer.spec_vis import C_specvis
-from helao.servers.visualizer.oersim_vis import C_oersimvis
 
 
 def find_server_names(vis: Vis, fast_key: str) -> list:
@@ -54,21 +50,26 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
     )
     app.vis.doc.add_root(Spacer(height=10))
 
+    vis_root = "helao.servers.visualizer"
+    vis_classes = {}
     # create visualizer objects for defined instruments
     vis_map = {
-        "potentiostat_server": C_potvis,
-        "gamry_server": C_potvis,
-        "spec_server": C_specvis,
-        "nidaqmx_server": C_nidaqmxvis,
-        "pal_server": C_palvis,
-        "cpsim_server": C_oersimvis
+        "potentiostat_server": ("gamry_vis", "C_potvis"),
+        "gamry_server": ("gamry_vis", "C_potvis"),
+        "spec_server": ("spec_vis", "C_specvis"),
+        "nidaqmx_server": ("nidaqmx_vis", "C_nidaqmxvis"),
+        "pal_server": ("pal_vis", "C_palvis"),
+        "cpsim_server": ("oersim_vis", "C_oersimvis"),
     }
     vis_dict = {}
 
-    for fkey, viscls in vis_map.items():
+    for fkey, (vismod, viscls) in vis_map.items():
         vis_dict[fkey] = []
         fservnames = find_server_names(vis=app.vis, fast_key=fkey)
-        for fsname in fservnames:
-            vis_dict[fkey].append(viscls(vis_serv=app.vis, serv_key=fsname))
+        for fsname, conf_pars in fservnames:
+            vis_classes[viscls] = getattr(import_module(f"{vis_root}.{vismod}"), viscls)
+            vis_dict[fkey].append(
+                vis_classes[viscls](vis_serv=app.vis, serv_key=fsname)
+            )
 
     return doc
