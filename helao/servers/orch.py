@@ -231,7 +231,11 @@ class Orch(Base):
                             host=serv_addr,
                             port=serv_port,
                             private_action="attach_client",
-                            params_dict={"client_servkey": self.server.server_name},
+                            params_dict={
+                                "client_servkey": self.server.server_name,
+                                "client_host": self.server_cfg["host"],
+                                "client_port": self.server_cfg["port"],
+                            },
                             json_dict={},
                         )
                         if response and error_code == ErrorCodes.none:
