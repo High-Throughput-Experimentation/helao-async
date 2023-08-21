@@ -329,11 +329,9 @@ class GPSimExec(Executor):
         self.active.base.print_message("GPSimExec initialized.")
         self.start_time = time.time()  # instantiation time
         self.duration = self.active.action.action_params.get("duration", -1)
-        self.feat = self.active.action.action_params["comp_vec"]
         self.plate_id = self.active.action.action_params["plate_id"]
 
     async def _exec(self):
-        self.active.base.fastapp.driver.acquire_point(self.feat, self.plate_id)
         self.active.base.fastapp.driver.fit_model(self.plate_id)
         return {
             "error": ErrorCodes.none,

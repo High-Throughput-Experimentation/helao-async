@@ -79,11 +79,25 @@ def makeApp(confPrefix, server_key, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
+    @app.post(f"/{server_key}/acquire_point", tags=["action"])
+    async def acquire_point(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        comp_vec: List[int] = [],
+        plate_id: int = 0,
+    ):
+        active = await app.base.setup_and_contain_action()
+        await app.driver.acquire_point(
+            active.action.action_params["comp_vec"],
+            active.action.action_params["plate_id"],
+        )
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
     @app.post(f"/{server_key}/update_model", tags=["action"])
     async def update_model(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        comp_vec: List[int] = [],
         plate_id: int = 0,
     ):
         """Record simulated data."""

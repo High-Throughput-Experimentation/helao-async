@@ -68,6 +68,12 @@ def OERSIM_sub_measure_CP(
         ],
     )
     apm.add(
+        GPSIM_server,
+        "acquire_point",
+        {},
+        from_globalexp_params={"_feature": "comp_vec", "_loaded_plate_id": "plate_id"},
+    )
+    apm.add(
         CPSIM_server, "measure_cp", {}, from_globalexp_params={"_feature": "comp_vec"}
     )
     apm.add(
