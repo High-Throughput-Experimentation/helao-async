@@ -38,10 +38,21 @@ class GPSim:
         self.all_data = unzpickle(self.data_file)
         self.els = self.all_data["els"]
         self.all_data.pop("els")
+
         self.features = {
-            k: np.array(sorted(d.keys())) for k, d in self.all_data.items()
+            k: np.array(sorted(d.keys())).astype(int) for k, d in self.all_data.items()
         }
         self.all_plate_feats = np.vstack([arr for arr in self.features.values()])
+
+        self.invfeats = {
+            feat: [
+                (plate_id, np.where((arr == feat).all(axis=1))[0])
+                for plate_id, arr in self.features.items()
+                if feat in self.all_data[plate_id]
+            ]
+            for feat in self.g_avl
+        }
+
         sign = -1.0 if self.config_dict.get("minimize", True) else 1.0
         self.targets = {
             k: np.array(
@@ -57,6 +68,9 @@ class GPSim:
         # acquired indices per library
         self.acquired = {k: [] for k in self.all_data}
         self.acq_fromglobal = {k: [] for k in self.all_data}
+        self.available = {
+            k: list(range(arr.shape[0])) for k, arr in self.features.items()
+        }
 
         # global acquired and available
         self.g_acq = set()
@@ -65,9 +79,9 @@ class GPSim:
         # inverse map of all comps to libraries
         self.invfeats = {
             feat: [
-                plate_id
-                for plate_id, feat_dict in self.all_data.items()
-                if feat in feat_dict
+                (plate_id, np.where((arr == feat).all(axis=1))[0])
+                for plate_id, arr in self.features.items()
+                if feat in self.all_data["plate_id"]
             ]
             for feat in self.g_avl
         }
@@ -169,9 +183,11 @@ class GPSim:
     def fit_model(self, plate_id):
         """Assemble acquired etas per plate and predict loaded space."""
         plate_step = len(self.acquired[plate_id])
-        inds = self.acquired[plate_id] + self.acq_fromglobal[plate_id]
-        X = self.features[plate_id][np.array(inds).astype(int)]
-        y = self.targets[plate_id][np.array(inds).astype(int)]
+        inds = np.array(self.acquired[plate_id] + self.acq_fromglobal[plate_id]).astype(
+            int
+        )
+        X = self.features[plate_id][inds]
+        y = self.targets[plate_id][inds]
         self.kernel = self.kernel_func()
         try:
             self.model = gpflow.models.GPR(
@@ -192,7 +208,7 @@ class GPSim:
             total_mae,
             total_pred,
             total_var,
-            np.array(inds),
+            inds,
         )
 
         avail_ei, avail_pred, avail_var = self.acq_fun(plate_id, 0.001, True)
@@ -200,7 +216,7 @@ class GPSim:
 
         avail_inds = np.array(
             [i for i in range(self.features[plate_id].shape[0]) if i not in inds]
-        )
+        ).astype(int)
         avail_mae = mean_absolute_error(avail_pred, self.targets[plate_id][avail_inds])
         self.avail_step[plate_id][plate_step] = (
             avail_mae,
@@ -208,10 +224,20 @@ class GPSim:
             avail_var,
             avail_inds,
         )
-        latest_ei = self.ei_step[plate_id][plate_step]
-        best_idx = latest_ei.argmax()
-        best_ei = max(latest_ei)
-        best_avail = list(self.features[plate_id][avail_inds[best_idx]])
+        latest_ei = list(self.ei_step[plate_id][plate_step])
+
+        best_idx, best_ei = [
+            (i, v) for i, v in enumerate(latest_ei) if v == max(latest_ei)
+        ][0]
+        best_avail = tuple(self.features[plate_id][avail_inds[best_idx]])
+        # hack retry for now
+        while best_avail in self.g_acq:
+            latest_ei.pop(best_idx)
+            best_idx, best_ei = [
+                (i, v) for i, v in enumerate(latest_ei) if v == max(latest_ei)
+            ][0]
+            best_avail = tuple(self.features[plate_id][avail_inds[best_idx]])
+
         total_mae = self.total_step[plate_id][plate_step][0]
         data = {
             "expected_improvement": float(best_ei),
@@ -220,8 +246,6 @@ class GPSim:
             "plate_step": plate_step,
             "global_step": self.global_step,
         }
-        for k, v in data.items():
-            print(k, v, type(v))
         self.progress[plate_id] = data
         return data
 
