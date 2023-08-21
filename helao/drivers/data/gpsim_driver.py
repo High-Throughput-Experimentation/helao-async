@@ -44,15 +44,6 @@ class GPSim:
         }
         self.all_plate_feats = np.vstack([arr for arr in self.features.values()])
 
-        self.invfeats = {
-            feat: [
-                (plate_id, np.where((arr == feat).all(axis=1))[0])
-                for plate_id, arr in self.features.items()
-                if feat in self.all_data[plate_id]
-            ]
-            for feat in self.g_avl
-        }
-
         sign = -1.0 if self.config_dict.get("minimize", True) else 1.0
         self.targets = {
             k: np.array(
@@ -81,7 +72,7 @@ class GPSim:
             feat: [
                 (plate_id, np.where((arr == feat).all(axis=1))[0])
                 for plate_id, arr in self.features.items()
-                if feat in self.all_data["plate_id"]
+                if feat in self.all_data[plate_id]
             ]
             for feat in self.g_avl
         }
@@ -165,16 +156,11 @@ class GPSim:
         """Adds eta result to acquired list and returns next composition."""
         self.g_acq.add(tuple(feat))
         self.g_avl.remove(tuple(feat))
-        for other_plate_id in self.invfeats[tuple(feat)]:
-            plate_feature_idxs = np.where(
-                (self.features[other_plate_id] == feat).all(axis=1)
-            )[0]
-            if plate_feature_idxs:
-                plate_feature_idx = plate_feature_idxs[0]
-                if other_plate_id != plate_id or init_points:
-                    self.acq_fromglobal[other_plate_id].append(plate_feature_idx)
-                elif plate_id in self.acquired:
-                    self.acquired[plate_id].append(plate_feature_idx)
+        for plate_key, idx in self.invfeats[tuple(feat)]:
+            if plate_key == plate_id:
+                self.acquired[plate_id].append(idx)
+            else:
+                self.acq_fromglobal[plate_key].append(idx)
         self.global_step += 1
         self.base.print_message(
             f"plate_id {plate_id} has acquired {len(self.acquired[plate_id])} points"
