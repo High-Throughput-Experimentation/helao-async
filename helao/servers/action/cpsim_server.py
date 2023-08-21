@@ -33,7 +33,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def measure_cp(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        comp_vec: List[float] = [],
+        comp_vec: List[int] = [],
         acquisition_rate: float = 0.2,
     ):
         """Record simulated data."""

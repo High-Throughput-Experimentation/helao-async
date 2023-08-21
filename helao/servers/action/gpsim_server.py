@@ -83,7 +83,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def update_model(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        comp_vec: List[float] = [],
+        comp_vec: List[int] = [],
         plate_id: int = 0,
     ):
         """Record simulated data."""
