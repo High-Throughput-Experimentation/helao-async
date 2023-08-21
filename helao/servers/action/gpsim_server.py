@@ -57,7 +57,7 @@ def makeApp(confPrefix, server_key, helao_root):
             app.base.print_message(
                 f"initializing priors for plate {pid} with {npoints} random points"
             )
-            app.driver.init_priors_random(pid, npoints)
+            await app.driver.init_priors_random(pid, npoints)
         else:
             app.base.print_message(f"plate {pid} is already initialized")
         finished_action = await active.finish()
@@ -87,7 +87,7 @@ def makeApp(confPrefix, server_key, helao_root):
         plate_id: int = 0,
     ):
         active = await app.base.setup_and_contain_action()
-        app.driver.acquire_point(
+        await app.driver.acquire_point(
             active.action.action_params["comp_vec"],
             active.action.action_params["plate_id"],
         )

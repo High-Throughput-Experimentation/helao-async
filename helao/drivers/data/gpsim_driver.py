@@ -103,7 +103,7 @@ class GPSim:
         for plate_id in self.features:
             self.init_priors_random(plate_id, num_points)
 
-    def init_priors_random(self, plate_id: int, num_points: int):
+    async def init_priors_random(self, plate_id: int, num_points: int):
         arr = self.features[plate_id]
         ridxs = self.rng.choice(
             range(arr.shape[0]),
@@ -114,7 +114,7 @@ class GPSim:
         self.clear_plate(plate_id)
         print(f"!!! initial indices for plate {plate_id} are: {ridxs}")
         for ridx in ridxs:
-            self.acquire_point(arr[ridx], plate_id, init_points=True)
+            await self.acquire_point(arr[ridx], plate_id, init_points=True)
         self.initialized[plate_id] = True
 
     def calc_ei(self, plate_id, xi=0.001, noise=True):
@@ -125,14 +125,16 @@ class GPSim:
         Returns:
             Expected improvements at points X.
         """
-        acqinds = self.acquired[plate_id] + self.acq_fromglobal[plate_id]
+        acqinds = np.array(
+            self.acquired[plate_id] + self.acq_fromglobal[plate_id]
+        ).astype(int)
         X = self.features[plate_id][
             np.array(
                 [i for i in range(self.features[plate_id].shape[0]) if i not in acqinds]
             )
         ].astype(float)
-        X_sample = self.features[plate_id][np.array(acqinds)].astype(float)
-        Y_sample = self.targets[plate_id][np.array(acqinds)]
+        X_sample = self.features[plate_id][acqinds].astype(float)
+        Y_sample = self.targets[plate_id][acqinds]
         mu, variance = (r.numpy() for r in self.model.predict_f(X))
         mu_sample, variance_sample = (r.numpy() for r in self.model.predict_f(X_sample))
 
@@ -151,16 +153,17 @@ class GPSim:
 
         return ei, mu, variance
 
-    def acquire_point(self, feat, plate_id: int, init_points: bool = False):
+    async def acquire_point(self, feat, plate_id: int, init_points: bool = False):
         """Adds eta result to acquired list and returns next composition."""
-        self.g_acq.add(tuple(feat))
-        for plate_key, idx in self.invfeats[tuple(feat)]:
-            if plate_key == plate_id and not init_points:
-                self.acquired[plate_key].append(idx)
-            else:
-                self.acq_fromglobal[plate_key].append(idx)
-            self.available[plate_key].remove(idx)
-        self.global_step += 1
+        async with self.base.aiolock:
+            self.g_acq.add(tuple(feat))
+            for plate_key, idx in self.invfeats[tuple(feat)]:
+                if plate_key == plate_id and not init_points:
+                    self.acquired[plate_key].append(idx)
+                else:
+                    self.acq_fromglobal[plate_key].append(idx)
+                self.available[plate_key].remove(idx)
+            self.global_step += 1
         self.base.print_message(
             f"plate_id {plate_id} has acquired {len(self.acquired[plate_id])} points"
         )
@@ -259,9 +262,7 @@ class GPSim:
             if i not in self.acq_fromglobal[plate_id]
         ]
 
-    async def check_condition(
-        self, activeobj: Active
-    ):
+    async def check_condition(self, activeobj: Active):
         params = activeobj.action.action_params
         plate_id = params["plate_id"]
         stop_condition = params["stop_condition"]
