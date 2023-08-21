@@ -876,7 +876,8 @@ class Orch(Base):
                         "!!!waiting for all actions to finish before dispatching next experiment",
                         info=True,
                     )
-                    await self.orch_wait_for_all_actions()
+                    self.print_message("finishing final experiment")
+                    await self.finish_active_experiment()
                     self.print_message("!!!dispatching next experiment", info=True)
                     error_code = await self.loop_task_dispatch_experiment()
                 # if no acts and no exps, disptach next sequence
@@ -886,6 +887,8 @@ class Orch(Base):
                         info=True,
                     )
                     await self.orch_wait_for_all_actions()
+                    self.print_message("finishing final sequence")
+                    await self.finish_active_sequence()
                     self.print_message("!!!dispatching next sequence", info=True)
                     error_code = await self.loop_task_dispatch_sequence()
                 else:
@@ -903,12 +906,12 @@ class Orch(Base):
             # finish the last exp
             # this wait for all actions in active experiment
             # to finish and then updates the exp with the acts
-            if not self.action_dq:  # in case of interrupt, don't finish exp
-                self.print_message("finishing final experiment")
-                await self.finish_active_experiment()
-            if not self.experiment_dq:  # in case of interrupt, don't finish seq
-                self.print_message("finishing final sequence")
-                await self.finish_active_sequence()
+            # if not self.action_dq:  # in case of interrupt, don't finish exp
+            #     self.print_message("finishing final experiment")
+            #     await self.finish_active_experiment()
+            # if not self.experiment_dq:  # in case of interrupt, don't finish seq
+            #     self.print_message("finishing final sequence")
+            #     await self.finish_active_sequence()
 
             if self.globalstatusmodel.loop_state != OrchStatus.estop:
                 self.globalstatusmodel.loop_state = OrchStatus.stopped
