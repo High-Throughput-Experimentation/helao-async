@@ -131,8 +131,8 @@ class GPSim:
             np.array(
                 [i for i in range(self.features[plate_id].shape[0]) if i not in acqinds]
             )
-        ]
-        X_sample = self.features[plate_id][np.array(acqinds)]
+        ].astype(float)
+        X_sample = self.features[plate_id][np.array(acqinds)].astype(float)
         Y_sample = self.targets[plate_id][np.array(acqinds)]
         mu, variance = (r.numpy() for r in self.model.predict_f(X))
         mu_sample, variance_sample = (r.numpy() for r in self.model.predict_f(X_sample))
