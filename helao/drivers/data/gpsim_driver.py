@@ -70,7 +70,7 @@ class GPSim:
         # inverse map of all comps to libraries
         self.invfeats = {
             feat: [
-                (plate_id, np.where((arr == feat).all(axis=1))[0])
+                (plate_id, np.where((arr == feat).all(axis=1))[0][0])
                 for plate_id, arr in self.features.items()
                 if feat in self.all_data[plate_id]
             ]
@@ -158,9 +158,10 @@ class GPSim:
         self.g_avl.remove(tuple(feat))
         for plate_key, idx in self.invfeats[tuple(feat)]:
             if plate_key == plate_id:
-                self.acquired[plate_id].append(idx)
+                self.acquired[plate_key].append(idx)
             else:
                 self.acq_fromglobal[plate_key].append(idx)
+            self.available[plate_key].pop(idx)
         self.global_step += 1
         self.base.print_message(
             f"plate_id {plate_id} has acquired {len(self.acquired[plate_id])} points"
@@ -200,9 +201,7 @@ class GPSim:
         avail_ei, avail_pred, avail_var = self.acq_fun(plate_id, 0.001, True)
         self.ei_step[plate_id][plate_step] = avail_ei
 
-        avail_inds = np.array(
-            [i for i in range(self.features[plate_id].shape[0]) if i not in inds]
-        ).astype(int)
+        avail_inds = np.array(self.available[plate_id]).astype(int)
         avail_mae = mean_absolute_error(avail_pred, self.targets[plate_id][avail_inds])
         self.avail_step[plate_id][plate_step] = (
             avail_mae,
@@ -245,6 +244,9 @@ class GPSim:
         self.progress = {k: {} for k in self.all_data}
         self.g_acq = set()
         self.g_avl = set([tuple(x) for x in self.all_plate_feats])
+        self.available = {
+            k: list(range(arr.shape[0])) for k, arr in self.features.items()
+        }
 
     def clear_plate(self, plate_id):
         self.acquired[plate_id] = []
@@ -255,6 +257,7 @@ class GPSim:
         self.avail_step[plate_id] = {}
         self.progress[plate_id] = {}
         self.initialized[plate_id] = False
+        self.available[plate_id] = list(range(self.features[plate_id].shape[0]))
 
     async def check_condition(self, activeobj: Active):
         params = activeobj.action.action_params
