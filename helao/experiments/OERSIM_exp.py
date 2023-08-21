@@ -57,21 +57,10 @@ def OERSIM_sub_measure_CP(
     )
     apm.add(
         GPSIM_server,
-        "get_progress",
-        {},
-        from_globalexp_params={"_loaded_plate_id": "plate_id"},
-        to_globalexp_params=[
-            "_expected_improvement",
-            "_feature",
-            "_plate_step",
-            "_global_step",
-        ],
-    )
-    apm.add(
-        GPSIM_server,
         "acquire_point",
         {},
-        from_globalexp_params={"_feature": "comp_vec", "_loaded_plate_id": "plate_id"},
+        from_globalexp_params={"_loaded_plate_id": "plate_id"},
+        to_globalexp_params=["_feature"]
     )
     apm.add(
         CPSIM_server, "measure_cp", {}, from_globalexp_params={"_feature": "comp_vec"}
@@ -80,7 +69,7 @@ def OERSIM_sub_measure_CP(
         GPSIM_server,
         "update_model",
         {},
-        from_globalexp_params={"_loaded_plate_id": "plate_id", "_feature": "comp_vec"},
+        from_globalexp_params={"_loaded_plate_id": "plate_id"},
     )
     return apm.action_list
 
@@ -105,13 +94,6 @@ def OERSIM_sub_decision(
             "_orch_host",
             "_orch_port",
         ],
-    )
-    # call progress action to force model fit if nothing has been measured
-    apm.add(
-        GPSIM_server,
-        "get_progress",
-        {},
-        from_globalexp_params={"_loaded_plate_id": "plate_id"},
     )
     apm.add(
         GPSIM_server,

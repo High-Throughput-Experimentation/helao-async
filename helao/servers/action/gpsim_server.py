@@ -58,6 +58,7 @@ def makeApp(confPrefix, server_key, helao_root):
                 f"initializing priors for plate {pid} with {npoints} random points"
             )
             await app.driver.init_priors_random(pid, npoints)
+            app.driver.fit_model(pid)
         else:
             app.base.print_message(f"plate {pid} is already initialized")
         finished_action = await active.finish()
@@ -72,7 +73,9 @@ def makeApp(confPrefix, server_key, helao_root):
         active = await app.base.setup_and_contain_action()
         progress = app.driver.progress[active.action.action_params["plate_id"]]
         if not progress:
+            await app.base.aiolock.acquire()
             app.driver.fit_model(active.action.action_params["plate_id"])
+            app.base.aiolock.release()
         progress = app.driver.progress[active.action.action_params["plate_id"]]
         active.action.action_params.update({f"_{k}": v for k, v in progress.items()})
         await active.enqueue_data_dflt(datadict=progress)
@@ -83,14 +86,15 @@ def makeApp(confPrefix, server_key, helao_root):
     async def acquire_point(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        comp_vec: List[int] = [],
         plate_id: int = 0,
     ):
         active = await app.base.setup_and_contain_action()
-        await app.driver.acquire_point(
-            active.action.action_params["comp_vec"],
-            active.action.action_params["plate_id"],
+        data = await app.driver.acquire_point(
+            plate_id=active.action.action_params["plate_id"],
+            init_point=[]
         )
+        await active.enqueue_data_dflt(datadict=data)
+        active.action.action_params["_feature"] = data["feature"]
         finished_action = await active.finish()
         return finished_action.as_dict()
 

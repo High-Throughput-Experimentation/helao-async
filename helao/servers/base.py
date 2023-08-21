@@ -440,7 +440,6 @@ class Base:
                 action_name=action_name
             )
         }
-        print("!!! dispatching update status to client subscriber")
         response, error_code = await async_private_dispatcher(
             server_key=client_servkey,
             host=client_host,
@@ -449,8 +448,6 @@ class Base:
             params_dict={},
             json_dict=json_dict,
         )
-        print("!!! response is not None", response is not None)
-        print("!!! error_code == ErrorCodes.none", error_code == ErrorCodes.none)
         return response, error_code
 
     async def send_nbstatuspackage(

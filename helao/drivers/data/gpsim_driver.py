@@ -114,7 +114,7 @@ class GPSim:
         self.clear_plate(plate_id)
         print(f"!!! initial indices for plate {plate_id} are: {ridxs}")
         for ridx in ridxs:
-            await self.acquire_point(arr[ridx], plate_id, init_points=True)
+            await self.acquire_point(plate_id, init_point=list(arr[ridx]))
         self.initialized[plate_id] = True
 
     def calc_ei(self, plate_id, xi=0.001, noise=True):
@@ -153,29 +153,71 @@ class GPSim:
 
         return ei, mu, variance
 
-    async def acquire_point(self, feat, plate_id: int, init_points: bool = False):
+    async def acquire_point(self, plate_id: int, init_point: list = []):
         """Adds eta result to acquired list and returns next composition."""
-        async with self.base.aiolock:
-            self.g_acq.add(tuple(feat))
-            for plate_key, idx in self.invfeats[tuple(feat)]:
-                if plate_key == plate_id and not init_points:
-                    self.acquired[plate_key].append(idx)
-                else:
-                    self.acq_fromglobal[plate_key].append(idx)
-                self.available[plate_key].remove(idx)
-            self.global_step += 1
+        if not init_point:
+            plate_step = len(self.acquired[plate_id])
+            latest_ei = self.ei_step[plate_id][plate_step]
+
+            ei_avail_inds = list(self.avail_step[plate_id][plate_step][3])
+            current_avail_inds = self.available[plate_id]
+
+            filtered_inds = [i for i in ei_avail_inds if i in current_avail_inds]
+            filtered_ei = [
+                ei for i, ei in zip(ei_avail_inds, latest_ei) if i in current_avail_inds
+            ]
+
+            best_idx, best_ei = [
+                (i, ei)
+                for i, ei in zip(filtered_inds, filtered_ei)
+                if ei == max(filtered_ei)
+            ][0]
+
+            best_avail = list(self.features[plate_id][best_idx])
+
+            total_mae = self.total_step[plate_id][plate_step][0]
+            data = {
+                "expected_improvement": float(best_ei),
+                "feature": [int(x) for x in best_avail],
+                "total_plate_mae": float(total_mae),
+                "plate_step": plate_step,
+                "global_step": self.global_step,
+            }
+            self.progress[plate_id] = data
+
+            async with self.base.aiolock:
+                self.g_acq.add(tuple(best_avail))
+                for plate_key, idx in self.invfeats[tuple(best_avail)]:
+                    if plate_key == plate_id:
+                        self.acquired[plate_key].append(idx)
+                    else:
+                        self.acq_fromglobal[plate_key].append(idx)
+                    if idx in self.available[plate_key]:
+                        self.available[plate_key].remove(idx)
+                self.global_step += 1
+        else:
+            data = {}
+            async with self.base.aiolock:
+                self.g_acq.add(tuple(init_point))
+                for plate_key, idx in self.invfeats[tuple(init_point)]:
+                    if idx not in self.acq_fromglobal[plate_key]:
+                        self.acq_fromglobal[plate_key].append(idx)
+                    if idx in self.available[plate_key]:
+                        self.available[plate_key].remove(idx)
+                self.global_step += 1
         self.base.print_message(
             f"plate_id {plate_id} has acquired {len(self.acquired[plate_id])} points"
         )
+        return data
 
     def fit_model(self, plate_id):
         """Assemble acquired etas per plate and predict loaded space."""
         plate_step = len(self.acquired[plate_id])
-        inds = np.array(self.acquired[plate_id] + self.acq_fromglobal[plate_id]).astype(
-            int
-        )
-        X = self.features[plate_id][inds].astype(float)
-        y = self.targets[plate_id][inds]
+        acq_inds = np.array(
+            self.acquired[plate_id] + self.acq_fromglobal[plate_id]
+        ).astype(int)
+        X = self.features[plate_id][acq_inds].astype(float)
+        y = self.targets[plate_id][acq_inds]
         self.kernel = self.kernel_func()
         try:
             self.model = gpflow.models.GPR(
@@ -197,7 +239,7 @@ class GPSim:
             total_mae,
             total_pred,
             total_var,
-            inds,
+            acq_inds,
         )
 
         avail_ei, avail_pred, avail_var = self.acq_fun(plate_id, 0.01, True)
@@ -211,22 +253,7 @@ class GPSim:
             avail_var,
             avail_inds,
         )
-        latest_ei = self.ei_step[plate_id][plate_step]
-
-        best_ei = latest_ei.max()
-        best_idx = latest_ei.argmax()
-        best_avail = list(self.features[plate_id][avail_inds[best_idx]])
-
-        total_mae = self.total_step[plate_id][plate_step][0]
-        data = {
-            "expected_improvement": float(best_ei),
-            "feature": [int(x) for x in best_avail],
-            "total_plate_mae": float(total_mae),
-            "plate_step": plate_step,
-            "global_step": self.global_step,
-        }
-        print(data)
-        self.progress[plate_id] = data
+        data = {}
         return data
 
     def clear_global(self):
