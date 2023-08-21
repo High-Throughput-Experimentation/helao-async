@@ -87,7 +87,7 @@ def makeApp(confPrefix, server_key, helao_root):
         plate_id: int = 0,
     ):
         active = await app.base.setup_and_contain_action()
-        await app.driver.acquire_point(
+        app.driver.acquire_point(
             active.action.action_params["comp_vec"],
             active.action.action_params["plate_id"],
         )
