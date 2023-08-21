@@ -155,13 +155,12 @@ class GPSim:
     def acquire_point(self, feat, plate_id: int, init_points: bool = False):
         """Adds eta result to acquired list and returns next composition."""
         self.g_acq.add(tuple(feat))
-        self.g_avl.remove(tuple(feat))
         for plate_key, idx in self.invfeats[tuple(feat)]:
             if plate_key == plate_id:
                 self.acquired[plate_key].append(idx)
             else:
                 self.acq_fromglobal[plate_key].append(idx)
-            self.available[plate_key].pop(idx)
+            self.available[plate_key].remove(idx)
         self.global_step += 1
         self.base.print_message(
             f"plate_id {plate_id} has acquired {len(self.acquired[plate_id])} points"
@@ -237,7 +236,6 @@ class GPSim:
         self.avail_step = {k: {} for k in self.all_data}
         self.progress = {k: {} for k in self.all_data}
         self.g_acq = set()
-        self.g_avl = set([tuple(x) for x in self.all_plate_feats])
         self.available = {
             k: list(range(arr.shape[0])) for k, arr in self.features.items()
         }
