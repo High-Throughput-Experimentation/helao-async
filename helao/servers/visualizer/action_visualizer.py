@@ -19,8 +19,7 @@ def find_server_names(vis: Vis, fast_key: str) -> list:
             vis.print_message(
                 f"found server: '{fast_key}' under '{server_name}'", info=True
             )
-            server_names.append(server_name)
-
+            server_names.append((server_name, sorted(server_config.get("params", []))))
     return server_names
 
 
