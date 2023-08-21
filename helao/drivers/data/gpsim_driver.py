@@ -173,7 +173,7 @@ class GPSim:
         inds = np.array(self.acquired[plate_id] + self.acq_fromglobal[plate_id]).astype(
             int
         )
-        X = self.features[plate_id][inds]
+        X = self.features[plate_id][inds].astype(float)
         y = self.targets[plate_id][inds]
         self.kernel = self.kernel_func()
         try:
