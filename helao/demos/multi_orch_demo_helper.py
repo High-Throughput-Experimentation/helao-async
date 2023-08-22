@@ -29,7 +29,8 @@ if __name__ == "__main__":
         "stop_condition": "max_iters",
         "thresh_value": 100,
     }
-    orchcfg = cfgd[sys.argv[1]]["servers"]["ORCH"]
+    demokey = f"demo{sys.argv[1].replace('plate','')}"
+    orchcfg = cfgd[demokey]["servers"]["ORCH"]
     seq = SequenceModel("OERSIM_activelearn", sequence_params=seq_params)
     resp, err = private_dispatcher(
         "ORCH",
@@ -40,8 +41,8 @@ if __name__ == "__main__":
         json_dict=seq.as_dict(),
     )
     if err == ErrorCodes.none:
-        print(f"enqueue sequence for {sys.argv[1]} was successful")
-        print(f"starting orchestrator on {sys.argv[1]}")
+        print(f"enqueue sequence for {demokey} was successful")
+        print(f"starting orchestrator on {demokey}")
         resp, err = private_dispatcher(
             "ORCH",
             orchcfg["host"],
@@ -51,6 +52,6 @@ if __name__ == "__main__":
             json_dict={},
         )
         if err == ErrorCodes.none:
-            print(f"orchestrator start on {sys.argv[1]} was successful")
+            print(f"orchestrator start on {demokey} was successful")
     else:
-        print(f"could not enqueue sequence for {sys.argv[1]}")
+        print(f"could not enqueue sequence for {demokey}")
