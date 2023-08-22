@@ -73,6 +73,7 @@ class OrchAPI(HelaoFastAPI):
                     response = await call_next(request)
                 else:  # collision between two orch requests for one resource, queue
                     action_dict["action_params"] = action_dict.get("action_params", {})
+                    action_dict["action_params"]["delayed_on_actserv"] = True
                     extra_params = {}
                     for d in (
                         request.query_params,
@@ -86,6 +87,7 @@ class OrchAPI(HelaoFastAPI):
                         server_name=server_key, machine_name=gethostname().lower()
                     )
                     # send active status but don't create active object
+                    action.action_status = [HloStatus.active]
                     await self.orch.status_q.put(action.get_actmodel())
                     response = JSONResponse(action.as_dict())
                     self.orch.print_message(
