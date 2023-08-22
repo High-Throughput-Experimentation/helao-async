@@ -10,8 +10,9 @@ The multi-orchestrator demo launches two instrumentation groups, each with their
 
 ## Usage
 1. Setup the helao environment per [readme.md](../../readme.md), hardware drivers are not required for this simulator demo.
-4. From helao-async repo root, change directory to demos: ```cd helao\demos```
-5. Run: ```multi_orch_demo.bat```
+2. From helao-async repo root, change directory to demos: ```cd helao\demos```
+3. Modify `config['root']` in both `helao/configs/demo0.py` and `helao/configs/demo1.py` to change where instrument logs and data are saved.
+4. Run: ```multi_orch_demo.bat```
 
 ## Description
-The `multi_orch_demo.bat` batch script will launch the first orchestrator along with a simulated CP measurement server and compute server, then wait 30 seconds before queueing and starting a command sequence of 100 active learning measure-acquire iterations for the composition library loaded on the measurement server. After 15 seconds, the second orchestrator and simulated CP measurement servers will start, and this orchestrator will share the compute server already running in the first group. Another separate set of 100 active learning iterations will queued and started on the second group.
+The `multi_orch_demo.bat` batch script will launch the first orchestrator along with a simulated CP measurement server and compute server, then wait 30 seconds before queueing and starting a command sequence of 100 active learning measure-acquire iterations for the composition library loaded on the measurement server. After 15 seconds, the second orchestrator and simulated CP measurement servers will start, and this orchestrator will share the compute server already running in the first group. Another set of 100 active learning iterations will be queued and started on the second group.
