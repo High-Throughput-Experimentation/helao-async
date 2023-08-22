@@ -215,7 +215,7 @@ class Orch(Base):
                 self.incoming = interrupt
                 await self.globstat_q.put(interrupt)
 
-    async def subscribe_all(self, retry_limit: int = 5):
+    async def subscribe_all(self, retry_limit: int = 15):
         """Subscribe to all fastapi servers in config."""
         fails = []
         for serv_key, serv_dict in self.world_cfg["servers"].items():
@@ -249,10 +249,10 @@ class Orch(Base):
                             f"failed to subscribe to "
                             f"{serv_key} at "
                             f"{serv_addr}:{serv_port}, {err}"
-                            "trying again in 1sec",
+                            "trying again in 2 seconds",
                             info=True,
                         )
-                        await asyncio.sleep(1)
+                        await asyncio.sleep(2)
 
                 if success:
                     self.print_message(
