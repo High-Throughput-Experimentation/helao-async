@@ -670,6 +670,7 @@ class Base:
                             f"{client_servkey} after {retry_limit} attempts.",
                             error=True,
                         )
+                    time.sleep(0.5)
                 # now delete the errored and finsihed statuses after
                 # all are send to the subscribers
                 self.actionservermodel.endpoints[
