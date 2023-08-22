@@ -43,13 +43,14 @@ if __name__ == "__main__":
         dummy=True,
         simulation=True
     )
+    print(seq.as_dict())
     resp, err = private_dispatcher(
         "ORCH",
         orchcfg["host"],
         orchcfg["port"],
         "append_sequence",
         params_dict={},
-        json_dict=seq.as_dict(),
+        json_dict=seq,
     )
     if err == ErrorCodes.none:
         print(f"enqueue sequence for {demokey} was successful")
