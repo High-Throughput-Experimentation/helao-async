@@ -9,13 +9,7 @@ The multi-orchestrator demo launches two instrumentation groups, each with their
 | HelaoData_example.ipynb   | example notebook for parsing helao data structures                              |
 
 ## Usage
-1. Clone helao-async and helao-core repositories:
-   ```
-   git clone https://github.com/High-Throughput-Experimentation/helao-async.git
-   git clone https://github.com/High-Throughput-Experimentation/helao-core.git
-   ```
-2. Change directory to helao-async: ```cd helao-async```
-3. Setup the helao environment per [readme.md](../../readme.md): ```conda env create -f helao.env```
+1. Setup the helao environment per [readme.md](../../readme.md), hardware drivers are not required for this simulator demo.
 4. From helao-async repo root, change directory to demos: ```cd helao\demos```
 5. Run: ```multi_orch_demo.bat```
 
