@@ -52,7 +52,7 @@ if __name__ == "__main__":
         orchcfg["port"],
         "append_sequence",
         params_dict={},
-        json_dict=seq.as_dict(),
+        json_dict={"sequence": seq.as_dict()},
     )
     if err == ErrorCodes.none:
         print(f"enqueue sequence for {demokey} was successful")

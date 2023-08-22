@@ -114,7 +114,7 @@ def private_dispatcher(
         with session.post(
             url,
             params=params_dict,
-            data=json_dict,
+            json=json_dict,
         ) as resp:
             error_code = ErrorCodes.none
             try:
