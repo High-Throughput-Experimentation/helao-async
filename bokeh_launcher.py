@@ -22,6 +22,7 @@ if __name__ == "__main__":
     servHost = S["host"]
     servPort = S["port"]
     servPy = S["bokeh"]
+    launch_browser = S.get("params", {}).get("launch_browser", False)
 
     makeApp = import_module(
         f"helao.servers.{S['group']}.{S['bokeh']}"
@@ -53,5 +54,6 @@ if __name__ == "__main__":
         info=True,
     )
     bokehapp.start()
-    # bokehapp.io_loop.add_callback(bokehapp.show, f"/{servPy}")
+    if launch_browser:
+        bokehapp.io_loop.add_callback(bokehapp.show, f"/{servPy}")
     bokehapp.io_loop.start()

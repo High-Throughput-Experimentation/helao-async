@@ -38,7 +38,7 @@ config["servers"] = {
         "port": 8011,
         "group": "orchestrator",
         "fast": "async_orch2",
-        "params": {"enable_op": True, "bokeh_port": 5011},
+        "params": {"enable_op": True, "bokeh_port": 5011, "launch_browser": True},
     },
     "CPSIM": {
         "host": HOSTIP,
@@ -52,7 +52,7 @@ config["servers"] = {
         "port": 5012,
         "group": "visualizer",
         "bokeh": "action_visualizer",
-        "params": {"doc_name": "demo1: OER Simulation Visualizer"},
+        "params": {"doc_name": "demo1: OER Simulation Visualizer", "launch_browser": True},
     },
     "GPSIM": {
         "host": HOSTIP,

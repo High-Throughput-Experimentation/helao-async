@@ -173,7 +173,8 @@ class Orch(Base):
         )
         self.print_message(f"started bokeh server {self.bokehapp}", info=True)
         self.bokehapp.start()
-        # self.bokehapp.io_loop.add_callback(self.bokehapp.show, f"/{servPy}")
+        if self.server_params.get("launch_browser", False):
+            self.bokehapp.io_loop.add_callback(self.bokehapp.show, f"/{servPy}")
         # bokehapp.io_loop.start()
 
     def makeBokehApp(self, doc, orch):

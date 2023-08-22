@@ -18,7 +18,7 @@ class CPSim:
         self.world_config = action_serv.world_cfg
         self.loaded_plate = self.config_dict["plate_id"]
         self.data_file = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))),
             "demos",
             "data",
             "oer13_cps.pzstd",

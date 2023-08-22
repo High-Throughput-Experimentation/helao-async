@@ -29,7 +29,7 @@ class GPSim:
         self.config_dict = action_serv.server_cfg["params"]
         self.rng = np.random.default_rng(seed=self.config_dict["random_seed"])
         self.data_file = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))),
             "demos",
             "data",
             "oer13_cps.pzstd",
