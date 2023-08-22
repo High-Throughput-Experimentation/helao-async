@@ -35,7 +35,7 @@ if __name__ == "__main__":
     resp, err = private_dispatcher(
         "ORCH",
         orchcfg["host"],
-        orchcfg["ORCH"],
+        orchcfg["port"],
         "append_sequence",
         params_dict={},
         json_dict=seq.as_dict(),
@@ -46,7 +46,7 @@ if __name__ == "__main__":
         resp, err = private_dispatcher(
             "ORCH",
             orchcfg["host"],
-            orchcfg["ORCH"],
+            orchcfg["port"],
             "start",
             params_dict={},
             json_dict={},
