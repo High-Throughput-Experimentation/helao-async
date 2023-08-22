@@ -10,8 +10,8 @@ The multi-orchestrator demo launches two instrumentation groups, each with their
 
 ## Usage
 1. Setup the helao environment per [readme.md](../../readme.md), hardware drivers are not required for this simulator demo.
-2. From helao-async repo root, change directory to demos: ```cd helao\demos```
-3. Modify `config['root']` in both `helao/configs/demo0.py` and `helao/configs/demo1.py` to change where instrument logs and data are saved.
+2. Modify `config['root']` in both `helao\configs\demo0.py` and `helao\configs\demo1.py` to change where instrument logs and data are saved.
+3. From helao-async repo root, change directory to demos: ```cd helao\demos```
 4. Run: ```multi_orch_demo.bat```
 
 ## Description
