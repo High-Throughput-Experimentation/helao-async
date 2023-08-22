@@ -12,6 +12,7 @@ sys.path.append(core_root)
 
 from helaocore.models.sequence import SequenceModel
 from helaocore.error import ErrorCodes
+from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.dispatcher import private_dispatcher
 from helao.configs.demo0 import config as config0
 from helao.configs.demo1 import config as config1
@@ -31,7 +32,11 @@ if __name__ == "__main__":
     }
     demokey = sys.argv[1]
     orchcfg = cfgd[demokey]["servers"]["ORCH"]
-    seq = SequenceModel(sequence_name="OERSIM_activelearn", sequence_params=seq_params)
+    seq = SequenceModel(
+        sequence_name="OERSIM_activelearn",
+        sequence_params=seq_params,
+        sequence_uuid=gen_uuid(),
+    )
     resp, err = private_dispatcher(
         "ORCH",
         orchcfg["host"],
