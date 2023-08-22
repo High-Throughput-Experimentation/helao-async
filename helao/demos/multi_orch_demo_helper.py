@@ -1,4 +1,5 @@
 import os
+import sys
 
 repo_root = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
@@ -6,13 +7,50 @@ repo_root = os.path.dirname(
 async_root = os.path.join(repo_root, "helao-async")
 core_root = os.path.join(repo_root, "helao-core")
 
-import sys
 sys.path.append(async_root)
 sys.path.append(core_root)
 
 from helaocore.models.sequence import SequenceModel
+from helaocore.error import ErrorCodes
 from helao.helpers.dispatcher import private_dispatcher
+from helao.configs.demo0 import config as config0
+from helao.configs.demo1 import config as config1
+from helao.configs.demo2 import config as config2
 
+cfgd = {"demo0": config0, "demo1": config1, "demo2": config2}
 
 if __name__ == "__main__":
-    pass
+    if len(sys.argv) == 1:
+        print("no arguments specified: use 'demo0', 'demo1', or 'demo2'")
+    elif sys.argv[1] not in ["demo0", "demo1", "demo2"]:
+        print("invalid arguments specified: use 'demo0', 'demo1', or 'demo2'")
+    seq_params = {
+        "init_random_points": 5,
+        "stop_condition": "max_iters",
+        "thresh_value": 100,
+    }
+    orchcfg = cfgd[sys.argv[1]]["servers"]["ORCH"]
+    seq = SequenceModel("OERSIM_activelearn", sequence_params=seq_params)
+    resp, err = private_dispatcher(
+        "ORCH",
+        orchcfg["host"],
+        orchcfg["ORCH"],
+        "append_sequence",
+        params_dict={},
+        json_dict=seq.as_dict(),
+    )
+    if err == ErrorCodes.none:
+        print(f"enqueue sequence for {sys.argv[1]} was successful")
+        print(f"starting orchestrator on {sys.argv[1]}")
+        resp, err = private_dispatcher(
+            "ORCH",
+            orchcfg["host"],
+            orchcfg["ORCH"],
+            "start",
+            params_dict={},
+            json_dict={},
+        )
+        if err == ErrorCodes.none:
+            print(f"orchestrator start on {sys.argv[1]} was successful")
+    else:
+        print(f"could not enqueue sequence for {sys.argv[1]}")
