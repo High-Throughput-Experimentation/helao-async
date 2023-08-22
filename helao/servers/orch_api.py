@@ -82,15 +82,13 @@ class OrchAPI(HelaoFastAPI):
                         for k, v in d.items():
                             extra_params[k] = eval_val(v)
                     action = Action(**action_dict)
-                    # action.action_name = request.url.path.strip("/").split("/")[-1]
-                    # action.action_server = MachineModel(
-                    #     server_name=server_key, machine_name=gethostname().lower()
-                    # )
-                    # # send active status but don't create active object
-                    # action.action_status = [HloStatus.active]
-                    # await self.orch.status_q.put(action.get_actmodel())
-                    active = await self.orch.setup_and_contain_action()
-                    response = JSONResponse(active.action.as_dict())
+                    action.action_name = request.url.path.strip("/").split("/")[-1]
+                    action.action_server = MachineModel(
+                        server_name=server_key, machine_name=gethostname().lower()
+                    )
+                    # send active status but don't create active object
+                    await self.orch.status_q.put(action.get_actmodel())
+                    response = JSONResponse(action.as_dict())
                     self.orch.print_message(
                         f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
                     )

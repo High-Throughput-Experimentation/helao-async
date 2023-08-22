@@ -79,7 +79,6 @@ class BaseAPI(HelaoFastAPI):
                         server_name=server_key, machine_name=gethostname().lower()
                     )
                     # send active status but don't create active object
-                    action.action_status = [HloStatus.active]
                     await self.base.status_q.put(action.get_actmodel())
                     response = JSONResponse(action.as_dict())
                     self.base.print_message(
