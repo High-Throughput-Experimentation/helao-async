@@ -352,6 +352,8 @@ class OrchAPI(HelaoFastAPI):
         async def append_sequence(
             sequence: Sequence = Body({}, embed=True),
         ):
+            if not isinstance(sequence, Sequence):
+                sequence = Sequence(**sequence)
             seq_uuid = await self.orch.add_sequence(sequence=sequence)
             return {"sequence_uuid": seq_uuid}
 
