@@ -106,7 +106,7 @@ class GPSim:
     async def init_all_plates(self, num_points: int):
         for plate_id in self.features:
             await self.init_priors_random(plate_id, num_points)
-            await self.fit_model(plate_id)
+            self.fit_model(plate_id)
 
     async def init_priors_random(self, plate_id: int, num_points: int):
         arr = self.features[plate_id]
