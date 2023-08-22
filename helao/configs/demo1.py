@@ -28,7 +28,8 @@ config["simulation"] = True
 config["experiment_libraries"] = ["OERSIM_exp"]
 config["sequence_libraries"] = ["OERSIM_seq"]
 config["run_type"] = "simulation"
-config["root"] = "/mnt/STORAGE/INST_hlo"  # software log and run files saved here
+# config["root"] = "/mnt/STORAGE/INST_hlo"  # software log and run files saved here
+config["root"] = "C:/INST_hlo"  # software log and run files saved here
 
 
 # we define all the servers here so that the overview is a bit better
