@@ -34,11 +34,13 @@ if __name__ == "__main__":
     }
     demokey = sys.argv[1]
     orchcfg = cfgd[demokey]["servers"]["ORCH"]
+    exp_plan = OERSIM_activelearn(**seq_params)
+    print(exp_plan)
     seq = Sequence(
         sequence_name="OERSIM_activelearn",
-        sequence_params=seq_params,
         sequence_label=f"{demokey}",
-        experiment_plan_list=OERSIM_activelearn(**seq_params),
+        sequence_params=seq_params,
+        experiment_plan_list=exp_plan,
         sequence_uuid=gen_uuid(),
         dummy=True,
         simulation=True
@@ -50,7 +52,7 @@ if __name__ == "__main__":
         orchcfg["port"],
         "append_sequence",
         params_dict={},
-        json_dict=seq,
+        json_dict=seq.as_dict(),
     )
     if err == ErrorCodes.none:
         print(f"enqueue sequence for {demokey} was successful")
