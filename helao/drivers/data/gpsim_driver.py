@@ -98,11 +98,14 @@ class GPSim:
 
         self.global_step = 0
         self.event_loop = asyncio.get_event_loop()
-        self.init_all_plates(5)
+        self.myinit()
+        
+    def myinit(self):
+        asyncio.create_task(self.init_all_plates(5))
 
-    def init_all_plates(self, num_points: int):
+    async def init_all_plates(self, num_points: int):
         for plate_id in self.features:
-            self.init_priors_random(plate_id, num_points)
+            await self.init_priors_random(plate_id, num_points)
 
     async def init_priors_random(self, plate_id: int, num_points: int):
         arr = self.features[plate_id]
