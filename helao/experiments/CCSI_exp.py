@@ -1347,9 +1347,9 @@ def CCSI_sub_flowflush(
     #cycles = int(co2measure_duration / 30),
     for t in range(60):
             apm.add(ORCH_server, "wait", {"waittime": 28})
-            apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 1})
+            apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1})
             apm.add(ORCH_server, "wait", {"waittime": 2})
-            apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 0})
+            apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 0})
             apm.add(ORCH_server, "wait", {"waittime": 28})
             apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1})
             apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 1}, asc.no_wait)
