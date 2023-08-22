@@ -118,7 +118,10 @@ def private_dispatcher(
         ) as resp:
             error_code = ErrorCodes.none
             try:
-                response = resp.json()
+                try:
+                    response = resp.json()
+                except:
+                    response = str(resp)
                 if resp.status_code != 200:
                     error_code = ErrorCodes.http
                     print_message(
