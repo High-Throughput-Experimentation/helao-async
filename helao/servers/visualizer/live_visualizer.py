@@ -15,12 +15,11 @@ def find_server_names(vis: Vis, fast_key: str) -> list:
     """finds server name for a given fast driver"""
     server_names = []
     for server_name, server_config in vis.world_cfg["servers"].items():
-        if server_config.get("fast", "") == fast_key:
+        if server_config.get("fast", server_config.get("demo", "")) == fast_key:
             vis.print_message(
                 f"found server: '{fast_key}' under '{server_name}'", info=True
             )
             server_names.append((server_name, sorted(server_config.get("params", []))))
-
     return server_names
 
 
@@ -38,7 +37,7 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
             [
                 Spacer(width=20),
                 Div(
-                    text=f"<b>Sensors on {gethostname().lower()}</b>",
+                    text=f"<b>Live visualizer on {gethostname().lower()} -- config: {confPrefix}.py</b>",
                     width=1004,
                     height=32,
                     style={"font-size": "200%", "color": "red"},

@@ -134,7 +134,7 @@ class HelaoAnalysisSyncer:
         )
         os.makedirs(local_ana_dir, exist_ok=True)
         with open(os.path.join(local_ana_dir, f"{eua.analysis_uuid}.yml"), "w") as f:
-            f.write(pyaml.dump(model_dict, sort_dicts=False))
+            f.write(pyaml.dump(model_dict, sort_dicts=False, vspacing=False))
 
         s3_model_target = f"analysis/{eua.analysis_uuid}.json"
 

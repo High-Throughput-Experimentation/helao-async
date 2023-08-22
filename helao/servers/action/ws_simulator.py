@@ -16,7 +16,8 @@ from helaocore.error import ErrorCodes
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.sample import SampleUnion
 
-from helao.servers.base import Base, BaseAPI, Executor
+from helao.servers.base import Base, Executor
+from helao.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
 

@@ -44,7 +44,7 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action, params={})
                         error=True,
                     )
             except Exception as e:
-                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 print_message(
                     actd,
                     "orchestrator",
@@ -56,8 +56,9 @@ async def async_action_dispatcher(world_config_dict: dict, A: Action, params={})
 
 
 async def async_private_dispatcher(
-    world_config_dict: dict,
-    server: str,
+    server_key: str,
+    host: str,
+    port: int,
     private_action: str,
     params_dict: dict = {},
     json_dict: dict = {},
@@ -68,11 +69,7 @@ async def async_private_dispatcher(
         Response string from http POST request to action server
     """
 
-    actd = world_config_dict["servers"][server]
-    act_addr = actd["host"]
-    act_port = actd["port"]
-
-    url = f"http://{act_addr}:{act_port}/{private_action}"
+    url = f"http://{host}:{port}/{private_action}"
 
     async with aiohttp.ClientSession() as session:
         async with session.post(
@@ -86,34 +83,32 @@ async def async_private_dispatcher(
                 if resp.status != 200:
                     error_code = ErrorCodes.http
                     print_message(
-                        actd,
+                        {},
                         "orchestrator",
-                        f"{server}/{private_action} POST request returned status {resp.status}: '{response}', error={repr(error_code)}",
+                        f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}', error={repr(error_code)}",
                         error=True,
                     )
             except Exception as e:
-                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 print_message(
-                    actd,
+                    {},
                     "orchestrator",
-                    f"{server}/{private_action} async_private_dispatcher could not decide response: '{resp}', error={repr(e), tb}",
+                    f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}', error={repr(e), tb}",
                     error=True,
                 )
                 response = None
             return response, error_code
 
+
 def private_dispatcher(
-    world_config_dict: dict,
-    server: str,
+    server_key: str,
+    server_host: str,
+    server_port: int,
     private_action: str,
     params_dict: dict,
     json_dict: dict,
 ):
-    actd = world_config_dict["servers"][server]
-    act_addr = actd["host"]
-    act_port = actd["port"]
-
-    url = f"http://{act_addr}:{act_port}/{private_action}"
+    url = f"http://{server_host}:{server_port}/{private_action}"
 
     with requests.Session() as session:
         with session.post(
@@ -123,21 +118,24 @@ def private_dispatcher(
         ) as resp:
             error_code = ErrorCodes.none
             try:
-                response = resp.json()
+                try:
+                    response = resp.json()
+                except:
+                    response = str(resp)
                 if resp.status_code != 200:
                     error_code = ErrorCodes.http
                     print_message(
-                        actd,
+                        {},
                         "orchestrator",
-                        f"{server}/{private_action} POST request returned status {resp.status_code}: '{response}', error={repr(error_code)}",
+                        f"{server_key}/{private_action} POST request returned status {resp.status_code}: '{response}', error={repr(error_code)}",
                         error=True,
                     )
             except Exception as e:
-                tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 print_message(
-                    actd,
+                    {},
                     "orchestrator",
-                    f"{server}/{private_action} async_private_dispatcher could not decide response: '{resp}', error={repr(e), tb}",
+                    f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}', error={repr(e), tb}",
                     error=True,
                 )
                 response = None

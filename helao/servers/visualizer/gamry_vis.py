@@ -48,15 +48,15 @@ class C_potvis:
         self.last_update_time = time.time()
 
         self.potentiostat_key = serv_key
-        potserv_config = self.vis.world_cfg["servers"].get(self.potentiostat_key, None)
-        if potserv_config is None:
+        self.potserv_config = self.vis.world_cfg["servers"].get(self.potentiostat_key, None)
+        if self.potserv_config is None:
             return
-        potserv_host = potserv_config.get("host", None)
-        potserv_port = potserv_config.get("port", None)
-        self.wss = Wss(potserv_host, potserv_port, "ws_data")
+        self.potserv_host = self.potserv_config.get("host", None)
+        self.potserv_port = self.potserv_config.get("port", None)
+        self.wss = Wss(self.potserv_host, self.potserv_port, "ws_data")
 
         self.data_url = (
-            f"ws://{potserv_config['host']}:{potserv_config['port']}/ws_data"
+            f"ws://{self.potserv_config['host']}:{self.potserv_config['port']}/ws_data"
         )
 
         self.IOloop_data_run = False
@@ -125,7 +125,7 @@ class C_potvis:
         self.plot_prev = figure(title="Title", height=300, width=500)
 
         # combine all sublayouts into a single one
-        docs_url = f"http://{potserv_host}:{potserv_port}/docs#/"
+        docs_url = f"http://{self.potserv_host}:{self.potserv_port}/docs#/"
         server_link = (
             f'<a href="{docs_url}" target="_blank">\'{self.potentiostat_key}\'</a>'
         )
@@ -168,8 +168,9 @@ class C_potvis:
         self.vis.doc.add_next_tick_callback(
             partial(
                 async_private_dispatcher,
-                world_config_dict=self.vis.world_cfg,
-                server="PSTAT",
+                server=self.potentiostat_key,
+                host=self.potserv_host,
+                port=self.potserv_port,
                 private_action="stop_private",
                 params_dict={},
                 json_dict={},
@@ -256,12 +257,12 @@ class C_potvis:
     def add_points(self, datapackage_list: list):
         for data_package in datapackage_list:
             data_dict = {k: [] for k in self.data_dict_keys}
-            # only resets if axis selector or action_uuid changes
-            self.reset_plot(str(data_package.action_uuid))
             if (
                 data_package.datamodel.status in VALID_DATA_STATUS
                 and data_package.action_name in VALID_ACTION_NAME
             ):
+                # only resets if axis selector or action_uuid changes
+                self.reset_plot(str(data_package.action_uuid))
                 for _, uuid_dict in data_package.datamodel.data.items():
                     for data_label, data_val in uuid_dict.items():
                         if data_label in self.data_dict_keys:

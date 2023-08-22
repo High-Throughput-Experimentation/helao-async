@@ -73,6 +73,7 @@ class OrchAPI(HelaoFastAPI):
                     response = await call_next(request)
                 else:  # collision between two orch requests for one resource, queue
                     action_dict["action_params"] = action_dict.get("action_params", {})
+                    action_dict["action_params"]["delayed_on_actserv"] = True
                     extra_params = {}
                     for d in (
                         request.query_params,
@@ -91,7 +92,12 @@ class OrchAPI(HelaoFastAPI):
                     self.orch.print_message(
                         f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
                     )
-                    self.orch.endpoint_queues[endpoint].put((action, extra_params,))
+                    self.orch.endpoint_queues[endpoint].put(
+                        (
+                            action,
+                            extra_params,
+                        )
+                    )
             else:
                 response = await call_next(request)
             return response
@@ -144,10 +150,12 @@ class OrchAPI(HelaoFastAPI):
             return self.orch.actionservermodel
 
         @self.post("/attach_client", tags=["private"])
-        async def attach_client(client_servkey: str = ""):
-            if client_servkey == "":
-                return {"error": "client key was not specified"}
-            return await self.orch.attach_client(client_servkey)
+        async def attach_client(
+            client_servkey: str, client_host: str, client_port: int
+        ):
+            return await self.orch.attach_client(
+                client_servkey, client_host, client_port
+            )
 
         @self.post("/stop_executor", tags=["private"])
         def stop_executor(executor_id: str = ""):
@@ -254,15 +262,34 @@ class OrchAPI(HelaoFastAPI):
             return await self.orch.update_status(actionservermodel=actionservermodel)
 
         @self.post("/update_nonblocking", tags=["private"])
-        async def update_nonblocking(actionmodel: ActionModel = Body({}, embed=True)):
+        async def update_nonblocking(
+            actionmodel: ActionModel = Body({}, embed=True),
+            server_host: str = "",
+            server_port: int = 9000,
+        ):
             self.orch.print_message(
                 f"'{self.orch.server.server_name.upper()}' "
                 f"got nonblocking status from "
                 f"'{actionmodel.action_server.server_name}': "
                 f"exec_id: {actionmodel.exec_id} -- status: {actionmodel.action_status}"
             )
-            result_dict = self.orch.update_nonblocking(actionmodel)
+            result_dict = self.orch.update_nonblocking(
+                actionmodel, server_host, server_port
+            )
             return result_dict
+
+        @self.post("/update_globalexp_params", tags=["private"])
+        async def update_globalexp_params(params: dict):
+            """Updates globalexp_params for active experiment"""
+            if self.orch.active_experiment is not None:
+                self.orch.active_experiment.globalexp_params.update(params)
+                self.orch.print_message(f"Updated globalexp params with {params}.")
+                return True
+            else:
+                self.orch.print_message(
+                    "No active experiment, could not update globalexp params."
+                )
+                return False
 
         @self.post("/start", tags=["private"])
         async def start():
@@ -325,6 +352,8 @@ class OrchAPI(HelaoFastAPI):
         async def append_sequence(
             sequence: Sequence = Body({}, embed=True),
         ):
+            if not isinstance(sequence, Sequence):
+                sequence = Sequence(**sequence)
             seq_uuid = await self.orch.add_sequence(sequence=sequence)
             return {"sequence_uuid": seq_uuid}
 
