@@ -98,6 +98,7 @@ class GPSim:
 
         self.global_step = 0
         self.event_loop = asyncio.get_event_loop()
+        self.init_all_plates(5)
 
     def init_all_plates(self, num_points: int):
         for plate_id in self.features:

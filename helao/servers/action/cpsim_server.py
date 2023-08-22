@@ -38,9 +38,6 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         """Record simulated data."""
         active = await app.base.setup_and_contain_action()
-        if len(active.action.action_params["comp_vec"])==0:
-            finished_action_dict = active.finish()
-            return finished_action_dict
         active.action.action_abbr = "CPSIM"
         executor = CPSimExec(
             active=active,

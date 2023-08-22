@@ -394,8 +394,6 @@ class Orch(Base):
 
     async def loop_task_dispatch_sequence(self) -> ErrorCodes:
         if self.sequence_dq:
-            # self.print_message("finishing last sequence")
-            # await self.finish_active_sequence()
             self.print_message("getting new sequence from sequence_dq")
             self.active_sequence = self.sequence_dq.popleft()
             self.print_message(
@@ -456,6 +454,7 @@ class Orch(Base):
         # generate uids when populating,
         # generate timestamp when acquring
         self.active_experiment = self.experiment_dq.popleft()
+        self.active_experiment.orch_key = self.orch_key
         self.active_experiment.orch_host = self.orch_host
         self.active_experiment.orch_port = self.orch_port
         self.active_seq_exp_counter += 1
@@ -516,6 +515,7 @@ class Orch(Base):
             # init uuid now for tracking later
             act.action_uuid = gen_uuid()
             act.action_order = int(i)
+            act.orch_key = self.orch_key
             act.orch_host = self.orch_host
             act.orch_port = self.orch_port
             # actual order should be the same at the beginning
@@ -772,6 +772,7 @@ class Orch(Base):
 
             if (
                 result_action.to_globalexp_params
+                and result_action.orch_key == self.orch_key
                 and result_action.orch_host == self.orch_host
                 and int(result_action.orch_port) == int(self.orch_port)
             ):
@@ -876,7 +877,7 @@ class Orch(Base):
                         "!!!waiting for all actions to finish before dispatching next experiment",
                         info=True,
                     )
-                    self.print_message("finishing final experiment")
+                    self.print_message("finishing last experiment")
                     await self.finish_active_experiment()
                     self.print_message("!!!dispatching next experiment", info=True)
                     error_code = await self.loop_task_dispatch_experiment()
@@ -886,8 +887,7 @@ class Orch(Base):
                         "!!!waiting for all actions to finish before dispatching next sequence",
                         info=True,
                     )
-                    await self.orch_wait_for_all_actions()
-                    self.print_message("finishing final sequence")
+                    self.print_message("finishing last sequence")
                     await self.finish_active_sequence()
                     self.print_message("!!!dispatching next sequence", info=True)
                     error_code = await self.loop_task_dispatch_sequence()
@@ -906,12 +906,12 @@ class Orch(Base):
             # finish the last exp
             # this wait for all actions in active experiment
             # to finish and then updates the exp with the acts
-            # if not self.action_dq:  # in case of interrupt, don't finish exp
-            #     self.print_message("finishing final experiment")
-            #     await self.finish_active_experiment()
-            # if not self.experiment_dq:  # in case of interrupt, don't finish seq
-            #     self.print_message("finishing final sequence")
-            #     await self.finish_active_sequence()
+            if not self.action_dq:  # in case of interrupt, don't finish exp
+                self.print_message("finishing final experiment")
+                await self.finish_active_experiment()
+            if not self.experiment_dq and not self.action_dq:  # in case of interrupt, don't finish seq
+                self.print_message("finishing final sequence")
+                await self.finish_active_sequence()
 
             if self.globalstatusmodel.loop_state != OrchStatus.estop:
                 self.globalstatusmodel.loop_state = OrchStatus.stopped
@@ -1294,6 +1294,7 @@ class Orch(Base):
         self.action_dq.append(new_action)
 
     async def finish_active_sequence(self):
+        await self.orch_wait_for_all_actions()
         if self.active_sequence is not None:
             self.replace_status(
                 status_list=self.active_sequence.sequence_status,
@@ -1364,6 +1365,7 @@ class Orch(Base):
 
             if (
                 self.active_experiment.to_globalseq_params
+                and self.active_experiment.orch_key == self.orch_key
                 and self.active_experiment.orch_host == self.orch_host
                 and self.active_experiment.orch_port == self.orch_port
             ):

@@ -480,7 +480,11 @@ class Base:
     ):
         """Add client for pushing status updates via HTTP POST."""
         success = False
-        combo_key = (client_servkey, client_host, client_port,)
+        combo_key = (
+            client_servkey,
+            client_host,
+            client_port,
+        )
         self.print_message("attaching status subscriber", combo_key)
 
         if combo_key in self.status_clients:
@@ -528,7 +532,11 @@ class Base:
 
     def detach_client(self, client_servkey: str, client_host: str, client_port: int):
         """Remove client from receiving status updates via HTTP POST"""
-        combo_key = (client_servkey, client_host, client_port,)
+        combo_key = (
+            client_servkey,
+            client_host,
+            client_port,
+        )
         if combo_key in self.status_clients:
             self.status_clients.remove(combo_key)
             self.print_message(
@@ -1705,6 +1713,25 @@ class Active:
 
             # send the last status
             await self.add_status(action=finish_action)
+
+            # send globalparams
+            if finish_action.to_globalexp_params:
+                export_params = {
+                    k: finish_action.action_params[k]
+                    for k in finish_action.to_globalexp_params
+                }
+                _, error_code = await async_private_dispatcher(
+                    server_key=finish_action.orch_key,
+                    host=finish_action.orch_host,
+                    port=finish_action.orch_port,
+                    private_action="update_globalexp_params",
+                    json_dict=export_params,
+                )
+                if error_code == ErrorCodes.none:
+                    self.base.print_message("Successfully updated globalexp params.")
+
+            if finish_action.to_globalseq_params:
+                pass
 
         # check if all actions are fininshed
         # if yes close datalogger etc

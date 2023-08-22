@@ -64,49 +64,34 @@ class BaseAPI(HelaoFastAPI):
                 ):
                     response = await call_next(request)
                 else:  # collision between two base requests for one resource, queue
-                    failed_retry = True
-                    for _ in range(50):
-                        time.sleep(0.2)
-                        if (
-                            len(
-                                self.base.actionservermodel.endpoints[
-                                    endpoint
-                                ].active_dict
-                            )
-                            == 0
-                        ):
-                            response = await call_next(request)
-                            failed_retry = False
-                            break
-                    if failed_retry:
-                        action_dict["action_params"] = action_dict.get(
-                            "action_params", {}
+                    action_dict["action_params"] = action_dict.get(
+                        "action_params", {}
+                    )
+                    action_dict["action_params"]["delayed_on_actserv"] = True
+                    extra_params = {}
+                    for d in (
+                        request.query_params,
+                        request.path_params,
+                    ):
+                        for k, v in d.items():
+                            extra_params[k] = eval_val(v)
+                    action = Action(**action_dict)
+                    action.action_name = request.url.path.strip("/").split("/")[-1]
+                    action.action_server = MachineModel(
+                        server_name=server_key, machine_name=gethostname().lower()
+                    )
+                    # send active status but don't create active object
+                    await self.base.status_q.put(action.get_actmodel())
+                    response = JSONResponse(action.as_dict())
+                    self.base.print_message(
+                        f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
+                    )
+                    self.base.endpoint_queues[endpoint].put(
+                        (
+                            action,
+                            extra_params,
                         )
-                        action_dict["action_params"]["delayed_on_actserv"] = True
-                        extra_params = {}
-                        for d in (
-                            request.query_params,
-                            request.path_params,
-                        ):
-                            for k, v in d.items():
-                                extra_params[k] = eval_val(v)
-                        action = Action(**action_dict)
-                        action.action_name = request.url.path.strip("/").split("/")[-1]
-                        action.action_server = MachineModel(
-                            server_name=server_key, machine_name=gethostname().lower()
-                        )
-                        # send active status but don't create active object
-                        await self.base.status_q.put(action.get_actmodel())
-                        response = JSONResponse(action.as_dict())
-                        self.base.print_message(
-                            f"simultaneous action requests for {action.action_name} received, queuing action {action.action_uuid}"
-                        )
-                        self.base.endpoint_queues[endpoint].put(
-                            (
-                                action,
-                                extra_params,
-                            )
-                        )
+                    )
             else:
                 response = await call_next(request)
             return response
