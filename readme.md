@@ -3,12 +3,11 @@
 HELAO-async is Caltech HTE group's instrument control software following [HELAO](https://doi.org/10.26434/chemrxiv-2021-kr87t) design principles. This repository contains instrument drivers, API server configurations, and experiment sequences intended for use with the [HELAO-core](https://github.com/High-Throughput-Experimentation/helao-core) package.
 
 
-## Requirements for v2.0 release
+## Requirements
 
-- Windows is required for Galil gclib and Gamry comtypes. (Tested with Windows 10 x64)
-
+- Windows is required for Galil (gclib) and Gamry (comtypes) drivers. (Tested with Windows 7 and Windows 10 x64)
+- The [multi-orchestrator demo](helao/demos/multi_orch_demo.md) was tested on Windows 10 and Linux (Ubuntu 22.04), however the helao.py launch script will produce errors in Linux when attempting close server processes before exiting.
 - [miniconda](https://docs.conda.io/en/latest/miniconda.html) (Tested with Python 3.8)
-
 - [HELAO-core](https://github.com/High-Throughput-Experimentation/helao-core)
 
 
@@ -41,7 +40,3 @@ helao adss_dev
 
 Exercise caution when running multiple server groups as there is currently no check for ports that are currently in-use between different config files.
 
-
-## Architecture
-
-- TODO
