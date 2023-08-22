@@ -18,6 +18,8 @@ from helao.configs.demo0 import config as config0
 from helao.configs.demo1 import config as config1
 from helao.configs.demo2 import config as config2
 
+from helao.sequences.OERSIM_seq import OERSIM_activelearn
+
 cfgd = {"demo0": config0, "demo1": config1, "demo2": config2}
 
 if __name__ == "__main__":
@@ -35,7 +37,11 @@ if __name__ == "__main__":
     seq = Sequence(
         sequence_name="OERSIM_activelearn",
         sequence_params=seq_params,
+        sequence_label=f"{demokey}",
+        experiment_plan_list=OERSIM_activelearn(**seq_params),
         sequence_uuid=gen_uuid(),
+        dummy=True,
+        simulation=True
     )
     resp, err = private_dispatcher(
         "ORCH",
