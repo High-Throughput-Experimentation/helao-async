@@ -6,6 +6,8 @@ dependencies:
   - pip:
     - aioshutil
     - git+https://github.com/spomjaksilp/pyMeCom
+    - tensorflow
+    - gpflow
   - aiofiles
   - aiohttp
   - bokeh=2

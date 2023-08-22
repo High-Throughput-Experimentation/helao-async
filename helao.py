@@ -346,7 +346,7 @@ def launcher(confArg, confDict, helao_root):
                     print_message(
                         {},
                         "launcher",
-                        f"{server} does not specify one of ({pidd.codeKeys}) so action not be managed.",
+                        f"{server} does not specify one of ({pidd.codeKeys}) so action server will not be managed by this launcher.",
                         info=True,
                     )
                 elif servKHP in activeKHP:

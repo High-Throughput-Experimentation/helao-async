@@ -7,7 +7,6 @@ config["simulation"] = True
 config["experiment_libraries"] = ["simulatews_exp", "TEST_exp"]
 config["sequence_libraries"] = ["TEST_seq"]
 config["run_type"] = "simulation"
-# config["root"] = "/mnt/STORAGE/INST_hlo"  # software log and run files saved here
 config["root"] = "c:/INST_hlo"  # software log and run files saved here
 
 
@@ -34,17 +33,4 @@ config["servers"] = {
         "bokeh": "live_visualizer",
         "params": {"doc_name": "Websocket Live Visualizer"},
     },
-    # "DB": {
-    #     "host": hostip,
-    #     "port": 8010,
-    #     "group": "action",
-    #     "fast": "dbpack_server",
-    #     "params": {
-    #         "aws_config_path": "k:/users/hte/.credentials/aws_config.ini",
-    #         "aws_profile": "default",
-    #         "aws_bucket": "helao.data",
-    #         "api_host": "caltech-api.modelyst.com",
-    #         "testing": True,
-    #     },
-    # },
 }

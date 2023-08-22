@@ -1,24 +1,22 @@
+"""Action visualizer for the websocket simulator: WIP"""
+
 import time
 import asyncio
 from functools import partial
 from copy import deepcopy
 
 from bokeh.models import (
-    RadioButtonGroup,
     TextInput,
 )
-from bokeh.models.widgets import Paragraph
 from bokeh.plotting import figure
 from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
-from bokeh.models import Button
-from bokeh.events import ButtonClick
+
 from helaocore.models.hlostatus import HloStatus
-from helao.helpers.premodels import Action
 from helao.servers.vis import Vis
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
-from helao.helpers.dispatcher import async_private_dispatcher
+
 
 VALID_DATA_STATUS = (
     None,
@@ -26,51 +24,45 @@ VALID_DATA_STATUS = (
     HloStatus.active,
 )
 
-VALID_ACTION_NAME = (
-    "run_LSV",
-    "run_CA",
-    "run_CP",
-    "run_CV",
-    "run_EIS",
-    "run_OCV",
-)
+VALID_ACTION_NAME = ("measure_cp",)
 
 
-class C_potvis:
-    """potentiostat visualizer module class"""
+class C_oersimvis:
+    """spectrometer visualizer module class"""
 
     def __init__(self, vis_serv: Vis, serv_key: str):
         self.vis = vis_serv
         self.config_dict = self.vis.server_cfg["params"]
         self.max_points = 500
-        self.max_prev = 4
         self.update_rate = 1e-3
         self.last_update_time = time.time()
 
-        self.potentiostat_key = serv_key
-        self.potserv_config = self.vis.world_cfg["servers"].get(self.potentiostat_key, None)
-        if self.potserv_config is None:
+        self.server_key = serv_key
+        actserv_config = self.vis.world_cfg["servers"].get(self.server_key, None)
+        if actserv_config is None:
             return
-        self.potserv_host = self.potserv_config.get("host", None)
-        self.potserv_port = self.potserv_config.get("port", None)
-        self.wss = Wss(self.potserv_host, self.potserv_port, "ws_data")
+        actserv_host = actserv_config.get("host", None)
+        actserv_port = actserv_config.get("port", None)
+        self.wss = Wss(actserv_host, actserv_port, "ws_data")
 
         self.data_url = (
-            f"ws://{self.potserv_config['host']}:{self.potserv_config['port']}/ws_data"
+            f"ws://{actserv_config['host']}:{actserv_config['port']}/ws_data"
         )
 
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["t_s", "Ewe_V", "Ach_V", "I_A"]
+        self.data_dict_keys = ["t_s", "erhe_v"]
         self.datasource = ColumnDataSource(
             data={key: [] for key in self.data_dict_keys}
         )
         self.cur_action_uuid = ""
+        self.cur_comp = ""
 
         # prev_datasources aren't streamed, replot when axis or action_uuid changes
         self.prev_datasources = {}
         self.prev_action_uuid = ""
+        self.prev_comp = ""
         self.prev_action_uuids = []
 
         # create visual elements
@@ -88,63 +80,23 @@ class C_potvis:
             partial(self.callback_input_max_points, sender=self.input_max_points),
         )
 
-        self.input_max_prev = TextInput(
-            value=f"{self.max_prev}",
-            title="max previous plots",
-            disabled=False,
-            width=150,
-            height=40,
-        )
-        self.input_max_prev.on_change(
-            "value",
-            partial(self.callback_input_max_prev, sender=self.input_max_prev),
-        )
-
-        self.button_stop_measure = Button(
-            label="Stop measurement",
-            button_type="danger",
-            width=70,
-            align="end",
-        )
-        self.button_stop_measure.on_event(ButtonClick, self.callback_stop_measure)
-
-        self.xaxis_selector_group = RadioButtonGroup(
-            labels=self.data_dict_keys, active=0, width=500
-        )
-        self.yaxis_selector_group = RadioButtonGroup(
-            labels=self.data_dict_keys, active=3, width=500
-        )
-        self.xaxis_selector_group.on_change(
-            "active", partial(self.callback_selector_change)
-        )
-        self.yaxis_selector_group.on_change(
-            "active", partial(self.callback_selector_change)
-        )
-
         self.plot = figure(title="Title", height=300, width=500)
         self.plot_prev = figure(title="Title", height=300, width=500)
+        self.plot.xaxis.axis_label = "Time (seconds)"
+        self.plot.yaxis.axis_label = "E vs RHE (V)"
+        self.plot_prev.xaxis.axis_label = "Time (seconds)"
+        self.plot_prev.yaxis.axis_label = "E vs RHE (V)"
 
         # combine all sublayouts into a single one
-        docs_url = f"http://{self.potserv_host}:{self.potserv_port}/docs#/"
-        server_link = (
-            f'<a href="{docs_url}" target="_blank">\'{self.potentiostat_key}\'</a>'
-        )
-        headerbar = f"<b>Potentiostat Visualizer module for server {server_link}</b>"
+        docs_url = f"http://{actserv_host}:{actserv_port}/docs#/"
+        server_link = f'<a href="{docs_url}" target="_blank">\'{self.server_key}\'</a>'
+        headerbar = f"<b>OER CP simulator for server {server_link}</b>"
         self.layout = layout(
             [
                 [Spacer(width=20), Div(text=headerbar, width=1004, height=15)],
                 [
                     self.input_max_points,
-                    Spacer(width=20),
-                    self.input_max_prev,
-                    Spacer(width=20),
-                    self.button_stop_measure,
                 ],
-                [
-                    Paragraph(text="""x-axis:""", width=500, height=15),
-                    Paragraph(text="""y-axis:""", width=500, height=15),
-                ],
-                [self.xaxis_selector_group, self.yaxis_selector_group],
                 Spacer(height=10),
                 [self.plot, Spacer(width=20), self.plot_prev],
                 Spacer(height=10),
@@ -153,39 +105,16 @@ class C_potvis:
             width=1024,
         )
 
-        # to check if selection changed during ploting
-        self.xselect = self.xaxis_selector_group.active
-        self.yselect = self.yaxis_selector_group.active
-
         self.vis.doc.add_root(self.layout)
         self.vis.doc.add_root(Spacer(height=10))
         self.IOtask = asyncio.create_task(self.IOloop_data())
         self.vis.doc.on_session_destroyed(self.cleanup_session)
         self.reset_plot(self.cur_action_uuid, forceupdate=True)
 
-    def callback_stop_measure(self, event):
-        self.vis.print_message("stopping gamry measurement")
-        self.vis.doc.add_next_tick_callback(
-            partial(
-                async_private_dispatcher,
-                server=self.potentiostat_key,
-                host=self.potserv_host,
-                port=self.potserv_port,
-                private_action="stop_private",
-                params_dict={},
-                json_dict={},
-            )
-        )
-
     def cleanup_session(self, session_context):
-        self.vis.print_message(
-            f"'{self.potentiostat_key}' Bokeh session closed", info=True
-        )
+        self.vis.print_message(f"'{self.server_key}' Bokeh session closed", info=True)
         self.IOloop_data_run = False
         self.IOtask.cancel()
-
-    def callback_selector_change(self, attr, old, new):
-        self.reset_plot()
 
     def callback_input_max_points(self, attr, old, new, sender):
         """callback for input_max_points"""
@@ -214,30 +143,6 @@ class C_potvis:
 
         self.vis.doc.add_next_tick_callback(
             partial(self.update_input_value, sender, f"{self.max_points}")
-        )
-
-    def callback_input_max_prev(self, attr, old, new, sender):
-        """callback for input_max_prev"""
-
-        def to_int(val):
-            try:
-                return int(val)
-            except ValueError:
-                return None
-
-        newpts = to_int(new)
-        oldpts = to_int(old)
-
-        if newpts is None:
-            if oldpts is not None:
-                newpts = oldpts
-            else:
-                newpts = 4
-
-        self.max_prev = newpts
-
-        self.vis.doc.add_next_tick_callback(
-            partial(self.update_input_value, sender, f"{self.max_prev}")
         )
 
     def update_input_value(self, sender, value):
@@ -270,6 +175,18 @@ class C_potvis:
                                 data_dict[data_label] += data_val
                             else:
                                 data_dict[data_label].append(data_val)
+                        elif data_label == "elements":
+                            compstr = "-".join(
+                                [
+                                    f"{x}{y:.2f}"
+                                    for x, y in zip(
+                                        data_val, uuid_dict["atfracs"]
+                                    )
+                                ]
+                            )
+                            if self.cur_comp != compstr:
+                                self.cur_comp = compstr
+                                self._add_plots()
 
             # check for missing I_A in OCV
             max_len = max([len(v) for v in data_dict.values()])
@@ -292,35 +209,34 @@ class C_potvis:
         self.plot_prev.renderers = []
 
         self.plot.title.text = f"active action_uuid: {self.cur_action_uuid}"
-        self.plot_prev.title.text = f"last {len(self.prev_action_uuids)} actions"
-        xstr = self.data_dict_keys[self.xselect]
-        ystr = self.data_dict_keys[self.yselect]
-        self.vis.print_message(f"{xstr}, {ystr}")
+        self.plot_prev.title.text = f"previous action_uuid: {self.prev_action_uuid}"
         colors = ["red", "blue", "orange", "green"]
         self.plot.line(
-            x=xstr,
-            y=ystr,
+            x="t_s",
+            y="erhe_v",
             line_color=colors[0],
             source=self.datasource,
             name=self.cur_action_uuid,
-            legend_label=ystr,
+            legend_label=self.cur_comp,
         )
-        for i, puuid in enumerate(self.prev_action_uuids):
+        self.plot.legend.location = "bottom_right"
+        for puuid in self.prev_action_uuids:
             self.plot_prev.line(
-                x=xstr,
-                y=ystr,
-                line_color=colors[i % len(colors)],
+                x="t_s",
+                y="erhe_v",
+                line_color=colors[1],
                 source=self.prev_datasources[puuid],
                 name=puuid,
-                # legend_label=puuid.split("-")[0],
-                legend_label=f"{i+1}",
+                legend_label=self.prev_comp,
             )
+            self.plot_prev.legend.location = "bottom_right"
 
     def reset_plot(self, new_action_uuid=None, forceupdate: bool = False):
         if self.cur_action_uuid != new_action_uuid or forceupdate:
             if new_action_uuid is not None:
-                self.vis.print_message(" ... reseting Gamry graph")
+                self.vis.print_message(" ... reseting CP graph")
                 self.prev_action_uuid = self.cur_action_uuid
+                self.prev_comp = self.cur_comp
                 if self.prev_action_uuid != "":
                     self.prev_action_uuids.append(self.prev_action_uuid)
                     self.vis.print_message(f"previous uuids: {self.prev_action_uuids}")
@@ -330,14 +246,8 @@ class C_potvis:
                     )
                 self.cur_action_uuid = new_action_uuid
                 # update prev_datasources
-                while len(self.prev_action_uuids) > self.max_prev:
+                while len(self.prev_action_uuids) > 1:
                     rp = self.prev_action_uuids.pop(0)
                     self.prev_datasources.pop(rp)
                 self.datasource.data = {key: [] for key in self.data_dict_keys}
-            self._add_plots()
-        if (self.xselect != self.xaxis_selector_group.active) or (
-            self.yselect != self.yaxis_selector_group.active
-        ):
-            self.xselect = self.xaxis_selector_group.active
-            self.yselect = self.yaxis_selector_group.active
             self._add_plots()

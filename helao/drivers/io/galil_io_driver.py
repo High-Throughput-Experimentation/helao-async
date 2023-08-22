@@ -26,7 +26,7 @@ from helaocore.models.hlostatus import HloStatus
 
 from helao.drivers.io.enum import TriggerType
 
-driver_path = os.path.dirname(__file__)
+driver_path = os.path.dirname(os.path.realpath(__file__))
 
 # install galil driver first
 # (helao) c:\Program Files (x86)\Galil\gclib\source\wrappers\python>python setup.py install

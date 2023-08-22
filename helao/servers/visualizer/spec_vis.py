@@ -47,23 +47,24 @@ class C_specvis:
         self.last_update_time = time.time()
 
         self.spec_key = serv_key
-        specserv_config = self.vis.world_cfg["servers"].get(self.spec_key, None)
-        if specserv_config is None:
+        self.specserv_config = self.vis.world_cfg["servers"].get(self.spec_key, None)
+        if self.specserv_config is None:
             return
-        specserv_host = specserv_config.get("host", None)
-        specserv_port = specserv_config.get("port", None)
-        self.wss = Wss(specserv_host, specserv_port, "ws_data")
+        self.specserv_host = self.specserv_config.get("host", None)
+        self.specserv_port = self.specserv_config.get("port", None)
+        self.wss = Wss(self.specserv_host, self.specserv_port, "ws_data")
 
         self.cmap = cm.get_cmap("Reds_r", self.max_spectra)
         self.latest_coloridx = 0
 
         self.data_url = (
-            f"ws://{specserv_config['host']}:{specserv_config['port']}/ws_data"
+            f"ws://{self.specserv_config['host']}:{self.specserv_config['port']}/ws_data"
         )
 
         self.wl = private_dispatcher(
-            self.vis.world_cfg,
             self.spec_key,
+            self.specserv_host,
+            self.specserv_port,
             "get_wl",
             params_dict={},
             json_dict={},
@@ -125,7 +126,7 @@ class C_specvis:
         self.plot_prev.xaxis.axis_label = "Wavelength (nm)"
         self.plot_prev.yaxis.axis_label = "Transmittance (counts/sec)"
         # combine all sublayouts into a single one
-        docs_url = f"http://{specserv_host}:{specserv_port}/docs#/"
+        docs_url = f"http://{self.specserv_host}:{self.specserv_port}/docs#/"
         server_link = f'<a href="{docs_url}" target="_blank">\'{self.spec_key}\'</a>'
         headerbar = f"<b>Spectrometer Visualizer module for server {server_link}</b>"
         self.layout = layout(

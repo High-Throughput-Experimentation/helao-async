@@ -63,6 +63,7 @@ class Operator:
         self.dataAPI = HTELegacyAPI(self.vis)
 
         self.config_dict = self.vis.server_cfg.get("params", {})
+        self.loaded_config_path = self.vis.world_cfg.get("loaded_config_path", "")
         self.pal_name = None
         self.update_q = asyncio.Queue()
         # find pal server if configured in world config
@@ -383,7 +384,7 @@ class Operator:
                     [
                         Spacer(width=20),
                         Div(
-                            text=f"<b>{self.config_dict.get('doc_name', 'Operator')} on {gethostname().lower()}</b>",
+                            text=f"<b>{self.config_dict.get('doc_name', 'Operator')} on {gethostname().lower()} -- config: {os.path.basename(self.loaded_config_path)}</b>",
                             width=self.max_width - 20,
                             height=32,
                             style={"font-size": "200%", "color": "red"},

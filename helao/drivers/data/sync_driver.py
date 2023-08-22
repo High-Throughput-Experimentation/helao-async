@@ -289,7 +289,7 @@ class HelaoYml:
     def write_meta(self, meta_dict: dict):
         with self.filelock:
             self.target.write_text(
-                str(pyaml.dump(meta_dict, safe=True, sort_dicts=False)),
+                str(pyaml.dump(meta_dict, safe=True, sort_dicts=False, vspacing=False)),
                 encoding="utf-8",
             )
 
@@ -384,7 +384,7 @@ class Progress:
     def write_dict(self, new_dict: Optional[Dict] = None):
         out_dict = self.dict if new_dict is None else new_dict
         self.prg.write_text(
-            str(pyaml.dump(out_dict, safe=True, sort_dicts=False)), encoding="utf-8"
+            str(pyaml.dump(out_dict, safe=True, sort_dicts=False, vspacing=False)), encoding="utf-8"
         )
 
     @property

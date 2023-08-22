@@ -367,8 +367,8 @@ class EcheUvisLoader(HelaoLoader):
         ) not in self.recent_cache:
             data = self.run_raw_query(query + "\n".join(conditions))
             pdf = pd.DataFrame(data)
-            print("!!! dataframe shape:", pdf.shape)
-            print("!!! dataframe cols:", pdf.columns)
+            # print("!!! dataframe shape:", pdf.shape)
+            # print("!!! dataframe cols:", pdf.columns)
             pdf["plate_id"] = pdf.global_label.apply(
                 lambda x: int(x.split("_")[-2])
                 if "solid" in x and "None" not in x

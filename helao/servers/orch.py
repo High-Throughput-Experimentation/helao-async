@@ -173,7 +173,8 @@ class Orch(Base):
         )
         self.print_message(f"started bokeh server {self.bokehapp}", info=True)
         self.bokehapp.start()
-        # self.bokehapp.io_loop.add_callback(self.bokehapp.show, f"/{servPy}")
+        if self.server_params.get("launch_browser", False):
+            self.bokehapp.io_loop.add_callback(self.bokehapp.show, f"/{servPy}")
         # bokehapp.io_loop.start()
 
     def makeBokehApp(self, doc, orch):
@@ -214,11 +215,11 @@ class Orch(Base):
                 self.incoming = interrupt
                 await self.globstat_q.put(interrupt)
 
-    async def subscribe_all(self, retry_limit: int = 5):
+    async def subscribe_all(self, retry_limit: int = 15):
         """Subscribe to all fastapi servers in config."""
         fails = []
         for serv_key, serv_dict in self.world_cfg["servers"].items():
-            if "fast" in serv_dict or "demo" in serv_dict:
+            if "bokeh" not in serv_dict:
                 self.print_message(f"trying to subscribe to {serv_key} status")
 
                 success = False
@@ -227,24 +228,31 @@ class Orch(Base):
                 for _ in range(retry_limit):
                     try:
                         response, error_code = await async_private_dispatcher(
-                            world_config_dict=self.world_cfg,
-                            server=serv_key,
+                            server_key=serv_key,
+                            host=serv_addr,
+                            port=serv_port,
                             private_action="attach_client",
-                            params_dict={"client_servkey": self.server.server_name},
+                            params_dict={
+                                "client_servkey": self.server.server_name,
+                                "client_host": self.server_cfg["host"],
+                                "client_port": self.server_cfg["port"],
+                            },
                             json_dict={},
                         )
-                        if response and error_code == ErrorCodes.none:
+                        print(response)
+                        print(error_code)
+                        if response is not None and error_code == ErrorCodes.none:
                             success = True
                             break
-                    except aiohttp.client_exceptions.ClientConnectorError:
+                    except aiohttp.client_exceptions.ClientConnectorError as err:
                         self.print_message(
                             f"failed to subscribe to "
                             f"{serv_key} at "
-                            f"{serv_addr}:{serv_port}, "
-                            "trying again in 1sec",
+                            f"{serv_addr}:{serv_port}, {err}"
+                            "trying again in 2 seconds",
                             info=True,
                         )
-                        await asyncio.sleep(1)
+                        await asyncio.sleep(2)
 
                 if success:
                     self.print_message(
@@ -264,11 +272,13 @@ class Orch(Base):
                 "all FastAPI servers in config file are accessible."
             )
 
-    def update_nonblocking(self, actionmodel: ActionModel):
+    def update_nonblocking(
+        self, actionmodel: ActionModel, server_host: str, server_port: int
+    ):
         """Update method for action server to push non-blocking action ids."""
         print(actionmodel.clean_dict())
         server_key = actionmodel.action_server.server_name
-        server_exec_id = (server_key, actionmodel.exec_id)
+        server_exec_id = (server_key, actionmodel.exec_id, server_host, server_port)
         if "active" in actionmodel.action_status:
             self.nonblocking.append(server_exec_id)
         else:
@@ -278,11 +288,12 @@ class Orch(Base):
     async def clear_nonblocking(self):
         """Clear method for orch to purge non-blocking action ids."""
         resp_tups = []
-        for server_key, exec_id in self.nonblocking:
-            print(server_key, exec_id)
+        for server_key, exec_id, server_host, server_port in self.nonblocking:
+            print(server_key, exec_id, server_host, server_port)
             response, error_code = await async_private_dispatcher(
-                world_config_dict=self.world_cfg,
-                server=server_key,
+                server_key=server_key,
+                host=server_host,
+                port=server_port,
                 private_action="stop_executor",
                 params_dict={"executor_id": exec_id},
                 json_dict={},
@@ -292,6 +303,11 @@ class Orch(Base):
 
     async def update_status(self, actionservermodel: ActionServerModel = None):
         """Dict update method for action server to push status messages."""
+
+        self.print_message(
+            "received status from server:", actionservermodel.action_server.server_name
+        )
+
         if actionservermodel is None:
             return False
 
@@ -379,8 +395,6 @@ class Orch(Base):
 
     async def loop_task_dispatch_sequence(self) -> ErrorCodes:
         if self.sequence_dq:
-            self.print_message("finishing last sequence")
-            await self.finish_active_sequence()
             self.print_message("getting new sequence from sequence_dq")
             self.active_sequence = self.sequence_dq.popleft()
             self.print_message(
@@ -434,13 +448,16 @@ class Orch(Base):
     async def loop_task_dispatch_experiment(self) -> ErrorCodes:
         self.print_message("action_dq is empty, getting new actions")
         # wait for all actions in last/active experiment to finish
-        self.print_message("finishing last active experiment first")
-        await self.finish_active_experiment()
+        # self.print_message("finishing last active experiment first")
+        # await self.finish_active_experiment()
 
         # self.print_message("getting new experiment to fill action_dq")
         # generate uids when populating,
         # generate timestamp when acquring
         self.active_experiment = self.experiment_dq.popleft()
+        self.active_experiment.orch_key = self.orch_key
+        self.active_experiment.orch_host = self.orch_host
+        self.active_experiment.orch_port = self.orch_port
         self.active_seq_exp_counter += 1
 
         # self.print_message("copying global vars to experiment")
@@ -499,6 +516,9 @@ class Orch(Base):
             # init uuid now for tracking later
             act.action_uuid = gen_uuid()
             act.action_order = int(i)
+            act.orch_key = self.orch_key
+            act.orch_host = self.orch_host
+            act.orch_port = self.orch_port
             # actual order should be the same at the beginning
             # will be incremented as necessary
             act.orch_submit_order = int(i)
@@ -751,7 +771,12 @@ class Orch(Base):
                 )
                 return result_action.error_code
 
-            if result_action.to_globalexp_params:
+            if (
+                result_action.to_globalexp_params
+                and result_action.orch_key == self.orch_key
+                and result_action.orch_host == self.orch_host
+                and int(result_action.orch_port) == int(self.orch_port)
+            ):
                 if isinstance(result_action.to_globalexp_params, list):
                     # self.print_message(
                     #     f"copying global vars {', '.join(result_action.to_globalexp_params)} back to experiment"
@@ -825,7 +850,7 @@ class Orch(Base):
                 elif self.action_dq:
                     self.print_message("!!!dispatching next action", info=True)
                     error_code = await self.loop_task_dispatch_action()
-                    if (
+                    while (
                         self.last_dispatched_action_uuid
                         not in self.last_50_action_uuids
                     ):
@@ -853,7 +878,8 @@ class Orch(Base):
                         "!!!waiting for all actions to finish before dispatching next experiment",
                         info=True,
                     )
-                    await self.orch_wait_for_all_actions()
+                    self.print_message("finishing last experiment")
+                    await self.finish_active_experiment()
                     self.print_message("!!!dispatching next experiment", info=True)
                     error_code = await self.loop_task_dispatch_experiment()
                 # if no acts and no exps, disptach next sequence
@@ -862,7 +888,8 @@ class Orch(Base):
                         "!!!waiting for all actions to finish before dispatching next sequence",
                         info=True,
                     )
-                    await self.orch_wait_for_all_actions()
+                    self.print_message("finishing last sequence")
+                    await self.finish_active_sequence()
                     self.print_message("!!!dispatching next sequence", info=True)
                     error_code = await self.loop_task_dispatch_sequence()
                 else:
@@ -883,7 +910,7 @@ class Orch(Base):
             if not self.action_dq:  # in case of interrupt, don't finish exp
                 self.print_message("finishing final experiment")
                 await self.finish_active_experiment()
-            if not self.experiment_dq:  # in case of interrupt, don't finish seq
+            if not self.experiment_dq and not self.action_dq:  # in case of interrupt, don't finish seq
                 self.print_message("finishing final sequence")
                 await self.finish_active_sequence()
 
@@ -1268,6 +1295,7 @@ class Orch(Base):
         self.action_dq.append(new_action)
 
     async def finish_active_sequence(self):
+        await self.orch_wait_for_all_actions()
         if self.active_sequence is not None:
             self.replace_status(
                 status_list=self.active_sequence.sequence_status,
@@ -1336,7 +1364,12 @@ class Orch(Base):
                 deepcopy(self.active_experiment.get_exp())
             )
 
-            if self.active_experiment.to_globalseq_params:
+            if (
+                self.active_experiment.to_globalseq_params
+                and self.active_experiment.orch_key == self.orch_key
+                and self.active_experiment.orch_host == self.orch_host
+                and self.active_experiment.orch_port == self.orch_port
+            ):
                 if isinstance(self.active_experiment.to_globalseq_params, list):
                     # self.print_message(
                     #     f"copying global vars {', '.join(self.active_experiment.to_globalseq_params)} back to sequence"
