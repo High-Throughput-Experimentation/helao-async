@@ -31,7 +31,7 @@ if __name__ == "__main__":
     }
     demokey = sys.argv[1]
     orchcfg = cfgd[demokey]["servers"]["ORCH"]
-    seq = SequenceModel("OERSIM_activelearn", sequence_params=seq_params)
+    seq = SequenceModel(sequence_name="OERSIM_activelearn", sequence_params=seq_params)
     resp, err = private_dispatcher(
         "ORCH",
         orchcfg["host"],
