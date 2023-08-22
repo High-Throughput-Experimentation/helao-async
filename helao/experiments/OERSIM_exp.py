@@ -35,6 +35,15 @@ def OERSIM_sub_load_plate(
     apm.add(
         CPSIM_server, "get_loaded_plate", {}, to_globalexp_params=["_loaded_plate_id"]
     )
+    apm.add(
+        GPSIM_server,
+        "initialize_plate",
+        {
+            "num_random_points": apm.pars.init_random_points,
+            "reinitialize": False,
+        },
+        from_globalexp_params={"_loaded_plate_id": "plate_id"},
+    )
 
 
 def OERSIM_sub_measure_CP(
@@ -45,15 +54,6 @@ def OERSIM_sub_measure_CP(
     apm = ActionPlanMaker()
     apm.add(
         CPSIM_server, "get_loaded_plate", {}, to_globalexp_params=["_loaded_plate_id"]
-    )
-    apm.add(
-        GPSIM_server,
-        "initialize_plate",
-        {
-            "num_random_points": apm.pars.init_random_points,
-            "reinitialize": False,
-        },
-        from_globalexp_params={"_loaded_plate_id": "plate_id"},
     )
     apm.add(
         GPSIM_server,

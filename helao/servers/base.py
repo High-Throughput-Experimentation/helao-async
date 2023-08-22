@@ -7,7 +7,7 @@ import sys
 import pickle
 from random import randint
 from socket import gethostname
-from time import ctime, time, time_ns
+from time import ctime, time, time_ns, sleep
 from typing import List, Dict
 from uuid import UUID, uuid1
 import hashlib
@@ -670,7 +670,7 @@ class Base:
                             f"{client_servkey} after {retry_limit} attempts.",
                             error=True,
                         )
-                    time.sleep(0.5)
+                    sleep(0.3)
                 # now delete the errored and finsihed statuses after
                 # all are send to the subscribers
                 self.actionservermodel.endpoints[
