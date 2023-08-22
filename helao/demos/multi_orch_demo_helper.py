@@ -30,7 +30,7 @@ if __name__ == "__main__":
         "thresh_value": 100,
     }
     demokey = sys.argv[1]
-    orchcfg = cfgd[demokey]["servers"]["ORCH"]
+    orchcfg = cfgd["servers"]["ORCH"]
     seq = SequenceModel(sequence_name="OERSIM_activelearn", sequence_params=seq_params)
     resp, err = private_dispatcher(
         "ORCH",
