@@ -29,7 +29,7 @@ if __name__ == "__main__":
         "stop_condition": "max_iters",
         "thresh_value": 100,
     }
-    demokey = f"demo{sys.argv[1].replace('plate','')}"
+    demokey = sys.argv[1]
     orchcfg = cfgd[demokey]["servers"]["ORCH"]
     seq = SequenceModel("OERSIM_activelearn", sequence_params=seq_params)
     resp, err = private_dispatcher(
