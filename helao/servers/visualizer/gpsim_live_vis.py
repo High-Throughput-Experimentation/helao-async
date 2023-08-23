@@ -182,17 +182,18 @@ class C_gpsimlivevis:
                 right=htup[1][1:],
                 line_color=colors[i],
                 fill_color=None,
-                alpha=0.5,
+                alpha=1.0,
                 legend_label=f"{self.datasource_table.data['plate_id'][i]} prediction",
             )
-            # self.plot.quad(
-            #     top=htup[2],
-            #     bottom=0,
-            #     left=htup[3][:-1],
-            #     right=htup[3][1:],
-            #     line_color=colors[i+1],
-            #     fill_color=None,
-            #     legend_label=f"{self.datasource_table.data['plate_id'][i]} g.t.",
-            # )
+            self.plot.quad(
+                top=htup[2],
+                bottom=0,
+                left=htup[3][:-1],
+                right=htup[3][1:],
+                line_color=None,
+                fill_color=colors[i],
+                alpha=0.3,
+                legend_label=f"{self.datasource_table.data['plate_id'][i]} g.t.",
+            )
             self.plot.legend.border_line_alpha = 0.2
             self.plot.legend.background_fill_alpha = 0.2
