@@ -84,9 +84,8 @@ class GPSim:
         self.kernel_func = lambda: gpflow.kernels.Constant() * gpflow.kernels.Matern32(
             lengthscales=0.25
         ) + gpflow.kernels.White(variance=0.015**2)
-        self.kernel = None
-        self.models = {k: None for k in self.targets}
-        self.opt = gpflow.optimizers.Scipy()
+        self.models = {k: None for k in self.all_data}
+        self.opts = {k: gpflow.optimizers.Scipy() for k in self.all_data}
         self.opt_logs = {k: {} for k in self.all_data}
         self.total_step = {k: {} for k in self.all_data}
         self.ei_step = {k: {} for k in self.all_data}
@@ -110,7 +109,6 @@ class GPSim:
     async def init_all_plates(self, num_points: int):
         for plate_id in self.features:
             await self.init_priors_random(plate_id, num_points)
-            self.fit_model(plate_id)
 
     async def init_priors_random(self, plate_id: int, num_points: int):
         arr = self.features[plate_id]
@@ -124,6 +122,7 @@ class GPSim:
         # print(f"!!! initial indices for plate {plate_id} are: {ridxs}")
         for ridx in ridxs:
             await self.acquire_point(plate_id, init_point=list(arr[ridx]))
+        self.fit_model(plate_id)
         self.initialized[plate_id] = True
 
     def calc_ei(self, plate_id, xi=0.001, noise=True):
@@ -273,7 +272,7 @@ class GPSim:
             )
         except Exception as e:
             print(e)
-        self.opt_logs[plate_id][plate_step] = self.opt.minimize(
+        self.opt_logs[plate_id][plate_step] = self.opts[plate_id].minimize(
             self.models[plate_id].training_loss,
             self.models[plate_id].trainable_variables,
             options={"maxiter": 100},
@@ -318,9 +317,12 @@ class GPSim:
         self.avail_step = {k: {} for k in self.all_data}
         self.progress = {k: {} for k in self.all_data}
         self.g_acq = set()
+        self.initialized = {k: False for k in self.all_data}
         self.available = {
             k: list(range(arr.shape[0])) for k, arr in self.features.items()
         }
+        self.models = {k: None for k in self.all_data}
+        self.opts = {k: gpflow.optimizers.Scipy() for k in self.all_data}
 
     def clear_plate(self, plate_id):
         self.acquired[plate_id] = []
@@ -341,6 +343,8 @@ class GPSim:
             for i in range(self.features[plate_id].shape[0])
             if i not in self.acq_fromglobal[plate_id]
         ]
+        self.models[plate_id] = None
+        self.opts[plate_id] = gpflow.optimizers.Scipy()
 
     async def check_condition(self, activeobj: Active):
         params = activeobj.action.action_params
