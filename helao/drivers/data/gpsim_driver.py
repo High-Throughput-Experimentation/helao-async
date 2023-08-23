@@ -83,7 +83,7 @@ class GPSim:
         # gpflow model
         self.kernel_func = (
             lambda: gpflow.kernels.Constant()
-            + gpflow.kernels.Matern32(lengthscales=0.5)
+            + gpflow.kernels.Matern32(lengthscales=50.0)
             + gpflow.kernels.White(variance=1e-4)
         )
         self.models = {k: None for k in self.all_data}
