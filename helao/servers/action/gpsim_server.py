@@ -108,12 +108,13 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         """Record simulated data."""
         active = await app.base.setup_and_contain_action()
-        orch_string = f"{active.action.orch_key} {active.action.orch_host}:{active.action.orch_port}"
+        active.action.action_params[
+            "orch_str"
+        ] = f"{active.action.orch_key} {active.action.orch_host}:{active.action.orch_port}"
         active.action.action_abbr = "GPSIM"
         executor = GPSimExec(
             active=active,
             oneoff=True,
-            orch_str=orch_string,
         )
         active_action_dict = active.start_executor(executor)
         return active_action_dict

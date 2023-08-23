@@ -448,9 +448,10 @@ class GPSimExec(Executor):
         self.start_time = time.time()  # instantiation time
         self.duration = self.active.action.action_params.get("duration", -1)
         self.plate_id = self.active.action.action_params["plate_id"]
+        self.orch_str = self.active.action.action_params["orch_str"]
 
     async def _exec(self):
-        await self.active.base.fastapp.driver.fit_model(self.plate_id)
+        await self.active.base.fastapp.driver.fit_model(self.plate_id, self.orch_str)
         return {
             "error": ErrorCodes.none,
             "status": HloStatus.active,
