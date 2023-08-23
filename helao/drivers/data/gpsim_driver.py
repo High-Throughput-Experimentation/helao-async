@@ -83,8 +83,8 @@ class GPSim:
         # gpflow model
         self.kernel_func = (
             lambda: gpflow.kernels.Constant()
-            + gpflow.kernels.Matern32(lengthscales=0.25)
-            + gpflow.kernels.White(variance=0.015**2)
+            + gpflow.kernels.Matern32(lengthscales=0.5)
+            + gpflow.kernels.White(variance=1e-4)
         )
         self.models = {k: None for k in self.all_data}
         self.opt_logs = {k: {} for k in self.all_data}
