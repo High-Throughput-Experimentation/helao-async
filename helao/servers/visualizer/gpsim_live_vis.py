@@ -73,6 +73,7 @@ class C_gpsimlivevis:
             height=300,
             width=400,
             index_width=20,
+            autosize_mode="none",
         )
         # combine all sublayouts into a single one
         docs_url = f"http://{host}:{port}/docs#/"
