@@ -82,8 +82,9 @@ class GPSim:
 
         # gpflow model
         self.kernel_func = lambda: gpflow.kernels.Constant() * gpflow.kernels.Matern32(
-            lengthscales=0.25
+            lengthscales=0.5
         ) + gpflow.kernels.White(variance=0.015**2)
+        self.kernels = {k: self.kernel_func() for k in self.all_data}
         self.models = {k: None for k in self.all_data}
         self.opts = {k: gpflow.optimizers.Scipy() for k in self.all_data}
         self.opt_logs = {k: {} for k in self.all_data}
@@ -267,10 +268,9 @@ class GPSim:
         y = self.targets[plate_id][acq_inds]
         print(f"features {X.shape}:", X)
         print(f"targets {y.shape}:", y)
-        kernel = self.kernel_func()
         try:
             self.models[plate_id] = gpflow.models.GPR(
-                data=(X, y), kernel=kernel, mean_function=None
+                data=(X, y), kernel=self.kernels[plate_id], mean_function=None
             )
         except Exception as e:
             print(e)
@@ -325,6 +325,7 @@ class GPSim:
         }
         self.models = {k: None for k in self.all_data}
         self.opts = {k: gpflow.optimizers.Scipy() for k in self.all_data}
+        self.kernels = {k: self.kernel_func() for k in self.all_data}
 
     def clear_plate(self, plate_id):
         self.acquired[plate_id] = []
@@ -347,6 +348,7 @@ class GPSim:
         ]
         self.models[plate_id] = None
         self.opts[plate_id] = gpflow.optimizers.Scipy()
+        self.kernels[plate_id] = self.kernel_func()
 
     async def check_condition(self, activeobj: Active):
         params = activeobj.action.action_params
