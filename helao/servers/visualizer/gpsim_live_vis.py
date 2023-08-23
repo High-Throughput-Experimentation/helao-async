@@ -172,7 +172,7 @@ class C_gpsimlivevis:
                     range=(0.2, 0.7),
                     density=True,
                 )
-                histquads.append((phist, pedge, pnum, ghist, gedge, gnum))
+                histquads = (phist, pedge, pnum, ghist, gedge, gnum)
                 self.hists[data_dict["plate_id"][i]] = histquads
 
         if latest_epoch != 0 and histquads and data_dict:
