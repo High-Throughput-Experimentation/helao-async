@@ -208,7 +208,6 @@ class GPSim:
             self.global_step += 1
 
             # update live buffer with acquired
-            active_plates = [k for k in self.acquired if self.acquired[k]]
             live_dict = {
                 k: []
                 for k in (
@@ -221,41 +220,37 @@ class GPSim:
                     "orchestrator"
                 )
             }
-            for pid in active_plates:
-                plate_step = len(self.acquired[pid]) - 1
-                frac_acquired = (
-                    len(self.acquired[pid] + self.acq_fromglobal[pid])
-                    / self.features[pid].shape[0]
-                )
-                # all_pred = list(
-                #     -1 * self.total_step[pid][plate_step][1].reshape(-1)
-                # )
-                avail_pred = list(
-                    -1 * self.avail_step[pid][plate_step][1].reshape(-1)
-                )
-                # all_gt = list(-1 * self.targets[pid].reshape(-1))
-                acq_gt = list(
-                    -1
-                    * self.targets[pid][
-                        np.array(self.acquired[pid] + self.acq_fromglobal[pid])
-                    ].reshape(-1)
-                )
-                live_dict["plate_id"].append(pid)
-                live_dict["step"].append(plate_step)
-                live_dict["frac_acquired"].append(frac_acquired)
-                compstr = "-".join(
-                    [
-                        f"{x}{y/100:.1f}"
-                        for x, y in zip(
-                            self.els, self.features[pid][self.acquired[pid][-1]]
-                        )
-                        if y > 0
-                    ]
-                )
-                live_dict["last_acquisition"].append(compstr)
-                live_dict["pred_avail"].append(avail_pred)
-                live_dict["gt_acquired"].append(acq_gt)
-                live_dict["orchestrator"].append(orch_str)
+            # populate live_dict
+            plate_step = len(self.acquired[plate_id]) - 1
+            frac_acquired = (
+                len(self.acquired[plate_id] + self.acq_fromglobal[plate_id])
+                / self.features[plate_id].shape[0]
+            )
+            avail_pred = list(
+                -1 * self.avail_step[plate_id][plate_step][1].reshape(-1)
+            )
+            acq_gt = list(
+                -1
+                * self.targets[plate_id][
+                    np.array(self.acquired[plate_id] + self.acq_fromglobal[plate_id])
+                ].reshape(-1)
+            )
+            live_dict["plate_id"].append(plate_id)
+            live_dict["step"].append(plate_step)
+            live_dict["frac_acquired"].append(frac_acquired)
+            compstr = "-".join(
+                [
+                    f"{x}{y/100:.1f}"
+                    for x, y in zip(
+                        self.els, self.features[plate_id][self.acquired[plate_id][-1]]
+                    )
+                    if y > 0
+                ]
+            )
+            live_dict["last_acquisition"].append(compstr)
+            live_dict["pred_avail"].append(avail_pred)
+            live_dict["gt_acquired"].append(acq_gt)
+            live_dict["orchestrator"].append(orch_str)
             await self.base.put_lbuf(live_dict)
 
         else:

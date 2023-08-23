@@ -37,9 +37,15 @@ class C_gpsimlivevis:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["plate_id", "step", "frac_acquired", "last_acquisition", "orchestrator"]
+        self.data_dict_keys = [
+            "plate_id",
+            "step",
+            "frac_acquired",
+            "last_acquisition",
+            "orchestrator",
+        ]
         self.hist_keys = ["pred_avail", "gt_acquired"]
-        self.hists = []
+        self.hists = {}
 
         self.datasource_table = ColumnDataSource(
             data={k: [] for k in self.data_dict_keys}
@@ -83,16 +89,16 @@ class C_gpsimlivevis:
         headerbar = f"<b>Live vis module for server {server_link}</b>"
         self.layout = layout(
             [
-                [Div(text=headerbar, height=15)],
+                Spacer(width=20),
+                [Div(text=headerbar, width=1004, height=15)],
                 [Spacer(width=10), self.input_update_rate, Spacer(width=10)],
                 Spacer(height=10),
                 [Spacer(width=10), self.plot, Spacer(width=10)],
                 Spacer(height=10),
                 [Spacer(width=10), self.table, Spacer(width=10)],
-                Spacer(height=10),
             ],
             background="#C0C0C0",
-            width=1000,
+            width=1024,
         )
 
         self.vis.doc.add_root(self.layout)
@@ -167,10 +173,10 @@ class C_gpsimlivevis:
                     density=True,
                 )
                 histquads.append((phist, pedge, pnum, ghist, gedge, gnum))
-            self.hists = histquads
+                self.hists[data_dict["plate_id"]] = histquads
 
         if latest_epoch != 0 and histquads and data_dict:
-            self.datasource_table.data = data_dict
+            self.datasource_table.stream(data_dict)
             self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
@@ -191,7 +197,9 @@ class C_gpsimlivevis:
         self.plot.renderers = []
 
         colors = ["red", "blue", "green", "orange"]
-        for i, (phist, pedge, pnum, ghist, gedge, gnum) in enumerate(self.hists):
+        for i, (k, (phist, pedge, pnum, ghist, gedge, gnum)) in enumerate(
+            self.hists.items()
+        ):
             self.plot.quad(
                 top=phist,
                 bottom=0,
@@ -200,7 +208,7 @@ class C_gpsimlivevis:
                 line_color=colors[i],
                 fill_color=None,
                 alpha=1.0,
-                legend_label=f"{self.datasource_table.data['plate_id'][i]} predicted available n={pnum:d}",
+                legend_label=f"{k} predicted available n={pnum:d}",
             )
             self.plot.quad(
                 top=ghist,
@@ -210,7 +218,7 @@ class C_gpsimlivevis:
                 line_color=None,
                 fill_color=colors[i],
                 alpha=0.3,
-                legend_label=f"{self.datasource_table.data['plate_id'][i]} g.t. acquired n={gnum:d}",
+                legend_label=f"{k} g.t. acquired n={gnum:d}",
             )
             self.plot.legend.border_line_alpha = 0.2
             self.plot.legend.background_fill_alpha = 0.2
