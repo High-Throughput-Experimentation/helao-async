@@ -65,13 +65,14 @@ class C_gpsimlivevis:
         self.table = DataTable(
             source=self.datasource_table,
             columns=[
-                TableColumn(field="plate_id", title="plate_id"),
-                TableColumn(field="step", title="step"),
-                TableColumn(field="frac_acquired", title="frac_acq."),
-                TableColumn(field="last_acquisition", title="last_acq."),
+                TableColumn(field="plate_id", title="plate_id", width=20),
+                TableColumn(field="step", title="step", width=40),
+                TableColumn(field="frac_acquired", title="frac_acq.", width=40),
+                TableColumn(field="last_acquisition", title="last_acq.", 300),
             ],
             height=300,
             width=400,
+            index_width=20,
         )
         # combine all sublayouts into a single one
         docs_url = f"http://{host}:{port}/docs#/"
