@@ -60,7 +60,7 @@ class C_gpsimlivevis:
             partial(self.callback_input_update_rate, sender=self.input_update_rate),
         )
 
-        self.plot = figure(height=300, width=900, output_backend="webgl")
+        self.plot = figure(height=300, width=1200, output_backend="webgl")
         self.plot.xaxis.axis_label = "Eta (V vs O2/H2O)"
         self.plot.yaxis.axis_label = "count"
 
@@ -73,8 +73,8 @@ class C_gpsimlivevis:
                 TableColumn(field="last_acquisition", title="last acquired"),
                 TableColumn(field="orchestrator", title="requested by"),
             ],
-            height=300,
-            width=900,
+            height=200,
+            width=600,
             index_width=20,
             autosize_mode="none",
         )
@@ -85,15 +85,15 @@ class C_gpsimlivevis:
         self.layout = layout(
             [
                 [Div(text=headerbar, width=1200, height=15)],
-                [self.input_update_rate],
+                [Spacer(width=10), self.input_update_rate, Spacer(width=10)],
                 Spacer(height=10),
-                [self.plot],
+                [Spacer(width=10), self.plot, Spacer(width=10)],
                 Spacer(height=10),
-                [self.table],
+                [Spacer(width=10), self.table, Spacer(width=10)],
                 Spacer(height=10),
             ],
             background="#C0C0C0",
-            width=1024,
+            width=1200,
         )
 
         self.vis.doc.add_root(self.layout)
