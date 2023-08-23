@@ -28,7 +28,7 @@ if __name__ == "__main__":
     elif sys.argv[1] not in ["demo0", "demo1", "demo2"]:
         print("invalid arguments specified: use 'demo0', 'demo1', or 'demo2'")
     if len(sys.argv) > 2:
-        iters = sys.argv[2]
+        iters = int(sys.argv[2])
     else:
         iters = 10
     seq_params = {
