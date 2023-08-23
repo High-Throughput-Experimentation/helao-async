@@ -68,7 +68,7 @@ class C_gpsimlivevis:
 
         self.plot = figure(height=300, width=780, output_backend="webgl")
         self.plot.xaxis.axis_label = "Eta (V vs O2/H2O)"
-        self.plot.yaxis.axis_label = "count"
+        self.plot.yaxis.axis_label = "density"
 
         self.table = DataTable(
             source=self.datasource_table,
