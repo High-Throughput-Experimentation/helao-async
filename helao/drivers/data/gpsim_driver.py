@@ -81,9 +81,11 @@ class GPSim:
         }
 
         # gpflow model
-        self.kernel_func = lambda: gpflow.kernels.Constant() * gpflow.kernels.Matern32(
-            lengthscales=0.5
-        ) + gpflow.kernels.White(variance=0.015**2)
+        self.kernel_func = (
+            lambda: gpflow.kernels.Constant()
+            + gpflow.kernels.Matern32(lengthscales=0.25)
+            + gpflow.kernels.White(variance=0.015**2)
+        )
         self.kernels = {k: self.kernel_func() for k in self.all_data}
         self.models = {k: None for k in self.all_data}
         self.opts = {k: gpflow.optimizers.Scipy() for k in self.all_data}
@@ -145,7 +147,9 @@ class GPSim:
         X_sample = self.features[plate_id][acqinds].astype(float).round(2)
         Y_sample = self.targets[plate_id][acqinds]
         mu, variance = (r.numpy() for r in self.models[plate_id].predict_f(X))
-        mu_sample, variance_sample = (r.numpy() for r in self.models[plate_id].predict_f(X_sample))
+        mu_sample, variance_sample = (
+            r.numpy() for r in self.models[plate_id].predict_f(X_sample)
+        )
 
         sigma = variance**0.5
 
