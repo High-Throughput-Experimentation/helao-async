@@ -37,8 +37,8 @@ class C_gpsimlivevis:
         self.IOloop_data_run = False
         self.IOloop_stat_run = False
 
-        self.data_dict_keys = ["plate_id", "step", "frac_acquired", "last_acquisition"]
-        self.hist_keys = ["pred", "gt"]
+        self.data_dict_keys = ["plate_id", "step", "frac_acquired", "last_acquisition", "orchestrator"]
+        self.hist_keys = ["pred_avail", "gt_acquired"]
         self.hists = []
 
         self.datasource_table = ColumnDataSource(
@@ -60,18 +60,21 @@ class C_gpsimlivevis:
             partial(self.callback_input_update_rate, sender=self.input_update_rate),
         )
 
-        self.plot = figure(height=300, width=600, output_backend="webgl")
+        self.plot = figure(height=300, width=900, output_backend="webgl")
+        self.plot.xaxis.axis_label = "Eta (V vs O2/H2O)"
+        self.plot.yaxis.axis_label = "count"
 
         self.table = DataTable(
             source=self.datasource_table,
             columns=[
-                TableColumn(field="plate_id", title="plate_id", width=20),
-                TableColumn(field="step", title="step", width=40),
-                TableColumn(field="frac_acquired", title="frac_acq.", width=40),
-                TableColumn(field="last_acquisition", title="last_acq.", width=300),
+                TableColumn(field="plate_id", title="plate_id"),
+                TableColumn(field="step", title="step"),
+                TableColumn(field="frac_acquired", title="fraction acquired"),
+                TableColumn(field="last_acquisition", title="last acquired"),
+                TableColumn(field="orchestrator", title="requested by"),
             ],
             height=300,
-            width=400,
+            width=900,
             index_width=20,
             autosize_mode="none",
         )
@@ -141,17 +144,28 @@ class C_gpsimlivevis:
         histquads = []
         if data_dict:
             for i in range(len(data_dict["plate_id"])):
+                pnum = len(hist_dict["pred_avail"][i])
                 print(
-                    "pred range:", min(hist_dict["pred"][i]), max(hist_dict["pred"][i])
+                    "pred range:",
+                    min(hist_dict["pred_avail"][i]),
+                    max(hist_dict["pred_avail"][i]),
                 )
                 phist, pedge = np.histogram(
-                    hist_dict["pred"][i], bins=100, range=(0.2, 0.7), density=False
+                    hist_dict["pred_avail"][i], bins=100, range=(0.2, 0.7), density=True
                 )
-                print("gt range:", min(hist_dict["gt"][i]), max(hist_dict["gt"][i]))
+                gnum = len(hist_dict["gt_acquired"][i])
+                print(
+                    "gt range:",
+                    min(hist_dict["gt_acquired"][i]),
+                    max(hist_dict["gt_acquired"][i]),
+                )
                 ghist, gedge = np.histogram(
-                    hist_dict["gt"][i], bins=100, range=(0.2, 0.7), density=False
+                    hist_dict["gt_acquired"][i],
+                    bins=100,
+                    range=(0.2, 0.7),
+                    density=True,
                 )
-                histquads.append((phist, pedge, ghist, gedge))
+                histquads.append((phist, pedge, pnum, ghist, gedge, gnum))
             self.hists = histquads
 
         if latest_epoch != 0 and histquads and data_dict:
@@ -176,26 +190,26 @@ class C_gpsimlivevis:
         self.plot.renderers = []
 
         colors = ["red", "blue", "green", "orange"]
-        for i, htup in enumerate(self.hists):
+        for i, (phist, pedge, pnum, ghist, gedge, gnum) in enumerate(self.hists):
             self.plot.quad(
-                top=htup[0],
+                top=phist,
                 bottom=0,
-                left=htup[1][:-1],
-                right=htup[1][1:],
+                left=pedge[:-1],
+                right=pedge[1:],
                 line_color=colors[i],
                 fill_color=None,
                 alpha=1.0,
-                legend_label=f"{self.datasource_table.data['plate_id'][i]} prediction",
+                legend_label=f"{self.datasource_table.data['plate_id'][i]} predicted available n={pnum:d}",
             )
             self.plot.quad(
-                top=htup[2],
+                top=ghist,
                 bottom=0,
-                left=htup[3][:-1],
-                right=htup[3][1:],
+                left=gedge[:-1],
+                right=gedge[1:],
                 line_color=None,
                 fill_color=colors[i],
                 alpha=0.3,
-                legend_label=f"{self.datasource_table.data['plate_id'][i]} g.t.",
+                legend_label=f"{self.datasource_table.data['plate_id'][i]} g.t. acquired n={gnum:d}",
             )
             self.plot.legend.border_line_alpha = 0.2
             self.plot.legend.background_fill_alpha = 0.2

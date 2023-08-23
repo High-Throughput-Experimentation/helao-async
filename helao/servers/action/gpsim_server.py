@@ -88,10 +88,12 @@ def makeApp(confPrefix, server_key, helao_root):
     ):
         active = await app.base.setup_and_contain_action()
         data = {}
+        orch_string = f"{active.action.orch_key} {active.action.orch_host}:{active.action.orch_port}"
         while data.get("feature", []) == []:
             data = await app.driver.acquire_point(
                 plate_id=active.action.action_params["plate_id"],
-                init_point=[]
+                init_point=[],
+                orch_str=orch_string,
             )
         await active.enqueue_data_dflt(datadict=data)
         active.action.action_params["_feature"] = data["feature"]

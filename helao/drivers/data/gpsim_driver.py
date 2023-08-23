@@ -166,7 +166,7 @@ class GPSim:
 
         return ei, mu, variance
 
-    async def acquire_point(self, plate_id: int, init_point: list = []):
+    async def acquire_point(self, plate_id: int, init_point: list = [], orch_str: str = ""):
         """Adds eta result to acquired list and returns next composition."""
         if not init_point:
             plate_step = len(self.acquired[plate_id])
@@ -216,20 +216,30 @@ class GPSim:
                     "step",
                     "frac_acquired",
                     "last_acquisition",
-                    "pred",
-                    "gt",
+                    "pred_avail",
+                    "gt_acquired",
+                    "orchestrator"
                 )
             }
             for pid in active_plates:
-                plate_step = len(self.acquired[pid])
+                plate_step = len(self.acquired[pid]) - 1
                 frac_acquired = (
                     len(self.acquired[pid] + self.acq_fromglobal[pid])
                     / self.features[pid].shape[0]
                 )
-                all_pred = list(
-                    -1 * self.total_step[pid][plate_step - 1][1].reshape(-1)
+                # all_pred = list(
+                #     -1 * self.total_step[pid][plate_step][1].reshape(-1)
+                # )
+                avail_pred = list(
+                    -1 * self.avail_step[pid][plate_step][1].reshape(-1)
                 )
-                all_gt = list(-1 * self.targets[pid].reshape(-1))
+                # all_gt = list(-1 * self.targets[pid].reshape(-1))
+                acq_gt = list(
+                    -1
+                    * self.targets[pid][
+                        np.array(self.acquired[pid] + self.acq_fromglobal[pid])
+                    ].reshape(-1)
+                )
                 live_dict["plate_id"].append(pid)
                 live_dict["step"].append(plate_step)
                 live_dict["frac_acquired"].append(frac_acquired)
@@ -243,8 +253,9 @@ class GPSim:
                     ]
                 )
                 live_dict["last_acquisition"].append(compstr)
-                live_dict["pred"].append(all_pred)
-                live_dict["gt"].append(all_gt)
+                live_dict["pred_avail"].append(avail_pred)
+                live_dict["gt_acquired"].append(acq_gt)
+                live_dict["orchestrator"].append(orch_str)
             await self.base.put_lbuf(live_dict)
 
         else:
