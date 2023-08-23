@@ -299,7 +299,7 @@ def wait_key():
     return keypress
 
 
-def launcher(confArg, confDict, helao_root):
+def launcher(confArg, confDict, helao_root, extraopt=""):
     confPrefix = os.path.basename(confArg).replace(".py", "")
     # get the BaseModel which contains all the dirs for helao
     helaodirs = helao_dirs(confDict, "launcher")
@@ -307,7 +307,9 @@ def launcher(confArg, confDict, helao_root):
     # API server launch priority (matches folders in root helao-dev/)
     LAUNCH_ORDER = ["action", "orchestrator", "visualizer", "operator"]
 
-    pidd = Pidd(pidFile=f"pids_{confPrefix}.pck", pidPath=helaodirs.states_root)
+    pidd = Pidd(
+        pidFile=f"pids_{confPrefix}_{extraopt}.pck", pidPath=helaodirs.states_root
+    )
     if not validateConfig(PIDD=pidd, confDict=confDict, helao_root=helao_root):
         print_message(
             {}, "launcher", f"Configuration for '{confPrefix}' is invalid.", error=True
@@ -341,6 +343,8 @@ def launcher(confArg, confDict, helao_root):
                 servPort = S["port"]
                 servKHP = (server, servHost, servPort)
                 servHP = (servHost, servPort)
+                if extraopt == "liveonly" and servPy != "live_visualizer":
+                    continue
                 # if 'py' key is None, assume remotely started or monitored by a separate action
                 if servPy is None:
                     print_message(
@@ -373,6 +377,8 @@ def launcher(confArg, confDict, helao_root):
                         p = subprocess.Popen(cmd, cwd=helao_root)
                         ppid = p.pid
                     elif codeKey == "bokeh":
+                        if extraopt == "nolive" and servPy == "live_visualizer":
+                            continue
                         cmd = ["python", "bokeh_launcher.py", confArg, server]
                         p = subprocess.Popen(cmd, cwd=helao_root)
                         try:
@@ -449,6 +455,10 @@ if __name__ == "__main__":
     helao_root = os.path.dirname(os.path.realpath(__file__))
     confArg = sys.argv[1]
     config = config_loader(confArg, helao_root)
+    if len(sys.argv) > 2:
+        extraopt = sys.argv[2]
+    else:
+        extraopt = ""
 
     print("\x1b[2J")  # clear screen
     print("\n\n")
@@ -526,7 +536,9 @@ if __name__ == "__main__":
             except:
                 print_message({}, "launcher", f"Error compressing log: {old_log}")
 
-    pidd = launcher(confArg=confArg, confDict=config, helao_root=helao_root)
+    pidd = launcher(
+        confArg=confArg, confDict=config, helao_root=helao_root, extraopt=extraopt
+    )
 
     def hotkey_msg():
         print_message(

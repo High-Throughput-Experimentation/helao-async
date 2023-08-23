@@ -29,7 +29,9 @@ class GPSim:
         self.config_dict = action_serv.server_cfg["params"]
         self.rng = np.random.default_rng(seed=self.config_dict["random_seed"])
         self.data_file = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))),
+            os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+            ),
             "demos",
             "data",
             "oer13_cps.pzstd",
@@ -50,6 +52,8 @@ class GPSim:
             ).reshape(-1, 1)
             for k, arr in self.features.items()
         }
+        for k, arr in self.targets.items():
+            print(f"plate {k} has eta mean {arr.mean()}")
         # precalculated for simulation only
         self.lib_pcts = {
             k: {p: np.percentile(etas, p) for p in (1, 2, 5, 10)}
@@ -77,12 +81,14 @@ class GPSim:
         }
 
         # gpflow model
-        self.kernel_func = lambda: gpflow.kernels.Constant() * gpflow.kernels.Matern32(
-            lengthscales=0.5
-        ) + gpflow.kernels.White(variance=0.015**2)
-        self.kernel = None
-        self.model = None
-        self.opt = gpflow.optimizers.Scipy()
+        self.kernel_func = (
+            lambda: gpflow.kernels.Constant()
+            + gpflow.kernels.Matern32(lengthscales=0.25)
+            + gpflow.kernels.White(variance=0.015**2)
+        )
+        self.kernels = {k: self.kernel_func() for k in self.all_data}
+        self.models = {k: None for k in self.all_data}
+        self.opts = {k: gpflow.optimizers.Scipy() for k in self.all_data}
         self.opt_logs = {k: {} for k in self.all_data}
         self.total_step = {k: {} for k in self.all_data}
         self.ei_step = {k: {} for k in self.all_data}
@@ -99,14 +105,13 @@ class GPSim:
         self.global_step = 0
         self.event_loop = asyncio.get_event_loop()
         self.myinit()
-        
+
     def myinit(self):
         asyncio.create_task(self.init_all_plates(5))
 
     async def init_all_plates(self, num_points: int):
         for plate_id in self.features:
             await self.init_priors_random(plate_id, num_points)
-            self.fit_model(plate_id)
 
     async def init_priors_random(self, plate_id: int, num_points: int):
         arr = self.features[plate_id]
@@ -117,9 +122,10 @@ class GPSim:
             shuffle=False,
         )
         self.clear_plate(plate_id)
-        print(f"!!! initial indices for plate {plate_id} are: {ridxs}")
+        # print(f"!!! initial indices for plate {plate_id} are: {ridxs}")
         for ridx in ridxs:
             await self.acquire_point(plate_id, init_point=list(arr[ridx]))
+        self.fit_model(plate_id)
         self.initialized[plate_id] = True
 
     def calc_ei(self, plate_id, xi=0.001, noise=True):
@@ -138,10 +144,12 @@ class GPSim:
                 [i for i in range(self.features[plate_id].shape[0]) if i not in acqinds]
             )
         ].astype(float)
-        X_sample = self.features[plate_id][acqinds].astype(float)
+        X_sample = self.features[plate_id][acqinds].astype(float).round(2)
         Y_sample = self.targets[plate_id][acqinds]
-        mu, variance = (r.numpy() for r in self.model.predict_f(X))
-        mu_sample, variance_sample = (r.numpy() for r in self.model.predict_f(X_sample))
+        mu, variance = (r.numpy() for r in self.models[plate_id].predict_f(X))
+        mu_sample, variance_sample = (
+            r.numpy() for r in self.models[plate_id].predict_f(X_sample)
+        )
 
         sigma = variance**0.5
 
@@ -158,7 +166,7 @@ class GPSim:
 
         return ei, mu, variance
 
-    async def acquire_point(self, plate_id: int, init_point: list = []):
+    async def acquire_point(self, plate_id: int, init_point: list = [], orch_str: str = ""):
         """Adds eta result to acquired list and returns next composition."""
         if not init_point:
             plate_step = len(self.acquired[plate_id])
@@ -198,6 +206,53 @@ class GPSim:
                 if idx in self.available[plate_key]:
                     self.available[plate_key].remove(idx)
             self.global_step += 1
+
+            # update live buffer with acquired
+            live_dict = {
+                k: []
+                for k in (
+                    "plate_id",
+                    "step",
+                    "frac_acquired",
+                    "last_acquisition",
+                    "pred_avail",
+                    "gt_acquired",
+                    "orchestrator"
+                )
+            }
+            # populate live_dict
+            plate_step = len(self.acquired[plate_id]) - 1
+            frac_acquired = (
+                len(self.acquired[plate_id] + self.acq_fromglobal[plate_id])
+                / self.features[plate_id].shape[0]
+            )
+            avail_pred = list(
+                -1 * self.avail_step[plate_id][plate_step][1].reshape(-1)
+            )
+            acq_gt = list(
+                -1
+                * self.targets[plate_id][
+                    np.array(self.acquired[plate_id] + self.acq_fromglobal[plate_id])
+                ].reshape(-1)
+            )
+            live_dict["plate_id"].append(plate_id)
+            live_dict["step"].append(plate_step)
+            live_dict["frac_acquired"].append(frac_acquired)
+            compstr = "-".join(
+                [
+                    f"{x}{y/100:.1f}"
+                    for x, y in zip(
+                        self.els, self.features[plate_id][self.acquired[plate_id][-1]]
+                    )
+                    if y > 0
+                ]
+            )
+            live_dict["last_acquisition"].append(compstr)
+            live_dict["pred_avail"].append(avail_pred)
+            live_dict["gt_acquired"].append(acq_gt)
+            live_dict["orchestrator"].append(orch_str)
+            await self.base.put_lbuf(live_dict)
+
         else:
             data = {}
             self.g_acq.add(tuple(init_point))
@@ -218,24 +273,31 @@ class GPSim:
         acq_inds = np.array(
             self.acquired[plate_id] + self.acq_fromglobal[plate_id]
         ).astype(int)
-        X = self.features[plate_id][acq_inds].astype(float)
+        print("acquired indices:", acq_inds)
+        X = self.features[plate_id][acq_inds].astype(float).round(2)
         y = self.targets[plate_id][acq_inds]
-        self.kernel = self.kernel_func()
+        print(f"features {X.shape}:", X)
+        print(f"targets {y.shape}:", y)
         try:
-            self.model = gpflow.models.GPR(
-                data=(X, y), kernel=self.kernel, mean_function=None
+            self.models[plate_id] = gpflow.models.GPR(
+                data=(X, y), kernel=self.kernels[plate_id], mean_function=None
             )
         except Exception as e:
             print(e)
-        self.opt_logs[plate_id][plate_step] = self.opt.minimize(
-            self.model.training_loss,
-            self.model.trainable_variables,
+        self.opt_logs[plate_id][plate_step] = self.opts[plate_id].minimize(
+            self.models[plate_id].training_loss,
+            self.models[plate_id].trainable_variables,
             options={"maxiter": 100},
         )
         total_pred, total_var = (
             r.numpy()
-            for r in self.model.predict_f(self.features[plate_id].astype(float))
+            for r in self.models[plate_id].predict_f(
+                self.features[plate_id].astype(float).round(2)
+            )
         )
+        print("prediction min:", total_pred.min())
+        print("prediction mean:", total_pred.mean())
+        print("prediction max:", total_pred.max())
         total_mae = mean_absolute_error(total_pred, self.targets[plate_id])
         self.total_step[plate_id][plate_step] = (
             total_mae,
@@ -267,9 +329,13 @@ class GPSim:
         self.avail_step = {k: {} for k in self.all_data}
         self.progress = {k: {} for k in self.all_data}
         self.g_acq = set()
+        self.initialized = {k: False for k in self.all_data}
         self.available = {
             k: list(range(arr.shape[0])) for k, arr in self.features.items()
         }
+        self.models = {k: None for k in self.all_data}
+        self.opts = {k: gpflow.optimizers.Scipy() for k in self.all_data}
+        self.kernels = {k: self.kernel_func() for k in self.all_data}
 
     def clear_plate(self, plate_id):
         self.acquired[plate_id] = []
@@ -290,6 +356,9 @@ class GPSim:
             for i in range(self.features[plate_id].shape[0])
             if i not in self.acq_fromglobal[plate_id]
         ]
+        self.models[plate_id] = None
+        self.opts[plate_id] = gpflow.optimizers.Scipy()
+        self.kernels[plate_id] = self.kernel_func()
 
     async def check_condition(self, activeobj: Active):
         params = activeobj.action.action_params
