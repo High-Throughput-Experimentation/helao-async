@@ -60,7 +60,7 @@ class C_gpsimlivevis:
             partial(self.callback_input_update_rate, sender=self.input_update_rate),
         )
 
-        self.plot = figure(height=300, width=1200, output_backend="webgl")
+        self.plot = figure(height=300, width=780, output_backend="webgl")
         self.plot.xaxis.axis_label = "Eta (V vs O2/H2O)"
         self.plot.yaxis.axis_label = "count"
 
@@ -74,9 +74,8 @@ class C_gpsimlivevis:
                 TableColumn(field="orchestrator", title="requested by"),
             ],
             height=200,
-            width=600,
+            width=780,
             index_width=20,
-            autosize_mode="none",
         )
         # combine all sublayouts into a single one
         docs_url = f"http://{host}:{port}/docs#/"
@@ -84,7 +83,7 @@ class C_gpsimlivevis:
         headerbar = f"<b>Live vis module for server {server_link}</b>"
         self.layout = layout(
             [
-                [Div(text=headerbar, width=1200, height=15)],
+                [Div(text=headerbar, width=1000, height=15)],
                 [Spacer(width=10), self.input_update_rate, Spacer(width=10)],
                 Spacer(height=10),
                 [Spacer(width=10), self.plot, Spacer(width=10)],
@@ -93,7 +92,7 @@ class C_gpsimlivevis:
                 Spacer(height=10),
             ],
             background="#C0C0C0",
-            width=1200,
+            width=1000,
         )
 
         self.vis.doc.add_root(self.layout)
