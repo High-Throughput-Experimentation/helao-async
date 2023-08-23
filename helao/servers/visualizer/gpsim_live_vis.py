@@ -68,7 +68,7 @@ class C_gpsimlivevis:
                 TableColumn(field="plate_id", title="plate_id", width=20),
                 TableColumn(field="step", title="step", width=40),
                 TableColumn(field="frac_acquired", title="frac_acq.", width=40),
-                TableColumn(field="last_acquisition", title="last_acq.", 300),
+                TableColumn(field="last_acquisition", title="last_acq.", width=300),
             ],
             height=300,
             width=400,
