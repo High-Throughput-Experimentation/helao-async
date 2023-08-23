@@ -63,7 +63,7 @@ config["servers"] = {
         "port": 8003,
         "group": "action",
         "fast": "gpsim_server",
-        "params": {"random_seed": 99999},
+        "params": {"random_seed": 9999},
     },
     "LIVE": {
         "host": HOSTIP,

@@ -265,6 +265,8 @@ class GPSim:
         print("acquired indices:", acq_inds)
         X = self.features[plate_id][acq_inds].astype(float).round(2)
         y = self.targets[plate_id][acq_inds]
+        print(f"features {X.shape}:", X)
+        print(f"targets {y.shape}:", y)
         kernel = self.kernel_func()
         try:
             self.models[plate_id] = gpflow.models.GPR(
