@@ -83,7 +83,7 @@ class C_gpsimlivevis:
         headerbar = f"<b>Live vis module for server {server_link}</b>"
         self.layout = layout(
             [
-                [Div(text=headerbar, width=1000, height=15)],
+                [Div(text=headerbar, height=15)],
                 [Spacer(width=10), self.input_update_rate, Spacer(width=10)],
                 Spacer(height=10),
                 [Spacer(width=10), self.plot, Spacer(width=10)],
