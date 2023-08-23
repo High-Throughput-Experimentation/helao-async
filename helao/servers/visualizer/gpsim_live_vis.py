@@ -10,7 +10,8 @@ from bokeh.plotting import figure
 from bokeh.models.widgets import Div
 from bokeh.models.widgets import DataTable, TableColumn
 from bokeh.layouts import layout, Spacer
-from bokeh.models import ColumnDataSource, DatetimeTickFormatter
+from bokeh.models import ColumnDataSource
+from bokeh.models.widgets import Toggle
 import numpy as np
 
 from helao.servers.vis import Vis
@@ -70,13 +71,21 @@ class C_gpsimlivevis:
         self.plot.xaxis.axis_label = "Eta (V vs O2/H2O)"
         self.plot.yaxis.axis_label = "density"
 
+        self.status_button = Toggle(
+            label="Disabled", disabled=True, button_type="success", width=400
+        )  # success: green, danger: red
+
         self.table = DataTable(
             source=self.datasource_table,
             columns=[
                 TableColumn(field="plate_id", title="plate_id"),
                 TableColumn(field="step", title="acqusition number per plate"),
-                TableColumn(field="frac_acquired", title="fraction of compositions acquired"),
-                TableColumn(field="last_acquisition", title="last acquired composition"),
+                TableColumn(
+                    field="frac_acquired", title="fraction of compositions acquired"
+                ),
+                TableColumn(
+                    field="last_acquisition", title="last acquired composition"
+                ),
                 TableColumn(field="orchestrator", title="requested by"),
             ],
             height=200,
@@ -92,7 +101,12 @@ class C_gpsimlivevis:
             [
                 Spacer(width=20),
                 [Div(text=headerbar, width=1004, height=15)],
-                [Spacer(width=10), self.input_update_rate, Spacer(width=10)],
+                [
+                    Spacer(width=10),
+                    self.input_update_rate,
+                    Spacer(width=10),
+                    self.status_button,
+                ],
                 Spacer(height=10),
                 [Spacer(width=10), self.plot, Spacer(width=10)],
                 Spacer(height=10),
@@ -148,10 +162,16 @@ class C_gpsimlivevis:
                     )
                 elif datalab in self.hist_keys:
                     hist_dict[datalab] = dataval
+                elif datalab == "status":
+                    self.status_button.label = dataval
+                    if "was advised" in dataval:
+                        self.status_button.button_type = "danger"
+                    else:
+                        self.status_button.button_type = "success"
                 latest_epoch = max([epochsec, latest_epoch])
 
         histquads = []
-        if data_dict:
+        if "plate_id" in data_dict:
             for i in range(len(data_dict["plate_id"])):
                 pnum = len(hist_dict["pred_avail"][i])
                 print(
