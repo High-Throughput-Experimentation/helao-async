@@ -72,7 +72,7 @@ class C_gpsimlivevis:
         self.plot.yaxis.axis_label = "density"
 
         self.status_button = Toggle(
-            label="Disabled", disabled=True, button_type="success", width=400
+            label="Disabled", disabled=True, button_type="success", width=400, align="end"
         )  # success: green, danger: red
 
         self.table = DataTable(
@@ -163,6 +163,8 @@ class C_gpsimlivevis:
                 elif datalab in self.hist_keys:
                     hist_dict[datalab] = dataval
                 elif datalab == "status":
+                    if isinstance(dataval, list):
+                        dataval = dataval[0]
                     self.status_button.label = dataval
                     if "was advised" in dataval:
                         self.status_button.button_type = "danger"
