@@ -176,7 +176,7 @@ class C_gpsimlivevis:
                 self.hists[data_dict["plate_id"][i]] = histquads
 
         if latest_epoch != 0 and histquads and data_dict:
-            self.datasource_table.stream(data_dict)
+            self.datasource_table.stream(data_dict, rollover=20)
             self._add_plots()
 
     async def IOloop_data(self):  # non-blocking coroutine, updates data source
