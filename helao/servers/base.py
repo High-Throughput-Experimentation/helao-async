@@ -1748,23 +1748,36 @@ class Active:
                 "finish active: sending finish data_stream_status package",
                 info=True,
             )
+            retry_counter = 0
             while not all(
                 [
                     action.data_stream_status != HloStatus.active
                     for action in self.action_list
                 ]
-            ):
+            ) and retry_counter < 5:
                 await self.enqueue_data(
                     datamodel=DataModel(data={}, errors=[], status=HloStatus.finished)
                 )
                 self.base.print_message(
                     f"Waiting for data_stream finished"
-                    f" packge: "
+                    f" package: "
                     f" {[action.data_stream_status for action in self.action_list]}",
                     info=True,
                 )
                 await asyncio.sleep(0.5)
-
+                retry_counter += 1
+            for action in self.action_list:
+                if action.data_stream_status != HloStatus.active:
+                    self.enqueue_data_nowait(
+                        datamodel=DataModel(
+                            data={}, errors=[], status=HloStatus.finished
+                        )
+                    )
+                    self.base.print_message(
+                        f"Setting datastream to finished:"
+                        f" {[action.data_stream_status for action in self.action_list]}",
+                        info=True,
+                    )
             # self.action_list[-1] is the very first action
             if self.action_list[-1].manual_action:
                 await self.finish_manual_action()
