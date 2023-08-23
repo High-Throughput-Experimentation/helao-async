@@ -86,9 +86,7 @@ class GPSim:
             + gpflow.kernels.Matern32(lengthscales=0.25)
             + gpflow.kernels.White(variance=0.015**2)
         )
-        self.kernels = {k: self.kernel_func() for k in self.all_data}
         self.models = {k: None for k in self.all_data}
-        self.opts = {k: gpflow.optimizers.Scipy() for k in self.all_data}
         self.opt_logs = {k: {} for k in self.all_data}
         self.total_step = {k: {} for k in self.all_data}
         self.ei_step = {k: {} for k in self.all_data}
@@ -278,13 +276,15 @@ class GPSim:
         y = self.targets[plate_id][acq_inds]
         print(f"features {X.shape}:", X)
         print(f"targets {y.shape}:", y)
+        opt = gpflow.optimizers.Scipy()
+        kernel = self.kernel_func()
         try:
             self.models[plate_id] = gpflow.models.GPR(
-                data=(X, y), kernel=self.kernels[plate_id], mean_function=None
+                data=(X, y), kernel=kernel, mean_function=None
             )
         except Exception as e:
             print(e)
-        self.opt_logs[plate_id][plate_step] = self.opts[plate_id].minimize(
+        self.opt_logs[plate_id][plate_step] = opt.minimize(
             self.models[plate_id].training_loss,
             self.models[plate_id].trainable_variables,
             options={"maxiter": 100},
@@ -334,8 +334,6 @@ class GPSim:
             k: list(range(arr.shape[0])) for k, arr in self.features.items()
         }
         self.models = {k: None for k in self.all_data}
-        self.opts = {k: gpflow.optimizers.Scipy() for k in self.all_data}
-        self.kernels = {k: self.kernel_func() for k in self.all_data}
 
     def clear_plate(self, plate_id):
         self.acquired[plate_id] = []
@@ -357,8 +355,6 @@ class GPSim:
             if i not in self.acq_fromglobal[plate_id]
         ]
         self.models[plate_id] = None
-        self.opts[plate_id] = gpflow.optimizers.Scipy()
-        self.kernels[plate_id] = self.kernel_func()
 
     async def check_condition(self, activeobj: Active):
         params = activeobj.action.action_params
