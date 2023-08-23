@@ -123,7 +123,7 @@ class GPSim:
         # print(f"!!! initial indices for plate {plate_id} are: {ridxs}")
         for ridx in ridxs:
             await self.acquire_point(plate_id, init_point=list(arr[ridx]))
-        self.fit_model(plate_id)
+        await self.fit_model(plate_id)
         self.initialized[plate_id] = True
 
     def calc_ei(self, plate_id, xi=0.001, noise=True):
@@ -164,7 +164,9 @@ class GPSim:
 
         return ei, mu, variance
 
-    async def acquire_point(self, plate_id: int, init_point: list = [], orch_str: str = ""):
+    async def acquire_point(
+        self, plate_id: int, init_point: list = [], orch_str: str = ""
+    ):
         """Adds eta result to acquired list and returns next composition."""
         if not init_point:
             plate_step = len(self.acquired[plate_id])
@@ -204,52 +206,16 @@ class GPSim:
                 if idx in self.available[plate_key]:
                     self.available[plate_key].remove(idx)
             self.global_step += 1
-
-            # update live buffer with acquired
-            live_dict = {
-                k: []
-                for k in (
-                    "plate_id",
-                    "step",
-                    "frac_acquired",
-                    "last_acquisition",
-                    "pred_avail",
-                    "gt_acquired",
-                    "orchestrator"
-                )
-            }
-            # populate live_dict
-            plate_step = len(self.acquired[plate_id]) - 1
-            frac_acquired = (
-                len(self.acquired[plate_id] + self.acq_fromglobal[plate_id])
-                / self.features[plate_id].shape[0]
-            )
-            avail_pred = list(
-                -1 * self.avail_step[plate_id][plate_step][1].reshape(-1)
-            )
-            acq_gt = list(
-                -1
-                * self.targets[plate_id][
-                    np.array(self.acquired[plate_id] + self.acq_fromglobal[plate_id])
-                ].reshape(-1)
-            )
-            live_dict["plate_id"].append(plate_id)
-            live_dict["step"].append(plate_step)
-            live_dict["frac_acquired"].append(frac_acquired)
             compstr = "-".join(
                 [
                     f"{x}{y/100:.1f}"
-                    for x, y in zip(
-                        self.els, self.features[plate_id][self.acquired[plate_id][-1]]
-                    )
+                    for x, y in zip(self.els, self.features[plate_id][best_idx])
                     if y > 0
                 ]
             )
-            live_dict["last_acquisition"].append(compstr)
-            live_dict["pred_avail"].append(avail_pred)
-            live_dict["gt_acquired"].append(acq_gt)
-            live_dict["orchestrator"].append(orch_str)
-            await self.base.put_lbuf(live_dict)
+            await self.base.put_lbuf(
+                {"status": f"{orch_str} was advised to measure composition {compstr}"}
+            )
 
         else:
             data = {}
@@ -265,9 +231,61 @@ class GPSim:
         )
         return data
 
-    def fit_model(self, plate_id):
+    async def fit_model(self, plate_id, orch_str: str = ""):
         """Assemble acquired etas per plate and predict loaded space."""
         plate_step = len(self.acquired[plate_id])
+
+        if plate_step > 0:
+            # update live buffer with acquired
+            live_dict = {
+                k: []
+                for k in (
+                    "plate_id",
+                    "step",
+                    "frac_acquired",
+                    "last_acquisition",
+                    "pred_avail",
+                    "gt_acquired",
+                    "orchestrator",
+                    "status"
+                )
+            }
+            # populate live_dict
+            frac_acquired = (
+                len(self.acquired[plate_id] + self.acq_fromglobal[plate_id])
+                / self.features[plate_id].shape[0]
+            )
+            avail_pred = list(
+                -1 * self.avail_step[plate_id][plate_step - 1][1].reshape(-1)
+            )
+            acq_gt = list(
+                -1
+                * self.targets[plate_id][
+                    np.array(self.acquired[plate_id] + self.acq_fromglobal[plate_id])
+                ].reshape(-1)
+            )
+            live_dict["plate_id"].append(plate_id)
+            live_dict["step"].append(plate_step - 1)
+            live_dict["frac_acquired"].append(frac_acquired)
+            compstr = "-".join(
+                [
+                    f"{x}{y/100:.1f}"
+                    for x, y in zip(
+                        self.els,
+                        self.features[plate_id][
+                            self.acquired[plate_id][plate_step - 1]
+                        ],
+                    )
+                    if y > 0
+                ]
+            )
+            live_dict["last_acquisition"].append(compstr)
+            live_dict["pred_avail"].append(avail_pred)
+            live_dict["gt_acquired"].append(acq_gt)
+            live_dict["orchestrator"].append(orch_str)
+            live_dict["status"].append(f"{compstr} was acquired on {orch_str}")
+            await self.base.put_lbuf(live_dict)
+
         acq_inds = np.array(
             self.acquired[plate_id] + self.acq_fromglobal[plate_id]
         ).astype(int)
@@ -432,7 +450,7 @@ class GPSimExec(Executor):
         self.plate_id = self.active.action.action_params["plate_id"]
 
     async def _exec(self):
-        self.active.base.fastapp.driver.fit_model(self.plate_id)
+        await self.active.base.fastapp.driver.fit_model(self.plate_id)
         return {
             "error": ErrorCodes.none,
             "status": HloStatus.active,
