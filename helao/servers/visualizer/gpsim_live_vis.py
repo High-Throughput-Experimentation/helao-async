@@ -66,7 +66,7 @@ class C_gpsimlivevis:
             partial(self.callback_input_update_rate, sender=self.input_update_rate),
         )
 
-        self.plot = figure(height=300, width=780, output_backend="webgl")
+        self.plot = figure(height=300, width=880, output_backend="webgl")
         self.plot.xaxis.axis_label = "Eta (V vs O2/H2O)"
         self.plot.yaxis.axis_label = "density"
 
@@ -74,19 +74,20 @@ class C_gpsimlivevis:
             source=self.datasource_table,
             columns=[
                 TableColumn(field="plate_id", title="plate_id"),
-                TableColumn(field="step", title="step"),
-                TableColumn(field="frac_acquired", title="fraction acquired"),
-                TableColumn(field="last_acquisition", title="last acquired"),
+                TableColumn(field="step", title="acqusition number per plate"),
+                TableColumn(field="frac_acquired", title="fraction of compositions acquired"),
+                TableColumn(field="last_acquisition", title="last acquired composition"),
                 TableColumn(field="orchestrator", title="requested by"),
             ],
             height=200,
-            width=780,
+            width=880,
             index_width=20,
         )
         # combine all sublayouts into a single one
         docs_url = f"http://{host}:{port}/docs#/"
         server_link = f'<a href="{docs_url}" target="_blank">\'{self.live_key}\'</a>'
         headerbar = f"<b>Live vis module for server {server_link}</b>"
+        tableheader = f"<b>Last 20 acquisitions across all Orchestrators:</b>"
         self.layout = layout(
             [
                 Spacer(width=20),
@@ -95,6 +96,7 @@ class C_gpsimlivevis:
                 Spacer(height=10),
                 [Spacer(width=10), self.plot, Spacer(width=10)],
                 Spacer(height=10),
+                [Div(text=tableheader, width=1004, height=15)],
                 [Spacer(width=10), self.table, Spacer(width=10)],
             ],
             background="#C0C0C0",
