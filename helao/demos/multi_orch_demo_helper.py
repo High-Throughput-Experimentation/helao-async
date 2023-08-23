@@ -30,7 +30,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 2:
         iters = sys.argv[2]
     else:
-        iters = 100
+        iters = 10
     seq_params = {
         "init_random_points": 5,
         "stop_condition": "max_iters",
