@@ -59,6 +59,7 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
         "mfc_server": ("mfc_vis", "C_mfc", ["devices"]),
         "ws_simulator": ("wssim_live_vis", "C_simlivevis", []),
         "tec_server": ("tec_vis", "C_tec", []),
+        "gpsim_server": ("gpsim_live_vis", "C_gpsimlivevis", []),
     }
     vis_dict = {}
 

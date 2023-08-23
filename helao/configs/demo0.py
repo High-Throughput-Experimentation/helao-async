@@ -63,6 +63,13 @@ config["servers"] = {
         "port": 8003,
         "group": "action",
         "fast": "gpsim_server",
-        "params": {"random_seed": 9999},
+        "params": {"random_seed": 99999},
+    },
+    "LIVE": {
+        "host": HOSTIP,
+        "port": 5003,
+        "group": "visualizer",
+        "bokeh": "live_visualizer",
+        "params": {"doc_name": "GP Live Visualizer", "launch_browser": True},
     },
 }

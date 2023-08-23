@@ -29,7 +29,9 @@ class GPSim:
         self.config_dict = action_serv.server_cfg["params"]
         self.rng = np.random.default_rng(seed=self.config_dict["random_seed"])
         self.data_file = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))),
+            os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+            ),
             "demos",
             "data",
             "oer13_cps.pzstd",
@@ -50,6 +52,8 @@ class GPSim:
             ).reshape(-1, 1)
             for k, arr in self.features.items()
         }
+        for k, arr in self.targets.items():
+            print(f"plate {k} has eta mean {arr.mean()}")
         # precalculated for simulation only
         self.lib_pcts = {
             k: {p: np.percentile(etas, p) for p in (1, 2, 5, 10)}
@@ -78,10 +82,10 @@ class GPSim:
 
         # gpflow model
         self.kernel_func = lambda: gpflow.kernels.Constant() * gpflow.kernels.Matern32(
-            lengthscales=0.5
+            lengthscales=0.25
         ) + gpflow.kernels.White(variance=0.015**2)
         self.kernel = None
-        self.model = None
+        self.models = {k: None for k in self.targets}
         self.opt = gpflow.optimizers.Scipy()
         self.opt_logs = {k: {} for k in self.all_data}
         self.total_step = {k: {} for k in self.all_data}
@@ -99,7 +103,7 @@ class GPSim:
         self.global_step = 0
         self.event_loop = asyncio.get_event_loop()
         self.myinit()
-        
+
     def myinit(self):
         asyncio.create_task(self.init_all_plates(5))
 
@@ -117,7 +121,7 @@ class GPSim:
             shuffle=False,
         )
         self.clear_plate(plate_id)
-        print(f"!!! initial indices for plate {plate_id} are: {ridxs}")
+        # print(f"!!! initial indices for plate {plate_id} are: {ridxs}")
         for ridx in ridxs:
             await self.acquire_point(plate_id, init_point=list(arr[ridx]))
         self.initialized[plate_id] = True
@@ -138,10 +142,10 @@ class GPSim:
                 [i for i in range(self.features[plate_id].shape[0]) if i not in acqinds]
             )
         ].astype(float)
-        X_sample = self.features[plate_id][acqinds].astype(float)
+        X_sample = self.features[plate_id][acqinds].astype(float).round(2)
         Y_sample = self.targets[plate_id][acqinds]
-        mu, variance = (r.numpy() for r in self.model.predict_f(X))
-        mu_sample, variance_sample = (r.numpy() for r in self.model.predict_f(X_sample))
+        mu, variance = (r.numpy() for r in self.models[plate_id].predict_f(X))
+        mu_sample, variance_sample = (r.numpy() for r in self.models[plate_id].predict_f(X_sample))
 
         sigma = variance**0.5
 
@@ -198,6 +202,47 @@ class GPSim:
                 if idx in self.available[plate_key]:
                     self.available[plate_key].remove(idx)
             self.global_step += 1
+
+            # update live buffer with acquired
+            active_plates = [k for k in self.acquired if self.acquired[k]]
+            live_dict = {
+                k: []
+                for k in (
+                    "plate_id",
+                    "step",
+                    "frac_acquired",
+                    "last_acquisition",
+                    "pred",
+                    "gt",
+                )
+            }
+            for pid in active_plates:
+                plate_step = len(self.acquired[pid])
+                frac_acquired = (
+                    len(self.acquired[pid] + self.acq_fromglobal[pid])
+                    / self.features[pid].shape[0]
+                )
+                all_pred = list(
+                    -1 * self.total_step[pid][plate_step - 1][1].reshape(-1)
+                )
+                all_gt = list(-1 * self.targets[pid].reshape(-1))
+                live_dict["plate_id"].append(pid)
+                live_dict["step"].append(plate_step)
+                live_dict["frac_acquired"].append(frac_acquired)
+                compstr = "-".join(
+                    [
+                        f"{x}{y/100:.1f}"
+                        for x, y in zip(
+                            self.els, self.features[pid][self.acquired[pid][-1]]
+                        )
+                        if y > 0
+                    ]
+                )
+                live_dict["last_acquisition"].append(compstr)
+                live_dict["pred"].append(all_pred)
+                live_dict["gt"].append(all_gt)
+            await self.base.put_lbuf(live_dict)
+
         else:
             data = {}
             self.g_acq.add(tuple(init_point))
@@ -218,24 +263,30 @@ class GPSim:
         acq_inds = np.array(
             self.acquired[plate_id] + self.acq_fromglobal[plate_id]
         ).astype(int)
-        X = self.features[plate_id][acq_inds].astype(float)
+        print("acquired indices:", acq_inds)
+        X = self.features[plate_id][acq_inds].astype(float).round(2)
         y = self.targets[plate_id][acq_inds]
-        self.kernel = self.kernel_func()
+        kernel = self.kernel_func()
         try:
-            self.model = gpflow.models.GPR(
-                data=(X, y), kernel=self.kernel, mean_function=None
+            self.models[plate_id] = gpflow.models.GPR(
+                data=(X, y), kernel=kernel, mean_function=None
             )
         except Exception as e:
             print(e)
         self.opt_logs[plate_id][plate_step] = self.opt.minimize(
-            self.model.training_loss,
-            self.model.trainable_variables,
+            self.models[plate_id].training_loss,
+            self.models[plate_id].trainable_variables,
             options={"maxiter": 100},
         )
         total_pred, total_var = (
             r.numpy()
-            for r in self.model.predict_f(self.features[plate_id].astype(float))
+            for r in self.models[plate_id].predict_f(
+                self.features[plate_id].astype(float).round(2)
+            )
         )
+        print("prediction min:", total_pred.min())
+        print("prediction mean:", total_pred.mean())
+        print("prediction max:", total_pred.max())
         total_mae = mean_absolute_error(total_pred, self.targets[plate_id])
         self.total_step[plate_id][plate_step] = (
             total_mae,
