@@ -1192,7 +1192,7 @@ def ADSS_CA_NiSb_cell_1potential_photo(
 
 
 def ADSS_CA_cell_1potential(
-    sequence_version: int = 4, #v3 move led off to exp v4 electrolyte insertion
+    sequence_version: int = 5, #v3 move led off to exp v4 electrolyte insertion
     #solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no: int = 14050,  #  instead of map select
@@ -1335,6 +1335,7 @@ def ADSS_CA_cell_1potential(
                 "insert_electrolyte_yn":insert_electrolyte_yn,
                 "insert_electrolyte_ul":insert_electrolyte_ul,
                 "insert_electrolyte_time_sec":insert_electrolyte_time_sec,             
+                "electrolyte_sample_no": liquid_sample_no,
                 "aliquot_volume_ul": aliquot_volume_ul,
                 "aliquot_times_sec": aliquot_times_sec,
                 "aliquot_insitu": True,

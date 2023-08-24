@@ -715,7 +715,7 @@ def ADSS_sub_CA(
 
 def ADSS_sub_CA_photo(
     experiment: Experiment,
-    experiment_version: int = 4,  # v4 add electrolyte add
+    experiment_version: int = 5,  # v4 add electrolyte add
     CA_potential: float = 0.0,
     ph: float = 9.53,
     potential_versus: str = "rhe",
@@ -729,6 +729,7 @@ def ADSS_sub_CA_photo(
     insert_electrolyte_yn: bool = False,
     insert_electrolyte_ul: int = 0,
     insert_electrolyte_time_sec: float = 1800,
+    electrolyte_sample_no: int = 1,
     aliquot_volume_ul: int = 200,
     aliquot_times_sec: List[float] = [],
     aliquot_insitu: bool = True,
@@ -828,7 +829,7 @@ def ADSS_sub_CA_photo(
         washmod = 0
         for mtup, interval in zip(mlist, intervals):
             if mtup[0] == "aliquot":
-                apm.add(ORCH_server, "wait", {"waittime": interval - vwait - 4}, waitcond)
+                apm.add(ORCH_server, "wait", {"waittime": interval - vwait}, waitcond)
                 apm.add(
                     NI_server,
                     "gasvalve",
@@ -862,7 +863,7 @@ def ADSS_sub_CA_photo(
                         ProcessContrib.run_use,
                     ],
                 )
-                vwait = 65
+                vwait = 61 #orig 65
                 washmod += 1
                 apm.add(ORCH_server, "wait", {"waittime": vwait}, waitcond)
                 apm.add(
@@ -873,6 +874,15 @@ def ADSS_sub_CA_photo(
                 )
             elif mtup[0] == "electrolyte":
                 if apm.pars.insert_electrolyte_yn:
+                    apm.add_action_list(
+                        ADSS_sub_load_liquid(
+                            experiment=experiment,
+                            liquid_custom_position="cell1_we",
+                            liquid_sample_no=apm.pars.electrolyte_sample_no,
+                            volume_ul_cell_liquid=apm.pars.insert_electrolyte_ul,
+                        )
+                    )
+
                     apm.add(ORCH_server, "wait", {"waittime": interval-vwait}, waitcond)
                     apm.add_action_list(
                         ADSS_sub_cellfill_prefilled(
@@ -881,7 +891,7 @@ def ADSS_sub_CA_photo(
                             Syringe_rate_ulsec=300,
                         )
                     )
-                    apm.add(ORCH_server, "wait", {"waittime": vwait - 3}, waitcond)
+                    apm.add(ORCH_server, "wait", {"waittime": 60}, waitcond)
                     apm.add(ORCH_server, "wait", {"waittime": 0.1},ActionStartCondition.wait_for_orch)
 
 
