@@ -343,7 +343,7 @@ def launcher(confArg, confDict, helao_root, extraopt=""):
                 servPort = S["port"]
                 servKHP = (server, servHost, servPort)
                 servHP = (servHost, servPort)
-                if extraopt == "liveonly" and servPy != "live_visualizer":
+                if extraopt in ["liveonly", "gpvis"] and servPy != "live_visualizer":
                     continue
                 # if 'py' key is None, assume remotely started or monitored by a separate action
                 if servPy is None:
@@ -377,7 +377,7 @@ def launcher(confArg, confDict, helao_root, extraopt=""):
                         p = subprocess.Popen(cmd, cwd=helao_root)
                         ppid = p.pid
                     elif codeKey == "bokeh":
-                        if extraopt == "nolive" and servPy == "live_visualizer":
+                        if extraopt in ["nolive", "actionvis"] and servPy == "live_visualizer":
                             continue
                         cmd = ["python", "bokeh_launcher.py", confArg, server]
                         p = subprocess.Popen(cmd, cwd=helao_root)

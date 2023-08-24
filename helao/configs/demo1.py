@@ -48,7 +48,7 @@ config["servers"] = {
         "fast": "cpsim_server",
         "params": {"plate_id": 3851},
     },
-    "VIS": {
+    "ACTVIS": {
         "host": HOSTIP,
         "port": 5012,
         "group": "visualizer",
