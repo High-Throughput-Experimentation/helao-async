@@ -16,11 +16,10 @@ from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.dispatcher import private_dispatcher
 from helao.configs.demo0 import config as config0
 from helao.configs.demo1 import config as config1
-from helao.configs.demo2 import config as config2
 
 from helao.sequences.OERSIM_seq import OERSIM_activelearn
 
-cfgd = {"demo0": config0, "demo1": config1, "demo2": config2}
+cfgd = {"demo0": config0, "demo1": config1}
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
