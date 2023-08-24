@@ -48,7 +48,7 @@ config["servers"] = {
         "fast": "cpsim_server",
         "params": {"plate_id": 2750},
     },
-    "VIS": {
+    "ACTVIS": {
         "host": HOSTIP,
         "port": 5002,
         "group": "visualizer",
@@ -65,7 +65,7 @@ config["servers"] = {
         "fast": "gpsim_server",
         "params": {"random_seed": 9999},
     },
-    "LIVE": {
+    "GPVIS": {
         "host": HOSTIP,
         "port": 5003,
         "group": "visualizer",
