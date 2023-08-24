@@ -6,13 +6,8 @@ https://doi.org/10.1039/C8MH01641K
 
 The "plate_id" parameter for the CPSIM server accepts any of the following integer
 values which map to 6!4 quaternary oxide composition spaces for a given plate library:
-    {2750: {'Ce', 'Co', 'Fe', 'La', 'Ni', 'Ta'},
-    3496: {'Ce', 'Co', 'Fe', 'La', 'Mn', 'Ni'},
-    3851: {'Co', 'Cu', 'Fe', 'Mn', 'Ni', 'Ta'},
-    3860: {'Co', 'Cu', 'Fe', 'Mn', 'Sn', 'Ta'},
-    3875: {'Co', 'Cu', 'Fe', 'Mn', 'Sn', 'Ta'},
-    4084: {'Ca', 'Co', 'Mg', 'Mn', 'Sn', 'Zn'},
-    4098: {'Ca', 'Co', 'Mn', 'Ni', 'Sb', 'Sn'}}
+    2750: {'Ce', 'Co', 'Fe', 'La', 'Ni', 'Ta'}
+    3851: {'Co', 'Cu', 'Fe', 'Mn', 'Ni', 'Ta'}
 
 The shared compute GPSIM server is launched with the demo0 configuration, and is only
 linked via host and port as an available resournce in demo1 and demo2.
