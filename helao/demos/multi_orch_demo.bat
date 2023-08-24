@@ -10,4 +10,4 @@ start %windir%\System32\cmd.exe /k "cd %dp0&cd..&cd..&helao.bat demo1"
 %windir%\System32\timeout /t 30 /nobreak
 python multi_orch_demo_helper.py demo1 5
 %windir%\System32\timeout /t 300 /nobreak
-python multi_orch_demo_helper.py demo1 5
+python multi_orch_demo_helper.py demo1 30

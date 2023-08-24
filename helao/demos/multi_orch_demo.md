@@ -15,4 +15,17 @@ The multi-orchestrator demo launches two instrumentation groups, each with their
 4. Run: ```multi_orch_demo.bat```
 
 ## Description
-The `multi_orch_demo.bat` batch script will launch the first orchestrator along with a simulated CP measurement server and compute server, then wait 30 seconds before queueing and starting a command sequence of 100 active learning measure-acquire iterations for the composition library loaded on the measurement server. After 15 seconds, the second orchestrator and simulated CP measurement servers will start, and this orchestrator will share the compute server already running in the first group. Another set of 100 active learning iterations will be queued and started on the second group.
+The `multi_orch_demo.bat` batch script will run the following commands:
+1. Start the first instrument group containing an orchestrator, simulated measurement server, and gaussian process modeling server.
+2. Wait 35 seconds for full server initialization.
+3. Queue a sequence of 50 active learning iterations on the plate library loaded in the first instrument group.
+4. Wait 30 seconds while the first instrument group performs acquire-measure-model iterations.
+5. Start a visualizer for the gaussian process modeling server as an independent observer.
+6. Wait 30 seconds while the first instrument group continues iterations, and the modeling visualizer plots the latest distributions of predicted Eta and the acquired ground truth.
+7. Start a second instrument group containing an orchestrator and simulated measurement server. This group will share the existing gaussian process modeling server and leverage the existing acquisition set.
+8. Wait 30 seconds for server initialization.
+9. Queue a sequence of 5 active learning iterations on a different plate library loaded in the second instrument group.
+10. Wait 300 seconds, by which point the second instrument group would be idle after completeing the 5-iteration sequence.
+11. Queue a sequence of 30 active learning itterations on the second instrument group.
+
+After an initial seed of 5 acquisitions, the demo0 Orchestrator acquires data on {} compositions with data on an additional {} compositions provided by the demo1 Orchestrator, resulting in N={} acquisitions at the end of the demo. After an initial seed of 5 acquisitions, the demo1 Orchestrator acquires data on {} compositions with data on an additional {} compositions provided by the demo0 Orchestrator, resulting in N={} acquisitions at the end of the demo.
