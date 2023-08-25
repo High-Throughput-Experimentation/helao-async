@@ -672,7 +672,7 @@ def ADSS_CA_NiSb_validation(
                 {
                     "DrainWait_s": Cell_draintime_s,
                     "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                    "ResidualWait_s": ResidualWait_s,
+                #    "ResidualWait_s": ResidualWait_s,
                 }
             )
             epm.add_experiment(
@@ -688,7 +688,7 @@ def ADSS_CA_NiSb_validation(
                 {
                     "DrainWait_s": Cell_draintime_s,
                     "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                    "ResidualWait_s": ResidualWait_s,
+                #    "ResidualWait_s": ResidualWait_s,
                 }
             )
             epm.add_experiment("ADSS_sub_unload_liquid",{})
@@ -709,7 +709,7 @@ def ADSS_CA_NiSb_validation(
                 "ReturnLineWait_s": ReturnLineWait_s,
                 "DrainWait_s": Cell_draintime_s,
                 "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                "ResidualWait_s": ResidualWait_s,
+            #    "ResidualWait_s": ResidualWait_s,
         }
         )
         refill_volume = (flush_volume_ul + liquid_sample_volume_ul)*counter
@@ -890,7 +890,7 @@ def ADSS_CA_NiSb_cell_1potential(
         {
             "DrainWait_s": Cell_draintime_s,
             "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-            "ResidualWait_s": ResidualWait_s,
+        #    "ResidualWait_s": ResidualWait_s,
         }
     )
     epm.add_experiment(
@@ -906,7 +906,7 @@ def ADSS_CA_NiSb_cell_1potential(
         {
             "DrainWait_s": Cell_draintime_s,
             "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-            "ResidualWait_s": ResidualWait_s,
+        #    "ResidualWait_s": ResidualWait_s,
         }
     )
     epm.add_experiment("ADSS_sub_unload_liquid",{})
@@ -929,7 +929,7 @@ def ADSS_CA_NiSb_cell_1potential(
                 "ReturnLineWait_s": ReturnLineWait_s,
                 "DrainWait_s": Cell_draintime_s,
                 "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                "ResidualWait_s": ResidualWait_s,
+            #    "ResidualWait_s": ResidualWait_s,
         }
         )
 
@@ -1134,7 +1134,7 @@ def ADSS_CA_NiSb_cell_1potential_photo(
         {
             "DrainWait_s": Cell_draintime_s,
             "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-            "ResidualWait_s": ResidualWait_s,
+         #   "ResidualWait_s": ResidualWait_s,
         }
     )
     epm.add_experiment(
@@ -1150,7 +1150,7 @@ def ADSS_CA_NiSb_cell_1potential_photo(
         {
             "DrainWait_s": Cell_draintime_s,
             "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-            "ResidualWait_s": ResidualWait_s,
+         #   "ResidualWait_s": ResidualWait_s,
         }
     )
     epm.add_experiment("ADSS_sub_unload_liquid",{})
@@ -1172,7 +1172,7 @@ def ADSS_CA_NiSb_cell_1potential_photo(
                 "ReturnLineWait_s": ReturnLineWait_s,
                 "DrainWait_s": Cell_draintime_s,
                 "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                "ResidualWait_s": ResidualWait_s,
+            #    "ResidualWait_s": ResidualWait_s,
         }
         )
     if refill:
@@ -1434,7 +1434,7 @@ def ADSS_CA_cell_1potential(
         {
             "DrainWait_s": Cell_draintime_s,
             "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-            "ResidualWait_s": ResidualWait_s,
+        #    "ResidualWait_s": ResidualWait_s,
         }
     )
     if stay_sample:
@@ -1451,7 +1451,7 @@ def ADSS_CA_cell_1potential(
             {
                 "DrainWait_s": Cell_draintime_s,
                 "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                "ResidualWait_s": ResidualWait_s,
+        #        "ResidualWait_s": ResidualWait_s,
             }
         )
     epm.add_experiment("ADSS_sub_unload_liquid",{})
@@ -1473,7 +1473,7 @@ def ADSS_CA_cell_1potential(
                 "ReturnLineWait_s": ReturnLineWait_s,
                 "DrainWait_s": Cell_draintime_s,
                 "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                "ResidualWait_s": ResidualWait_s,
+            #    "ResidualWait_s": ResidualWait_s,
         }
         )
     if refill:
@@ -1724,7 +1724,7 @@ def ADSS_CA_cell_multipotential(
         {
             "DrainWait_s": Cell_draintime_s,
             "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-            "ResidualWait_s": ResidualWait_s,
+        #    "ResidualWait_s": ResidualWait_s,
         }
     )
     if stay_sample:
@@ -1741,7 +1741,7 @@ def ADSS_CA_cell_multipotential(
             {
                 "DrainWait_s": Cell_draintime_s,
                 "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                "ResidualWait_s": ResidualWait_s,
+        #        "ResidualWait_s": ResidualWait_s,
             }
         )
     epm.add_experiment("ADSS_sub_unload_liquid",{})
@@ -1763,7 +1763,7 @@ def ADSS_CA_cell_multipotential(
                 "ReturnLineWait_s": ReturnLineWait_s,
                 "DrainWait_s": Cell_draintime_s,
                 "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                "ResidualWait_s": ResidualWait_s,
+        #        "ResidualWait_s": ResidualWait_s,
         }
         )
     if refill:

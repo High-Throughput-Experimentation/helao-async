@@ -1602,10 +1602,10 @@ def ADSS_sub_cellfill_flush(
 
 def ADSS_sub_drain_cell(
     experiment: Experiment,
-    experiment_version: int = 2,  # v2 remove residual part
+    experiment_version: int = 3,  # v2 remove residual part v3 add waterpurge
     DrainWait_s: float = 60,
     ReturnLineReverseWait_s: float = 5,
-    ResidualWait_s: float = 15,
+#    ResidualWait_s: float = 15,
 ):
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
@@ -1617,7 +1617,10 @@ def ADSS_sub_drain_cell(
     apm.add(NI_server, "gasvalve", {"gasvalve": "V4", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})  # draining reservoir
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.DrainWait_s})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.DrainWait_s-9})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime":9})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
     #    apm.add(NI_server, "gasvalve", {"gasvalve": "V5", "on": 1})
     #    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})  # draining cell
@@ -1656,9 +1659,35 @@ def ADSS_sub_clean_cell(
     ReturnLineWait_s: float = 30,
     DrainWait_s: float = 60,
     ReturnLineReverseWait_s: float = 5,
-    ResidualWait_s: float = 15,
+#    ResidualWait_s: float = 15,
 ):
     apm = ActionPlanMaker()
+
+    if apm.pars.Clean_volume_ul > 10000:
+        apm.add(
+            WATERCLEANPUMP_server,
+            "infuse",
+            {
+                "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+                "volume_uL": 6000,
+            },
+        )
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": apm.pars.PurgeWait_s})
+
+        apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
+        apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": apm.pars.ReturnLineWait_s})
+        apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
+
+        apm.add_action_list(
+            ADSS_sub_drain_cell(
+                experiment=experiment,
+                DrainWait_s=40,
+                ReturnLineReverseWait_s=apm.pars.ReturnLineReverseWait_s,
+                #ResidualWait_s=apm.pars.ResidualWait_s,
+            )
+        )
 
     apm.add(
         WATERCLEANPUMP_server,
@@ -1668,8 +1697,9 @@ def ADSS_sub_clean_cell(
             "volume_uL": apm.pars.Clean_volume_ul,
         },
     )
-    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.PurgeWait_s})
+    if apm.pars.Clean_volume_ul > 10000:
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": apm.pars.PurgeWait_s})
 
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
@@ -1681,7 +1711,7 @@ def ADSS_sub_clean_cell(
             experiment=experiment,
             DrainWait_s=apm.pars.DrainWait_s,
             ReturnLineReverseWait_s=apm.pars.ReturnLineReverseWait_s,
-            ResidualWait_s=apm.pars.ResidualWait_s,
+            #ResidualWait_s=apm.pars.ResidualWait_s,
         )
     )
 
