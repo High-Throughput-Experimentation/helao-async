@@ -722,13 +722,21 @@ def ADSS_sub_CA(
                 )
             elif mtup[0] == "electrolyte":
                 if apm.pars.insert_electrolyte_yn:
-                    apm.add_action_list(
-                        ADSS_sub_load_liquid(
-                            experiment=experiment,
-                            liquid_custom_position="cell1_we",
-                            liquid_sample_no=apm.pars.electrolyte_sample_no,
-                            volume_ul_cell_liquid=apm.pars.insert_electrolyte_ul,
-                        )
+                    apm.add(
+                        PAL_server,
+                        "archive_custom_add_liquid",
+                        {
+                            "custom": "cell1_we",
+                            "source_liquid_in": LiquidSample(
+                                **{
+                                    "sample_no": apm.pars.electrolyte_sample_no,
+                                    "machine_name": gethostname(),
+                                }
+                            ).dict(),
+                            "volume_ml": apm.pars.insert_electrolyte_ul / 1000,
+                            "combine_liquids": True,
+                            "dilute_liquids": False,
+                        },
                     )
 
                     apm.add(ORCH_server, "wait", {"waittime": interval-vwait}, waitcond)
@@ -907,14 +915,30 @@ def ADSS_sub_CA_photo(
                 )
             elif mtup[0] == "electrolyte":
                 if apm.pars.insert_electrolyte_yn:
-                    apm.add_action_list(
-                        ADSS_sub_load_liquid(
-                            experiment=experiment,
-                            liquid_custom_position="cell1_we",
-                            liquid_sample_no=apm.pars.electrolyte_sample_no,
-                            volume_ul_cell_liquid=apm.pars.insert_electrolyte_ul,
-                        )
+                    apm.add(
+                        PAL_server,
+                        "archive_custom_add_liquid",
+                        {
+                            "custom": "cell1_we",
+                            "source_liquid_in": LiquidSample(
+                                **{
+                                    "sample_no": apm.pars.electrolyte_sample_no,
+                                    "machine_name": gethostname(),
+                                }
+                            ).dict(),
+                            "volume_ml": apm.pars.insert_electrolyte_ul / 1000,
+                            "combine_liquids": True,
+                            "dilute_liquids": False,
+                        },
                     )
+                    # apm.add_action_list(
+                    #     ADSS_sub_load_liquid(
+                    #         experiment=experiment,
+                    #         liquid_custom_position="cell1_we",
+                    #         liquid_sample_no=apm.pars.electrolyte_sample_no,
+                    #         volume_ul_cell_liquid=apm.pars.insert_electrolyte_ul,
+                    #     )
+                    # )
 
                     apm.add(ORCH_server, "wait", {"waittime": interval-vwait}, waitcond)
                     apm.add_action_list(
