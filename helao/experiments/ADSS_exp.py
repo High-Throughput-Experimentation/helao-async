@@ -737,7 +737,8 @@ def ADSS_sub_CA(
                             "combine_liquids": True,
                             "dilute_liquids": False,
                         },
-                    )
+                        ActionStartCondition.wait_for_orch,
+                )
 
                     apm.add(ORCH_server, "wait", {"waittime": interval-vwait}, waitcond)
                     apm.add_action_list(
@@ -930,6 +931,7 @@ def ADSS_sub_CA_photo(
                             "combine_liquids": True,
                             "dilute_liquids": False,
                         },
+                        ActionStartCondition.wait_for_orch,
                     )
                     # apm.add_action_list(
                     #     ADSS_sub_load_liquid(
@@ -1641,9 +1643,9 @@ def ADSS_sub_drain_cell(
     apm.add(NI_server, "gasvalve", {"gasvalve": "V4", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})  # draining reservoir
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.DrainWait_s-9})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.DrainWait_s/2})
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime":9})
+    apm.add(ORCH_server, "wait", {"waittime":apm.pars.DrainWait_s/2})
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
     #    apm.add(NI_server, "gasvalve", {"gasvalve": "V5", "on": 1})
@@ -1698,6 +1700,7 @@ def ADSS_sub_clean_cell(
         )
         apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": apm.pars.PurgeWait_s})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
 
         apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
         apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
