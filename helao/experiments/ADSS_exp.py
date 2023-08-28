@@ -578,7 +578,7 @@ def ADSS_sub_CA(
     gamry_i_range: str = "auto",
     samplerate_sec: float = 0.05,
     CA_duration_sec: float = 1800,
-    insert_electrolyte_yn: bool = False,
+    insert_electrolyte_yn: bool = False,  # rename this to insert_electrolyte_bool to avoid confusion
     insert_electrolyte_ul: int = 0,
     insert_electrolyte_time_sec: float = 1800,
     electrolyte_sample_no: int = 1,
@@ -735,12 +735,12 @@ def ADSS_sub_CA(
                             ).dict(),
                             "volume_ml": apm.pars.insert_electrolyte_ul / 1000,
                             "combine_liquids": True,
-                            "dilute_liquids": False,
+                            "dilute_liquids": False,  # if liquid is being diluted, make this True, then dilution factor can be used to calculate concentrations later
                         },
                         ActionStartCondition.wait_for_orch,
                 )
 
-                    apm.add(ORCH_server, "wait", {"waittime": interval-vwait}, waitcond)
+                    apm.add(ORCH_server, "wait", {"waittime": interval-vwait}, waitcond)  # time-wise, it would make sense to track the volume addition as close to the physical infuse as possible, here it's spaced out by an interval
                     apm.add_action_list(
                         ADSS_sub_cellfill_prefilled(
                             experiment=experiment,
