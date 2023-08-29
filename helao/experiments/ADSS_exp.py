@@ -14,6 +14,7 @@ __all__ = [
     "ADSS_sub_OCV",  # at beginning of all sequences
     "ADSS_sub_unloadall_customs",
     "ADSS_sub_unload_liquid",
+    "ADSS_sub_unload_solid",
     "ADSS_sub_load",
     "ADSS_sub_load_solid",
     "ADSS_sub_load_liquid",
@@ -26,6 +27,7 @@ __all__ = [
     "ADSS_sub_cellfill_prefilled",
     "ADSS_sub_cellfill_flush",
     "ADSS_sub_drain_cell",
+    "ADSS_sub_keep_electrolyte",
     #    "ADSS_sub_empty_cell",
     "ADSS_sub_move_to_clean_cell",
     "ADSS_sub_clean_cell",
@@ -36,6 +38,7 @@ __all__ = [
     "ADSS_sub_cell_illumination",
     "ADSS_sub_CA_photo",
     "ADSS_sub_OCV_photo",
+    "ADSS_sub_interrupt",
 ]
 
 
@@ -183,6 +186,27 @@ def ADSS_sub_unload_liquid(
     )
     return apm.action_list
 
+def ADSS_sub_unload_solid(
+    experiment: Experiment,
+    experiment_version: int = 1,
+):
+    """Unload solid sample at 'cell1_we' position and reload liquid sample."""
+
+    apm = ActionPlanMaker()
+    apm.add(
+        PAL_server,
+        "archive_custom_unloadall",
+        {},
+        to_globalexp_params=["_unloaded_liquid"],
+    )
+    apm.add(
+        PAL_server,
+        "archive_custom_load",
+        {"custom": "cell1_we"},
+        from_globalexp_params={"_unloaded_liquid": "load_sample_in"},
+    )
+    return apm.action_list
+
 
 def ADSS_sub_load_solid(
     experiment: Experiment,
@@ -244,19 +268,29 @@ def ADSS_sub_load_liquid(
 
 def ADSS_sub_load(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     solid_custom_position: str = "cell1_we",
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
+    previous_liquid: bool = False,
     liquid_custom_position: str = "cell1_we",
     liquid_sample_no: int = 1,
     liquid_sample_volume_ul: float = 4000,
 ):
     apm = ActionPlanMaker()
 
+    if not previous_liquid:
     #    # unload all samples from custom positions
-    apm.add_action_list(ADSS_sub_unloadall_customs(experiment=experiment))
+        apm.add_action_list(ADSS_sub_unloadall_customs(experiment=experiment))
 
+        apm.add_action_list(
+            ADSS_sub_load_liquid(
+                experiment=experiment,
+                liquid_custom_position=apm.pars.liquid_custom_position,
+                liquid_sample_no=apm.pars.liquid_sample_no,
+                volume_ul_cell_liquid=apm.pars.liquid_sample_volume_ul,
+            )
+        )
     # load new requested samples
     apm.add_action_list(
         ADSS_sub_load_solid(
@@ -267,14 +301,6 @@ def ADSS_sub_load(
         )
     )
 
-    apm.add_action_list(
-        ADSS_sub_load_liquid(
-            experiment=experiment,
-            liquid_custom_position=apm.pars.liquid_custom_position,
-            liquid_sample_no=apm.pars.liquid_sample_no,
-            volume_ul_cell_liquid=apm.pars.liquid_sample_volume_ul,
-        )
-    )
 
     return apm.action_list
 
@@ -287,6 +313,7 @@ def ADSS_sub_sample_start(
     solid_sample_no: int = 1,
     #    x_mm: float = 0.0,
     #    y_mm: float = 0.0,
+    previous_liquid: bool = False,
     liquid_custom_position: str = "cell1_we",
     liquid_sample_no: int = 1,
     liquid_sample_volume_ul: float = 4000,
@@ -308,6 +335,7 @@ def ADSS_sub_sample_start(
             solid_custom_position=apm.pars.solid_custom_position,
             solid_plate_id=apm.pars.solid_plate_id,
             solid_sample_no=apm.pars.solid_sample_no,
+            previous_liquid=apm.pars.previous_liquid,
             liquid_custom_position=apm.pars.liquid_custom_position,
             liquid_sample_no=apm.pars.liquid_sample_no,
             liquid_sample_volume_ul=apm.pars.liquid_sample_volume_ul,
@@ -1657,6 +1685,23 @@ def ADSS_sub_drain_cell(
 
     return apm.action_list
 
+def ADSS_sub_keep_electrolyte(
+    experiment: Experiment,
+    experiment_version: int = 1, 
+    ReturnLineReverseWait_s: float = 5,
+#    ResidualWait_s: float = 15,
+):
+    apm = ActionPlanMaker()
+    apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
+    apm.add(NI_server, "pump", {"pump": "direction", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})  # clearing return line
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.ReturnLineReverseWait_s})
+    apm.add(ORCH_server, "interrupt", {"reason": "Save electrolyte in reservoir."})
+    apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
+    apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
+
+    return apm.action_list
 
 # def ADSS_sub_empty_cell(
 #     experiment: Experiment,
@@ -1928,3 +1973,13 @@ def ADSS_sub_cell_illumination(
         )
 
     return apm.action_list  # returns complete action list to orch
+
+def ADSS_sub_interrupt(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    reason: str = "wait",
+):
+    apm = ActionPlanMaker()
+    apm.add(ORCH_server, "interrupt", {"reason": apm.pars.reason})
+    return apm.action_list
+

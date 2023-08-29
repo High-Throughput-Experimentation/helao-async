@@ -1192,7 +1192,7 @@ def ADSS_CA_NiSb_cell_1potential_photo(
 
 
 def ADSS_CA_cell_1potential(
-    sequence_version: int = 6, #v3 move led off to exp v4 electrolyte insertion
+    sequence_version: int = 7, #v3 move led off to exp v4 electrolyte insertion v7 keep electrolyte
     #solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no: int = 14050,  #  instead of map select
@@ -1212,6 +1212,8 @@ def ADSS_CA_cell_1potential(
     insert_electrolyte: bool = False,
     insert_electrolyte_ul: int = 0,
     insert_electrolyte_time_sec: float = 1800,
+    keep_electrolyte: bool = False,
+    use_electrolyte: bool = False,
     OCV_duration: float = 60,
     OCValiquot_times_sec: List[float] = [20],
     samplerate_sec: float = 1,
@@ -1249,6 +1251,7 @@ def ADSS_CA_cell_1potential(
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample_no,
+                "previous_liquid": use_electrolyte,
                 "liquid_custom_position": "cell1_we",
                 "liquid_sample_no": liquid_sample_no,            
                 "liquid_sample_volume_ul": liquid_sample_volume_ul,
@@ -1261,6 +1264,7 @@ def ADSS_CA_cell_1potential(
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample_no,
+                "previous_liquid": use_electrolyte,
                 "liquid_custom_position": "cell1_we",
                 "liquid_sample_no": liquid_sample_no,
                 "liquid_sample_volume_ul": liquid_sample_volume_ul,
@@ -1275,13 +1279,15 @@ def ADSS_CA_cell_1potential(
     #         }
             
     #     )
-    epm.add_experiment(
-        "ADSS_sub_cellfill_prefilled",
-        {
-            "Solution_volume_ul": liquid_sample_volume_ul,
-            "Syringe_rate_ulsec": Syringe_rate_ulsec,
-        }
-    )
+    if not use_electrolyte:
+
+        epm.add_experiment(
+            "ADSS_sub_cellfill_prefilled",
+            {
+                "Solution_volume_ul": liquid_sample_volume_ul,
+                "Syringe_rate_ulsec": Syringe_rate_ulsec,
+            }
+        )
 # redundant?
     # epm.add_experiment(    
     #     "ADSS_sub_load_liquid",
@@ -1428,15 +1434,23 @@ def ADSS_CA_cell_1potential(
             },
         )
 
+    if keep_electrolyte:
+        epm.add_experiment(
+            "ADSS_sub_keep_electrolyte",
+            {
+                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+            }
+        )
 
-    epm.add_experiment(
-        "ADSS_sub_drain_cell",
-        {
-            "DrainWait_s": Cell_draintime_s,
-            "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-        #    "ResidualWait_s": ResidualWait_s,
-        }
-    )
+    else:
+        epm.add_experiment(
+            "ADSS_sub_drain_cell",
+            {
+                "DrainWait_s": Cell_draintime_s,
+                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+            #    "ResidualWait_s": ResidualWait_s,
+            }
+        )
     if stay_sample:
         epm.add_experiment(
             "ADSS_sub_cellfill_flush",
@@ -1454,9 +1468,15 @@ def ADSS_CA_cell_1potential(
         #        "ResidualWait_s": ResidualWait_s,
             }
         )
-    epm.add_experiment("ADSS_sub_unload_liquid",{})
+    if keep_electrolyte:
+        epm.add_experiment("ADSS_sub_unload_solid",{})
 
-    epm.add_experiment("ADSS_sub_unloadall_customs",{})
+    else:
+        epm.add_experiment("ADSS_sub_unload_liquid",{})
+
+        epm.add_experiment("ADSS_sub_unloadall_customs",{})
+
+
 
     if clean:
 
