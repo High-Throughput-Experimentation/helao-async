@@ -912,7 +912,7 @@ class Archive:
         if keep_gas:
             destroy_gas = False
             for gas in gases:
-                keep_samples.append(solid)
+                keep_samples.append(gas)
 
         samples_in, samples_out = await self._unload_custom_helper(
             samples=samples,
