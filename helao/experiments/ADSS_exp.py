@@ -578,7 +578,7 @@ def ADSS_sub_CA(
     gamry_i_range: str = "auto",
     samplerate_sec: float = 0.05,
     CA_duration_sec: float = 1800,
-    insert_electrolyte_yn: bool = False,  # rename this to insert_electrolyte_bool to avoid confusion
+    insert_electrolyte: bool = False,  # rename this to insert_electrolyte_bool to avoid confusion
     insert_electrolyte_ul: int = 0,
     insert_electrolyte_time_sec: float = 1800,
     electrolyte_sample_no: int = 1,
@@ -768,7 +768,7 @@ def ADSS_sub_CA_photo(
     CA_duration_sec: float = 1800,
     led_wavelength: str = "385",
     toggle_illum_duty: float = 1,
-    insert_electrolyte_yn: bool = False,
+    insert_electrolyte: bool = False,
     insert_electrolyte_ul: int = 0,
     insert_electrolyte_time_sec: float = 1800,
     electrolyte_sample_no: int = 1,
