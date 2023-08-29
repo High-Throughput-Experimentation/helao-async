@@ -34,7 +34,6 @@ from helao.helpers.config_loader import config_loader
 
 
 def makeApp(confPrefix, server_key, helao_root):
-
     config = config_loader(confPrefix, helao_root)
 
     app = BaseAPI(
@@ -48,7 +47,7 @@ def makeApp(confPrefix, server_key, helao_root):
 
     _cams = app.server_params.get("cams", {})
     # _camsitems = make_str_enum("cams",{key:key for key in _cams.keys()})
-    #app.base.print_message(_cams)
+    # app.base.print_message(_cams)
 
     if "positions" in app.server_params:
         dev_custom = app.server_params["positions"].get("custom", {})
@@ -157,7 +156,7 @@ def makeApp(confPrefix, server_key, helao_root):
             timeoffset: float = 0.0,
         ):
             """universal pal action"""
-            A =  app.base.setup_action()
+            A = app.base.setup_action()
             active_dict = await app.driver.method_arbitrary(A)
             return active_dict
 
@@ -183,7 +182,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A =  app.base.setup_action()
+            A = app.base.setup_action()
             A.action_abbr = "GC_injection"
             active_dict = await app.driver.method_ANEC_aliquot(A)
             return active_dict
@@ -203,7 +202,7 @@ def makeApp(confPrefix, server_key, helao_root):
             source: dev_customitems = "cell1_we",
             volume_ul_GC: int = 300,
         ):
-            A =  app.base.setup_action()
+            A = app.base.setup_action()
             A.action_abbr = "GC_injection"
             active_dict = await app.driver.method_ANEC_GC(A)
             return active_dict
@@ -232,7 +231,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A =  app.base.setup_action()
+            A = app.base.setup_action()
             A.action_abbr = "GC_injection"
             active_dict = await app.driver.method_injection_tray_GC(A)
             return active_dict
@@ -259,7 +258,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A =  app.base.setup_action()
+            A = app.base.setup_action()
             A.action_abbr = "GC_injection"
             active_dict = await app.driver.method_injection_custom_GC(A)
             return active_dict
@@ -279,7 +278,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A =  app.base.setup_action()
+            A = app.base.setup_action()
             A.action_abbr = "HPLC_injection"
             active_dict = await app.driver.method_injection_custom_HPLC(A)
             return active_dict
@@ -301,12 +300,12 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A =  app.base.setup_action()
+            A = app.base.setup_action()
             A.action_abbr = "HPLC_injection"
             active_dict = await app.driver.method_injection_tray_HPLC(A)
             return active_dict
 
-#    if "transfer_tray_tray" in _cams:
+    #    if "transfer_tray_tray" in _cams:
     if "transfer_tray_tray" in _cams:
 
         @app.post(f"/{server_key}/PAL_transfer_tray_tray", tags=["action"])
@@ -330,12 +329,12 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A =  app.base.setup_action()
+            A = app.base.setup_action()
             A.action_abbr = "transfer"
             active_dict = await app.driver.method_transfer_tray_tray(A)
             return active_dict
 
-#    if "transfer_tray_custom" in _cams:
+    #    if "transfer_tray_custom" in _cams:
     if "transfer_tray_custom" in _cams:
 
         @app.post(f"/{server_key}/PAL_transfer_tray_custom", tags=["action"])
@@ -357,12 +356,12 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A =  app.base.setup_action()
+            A = app.base.setup_action()
             A.action_abbr = "transfer"
             active_dict = await app.driver.method_transfer_tray_custom(A)
             return active_dict
 
-#    if "transfer_custom_tray" in _cams:
+    #    if "transfer_custom_tray" in _cams:
     if "transfer_custom_tray" in _cams:
 
         @app.post(f"/{server_key}/PAL_transfer_custom_tray", tags=["action"])
@@ -384,7 +383,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A =  app.base.setup_action()
+            A = app.base.setup_action()
             A.action_abbr = "transfer"
             active_dict = await app.driver.method_transfer_custom_tray(A)
             return active_dict
@@ -408,7 +407,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = False,
         ):
-            A =  app.base.setup_action()
+            A = app.base.setup_action()
             A.action_abbr = "transfer"
             active_dict = await app.driver.method_transfer_custom_custom(A)
             return active_dict
@@ -431,7 +430,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = False,
             wash4: bool = False,
         ):
-            A =  app.base.setup_action()
+            A = app.base.setup_action()
             A.action_abbr = "archive"
             active_dict = await app.driver.method_archive(A)
             return active_dict
@@ -489,7 +488,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = True,
         ):
-            A =  app.base.setup_action()
+            A = app.base.setup_action()
             A.action_abbr = "deepclean"
             active_dict = await app.driver.method_deepclean(A)
             return active_dict
@@ -515,7 +514,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = True,
         ):
-            A =  app.base.setup_action()
+            A = app.base.setup_action()
             A.action_abbr = "dilute"
             active_dict = await app.driver.method_dilute(A)
             return active_dict
@@ -538,7 +537,7 @@ def makeApp(confPrefix, server_key, helao_root):
             wash3: bool = True,
             wash4: bool = True,
         ):
-            A =  app.base.setup_action()
+            A = app.base.setup_action()
             A.action_abbr = "autodilute"
             active_dict = await app.driver.method_autodilute(A)
             return active_dict
@@ -587,7 +586,8 @@ def makeApp(confPrefix, server_key, helao_root):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
         load_sample_in: SampleUnion = Body(
-            LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}), embed=True
+            LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
+            embed=True,
         ),
         tray: int = None,
         slot: int = None,
@@ -655,7 +655,8 @@ def makeApp(confPrefix, server_key, helao_root):
         action: Action = Body({}, embed=True),
         action_version: int = 1,
         sample: SampleUnion = Body(
-            LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}), embed=True
+            LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
+            embed=True,
         ),
         tray: int = None,
         slot: int = None,
@@ -745,7 +746,6 @@ def makeApp(confPrefix, server_key, helao_root):
         sample_no: int = 1,
         plate_id: int = 1,
     ):
-
         active = await app.base.setup_and_contain_action(
             action_abbr="load_sample",
         )
@@ -769,7 +769,8 @@ def makeApp(confPrefix, server_key, helao_root):
         action_version: int = 1,
         custom: dev_customitems = None,
         load_sample_in: SampleUnion = Body(
-            LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}), embed=True
+            LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
+            embed=True,
         ),
     ):
         active = await app.base.setup_and_contain_action(
@@ -848,12 +849,12 @@ def makeApp(confPrefix, server_key, helao_root):
         unloaded_liquids = [
             s for s in samples_out if s.sample_type == SampleType.liquid
         ]
-        if unloaded_solids:
-            first_unloaded_solid = unloaded_solids[0]
-        else:
-            first_unloaded_solid = NoneSample()
+        first_unloaded_solid = unloaded_solids[0] if unloaded_solids else NoneSample()
+        first_unloaded_liquid = (
+            unloaded_liquids[0] if unloaded_liquids else NoneSample()
+        )
         active.action.action_params.update({"_unloaded_solid": first_unloaded_solid})
-        active.action.action_params.update({"_unloaded_liquids": unloaded_liquids})
+        active.action.action_params.update({"_unloaded_liquid": first_unloaded_liquid})
         finished_act = await active.finish()
         return finished_act.as_dict()
 
@@ -884,7 +885,8 @@ def makeApp(confPrefix, server_key, helao_root):
         action_version: int = 1,
         custom: dev_customitems = None,
         source_liquid_in: LiquidSample = Body(
-            LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}), embed=True
+            LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
+            embed=True,
         ),
         volume_ml: float = 0.0,
         combine_liquids: bool = False,
