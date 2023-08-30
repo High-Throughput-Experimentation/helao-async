@@ -1244,22 +1244,10 @@ def ADSS_CA_cell_1potential(
 
     #for solid_sample_no in plate_sample_no_list:  # have to indent add expts if used
 
-    if same_sample:
+    if not same_sample:
+        
         epm.add_experiment(
-            "ADSS_sub_load",
-            {
-                "solid_custom_position": "cell1_we",
-                "solid_plate_id": plate_id,
-                "solid_sample_no": plate_sample_no,
-                "previous_liquid": use_electrolyte,
-                "liquid_custom_position": "cell1_we",
-                "liquid_sample_no": liquid_sample_no,            
-                "liquid_sample_volume_ul": liquid_sample_volume_ul,
-            }
-        )
-    else:    
-        epm.add_experiment(
-            "ADSS_sub_sample_start",
+            "ADSS_sub_move_to_sample",
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
@@ -1270,6 +1258,18 @@ def ADSS_CA_cell_1potential(
                 "liquid_sample_volume_ul": liquid_sample_volume_ul,
             },
         )
+    epm.add_experiment(
+        "ADSS_sub_load",
+        {
+            "solid_custom_position": "cell1_we",
+            "solid_plate_id": plate_id,
+            "solid_sample_no": plate_sample_no,
+            "previous_liquid": use_electrolyte,
+            "liquid_custom_position": "cell1_we",
+            "liquid_sample_no": liquid_sample_no,            
+            "liquid_sample_volume_ul": liquid_sample_volume_ul,
+        }
+    )
     # if led_illumination:
     #     epm.add_experiment(
     #         "ADSS_sub_cell_illumination",
@@ -1338,7 +1338,7 @@ def ADSS_CA_cell_1potential(
                 "CA_duration_sec": CA_duration_sec,
                 "led_wavelength": led_wavelength,
                 "toggle_illum_duty": led_dutycycle,
-                "insert_electrolyte":insert_electrolyte_yn,
+                "insert_electrolyte":insert_electrolyte,
                 "insert_electrolyte_ul":insert_electrolyte_ul,
                 "insert_electrolyte_time_sec":insert_electrolyte_time_sec,             
                 "electrolyte_sample_no": liquid_sample_no,
@@ -1404,7 +1404,7 @@ def ADSS_CA_cell_1potential(
                 "potential_versus": potential_versus,
                 "samplerate_sec": samplerate_sec,
                 "CA_duration_sec": CA_duration_sec,
-                "insert_electrolyte":insert_electrolyte_yn,
+                "insert_electrolyte":insert_electrolyte,
                 "insert_electrolyte_ul":insert_electrolyte_ul,
                 "insert_electrolyte_time_sec":insert_electrolyte_time_sec,             
                 "electrolyte_sample_no": liquid_sample_no,
@@ -1472,7 +1472,6 @@ def ADSS_CA_cell_1potential(
         epm.add_experiment("ADSS_sub_unload_solid",{})
 
     else:
-        epm.add_experiment("ADSS_sub_unload_liquid",{})
 
         epm.add_experiment("ADSS_sub_unloadall_customs",{})
 

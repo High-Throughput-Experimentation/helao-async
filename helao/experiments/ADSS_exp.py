@@ -6,6 +6,7 @@ server_key must be a FastAPI action server defined in config
 __all__ = [
     "debug",
     "ADSS_sub_sample_start",
+    "ADSS_sub_move_to_sample",
     "ADSS_sub_shutdown",
     "ADSS_sub_drain",
     "ADSS_sub_clean_PALtool",
@@ -167,43 +168,52 @@ def ADSS_sub_unloadall_customs(experiment: Experiment):
 
 def ADSS_sub_unload_liquid(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2, #newer unload via keep, also no_wait
 ):
-    """Unload liquid sample at 'cell1_we' position and reload solid sample."""
+    #"""Unload liquid sample at 'cell1_we' position and reload solid sample."""
 
     apm = ActionPlanMaker()
     apm.add(
         PAL_server,
-        "archive_custom_unloadall",
-        {},
-        to_globalexp_params=["_unloaded_solid"],
+        "archive_custom_unload",
+        {   
+            "keep_solid": True,
+            "custom": "cell1_we",
+
+        },
+         start_condition=ActionStartCondition.wait_for_orch,
+        #to_globalexp_params=["_unloaded_solid"],
     )
-    apm.add(
-        PAL_server,
-        "archive_custom_load",
-        {"custom": "cell1_we"},
-        from_globalexp_params={"_unloaded_solid": "load_sample_in"},
-    )
+    # apm.add(
+    #     PAL_server,
+    #     "archive_custom_load",
+    #     {"custom": "cell1_we"},
+    #     from_globalexp_params={"_unloaded_solid": "load_sample_in"},
+    # )
     return apm.action_list
 
 def ADSS_sub_unload_solid(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2, #newer via keep
 ):
-    """Unload solid sample at 'cell1_we' position and reload liquid sample."""
+   # """Unload solid sample at 'cell1_we' position and reload liquid sample."""
 
     apm = ActionPlanMaker()
+    # apm.add(
+    #     PAL_server,
+    #     "archive_custom_unloadall",
+    #     {},
+    #     to_globalexp_params=["_unloaded_liquid"],
+    # )
     apm.add(
         PAL_server,
-        "archive_custom_unloadall",
-        {},
-        to_globalexp_params=["_unloaded_liquid"],
-    )
-    apm.add(
-        PAL_server,
-        "archive_custom_load",
-        {"custom": "cell1_we"},
-        from_globalexp_params={"_unloaded_liquid": "load_sample_in"},
+        "archive_custom_unload",
+        {
+            "custom": "cell1_we",
+            "keep_liquid": True,
+        },
+        start_condition=ActionStartCondition.wait_for_orch,
+        #from_globalexp_params={"_unloaded_liquid": "load_sample_in"},
     )
     return apm.action_list
 
@@ -231,7 +241,7 @@ def ADSS_sub_load_solid(
                 }
             ).dict(),
         },
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        start_condition=ActionStartCondition.wait_for_orch,  # 
     )
     return apm.action_list  # returns complete action list to orch
 
@@ -243,7 +253,6 @@ def ADSS_sub_load_liquid(
     liquid_sample_no: int = 1,
     volume_ul_cell_liquid: int = 1000,
 ):
-    """last functionality test: 11/29/2021"""
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
@@ -261,7 +270,7 @@ def ADSS_sub_load_liquid(
             "combine_liquids": False,
             "dilute_liquids": False,
         },
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        start_condition=ActionStartCondition.wait_for_orch,  #
     )
     return apm.action_list  # returns complete action list to orch
 
@@ -303,6 +312,78 @@ def ADSS_sub_load(
 
 
     return apm.action_list
+
+def ADSS_sub_move_to_sample(
+    experiment: Experiment,
+    experiment_version: int = 4,
+    solid_custom_position: str = "cell1_we",
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
+    #    x_mm: float = 0.0,
+    #    y_mm: float = 0.0,
+):
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    apm.add_action_list()
+
+    # turn pump off
+    apm.add(
+        NI_server,
+        "pump",
+        {
+            "pump": "peripump",
+            "on": 0,
+        },
+        start_condition=ActionStartCondition.wait_for_all,
+    )
+
+    # set pump flow forward
+    apm.add(
+        NI_server,
+        "pump",
+        {
+            "pump": "direction",
+            "on": 0,
+        },
+        start_condition=ActionStartCondition.wait_for_all,
+    )
+
+    # move z to home
+    apm.add(MOTOR_server, "z_move", {"z_position": "load"})
+
+    # move to position
+    apm.add(
+        MOTOR_server,
+        "solid_get_samples_xy",
+        {
+            "plate_id": apm.pars.solid_plate_id,
+            "sample_no": apm.pars.solid_sample_no,
+        },
+        to_globalexp_params=[
+            "_platexy"
+        ],  # save new liquid_sample_no of eche cell to globals
+        start_condition=ActionStartCondition.wait_for_all,
+    )
+
+    apm.add(
+        MOTOR_server,
+        "move",
+        {
+            "axis": ["x", "y"],
+            "mode": MoveModes.absolute,
+            "transformation": TransformationModes.platexy,
+        },
+        from_globalexp_params={"_platexy": "d_mm"},
+        save_act=debug_save_act,
+        save_data=debug_save_data,
+        start_condition=ActionStartCondition.wait_for_all,
+    )
+
+    # seal cell
+    apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
+
+    return apm.action_list  # returns complete action list to orch
 
 
 def ADSS_sub_sample_start(
@@ -749,7 +830,7 @@ def ADSS_sub_CA(
                     ActionStartCondition.wait_for_orch,
                 )
             elif mtup[0] == "electrolyte":
-                if apm.pars.insert_electrolyte_yn:
+                if apm.pars.insert_electrolyte:
                     apm.add(
                         PAL_server,
                         "archive_custom_add_liquid",
@@ -943,7 +1024,7 @@ def ADSS_sub_CA_photo(
                     ActionStartCondition.wait_for_orch,
                 )
             elif mtup[0] == "electrolyte":
-                if apm.pars.insert_electrolyte_yn:
+                if apm.pars.insert_electrolyte:
                     apm.add(
                         PAL_server,
                         "archive_custom_add_liquid",
