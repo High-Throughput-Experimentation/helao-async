@@ -230,6 +230,12 @@ def ADSS_sub_load_solid(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
         PAL_server,
+        "archive_custom_unloadall",
+        {},
+        to_globalexp_params=["_unloaded_liquid"],
+    )
+    apm.add(
+        PAL_server,
         "archive_custom_load",
         {
             "custom": apm.pars.solid_custom_position,
@@ -242,6 +248,16 @@ def ADSS_sub_load_solid(
             ).dict(),
         },
         start_condition=ActionStartCondition.wait_for_orch,  # 
+    )
+    apm.add(
+        PAL_server,
+        "archive_custom_load",
+        {
+            "custom": "cell1_we",
+            "keep_liquid": True,
+        },
+        from_globalexp_params={"_unloaded_liquid": "load_sample_in"},
+        start_condition=ActionStartCondition.wait_for_orch,
     )
     return apm.action_list  # returns complete action list to orch
 
@@ -324,6 +340,7 @@ def ADSS_sub_move_to_sample(
 ):
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
 
     # turn pump off
     apm.add(
