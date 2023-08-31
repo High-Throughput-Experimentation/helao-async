@@ -288,7 +288,7 @@ def ADSS_sub_load(
 ):
     apm = ActionPlanMaker()
 
-    if not previous_liquid:
+    if not apm.pars.previous_liquid:
     #    # unload all samples from custom positions
         apm.add_action_list(ADSS_sub_unloadall_customs(experiment=experiment))
 
@@ -324,8 +324,6 @@ def ADSS_sub_move_to_sample(
 ):
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    apm.add_action_list()
 
     # turn pump off
     apm.add(
