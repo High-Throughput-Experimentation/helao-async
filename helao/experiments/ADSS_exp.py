@@ -1815,6 +1815,7 @@ def ADSS_sub_clean_cell(
 ):
     apm = ActionPlanMaker()
 
+    apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
     if apm.pars.Clean_volume_ul > 10000:
         apm.add(
             WATERCLEANPUMP_server,
@@ -1824,6 +1825,7 @@ def ADSS_sub_clean_cell(
                 "volume_uL": 6000,
             },
         )
+        apm.add(ORCH_server, "wait", {"waittime": 10})
         apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": apm.pars.PurgeWait_s})
         apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
@@ -1850,9 +1852,11 @@ def ADSS_sub_clean_cell(
             "volume_uL": apm.pars.Clean_volume_ul,
         },
     )
-    if apm.pars.Clean_volume_ul > 10000:
+    apm.add(ORCH_server, "wait", {"waittime": 10})
+    if apm.pars.Clean_volume_ul < 7000:
         apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
         apm.add(ORCH_server, "wait", {"waittime": apm.pars.PurgeWait_s})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
 
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})

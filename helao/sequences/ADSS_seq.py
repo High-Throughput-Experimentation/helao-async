@@ -1192,7 +1192,7 @@ def ADSS_CA_NiSb_cell_1potential_photo(
 
 
 def ADSS_CA_cell_1potential(
-    sequence_version: int = 7, #v3 move led off to exp v4 electrolyte insertion v7 keep electrolyte
+    sequence_version: int = 8, #v3 move led off to exp v4 electrolyte insertion v7 keep electrolyte
     #solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no: int = 14050,  #  instead of map select
@@ -1207,6 +1207,7 @@ def ADSS_CA_cell_1potential(
     ref_type: str = "leakless",
     ref_offset__V: float = 0.0,
     CA_duration_sec: float = 1320,
+    aliquot_tf: bool = True,
     aliquot_times_sec: List[float] = [60, 600, 1140],
     aliquot_volume_ul: int = 200,
     insert_electrolyte: bool = False,
@@ -1320,7 +1321,7 @@ def ADSS_CA_cell_1potential(
                 "toggle_illum_duty": led_dutycycle,
                 "aliquot_volume_ul": aliquot_volume_ul,
                 "aliquot_times_sec": OCValiquot_times_sec,
-                "aliquot_insitu": True,
+                "aliquot_insitu": aliquot_tf,
                 "PAL_Injector": PAL_Injector,
                 "PAL_Injector_id": PAL_Injector_id,
                 "rinse_1": 1,
@@ -1344,7 +1345,7 @@ def ADSS_CA_cell_1potential(
                 "electrolyte_sample_no": liquid_sample_no,
                 "aliquot_volume_ul": aliquot_volume_ul,
                 "aliquot_times_sec": aliquot_times_sec,
-                "aliquot_insitu": True,
+                "aliquot_insitu": aliquot_tf,
                 "PAL_Injector": PAL_Injector,
                 "PAL_Injector_id": PAL_Injector_id,
             },
@@ -1361,7 +1362,7 @@ def ADSS_CA_cell_1potential(
                 "toggle_illum_duty": led_dutycycle,
                 "aliquot_volume_ul": aliquot_volume_ul,
                 "aliquot_times_sec": OCValiquot_times_sec,
-                "aliquot_insitu": True,
+                "aliquot_insitu": aliquot_tf,
                 "PAL_Injector": PAL_Injector,
                 "PAL_Injector_id": PAL_Injector_id,
                 "rinse_1": 1,
