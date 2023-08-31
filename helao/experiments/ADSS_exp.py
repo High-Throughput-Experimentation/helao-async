@@ -254,7 +254,6 @@ def ADSS_sub_load_solid(
         "archive_custom_load",
         {
             "custom": "cell1_we",
-            "keep_liquid": True,
         },
         from_globalexp_params={"_unloaded_liquid": "load_sample_in"},
         start_condition=ActionStartCondition.wait_for_orch,
