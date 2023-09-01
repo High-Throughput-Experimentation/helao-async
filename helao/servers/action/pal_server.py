@@ -853,10 +853,14 @@ def makeApp(confPrefix, server_key, helao_root):
         first_unloaded_liquid = (
             unloaded_liquids[0] if unloaded_liquids else NoneSample()
         )
+        if first_unloaded_liquid == NoneSample():
+            unloaded_vol = 0
+        else:
+            unloaded_vol = first_unloaded_liquid.volume_ml
         active.action.action_params.update({"_unloaded_solid": first_unloaded_solid})
         active.action.action_params.update({"_unloaded_liquid": first_unloaded_liquid})
         active.action.action_params.update(
-            {"_unloaded_liquid_vol": first_unloaded_liquid.volume_ml}
+            {"_unloaded_liquid_vol": unloaded_vol}
         )
         finished_act = await active.finish()
         return finished_act.as_dict()

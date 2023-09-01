@@ -354,7 +354,7 @@ def ADSS_sub_load(
                         "machine_name": gethostname(),
                     }
                 ).dict(),
-                "volume_ml": apm.pars.volume_ul_cell_liquid / 1000,
+                "volume_ml": apm.pars.liquid_sample_volume_ul / 1000,
                 "combine_liquids": False,
                 "dilute_liquids": False,
             },
