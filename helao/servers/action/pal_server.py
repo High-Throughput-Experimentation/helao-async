@@ -847,7 +847,9 @@ def makeApp(confPrefix, server_key, helao_root):
         )
         unloaded_solids = [s for s in samples_out if s.sample_type == SampleType.solid]
         unloaded_liquids = [
-            s for s in samples_out if s.sample_type == SampleType.liquid
+            s
+            for s in samples_out
+            if s.sample_type == SampleType.liquid and "loaded" in s.status
         ]
         first_unloaded_solid = unloaded_solids[0] if unloaded_solids else NoneSample()
         first_unloaded_liquid = (
@@ -859,9 +861,7 @@ def makeApp(confPrefix, server_key, helao_root):
             unloaded_vol = first_unloaded_liquid.volume_ml
         active.action.action_params.update({"_unloaded_solid": first_unloaded_solid})
         active.action.action_params.update({"_unloaded_liquid": first_unloaded_liquid})
-        active.action.action_params.update(
-            {"_unloaded_liquid_vol": unloaded_vol}
-        )
+        active.action.action_params.update({"_unloaded_liquid_vol": unloaded_vol})
         finished_act = await active.finish()
         return finished_act.as_dict()
 

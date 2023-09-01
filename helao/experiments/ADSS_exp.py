@@ -199,21 +199,21 @@ def ADSS_sub_unload_solid(
     # """Unload solid sample at 'cell1_we' position and reload liquid sample."""
 
     apm = ActionPlanMaker()
+    # apm.add(
+    #     PAL_server,
+    #     "archive_custom_unloadall",
+    #     {},
+    #     to_globalexp_params=["_unloaded_liquid"],
+    # )
     apm.add(
         PAL_server,
-        "archive_custom_unloadall",
-        {},
-        to_globalexp_params=["_unloaded_liquid"],
-        start_condition=ActionStartCondition.wait_for_orch,
-    )
-    apm.add(
-        PAL_server,
-        "archive_custom_load",
+        "archive_custom_unload",
         {
             "custom": "cell1_we",
+            "keep_liquid": True,
         },
         start_condition=ActionStartCondition.wait_for_orch,
-        from_globalexp_params={"_unloaded_liquid": "load_sample_in"},
+        # from_globalexp_params={"_unloaded_liquid": "load_sample_in"},
     )
     return apm.action_list
 
