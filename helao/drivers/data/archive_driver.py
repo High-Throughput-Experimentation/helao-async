@@ -1373,7 +1373,7 @@ class Archive:
                 sample_out_type=SampleType.assembly,
                 sample_position=custom,
                 action=action,
-                combine_liquids=True,
+                combine_liquids=combine_liquids,
             )
 
             ref_samples_out2[0].sample_position = custom
@@ -1440,8 +1440,18 @@ class Archive:
                 sample_out_type=SampleType.assembly,
                 sample_position=custom,
                 action=action,
+                combine_liquids=combine_liquids,
             )
 
+            ref_samples_out2[0].sample_position = custom
+            ref_samples_out2[0].volume_ml = custom_sample.volume_ml
+            ref_samples_out2[0].dilution_factor = custom_sample.dilution_factor
+            update_vol(
+                ref_samples_out2[0],
+                delta_vol_ml=samples_out[0].volume_ml,
+                dilute=dilute_liquids,
+            )
+            
             if error != ErrorCodes.none:
                 # something went wrong when creating the referenceassembly
                 return error, [], []
