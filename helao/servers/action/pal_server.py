@@ -855,6 +855,9 @@ def makeApp(confPrefix, server_key, helao_root):
         )
         active.action.action_params.update({"_unloaded_solid": first_unloaded_solid})
         active.action.action_params.update({"_unloaded_liquid": first_unloaded_liquid})
+        active.action.action_params.update(
+            {"_unloaded_liquid_vol": first_unloaded_liquid.volume_ml}
+        )
         finished_act = await active.finish()
         return finished_act.as_dict()
 

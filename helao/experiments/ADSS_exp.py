@@ -168,21 +168,20 @@ def ADSS_sub_unloadall_customs(experiment: Experiment):
 
 def ADSS_sub_unload_liquid(
     experiment: Experiment,
-    experiment_version: int = 2, #newer unload via keep, also no_wait
+    experiment_version: int = 2,  # newer unload via keep, also no_wait
 ):
-    #"""Unload liquid sample at 'cell1_we' position and reload solid sample."""
+    # """Unload liquid sample at 'cell1_we' position and reload solid sample."""
 
     apm = ActionPlanMaker()
     apm.add(
         PAL_server,
         "archive_custom_unload",
-        {   
+        {
             "keep_solid": True,
             "custom": "cell1_we",
-
         },
-         start_condition=ActionStartCondition.wait_for_orch,
-        #to_globalexp_params=["_unloaded_solid"],
+        start_condition=ActionStartCondition.wait_for_orch,
+        # to_globalexp_params=["_unloaded_solid"],
     )
     # apm.add(
     #     PAL_server,
@@ -192,11 +191,12 @@ def ADSS_sub_unload_liquid(
     # )
     return apm.action_list
 
+
 def ADSS_sub_unload_solid(
     experiment: Experiment,
-    experiment_version: int = 2, #newer via keep
+    experiment_version: int = 2,  # newer via keep
 ):
-   # """Unload solid sample at 'cell1_we' position and reload liquid sample."""
+    # """Unload solid sample at 'cell1_we' position and reload liquid sample."""
 
     apm = ActionPlanMaker()
     # apm.add(
@@ -213,7 +213,7 @@ def ADSS_sub_unload_solid(
             "keep_liquid": True,
         },
         start_condition=ActionStartCondition.wait_for_orch,
-        #from_globalexp_params={"_unloaded_liquid": "load_sample_in"},
+        # from_globalexp_params={"_unloaded_liquid": "load_sample_in"},
     )
     return apm.action_list
 
@@ -247,7 +247,7 @@ def ADSS_sub_load_solid(
                 }
             ).dict(),
         },
-        start_condition=ActionStartCondition.wait_for_orch,  # 
+        start_condition=ActionStartCondition.wait_for_orch,  #
     )
     apm.add(
         PAL_server,
@@ -268,7 +268,6 @@ def ADSS_sub_load_liquid(
     liquid_sample_no: int = 1,
     volume_ul_cell_liquid: int = 1000,
 ):
-
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
         PAL_server,
@@ -303,30 +302,67 @@ def ADSS_sub_load(
 ):
     apm = ActionPlanMaker()
 
-    if not apm.pars.previous_liquid:
-    #    # unload all samples from custom positions
-        apm.add_action_list(ADSS_sub_unloadall_customs(experiment=experiment))
-
-        apm.add_action_list(
-            ADSS_sub_load_liquid(
-                experiment=experiment,
-                liquid_custom_position=apm.pars.liquid_custom_position,
-                liquid_sample_no=apm.pars.liquid_sample_no,
-                volume_ul_cell_liquid=apm.pars.liquid_sample_volume_ul,
-            )
-        )
-    # load new requested samples
-    apm.add_action_list(
-        ADSS_sub_load_solid(
-            experiment=experiment,
-            solid_custom_position=apm.pars.solid_custom_position,
-            solid_plate_id=apm.pars.solid_plate_id,
-            solid_sample_no=apm.pars.solid_sample_no,
-        )
+    # clear cell position and track unloaded liquid
+    apm.add(
+        PAL_server,
+        "archive_custom_unloadall",
+        {},
+        start_condition=ActionStartCondition.wait_for_orch,
+        to_globalexp_params=["_unloaded_liquid", "_unloaded_liquid_vol"],
     )
-
+    # load solid into cell position
+    apm.add(
+        PAL_server,
+        "archive_custom_load",
+        {
+            "custom": apm.pars.solid_custom_position,
+            "load_sample_in": SolidSample(
+                **{
+                    "sample_no": apm.pars.solid_sample_no,
+                    "plate_id": apm.pars.solid_plate_id,
+                    "machine_name": "legacy",
+                }
+            ).dict(),
+        },
+        start_condition=ActionStartCondition.wait_for_orch,
+    )
+    # add liquid to cell position
+    if apm.pars.previous_liquid:
+        apm.add(
+            PAL_server,
+            "archive_custom_add_liquid",
+            {
+                "custom": apm.pars.liquid_custom_position,
+                "combine_liquids": False,
+                "dilute_liquids": False,
+            },
+            from_globalexp_params={
+                "_unloaded_liquid": "source_liquid_in",
+                "_unloaded_liquid_vol": "volume_ml",
+            },
+            start_condition=ActionStartCondition.wait_for_orch,
+        )
+    else:
+        apm.add(
+            PAL_server,
+            "archive_custom_add_liquid",
+            {
+                "custom": apm.pars.liquid_custom_position,
+                "source_liquid_in": LiquidSample(
+                    **{
+                        "sample_no": apm.pars.liquid_sample_no,
+                        "machine_name": gethostname(),
+                    }
+                ).dict(),
+                "volume_ml": apm.pars.volume_ul_cell_liquid / 1000,
+                "combine_liquids": False,
+                "dilute_liquids": False,
+            },
+            start_condition=ActionStartCondition.wait_for_orch,
+        )
 
     return apm.action_list
+
 
 def ADSS_sub_move_to_sample(
     experiment: Experiment,
@@ -337,9 +373,7 @@ def ADSS_sub_move_to_sample(
     #    x_mm: float = 0.0,
     #    y_mm: float = 0.0,
 ):
-
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
 
     # turn pump off
     apm.add(
@@ -692,7 +726,7 @@ def ADSS_sub_fill(
 
 def ADSS_sub_CA(
     experiment: Experiment,
-    experiment_version: int = 9, #v9 electrolyte add
+    experiment_version: int = 9,  # v9 electrolyte add
     CA_potential: float = 0.0,
     ph: float = 9.53,
     potential_versus: str = "rhe",
@@ -798,83 +832,89 @@ def ADSS_sub_CA(
             else:
                 waitcond = ActionStartCondition.wait_for_all
 
-            washmod = 0
-            for mtup, interval in zip(mlist, intervals):
-                if mtup[0] == "aliquot":
-                    apm.add(ORCH_server, "wait", {"waittime": interval - vwait}, waitcond)
-                    apm.add(
-                        NI_server,
-                        "gasvalve",
-                        {"gasvalve": "V1", "on": 0},
-                        ActionStartCondition.wait_for_orch,
-                    )
+        washmod = 0
+        for mtup, interval in zip(mlist, intervals):
+            if mtup[0] == "aliquot":
+                apm.add(ORCH_server, "wait", {"waittime": interval - vwait}, waitcond)
+                apm.add(
+                    NI_server,
+                    "gasvalve",
+                    {"gasvalve": "V1", "on": 0},
+                    ActionStartCondition.wait_for_orch,
+                )
+                apm.add(
+                    PAL_server,
+                    "PAL_archive",
+                    {
+                        "tool": apm.pars.PAL_Injector,
+                        "source": "cell1_we",
+                        "volume_ul": apm.pars.aliquot_volume_ul,
+                        "sampleperiod": [0.0],
+                        "spacingmethod": Spacingmethod.linear,
+                        "spacingfactor": 1.0,
+                        "timeoffset": 0.0,
+                        "wash1": 0,
+                        "wash2": washmod % 3 % 2,
+                        "wash3": (washmod + 1) % 3 % 2,
+                        "wash4": (washmod + 2) % 3 % 2,
+                    },
+                    start_condition=ActionStartCondition.no_wait,
+                    technique_name="liquid_product_archive",
+                    process_finish=True,
+                    process_contrib=[
+                        ProcessContrib.action_params,
+                        ProcessContrib.files,
+                        ProcessContrib.samples_in,
+                        ProcessContrib.samples_out,
+                        ProcessContrib.run_use,
+                    ],
+                )
+                vwait = 61
+                washmod += 1
+                apm.add(ORCH_server, "wait", {"waittime": vwait}, waitcond)
+                apm.add(
+                    NI_server,
+                    "gasvalve",
+                    {"gasvalve": "V1", "on": 1},
+                    ActionStartCondition.wait_for_orch,
+                )
+            elif mtup[0] == "electrolyte":
+                if apm.pars.insert_electrolyte:
                     apm.add(
                         PAL_server,
-                        "PAL_archive",
+                        "archive_custom_add_liquid",
                         {
-                            "tool": apm.pars.PAL_Injector,
-                            "source": "cell1_we",
-                            "volume_ul": apm.pars.aliquot_volume_ul,
-                            "sampleperiod": [0.0],
-                            "spacingmethod": Spacingmethod.linear,
-                            "spacingfactor": 1.0,
-                            "timeoffset": 0.0,
-                            "wash1": 0,
-                            "wash2": washmod % 3 % 2,
-                            "wash3": (washmod + 1) % 3 % 2,
-                            "wash4": (washmod + 2) % 3 % 2,
+                            "custom": "cell1_we",
+                            "source_liquid_in": LiquidSample(
+                                **{
+                                    "sample_no": apm.pars.electrolyte_sample_no,
+                                    "machine_name": gethostname(),
+                                }
+                            ).dict(),
+                            "volume_ml": apm.pars.insert_electrolyte_ul / 1000,
+                            "combine_liquids": True,
+                            "dilute_liquids": False,  # if liquid is being diluted, make this True, then dilution factor can be used to calculate concentrations later
                         },
-                        start_condition=ActionStartCondition.no_wait,
-                        technique_name="liquid_product_archive",
-                        process_finish=True,
-                        process_contrib=[
-                            ProcessContrib.action_params,
-                            ProcessContrib.files,
-                            ProcessContrib.samples_in,
-                            ProcessContrib.samples_out,
-                            ProcessContrib.run_use,
-                        ],
-                    )
-                    vwait = 61
-                    washmod += 1
-                    apm.add(ORCH_server, "wait", {"waittime": vwait}, waitcond)
-                    apm.add(
-                        NI_server,
-                        "gasvalve",
-                        {"gasvalve": "V1", "on": 1},
                         ActionStartCondition.wait_for_orch,
                     )
-                elif mtup[0] == "electrolyte":
-                    if apm.pars.insert_electrolyte:
-                        apm.add(
-                            PAL_server,
-                            "archive_custom_add_liquid",
-                            {
-                                "custom": "cell1_we",
-                                "source_liquid_in": LiquidSample(
-                                    **{
-                                        "sample_no": apm.pars.electrolyte_sample_no,
-                                        "machine_name": gethostname(),
-                                    }
-                                ).dict(),
-                                "volume_ml": apm.pars.insert_electrolyte_ul / 1000,
-                                "combine_liquids": True,
-                                "dilute_liquids": False,  # if liquid is being diluted, make this True, then dilution factor can be used to calculate concentrations later
-                            },
-                            ActionStartCondition.wait_for_orch,
-                    )
 
-                        apm.add(ORCH_server, "wait", {"waittime": interval-vwait}, waitcond)  # time-wise, it would make sense to track the volume addition as close to the physical infuse as possible, here it's spaced out by an interval
-                        apm.add_action_list(
-                            ADSS_sub_cellfill_prefilled(
-                                experiment=experiment,
-                                Solution_volume_ul=apm.pars.insert_electrolyte_ul,
-                                Syringe_rate_ulsec=300,
-                            )
+                    apm.add(
+                        ORCH_server, "wait", {"waittime": interval - vwait}, waitcond
+                    )  # time-wise, it would make sense to track the volume addition as close to the physical infuse as possible, here it's spaced out by an interval
+                    apm.add_action_list(
+                        ADSS_sub_cellfill_prefilled(
+                            experiment=experiment,
+                            Solution_volume_ul=apm.pars.insert_electrolyte_ul,
+                            Syringe_rate_ulsec=300,
                         )
-                        apm.add(ORCH_server, "wait", {"waittime": 60}, waitcond)
-                        apm.add(ORCH_server, "wait", {"waittime": 0.1},ActionStartCondition.wait_for_orch)
-
+                    )
+                    apm.add(ORCH_server, "wait", {"waittime": 60}, waitcond)
+                    apm.add(
+                        ORCH_server,
+                        "wait",
+                        {"waittime": 0.1},
+                        ActionStartCondition.wait_for_orch,
+                    )
 
     return apm.action_list  # returns complete action list to orch
 
@@ -993,91 +1033,97 @@ def ADSS_sub_CA_photo(
             else:
                 waitcond = ActionStartCondition.wait_for_all
 
-            washmod = 0
-            for mtup, interval in zip(mlist, intervals):
-                if mtup[0] == "aliquot":
-                    apm.add(ORCH_server, "wait", {"waittime": interval - vwait}, waitcond)
-                    apm.add(
-                        NI_server,
-                        "gasvalve",
-                        {"gasvalve": "V1", "on": 0},
-                        ActionStartCondition.wait_for_orch,
-                    )
+        washmod = 0
+        for mtup, interval in zip(mlist, intervals):
+            if mtup[0] == "aliquot":
+                apm.add(ORCH_server, "wait", {"waittime": interval - vwait}, waitcond)
+                apm.add(
+                    NI_server,
+                    "gasvalve",
+                    {"gasvalve": "V1", "on": 0},
+                    ActionStartCondition.wait_for_orch,
+                )
+                apm.add(
+                    PAL_server,
+                    "PAL_archive",
+                    {
+                        "tool": apm.pars.PAL_Injector,
+                        "source": "cell1_we",
+                        "volume_ul": apm.pars.aliquot_volume_ul,
+                        "sampleperiod": [0.0],
+                        "spacingmethod": Spacingmethod.linear,
+                        "spacingfactor": 1.0,
+                        "timeoffset": 0.0,
+                        "wash1": 0,
+                        "wash2": washmod % 3 % 2,
+                        "wash3": (washmod + 1) % 3 % 2,
+                        "wash4": (washmod + 2) % 3 % 2,
+                    },
+                    start_condition=ActionStartCondition.no_wait,
+                    technique_name="liquid_product_archive",
+                    process_finish=True,
+                    process_contrib=[
+                        ProcessContrib.action_params,
+                        ProcessContrib.files,
+                        ProcessContrib.samples_in,
+                        ProcessContrib.samples_out,
+                        ProcessContrib.run_use,
+                    ],
+                )
+                vwait = 61  # orig 65
+                washmod += 1
+                apm.add(ORCH_server, "wait", {"waittime": vwait}, waitcond)
+                apm.add(
+                    NI_server,
+                    "gasvalve",
+                    {"gasvalve": "V1", "on": 1},
+                    ActionStartCondition.wait_for_orch,
+                )
+            elif mtup[0] == "electrolyte":
+                if apm.pars.insert_electrolyte:
                     apm.add(
                         PAL_server,
-                        "PAL_archive",
+                        "archive_custom_add_liquid",
                         {
-                            "tool": apm.pars.PAL_Injector,
-                            "source": "cell1_we",
-                            "volume_ul": apm.pars.aliquot_volume_ul,
-                            "sampleperiod": [0.0],
-                            "spacingmethod": Spacingmethod.linear,
-                            "spacingfactor": 1.0,
-                            "timeoffset": 0.0,
-                            "wash1": 0,
-                            "wash2": washmod % 3 % 2,
-                            "wash3": (washmod + 1) % 3 % 2,
-                            "wash4": (washmod + 2) % 3 % 2,
+                            "custom": "cell1_we",
+                            "source_liquid_in": LiquidSample(
+                                **{
+                                    "sample_no": apm.pars.electrolyte_sample_no,
+                                    "machine_name": gethostname(),
+                                }
+                            ).dict(),
+                            "volume_ml": apm.pars.insert_electrolyte_ul / 1000,
+                            "combine_liquids": True,
+                            "dilute_liquids": False,
                         },
-                        start_condition=ActionStartCondition.no_wait,
-                        technique_name="liquid_product_archive",
-                        process_finish=True,
-                        process_contrib=[
-                            ProcessContrib.action_params,
-                            ProcessContrib.files,
-                            ProcessContrib.samples_in,
-                            ProcessContrib.samples_out,
-                            ProcessContrib.run_use,
-                        ],
-                    )
-                    vwait = 61 #orig 65
-                    washmod += 1
-                    apm.add(ORCH_server, "wait", {"waittime": vwait}, waitcond)
-                    apm.add(
-                        NI_server,
-                        "gasvalve",
-                        {"gasvalve": "V1", "on": 1},
                         ActionStartCondition.wait_for_orch,
                     )
-                elif mtup[0] == "electrolyte":
-                    if apm.pars.insert_electrolyte:
-                        apm.add(
-                            PAL_server,
-                            "archive_custom_add_liquid",
-                            {
-                                "custom": "cell1_we",
-                                "source_liquid_in": LiquidSample(
-                                    **{
-                                        "sample_no": apm.pars.electrolyte_sample_no,
-                                        "machine_name": gethostname(),
-                                    }
-                                ).dict(),
-                                "volume_ml": apm.pars.insert_electrolyte_ul / 1000,
-                                "combine_liquids": True,
-                                "dilute_liquids": False,
-                            },
-                            ActionStartCondition.wait_for_orch,
-                        )
-                        # apm.add_action_list(
-                        #     ADSS_sub_load_liquid(
-                        #         experiment=experiment,
-                        #         liquid_custom_position="cell1_we",
-                        #         liquid_sample_no=apm.pars.electrolyte_sample_no,
-                        #         volume_ul_cell_liquid=apm.pars.insert_electrolyte_ul,
-                        #     )
-                        # )
+                    # apm.add_action_list(
+                    #     ADSS_sub_load_liquid(
+                    #         experiment=experiment,
+                    #         liquid_custom_position="cell1_we",
+                    #         liquid_sample_no=apm.pars.electrolyte_sample_no,
+                    #         volume_ul_cell_liquid=apm.pars.insert_electrolyte_ul,
+                    #     )
+                    # )
 
-                        apm.add(ORCH_server, "wait", {"waittime": interval-vwait}, waitcond)
-                        apm.add_action_list(
-                            ADSS_sub_cellfill_prefilled(
-                                experiment=experiment,
-                                Solution_volume_ul=apm.pars.insert_electrolyte_ul,
-                                Syringe_rate_ulsec=300,
-                            )
+                    apm.add(
+                        ORCH_server, "wait", {"waittime": interval - vwait}, waitcond
+                    )
+                    apm.add_action_list(
+                        ADSS_sub_cellfill_prefilled(
+                            experiment=experiment,
+                            Solution_volume_ul=apm.pars.insert_electrolyte_ul,
+                            Syringe_rate_ulsec=300,
                         )
-                        apm.add(ORCH_server, "wait", {"waittime": 60}, waitcond)
-                        apm.add(ORCH_server, "wait", {"waittime": 0.1},ActionStartCondition.wait_for_orch)
-
+                    )
+                    apm.add(ORCH_server, "wait", {"waittime": 60}, waitcond)
+                    apm.add(
+                        ORCH_server,
+                        "wait",
+                        {"waittime": 0.1},
+                        ActionStartCondition.wait_for_orch,
+                    )
 
     apm.add(NI_server, "led", {"led": "led", "on": 0})
 
@@ -1758,7 +1804,7 @@ def ADSS_sub_drain_cell(
     experiment_version: int = 3,  # v2 remove residual part v3 add waterpurge
     DrainWait_s: float = 60,
     ReturnLineReverseWait_s: float = 5,
-#    ResidualWait_s: float = 15,
+    #    ResidualWait_s: float = 15,
 ):
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
@@ -1770,9 +1816,9 @@ def ADSS_sub_drain_cell(
     apm.add(NI_server, "gasvalve", {"gasvalve": "V4", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})  # draining reservoir
-    apm.add(ORCH_server, "wait", {"waittime": apm.pars.DrainWait_s/2})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.DrainWait_s / 2})
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime":apm.pars.DrainWait_s/2})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.DrainWait_s / 2})
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 0})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
     #    apm.add(NI_server, "gasvalve", {"gasvalve": "V5", "on": 1})
@@ -1784,11 +1830,12 @@ def ADSS_sub_drain_cell(
 
     return apm.action_list
 
+
 def ADSS_sub_keep_electrolyte(
     experiment: Experiment,
-    experiment_version: int = 1, 
+    experiment_version: int = 1,
     ReturnLineReverseWait_s: float = 5,
-#    ResidualWait_s: float = 15,
+    #    ResidualWait_s: float = 15,
 ):
     apm = ActionPlanMaker()
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
@@ -1801,6 +1848,7 @@ def ADSS_sub_keep_electrolyte(
     apm.add(NI_server, "pump", {"pump": "direction", "on": 0})
 
     return apm.action_list
+
 
 # def ADSS_sub_empty_cell(
 #     experiment: Experiment,
@@ -1829,7 +1877,7 @@ def ADSS_sub_clean_cell(
     ReturnLineWait_s: float = 30,
     DrainWait_s: float = 60,
     ReturnLineReverseWait_s: float = 5,
-#    ResidualWait_s: float = 15,
+    #    ResidualWait_s: float = 15,
 ):
     apm = ActionPlanMaker()
 
@@ -1858,7 +1906,7 @@ def ADSS_sub_clean_cell(
                 experiment=experiment,
                 DrainWait_s=40,
                 ReturnLineReverseWait_s=apm.pars.ReturnLineReverseWait_s,
-                #ResidualWait_s=apm.pars.ResidualWait_s,
+                # ResidualWait_s=apm.pars.ResidualWait_s,
             )
         )
 
@@ -1886,7 +1934,7 @@ def ADSS_sub_clean_cell(
             experiment=experiment,
             DrainWait_s=apm.pars.DrainWait_s,
             ReturnLineReverseWait_s=apm.pars.ReturnLineReverseWait_s,
-            #ResidualWait_s=apm.pars.ResidualWait_s,
+            # ResidualWait_s=apm.pars.ResidualWait_s,
         )
     )
 
@@ -2077,6 +2125,7 @@ def ADSS_sub_cell_illumination(
 
     return apm.action_list  # returns complete action list to orch
 
+
 def ADSS_sub_interrupt(
     experiment: Experiment,
     experiment_version: int = 1,
@@ -2085,4 +2134,3 @@ def ADSS_sub_interrupt(
     apm = ActionPlanMaker()
     apm.add(ORCH_server, "interrupt", {"reason": apm.pars.reason})
     return apm.action_list
-
