@@ -1442,6 +1442,7 @@ class Archive:
                 action=action,
                 combine_liquids=combine_liquids,
             )
+            self.base.print_message(ref_samples_out2, error=True)
 
             ref_samples_out2[0].sample_position = custom
             ref_samples_out2[0].volume_ml = custom_sample.volume_ml
@@ -1451,7 +1452,7 @@ class Archive:
                 delta_vol_ml=samples_out[0].volume_ml,
                 dilute=dilute_liquids,
             )
-            
+
             if error != ErrorCodes.none:
                 # something went wrong when creating the referenceassembly
                 return error, [], []
