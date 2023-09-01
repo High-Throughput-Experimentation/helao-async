@@ -845,12 +845,10 @@ def makeApp(confPrefix, server_key, helao_root):
         await active.enqueue_data_dflt(
             datadict={"unloaded": unloaded, "customs_dict": customs_dict}
         )
-        unloaded_solids = [s for s in samples_out if s.sample_type == SampleType.solid]
-        unloaded_liquids = [
-            s
-            for s in samples_out
-            if s.sample_type == SampleType.liquid and "loaded" in s.status
-        ]
+        unloaded_solids = [s for s in samples_in if s.sample_type == SampleType.solid]
+        print(unloaded_solids)
+        unloaded_liquids = [s for s in samples_in if s.sample_type == SampleType.liquid]
+        print(unloaded_liquids)
         first_unloaded_solid = unloaded_solids[0] if unloaded_solids else NoneSample()
         first_unloaded_liquid = (
             unloaded_liquids[0] if unloaded_liquids else NoneSample()
