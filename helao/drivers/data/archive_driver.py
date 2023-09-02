@@ -1471,7 +1471,7 @@ class Archive:
                     delta_vol_ml=samples_out[0].volume_ml,
                     dilute=dilute_liquids,
                 )
-                new_assembly_parts.append(new_liquid_mixture)
+                new_assembly_parts.append(new_liquid_mixture[0])
                 # set inheritance and status for sample transfered out of source_liquid_in
                 samples_out[0].inheritance = SampleInheritance.allow_both
                 samples_out[0].status.append(SampleStatus.merged)
