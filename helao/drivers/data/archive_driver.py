@@ -1563,7 +1563,7 @@ class Archive:
             )
 
             if error != ErrorCodes.none:
-                # something went wrong when creating the referenceassembly
+                # something went wrong when creating the reference assembly
                 return error, [], []
 
             # a reference assembly was successfully created
