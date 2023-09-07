@@ -1237,7 +1237,7 @@ def ADSS_sub_OCV_photo(
 
 def ADSS_sub_insitu_actions(
     experiment: Experiment,
-    experiment_version: int = 1, 
+    experiment_version: int = 2,  #added washes
     insert_electrolyte: bool = False,
     insert_electrolyte_volume_ul: int = 0,
     insert_electrolyte_time_sec: float = 1800,
