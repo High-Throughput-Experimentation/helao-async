@@ -1044,7 +1044,7 @@ def ADSS_sub_CA_photo(
                 experiment=experiment,
                 aliquot_insitu=apm.pars.aliquot_insitu,
                 insert_electrolyte=apm.pars.insert_electrolyte,
-                insert_electrolyte_volume_ul=apm.pars.insert_electrolyte_volume_ul,
+                insert_electrolyte_volume_ul=apm.pars.insert_electrolyte_ul,
                 insert_electrolyte_time_sec=apm.pars.insert_electrolyte_time_sec,
                 electrolyte_sample_no=apm.pars.electrolyte_sample_no,
                 aliquot_volume_ul=apm.pars.aliquot_volume_ul,
@@ -1551,7 +1551,7 @@ def ADSS_sub_insitu_actions(
                         Syringe_rate_ulsec=300,
                     )
                 )
-                apm.add(ORCH_server, "wait", {"waittime": 60}, waitcond) #orig wait is 60 can't remember why. vwait?
+                apm.add(ORCH_server, "wait", {"waittime": 10}, waitcond) #orig wait is 60 can't remember why. vwait?
                 apm.add(
                     ORCH_server,
                     "wait",
