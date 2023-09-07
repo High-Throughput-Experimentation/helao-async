@@ -34,6 +34,7 @@ __all__ = [
     "ADSS_sub_clean_cell",
     "ADSS_sub_refill_syringes",
     "ADSS_sub_sample_aliquot",
+    "ADSS_sub_insitu_actions",
     "ADSS_sub_recirculate",
     "ADSS_sub_abs_move",
     "ADSS_sub_cell_illumination",
@@ -1016,6 +1017,10 @@ def ADSS_sub_CA_photo(
         that occurs before full PAL action is completed
     """
     if apm.pars.aliquot_insitu:
+        waitcond = ActionStartCondition.no_wait
+    else:
+        waitcond = ActionStartCondition.wait_for_all
+
     atimes = apm.pars.aliquot_times_sec
     etime = apm.pars.insert_electrolyte_time_sec
     intervals = []
