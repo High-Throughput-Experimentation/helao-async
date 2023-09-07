@@ -1016,10 +1016,6 @@ def ADSS_sub_CA_photo(
         that occurs before full PAL action is completed
     """
     if apm.pars.aliquot_insitu:
-        waitcond = ActionStartCondition.no_wait
-    else:
-        waitcond = ActionStartCondition.wait_for_all
-
     atimes = apm.pars.aliquot_times_sec
     etime = apm.pars.insert_electrolyte_time_sec
     intervals = []
