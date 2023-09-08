@@ -1889,7 +1889,8 @@ class Active:
             await self.base.write_seq(exp, manual=True)
 
     async def send_nonblocking_status(self, retry_limit: int = 3):
-        for client_servkey in self.base.status_clients:
+        for combo_key in self.base.status_clients:
+            client_servkey, client_host, client_port = combo_key
             self.base.print_message(
                 f"executor trying to send non-blocking status to {client_servkey}."
             )
@@ -1897,6 +1898,8 @@ class Active:
             for _ in range(retry_limit):
                 response, error_code = await self.base.send_nbstatuspackage(
                     client_servkey=client_servkey,
+                    client_host=client_host,
+                    client_port=client_port,
                     actionmodel=self.action.get_actmodel(),
                 )
 
