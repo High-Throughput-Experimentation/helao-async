@@ -4,11 +4,10 @@ server_key must be a FastAPI action server defined in config
 """
 
 __all__ = [
-    "debug",
-    "ADSS_sub_sample_start",
+#    "ADSS_sub_sample_start",
     "ADSS_sub_move_to_sample",
     "ADSS_sub_shutdown",
-    "ADSS_sub_drain",
+#    "ADSS_sub_drain",
     "ADSS_sub_clean_PALtool",
     "ADSS_sub_CA",  # latest
     "ADSS_sub_CV",  # latest
@@ -19,12 +18,13 @@ __all__ = [
     "ADSS_sub_load",
     "ADSS_sub_load_solid",
     "ADSS_sub_load_liquid",
-    "ADSS_sub_fillfixed",
-    "ADSS_sub_fill",
+    "ADSS_sub_add_liquid",
+#    "ADSS_sub_fillfixed",
+#    "ADSS_sub_fill",
     "ADSS_sub_tray_unload",
-    "ADSS_sub_rel_move",
-    "ADSS_sub_heat",
-    "ADSS_sub_stopheat",
+#    "ADSS_sub_rel_move",
+#    "ADSS_sub_heat",
+#    "ADSS_sub_stopheat",
     "ADSS_sub_cellfill_prefilled",
     "ADSS_sub_cellfill_flush",
     "ADSS_sub_drain_cell",
@@ -36,7 +36,7 @@ __all__ = [
     "ADSS_sub_sample_aliquot",
     "ADSS_sub_insitu_actions",
     "ADSS_sub_recirculate",
-    "ADSS_sub_abs_move",
+#    "ADSS_sub_abs_move",
     "ADSS_sub_cell_illumination",
     "ADSS_sub_CA_photo",
     "ADSS_sub_OCV_photo",
@@ -1365,7 +1365,7 @@ def ADSS_sub_insitu_actions(
                                 "machine_name": gethostname(),
                             }
                         ).dict(),
-                        "volume_ml": apm.pars.insert_electrolyte_ul / 1000,
+                        "volume_ml": apm.pars.insert_electrolyte_volume_ul / 1000,
                         "combine_liquids": True,
                         "dilute_liquids": False,
                     },
@@ -1374,7 +1374,7 @@ def ADSS_sub_insitu_actions(
                 apm.add_action_list(
                     ADSS_sub_cellfill_prefilled(
                         experiment=experiment,
-                        Solution_volume_ul=apm.pars.insert_electrolyte_ul,
+                        Solution_volume_ul=apm.pars.insert_electrolyte_volume_ul,
                         Syringe_rate_ulsec=300,
                     )
                 )
@@ -1400,7 +1400,7 @@ def ADSS_sub_insitu_actions(
                         "machine_name": gethostname(),
                     }
                 ).dict(),
-                "volume_ml": apm.pars.insert_electrolyte_ul / 1000,
+                "volume_ml": apm.pars.insert_electrolyte_volume_ul / 1000,
                 "combine_liquids": True,
                 "dilute_liquids": False,
             },
@@ -1409,7 +1409,7 @@ def ADSS_sub_insitu_actions(
         apm.add_action_list(
             ADSS_sub_cellfill_prefilled(
                 experiment=experiment,
-                Solution_volume_ul=apm.pars.insert_electrolyte_ul,
+                Solution_volume_ul=apm.pars.insert_electrolyte_volume_ul,
                 Syringe_rate_ulsec=300,
             )
         )
@@ -1424,6 +1424,44 @@ def ADSS_sub_insitu_actions(
 
     return apm.action_list  # returns complete action list to orch
 
+def ADSS_sub_add_liquid(
+    experiment: Experiment,
+    experiment_version: int = 1,  
+    virtual_add: bool = False,
+    added_liquid_volume_ul: int = 0,
+    liquid_sample_no: int = 1,
+):
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+
+    apm.add(
+        PAL_server,
+        "archive_custom_add_liquid",
+        {
+            "custom": "cell1_we",
+            "source_liquid_in": LiquidSample(
+                **{
+                    "sample_no": apm.pars.liquid_sample_no,
+                    "machine_name": gethostname(),
+                }
+            ).dict(),
+            "volume_ml": apm.pars.added_liquid_volume_ul / 1000,
+            "combine_liquids": True,
+            "dilute_liquids": False,
+        },
+        ActionStartCondition.wait_for_orch,
+    )
+    if not apm.pars.virtual_add: 
+        apm.add_action_list(
+            ADSS_sub_cellfill_prefilled(
+                experiment=experiment,
+                Solution_volume_ul=apm.pars.added_liquid_volume_ul,
+                Syringe_rate_ulsec=300,
+            )
+        )
+
+    return apm.action_list  # returns complete action list to orch
 
 def ADSS_sub_tray_unload(
     experiment: Experiment,
