@@ -1426,7 +1426,7 @@ def ADSS_CA_cell_1potential(
                 "ref_offset__V": ref_offset__V,
                 "aliquot_volume_ul": aliquot_volume_ul,
                 "aliquot_times_sec": OCValiquot_times_sec,
-                "aliquot_insitu": aliquot_tf,
+                "aliquot_insitu": True,
                 "PAL_Injector": PAL_Injector,
                 "PAL_Injector_id": PAL_Injector_id,
                 "rinse_1": 1,
