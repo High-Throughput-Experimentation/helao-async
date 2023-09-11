@@ -1352,7 +1352,7 @@ def ADSS_sub_insitu_actions(
                     # )
 
                 apm.add(
-                    ORCH_server, "wait", {"waittime": interval}, waitcond  #remove -vwait
+                    ORCH_server, "wait", {"waittime": interval-vwait}, waitcond  #remove -vwait
                 )
                 apm.add(
                     PAL_server,
