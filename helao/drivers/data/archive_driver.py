@@ -96,12 +96,16 @@ class Archive:
         # get some empty db dicts from default config
 
         self.startup_positions = self.action_startup_config()
-        self.base.print_message(f"Config trays_dict has {len(self.startup_positions.trays_dict)} keys")
+        self.base.print_message(
+            f"Config trays_dict has {len(self.startup_positions.trays_dict)} keys"
+        )
         # compare default config to backup
 
         try:
             self.positions = self.load_config()
-            self.base.print_message(f"Archive json has {len(self.positions.trays_dict)} keys")
+            self.base.print_message(
+                f"Archive json has {len(self.positions.trays_dict)} keys"
+            )
         except IOError:
             self.base.print_message(
                 f"'{self.archivejson}' does not exist, writing empty global dict.",
@@ -109,15 +113,17 @@ class Archive:
             )
             self.write_config()
         # except Exception:
-            # print_message({}, "launcher", f"Error loading '{pidFile}', writing empty global dict.", error = True)
-            # self.write_config()
+        # print_message({}, "launcher", f"Error loading '{pidFile}', writing empty global dict.", error = True)
+        # self.write_config()
 
         # check trays
         failed = False
         if len(self.positions.trays_dict) == len(self.startup_positions.trays_dict):
             for i, tray in self.positions.trays_dict.items():
                 if i not in self.startup_positions.trays_dict:
-                    self.base.print_message(f"tray key {i} from archive.json does not match config")
+                    self.base.print_message(
+                        f"tray key {i} from archive.json does not match config"
+                    )
                     failed = True
                     break
                 else:
@@ -548,7 +554,9 @@ class Archive:
             )
 
             samplelist = [v for _, v in sampletups]
-            self.base.print_message(f"Found {len(samplelist)} vials on tray {tray}, slot {slot}. Exporting csv.")
+            self.base.print_message(
+                f"Found {len(samplelist)} vials on tray {tray}, slot {slot}. Exporting csv."
+            )
 
             headerline = ";".join(
                 [
@@ -561,7 +569,10 @@ class Archive:
                 ]
             )
             csv_filename = f"VialTable__tray{tray}__slot{slot}__{datetime.now().strftime('%Y%m%d-%H%M%S%f')}_ICPMS.csv"
-            csv_dir = os.path.join(self.base.helaodirs.save_root.__str__(), myactive.action.get_action_dir())
+            csv_dir = os.path.join(
+                self.base.helaodirs.save_root.__str__(),
+                myactive.action.get_action_dir(),
+            )
             csv_path = os.path.join(csv_dir, csv_filename)
             with open(csv_path, "w") as f:
                 f.write("\n".join([headerline, tmp_output_str]))
@@ -570,7 +581,9 @@ class Archive:
                 file_type="pal_icpms_file", file_path=csv_path, samples=samplelist
             )
         else:
-            self.base.print_message(f"Slot {slot} not found in positions dict. Cannot export.")
+            self.base.print_message(
+                f"Slot {slot} not found in positions dict. Cannot export."
+            )
 
     async def tray_query_sample(
         self, tray: int = None, slot: int = None, vial: int = None
@@ -601,7 +614,7 @@ class Archive:
         It will select the first empty vial which has the smallest volume that still can hold req_vol
         """
 
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         lock = asyncio.Lock()
         async with lock:
             self.base.print_message(self.positions.trays_dict)
@@ -912,7 +925,7 @@ class Archive:
         if keep_gas:
             destroy_gas = False
             for gas in gases:
-                keep_samples.append(solid)
+                keep_samples.append(gas)
 
         samples_in, samples_out = await self._unload_custom_helper(
             samples=samples,
@@ -1373,7 +1386,7 @@ class Archive:
                 sample_out_type=SampleType.assembly,
                 sample_position=custom,
                 action=action,
-                combine_liquids=True,
+                combine_liquids=combine_liquids,
             )
 
             ref_samples_out2[0].sample_position = custom
@@ -1411,8 +1424,115 @@ class Archive:
                 )
                 return ErrorCodes.critical, [], []
 
-            # else:
-            #      return ErrorCodes.not_allowed, [], []
+        # (5-2b) liquid + assembly case
+        elif (
+            (custom_sample.sample_type == SampleType.assembly)
+            and combine_liquids
+            and self.custom_assembly_allowed(custom=custom)
+        ):
+            # convert the ref samples that gets added to a real sample
+            # this next line populates local sqlite dbs with new liquid sample, should
+            # be the liquid created from new liquid_in + existing assembly liquid
+            samples_out = await self.unified_db.new_samples(samples=ref_samples_out)
+            if not samples_out:
+                error = ErrorCodes.no_sample
+                return error, [], []
+
+            # seprate assembly into solid and liquid parts
+            loaded_liquid = [
+                p for p in custom_sample.parts if p.sample_type == SampleType.liquid
+            ]
+            loaded_solid = [
+                p for p in custom_sample.parts if p.sample_type == SampleType.solid
+            ]
+            loaded_gas = [
+                p for p in custom_sample.parts if p.sample_type == SampleType.gas
+            ]
+
+            new_assembly_parts = []
+
+            self.base.print_message("recovering parts from assembly")
+            if loaded_liquid:
+                # create a new liquid mixture
+                error, new_liquid_mixture = await self.new_ref_samples(
+                    samples_in=[loaded_liquid[0], samples_out[0]],
+                    sample_out_type=SampleType.assembly,
+                    sample_position=custom,
+                    action=action,
+                    combine_liquids=combine_liquids,
+                )
+                new_liquid_mixture[0].status.append(SampleStatus.merged)
+                # calculate volumes, dilutions
+                new_liquid_mixture[0].sample_position = custom
+                new_liquid_mixture[0].volume_ml = loaded_liquid[0].volume_ml
+                new_liquid_mixture[0].dilution_factor = loaded_liquid[0].dilution_factor
+                update_vol(
+                    new_liquid_mixture[0],
+                    delta_vol_ml=samples_out[0].volume_ml,
+                    dilute=dilute_liquids,
+                )
+                liquid_samples_out = await self.unified_db.new_samples(
+                    samples=new_liquid_mixture
+                )
+                new_assembly_parts.append(liquid_samples_out[0])
+                # set inheritance and status for sample transfered out of source_liquid_in
+                samples_out[0].inheritance = SampleInheritance.allow_both
+                samples_out[0].status.append(SampleStatus.merged)
+                self.base.print_message("liquid recovered")
+            if loaded_solid:
+                new_assembly_parts.append(loaded_solid[0])
+                self.base.print_message("solid recovered")
+            if loaded_gas:
+                new_assembly_parts.append(loaded_gas[0])
+                self.base.print_message("gas recovered")
+
+            # old assembly, mark as incorporated
+            custom_sample.status = [SampleStatus.recovered]
+            self.base.print_message("old assembly status set to recovered")
+
+            # add the old assembly to the samples_in which already contains source_liquid_in
+            samples_in.append(custom_sample)
+            samples_in_initial.append(deepcopy(custom_sample))
+
+            self.base.print_message("creating new assembly reference")
+            # create a new ref sample for new assembly
+            error, ref_samples_out2 = await self.new_ref_samples(
+                # input for assembly is the custom sample
+                # and the new sample from source_liquid_in
+                samples_in=new_assembly_parts,
+                sample_out_type=SampleType.assembly,
+                sample_position=custom,
+                action=action,
+            )
+            self.base.print_message("new assembly was successfully created")
+            ref_samples_out2[0].sample_position = custom
+
+            # a reference assembly was successfully created
+            # convert it now to a real sample
+            self.base.print_message("adding new assembly to sqlite db")
+            samples_out2 = await self.unified_db.new_samples(samples=ref_samples_out2)
+
+            if not samples_out2:
+                # reference could not be converted to a real sample
+                self.base.print_message(
+                    "could not convert reference assembly to real assembly",
+                    error=True,
+                )
+                return ErrorCodes.critical, [], []
+
+            # add new reference to samples out list which already contains new liquid mixture
+            samples_out.append(samples_out2[0])
+            # and update the custom position with the new sample
+
+            replaced, sample = await self.custom_replace_sample(
+                custom=custom, sample=samples_out2[0]
+            )
+            if not replaced:
+                self.base.print_message(
+                    "could not replace sample with assembly when adding liquid",
+                    error=True,
+                )
+                return ErrorCodes.critical, [], []
 
         # (5-3)
         # custom holds a sample and we need to create an assembly
@@ -1443,7 +1563,7 @@ class Archive:
             )
 
             if error != ErrorCodes.none:
-                # something went wrong when creating the referenceassembly
+                # something went wrong when creating the reference assembly
                 return error, [], []
 
             # a reference assembly was successfully created

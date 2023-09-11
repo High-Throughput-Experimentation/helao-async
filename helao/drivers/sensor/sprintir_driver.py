@@ -275,7 +275,7 @@ class SprintIR:
         The 'while self.IO_do_meas' loop is exited by IOloop
         """
         # first_print = True
-        # await asyncio.sleep(0.001)
+        # await asyncio.sleep(0.01)
 
         if self.com is None:
             self.IO_measuring = False
@@ -310,7 +310,7 @@ class SprintIR:
                     )
                 )
                 self.last_rec_time = now
-            await asyncio.sleep(0.001)
+            await asyncio.sleep(0.01)
             # await asyncio.sleep(self.recording_rate)
 
         self.base.print_message("polling loop duration complete, finishing")
@@ -424,7 +424,7 @@ class CO2MonExec(Executor):
             status = HloStatus.active
         else:
             status = HloStatus.finished
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         # self.active.base.print_message(f"sending status: {status}")
         # self.active.base.print_message(f"sending data: {live_dict}")
         return {
