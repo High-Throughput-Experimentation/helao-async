@@ -1,4 +1,4 @@
-""" Motion simulation server
+""" CP simulation server
 
 FastAPI server host for the websocket simulator driver.
 
@@ -16,13 +16,12 @@ from helaocore.error import ErrorCodes
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.sample import SampleUnion
 
-from helao.servers.base import Base, Executor
-from helao.servers.base_api import BaseAPI
+from helao.servers.base import Base, BaseAPI, Executor
 from helao.helpers.premodels import Action
 from helao.helpers.config_loader import config_loader
 
 
-class WsSim:
+class EcheSim:
     def __init__(self, action_serv: Base):
         self.base = action_serv
         self.config_dict = action_serv.server_cfg["params"]
@@ -45,7 +44,7 @@ class WsSim:
     def shutdown(self):
         pass
 
-class WsExec(Executor):
+class EcheSimExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.active.base.print_message("WsExec initialized.")

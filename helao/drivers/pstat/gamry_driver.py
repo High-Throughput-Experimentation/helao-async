@@ -298,7 +298,7 @@ class gamry:
     async def open_connection(self):
         """Open connection to Gamry"""
         # this just tries to open a connection with try/catch
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         if not self.pstat:
             await self.init_Gamry(self.Gamry_devid)
         try:
@@ -354,7 +354,7 @@ class gamry:
     async def measurement_setup(self, act_params, mode: Gamry_modes = None, *argv):
         """setting up the measurement parameters
         need to initialize and open connection to gamry first"""
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         error = ErrorCodes.none
         if self.pstat:
             try:
@@ -918,7 +918,7 @@ class gamry:
     async def measure(self):
         """performing a measurement with the Gamry
         this is the main function for the instrument"""
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
 
         if not self.pstat:
             self.IO_measuring = False
@@ -968,7 +968,7 @@ class gamry:
                     if self.IO_TTLwait & bits:
                         break
                     # break  # for testing, we don't want to wait forever
-                    await asyncio.sleep(0.001)
+                    await asyncio.sleep(0.01)
 
             # second, send a trigger
             # TODO: need to reset trigger first during init to high/low
@@ -1049,7 +1049,7 @@ class gamry:
                 )
             ):
                 # need some await points
-                await asyncio.sleep(0.001)
+                await asyncio.sleep(0.01)
                 client.PumpEvents(0.001)
                 tmpc = len(self.dtaqsink.acquired_points)
                 if counter < tmpc:
@@ -1105,7 +1105,7 @@ class gamry:
 
     async def status(self):
         """return status of data structure"""
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         return self.dtaqsink.status
 
     async def stop(self):

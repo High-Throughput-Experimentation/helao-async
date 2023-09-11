@@ -369,7 +369,7 @@ class Orch(Base):
     async def globstat_broadcast_task(self):
         """Consume globstat_q. Does nothing for now."""
         async for _ in self.globstat_q.subscribe():
-            await asyncio.sleep(0.001)
+            await asyncio.sleep(0.01)
 
     def unpack_sequence(
         self, sequence_name: str, sequence_params
@@ -1052,11 +1052,11 @@ class Orch(Base):
             await self.intend_skip()
         else:
             self.print_message("orchestrator not running, clearing action queue")
-            await asyncio.sleep(0.001)
+            await asyncio.sleep(0.01)
             self.action_dq.clear()
 
     async def intend_skip(self):
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         self.globalstatusmodel.loop_intent = OrchStatus.skip
         await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
@@ -1071,23 +1071,23 @@ class Orch(Base):
             self.print_message("orchestrator is not running")
 
     async def intend_stop(self):
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         self.globalstatusmodel.loop_intent = OrchStatus.stop
         await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
     async def intend_estop(self):
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         self.globalstatusmodel.loop_intent = OrchStatus.estop
         await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
     async def intend_none(self):
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         self.globalstatusmodel.loop_intent = OrchStatus.none
         await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
     async def clear_estop(self):
         # which were estopped first
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         self.print_message("clearing estopped uuids")
         self.globalstatusmodel.clear_in_finished(hlostatus=HloStatus.estopped)
         # release estop for all action servers
@@ -1099,23 +1099,23 @@ class Orch(Base):
     async def clear_error(self):
         # currently only resets the error dict
         self.print_message("clearing errored uuids")
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         self.globalstatusmodel.clear_in_finished(hlostatus=HloStatus.errored)
         await self.interrupt_q.put("cleared_errored")
 
     async def clear_sequences(self):
         self.print_message("clearing sequence queue")
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         self.sequence_dq.clear()
 
     async def clear_experiments(self):
         self.print_message("clearing experiment queue")
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         self.experiment_dq.clear()
 
     async def clear_actions(self):
         self.print_message("clearing action queue")
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         self.action_dq.clear()
 
     async def add_sequence(
@@ -1145,7 +1145,7 @@ class Orch(Base):
         if D.orchestrator.server_name is None or D.orchestrator.machine_name is None:
             D.orchestrator = self.server
 
-        await asyncio.sleep(0.0001)
+        await asyncio.sleep(0.01)
         if at_index is not None:
             self.experiment_dq.insert(i=at_index, x=D)
         elif prepend:

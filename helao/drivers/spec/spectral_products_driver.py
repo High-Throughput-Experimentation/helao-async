@@ -376,7 +376,7 @@ class SM303:
         to account for the time delay between SPEC and PSTAT actions
         """
         # first_print = True
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
 
         if self.spec is None:
             self.IO_measuring = False
@@ -418,7 +418,7 @@ class SM303:
                     )
                 )
                 self.data = []
-            await asyncio.sleep(0.001)
+            await asyncio.sleep(0.01)
             self.spec_time = time.time()
             # first_print = False
 

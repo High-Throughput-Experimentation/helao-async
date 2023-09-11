@@ -206,7 +206,7 @@ class C_tec:
                         partial(self.add_points, messages)
                     )
                     self.last_update_time = time.time()
-            await asyncio.sleep(0.001)
+            await asyncio.sleep(0.01)
 
     def _add_plots(self):
         # clear legend
