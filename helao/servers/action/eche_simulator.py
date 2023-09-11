@@ -63,7 +63,7 @@ class EcheSimExec(Executor):
             status = HloStatus.active
         else:
             status = HloStatus.finished
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         return {
             "error": ErrorCodes.none,
             "status": status,

@@ -614,7 +614,7 @@ class Archive:
         It will select the first empty vial which has the smallest volume that still can hold req_vol
         """
 
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         lock = asyncio.Lock()
         async with lock:
             self.base.print_message(self.positions.trays_dict)

@@ -160,7 +160,7 @@ class _BaseSampleAPI:
         self._con.commit()
 
     async def _append_sample(self, sample: SampleUnion) -> SampleUnion:
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         lock = asyncio.Lock()
         async with lock:
             await self._open_db()
@@ -220,12 +220,12 @@ class _BaseSampleAPI:
         while not self.ready:
             self._base.print_message("db not ready", info=True)
             await asyncio.sleep(0.1)
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         ret_samples = []
 
         for i, sample in enumerate(samples):
             if isinstance(sample, type(self._sampleclass)):
-                await asyncio.sleep(0.001)
+                await asyncio.sleep(0.01)
                 sample = await self._key_checks(sample)
                 added_sample = await self._append_sample(sample=sample)
                 if added_sample.sample_type is not None:
@@ -271,7 +271,7 @@ class _BaseSampleAPI:
         while not self.ready:
             self._base.print_message("db not ready", info=True)
             await asyncio.sleep(0.1)
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         lock = asyncio.Lock()
         async with lock:
             await self._open_db()
@@ -289,7 +289,7 @@ class _BaseSampleAPI:
         while not self.ready:
             self._base.print_message("db not ready", info=True)
             await asyncio.sleep(0.1)
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         ret_samples = []
 
         lock = asyncio.Lock()
@@ -304,7 +304,7 @@ class _BaseSampleAPI:
                         self._base.print_message(
                             f"getting sample: {self._sample_type} {counts+sample.sample_no+1}"
                         )
-                        await asyncio.sleep(0.001)
+                        await asyncio.sleep(0.01)
                         retdf = pd.read_sql_query(
                             f"""select * from {self._sample_type} where idx={counts+sample.sample_no+1};""",
                             con=self._con,
@@ -321,7 +321,7 @@ class _BaseSampleAPI:
                         # ret_samples.append(NoneSample())
                 elif sample.sample_no > 0:  # get sample from front
                     self._base.print_message(f"getting sample: {self._sample_type} {sample.sample_no}")
-                    await asyncio.sleep(0.001)
+                    await asyncio.sleep(0.01)
                     retdf = pd.read_sql_query(
                         f"""select * from {self._sample_type} where idx={sample.sample_no};""", con=self._con
                     )
@@ -343,14 +343,14 @@ class _BaseSampleAPI:
         while not self.ready:
             self._base.print_message("db not ready", info=True)
             await asyncio.sleep(0.1)
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         ret_samples = []
         inherit = 'WHERE inheritance = "give_only"' if give_only else ''
         lock = asyncio.Lock()
         async with lock:
             await self._open_db()
             self._base.print_message(f"getting {limit} samples of type {self._sample_type}")
-            await asyncio.sleep(0.001)
+            await asyncio.sleep(0.01)
             retdf = pd.read_sql_query(
                 f"""
                 SELECT 
@@ -406,7 +406,7 @@ class _BaseSampleAPI:
             self._base.print_message("db not ready", info=True)
             await asyncio.sleep(0.1)
 
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
 
         lock = asyncio.Lock()
         async with lock:
@@ -428,7 +428,7 @@ class _BaseSampleAPI:
 
                 # get the current info from db so we can perform some checks
                 self._base.print_message(f"getting sample {self._sample_type} {sample.sample_no}")
-                await asyncio.sleep(0.001)
+                await asyncio.sleep(0.01)
                 retdf = pd.read_sql_query(
                     f"""select * from {self._sample_type} where idx={sample.sample_no};""", con=self._con
                 )
@@ -581,20 +581,20 @@ class SolidSampleAPI(_BaseSampleAPI):
 
     async def new_samples(self, samples: List[SampleUnion] = []) -> List[SampleUnion]:
         self._base.print_message("new_sample is not supported yet for solid sample", error=True)
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         ret_samples = []
 
         return ret_samples
 
     async def get_samples(self, samples: List[SampleUnion] = []) -> List[SampleUnion]:
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         ret_samples = []
 
         for i, sample in enumerate(samples):
             self._base.print_message(
                 f"getting sample {self._sample_type} {sample.sample_no} on plate {sample.plate_id}"
             )
-            await asyncio.sleep(0.001)
+            await asyncio.sleep(0.01)
             if sample.machine_name == "legacy":
                 # verify legacy sample by getting its xy coordinates
                 xylist = await self.get_samples_xy(samples=[sample])
@@ -621,7 +621,7 @@ class SolidSampleAPI(_BaseSampleAPI):
     async def update_samples(self, samples: List[SampleUnion] = []) -> List[SampleUnion]:
         # self._base.print_message("Update is not supported yet "
         #                          "for solid sample", error=True)
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         # only check if its a valid sample
         return await self.get_samples(samples=samples)
 
