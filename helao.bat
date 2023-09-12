@@ -1,4 +1,5 @@
 @echo off
-set HA_DIR=%~dp0..\helao-async
+for %%A IN ("%~dp0.") do set REPO_PARENT_FOLDER=%%~dpA
+set HA_DIR=%REPO_PARENT_FOLDERhelao-async
 call conda activate helao
 python %HA_DIR%helao.py %*
