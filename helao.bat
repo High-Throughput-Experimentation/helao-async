@@ -1,4 +1,4 @@
 @echo off
+set HA_DIR=%~dp0..\helao-async
 call conda activate helao
-set PYTHONPATH=%~dp0..\helao-async;%~dp0..\helao-core
-python %~dp0helao.py %*
+python %HA_DIR%helao.py %*
