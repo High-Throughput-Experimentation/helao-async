@@ -1388,7 +1388,7 @@ class Active:
                                 file_conn_key=file_conn_key,
                             )
 
-                        if type(sample_data) is dict:
+                        if isinstance(sample_data, dict):
                             try:
                                 output_str = json.dumps(sample_data)
                             except TypeError:
