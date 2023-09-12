@@ -19,5 +19,5 @@ echo "setting PYTHONPATH in 'helao' conda environment vars"
 conda activate helao
 conda env config vars set PYTHONPATH=$HA_DIR:$HC_DIR > /dev/null
 conda deactivate
-conda activate helao
 echo ""
+echo "'helao' environment setup is complete"
