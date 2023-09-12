@@ -14,6 +14,7 @@ echo.
 call conda activate helao
 echo setting PYTHONPATH in 'helao' conda environment vars
 conda env config vars set PYTHONPATH=%HA_DIR%;%HC_DIR%
+conda env config vars set HELAOLAUNCH=%HA_DIR%\helao.bat
 call conda deactivate
 echo.
 echo 'helao' environment setup is complete
