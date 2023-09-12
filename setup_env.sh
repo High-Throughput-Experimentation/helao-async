@@ -8,7 +8,7 @@ then
     git clone https://github.com/High-Throughput-Experimentation/helao-core $HC_DIR
 fi
 source $CONDA_DIR/etc/profile.d/conda.sh
-if [[ ! $(conda env list | grep helao) ]]
+if [[ ! $(conda env list | grep "envs/helao$") ]]
 then
     echo "'helao' conda environment was not found, creating it now..."
     conda env create -f helao_pinned_linux-64.yml -n helao
