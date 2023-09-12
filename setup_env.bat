@@ -1,7 +1,7 @@
 @echo off
 for %%A IN ("%~dp0.") do set REPO_PARENT_FOLDER=%%~dpA
-set HA_DIR=%REPO_PARENT_FOLDERhelao-async
-set HC_DIR=%REPO_PARENT_FOLDERhelao-core
+set HA_DIR=%REPO_PARENT_FOLDER%helao-async
+set HC_DIR=%REPO_PARENT_FOLDER%helao-core
 if not exist %HC_DIR% (
     echo %HC_DIR% does not exist, cloning...
     git clone https://github.com/High-Throughput-Experimentation/helao-core %HC_DIR%
