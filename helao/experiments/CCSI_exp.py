@@ -1048,18 +1048,19 @@ def CCSI_sub_co2massdose(
     apm = ActionPlanMaker()
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 #    apm.add(IO_server, "acquire_analog_in", {"duration":apm.pars.co2measure_duration + 1,"acquisition_rate": apm.pars.co2measure_acqrate, }, nonblocking=True)
-    apm.add(MFC_server, "acquire_flowrate", {"flowrate_sccm":None,"ramp_sccm_sec":apm.pars.flowramp_sccm,"duration":apm.pars.co2measure_duration+300,"acquisition_rate": apm.pars.co2measure_acqrate,}, nonblocking=True)
+    apm.add(MFC_server, "acquire_flowrate", {"flowrate_sccm":None,"duration":-1,"acquisition_rate": apm.pars.co2measure_acqrate,}, nonblocking=True)
     apm.add(
         MFC_server, 
         "maintain_pressure", 
         {
             "flowrate_sccm":apm.pars.flowrate_sccm,
             "ramp_sccm_sec":apm.pars.flowramp_sccm,
-            "duration":apm.pars.co2measure_duration + 60,
+            "duration":apm.pars.co2measure_duration + 30, #arbitrary time to allow for final correction
             "target_pressure": apm.pars.target_pressure,
             "total_gas_scc": apm.pars.total_gas_scc,
             "refill_freq_sec": apm.pars.refill_freq_sec,
         }, 
+        asc.no_wait,
         nonblocking=True
     )
 #need to account for gas sample
@@ -1070,7 +1071,7 @@ def CCSI_sub_co2massdose(
             "duration": apm.pars.co2measure_duration,
             "acquisition_rate": apm.pars.co2measure_acqrate,
         },
-        #asc.no_wait,
+        asc.no_wait,
         #nonblocking=True,
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="Measure_recirculated_headspace",
@@ -1083,10 +1084,10 @@ def CCSI_sub_co2massdose(
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
 
-
-
 #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0}, asc.wait_for_orch)
+    apm.add(ORCH_server, "wait", {"waittime": 60})  # arbitrary time to allow for dose finish
+    apm.add(MFC_server, "cancel_acquire_flowrate",{})
 
     return apm.action_list
 
