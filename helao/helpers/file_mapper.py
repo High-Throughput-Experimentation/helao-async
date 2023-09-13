@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Union
 
-from ruamel.yaml import YAML
+from helao.helpers.yml_tools import yml_load
 from helao.helpers.read_hlo import read_hlo
 
 
@@ -61,8 +61,7 @@ class FileMapper:
         if lp is None:
             raise FileNotFoundError
         else:
-            yaml = YAML(typ="safe")
-            return yaml.load(lp)
+            return yml_load(lp)
 
     def read_lines(self, p: str):
         lp = self.locate(p)

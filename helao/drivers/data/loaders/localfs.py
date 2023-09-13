@@ -6,14 +6,13 @@ from uuid import UUID
 from datetime import datetime
 from zipfile import ZipFile
 from collections import defaultdict
-from ruamel.yaml import YAML
 
 import pandas as pd
 
+from helao.helpers.yml_tools import yml_load
 from helao.helpers.read_hlo import read_hlo
 
 # yaml reader
-yaml = YAML(typ="safe")
 
 
 class LocalLoader:
@@ -145,9 +144,9 @@ class LocalLoader:
     def get_yml(self, path: str):
         if self.target.endswith(".zip"):
             with ZipFile(self.target, "r") as zf:
-                metad = yaml.load(zf.open(path).read().decode("utf-8"))
+                metad = yml_load(zf.open(path).read().decode("utf-8"))
         else:
-            metad = yaml.load("".join(builtins.open(path, "r").readlines()))
+            metad = yml_load("".join(builtins.open(path, "r").readlines()))
         return metad
 
     def get_act(self, index=None, path: str = None):
@@ -185,7 +184,7 @@ class LocalLoader:
 
             lines = [x.decode("UTF-8").replace("\r\n", "\n") for x in lines]
             sep_index = lines.index("%%\n")
-            meta = yaml.load("".join(lines[:sep_index]))
+            meta = yml_load("".join(lines[:sep_index]))
 
             data = defaultdict(list)
             for line in lines[sep_index + 1 :]:
