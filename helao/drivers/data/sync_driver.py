@@ -29,7 +29,6 @@ from typing import Union, Optional, Dict, List
 import traceback
 from collections import defaultdict
 
-import pyaml
 import botocore.exceptions
 import boto3
 from filelock import FileLock
@@ -41,6 +40,7 @@ from helaocore.models.experiment import ExperimentModel
 from helaocore.models.sequence import SequenceModel
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.read_hlo import read_hlo
+from helao.helpers.yml_tools import yml_dumps
 from helao.helpers.zip_dir import zip_dir
 
 
@@ -258,7 +258,10 @@ class HelaoYml:
         return [
             x
             for x in self.dir.glob("*")
-            if x.is_file() and not x.suffix == ".yml" and not x.suffix == ".hlo" and not x.suffix == ".lock"
+            if x.is_file()
+            and not x.suffix == ".yml"
+            and not x.suffix == ".hlo"
+            and not x.suffix == ".lock"
         ]
 
     @property
@@ -289,8 +292,10 @@ class HelaoYml:
     def write_meta(self, meta_dict: dict):
         with self.filelock:
             self.target.write_text(
-                str(pyaml.dump(meta_dict, safe=True, sort_dicts=False, vspacing=False)),
-                encoding="utf-8",
+                str(
+                    yml_dumps(meta_dict),
+                    encoding="utf-8",
+                )
             )
 
 
@@ -383,9 +388,7 @@ class Progress:
 
     def write_dict(self, new_dict: Optional[Dict] = None):
         out_dict = self.dict if new_dict is None else new_dict
-        self.prg.write_text(
-            str(pyaml.dump(out_dict, safe=True, sort_dicts=False, vspacing=False)), encoding="utf-8"
-        )
+        self.prg.write_text(str(yml_dumps(out_dict)), encoding="utf-8")
 
     @property
     def s3_done(self):
