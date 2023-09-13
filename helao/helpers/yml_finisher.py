@@ -16,7 +16,7 @@ from helao.helpers.premodels import Sequence, Experiment, Action
 
 
 async def yml_finisher(yml_path: str, base: object = None, retry: int = 3):
-    ymld = yml_load.load(Path(yml_path))
+    ymld = yml_load(Path(yml_path))
     yml_type = ymld["file_type"]
 
     def print_msg(msg):
