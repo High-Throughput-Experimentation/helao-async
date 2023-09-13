@@ -5,17 +5,19 @@ The multi-orchestrator demo launches two instrumentation groups, each with their
 | file name                 | file description                                                                |
 | ------------------------- | ------------------------------------------------------------------------------- |
 | multi_orch_demo.bat       | windows cmd batch script for launching multi-orchestrator, shared resource demo |
+| multi_orch_demo.sh        | linux bash script for launching multi-orchestrator, shared resource demo        |
 | multi_orch_demo_helper.py | python wrapper for launching helao with demo configurations                     |
 | HelaoData_example.ipynb   | example notebook for parsing helao data structures                              |
 
 ## Usage
 1. Setup the helao environment per [readme.md](../../readme.md), hardware drivers are not required for this simulator demo.
-2. Modify `config['root']` in both `helao\configs\demo0.py` and `helao\configs\demo1.py` to change where instrument logs and data are saved.
-3. From helao-async repo root, change directory to demos: ```cd helao\demos```
-4. Run: ```multi_orch_demo.bat```
+2. Modify `root: C:/INST_hlo` in both `helao\configs\demo0.yml` and `helao\configs\demo1.yml` to change where instrument logs and data are saved. **This demo will save run files in subdirectories of the specified root location.**
+3. *Linux only:* modify `TERMGUI` variable in `multi_orch_demo.sh` with the appropriate terminal emulator application installed on your system. Note that the `-e` command switch on lines 6, 10, and 12 is not universal to all terminal emulators and must be updated accordingly.
+4. From helao-async repo root, change directory to demos: ```cd helao\demos```
+5. Run ```multi_orch_demo.bat``` (Windows) or ```bash multi_orch_demo.sh``` (Linux).
 
 ## Description
-The `multi_orch_demo.bat` batch script will run the following commands:
+The `multi_orch_demo.bat` and `multi_orch_demo.sh` scripts will run the following commands:
 1. Start the first instrument group containing an orchestrator, simulated measurement server, and gaussian process modeling server.
 2. Wait 35 seconds for full server initialization.
 3. Queue a sequence of 50 active learning iterations on the plate library loaded in the first instrument group.
