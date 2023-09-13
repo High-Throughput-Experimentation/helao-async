@@ -1,0 +1,34 @@
+%YAML 1.2
+---
+dummy: true
+simulation: true
+experiment_libraries:
+  - simulatews_exp
+  - TEST_exp
+sequence_libraries:
+  - TEST_seq
+run_type: simulation
+root: c:/INST_hlo
+servers:
+  ORCH:
+    host: 127.0.0.1
+    port: 8001
+    group: orchestrator
+    fast: async_orch2
+    params:
+      enable_op: true
+      bokeh_port: 5001
+  SIM:
+    host: 127.0.0.1
+    port: 8002
+    group: action
+    fast: ws_simulator
+    params: {}
+  LIVE:
+    host: 127.0.0.1
+    port: 5003
+    group: visualizer
+    bokeh: live_visualizer
+    params:
+      doc_name: Websocket Live Visualizer
+loaded_config_path: /mnt/STORAGE/repos/helao/helao-async/helao/configs/ws_demo.py

@@ -20,7 +20,6 @@ import aiofiles
 import colorama
 import ntplib
 import numpy as np
-import pyaml
 import pyzstd
 
 from filelock import FileLock
@@ -33,6 +32,7 @@ from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.print_message import print_message
 from helao.helpers import async_copy
+from helao.helpers.yml_tools import yml_dumps
 from helao.helpers.yml_finisher import move_dir
 from helao.helpers.premodels import Action
 from helaocore.models.action_start_condition import ActionStartCondition as ASC
@@ -772,8 +772,8 @@ class Base:
                 os.makedirs(output_path, exist_ok=True)
 
             async with aiofiles.open(output_file, mode="w+") as f:
-                await f.write(pyaml.dump({"file_type": "action"}, vspacing=False))
-                await f.write(pyaml.dump(act_dict, sort_dicts=False, vspacing=False))
+                await f.write(yml_dumps({"file_type": "action"}))
+                await f.write(yml_dumps(act_dict))
         else:
             self.print_message(
                 f"writing meta file for action '{action.action_name}' is disabled.",
@@ -793,13 +793,13 @@ class Base:
         )
 
         self.print_message(f"writing to exp meta file: {output_file}")
-        output_str = pyaml.dump(exp_dict, sort_dicts=False, vspacing=False)
+        output_str = yml_dumps(exp_dict)
 
         if not os.path.exists(output_path):
             os.makedirs(output_path, exist_ok=True)
 
         async with aiofiles.open(output_file, mode="w+") as f:
-            await f.write(pyaml.dump({"file_type": "experiment"}, vspacing=False))
+            await f.write(yml_dumps({"file_type": "experiment"}))
             if not output_str.endswith("\n"):
                 output_str += "\n"
             await f.write(output_str)
@@ -818,13 +818,13 @@ class Base:
         )
 
         self.print_message(f"writing to seq meta file: {output_file}")
-        output_str = pyaml.dump(seq_dict, sort_dicts=False, vspacing=False)
+        output_str = yml_dumps(seq_dict)
 
         if not os.path.exists(output_path):
             os.makedirs(output_path, exist_ok=True)
 
         async with aiofiles.open(output_file, mode="w+") as f:
-            await f.write(pyaml.dump({"file_type": "sequence"}, vspacing=False))
+            await f.write(yml_dumps({"file_type": "sequence"}))
             if not output_str.endswith("\n"):
                 output_str += "\n"
             await f.write(output_str)
@@ -839,7 +839,7 @@ class Base:
             "\n".join(
                 [
                     "  " + x
-                    for x in pyaml.dump([append_dict], vspacing=False).split("\n")
+                    for x in yml_dumps([append_dict]).split("\n")
                 ][:-1]
             )
             + "\n"
@@ -1038,7 +1038,7 @@ class Active:
         if isinstance(header, dict):
             # {} is "{}\n" if not filtered
             if header:
-                header = pyaml.dump(header, sort_dicts=False, vspacing=False)
+                header = yml_dumps(header)
             else:
                 header = ""
         elif isinstance(header, list):

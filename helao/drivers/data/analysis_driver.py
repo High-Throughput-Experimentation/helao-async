@@ -16,12 +16,12 @@ from uuid import UUID
 
 import aiohttp
 import json
-import pyaml
 import botocore.exceptions
 import pandas as pd
 
 from helao.servers.base import Base
 from helao.helpers.set_time import set_time
+from helao.helpers.yml_tools import yml_dumps
 from helao.drivers.data.sync_driver import dict2json
 from helao.drivers.data.loaders import pgs3
 from helao.drivers.data.analyses.echeuvis_stability import (
@@ -134,7 +134,7 @@ class HelaoAnalysisSyncer:
         )
         os.makedirs(local_ana_dir, exist_ok=True)
         with open(os.path.join(local_ana_dir, f"{eua.analysis_uuid}.yml"), "w") as f:
-            f.write(pyaml.dump(model_dict, sort_dicts=False, vspacing=False))
+            f.write(yml_dumps(model_dict))
 
         s3_model_target = f"analysis/{eua.analysis_uuid}.json"
 

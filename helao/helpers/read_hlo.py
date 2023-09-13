@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Tuple
 from collections import defaultdict
 from glob import glob
-from ruamel.yaml import YAML
 from zipfile import ZipFile
 import zipfile
 
+from helao.helpers.yml_tools import yml_load
 
 def read_hlo(path: str) -> Tuple[dict, dict]:
     "Parse .hlo file into tuple of dictionaries containing metadata and data."
@@ -20,8 +20,7 @@ def read_hlo(path: str) -> Tuple[dict, dict]:
 
     sep_index = lines.index("%%\n")
 
-    yaml = YAML(typ="safe")
-    meta = yaml.load("".join(lines[:sep_index]))
+    meta = yml_load("".join(lines[:sep_index]))
 
     data = defaultdict(list)
     for line in lines[sep_index + 1 :]:
@@ -38,7 +37,6 @@ def read_hlo(path: str) -> Tuple[dict, dict]:
 
 class HelaoData:
     def __init__(self, target: str, **kwargs):
-        yaml = YAML(typ="unsafe")
         self.ord = ["seq", "exp", "act"]
         self.abbrd = {"seq": "sequence", "exp": "experiment", "act": "action"}
         self.target = target
@@ -56,7 +54,7 @@ class HelaoData:
                     self.ymlpath = [p for p in self.zflist if p.endswith("-seq.yml")][0]
                 self.ymldir = os.path.dirname(self.ymlpath)
                 self.type = self.ymlpath.split("-")[-1].replace(".yml", "")
-                self.yml = yaml.load(zf.open(self.ymlpath).read().decode("UTF-8"))
+                self.yml = yml_load(zf.open(self.ymlpath).read().decode("UTF-8"))
             self.seq = []
             self.exp = []
             self.act = []
@@ -105,7 +103,7 @@ class HelaoData:
                 self.ymldir = os.path.dirname(self.target)
                 self.ymlpath = target
             self.type = self.ymlpath.split("-")[-1].replace(".yml", "")
-            self.yml = yaml.load("".join(builtins.open(self.ymlpath, "r").readlines()))
+            self.yml = yml_load("".join(builtins.open(self.ymlpath, "r").readlines()))
             self.seq = [
                 HelaoData(x)
                 for x in sorted(
@@ -158,8 +156,7 @@ class HelaoData:
 
             lines = [x.decode("UTF-8").replace("\r\n", "\n") for x in lines]
             sep_index = lines.index("%%\n")
-            yaml = YAML(typ="safe")
-            meta = yaml.load("".join(lines[:sep_index]))
+            meta = yml_load("".join(lines[:sep_index]))
 
             data = defaultdict(list)
             for line in lines[sep_index + 1 :]:

@@ -9,15 +9,14 @@ from pathlib import Path
 import aiohttp
 import aioshutil
 import aiofiles
-from ruamel.yaml import YAML
 
+from helao.helpers.yml_tools import yml_load
 from helao.helpers.print_message import print_message
 from helao.helpers.premodels import Sequence, Experiment, Action
 
 
 async def yml_finisher(yml_path: str, base: object = None, retry: int = 3):
-    yaml = YAML(typ="safe")
-    ymld = yaml.load(Path(yml_path))
+    ymld = yml_load.load(Path(yml_path))
     yml_type = ymld["file_type"]
 
     def print_msg(msg):

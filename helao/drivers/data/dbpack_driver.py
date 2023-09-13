@@ -6,7 +6,6 @@ import codecs
 import json
 import asyncio
 from time import sleep
-from ruamel.yaml import YAML
 from pathlib import Path
 from glob import glob
 from datetime import datetime
@@ -27,6 +26,7 @@ from helaocore.models.sequence import SequenceModel
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.read_hlo import read_hlo
 from helao.helpers.print_message import print_message
+from helao.helpers.yml_tools import yml_load, yml_dumps
 from helao.helpers.zip_dir import zip_dir
 from helao.drivers.data.enum import YmlType
 
@@ -149,8 +149,7 @@ class HelaoYml:
     def parse_yml(self, path):
         # print(f"!!! parsing yml {path}")
         self.target = path if isinstance(path, HelaoPath) else HelaoPath(path)
-        yaml = YAML(typ="safe")
-        self.dict = yaml.load(self.target)
+        self.dict = yml_load(self.target)
         # print(f"!!! successfully parsed yml {path}")
         self.file_type = self.dict["file_type"]
         self.uuid = self.dict[f"{self.file_type}_uuid"]
@@ -540,14 +539,11 @@ class Progress(UserDict):
 
     def read(self):
         if self.progress_path.exists():
-            yaml = YAML(typ="safe")
-            self.data = yaml.load(self.progress_path)
+            self.data = yml_load(self.progress_path)
 
     def write(self):
         self.progress_path.parent.mkdir(parents=True, exist_ok=True)
-        self.progress_path.write_text(
-            pyaml.dump(self.data, safe=True, sort_dicts=False, vspacing=False)
-        )
+        self.progress_path.write_text(yml_dumps(self.data))
 
     def __setitem__(self, key, item):
         self.data[key] = item
@@ -631,9 +627,7 @@ class DBPack:
         )
         self.log_dict = {}
         if not self.log_path.exists():
-            self.log_path.write_text(
-                pyaml.dump(self.log_dict, safe=True, sort_dicts=False, vspacing=False)
-            )
+            self.log_path.write_text(yml_dumps(self.log_dict))
         else:
             self.read_log()
         if self.config_dict.get("testing", False):
@@ -717,11 +711,10 @@ class DBPack:
                             )
 
     def read_log(self):
-        yaml = YAML(typ="safe")
-        self.log_dict = yaml.load(self.log_path)
+        self.log_dict = yml_load(self.log_path)
 
     def write_log(self):
-        self.log_path.write_text(pyaml.dump(self.log_dict, safe=True, sort_dicts=False, vspacing=False))
+        self.log_path.write_text(yml_dumps(self.log_dict))
 
     def update_log(self, yml_path: str, flag_dict: dict):
         if yml_path not in self.log_dict.keys():
