@@ -1,0 +1,51 @@
+%YAML 1.2
+---
+dummy: true
+simulation: true
+experiment_libraries:
+  - OERSIM_exp
+sequence_libraries:
+  - OERSIM_seq
+run_type: simulation
+root: C:/INST_hlo
+servers:
+  ORCH:
+    host: 127.0.0.1
+    port: 8001
+    group: orchestrator
+    fast: async_orch2
+    params:
+      enable_op: true
+      bokeh_port: 5001
+      launch_browser: true
+  CPSIM:
+    host: 127.0.0.1
+    port: 8002
+    group: action
+    fast: cpsim_server
+    params:
+      plate_id: 2750
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5002
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'demo0: OER Simulation Visualizer'
+      launch_browser: true
+  GPSIM:
+    host: 127.0.0.1
+    port: 8003
+    group: action
+    fast: gpsim_server
+    params:
+      random_seed: 9999
+  GPVIS:
+    host: 127.0.0.1
+    port: 5003
+    group: visualizer
+    bokeh: live_visualizer
+    params:
+      doc_name: GP Live Visualizer
+      launch_browser: true
+loaded_config_path: /mnt/STORAGE/repos/helao/helao-async/helao/configs/demo0.py
