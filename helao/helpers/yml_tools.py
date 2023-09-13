@@ -9,7 +9,6 @@ def yml_dumps(obj, options=None):
     
     """
     yaml = ruamel.yaml.YAML(typ='rt')
-    yaml.version = (1, 2)
     yaml.indent(mapping=2, sequence=4, offset=2)
     yaml.allow_duplicate_keys = True
     # show null
