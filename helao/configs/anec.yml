@@ -1,5 +1,3 @@
-%YAML 1.2
----
 dummy: false
 simulation: false
 experiment_libraries:
@@ -177,4 +175,3 @@ servers:
     bokeh: live_visualizer
     params:
       doc_name: Sensor Visualizer
-loaded_config_path: /mnt/STORAGE/repos/helao/helao-async/helao/configs/anec.py

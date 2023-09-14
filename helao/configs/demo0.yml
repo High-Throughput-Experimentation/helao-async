@@ -1,5 +1,3 @@
-%YAML 1.2
----
 dummy: true
 simulation: true
 experiment_libraries:
@@ -48,4 +46,3 @@ servers:
     params:
       doc_name: GP Live Visualizer
       launch_browser: true
-loaded_config_path: /mnt/STORAGE/repos/helao/helao-async/helao/configs/demo0.py

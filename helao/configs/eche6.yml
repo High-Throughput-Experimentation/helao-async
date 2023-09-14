@@ -1,5 +1,3 @@
-%YAML 1.2
----
 dummy: false
 simulation: false
 experiment_libraries:
@@ -136,4 +134,3 @@ servers:
       aws_bucket: helao.data
       api_host: caltech-api.modelyst.com
       testing: false
-loaded_config_path: /mnt/STORAGE/repos/helao/helao-async/helao/configs/eche6.py
