@@ -4,8 +4,10 @@ dummy: true
 simulation: true
 experiment_libraries:
   - OERSIM_exp
+  - TEST_exp
 sequence_libraries:
   - OERSIM_seq
+  - TEST_seq
 run_type: simulation
 root: C:/INST_hlo
 servers:
