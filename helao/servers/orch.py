@@ -272,7 +272,7 @@ class Orch(Base):
                 "all FastAPI servers in config file are accessible."
             )
 
-    def update_nonblocking(
+    async def update_nonblocking(
         self, actionmodel: ActionModel, server_host: str, server_port: int
     ):
         """Update method for action server to push non-blocking action ids."""
@@ -284,7 +284,7 @@ class Orch(Base):
         else:
             self.nonblocking.remove(server_exec_id)
         # put an empty object in interrupt_q to trigger orch dispatch loop
-        self.interrupt_q.put({})
+        await self.interrupt_q.put({})
         return {"success": True}
 
     async def clear_nonblocking(self):
