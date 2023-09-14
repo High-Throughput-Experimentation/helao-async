@@ -460,6 +460,8 @@ class Base:
         # needs private dispatcher
         json_dict = {
             "actionmodel": actionmodel.as_dict(),
+        }
+        params_dict = {
             "server_host": self.server_cfg["host"],
             "server_port": self.server_cfg["port"],
         }
@@ -469,7 +471,7 @@ class Base:
             host=client_host,
             port=client_port,
             private_action="update_nonblocking",
-            params_dict={},
+            params_dict=params_dict,
             json_dict=json_dict,
         )
         self.print_message(f"update_nonblocking request got response: {response}")
