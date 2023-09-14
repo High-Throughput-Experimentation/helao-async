@@ -283,6 +283,8 @@ class Orch(Base):
             self.nonblocking.append(server_exec_id)
         else:
             self.nonblocking.remove(server_exec_id)
+        # put an empty object in interrupt_q to trigger orch dispatch loop
+        self.interrupt_q.put({})
         return {"success": True}
 
     async def clear_nonblocking(self):
