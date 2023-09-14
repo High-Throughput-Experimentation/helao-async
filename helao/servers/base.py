@@ -903,7 +903,8 @@ class Base:
             return {"signal_stop": True}
         except KeyError:
             self.print_message(f"Could not find {executor_id} among active executors.")
-            return {"signal_stop": True}
+            self.print_message(f"Current executors are: {self.executors.keys()}")
+            return {"signal_stop": False}
 
     def stop_all_executor_prefix(self, action_name: str, match_vars: dict = {}):
         matching_execs = [k for k in self.executors if k.startswith(action_name)]
