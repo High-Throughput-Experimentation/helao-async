@@ -2004,9 +2004,9 @@ class Active:
             self.base.print_message("Error encountered during executor cleanup.")
 
         _ = self.base.executors.pop(executor.exec_id)
-        await self.finish()
         if self.action.nonblocking:
             await self.send_nonblocking_status()
+        await self.finish()
 
     def stop_action_task(self):
         "External method for stopping action_loop_task."
