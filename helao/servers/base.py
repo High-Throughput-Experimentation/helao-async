@@ -835,7 +835,7 @@ class Base:
         append_dict = {
             "experiment_uuid": str(exp.experiment_uuid),
             "experiment_name": exp.experiment_name,
-            "experiment_output_dir": exp.experiment_output_dir,
+            "experiment_output_dir": str(exp.experiment_output_dir),
         }
         append_str = (
             "\n".join(
