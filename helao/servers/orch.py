@@ -277,6 +277,7 @@ class Orch(Base):
     ):
         """Update method for action server to push non-blocking action ids."""
         # print(actionmodel.clean_dict())
+        self.register_action_uuid(actionmodel.action_uuid)
         server_key = actionmodel.action_server.server_name
         server_exec_id = (server_key, actionmodel.exec_id, server_host, server_port)
         if "active" in actionmodel.action_status:
@@ -713,41 +714,6 @@ class Orch(Base):
                 nextA = self.action_dq[0]
                 if nextA.start_condition == ActionStartCondition.no_wait:
                     error_code = await self.loop_task_dispatch_action()
-
-                # await self.interrupt_q.put(self.globalstatusmodel)
-                # await self.update_operator(True)
-                # await self.globstat_q.put(self.globalstatusmodel.as_json())
-
-                # endpoint_uuids = [
-                #     str(k) for k in self.globalstatusmodel.active_dict.keys()
-                # ] + [
-                #     str(k)
-                #     for k in self.globalstatusmodel.nonactive_dict.get(
-                #         "finished", {}
-                #     ).keys()
-                # ]
-                # self.print_message(
-                #     f"Current {A.action_name} received uuids: {endpoint_uuids}"
-                # )
-                # while result_uuid not in endpoint_uuids:
-                #     self.print_message(
-                #         f"Waiting for dispatched {A.action_name}, {A.action_uuid} request to register in global status."
-                #     )
-                #     try:
-                #         await asyncio.wait_for(self.wait_for_interrupt(), timeout=5.0)
-                #     except asyncio.TimeoutError:
-                #         print(
-                #             "!!! Did not receive interrupt after 5 sec, retrying. !!!"
-                #         )
-                #     endpoint_uuids = [
-                #         str(k) for k in self.globalstatusmodel.active_dict.keys()
-                #     ] + [
-                #         str(k)
-                #         for k in self.globalstatusmodel.nonactive_dict.get(
-                #             "finished", {}
-                #         ).keys()
-                #     ]
-                # self.print_message(f"New status registered on {A.action_name}.")
 
             if error_code is not ErrorCodes.none:
                 return error_code
