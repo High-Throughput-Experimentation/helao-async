@@ -271,7 +271,7 @@ class OrchAPI(HelaoFastAPI):
                 f"'{self.orch.server.server_name.upper()}' "
                 f"got nonblocking status from "
                 f"'{actionmodel.action_server.server_name}': "
-                f"exec_id: {actionmodel.exec_id} -- status: {actionmodel.action_status}"
+                f"exec_id: {actionmodel.exec_id} -- status: {actionmodel.action_status} "
                 f"on {server_host}:{server_port}"
             )
             result_dict = await self.orch.update_nonblocking(
