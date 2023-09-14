@@ -1,5 +1,3 @@
-%YAML 1.2
----
 dummy: true
 simulation: false
 builtin_ref_motorxy:
@@ -222,4 +220,3 @@ servers:
       api_host: caltech-api.modelyst.com
       testing: false
     verbose: true
-loaded_config_path: /mnt/STORAGE/repos/helao/helao-async/helao/configs/adss.py

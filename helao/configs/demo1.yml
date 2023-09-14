@@ -1,5 +1,3 @@
-%YAML 1.2
----
 dummy: true
 simulation: true
 experiment_libraries:
@@ -39,4 +37,3 @@ servers:
     host: 127.0.0.1
     port: 8003
     group: action
-loaded_config_path: /mnt/STORAGE/repos/helao/helao-async/helao/configs/demo1.py

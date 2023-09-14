@@ -1,5 +1,3 @@
-%YAML 1.2
----
 dummy: true
 simulation: false
 builtin_ref_motorxy:
@@ -166,4 +164,3 @@ servers:
     fast: cam_server
     params:
       axis_ip: 192.168.200.210
-loaded_config_path: /mnt/STORAGE/repos/helao/helao-async/helao/configs/eche4.py
