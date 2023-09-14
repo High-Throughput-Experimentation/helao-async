@@ -292,6 +292,7 @@ class Orch(Base):
         """Clear method for orch to purge non-blocking action ids."""
         resp_tups = []
         for server_key, exec_id, server_host, server_port in self.nonblocking:
+            self.print_message("Sending stop_executor request to {server_key} on {server_host}:{server_port} for executor {exec_id}")
             # print(server_key, exec_id, server_host, server_port)
             response, error_code = await async_private_dispatcher(
                 server_key=server_key,
