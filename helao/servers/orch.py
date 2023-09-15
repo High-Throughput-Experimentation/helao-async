@@ -292,7 +292,9 @@ class Orch(Base):
         """Clear method for orch to purge non-blocking action ids."""
         resp_tups = []
         for server_key, exec_id, server_host, server_port in self.nonblocking:
-            self.print_message(f"Sending stop_executor request to {server_key} on {server_host}:{server_port} for executor {exec_id}")
+            self.print_message(
+                f"Sending stop_executor request to {server_key} on {server_host}:{server_port} for executor {exec_id}"
+            )
             # print(server_key, exec_id, server_host, server_port)
             response, error_code = await async_private_dispatcher(
                 server_key=server_key,
@@ -883,7 +885,9 @@ class Orch(Base):
             if not self.action_dq:  # in case of interrupt, don't finish exp
                 self.print_message("finishing final experiment")
                 await self.finish_active_experiment()
-            if not self.experiment_dq and not self.action_dq:  # in case of interrupt, don't finish seq
+            if (
+                not self.experiment_dq and not self.action_dq
+            ):  # in case of interrupt, don't finish seq
                 self.print_message("finishing final sequence")
                 await self.finish_active_sequence()
 
@@ -1097,6 +1101,13 @@ class Orch(Base):
     ):
         # init uuid now for tracking later
         sequence.sequence_uuid = gen_uuid()
+        if (
+            sequence.sequence_codehash is None
+            and sequence.sequence_name in self.sequence_codehash_lib
+        ):
+            sequence.sequence_codehash = self.sequence_codehash_lib[
+                sequence.sequence_name
+            ]
         self.sequence_dq.append(sequence)
         return sequence.sequence_uuid
 
