@@ -122,6 +122,9 @@ class HelaoAnalysisSyncer:
             region=self.region,
             dummy=self.world_config.get("dummy", True),
         )
+        process_dict = pgs3.LOADER.get_pro(process_uuid)
+        if process_dict.get("data_request_id", None) is not None:
+            model_dict["data_request_id"] = process_dict["data_request_id"]
         ana_tsstr = model_dict.get(
             "analysis_timestamp", set_time().strftime("%Y-%m-%d %H:%M:%S.%f")
         )

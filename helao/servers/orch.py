@@ -391,8 +391,10 @@ class Orch(Base):
             # self.print_message(
             #     f"unpack experiment {experimentmodel.experiment_name}"
             # )
+            if self.seq_model.data_request_id is not None:
+                experimentmodel.data_request_id = self.seq_model.data_request_id
             await self.add_experiment(
-                seq=self.seq_file, experimentmodel=experimentmodel
+                seq=self.seq_model, experimentmodel=experimentmodel
             )
             if i == 0:
                 self.globalstatusmodel.loop_state = OrchStatus.started
@@ -431,7 +433,7 @@ class Orch(Base):
             #     D = Experiment(**exp.as_dict())
             #     self.active_sequence.experiment_plan_list.append(D)
 
-            self.seq_file = self.active_sequence.get_seq()
+            self.seq_model = self.active_sequence.get_seq()
             await self.write_seq(self.active_sequence)
 
             # add all experiments from sequence to experiment queue
@@ -532,6 +534,8 @@ class Orch(Base):
             if act.process_finish:
                 process_count += 1
                 init_process_uuids.append(gen_uuid())
+            if self.active_experiment.data_request_id is not None:
+                act.data_request_id = self.active_experiment.data_request_id
             self.action_dq.append(act)
         if process_order_groups:
             self.active_experiment.process_order_groups = process_order_groups
