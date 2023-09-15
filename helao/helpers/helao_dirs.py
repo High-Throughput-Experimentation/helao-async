@@ -29,6 +29,7 @@ def helao_dirs(world_cfg: dict, server_name: str) -> HelaoDirs:
         user_exp = os.path.join(root, "USER_CONFIG", "EXP")
         user_seq = os.path.join(root, "USER_CONFIG", "SEQ")
         ana_root = os.path.join(root, "ANALYSES")
+        process_root = os.path.join(root, "PROCESSES")
         print_message(
             {},
             "DIR",
@@ -42,6 +43,7 @@ def helao_dirs(world_cfg: dict, server_name: str) -> HelaoDirs:
         check_dir(user_exp)
         check_dir(user_seq)
         check_dir(ana_root)
+        check_dir(process_root)
 
         helaodirs = HelaoDirs(
             root=root,
@@ -52,6 +54,7 @@ def helao_dirs(world_cfg: dict, server_name: str) -> HelaoDirs:
             user_exp=user_exp,
             user_seq=user_seq,
             ana_root=ana_root,
+            process_root=process_root,
         )
 
         # zip and remove old txt logs (start new log for every helao launch)
@@ -100,6 +103,8 @@ def helao_dirs(world_cfg: dict, server_name: str) -> HelaoDirs:
             db_root=None,
             user_exp=None,
             user_seq=None,
+            ana_root=None,
+            process_root=None,
         )
 
     return helaodirs
