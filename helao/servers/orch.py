@@ -31,7 +31,7 @@ from helaocore.models.server import ActionServerModel, GlobalStatusModel
 from helaocore.models.orchstatus import OrchStatus
 from helaocore.error import ErrorCodes
 
-from helao.servers.operator.bokeh_operator import Operator
+from helao.servers.operator.bokeh_operator import BokehOperator
 from helao.servers.vis import HelaoVis
 from helao.helpers.import_experiments import import_experiments
 from helao.helpers.import_sequences import import_sequences
@@ -163,7 +163,7 @@ class Orch(Base):
     def start_operator(self):
         servHost = self.server_cfg["host"]
         servPort = self.server_params.get("bokeh_port", self.server_cfg["port"] + 1000)
-        servPy = "Operator"
+        servPy = "BokehOperator"
 
         self.bokehapp = Server(
             {f"/{servPy}": partial(self.makeBokehApp, orch=self)},
@@ -185,7 +185,7 @@ class Orch(Base):
         )
 
         # _ = Operator(app.vis)
-        doc.operator = Operator(app.vis, orch)
+        doc.operator = BokehOperator(app.vis, orch)
         # get the event loop
         # operatorloop = asyncio.get_event_loop()
 
