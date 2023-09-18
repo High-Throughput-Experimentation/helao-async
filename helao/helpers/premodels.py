@@ -240,6 +240,10 @@ class Action(Experiment, ActionModel):
     def __str__(self):
         return f"action_name:{self.action_name}"
 
+    @property
+    def url(self):
+        return f"http://{self.action_server.hostname}:{self.action_server.port}/{self.action_server.server_name}/{self.action_name}"
+
     def get_actmodel(self):
         return ActionModel(**self.dict())
 

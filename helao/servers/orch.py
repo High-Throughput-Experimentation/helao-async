@@ -35,7 +35,11 @@ from helao.servers.operator.bokeh_operator import BokehOperator
 from helao.servers.vis import HelaoVis
 from helao.helpers.import_experiments import import_experiments
 from helao.helpers.import_sequences import import_sequences
-from helao.helpers.dispatcher import async_private_dispatcher, async_action_dispatcher
+from helao.helpers.dispatcher import (
+    async_private_dispatcher,
+    async_action_dispatcher,
+    endpoints_available,
+)
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.yml_finisher import move_dir
 from helao.helpers.premodels import Sequence, Experiment, Action
@@ -87,6 +91,7 @@ class Orch(Base):
         self.sequence_dq = zdeque([])
         self.experiment_dq = zdeque([])
         self.action_dq = zdeque([])
+        self.dispatch_buffer = []
         self.nonblocking = []
 
         # holder for tracking dispatched action in status
@@ -538,6 +543,9 @@ class Orch(Base):
                 init_process_uuids.append(gen_uuid())
             if self.active_experiment.data_request_id is not None:
                 act.data_request_id = self.active_experiment.data_request_id
+            actserv_cfg = self.world_cfg["servers"][act.action_server.server_name]
+            act.action_server.hostname = actserv_cfg["host"]
+            act.action_sever.port = actserv_cfg["port"]
             self.action_dq.append(act)
         if process_order_groups:
             self.active_experiment.process_order_groups = process_order_groups
@@ -644,6 +652,15 @@ class Orch(Base):
                         {v: self.active_experiment.globalexp_params[k]}
                     )
 
+            actserv_exists = await endpoints_available([A.url])
+            if not actserv_exists:
+                stop_message = f"{A.url} is not available, orchestrator will stop. Rectify action server then resume orchestrator run."
+                self.stop_message = stop_message
+                await self.orch.stop()
+                self.action_dq.insert(0, A)
+                await self.orch.update_operator(True)
+                return ErrorCodes.none
+
             self.print_message(
                 f"dispatching action {A.action_name} on server {A.action_server.server_name}"
             )
@@ -661,14 +678,28 @@ class Orch(Base):
                     result_actiondict, error_code = await async_action_dispatcher(
                         self.world_cfg, A
                     )
-                except asyncio.exceptions.TimeoutError:
-                    result_actiondict, error_code = await async_private_dispatcher(
-                        self.world_cfg,
-                        A.action_server.server_name,
-                        "resend_active",
-                        params_dict={},
-                        json_dict={"action_uuid": A.action_uuid},
+                except Exception as e:
+                    self.print_message(
+                        f"Error while dispatching action {A.action_name}: {e}"
                     )
+                    error_code = ErrorCodes.http
+
+                if error_code != ErrorCodes.none:
+                    stop_message = f"Dispatching action {A.action_name} did not return status code 200. Pausing orch."
+                    self.stop_message = stop_message
+                    await self.orch.stop()
+                    self.action_dq.insert(0, A)
+                    await self.orch.update_operator(True)
+                    return ErrorCodes.none
+
+                # except asyncio.exceptions.TimeoutError:
+                #     result_actiondict, error_code = await async_private_dispatcher(
+                #         self.world_cfg,
+                #         A.action_server.server_name,
+                #         "resend_active",
+                #         params_dict={},
+                #         json_dict={"action_uuid": A.action_uuid},
+                #     )
 
                 result_uuid = result_actiondict["action_uuid"]
                 self.last_action_uuid = result_uuid
