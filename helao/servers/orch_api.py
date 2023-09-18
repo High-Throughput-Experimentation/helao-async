@@ -433,6 +433,10 @@ class OrchAPI(HelaoFastAPI):
         def list_non_blocking():
             return self.orch.nonblocking
 
+        @self.post("/get_orch_state", tags=["private"])
+        def get_orch_state():
+            return self.orch.globalstatusmodel.loop_state
+
         @self.post(f"/{server_key}/wait", tags=["action"])
         async def wait(
             action: Action = Body({}, embed=True),

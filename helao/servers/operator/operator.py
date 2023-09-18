@@ -48,6 +48,10 @@ class Operator:
         """Dispatch stop request on orch"""
         return self.request("stop")
 
+    def orch_state(self):
+        """Dispatch stop request on orch"""
+        return self.request("get_orch_state")
+
     def get_active_experiment(self):
         """Retrieve active experiment"""
         return self.request("get_active_experiment")
