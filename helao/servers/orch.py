@@ -135,8 +135,12 @@ class Orch(Base):
         self.step_thru_experiments = False
         self.step_thru_sequences = False
 
+    def exception_handler(self, loop, context):
+        self.print_message(f'Got exception from coroutine: {context}')
+
     def myinit(self):
         self.aloop = asyncio.get_running_loop()
+        self.aloop.set_exception_handler(self.exception_handler)
         if self.ntp_last_sync is None:
             asyncio.gather(self.get_ntp_time())
 

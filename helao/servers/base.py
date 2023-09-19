@@ -178,8 +178,12 @@ class Base:
                             self.ntp_last_sync, self.ntp_offset = tmps
                             self.ntp_offset = float(self.ntp_offset)
 
+    def exception_handler(self, loop, context):
+        self.print_message(f'Got exception from coroutine: {context}')
+
     def myinit(self):
         self.aloop = asyncio.get_running_loop()
+        self.aloop.set_exception_handler(self.exception_handler)
         if self.ntp_last_sync is None:
             asyncio.gather(self.get_ntp_time())
 
