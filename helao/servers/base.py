@@ -1279,16 +1279,15 @@ class Active:
 
         self.base.print_message(f"writing data to: {output_file}")
         # create output file and set connection
-        async with self.base.aiolock:
-            self.file_conn_dict[file_conn_key].file = await aiofiles.open(
-                output_file, mode="a+"
-            )
+        self.file_conn_dict[file_conn_key].file = await aiofiles.open(
+            output_file, mode="a+"
+        )
 
-            if header:
-                self.base.print_message("adding header to new file")
-                if not header.endswith("\n"):
-                    header += "\n"
-                await self.file_conn_dict[file_conn_key].file.write(header)
+        if header:
+            self.base.print_message("adding header to new file")
+            if not header.endswith("\n"):
+                header += "\n"
+            await self.file_conn_dict[file_conn_key].file.write(header)
 
     async def log_data_task(self):
         """Self-subscribe to data queue, write to present file path."""
