@@ -1292,7 +1292,7 @@ def ADSS_sub_insitu_actions(
         washfour = 0
         for mtup, interval in zip(mlist, intervals):
             if mtup[0] == "aliquot":
-                apm.add(ORCH_server, "wait", {"waittime": interval - vwait -5}, waitcond)
+                apm.add(ORCH_server, "wait", {"waittime": interval - vwait -1}, waitcond)
                 apm.add(
                     NI_server,
                     "gasvalve",
