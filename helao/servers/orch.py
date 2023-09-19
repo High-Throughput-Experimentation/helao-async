@@ -98,6 +98,7 @@ class Orch(Base):
         self.last_dispatched_action_uuid = None
         self.last_50_action_uuids = []
         self.last_action_uuid = ""
+        self.last_interrupt = time.time()
         # hold schema objects
         self.active_experiment = None
         self.last_experiment = None
@@ -209,16 +210,25 @@ class Orch(Base):
         # empty it and then return
 
         # get at least one status
-        interrupt = await self.interrupt_q.get()
-        if isinstance(interrupt, GlobalStatusModel):
-            self.incoming = interrupt
+        try:
+            interrupt = await asyncio.wait_for(self.interrupt_q.get(), 0.1)
+            if isinstance(interrupt, GlobalStatusModel):
+                self.incoming = interrupt
+        except asyncio.TimeoutError:
+            if time.time() - self.last_interrupt > 10.0:
+                self.print_message("No interrupt, returning to while loop to check condition.")
+                self.print_message("This message will print again after 10 seconds.")
+                self.last_interrupt = time.time()
+            return None
 
+        self.last_interrupt = time.time()
         # if not empty clear it
         while not self.interrupt_q.empty():
             interrupt = await self.interrupt_q.get()
             if isinstance(interrupt, GlobalStatusModel):
                 self.incoming = interrupt
                 await self.globstat_q.put(interrupt)
+        return None
 
     async def subscribe_all(self, retry_limit: int = 15):
         """Subscribe to all fastapi servers in config."""
@@ -622,10 +632,10 @@ class Orch(Base):
                     )
                     while True:
                         await self.wait_for_interrupt()
-                        endpoint_free = self.globalstatusmodel.endpoint_free(
+                        wait_free = self.globalstatusmodel.endpoint_free(
                             action_server=A.orchestrator, endpoint_name="wait"
                         )
-                        if endpoint_free:
+                        if wait_free:
                             break
                 elif A.start_condition == ActionStartCondition.wait_for_previous:
                     self.print_message("orch is waiting for previous action to finish")
