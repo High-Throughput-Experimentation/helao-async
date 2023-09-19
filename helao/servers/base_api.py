@@ -58,7 +58,8 @@ class BaseAPI(HelaoFastAPI):
                 with open(os.path.join(self.base.helaodirs.save_root, "request_body.pck"), "wb") as f:
                     pickle.dump(body_bytes, f)
                 # body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"')).strip()
-                body_dict = await request.json()
+                # body_dict = await request.json()
+                body_dict = json.loads(body_bytes)
                 print(body_dict)
                 action_dict = body_dict.get("action", {})
                 start_cond = action_dict.get("start_condition", ASC.wait_for_all)
