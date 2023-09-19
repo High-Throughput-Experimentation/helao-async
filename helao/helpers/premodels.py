@@ -80,7 +80,7 @@ class Sequence(SequenceModel):
             year_week,
             sequence_day,
             f"{HMS}__{self.sequence_name}__{self.sequence_label}{append_plate}",
-        )
+        ).replace(r"\\", "/")
 
 
 class Experiment(Sequence, ExperimentModel):
@@ -118,7 +118,7 @@ class Experiment(Sequence, ExperimentModel):
         return os.path.join(
             sequence_dir,
             f"{experiment_time}__{self.experiment_name}",
-        )
+        ).replace(r"\\", "/")
 
     def get_exp(self):
         exp = ExperimentModel(**self.dict())
@@ -275,7 +275,7 @@ class Action(Experiment, ActionModel):
             f"{self.orch_submit_order}__"
             f"{self.action_split}__"
             f"{self.action_server.server_name}__{self.action_name}",
-        )
+        ).replace(r"\\", "/")
 
 
 class ActionPlanMaker:
