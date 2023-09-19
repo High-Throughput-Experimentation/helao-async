@@ -31,3 +31,5 @@ The `multi_orch_demo.bat` and `multi_orch_demo.sh` scripts will run the followin
 11. Queue a sequence of 30 active learning itterations on the second instrument group.
 
 After an initial seed of 5 acquisitions, the demo0 Orchestrator acquires data on 50 compositions with data on an additional 20 compositions provided by the demo1 Orchestrator, resulting in N=75 acquisitions at the end of the demo. After an initial seed of 5 acquisitions, the demo1 Orchestrator acquires data on 30 compositions with data on an additional 18 compositions provided by the demo0 Orchestrator, resulting in N=53 acquisitions at the end of the demo.
+
+Pressing Ctrl-x within a terminal window will shut down the server or servers launched in that instance.
