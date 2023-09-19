@@ -4,7 +4,7 @@ Sequence library for UVIS
 
 __all__ = ["UVIS_T"]
 
-
+from typing import Optional
 from helao.helpers.premodels import ExperimentPlanMaker
 
 

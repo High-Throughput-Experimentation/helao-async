@@ -109,7 +109,6 @@ dependencies:
   - libglib=2.76.4=he8f3873_0
   - libhwloc=2.9.2=nocuda_h15da153_1008
   - libiconv=1.17=h8ffe710_0
-  - libjpeg-turbo=2.1.5.1=hcfcfb64_0
   - liblapack=3.9.0=17_win64_mkl
   - libogg=1.3.4=h8ffe710_1
   - libpng=1.6.39=h19919ed_0

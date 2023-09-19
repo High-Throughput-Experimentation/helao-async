@@ -14,12 +14,10 @@ from helaocore.error import ErrorCodes
 from helao.helpers.premodels import Sequence
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.dispatcher import private_dispatcher
-from helao.configs.demo0 import config as config0
-from helao.configs.demo1 import config as config1
-
 from helao.sequences.OERSIM_seq import OERSIM_activelearn
+from helao.helpers.config_loader import config_loader
 
-cfgd = {"demo0": config0, "demo1": config1}
+cfgd = {f"demo{i}": config_loader(f"demo{i}", async_root) for i in range(2)}
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
@@ -46,7 +44,7 @@ if __name__ == "__main__":
         experiment_plan_list=exp_plan,
         sequence_uuid=gen_uuid(),
         dummy=True,
-        simulation=True
+        simulation=True,
     )
     print(seq.as_dict())
     resp, err = private_dispatcher(

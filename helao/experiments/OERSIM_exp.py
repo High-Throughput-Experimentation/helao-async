@@ -29,6 +29,7 @@ def OERSIM_sub_load_plate(
     experiment: Experiment,
     experiment_version: int = 1,
     plate_id: int = 0,
+    init_random_points: int = 5,
 ):
     apm = ActionPlanMaker()
     apm.add(CPSIM_server, "change_plate", {"plate_id": apm.pars.plate_id})
