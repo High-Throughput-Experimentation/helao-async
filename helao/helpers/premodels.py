@@ -275,7 +275,7 @@ class Action(Experiment, ActionModel):
             f"{self.orch_submit_order}__"
             f"{self.action_split}__"
             f"{self.action_server.server_name}__{self.action_name}",
-        ).replace("\\\\", "/").replace(r"\\", "/")
+        ).replace(r"\\", "/")
 
 
 class ActionPlanMaker:
