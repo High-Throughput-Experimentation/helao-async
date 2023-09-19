@@ -271,11 +271,13 @@ class Action(Experiment, ActionModel):
     def get_action_dir(self):
         experiment_dir = self.get_experiment_dir()
         return "/".join(
-            experiment_dir,
-            f"{self.orch_submit_order}__"
-            f"{self.action_split}__"
-            f"{self.action_server.server_name}__{self.action_name}",
-        ).replace(r"\\", "/")
+            [
+                experiment_dir,
+                f"{self.orch_submit_order}__"
+                f"{self.action_split}__"
+                f"{self.action_server.server_name}__{self.action_name}",
+            ]
+        )
 
 
 class ActionPlanMaker:
