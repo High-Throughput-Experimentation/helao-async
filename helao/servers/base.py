@@ -107,6 +107,8 @@ class Base:
         self.server_params = self.fastapp.helao_cfg["servers"][
             self.server.server_name
         ].get("params", {})
+        self.server.hostname = self.server_cfg["host"]
+        self.server.port = self.server_cfg["port"]
         self.world_cfg = self.fastapp.helao_cfg
         self.orch_key = [
             k
