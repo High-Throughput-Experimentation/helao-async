@@ -51,10 +51,11 @@ class BaseAPI(HelaoFastAPI):
             endpoint = request.url.path.strip("/").split("/")[-1]
             if request.url.path.strip("/").startswith(f"{server_key}/"):
                 await set_body(request, await request.body())
-                # body_dict = await request.json()
                 body_bytes = await get_body(request)
                 print(body_bytes.decode("utf8"))
-                body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
+                # body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"')).strip()
+                body_dict = await request.json()
+                print(body_dict)
                 action_dict = body_dict.get("action", {})
                 start_cond = action_dict.get("start_condition", ASC.wait_for_all)
                 action_dict["action_uuid"] = action_dict.get("action_uuid", gen_uuid())
