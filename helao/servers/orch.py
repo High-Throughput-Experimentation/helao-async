@@ -559,7 +559,7 @@ class Orch(Base):
                 act.data_request_id = self.active_experiment.data_request_id
             actserv_cfg = self.world_cfg["servers"][act.action_server.server_name]
             act.action_server.hostname = actserv_cfg["host"]
-            act.action_sever.port = actserv_cfg["port"]
+            act.action_server.port = actserv_cfg["port"]
             self.action_dq.append(act)
         if process_order_groups:
             self.active_experiment.process_order_groups = process_order_groups
