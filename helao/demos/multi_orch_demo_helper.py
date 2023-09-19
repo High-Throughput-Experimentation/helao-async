@@ -17,9 +17,7 @@ from helao.helpers.dispatcher import private_dispatcher
 from helao.sequences.OERSIM_seq import OERSIM_activelearn
 from helao.helpers.config_loader import config_loader
 
-config0 = config_loader("config0", repo_root)
-config1 = config_loader("config1", repo_root)
-cfgd = {"demo0": config0, "demo1": config1}
+cfgd = {f"demo{i}": config_loader(f"demo{i}", repo_root) for i in range(2)}
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
@@ -46,7 +44,7 @@ if __name__ == "__main__":
         experiment_plan_list=exp_plan,
         sequence_uuid=gen_uuid(),
         dummy=True,
-        simulation=True
+        simulation=True,
     )
     print(seq.as_dict())
     resp, err = private_dispatcher(
