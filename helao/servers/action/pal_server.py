@@ -849,9 +849,9 @@ def makeApp(confPrefix, server_key, helao_root):
         print(unloaded_solids)
         unloaded_liquids = [s for s in samples_in if s.sample_type == SampleType.liquid]
         print(unloaded_liquids)
-        first_unloaded_solid = unloaded_solids[0] if unloaded_solids else None
+        first_unloaded_solid = unloaded_solids[0].as_dict() if unloaded_solids else None
         first_unloaded_liquid = (
-            unloaded_liquids[0] if unloaded_liquids else None
+            unloaded_liquids[0].as_dict() if unloaded_liquids else None
         )
         if first_unloaded_liquid is None:
             unloaded_vol = 0
