@@ -133,7 +133,6 @@ dependencies:
   - libgomp=12.2.0=h65d4601_19
   - libgpg-error=1.46=h620e276_0
   - libiconv=1.17=h166bdaf_0
-  - libjpeg-turbo=2.1.5.1=h0b41bf4_0
   - liblapack=3.9.0=16_linux64_openblas
   - libllvm15=15.0.7=h5cf9203_3
   - libllvm16=16.0.6=h5cf9203_2

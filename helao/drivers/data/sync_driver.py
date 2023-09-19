@@ -413,9 +413,15 @@ class HelaoSyncer:
         self.config_dict = action_serv.server_cfg["params"]
         self.world_config = action_serv.world_cfg
         self.max_tasks = self.config_dict.get("max_tasks", 4)
-        os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
-        self.aws_session = boto3.Session(profile_name=self.config_dict["aws_profile"])
-        self.s3 = self.aws_session.client("s3")
+        if "aws_config_path" in self.config_dict:
+            os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
+            self.aws_session = boto3.Session(
+                profile_name=self.config_dict["aws_profile"]
+            )
+            self.s3 = self.aws_session.client("s3")
+        else:
+            self.aws_session = None
+            self.s3 = None
         self.bucket = self.config_dict["aws_bucket"]
         self.api_host = self.config_dict["api_host"]
 
@@ -833,6 +839,10 @@ class HelaoSyncer:
                     "run_type",
                 ]
             }
+            if "data_request_id" in exp_prog.yml.meta:
+                exp_prog.dict["process_metas"][pidx] = exp_prog.yml.meta[
+                    "data_request_id"
+                ]
             exp_prog.dict["process_metas"][pidx][
                 "process_params"
             ] = exp_prog.yml.meta.get("experiment_params", {})
@@ -931,9 +941,23 @@ class HelaoSyncer:
                 )
             if push_condition:
                 meta = exp_prog.dict["process_metas"][pidx]
-                model = MOD_MAP["process"](**meta).clean_dict(strip_private=True)
-                # sync to s3
                 uuid_key = meta["process_uuid"]
+                model = ProcessModel(**meta).clean_dict(strip_private=True)
+                # write to local yml
+                save_dir = os.path.dirname(
+                    os.path.join(
+                        self.base.helaodirs.process_root,
+                        "PROCESSES",
+                        exp_prog.yml.relative_path,
+                    )
+                )
+                save_yml_path = os.path.join(
+                    save_dir, f"{pidx}__{uuid_key}__{meta['technique_name']}-prc.yml"
+                )
+                os.makedirs(save_dir, exist_ok=True)
+                with open(save_yml_path, "w") as f:
+                    f.write(yml_dumps(model))
+                # sync to s3
                 meta_s3_key = f"process/{uuid_key}.json"
                 s3_success = await self.to_s3(model, meta_s3_key)
                 if s3_success:
@@ -943,7 +967,7 @@ class HelaoSyncer:
             gids = exp_prog.dict["process_groups"][pidx]
             if all(i in exp_prog.dict["process_actions_done"] for i in gids):
                 meta = exp_prog.dict["process_metas"][pidx]
-                model = MOD_MAP["process"](**meta).clean_dict(strip_private=True)
+                model = ProcessModel(**meta).clean_dict(strip_private=True)
                 api_success = await self.to_api(model, "process")
                 if api_success:
                     exp_prog.dict["process_api"].append(pidx)
@@ -952,6 +976,9 @@ class HelaoSyncer:
 
     async def to_s3(self, msg: Union[dict, Path], target: str, retries: int = 3):
         """Uploads to S3: dict sent as json, path sent as file."""
+        if self.s3 is None:
+            self.base.print_message("S3 is not configured. Skipping to S3 upload.")
+            return True
         if isinstance(msg, dict):
             uploaded = dict2json(msg)
             uploader = self.s3.upload_fileobj
@@ -977,6 +1004,11 @@ class HelaoSyncer:
 
     async def to_api(self, req_model: dict, meta_type: str, retries: int = 3):
         """POST/PATCH model via Modelyst API."""
+        if self.api_host is None:
+            self.base.print_message(
+                "Modelyst API is not configured. Skipping to API push."
+            )
+            return True
         req_url = f"https://{self.api_host}/{PLURALS[meta_type]}/"
         # self.base.print_message(f"preparing API push to {req_url}")
         # meta_name = req_model.get(

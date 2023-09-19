@@ -140,3 +140,29 @@ def private_dispatcher(
                 )
                 response = None
             return response, error_code
+
+
+async def check_endpoint(url: str):
+    async with aiohttp.ClientSession() as session:
+        async with session.head(url) as resp:
+            return resp.status
+
+
+async def endpoints_available(req_list: list):
+    available = []
+    unavailable = []
+    for req in req_list:
+        try:
+            status = await check_endpoint(req)
+            available.append((req, status))
+        except aiohttp.ClientConnectionError:
+            unavailable.append(req)
+    if unavailable:
+        print_message(
+            {},
+            "orchestrator",
+            f"Cannot dispatch actions because the following endpoints are unavailable: {unavailable}",
+        )
+        return False
+    else:
+        return True

@@ -56,7 +56,7 @@ class return_experiment_lib(BaseModel):
     argtypes: list
 
 
-class Operator:
+class BokehOperator:
     def __init__(self, vis_serv: Vis, orch):
         self.vis = vis_serv
         self.orch = orch
@@ -384,7 +384,7 @@ class Operator:
                     [
                         Spacer(width=20),
                         Div(
-                            text=f"<b>{self.config_dict.get('doc_name', 'Operator')} on {gethostname().lower()} -- config: {os.path.basename(self.loaded_config_path)}</b>",
+                            text=f"<b>{self.config_dict.get('doc_name', 'BokehOperator')} on {gethostname().lower()} -- config: {os.path.basename(self.loaded_config_path)}</b>",
                             width=self.max_width - 20,
                             height=32,
                             style={"font-size": "200%", "color": "red"},
@@ -643,7 +643,7 @@ class Operator:
         self.orch.orch_op = self
 
     def cleanup_session(self, session_context):
-        self.vis.print_message("Operator Bokeh session closed", info=True)
+        self.vis.print_message("BokehOperator session closed", info=True)
         self.IOloop_run = False
         self.IOtask.cancel()
 
@@ -1737,7 +1737,7 @@ class Operator:
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 self.vis.print_message(
-                    f"Operator IOloop error: {repr(e), tb,}", error=True
+                    f"BokehOperator IOloop error: {repr(e), tb,}", error=True
                 )
 
     def get_last_seq_pars(self):

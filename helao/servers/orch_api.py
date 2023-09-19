@@ -298,6 +298,16 @@ class OrchAPI(HelaoFastAPI):
             await self.orch.start()
             return {}
 
+        @self.post("/get_active_experiment", tags=["private"])
+        def get_active_experiment():
+            """Return active experiment."""
+            return self.orch.active_experiment.clean_dict()
+
+        @self.post("/get_active_sequence", tags=["private"])
+        def get_active_sequence():
+            """Return active sequence."""
+            return self.orch.active_sequence.clean_dict()
+
         @self.post("/estop", tags=["private"])
         async def estop():
             """Emergency stop experiment and action queues, interrupt running actions."""
@@ -362,7 +372,7 @@ class OrchAPI(HelaoFastAPI):
         async def append_experiment(experiment: Experiment = Body({}, embed=True)):
             """Add a experiment object to the end of the experiment queue."""
             exp_uuid = await self.orch.add_experiment(
-                seq=self.orch.seq_file, experimentmodel=experiment.get_exp()
+                seq=self.orch.seq_model, experimentmodel=experiment.get_exp()
             )
             return {"experiment_uuid": exp_uuid}
 
@@ -370,7 +380,7 @@ class OrchAPI(HelaoFastAPI):
         async def prepend_experiment(experiment: Experiment = Body({}, embed=True)):
             """Add a experiment object to the start of the experiment queue."""
             exp_uuid = await self.orch.add_experiment(
-                seq=self.orch.seq_file,
+                seq=self.orch.seq_model,
                 experimentmodel=experiment.get_exp(),
                 prepend=True,
             )
@@ -383,7 +393,7 @@ class OrchAPI(HelaoFastAPI):
         ):
             """Insert a experiment object at experiment queue index."""
             exp_uuid = await self.orch.add_experiment(
-                seq=self.orch.seq_file,
+                seq=self.orch.seq_model,
                 experimentmodel=experiment.get_exp(),
                 at_index=idx,
             )
@@ -422,6 +432,10 @@ class OrchAPI(HelaoFastAPI):
         @self.post("/list_nonblocking", tags=["private"])
         def list_non_blocking():
             return self.orch.nonblocking
+
+        @self.post("/get_orch_state", tags=["private"])
+        def get_orch_state():
+            return self.orch.globalstatusmodel.loop_state
 
         @self.post(f"/{server_key}/wait", tags=["action"])
         async def wait(

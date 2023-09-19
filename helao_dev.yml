@@ -16,9 +16,10 @@ dependencies:
   - colorama
   - comtypes
   - databases
-  - git
   - fastapi
   - filelock
+  - git
+  - httpx
   - ipykernel
   - jupyterlab
   - matplotlib

@@ -31,11 +31,15 @@ from helaocore.models.server import ActionServerModel, GlobalStatusModel
 from helaocore.models.orchstatus import OrchStatus
 from helaocore.error import ErrorCodes
 
-from helao.servers.operator.bokeh_operator import Operator
+from helao.servers.operator.bokeh_operator import BokehOperator
 from helao.servers.vis import HelaoVis
 from helao.helpers.import_experiments import import_experiments
 from helao.helpers.import_sequences import import_sequences
-from helao.helpers.dispatcher import async_private_dispatcher, async_action_dispatcher
+from helao.helpers.dispatcher import (
+    async_private_dispatcher,
+    async_action_dispatcher,
+    endpoints_available,
+)
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.yml_finisher import move_dir
 from helao.helpers.premodels import Sequence, Experiment, Action
@@ -87,12 +91,14 @@ class Orch(Base):
         self.sequence_dq = zdeque([])
         self.experiment_dq = zdeque([])
         self.action_dq = zdeque([])
+        self.dispatch_buffer = []
         self.nonblocking = []
 
         # holder for tracking dispatched action in status
         self.last_dispatched_action_uuid = None
         self.last_50_action_uuids = []
         self.last_action_uuid = ""
+        self.last_interrupt = time.time()
         # hold schema objects
         self.active_experiment = None
         self.last_experiment = None
@@ -129,8 +135,12 @@ class Orch(Base):
         self.step_thru_experiments = False
         self.step_thru_sequences = False
 
+    def exception_handler(self, loop, context):
+        self.print_message(f'Got exception from coroutine: {context}')
+
     def myinit(self):
         self.aloop = asyncio.get_running_loop()
+        self.aloop.set_exception_handler(self.exception_handler)
         if self.ntp_last_sync is None:
             asyncio.gather(self.get_ntp_time())
 
@@ -163,7 +173,7 @@ class Orch(Base):
     def start_operator(self):
         servHost = self.server_cfg["host"]
         servPort = self.server_params.get("bokeh_port", self.server_cfg["port"] + 1000)
-        servPy = "Operator"
+        servPy = "BokehOperator"
 
         self.bokehapp = Server(
             {f"/{servPy}": partial(self.makeBokehApp, orch=self)},
@@ -185,7 +195,7 @@ class Orch(Base):
         )
 
         # _ = Operator(app.vis)
-        doc.operator = Operator(app.vis, orch)
+        doc.operator = BokehOperator(app.vis, orch)
         # get the event loop
         # operatorloop = asyncio.get_event_loop()
 
@@ -204,16 +214,25 @@ class Orch(Base):
         # empty it and then return
 
         # get at least one status
-        interrupt = await self.interrupt_q.get()
-        if isinstance(interrupt, GlobalStatusModel):
-            self.incoming = interrupt
+        try:
+            interrupt = await asyncio.wait_for(self.interrupt_q.get(), 0.5)
+            if isinstance(interrupt, GlobalStatusModel):
+                self.incoming = interrupt
+        except asyncio.TimeoutError:
+            if time.time() - self.last_interrupt > 10.0:
+                self.print_message("No interrupt, returning to while loop to check condition.")
+                self.print_message("This message will print again after 10 seconds.")
+                self.last_interrupt = time.time()
+            return None
 
+        self.last_interrupt = time.time()
         # if not empty clear it
         while not self.interrupt_q.empty():
             interrupt = await self.interrupt_q.get()
             if isinstance(interrupt, GlobalStatusModel):
                 self.incoming = interrupt
                 await self.globstat_q.put(interrupt)
+        return None
 
     async def subscribe_all(self, retry_limit: int = 15):
         """Subscribe to all fastapi servers in config."""
@@ -292,7 +311,9 @@ class Orch(Base):
         """Clear method for orch to purge non-blocking action ids."""
         resp_tups = []
         for server_key, exec_id, server_host, server_port in self.nonblocking:
-            self.print_message(f"Sending stop_executor request to {server_key} on {server_host}:{server_port} for executor {exec_id}")
+            self.print_message(
+                f"Sending stop_executor request to {server_key} on {server_host}:{server_port} for executor {exec_id}"
+            )
             # print(server_key, exec_id, server_host, server_port)
             response, error_code = await async_private_dispatcher(
                 server_key=server_key,
@@ -391,8 +412,10 @@ class Orch(Base):
             # self.print_message(
             #     f"unpack experiment {experimentmodel.experiment_name}"
             # )
+            if self.seq_model.data_request_id is not None:
+                experimentmodel.data_request_id = self.seq_model.data_request_id
             await self.add_experiment(
-                seq=self.seq_file, experimentmodel=experimentmodel
+                seq=self.seq_model, experimentmodel=experimentmodel
             )
             if i == 0:
                 self.globalstatusmodel.loop_state = OrchStatus.started
@@ -431,7 +454,7 @@ class Orch(Base):
             #     D = Experiment(**exp.as_dict())
             #     self.active_sequence.experiment_plan_list.append(D)
 
-            self.seq_file = self.active_sequence.get_seq()
+            self.seq_model = self.active_sequence.get_seq()
             await self.write_seq(self.active_sequence)
 
             # add all experiments from sequence to experiment queue
@@ -532,6 +555,11 @@ class Orch(Base):
             if act.process_finish:
                 process_count += 1
                 init_process_uuids.append(gen_uuid())
+            if self.active_experiment.data_request_id is not None:
+                act.data_request_id = self.active_experiment.data_request_id
+            actserv_cfg = self.world_cfg["servers"][act.action_server.server_name]
+            act.action_server.hostname = actserv_cfg["host"]
+            act.action_server.port = actserv_cfg["port"]
             self.action_dq.append(act)
         if process_order_groups:
             self.active_experiment.process_order_groups = process_order_groups
@@ -604,14 +632,14 @@ class Orch(Base):
                             break
                 elif A.start_condition == ActionStartCondition.wait_for_orch:
                     self.print_message(
-                        "orch is waiting for endpoint to become available"
+                        "orch is waiting for wait action to end"
                     )
                     while True:
                         await self.wait_for_interrupt()
-                        endpoint_free = self.globalstatusmodel.endpoint_free(
+                        wait_free = self.globalstatusmodel.endpoint_free(
                             action_server=A.orchestrator, endpoint_name="wait"
                         )
-                        if endpoint_free:
+                        if wait_free:
                             break
                 elif A.start_condition == ActionStartCondition.wait_for_previous:
                     self.print_message("orch is waiting for previous action to finish")
@@ -638,6 +666,15 @@ class Orch(Base):
                         {v: self.active_experiment.globalexp_params[k]}
                     )
 
+            actserv_exists = await endpoints_available([A.url])
+            if not actserv_exists:
+                stop_message = f"{A.url} is not available, orchestrator will stop. Rectify action server then resume orchestrator run."
+                self.stop_message = stop_message
+                await self.orch.stop()
+                self.action_dq.insert(0, A)
+                await self.orch.update_operator(True)
+                return ErrorCodes.none
+
             self.print_message(
                 f"dispatching action {A.action_name} on server {A.action_server.server_name}"
             )
@@ -655,14 +692,28 @@ class Orch(Base):
                     result_actiondict, error_code = await async_action_dispatcher(
                         self.world_cfg, A
                     )
-                except asyncio.exceptions.TimeoutError:
-                    result_actiondict, error_code = await async_private_dispatcher(
-                        self.world_cfg,
-                        A.action_server.server_name,
-                        "resend_active",
-                        params_dict={},
-                        json_dict={"action_uuid": A.action_uuid},
+                except Exception as e:
+                    self.print_message(
+                        f"Error while dispatching action {A.action_name}: {e}"
                     )
+                    error_code = ErrorCodes.http
+
+                if error_code != ErrorCodes.none:
+                    stop_message = f"Dispatching action {A.action_name} did not return status code 200. Pausing orch."
+                    self.stop_message = stop_message
+                    await self.orch.stop()
+                    self.action_dq.insert(0, A)
+                    await self.orch.update_operator(True)
+                    return ErrorCodes.none
+
+                # except asyncio.exceptions.TimeoutError:
+                #     result_actiondict, error_code = await async_private_dispatcher(
+                #         self.world_cfg,
+                #         A.action_server.server_name,
+                #         "resend_active",
+                #         params_dict={},
+                #         json_dict={"action_uuid": A.action_uuid},
+                #     )
 
                 result_uuid = result_actiondict["action_uuid"]
                 self.last_action_uuid = result_uuid
@@ -879,7 +930,9 @@ class Orch(Base):
             if not self.action_dq:  # in case of interrupt, don't finish exp
                 self.print_message("finishing final experiment")
                 await self.finish_active_experiment()
-            if not self.experiment_dq and not self.action_dq:  # in case of interrupt, don't finish seq
+            if (
+                not self.experiment_dq and not self.action_dq
+            ):  # in case of interrupt, don't finish seq
                 self.print_message("finishing final sequence")
                 await self.finish_active_sequence()
 
@@ -907,9 +960,10 @@ class Orch(Base):
         # some actions are active
         # we need to wait for them to finish
         while not self.globalstatusmodel.actions_idle():
-            self.print_message(
-                "some actions are still active, waiting for status update"
-            )
+            if time.time() - self.last_interrupt > 10.0:
+                self.print_message(
+                    "some actions are still active, waiting for status update"
+                )
             # we check again once the active action
             # updates its status again
             await self.wait_for_interrupt()
@@ -1093,6 +1147,13 @@ class Orch(Base):
     ):
         # init uuid now for tracking later
         sequence.sequence_uuid = gen_uuid()
+        if (
+            sequence.sequence_codehash is None
+            and sequence.sequence_name in self.sequence_codehash_lib
+        ):
+            sequence.sequence_codehash = self.sequence_codehash_lib[
+                sequence.sequence_name
+            ]
         self.sequence_dq.append(sequence)
         return sequence.sequence_uuid
 

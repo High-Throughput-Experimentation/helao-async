@@ -80,7 +80,7 @@ class Sequence(SequenceModel):
             year_week,
             sequence_day,
             f"{HMS}__{self.sequence_name}__{self.sequence_label}{append_plate}",
-        )
+        ).replace(r"\\", "/")
 
 
 class Experiment(Sequence, ExperimentModel):
@@ -118,7 +118,7 @@ class Experiment(Sequence, ExperimentModel):
         return os.path.join(
             sequence_dir,
             f"{experiment_time}__{self.experiment_name}",
-        )
+        ).replace(r"\\", "/")
 
     def get_exp(self):
         exp = ExperimentModel(**self.dict())
@@ -240,6 +240,10 @@ class Action(Experiment, ActionModel):
     def __str__(self):
         return f"action_name:{self.action_name}"
 
+    @property
+    def url(self):
+        return f"http://{self.action_server.hostname}:{self.action_server.port}/{self.action_server.server_name}/{self.action_name}"
+
     def get_actmodel(self):
         return ActionModel(**self.dict())
 
@@ -266,11 +270,13 @@ class Action(Experiment, ActionModel):
 
     def get_action_dir(self):
         experiment_dir = self.get_experiment_dir()
-        return os.path.join(
-            experiment_dir,
-            f"{self.orch_submit_order}__"
-            f"{self.action_split}__"
-            f"{self.action_server.server_name}__{self.action_name}",
+        return "/".join(
+            [
+                experiment_dir,
+                f"{self.orch_submit_order}__"
+                f"{self.action_split}__"
+                f"{self.action_server.server_name}__{self.action_name}",
+            ]
         )
 
 
