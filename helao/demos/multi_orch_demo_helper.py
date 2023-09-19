@@ -14,11 +14,11 @@ from helaocore.error import ErrorCodes
 from helao.helpers.premodels import Sequence
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.dispatcher import private_dispatcher
-from helao.configs.demo0 import config as config0
-from helao.configs.demo1 import config as config1
-
 from helao.sequences.OERSIM_seq import OERSIM_activelearn
+from helao.helpers.config_loader import config_loader
 
+config0 = config_loader("config0", repo_root)
+config1 = config_loader("config1", repo_root)
 cfgd = {"demo0": config0, "demo1": config1}
 
 if __name__ == "__main__":
