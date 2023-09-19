@@ -53,6 +53,7 @@ class BaseAPI(HelaoFastAPI):
                 await set_body(request, await request.body())
                 # body_dict = await request.json()
                 body_bytes = await get_body(request)
+                print(body_bytes.decode("utf8"))
                 body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"'))
                 action_dict = body_dict.get("action", {})
                 start_cond = action_dict.get("start_condition", ASC.wait_for_all)
