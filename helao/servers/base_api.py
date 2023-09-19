@@ -53,6 +53,10 @@ class BaseAPI(HelaoFastAPI):
                 await set_body(request, await request.body())
                 body_bytes = await get_body(request)
                 print(body_bytes.decode("utf8"))
+                import pickle
+                import os
+                with open(os.path.join(self.base.helaodirs.save_root "request_body.pck"), "wb") as f:
+                    pickle.dump(body_bytes, f)
                 # body_dict = json.loads(body_bytes.decode("utf8").replace("'", '"')).strip()
                 body_dict = await request.json()
                 print(body_dict)
