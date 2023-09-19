@@ -618,7 +618,7 @@ class Orch(Base):
                             break
                 elif A.start_condition == ActionStartCondition.wait_for_orch:
                     self.print_message(
-                        "orch is waiting for endpoint to become available"
+                        "orch is waiting for wait action to end"
                     )
                     while True:
                         await self.wait_for_interrupt()
