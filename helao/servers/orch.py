@@ -215,7 +215,7 @@ class Orch(Base):
 
         # get at least one status
         try:
-            interrupt = await asyncio.wait_for(self.interrupt_q.get(), 0.1)
+            interrupt = await asyncio.wait_for(self.interrupt_q.get(), 0.5)
             if isinstance(interrupt, GlobalStatusModel):
                 self.incoming = interrupt
         except asyncio.TimeoutError:
@@ -960,9 +960,10 @@ class Orch(Base):
         # some actions are active
         # we need to wait for them to finish
         while not self.globalstatusmodel.actions_idle():
-            self.print_message(
-                "some actions are still active, waiting for status update"
-            )
+            if time.time() - self.last_interrupt > 10.0:
+                self.print_message(
+                    "some actions are still active, waiting for status update"
+                )
             # we check again once the active action
             # updates its status again
             await self.wait_for_interrupt()
