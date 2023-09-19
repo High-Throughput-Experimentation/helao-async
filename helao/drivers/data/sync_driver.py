@@ -22,7 +22,6 @@ import codecs
 import json
 import asyncio
 from zipfile import ZipFile
-from ruamel.yaml import YAML
 from pathlib import Path
 from datetime import datetime
 from typing import Union, Optional, Dict, List
@@ -40,7 +39,7 @@ from helaocore.models.experiment import ExperimentModel
 from helaocore.models.sequence import SequenceModel
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.read_hlo import read_hlo
-from helao.helpers.yml_tools import yml_dumps
+from helao.helpers.yml_tools import yml_dumps, yml_load
 from helao.helpers.zip_dir import zip_dir
 
 
@@ -64,7 +63,6 @@ PLURALS = {
 MOD_PATCH = {
     "exid": "exec_id",
 }
-YAML_LOADER = YAML(typ="safe")
 
 
 def dict2json(input_dict: dict):
@@ -286,7 +284,7 @@ class HelaoYml:
     @property
     def meta(self):
         with self.filelock:
-            ymld = YAML_LOADER.load(self.target)
+            ymld = yml_load(self.target)
         return ymld
 
     def write_meta(self, meta_dict: dict):
@@ -384,7 +382,7 @@ class Progress:
         return [], []
 
     def read_dict(self):
-        self.dict = YAML_LOADER.load(self.prg)
+        self.dict = yml_load(self.prg)
 
     def write_dict(self, new_dict: Optional[Dict] = None):
         out_dict = self.dict if new_dict is None else new_dict
