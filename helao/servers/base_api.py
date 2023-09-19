@@ -48,12 +48,13 @@ class BaseAPI(HelaoFastAPI):
 
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
+            print(request.method)
+            if request.method.lower() == "head" :  # comes from endpoint checker, session.head()
+                response = await call_next(request)
             endpoint = request.url.path.strip("/").split("/")[-1]
             if request.url.path.strip("/").startswith(f"{server_key}/"):
                 await set_body(request, await request.body())
                 body_bytes = await get_body(request)
-                if body_bytes is None:
-                    response = await call_next(request)
                 body_dict = json.loads(body_bytes)
                 print(body_dict)
                 action_dict = body_dict.get("action", {})
