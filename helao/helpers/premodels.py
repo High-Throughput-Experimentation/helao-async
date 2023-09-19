@@ -270,7 +270,7 @@ class Action(Experiment, ActionModel):
 
     def get_action_dir(self):
         experiment_dir = self.get_experiment_dir()
-        return os.path.join(
+        return "/".join(
             experiment_dir,
             f"{self.orch_submit_order}__"
             f"{self.action_split}__"
