@@ -652,11 +652,13 @@ class HelaoSyncer:
                             file_s3_key = (
                                 f"raw_data/{meta['action_uuid']}/{fp.name}.json"
                             )
+                            self.base.print_message("Parsing hlo dicts.")
                             file_meta, file_data = read_hlo(str(fp))
                             msg = {"meta": file_meta, "data": file_data}
                         else:
                             file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}"
                             msg = fp
+                        self.base.print_message(f"Destination: {file_s3_key}")
                         file_success = await self.to_s3(msg, file_s3_key)
                         if file_success:
                             prog.dict["files_pending"].remove(fp)
@@ -978,9 +980,11 @@ class HelaoSyncer:
             self.base.print_message("S3 is not configured. Skipping to S3 upload.")
             return True
         if isinstance(msg, dict):
+            self.base.print_message("Converting dict to json.")
             uploaded = dict2json(msg)
             uploader = self.s3.upload_fileobj
         else:
+            self.base.print_message("Converting path to str")
             uploaded = str(msg)
             uploader = self.s3.upload_file
         for i in range(retries + 1):
