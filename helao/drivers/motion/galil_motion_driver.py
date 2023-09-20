@@ -511,7 +511,7 @@ class Galil:
                 new_motorxyz = self.transform.transform_instrxyz_to_motorxyz(
                     new_instrxyz[0:3]
                 )
-                self.base.print_messagef(f"new motor position (abs): {new_motorxyz}")
+                self.base.print_message(f"new motor position (abs): {new_motorxyz}")
                 axis = ["x", "y", "z"]
                 d_mm = [d for d in new_motorxyz[0:3]]
                 mode = MoveModes.absolute
