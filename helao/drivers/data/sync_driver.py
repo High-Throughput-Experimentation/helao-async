@@ -637,23 +637,24 @@ class HelaoSyncer:
                 # re-check file lists
                 # self.base.print_message(f"Checking file lists for {yml.target.name}")
                 prog.dict["files_pending"] += [
-                    p
+                    str(p)
                     for p in yml.hlo_files + yml.misc_files
                     if p not in prog.dict["files_pending"]
                     and p not in prog.dict["files_s3"]
                 ]
                 # push files to S3
                 while prog.dict.get("files_pending", []):
-                    for fp in prog.dict["files_pending"]:
+                    for sp in prog.dict["files_pending"]:
+                        fp = Path(sp)
                         self.base.print_message(
-                            f"Pushing {str(fp)} to S3 for {yml.target.name}"
+                            f"Pushing {sp} to S3 for {yml.target.name}"
                         )
                         if fp.suffix == ".hlo":
                             file_s3_key = (
                                 f"raw_data/{meta['action_uuid']}/{fp.name}.json"
                             )
                             self.base.print_message("Parsing hlo dicts.")
-                            file_meta, file_data = read_hlo(str(fp))
+                            file_meta, file_data = read_hlo(sp)
                             msg = {"meta": file_meta, "data": file_data}
                         else:
                             file_s3_key = f"raw_data/{meta['action_uuid']}/{fp.name}"
@@ -662,7 +663,7 @@ class HelaoSyncer:
                         file_success = await self.to_s3(msg, file_s3_key)
                         if file_success:
                             self.base.print_message("Removing file from pending list.")
-                            prog.dict["files_pending"].remove(fp)
+                            prog.dict["files_pending"].remove(sp)
                             self.base.print_message(f"Adding file to S3 dict. {fp.name}: {file_s3_key}")
                             prog.dict["files_s3"].update({fp.name: file_s3_key})
                             self.base.print_message(f"Updating progress: {prog.dict}")
