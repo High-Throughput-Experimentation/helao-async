@@ -856,7 +856,7 @@ def makeApp(confPrefix, server_key, helao_root):
         if first_unloaded_liquid is None:
             unloaded_vol = 0
         else:
-            unloaded_vol = first_unloaded_liquid.volume_ml
+            unloaded_vol = first_unloaded_liquid['volume_ml']
         active.action.action_params.update({"_unloaded_solid": first_unloaded_solid})
         active.action.action_params.update({"_unloaded_liquid": first_unloaded_liquid})
         active.action.action_params.update({"_unloaded_liquid_vol": unloaded_vol})
