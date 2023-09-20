@@ -1030,8 +1030,8 @@ class HelaoSyncer:
         self.base.print_message("creating async request session")
         async with aiohttp.ClientSession() as session:
             for i in range(retries):
-                self.base.print_message(f"session attempt {i}")
                 if not api_success:
+                    self.base.print_message(f"session attempt {i}")
                     req_method = session.post if try_create else session.patch
                     api_str = f"API {'POST' if try_create else 'PATCH'}"
                     try:
@@ -1054,6 +1054,8 @@ class HelaoSyncer:
                         self.base.print_message(
                             f"[{i+1}/{retries}] an exception occurred: {e}"
                         )
+                else:
+                    break
             if not api_success:
                 meta_s3_key = f"{meta_type}/{meta_uuid}.json"
                 fail_model = {
