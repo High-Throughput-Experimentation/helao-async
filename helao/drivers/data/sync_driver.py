@@ -661,6 +661,7 @@ class HelaoSyncer:
                         self.base.print_message(f"Destination: {file_s3_key}")
                         file_success = await self.to_s3(msg, file_s3_key)
                         if file_success:
+                            self.base.print_message("Updating progress file.")
                             prog.dict["files_pending"].remove(fp)
                             prog.dict["files_s3"].update({fp.name: file_s3_key})
                             prog.write_dict()
