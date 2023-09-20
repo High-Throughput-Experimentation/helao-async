@@ -2,16 +2,20 @@ import sys
 import os
 import inspect
 import time
+from dotenv import load_dotenv
+from pathlib import Path
 
 from helao.servers.operator.operator import Operator
 from helao.helpers.gcld_client import DataRequestsClient
 from helao.helpers.premodels import Sequence
 from helao.sequences.UVIS_T_seq import UVIS_T
 
-client = DataRequestsClient()
 inst_config = sys.argv[1]
 PLATE_ID = int(sys.argv[2])
+env_config = sys.argv[3]
 
+load_dotenv(dotenv_path=Path(env_config))
+client = DataRequestsClient()
 
 def uvis_seq_constructor(plate_id, sample_no, data_request_id, params={}):
     argspec = inspect.getfullargspec(UVIS_T)
