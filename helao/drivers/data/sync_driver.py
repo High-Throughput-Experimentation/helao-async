@@ -665,7 +665,7 @@ class HelaoSyncer:
                             prog.dict["files_pending"].remove(fp)
                             self.base.print_message(f"Adding file to S3 dict. {fp.name}: {file_s3_key}")
                             prog.dict["files_s3"].update({fp.name: file_s3_key})
-                            self.base.print_message("Updating progress.")
+                            self.base.print_message(f"Updating progress: {prog.dict}")
                             prog.write_dict()
 
             # if yml is an experiment first check processes before pushing to API
