@@ -808,7 +808,7 @@ class HelaoSyncer:
         exp_path = Path(act_yml.parent_path)
         exp_prog = self.get_progress(exp_path)
         with exp_prog.prglock:
-            act_idx = int(act_meta["action_order"])
+            act_idx = act_meta["action_order"]
             # handle legacy experiments (no process list)
             if exp_prog.dict["legacy_experiment"]:
                 # if action is a process finisher, add to exp progress
@@ -822,18 +822,17 @@ class HelaoSyncer:
                     if act_idx > max(pf_idxs + [-1])
                     else pf_idxs.index(min(x for x in pf_idxs if x >= act_idx))
                 )
-                exp_prog.dict["process_groups"][pidx] = exp_prog.dict["process_groups"].get(
-                    pidx, []
-                )
+                exp_prog.dict["process_groups"][pidx] = exp_prog.dict[
+                    "process_groups"
+                ].get(pidx, [])
                 exp_prog.dict["process_groups"][pidx].append(act_idx)
             else:
-                pidx = int(
-                    [
-                        k
-                        for k, l in exp_prog.dict["process_groups"].items()
-                        if int(act_idx) in l
-                    ][0]
-                )
+                pidx = [
+                    k
+                    for k, l in exp_prog.dict["process_groups"].items()
+                    if act_idx in l
+                ][0]
+
             # if exp_prog doesn't yet have metadict, create one
             if pidx not in exp_prog.dict["process_metas"]:
                 process_meta = {
@@ -851,15 +850,13 @@ class HelaoSyncer:
                     ]
                 }
                 if "data_request_id" in exp_prog.yml.meta:
-                    process_meta[
+                    process_meta["data_request_id"] = exp_prog.yml.meta[
                         "data_request_id"
-                    ] = exp_prog.yml.meta["data_request_id"]
-                process_meta[
-                    "process_params"
-                ] = exp_prog.yml.meta.get("experiment_params", {})
-                process_meta[
-                    "technique_name"
-                ] = exp_prog.yml.meta.get(
+                    ]
+                process_meta["process_params"] = exp_prog.yml.meta.get(
+                    "experiment_params", {}
+                )
+                process_meta["technique_name"] = exp_prog.yml.meta.get(
                     "technique_name", exp_prog.yml.meta["experiment_name"]
                 )
                 process_list = exp_prog.yml.meta.get("process_list", [])
@@ -878,13 +875,9 @@ class HelaoSyncer:
 
             # self.base.print_message(f"current experiment progress:\n{exp_prog.dict}")
             if act_idx == min(exp_prog.dict["process_groups"][pidx]):
-                process_meta["process_timestamp"] = act_meta[
-                    "action_timestamp"
-                ]
+                process_meta["process_timestamp"] = act_meta["action_timestamp"]
             if "technique_name" in act_meta:
-                process_meta["technique_name"] = act_meta[
-                    "technique_name"
-                ]
+                process_meta["technique_name"] = act_meta["technique_name"]
             tech_name = process_meta["technique_name"]
             if isinstance(tech_name, list):
                 split_technique = tech_name[act_meta.get("action_split", 0)]
@@ -913,7 +906,9 @@ class HelaoSyncer:
                     deduped_samples = []
                     for si, x in enumerate(sample_list):
                         sample_label = x["global_label"]
-                        actuuid = [y for y in x["action_uuid"] if y in actuuid_order.keys()]
+                        actuuid = [
+                            y for y in x["action_uuid"] if y in actuuid_order.keys()
+                        ]
                         if not actuuid:
                             # self.base.print_message(
                             #     "no action_uuid for {sample_label}, using listed order"
@@ -943,7 +938,7 @@ class HelaoSyncer:
         """Pushes unfinished procesess to S3 & API from experiment progress."""
         s3_unfinished, api_unfinished = exp_prog.list_unfinished_procs()
         for pidx in s3_unfinished:
-            pidx = int(pidx)
+            pidx = pidx
             gids = exp_prog.dict["process_groups"][pidx]
             push_condition = False
             if force:
@@ -952,17 +947,19 @@ class HelaoSyncer:
                 push_condition = max(gids) in exp_prog.dict[
                     "legacy_finisher_idxs"
                 ] and all(i in exp_prog.dict["process_actions_done"] for i in gids)
-            elif exp_prog.dict["process_metas"].get(pidx, {}) == {}:
-                push_condition = False
-                sync_path = str(exp_prog.prg)
-                self.reset_sync(sync_path)
-                await self.enqueue_yml(str(exp_prog.yml.target))
             else:
-                push_condition = all(
-                    i in exp_prog.dict["process_actions_done"] for i in gids
-                ) and exp_prog.dict["process_metas"].get(pidx, {})
-            
+                push_condition = (
+                    all(i in exp_prog.dict["process_actions_done"] for i in gids)
+                    and exp_prog.dict["process_metas"].get(pidx, {}) != {}
+                )
+
             if push_condition:
+                if pidx not in exp_prog.dict["process_metas"]:
+                    push_condition = False
+                    sync_path = str(exp_prog.prg)
+                    self.reset_sync(sync_path)
+                    await self.enqueue_yml(str(exp_prog.yml.target))
+                    return exp_prog
                 meta = exp_prog.dict["process_metas"][pidx]
                 uuid_key = meta["process_uuid"]
                 model = ProcessModel(**meta).clean_dict(strip_private=True)
