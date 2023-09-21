@@ -1,9 +1,7 @@
 import os
 
 from helaocore.error import ErrorCodes
-from helaocore.models.experiment import ExperimentModel
-from helaocore.models.sequence import SequenceModel
-from helao.helpers.premodels import Sequence
+from helao.helpers.premodels import Sequence, Experiment
 from helao.helpers.dispatcher import private_dispatcher
 from helao.helpers.config_loader import config_loader
 
@@ -61,7 +59,7 @@ class Operator:
         """Retrieve active sequence"""
         return self.request("get_active_sequence")
 
-    def add_experiment(self, experiment: ExperimentModel, index: int = -1):
+    def add_experiment(self, experiment: Experiment, index: int = -1):
         """add experiment to active sequence or creates new sequence"""
         if index == -1:
             return self.request(
