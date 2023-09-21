@@ -40,7 +40,7 @@ class C_specvis:
 
     def __init__(self, vis_serv: Vis, serv_key: str):
         self.vis = vis_serv
-        self.config_dict = self.vis.server_cfg["params"]
+        self.config_dict = self.vis.server_cfg.get("params", {})
         self.max_spectra = 5
         self.downsample = 2
         self.update_rate = 1e-3

@@ -39,7 +39,7 @@ class Aligner:
     def __init__(self, vis_serv: Vis, motor):
         self.vis = vis_serv
         self.motor = motor
-        self.config_dict = self.vis.server_cfg["params"]
+        self.config_dict = self.vis.server_cfg.get("params", {})
         self.dataAPI = HTELegacyAPI(self.vis)
         self.motorpos_q = asyncio.Queue()
 

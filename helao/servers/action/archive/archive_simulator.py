@@ -23,7 +23,7 @@ from helao.helpers.config_loader import config_loader
 class ArchiveSim:
     def __init__(self, action_serv: Base):
         self.base = action_serv
-        self.config_dict = action_serv.server_cfg["params"]
+        self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
         self.loaded_plate_id = None
         self.loaded_ph = None

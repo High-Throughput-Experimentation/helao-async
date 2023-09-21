@@ -615,7 +615,7 @@ class DBPack:
 
     def __init__(self, action_serv: Base):
         self.base = action_serv
-        self.config_dict = action_serv.server_cfg["params"]
+        self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
         os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
         self.aws_session = boto3.Session(profile_name=self.config_dict["aws_profile"])
