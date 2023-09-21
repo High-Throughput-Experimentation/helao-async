@@ -53,7 +53,7 @@ class Sequence(SequenceModel):
         # seq.experiment_plan_list = [ExperimentTemplate(**exp.dict()) for exp in self.experimentmodel_list]
         return seq
 
-    def init_seq(self, time_offset: float = 0, force: Optional[bool] = None):
+    def init_seq(self, time_offset: float = 0, force: Optional[bool] = False):
         if force is None:
             force = False
         if force or self.sequence_timestamp is None:
@@ -99,7 +99,7 @@ class Experiment(Sequence, ExperimentModel):
     def __str__(self):
         return f"experiment_name:{self.experiment_name}"
 
-    def init_exp(self, time_offset: float = 0, force: Optional[bool] = None):
+    def init_exp(self, time_offset: float = 0, force: Optional[bool] = False):
         if force is None:
             force = False
         if force or self.experiment_timestamp is None:
@@ -247,7 +247,7 @@ class Action(Experiment, ActionModel):
     def get_actmodel(self):
         return ActionModel(**self.dict())
 
-    def init_act(self, time_offset: float = 0, force: Optional[bool] = None):
+    def init_act(self, time_offset: float = 0, force: Optional[bool] = False):
         if self.sequence_timestamp is None or self.experiment_timestamp is None:
             self.manual_action = True
             self.access = "manual"
