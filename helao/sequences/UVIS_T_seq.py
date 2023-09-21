@@ -27,12 +27,6 @@ def UVIS_T(
     led_wavelengths_nm: list = [-1],
     led_intensities_mw: list = [0.432],
     toggle_is_shutter: bool = False,
-    calc_ev_parts: list = [1.8, 2.2, 2.6, 3.0],
-    calc_bin_width: int = 3,
-    calc_window_length: int = 45,
-    calc_poly_order: int = 4,
-    calc_lower_wl: float = 370.0,
-    calc_upper_wl: float = 700.0,
     analysis_seq_uuid: str = "",
 ):
     epm = ExperimentPlanMaker()

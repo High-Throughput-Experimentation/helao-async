@@ -46,12 +46,6 @@ def uvis_seq_constructor(plate_id, sample_no, data_request_id, params={}):
             "led_wavelengths_nm": [-1],
             "led_intensities_mw": [-1],
             "toggle_is_shutter": False,
-            "calc_ev_parts": [1.8, 2.2, 2.6, 3.0],
-            "calc_bin_width": 3,
-            "calc_window_length": 45,
-            "calc_poly_order": 4,
-            "calc_lower_wl": 370.0,
-            "calc_upper_wl": 700.0,
             "analysis_seq_uuid": str(seq_uuid)
         }
     )
