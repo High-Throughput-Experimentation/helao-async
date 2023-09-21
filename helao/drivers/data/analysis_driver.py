@@ -142,7 +142,7 @@ class HelaoAnalysisSyncer:
         s3_model_target = f"analysis/{eua.analysis_uuid}.json"
 
         if not self.config_dict.get("local_only", False):
-            # self.base.print_message("uploading analysis model to S3 bucket")
+            self.base.print_message("uploading analysis model to S3 bucket")
             try:
                 s3_model_success = await self.to_s3(model_dict, s3_model_target)
             except Exception as e:
