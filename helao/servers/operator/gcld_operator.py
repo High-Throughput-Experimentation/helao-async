@@ -30,6 +30,29 @@ def uvis_seq_constructor(plate_id, sample_no, data_request_id, params={}):
     seq_params.update(params)
     seq_params["plate_id"] = plate_id
     seq_params["plate_sample_no_list"] = [sample_no]
+    seq_params.update(
+        {
+            "reference_mode": "builtin",
+            "custom_position": "cell1_we",
+            "spec_n_avg": 5,
+            "spec_int_time_ms": 10,
+            "duration_sec": 5,
+            "specref_code": 1,
+            "led_type": "front",
+            "led_date": "4/28/2023",
+            "led_names": ["doric_wled"],
+            "led_wavelengths_nm": [-1],
+            "led_intensities_mw": [-1],
+            "toggle_is_shutter": False,
+            "calc_ev_parts": [1.8, 2.2, 2.6, 3.0],
+            "calc_bin_width": 3,
+            "calc_window_length": 45,
+            "calc_poly_order": 4,
+            "calc_lower_wl": 370.0,
+            "calc_upper_wl": 700.0,
+        }
+    )
+
     seq = Sequence(
         sequence_name="UVIS_T",
         sequence_label="gcld-mvp-demo",
