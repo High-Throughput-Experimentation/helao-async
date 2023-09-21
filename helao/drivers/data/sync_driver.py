@@ -805,7 +805,7 @@ class HelaoSyncer:
         """Takes action yml and updates processes in exp parent."""
         exp_path = Path(act_yml.parent_path)
         exp_prog = self.get_progress(exp_path)
-        act_idx = act_meta["action_order"]
+        act_idx = int(act_meta["action_order"])
         # handle legacy experiments (no process list)
         if exp_prog.dict["legacy_experiment"]:
             # if action is a process finisher, add to exp progress
@@ -824,9 +824,9 @@ class HelaoSyncer:
             )
             exp_prog.dict["process_groups"][pidx].append(act_idx)
         else:
-            pidx = [
-                k for k, l in exp_prog.dict["process_groups"].items() if act_idx in l
-            ][0]
+            pidx = int([
+                k for k, l in exp_prog.dict["process_groups"].items() if int(act_idx) in l
+            ][0])
         # if exp_prog doesn't yet have metadict, create one
         if pidx not in exp_prog.dict["process_metas"]:
             exp_prog.dict["process_metas"][pidx] = {
@@ -931,6 +931,7 @@ class HelaoSyncer:
         """Pushes unfinished procesess to S3 & API from experiment progress."""
         s3_unfinished, api_unfinished = exp_prog.list_unfinished_procs()
         for pidx in s3_unfinished:
+            pidx = int(pidx)
             gids = exp_prog.dict["process_groups"][pidx]
             push_condition = False
             if force:
@@ -1195,7 +1196,7 @@ class HelaoSyncer:
                         os.remove(sp)
                     # move path back to RUNS_FINISHED
                     shutil.move(
-                        base_dir, base_dir.replace("RUNS_SYNCED", "RUNS_FINISHED")
+                        base_dir, os.path.dirname(base_dir.replace("RUNS_SYNCED", "RUNS_FINISHED"))
                     )
                     self.base.print_message(f"Successfully reverted {base_dir}")
 
