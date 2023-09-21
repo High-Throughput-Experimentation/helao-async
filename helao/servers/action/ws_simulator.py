@@ -25,7 +25,7 @@ from helao.helpers.config_loader import config_loader
 class WsSim:
     def __init__(self, action_serv: Base):
         self.base = action_serv
-        self.config_dict = action_serv.server_cfg["params"]
+        self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
         self.scale_map = {
             f"series_{i}": v for i, v in enumerate([1, 2, 5, 10, 50, 100])

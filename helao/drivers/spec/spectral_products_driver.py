@@ -24,7 +24,7 @@ class SM303:
 
     def __init__(self, action_serv: Base):
         self.base = action_serv
-        self.config_dict = action_serv.server_cfg["params"]
+        self.config_dict = action_serv.server_cfg.get("params", {})
         self.lib_path = self.config_dict["lib_path"]
         self.n_pixels = self.config_dict["n_pixels"]
         self.start_margin = self.config_dict["start_margin"]

@@ -46,7 +46,7 @@ class Galil:
     def __init__(self, action_serv: Base):
 
         self.base = action_serv
-        self.config_dict = action_serv.server_cfg["params"]
+        self.config_dict = action_serv.server_cfg.get("params", {})
         self.unified_db = UnifiedSampleDataAPI(self.base)
 
         self.dflt_matrix = np.matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])

@@ -23,7 +23,7 @@ class CM0134:
 
     def __init__(self, action_serv: Base):
         self.base = action_serv
-        self.config_dict = action_serv.server_cfg["params"]
+        self.config_dict = action_serv.server_cfg.get("params", {})
         self.inst = minimalmodbus.Instrument(
             self.config_dict.get("device", "COM7"), self.config_dict.get("address", 254)
         )

@@ -44,7 +44,7 @@ class Galil:
     def __init__(self, action_serv: Base):
 
         self.base = action_serv
-        self.config_dict = action_serv.server_cfg["params"]
+        self.config_dict = action_serv.server_cfg.get("params", {})
 
         self.dev_ai = self.config_dict.get("dev_ai", {})
         self.dev_aiitems = make_str_enum("dev_ai", {key: key for key in self.dev_ai})

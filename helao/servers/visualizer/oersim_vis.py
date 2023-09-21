@@ -32,7 +32,7 @@ class C_oersimvis:
 
     def __init__(self, vis_serv: Vis, serv_key: str):
         self.vis = vis_serv
-        self.config_dict = self.vis.server_cfg["params"]
+        self.config_dict = self.vis.server_cfg.get("params", {})
         self.max_points = 500
         self.update_rate = 1e-3
         self.last_update_time = time.time()

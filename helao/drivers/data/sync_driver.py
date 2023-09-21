@@ -408,7 +408,7 @@ class HelaoSyncer:
     def __init__(self, action_serv: Base):
         """Pushes yml to S3 and API."""
         self.base = action_serv
-        self.config_dict = action_serv.server_cfg["params"]
+        self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
         self.max_tasks = self.config_dict.get("max_tasks", 4)
         if "aws_config_path" in self.config_dict:

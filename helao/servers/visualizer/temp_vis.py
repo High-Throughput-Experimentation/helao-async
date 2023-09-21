@@ -21,7 +21,7 @@ class C_temperature:
 
     def __init__(self, vis_serv: Vis, serv_key: str):
         self.vis = vis_serv
-        self.config_dict = self.vis.server_cfg["params"]
+        self.config_dict = self.vis.server_cfg.get("params", {})
         self.update_rate = self.config_dict.get("update_rate", 0.5)
         self.max_points = 500
         self.last_update_time = time.time()

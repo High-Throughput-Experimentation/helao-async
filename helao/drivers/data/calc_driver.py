@@ -75,7 +75,7 @@ class Calc:
 
     def __init__(self, action_serv: Base):
         self.base = action_serv
-        self.config_dict = action_serv.server_cfg["params"]
+        self.config_dict = action_serv.server_cfg.get("params", {})
         self.yaml = YAML(typ="safe")
         self.world_config = self.base.fastapp.helao_cfg
 

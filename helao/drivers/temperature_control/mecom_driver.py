@@ -40,7 +40,7 @@ class MeerstetterTEC(object):
 
     def __init__(self, action_serv: Base):
         self.base = action_serv
-        self.config_dict = action_serv.server_cfg["params"]
+        self.config_dict = action_serv.server_cfg.get("params", {})
         self.channel = self.config_dict["channel"]
         self.port = self.config_dict["port"]
         connection_retries = self.config_dict.get("retries", 15)

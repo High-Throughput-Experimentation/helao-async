@@ -41,7 +41,7 @@ class C_potvis:
 
     def __init__(self, vis_serv: Vis, serv_key: str):
         self.vis = vis_serv
-        self.config_dict = self.vis.server_cfg["params"]
+        self.config_dict = self.vis.server_cfg.get("params", {})
         self.max_points = 500
         self.max_prev = 4
         self.update_rate = 1e-3

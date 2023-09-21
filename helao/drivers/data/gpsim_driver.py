@@ -26,7 +26,7 @@ def calc_eta(cp_dict):
 class GPSim:
     def __init__(self, action_serv: Base):
         self.base = action_serv
-        self.config_dict = action_serv.server_cfg["params"]
+        self.config_dict = action_serv.server_cfg.get("params", {})
         self.rng = np.random.default_rng(seed=self.config_dict["random_seed"])
         self.data_file = os.path.join(
             os.path.dirname(
