@@ -182,6 +182,8 @@ class Base:
 
     def exception_handler(self, loop, context):
         self.print_message(f'Got exception from coroutine: {context}')
+        exc = context.get('exception')
+        self.print_message(f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}")
 
     def myinit(self):
         self.aloop = asyncio.get_running_loop()
