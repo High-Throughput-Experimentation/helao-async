@@ -952,10 +952,16 @@ class HelaoSyncer:
                 push_condition = max(gids) in exp_prog.dict[
                     "legacy_finisher_idxs"
                 ] and all(i in exp_prog.dict["process_actions_done"] for i in gids)
+            elif exp_prog.dict["process_metas"].get(pidx, {}) == {}:
+                push_condition = False
+                sync_path = str(exp_prog.prg)
+                self.reset_sync(sync_path)
+                await self.enqueue_yml(str(exp_prog.yml.target))
             else:
                 push_condition = all(
                     i in exp_prog.dict["process_actions_done"] for i in gids
-                )
+                ) and exp_prog.dict["process_metas"].get(pidx, {})
+            
             if push_condition:
                 meta = exp_prog.dict["process_metas"][pidx]
                 uuid_key = meta["process_uuid"]
