@@ -6,7 +6,7 @@ if not exist %HC_DIR% (
     echo %HC_DIR% does not exist, cloning...
     git clone https://github.com/High-Throughput-Experimentation/helao-core %HC_DIR%
 )
-conda env list | findstr /r /c:"^helao[\s].*envs\\helao$"
+conda env list | findstr /r /c:"^helao.*envs\\helao$"
 if ERRORLEVEL 1 (
     echo 'helao' conda environment was not found, creating it now...
     conda env create -f helao_pinned_win-64.yml -n helao
