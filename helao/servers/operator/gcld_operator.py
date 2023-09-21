@@ -62,6 +62,7 @@ def uvis_seq_constructor(plate_id, sample_no, data_request_id, params={}):
         experiment_plan_list=experiment_list,
         experimentmodel_list=experiment_list,
     )
+    seq.sequence_uuid = seq_uuid
     return seq
 
 def uvis_ana_constructor(plate_id, sequence_uuid, data_request_id, params={}):
@@ -90,6 +91,7 @@ def uvis_ana_constructor(plate_id, sequence_uuid, data_request_id, params={}):
         experiment_plan_list=experiment_list,
         experimentmodel_list=experiment_list,
     )
+    seq.sequence_uuid = seq_uuid
     return seq
 
 
