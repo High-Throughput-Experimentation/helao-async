@@ -1201,11 +1201,14 @@ class HelaoSyncer:
                     for sp in sub_prgs:
                         os.remove(sp)
                     # move path back to RUNS_FINISHED
-                    for fp in glob(os.path.join(base_dir, "*")):
-                        shutil.move(
-                            fp,
-                            os.path.dirname(fp.replace("RUNS_SYNCED", "RUNS_FINISHED")),
-                        )
+                    for fp in glob(os.path.join(base_dir, "**", "*"), recursive=True):
+                        if not os.path.isdir(fp):
+                            shutil.move(
+                                fp,
+                                os.path.dirname(
+                                    fp.replace("RUNS_SYNCED", "RUNS_FINISHED")
+                                ),
+                            )
                     self.base.print_message(f"Successfully reverted {base_dir}")
 
             seq_zips = glob(os.path.join(sync_path, "**", "*.zip"), recursive=True)
