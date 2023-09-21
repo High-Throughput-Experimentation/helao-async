@@ -807,130 +807,136 @@ class HelaoSyncer:
         """Takes action yml and updates processes in exp parent."""
         exp_path = Path(act_yml.parent_path)
         exp_prog = self.get_progress(exp_path)
-        act_idx = int(act_meta["action_order"])
-        # handle legacy experiments (no process list)
-        if exp_prog.dict["legacy_experiment"]:
-            # if action is a process finisher, add to exp progress
-            if act_meta["process_finish"]:
-                exp_prog.dict["legacy_finisher_idxs"] = sorted(
-                    set(exp_prog.dict["legacy_finisher_idxs"]).union([act_idx])
+        with exp_prog.prglock:
+            act_idx = int(act_meta["action_order"])
+            # handle legacy experiments (no process list)
+            if exp_prog.dict["legacy_experiment"]:
+                # if action is a process finisher, add to exp progress
+                if act_meta["process_finish"]:
+                    exp_prog.dict["legacy_finisher_idxs"] = sorted(
+                        set(exp_prog.dict["legacy_finisher_idxs"]).union([act_idx])
+                    )
+                pf_idxs = exp_prog.dict["legacy_finisher_idxs"]
+                pidx = (
+                    len(pf_idxs)
+                    if act_idx > max(pf_idxs + [-1])
+                    else pf_idxs.index(min(x for x in pf_idxs if x >= act_idx))
                 )
-            pf_idxs = exp_prog.dict["legacy_finisher_idxs"]
-            pidx = (
-                len(pf_idxs)
-                if act_idx > max(pf_idxs + [-1])
-                else pf_idxs.index(min(x for x in pf_idxs if x >= act_idx))
-            )
-            exp_prog.dict["process_groups"][pidx] = exp_prog.dict["process_groups"].get(
-                pidx, []
-            )
-            exp_prog.dict["process_groups"][pidx].append(act_idx)
-        else:
-            pidx = int(
-                [
-                    k
-                    for k, l in exp_prog.dict["process_groups"].items()
-                    if int(act_idx) in l
-                ][0]
-            )
-        # if exp_prog doesn't yet have metadict, create one
-        if pidx not in exp_prog.dict["process_metas"]:
-            exp_prog.dict["process_metas"][pidx] = {
-                k: v
-                for k, v in exp_prog.yml.meta.items()
-                if k
-                in [
-                    "sequence_uuid",
-                    "experiment_uuid",
-                    "orchestrator",
-                    "access",
-                    "dummy",
-                    "simulation",
-                    "run_type",
-                ]
-            }
-            if "data_request_id" in exp_prog.yml.meta:
-                exp_prog.dict["process_metas"][pidx][
-                    "data_request_id"
-                ] = exp_prog.yml.meta["data_request_id"]
-            exp_prog.dict["process_metas"][pidx][
-                "process_params"
-            ] = exp_prog.yml.meta.get("experiment_params", {})
-            exp_prog.dict["process_metas"][pidx][
-                "technique_name"
-            ] = exp_prog.yml.meta.get(
-                "technique_name", exp_prog.yml.meta["experiment_name"]
-            )
-            process_list = exp_prog.yml.meta.get("process_list", [])
-            process_uuid = process_list[pidx] if process_list else str(gen_uuid())
-            exp_prog.dict["process_metas"][pidx]["process_uuid"] = process_uuid
-            exp_prog.dict["process_metas"][pidx]["process_group_index"] = pidx
-            exp_prog.dict["process_metas"][pidx]["action_list"] = []
-
-        # update experiment progress with action
-        exp_prog.dict["process_metas"][pidx]["action_list"].append(
-            ShortActionModel(**act_meta).clean_dict(strip_private=True)
-        )
-
-        # self.base.print_message(f"current experiment progress:\n{exp_prog.dict}")
-        if act_idx == min(exp_prog.dict["process_groups"][pidx]):
-            exp_prog.dict["process_metas"][pidx]["process_timestamp"] = act_meta[
-                "action_timestamp"
-            ]
-        if "technique_name" in act_meta:
-            exp_prog.dict["process_metas"][pidx]["technique_name"] = act_meta[
-                "technique_name"
-            ]
-        tech_name = exp_prog.dict["process_metas"][pidx]["technique_name"]
-        if isinstance(tech_name, list):
-            split_technique = tech_name[act_meta.get("action_split", 0)]
-            exp_prog.dict["process_metas"][pidx]["technique_name"] = split_technique
-        for pc in act_meta["process_contrib"]:
-            if pc not in act_meta:
-                continue
-            contrib = act_meta[pc]
-            new_name = pc.replace("action_", "process_")
-            if new_name not in exp_prog.dict["process_metas"][pidx]:
-                exp_prog.dict["process_metas"][pidx][new_name] = contrib
-            elif isinstance(contrib, dict):
-                exp_prog.dict["process_metas"][pidx][new_name].update(contrib)
-            elif isinstance(contrib, list):
-                exp_prog.dict["process_metas"][pidx][new_name] += contrib
+                exp_prog.dict["process_groups"][pidx] = exp_prog.dict["process_groups"].get(
+                    pidx, []
+                )
+                exp_prog.dict["process_groups"][pidx].append(act_idx)
             else:
-                exp_prog.dict["process_metas"][pidx][new_name] = contrib
-            # deduplicate sample lists
-            if new_name in ["samples_in", "samples_out"]:
-                actuuid_order = {
-                    x["action_uuid"]: x["orch_submit_order"]
-                    for x in exp_prog.dict["process_metas"][pidx]["action_list"]
+                pidx = int(
+                    [
+                        k
+                        for k, l in exp_prog.dict["process_groups"].items()
+                        if int(act_idx) in l
+                    ][0]
+                )
+            # if exp_prog doesn't yet have metadict, create one
+            if pidx not in exp_prog.dict["process_metas"]:
+                process_meta = {
+                    k: v
+                    for k, v in exp_prog.yml.meta.items()
+                    if k
+                    in [
+                        "sequence_uuid",
+                        "experiment_uuid",
+                        "orchestrator",
+                        "access",
+                        "dummy",
+                        "simulation",
+                        "run_type",
+                    ]
                 }
-                sample_list = exp_prog.dict["process_metas"][pidx][new_name]
-                dedupe_dict = defaultdict(list)
-                deduped_samples = []
-                for si, x in enumerate(sample_list):
-                    sample_label = x["global_label"]
-                    actuuid = [y for y in x["action_uuid"] if y in actuuid_order.keys()]
-                    if not actuuid:
-                        # self.base.print_message(
-                        #     "no action_uuid for {sample_label}, using listed order"
-                        # )
-                        actorder = si
-                    else:
-                        actorder = actuuid_order[actuuid[0]]
-                    dedupe_dict[sample_label].append((actorder, si))
-                if new_name == "samples_in":
-                    deduped_samples = [
-                        sample_list[min(v)[1]] for v in dedupe_dict.values()
-                    ]
-                elif new_name == "samples_out":
-                    deduped_samples = [
-                        sample_list[max(v)[1]] for v in dedupe_dict.values()
-                    ]
-                if deduped_samples:
-                    exp_prog.dict["process_metas"][pidx][new_name] = deduped_samples
-        # register finished action in process_actions_done {order: ymltargetname}
-        exp_prog.dict["process_actions_done"].update({act_idx: act_yml.target.name})
-        exp_prog.write_dict()
+                if "data_request_id" in exp_prog.yml.meta:
+                    process_meta[
+                        "data_request_id"
+                    ] = exp_prog.yml.meta["data_request_id"]
+                process_meta[
+                    "process_params"
+                ] = exp_prog.yml.meta.get("experiment_params", {})
+                process_meta[
+                    "technique_name"
+                ] = exp_prog.yml.meta.get(
+                    "technique_name", exp_prog.yml.meta["experiment_name"]
+                )
+                process_list = exp_prog.yml.meta.get("process_list", [])
+                process_uuid = process_list[pidx] if process_list else str(gen_uuid())
+                process_meta["process_uuid"] = process_uuid
+                process_meta["process_group_index"] = pidx
+                process_meta["action_list"] = []
+
+            else:
+                process_meta = exp_prog.dict["process_metas"][pidx]
+
+            # update experiment progress with action
+            process_meta["action_list"].append(
+                ShortActionModel(**act_meta).clean_dict(strip_private=True)
+            )
+
+            # self.base.print_message(f"current experiment progress:\n{exp_prog.dict}")
+            if act_idx == min(exp_prog.dict["process_groups"][pidx]):
+                process_meta["process_timestamp"] = act_meta[
+                    "action_timestamp"
+                ]
+            if "technique_name" in act_meta:
+                process_meta["technique_name"] = act_meta[
+                    "technique_name"
+                ]
+            tech_name = process_meta["technique_name"]
+            if isinstance(tech_name, list):
+                split_technique = tech_name[act_meta.get("action_split", 0)]
+                process_meta["technique_name"] = split_technique
+            for pc in act_meta["process_contrib"]:
+                if pc not in act_meta:
+                    continue
+                contrib = act_meta[pc]
+                new_name = pc.replace("action_", "process_")
+                if new_name not in process_meta:
+                    process_meta[new_name] = contrib
+                elif isinstance(contrib, dict):
+                    process_meta[new_name].update(contrib)
+                elif isinstance(contrib, list):
+                    process_meta[new_name] += contrib
+                else:
+                    process_meta[new_name] = contrib
+                # deduplicate sample lists
+                if new_name in ["samples_in", "samples_out"]:
+                    actuuid_order = {
+                        x["action_uuid"]: x["orch_submit_order"]
+                        for x in process_meta["action_list"]
+                    }
+                    sample_list = process_meta[new_name]
+                    dedupe_dict = defaultdict(list)
+                    deduped_samples = []
+                    for si, x in enumerate(sample_list):
+                        sample_label = x["global_label"]
+                        actuuid = [y for y in x["action_uuid"] if y in actuuid_order.keys()]
+                        if not actuuid:
+                            # self.base.print_message(
+                            #     "no action_uuid for {sample_label}, using listed order"
+                            # )
+                            actorder = si
+                        else:
+                            actorder = actuuid_order[actuuid[0]]
+                        dedupe_dict[sample_label].append((actorder, si))
+                    if new_name == "samples_in":
+                        deduped_samples = [
+                            sample_list[min(v)[1]] for v in dedupe_dict.values()
+                        ]
+                    elif new_name == "samples_out":
+                        deduped_samples = [
+                            sample_list[max(v)[1]] for v in dedupe_dict.values()
+                        ]
+                    if deduped_samples:
+                        process_meta[new_name] = deduped_samples
+            # register finished action in process_actions_done {order: ymltargetname}
+            exp_prog = self.get_progress(exp_path)
+            exp_prog.dict["process_metas"][pidx] = process_meta
+            exp_prog.dict["process_actions_done"].update({act_idx: act_yml.target.name})
+            exp_prog.write_dict()
         return exp_prog
 
     async def sync_process(self, exp_prog: Progress, force: bool = False):
