@@ -54,6 +54,7 @@ def uvis_seq_constructor(plate_id, sample_no, data_request_id, params={}):
         sequence_name="UVIS_T",
         sequence_label="gcld-mvp-demo",
         sequence_params=seq_params,
+        sequence_uuid=seq_uuid,
         data_request_id=data_request_id,
         experiment_list = experiment_list,
         experiment_plan_list = experiment_list,
