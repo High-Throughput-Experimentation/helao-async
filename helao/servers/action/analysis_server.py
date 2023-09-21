@@ -29,7 +29,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post("/batch_calc_echeuvis", tags=["private"])
     async def batch_calc_echeuvis(
-        sequence_uuid: str, plate_id: Union[int, None] = None, recent: bool = True, params: dict = {}
+        sequence_uuid: str,
+        plate_id: Union[int, None] = None,
+        recent: bool = True,
+        params: dict = {},
     ):
         """Generates ECHEUVIS stability analyses from sequence_uuid."""
         await app.driver.batch_calc_echeuvis(
@@ -42,7 +45,10 @@ def makeApp(confPrefix, server_key, helao_root):
 
     @app.post("/batch_calc_dryuvis", tags=["private"])
     async def batch_calc_dryuvis(
-        sequence_uuid: str, plate_id: Union[int, None] = None, recent: bool = True, params: dict = {}
+        sequence_uuid: Union[str, None] = None,
+        plate_id: Union[int, None] = None,
+        recent: bool = True,
+        params: dict = {},
     ):
         """Generates dry UVIS-T analyses from sequence_uuid."""
         await app.driver.batch_calc_dryuvis(
@@ -53,6 +59,27 @@ def makeApp(confPrefix, server_key, helao_root):
         )
         return sequence_uuid
 
+    @app.post(f"{server_key}/analyze_dryuvis", tags=["private"])
+    async def analyze_dryuvis(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        sequence_uuid: str = "",
+        plate_id: Union[int, None] = None,
+        recent: bool = True,
+        params: dict = {},
+    ):
+        """Generates dry UVIS-T analyses from sequence_uuid."""
+        active = await app.base.setup_and_contain_action()
+            
+        await app.driver.batch_calc_dryuvis(
+            plate_id=active.action.action_params['plate_id'],
+            sequence_uuid=UUID(active.action.action_params['sequence_uuid']),
+            params=active.action.action_params['params'],
+            recent=active.action.action_params['recent'],
+        )
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
     @app.post("/list_running_tasks", tags=["private"])
     def list_current_tasks():
         return list(app.driver.running_tasks.keys())
@@ -60,5 +87,5 @@ def makeApp(confPrefix, server_key, helao_root):
     @app.post("/list_queued_tasks", tags=["private"])
     def list_queued_tasks():
         return list(app.driver.task_set)
-    
+
     return app

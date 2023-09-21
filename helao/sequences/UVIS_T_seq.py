@@ -33,6 +33,7 @@ def UVIS_T(
     calc_poly_order: int = 4,
     calc_lower_wl: float = 370.0,
     calc_upper_wl: float = 700.0,
+    analysis_seq_uuid: str = "",
 ):
     epm = ExperimentPlanMaker()
     epm.add_experiment("UVIS_sub_unloadall_customs", {})
@@ -166,14 +167,11 @@ def UVIS_T(
     )
 
     epm.add_experiment(
-        "UVIS_calc_abs",
+        "UVIS_analysis_dry",
         {
-            "ev_parts": calc_ev_parts,
-            "bin_width": calc_bin_width,
-            "window_length": calc_window_length,
-            "poly_order": calc_poly_order,
-            "lower_wl": calc_lower_wl,
-            "upper_wl": calc_upper_wl,
+            "sequence_uuid": analysis_seq_uuid,
+            "plate_id": plate_id,
+            "recent": True,
         },
     )
 
