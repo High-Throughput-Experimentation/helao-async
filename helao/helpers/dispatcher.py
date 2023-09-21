@@ -86,7 +86,9 @@ async def async_private_dispatcher(
                         {},
                         "orchestrator",
                         f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}', error={repr(error_code)}",
-                        error=True,
+                        error=True,world_cfg = config_loader(inst_config)
+def len_upload_queue():
+    return private_dispatcher("DB", )
                     )
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -105,8 +107,8 @@ def private_dispatcher(
     server_host: str,
     server_port: int,
     private_action: str,
-    params_dict: dict,
-    json_dict: dict,
+    params_dict: dict = {},
+    json_dict: dict = {},
 ):
     url = f"http://{server_host}:{server_port}/{private_action}"
 
