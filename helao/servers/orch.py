@@ -1146,7 +1146,8 @@ class Orch(Base):
         sequence: Sequence,
     ):
         # init uuid now for tracking later
-        sequence.sequence_uuid = gen_uuid()
+        if sequence.sequenc_uuid is None:
+            sequence.sequence_uuid = gen_uuid()
         if (
             sequence.sequence_codehash is None
             and sequence.sequence_name in self.sequence_codehash_lib
