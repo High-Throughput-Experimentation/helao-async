@@ -49,15 +49,17 @@ def uvis_seq_constructor(plate_id, sample_no, data_request_id, params={}):
             "analysis_seq_uuid": str(seq_uuid)
         }
     )
-
+    experiment_list = UVIS_T(**seq_params)
     seq = Sequence(
         sequence_name="UVIS_T",
         sequence_label="gcld-mvp-demo",
-        sequence_uuid=seq_uuid,
         sequence_params=seq_params,
         data_request_id=data_request_id,
+        experiment_list = experiment_list,
+        experiment_plan_list = experiment_list,
+        experimentmodel_list = experiment_list,
     )
-    seq.experiment_list = UVIS_T(**seq_params)
+    
     return seq
 
 
