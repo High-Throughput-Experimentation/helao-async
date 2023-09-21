@@ -52,6 +52,7 @@ def uvis_seq_constructor(plate_id, sample_no, data_request_id, params={}):
             "calc_poly_order": 4,
             "calc_lower_wl": 370.0,
             "calc_upper_wl": 700.0,
+            "analysis_seq_uuid": str(seq_uuid)
         }
     )
 
