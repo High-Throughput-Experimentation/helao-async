@@ -1235,7 +1235,9 @@ class HelaoSyncer:
 
     def unsync_dir(self, sync_dir: str):
         for fp in glob(os.path.join(sync_dir, "**", "*"), recursive=True):
-            if not os.path.isdir(fp):
+            if fp.endswith(".lock"):
+                os.remove(fp)
+            elif not os.path.isdir(fp):
                 shutil.move(
                     fp,
                     os.path.dirname(
