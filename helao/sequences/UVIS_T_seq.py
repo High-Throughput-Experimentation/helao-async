@@ -160,14 +160,14 @@ def UVIS_T(
         },
     )
 
-    epm.add_experiment(
-        "UVIS_analysis_dry",
-        {
-            "sequence_uuid": analysis_seq_uuid,
-            "plate_id": plate_id,
-            "recent": True,
-        },
-    )
+    # epm.add_experiment(
+    #     "UVIS_analysis_dry",
+    #     {
+    #         "sequence_uuid": analysis_seq_uuid,
+    #         "plate_id": plate_id,
+    #         "recent": True,
+    #     },
+    # )
 
     epm.add_experiment("UVIS_sub_shutdown", {})
 
