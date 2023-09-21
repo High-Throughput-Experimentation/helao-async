@@ -61,7 +61,7 @@ def makeApp(confPrefix, server_key, helao_root):
         )
         return sequence_uuid
 
-    @app.post(f"{server_key}/analyze_dryuvis", tags=["private"])
+    @app.post(f"{server_key}/analyze_dryuvis", tags=["action"])
     async def analyze_dryuvis(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
