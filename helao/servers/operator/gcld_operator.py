@@ -55,30 +55,32 @@ if __name__ == "__main__":
             # get pending data requests
             output = client.read_data_requests(status="pending")
 
-            if output:
-                print(f"Pending data request count: {len(output)}")
-                data_request = output[0]
-                sample_no = int(data_request.sample_label.split("_")[-1])
+        if output:
+            print(f"Pending data request count: {len(output)}")
+            data_request = output[0]
+            sample_no = int(data_request.sample_label.split("_")[-1])
 
-                seq = uvis_seq_constructor(PLATE_ID, sample_no, data_request.id)
-                operator.add_sequence(seq.get_seq())
-                operator.start()
+            seq = uvis_seq_constructor(PLATE_ID, sample_no, data_request.id)
+            operator.add_sequence(seq.get_seq())
+            operator.start()
+            time.sleep(2)
 
-            current_state = operator.orch_state()
+        current_state = operator.orch_state()
 
-            if current_state != "stopped":
-                # Acknowledge the data request
+        if current_state != "stopped":
+            # Acknowledge the data request
+            with client:
                 output = client.acknowledge_data_request(data_request.id)
-                print(f"Data request status: {output.status}")
+            print(f"Data request status: {output.status}")
 
-                while current_state != "stopped":
-                    print(
-                        f"{gen_ts()} Orchestrator loop status is {current_state}. Sleeping for 10s."
-                    )
-                    time.sleep(10)
-                    current_state = operator.orch_state()
+            while current_state != "stopped":
+                print(
+                    f"{gen_ts()} Orchestrator loop status is {current_state}. Sleeping for 10s."
+                )
+                time.sleep(10)
+                current_state = operator.orch_state()
 
-            print(
-                f"{gen_ts()} Orchestrator is idle. Checking for data requests in 30 seconds."
-            )
-            time.sleep(30)
+        print(
+            f"{gen_ts()} Orchestrator is idle. Checking for data requests in 30 seconds."
+        )
+        time.sleep(30)
