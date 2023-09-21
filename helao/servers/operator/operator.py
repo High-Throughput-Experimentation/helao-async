@@ -27,7 +27,7 @@ class Operator:
             f"Operator initialized for orchestrator {self.orch_key} on {self.orch_host}:{self.orch_port}"
         )
 
-    def request(self, endpoint: str, path_params: {}, json_params: {}):
+    def request(self, endpoint: str, path_params: dict={}, json_params: dict={}):
         resp, error_code = private_dispatcher(
             self.orch_key,
             self.orch_host,
