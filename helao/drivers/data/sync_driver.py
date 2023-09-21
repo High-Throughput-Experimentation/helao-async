@@ -1190,6 +1190,8 @@ class HelaoSyncer:
                 self.base.print_message(
                     f"Did not find any .prg or .progress files in subdirectories of {sync_path}"
                 )
+                self.unsync_dir(sync_path)
+                
             else:
                 self.base.print_message(
                     f"Found {len(base_prgs)} .prg or .progress files in subdirectories of {sync_path}"
@@ -1209,16 +1211,9 @@ class HelaoSyncer:
                     )
                     for sp in sub_prgs:
                         os.remove(sp)
+
                     # move path back to RUNS_FINISHED
-                    for fp in glob(os.path.join(base_dir, "**", "*"), recursive=True):
-                        if not os.path.isdir(fp):
-                            shutil.move(
-                                fp,
-                                os.path.dirname(
-                                    fp.replace("RUNS_SYNCED", "RUNS_FINISHED")
-                                ),
-                            )
-                    self.base.print_message(f"Successfully reverted {base_dir}")
+                    self.unsync_dir(base_dir)
 
             seq_zips = glob(os.path.join(sync_path, "**", "*.zip"), recursive=True)
             if not seq_zips:
@@ -1237,3 +1232,14 @@ class HelaoSyncer:
 
     def shutdown(self):
         pass
+
+    def unsync_dir(self, sync_dir: str):
+        for fp in glob(os.path.join(sync_dir, "**", "*"), recursive=True):
+            if not os.path.isdir(fp):
+                shutil.move(
+                    fp,
+                    os.path.dirname(
+                        fp.replace("RUNS_SYNCED", "RUNS_FINISHED")
+                    ),
+                )
+        self.base.print_message(f"Successfully reverted {sync_dir}")
