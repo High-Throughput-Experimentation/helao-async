@@ -3,6 +3,7 @@ import os
 from helaocore.error import ErrorCodes
 from helaocore.models.experiment import ExperimentModel
 from helaocore.models.sequence import SequenceModel
+from helao.helpers.premodels import Sequence
 from helao.helpers.dispatcher import private_dispatcher
 from helao.helpers.config_loader import config_loader
 
@@ -64,14 +65,14 @@ class Operator:
         """add experiment to active sequence or creates new sequence"""
         if index == -1:
             return self.request(
-                "append_experiment", json_params=experiment.clean_dict()
+                "append_experiment", json_params={"experiment": experiment.as_dict()}
             )
         return self.request(
             "insert_experiment",
             path_params={"idx": index},
-            json_params=experiment.clean_dict(),
+            json_params={"experiment": experiment.as_dict()},
         )
 
-    def add_sequence(self, sequence: SequenceModel):
+    def add_sequence(self, sequence: Sequence):
         """add sequence to orch queue"""
-        return self.request("append_sequence", json_params=sequence.clean_dict())
+        return self.request("append_sequence", json_params={"sequence": sequence.as_dict()})
