@@ -12,9 +12,11 @@ load_dotenv(dotenv_path=Path(env_config))
 
 from helao.servers.operator.operator import Operator
 from helao.helpers.gcld_client import DataRequestsClient
-from helao.helpers.premodels import Sequence
+from helao.helpers.premodels import Sequence, Experiment
+from helao.helpers.dispatcher import private_dispatcher
+from helao.helpers.config_loader import config_loader
 from helao.helpers.gen_uuid import gen_uuid
-from helao.sequences.UVIS_T_seq import UVIS_T
+from helao.sequences.UVIS_T_seq import UVIS_T, UVIS_T_postseq
 
 
 # print({k: v for k, v in os.environ.items() if k in ('API_KEY', 'BASE_URL')})
@@ -46,7 +48,7 @@ def uvis_seq_constructor(plate_id, sample_no, data_request_id, params={}):
             "led_wavelengths_nm": [-1],
             "led_intensities_mw": [-1],
             "toggle_is_shutter": False,
-            "analysis_seq_uuid": str(seq_uuid)
+            "analysis_seq_uuid": str(seq_uuid),
         }
     )
     experiment_list = UVIS_T(**seq_params)
@@ -56,11 +58,38 @@ def uvis_seq_constructor(plate_id, sample_no, data_request_id, params={}):
         sequence_params=seq_params,
         sequence_uuid=seq_uuid,
         data_request_id=data_request_id,
-        experiment_list = experiment_list,
-        experiment_plan_list = experiment_list,
-        experimentmodel_list = experiment_list,
+        experiment_list=experiment_list,
+        experiment_plan_list=experiment_list,
+        experimentmodel_list=experiment_list,
     )
-    
+    return seq
+
+def uvis_ana_constructor(plate_id, sequence_uuid, data_request_id, params={}):
+    argspec = inspect.getfullargspec(UVIS_T_postseq)
+    seq_args = list(argspec.args)
+    seq_defaults = list(argspec.defaults)
+    seq_uuid = gen_uuid()
+    seq_params = {k: v for k, v in zip(seq_args, seq_defaults)}
+    seq_params.update(params)
+    seq_params["plate_id"] = plate_id
+    seq_params.update(
+        {
+            "analysis_seq_uuid": sequence_uuid,
+            "plate_id": plate_id,
+            "recent": True
+        }
+    )
+    experiment_list = UVIS_T_postseq(**seq_params)
+    seq = Sequence(
+        sequence_name="UVIS_T_postseq",
+        sequence_label="gcld-mvp-demo-analysis",
+        sequence_params=seq_params,
+        sequence_uuid=seq_uuid,
+        data_request_id=data_request_id,
+        experiment_list=experiment_list,
+        experiment_plan_list=experiment_list,
+        experimentmodel_list=experiment_list,
+    )
     return seq
 
 
@@ -74,6 +103,13 @@ if __name__ == "__main__":
         helao_root = os.path.dirname(helao_root)
     operator = Operator(inst_config, "ORCH")
 
+    world_cfg = config_loader(inst_config, helao_root)
+    db_cfg = world_cfg["servers"]["DB"]
+
+    def len_upload_queue():
+        resp, err = private_dispatcher("DB", db_cfg["host"], db_cfg["port"], "n_queue")
+        return resp
+
     while True:
         with client:
             # get pending data requests
@@ -86,24 +122,50 @@ if __name__ == "__main__":
 
             seq = uvis_seq_constructor(PLATE_ID, sample_no, data_request.id)
             operator.add_sequence(seq.get_seq())
+            print(f"Dispatching measurement sequence: {seq.sequence_uuid}")
             operator.start()
             time.sleep(2)
 
-        current_state = operator.orch_state()
+            current_state = operator.orch_state()
 
-        if current_state != "stopped":
-            # Acknowledge the data request
-            with client:
-                output = client.acknowledge_data_request(data_request.id)
-            print(f"Data request status: {output.status}")
+            if current_state != "stopped":
+                # Acknowledge the data request
+                with client:
+                    output = client.acknowledge_data_request(data_request.id)
+                print(f"Data request status: {output.status}")
 
-            while current_state != "stopped":
-                print(
-                    f"{gen_ts()} Orchestrator loop status is {current_state}. Sleeping for 10s."
-                )
-                time.sleep(10)
-                current_state = operator.orch_state()
+                while current_state != "stopped":
+                    print(
+                        f"{gen_ts()} Orchestrator loop status is {current_state}. Sleeping for 10s."
+                    )
+                    time.sleep(10)
+                    current_state = operator.orch_state()
+                
+            # when orchestrator has stopped, check DB server for upload state
+            while len_upload_queue() > 0:
+                print("Waiting for sequence uploads to finish.")
+            
+            ana = uvis_ana_constructor(PLATE_ID, seq.sequence_uuid, data_request.id)
+            operator.add_sequence(ana.get_seq())
+            print(f"Dispatching analysis sequence: {ana.sequence_uuid}")
+            operator.start()
+            time.sleep(2)
 
+            current_state = operator.orch_state()
+
+            if current_state != "stopped":
+                # Acknowledge the data request
+                with client:
+                    output = client.acknowledge_data_request(data_request.id)
+                print(f"Data request status: {output.status}")
+
+                while current_state != "stopped":
+                    print(
+                        f"{gen_ts()} Orchestrator loop status is {current_state}. Sleeping for 10s."
+                    )
+                    time.sleep(10)
+                    current_state = operator.orch_state()
+                
         print(
             f"{gen_ts()} Orchestrator is idle. Checking for data requests in 30 seconds."
         )
