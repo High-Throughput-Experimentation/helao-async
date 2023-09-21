@@ -930,7 +930,15 @@ def CCSI_sub_co2topup_mfcmassdose(
 
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 #    apm.add(IO_server, "acquire_analog_in", {"duration":apm.pars.duration_s,"acquisition_rate": apm.pars.co2measure_acqrate, })
-    apm.add(MFC_server, "acquire_flowrate", {"flowrate_sccm":None,"duration":-1,"acquisition_rate": apm.pars.co2measure_acqrate,})
+    apm.add(MFC_server, "acquire_flowrate", {"flowrate_sccm":None,"duration":-1,"acquisition_rate": apm.pars.co2measure_acqrate,},
+        technique_name="Measure_added_co2",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+        ],           
+
+    )
 #need to account for gas sample
     apm.add(
         MFC_server, 
@@ -963,7 +971,15 @@ def CCSI_sub_co2constantpressure(
     apm = ActionPlanMaker()
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 #    apm.add(IO_server, "acquire_analog_in", {"duration":apm.pars.co2measure_duration + 1,"acquisition_rate": apm.pars.co2measure_acqrate, })
-    apm.add(MFC_server, "acquire_pressure", {"pressure_psia":apm.pars.atm_pressure,"ramp_psi_sec":apm.pars.pressureramp,"duration":apm.pars.co2measure_duration,"acquisition_rate": apm.pars.co2measure_acqrate,})
+    apm.add(MFC_server, "acquire_pressure", {"pressure_psia":apm.pars.atm_pressure,"ramp_psi_sec":apm.pars.pressureramp,"duration":apm.pars.co2measure_duration,"acquisition_rate": apm.pars.co2measure_acqrate,},
+        technique_name="Measure_added_co2",
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+        ],           
+
+    )
 #need to account for gas sample
     apm.add(
         CO2S_server,
@@ -1002,7 +1018,14 @@ def CCSI_sub_co2mass_temp(
     apm = ActionPlanMaker()
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 #    apm.add(IO_server, "acquire_analog_in", {"duration":apm.pars.co2measure_duration + 1,"acquisition_rate": apm.pars.co2measure_acqrate, }, nonblocking=True)
-    apm.add(MFC_server, "acquire_flowrate", {"flowrate_sccm":0.5,"ramp_sccm_sec":apm.pars.flowramp_sccm,"duration":apm.pars.init_max_flow_s,"acquisition_rate": apm.pars.co2measure_acqrate,})
+    apm.add(MFC_server, "acquire_flowrate", {"flowrate_sccm":0.5,"ramp_sccm_sec":apm.pars.flowramp_sccm,"duration":apm.pars.init_max_flow_s,"acquisition_rate": apm.pars.co2measure_acqrate,},
+        technique_name="Measure_added_co2",
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+        ],              
+    )
 #need to account for gas sample
     apm.add(
         CO2S_server,
@@ -1015,7 +1038,7 @@ def CCSI_sub_co2mass_temp(
         nonblocking=True,
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
         technique_name="Measure_recirculated_headspace",
-        process_finish=True,
+        process_finish=False,
         process_contrib=[
             ProcessContrib.files,
             ProcessContrib.samples_in,
@@ -1024,8 +1047,14 @@ def CCSI_sub_co2mass_temp(
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
 
-    apm.add(MFC_server, "acquire_flowrate", {"flowrate_sccm":apm.pars.flowrate_sccm,"ramp_sccm_sec":apm.pars.flowramp_sccm,"duration":apm.pars.co2measure_duration-apm.pars.init_max_flow_s,"acquisition_rate": apm.pars.co2measure_acqrate,})
-
+    apm.add(MFC_server, "acquire_flowrate", {"flowrate_sccm":apm.pars.flowrate_sccm,"ramp_sccm_sec":apm.pars.flowramp_sccm,"duration":apm.pars.co2measure_duration-apm.pars.init_max_flow_s,"acquisition_rate": apm.pars.co2measure_acqrate,},
+        technique_name="Measure_added_co2",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+        ],           
+    )
 
 #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
@@ -1048,7 +1077,15 @@ def CCSI_sub_co2massdose(
     apm = ActionPlanMaker()
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 #    apm.add(IO_server, "acquire_analog_in", {"duration":apm.pars.co2measure_duration + 1,"acquisition_rate": apm.pars.co2measure_acqrate, }, nonblocking=True)
-    apm.add(MFC_server, "acquire_flowrate", {"flowrate_sccm":None,"duration":-1,"acquisition_rate": apm.pars.co2measure_acqrate,}, nonblocking=True)
+    apm.add(MFC_server, "acquire_flowrate", {"flowrate_sccm":None,"duration":-1,"acquisition_rate": apm.pars.co2measure_acqrate,},
+        nonblocking=True,
+        technique_name="Measure_added_co2",
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+        ],           
+    )
     apm.add(
         MFC_server, 
         "maintain_pressure", 
@@ -1087,7 +1124,8 @@ def CCSI_sub_co2massdose(
 #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0}, asc.wait_for_orch)
     apm.add(ORCH_server, "wait", {"waittime": 60})  # arbitrary time to allow for dose finish
-    apm.add(MFC_server, "cancel_acquire_flowrate",{})
+    apm.add(MFC_server, "cancel_acquire_flowrate",{},
+            )
 
     return apm.action_list
 
