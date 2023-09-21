@@ -1,3 +1,4 @@
+import os
 import datetime
 from enum import Enum
 from typing import List, Optional, Dict
@@ -21,7 +22,7 @@ class ClientSettings(BaseSettings):
     API_KEY: Optional[str]
 
     class Config:
-        env_file = ".env"
+        env_file = os.environ.get("DATA_REQ_CRED", ".env")
 
 
 settings = ClientSettings()
