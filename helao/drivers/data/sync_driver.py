@@ -664,7 +664,9 @@ class HelaoSyncer:
                         if file_success:
                             self.base.print_message("Removing file from pending list.")
                             prog.dict["files_pending"].remove(sp)
-                            self.base.print_message(f"Adding file to S3 dict. {fp.name}: {file_s3_key}")
+                            self.base.print_message(
+                                f"Adding file to S3 dict. {fp.name}: {file_s3_key}"
+                            )
                             prog.dict["files_s3"].update({fp.name: file_s3_key})
                             self.base.print_message(f"Updating progress: {prog.dict}")
                             prog.write_dict()
@@ -824,9 +826,13 @@ class HelaoSyncer:
             )
             exp_prog.dict["process_groups"][pidx].append(act_idx)
         else:
-            pidx = int([
-                k for k, l in exp_prog.dict["process_groups"].items() if int(act_idx) in l
-            ][0])
+            pidx = int(
+                [
+                    k
+                    for k, l in exp_prog.dict["process_groups"].items()
+                    if int(act_idx) in l
+                ][0]
+            )
         # if exp_prog doesn't yet have metadict, create one
         if pidx not in exp_prog.dict["process_metas"]:
             exp_prog.dict["process_metas"][pidx] = {
@@ -844,9 +850,9 @@ class HelaoSyncer:
                 ]
             }
             if "data_request_id" in exp_prog.yml.meta:
-                exp_prog.dict["process_metas"][pidx] = exp_prog.yml.meta[
+                exp_prog.dict["process_metas"][pidx][
                     "data_request_id"
-                ]
+                ] = exp_prog.yml.meta["data_request_id"]
             exp_prog.dict["process_metas"][pidx][
                 "process_params"
             ] = exp_prog.yml.meta.get("experiment_params", {})
@@ -1197,7 +1203,8 @@ class HelaoSyncer:
                     # move path back to RUNS_FINISHED
                     for fp in glob(os.path.join(base_dir, "*")):
                         shutil.move(
-                            fp, os.path.dirname(fp.replace("RUNS_SYNCED", "RUNS_FINISHED"))
+                            fp,
+                            os.path.dirname(fp.replace("RUNS_SYNCED", "RUNS_FINISHED")),
                         )
                     self.base.print_message(f"Successfully reverted {base_dir}")
 
