@@ -13,6 +13,7 @@ __all__ = [
     "UVIS_sub_measure",
     "UVIS_sub_setup_ref",
     "UVIS_calc_abs",
+    "UVIS_analysis_dry",
 ]
 
 
@@ -40,6 +41,7 @@ SPEC_R_server = MM(server_name="SPEC_R", machine_name=gethostname().lower()).as_
 ORCH_server = MM(server_name="ORCH", machine_name=gethostname().lower()).as_dict()
 PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
 CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict()
+ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
 
 toggle_triggertype = TriggerType.fallingedge
 
@@ -389,3 +391,24 @@ def UVIS_calc_abs(
         },
     )
     return apm.action_list  # returns complete action list to orch
+
+def UVIS_analysis_dry(
+    experiment: Experiment,
+    experiment_version: int = 2,
+    sequence_uuid: str = "",
+    plate_id: int = 0,
+    recent: bool = True,
+    params: dict = {}
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(
+        ANA_server,
+        "analyze_dryuvis",
+        {
+            "sequence_uuid": apm.pars.sequence_uuid,
+            "plate_id": apm.pars.plate_id,
+            "recent": apm.pars.recent,
+            "params": apm.pars.params
+        },
+    )
+    return apm.action_list

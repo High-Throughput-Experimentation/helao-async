@@ -13,6 +13,7 @@ load_dotenv(dotenv_path=Path(env_config))
 from helao.servers.operator.operator import Operator
 from helao.helpers.gcld_client import DataRequestsClient
 from helao.helpers.premodels import Sequence
+from helao.helpers.gen_uuid import gen_uuid
 from helao.sequences.UVIS_T_seq import UVIS_T
 
 
@@ -26,6 +27,7 @@ def uvis_seq_constructor(plate_id, sample_no, data_request_id, params={}):
     argspec = inspect.getfullargspec(UVIS_T)
     seq_args = list(argspec.args)
     seq_defaults = list(argspec.defaults)
+    seq_uuid = gen_uuid()
     seq_params = {k: v for k, v in zip(seq_args, seq_defaults)}
     seq_params.update(params)
     seq_params["plate_id"] = plate_id
@@ -56,6 +58,7 @@ def uvis_seq_constructor(plate_id, sample_no, data_request_id, params={}):
     seq = Sequence(
         sequence_name="UVIS_T",
         sequence_label="gcld-mvp-demo",
+        sequence_uuid=seq_uuid,
         sequence_params=seq_params,
         data_request_id=data_request_id,
     )
