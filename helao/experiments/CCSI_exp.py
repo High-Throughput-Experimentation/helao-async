@@ -1122,8 +1122,7 @@ def CCSI_sub_co2massdose(
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
 
 #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0}, asc.wait_for_orch)
-    apm.add(ORCH_server, "wait", {"waittime": 60})  # arbitrary time to allow for dose finish
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
     apm.add(MFC_server, "cancel_acquire_flowrate",{},
             )
 
