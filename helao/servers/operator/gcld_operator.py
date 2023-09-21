@@ -5,17 +5,17 @@ import time
 from dotenv import load_dotenv
 from pathlib import Path
 
+inst_config = sys.argv[1]
+PLATE_ID = int(sys.argv[2])
+env_config = sys.argv[3]
+load_dotenv(dotenv_path=Path(env_config))
+
 from helao.servers.operator.operator import Operator
 from helao.helpers.gcld_client import DataRequestsClient
 from helao.helpers.premodels import Sequence
 from helao.sequences.UVIS_T_seq import UVIS_T
 
 
-inst_config = sys.argv[1]
-PLATE_ID = int(sys.argv[2])
-env_config = sys.argv[3]
-
-load_dotenv(dotenv_path=Path(env_config))
 # print({k: v for k, v in os.environ.items() if k in ('API_KEY', 'BASE_URL')})
 client = DataRequestsClient(
     base_url=os.environ["BASE_URL"], api_key=os.environ["API_KEY"]
