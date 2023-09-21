@@ -86,9 +86,7 @@ async def async_private_dispatcher(
                         {},
                         "orchestrator",
                         f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}', error={repr(error_code)}",
-                        error=True,world_cfg = config_loader(inst_config)
-def len_upload_queue():
-    return private_dispatcher("DB", )
+                        error=True,
                     )
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
