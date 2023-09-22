@@ -227,6 +227,7 @@ class Base:
                 self.actionservermodel.endpoints.update(
                     {route.name: EndpointModel(endpoint_name=route.name)}
                 )
+                self.actionservermodel.endpoints[route.name].sort_status()
         self.print_message(
             f"Found {len(self.actionservermodel.endpoints.keys())} endpoints "
             f"for status monitoring on {self.server.server_name}."
