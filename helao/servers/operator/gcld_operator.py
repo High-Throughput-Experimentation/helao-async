@@ -77,7 +77,7 @@ def uvis_ana_constructor(plate_id, sequence_uuid, data_request_id, params={}):
         {
             "analysis_seq_uuid": sequence_uuid,
             "plate_id": plate_id,
-            "recent": True
+            "recent": False
         }
     )
     experiment_list = UVIS_T_postseq(**seq_params)
