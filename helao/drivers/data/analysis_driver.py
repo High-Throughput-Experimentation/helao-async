@@ -48,6 +48,7 @@ class HelaoAnalysisSyncer:
             self.config_dict["env_file"],
             cache_s3=False,
             cache_json=False,
+            cache_sql=False,
         )
         self.s3 = pgs3.LOADER.cli
         # os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
