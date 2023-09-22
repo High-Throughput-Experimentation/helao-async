@@ -21,7 +21,8 @@ class HelaoLoader:
         self,
         env_file: str = ".env",
         cache_s3: bool = False,
-        cache_json: bool = True,
+        cache_json: bool = False,
+        cache_sql: bool = False,
     ):
         self.hcred = HelaoCredentials(_env_file=env_file)
         self.tunnel = sshtunnel.SSHTunnelForwarder(
@@ -42,6 +43,7 @@ class HelaoLoader:
         self.res = self.sess.resource("s3")
         self.cache_s3 = cache_s3
         self.cache_json = cache_json
+        self.cache_sql = cache_sql
         self.act_cache = {}  # {uuid: json_dict}
         self.exp_cache = {}
         self.seq_cache = {}
@@ -128,7 +130,7 @@ class HelaoLoader:
         if (
             helao_type,
             obj_uuid,
-        ) not in self.sql_cache.keys():
+        ) not in self.sql_cache.keys() or not self.cache_sql:
             sql_command = f"""
                 SELECT *
                 FROM helao_{helao_type} ht
@@ -288,12 +290,14 @@ class EcheUvisLoader(HelaoLoader):
         self,
         env_file: str = ".env",
         cache_s3: bool = False,
-        cache_json: bool = True,
+        cache_json: bool = False,
+        cache_sql: bool = False,
     ):
-        super().__init__(env_file, cache_s3, cache_json)
+        super().__init__(env_file, cache_s3, cache_json, cache_sql)
         # print("!!! using env_file:", env_file)
         # print("!!! postgresql dsn:", self.hcred.api_dsn)
         self.recent_cache = {}  # {'%Y-%m-%d': dataframe}
+        self.cache_sql = cache_sql
 
     def get_recent(
         self,
@@ -364,7 +368,7 @@ class EcheUvisLoader(HelaoLoader):
             min_date,
             plate_id,
             sample_no,
-        ) not in self.recent_cache:
+        ) not in self.recent_cache or not self.cache_sql:
             data = self.run_raw_query(query + "\n".join(conditions))
             pdf = pd.DataFrame(data)
             # print("!!! dataframe shape:", pdf.shape)
