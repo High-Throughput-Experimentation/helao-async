@@ -108,9 +108,9 @@ if __name__ == "__main__":
     world_cfg = config_loader(inst_config, helao_root)
     db_cfg = world_cfg["servers"]["DB"]
 
-    def len_upload_queue():
-        resp, err = private_dispatcher("DB", db_cfg["host"], db_cfg["port"], "n_queue")
-        return resp
+    def num_running_uploads():
+        resp, err = private_dispatcher("DB", db_cfg["host"], db_cfg["port"], "running")
+        return len(resp)
 
     while True:
         with client:
@@ -144,9 +144,11 @@ if __name__ == "__main__":
                 current_state = operator.orch_state()
                 
             # when orchestrator has stopped, check DB server for upload state
-            while len_upload_queue() > 0:
-                print("Waiting for sequence uploads to finish.")
+            num_uploads = num_running_uploads()
+            while num_uploads > 0:
+                print(f"Waiting for {num_uploads} sequence uploads to finish.")
                 time.sleep(10)
+                num_uploads = num_running_uploads()
             
             ana = uvis_ana_constructor(PLATE_ID, str(seq.sequence_uuid), data_request.id)
             operator.add_sequence(ana.get_seq())
