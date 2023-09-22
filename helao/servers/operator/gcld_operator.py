@@ -136,16 +136,17 @@ if __name__ == "__main__":
                     output = client.acknowledge_data_request(data_request.id)
                 print(f"Data request status: {output.status}")
 
-                while current_state != "stopped":
-                    print(
-                        f"{gen_ts()} Orchestrator loop status is {current_state}. Sleeping for 10s."
-                    )
-                    time.sleep(10)
-                    current_state = operator.orch_state()
+            while current_state != "stopped":
+                print(
+                    f"{gen_ts()} Orchestrator loop status is {current_state}. Sleeping for 10s."
+                )
+                time.sleep(10)
+                current_state = operator.orch_state()
                 
             # when orchestrator has stopped, check DB server for upload state
             while len_upload_queue() > 0:
                 print("Waiting for sequence uploads to finish.")
+                time.sleep(10)
             
             ana = uvis_ana_constructor(PLATE_ID, seq.sequence_uuid, data_request.id)
             operator.add_sequence(ana.get_seq())
@@ -155,18 +156,12 @@ if __name__ == "__main__":
 
             current_state = operator.orch_state()
 
-            if current_state != "stopped":
-                # Acknowledge the data request
-                with client:
-                    output = client.acknowledge_data_request(data_request.id)
-                print(f"Data request status: {output.status}")
-
-                while current_state != "stopped":
-                    print(
-                        f"{gen_ts()} Orchestrator loop status is {current_state}. Sleeping for 10s."
-                    )
-                    time.sleep(10)
-                    current_state = operator.orch_state()
+            while current_state != "stopped":
+                print(
+                    f"{gen_ts()} Orchestrator loop status is {current_state}. Sleeping for 10s."
+                )
+                time.sleep(10)
+                current_state = operator.orch_state()
                 
         print(
             f"{gen_ts()} Orchestrator is idle. Checking for data requests in 30 seconds."
