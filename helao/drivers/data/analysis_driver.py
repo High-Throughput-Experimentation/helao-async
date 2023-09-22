@@ -46,8 +46,8 @@ class HelaoAnalysisSyncer:
         # declare global loader for analysis models used by driver.batch_* methods
         pgs3.LOADER = pgs3.EcheUvisLoader(
             self.config_dict["env_file"],
-            cache_s3=True,
-            cache_json=True,
+            cache_s3=False,
+            cache_json=False,
         )
         self.s3 = pgs3.LOADER.cli
         # os.environ["AWS_CONFIG_FILE"] = self.config_dict["aws_config_path"]
