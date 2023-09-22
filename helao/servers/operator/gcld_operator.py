@@ -148,7 +148,7 @@ if __name__ == "__main__":
                 print("Waiting for sequence uploads to finish.")
                 time.sleep(10)
             
-            ana = uvis_ana_constructor(PLATE_ID, seq.sequence_uuid, data_request.id)
+            ana = uvis_ana_constructor(PLATE_ID, str(seq.sequence_uuid), data_request.id)
             operator.add_sequence(ana.get_seq())
             print(f"Dispatching analysis sequence: {ana.sequence_uuid}")
             operator.start()
