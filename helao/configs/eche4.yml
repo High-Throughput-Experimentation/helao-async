@@ -156,7 +156,7 @@ servers:
     fast: analysis_server
     params:
       env_file: k:/users/hte/.credentials/helao_data.env
-      local_only: true
+      local_only: false
   CAM:
     host: hte-eche-04.htejcap.caltech.edu
     port: 8013
