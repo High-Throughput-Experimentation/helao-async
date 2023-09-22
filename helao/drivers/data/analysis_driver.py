@@ -6,6 +6,7 @@ Handles Helao analyses uploads to S3.
 
 __all__ = ["HelaoAnalysisSyncer"]
 
+import time
 import asyncio
 import traceback
 import os
@@ -328,9 +329,20 @@ class HelaoAnalysisSyncer:
         """Generate list of DryUvisAnalysis from sequence or plate_id (latest seq)."""
         # eul = EcheUvisLoader(env_file=self.config_dict["env_file"], cache_s3=True)
         min_date = datetime.now().strftime("%Y-%m-%d") if recent else "2023-04-26"
+        
         df = pgs3.LOADER.get_recent(
             query=DRYUVIS_QUERY, min_date=min_date, plate_id=plate_id
         )
+
+        retry_counter = 0
+        while df.shape[0] == 0 and retry_counter < 3:
+            self.base.print_message("query returned 0 rows, checking again in 5 seconds.")
+            time.sleep(5)
+            df = pgs3.LOADER.get_recent(
+                query=DRYUVIS_QUERY, min_date=min_date, plate_id=plate_id
+            )
+            retry_counter += 1
+
 
         # all processes in sequence
         pdf = df.sort_values(

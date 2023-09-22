@@ -142,6 +142,8 @@ if __name__ == "__main__":
                 )
                 time.sleep(10)
                 current_state = operator.orch_state()
+
+            time.sleep(30)
                 
             # when orchestrator has stopped, check DB server for upload state
             num_uploads = num_running_uploads()
