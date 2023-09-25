@@ -10,26 +10,27 @@ from fastapi import Body
 from helao.helpers.premodels import Action
 from helao.servers.base_api import BaseAPI
 from helaocore.models.sample import SampleUnion
-from helao.drivers.mfc.alicat_driver import AliCatMFC, MfcExec, PfcExec, MfcConstPresExec
+from helao.drivers.mfc.alicat_driver import (
+    AliCatMFC,
+    MfcExec,
+    PfcExec,
+    MfcConstPresExec,
+)
 from helao.helpers.config_loader import config_loader
-from helao.helpers.make_str_enum import make_str_enum
 
 
 async def mfc_dyn_endpoints(app=None):
     server_key = app.base.server.server_name
     co2_sensor_key = app.base.server_cfg["params"].get("co2_server_name", None)
-    app.base.print_message(app.base.server_cfg["params"])
-    app.base.print_message(f"co2_server_name set to: {co2_sensor_key}")
-    dev_names = list(app.base.server_cfg["params"]["devices"].keys())
-    dev_mfcs = make_str_enum("dev_mfcs", {k: k for k in dev_names})
-    
+    dev_names = list(app.driver.fcs.keys())
+
     if co2_sensor_key in app.helao_cfg["servers"]:
-        
+
         @app.post(f"/{server_key}/maintain_concentration", tags=["action"])
         async def maintain_concentration(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            device_name: dev_mfcs = dev_names[0],
+            device_name: app.driver.dev_mfcs = dev_names[0],
             target_ppm: float = 1e5,
             headspace_scc: float = 7.5,
             refill_freq_sec: float = 10.0,
@@ -65,7 +66,9 @@ async def mfc_dyn_endpoints(app=None):
                 if active.action.action_params["device_name"] is None:
                     dev_dict = {}
                 else:
-                    dev_dict = {"device_name": active.action.action_params["device_name"]}
+                    dev_dict = {
+                        "device_name": active.action.action_params["device_name"]
+                    }
                 app.base.stop_all_executor_prefix("maintain_concentration", dev_dict)
             finished_action = await active.finish()
             return finished_action.as_dict()
@@ -74,12 +77,11 @@ async def mfc_dyn_endpoints(app=None):
         app.base.print_message(f"server_name {co2_sensor_key} was not found in config.")
         app.base.print_message(app.helao_cfg["servers"])
 
+
 def makeApp(confPrefix, server_key, helao_root):
     config = config_loader(confPrefix, helao_root)
 
     # current plan is 1 mfc per COM
-    dev_names = list(config["servers"][server_key]["params"]["devices"].keys())
-    dev_mfcs = make_str_enum("dev_mfcs", {k: k for k in dev_names})
 
     app = BaseAPI(
         config=config,
@@ -88,14 +90,15 @@ def makeApp(confPrefix, server_key, helao_root):
         description="MFC server",
         version=0.1,
         driver_class=AliCatMFC,
-        dyn_endpoints=mfc_dyn_endpoints
+        dyn_endpoints=mfc_dyn_endpoints,
     )
+    dev_names = list(app.driver.fcs.keys())
 
     @app.post(f"/{server_key}/acquire_flowrate", tags=["action"])
     async def acquire_flowrate(
         action: Action = Body({}, embed=True),
         action_version: int = 2,
-        device_name: dev_mfcs = dev_names[0],
+        device_name: app.driver.dev_mfcs = dev_names[0],
         flowrate_sccm: float = None,
         ramp_sccm_sec: float = 0,
         stay_open: bool = False,
@@ -139,7 +142,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def acquire_pressure(
         action: Action = Body({}, embed=True),
         action_version: int = 2,
-        device_name: dev_mfcs = dev_names[0],
+        device_name: app.driver.dev_mfcs = dev_names[0],
         pressure_psia: float = None,
         ramp_psi_sec: float = 0,
         stay_open: bool = False,
@@ -183,7 +186,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def set_flowrate(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        device_name: dev_mfcs = dev_names[0],
+        device_name: app.driver.dev_mfcs = dev_names[0],
         flowrate_sccm: float = None,
         ramp_sccm_sec: float = 0,
     ):
@@ -196,7 +199,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def set_pressure(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        device_name: dev_mfcs = dev_names[0],
+        device_name: app.driver.dev_mfcs = dev_names[0],
         pressure_psia: float = None,
         ramp_psi_sec: float = 0,
     ):
@@ -209,7 +212,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def hold_valve_action(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        device_name: dev_mfcs = dev_names[0],
+        device_name: app.driver.dev_mfcs = dev_names[0],
     ):
         active = await app.base.setup_and_contain_action(action_abbr="hold_valve")
         app.driver.hold_valve(active.action.action_params.get("device_name", None))
@@ -220,7 +223,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def cancel_hold_action(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        device_name: dev_mfcs = dev_names[0],
+        device_name: app.driver.dev_mfcs = dev_names[0],
     ):
         active = await app.base.setup_and_contain_action(action_abbr="cancel_hold")
         app.driver.cancel_hold(active.action.action_params.get("device_name", None))
@@ -231,7 +234,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def hold_valve_closed_action(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
-        device_name: dev_mfcs = dev_names[0],
+        device_name: app.driver.dev_mfcs = dev_names[0],
     ):
         active = await app.base.setup_and_contain_action(action_abbr="close_valve")
         app.driver.hold_valve_closed(
@@ -244,7 +247,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def maintain_pressure(
         action: Action = Body({}, embed=True),
         action_version: int = 2,
-        device_name: dev_mfcs = dev_names[0],
+        device_name: app.driver.dev_mfcs = dev_names[0],
         target_pressure: float = 14.7,
         total_gas_scc: float = 7.0,
         refill_freq_sec: float = 10.0,
@@ -300,67 +303,73 @@ def makeApp(confPrefix, server_key, helao_root):
         return app.driver.fcinfo
 
     @app.post("/list_gases", tags=["private"])
-    def list_gases(device_name: dev_mfcs = dev_names[0]):
+    def list_gases(
+        device_name: app.driver.dev_mfcs = dev_names[0],
+    ):
         return app.driver.list_gases(device_name)
 
     @app.post("/set_gas", tags=["private"])
     async def set_gas(
-        device_name: dev_mfcs = dev_names[0], gas: Union[int, str] = "N2"
+        device_name: app.driver.dev_mfcs = dev_names[0], gas: Union[int, str] = "N2"
     ):
         return await app.driver.set_gas(device_name, gas)
 
     @app.post("/set_gas_mixture", tags=["private"])
     async def set_gas_mixture(
-        device_name: dev_mfcs = dev_names[0], gas_dict: dict = {"N2": 100}
+        device_name: app.driver.dev_mfcs = dev_names[0], gas_dict: dict = {"N2": 100}
     ):
         return await app.driver.set_gas_mixture(device_name, gas_dict)
 
     @app.post("/lock_display", tags=["private"])
-    async def lock_display(device_name: dev_mfcs = dev_names[0]):
+    async def lock_display(device_name: app.driver.dev_mfcs = dev_names[0]):
         return await app.driver.lock_display(device_name)
 
     @app.post("/unlock_display", tags=["private"])
-    async def unlock_display(device_name: dev_mfcs = dev_names[0]):
+    async def unlock_display(device_name: app.driver.dev_mfcs = dev_names[0]):
         return await app.driver.unlock_display(device_name)
 
     @app.post("/hold_valve", tags=["private"])
-    async def hold_valve(device_name: dev_mfcs = dev_names[0]):
+    async def hold_valve(device_name: app.driver.dev_mfcs = dev_names[0]):
         return await app.driver.hold_valve(device_name)
 
     @app.post("/hold_valve_closed", tags=["private"])
-    async def hold_valve_closed(device_name: dev_mfcs = dev_names[0]):
+    async def hold_valve_closed(device_name: app.driver.dev_mfcs = dev_names[0]):
         return await app.driver.hold_valve_closed(device_name)
 
     @app.post("/hold_cancel", tags=["private"])
-    async def hold_cancel(device_name: dev_mfcs = dev_names[0]):
+    async def hold_cancel(device_name: app.driver.dev_mfcs = dev_names[0]):
         return await app.driver.hold_cancel(device_name)
 
     @app.post("/tare_volume", tags=["private"])
-    async def tare_volume(device_name: dev_mfcs = dev_names[0]):
+    async def tare_volume(device_name: app.driver.dev_mfcs = dev_names[0]):
         return await app.driver.tare_volume(device_name)
 
     @app.post("/tare_pressure", tags=["private"])
-    async def tare_pressure(device_name: dev_mfcs = dev_names[0]):
+    async def tare_pressure(device_name: app.driver.dev_mfcs = dev_names[0]):
         return await app.driver.tare_pressure(device_name)
 
     # @app.post("/reset_totalizer", tags=["private"])
-    # def reset_totalizer(device_name: dev_mfcs = dev_names[0]):
+    # def reset_totalizer(device_name: app.driver.dev_mfcs = dev_names[0]):
     #     return app.driver.reset_totalizer(device_name)
 
     @app.post("/manual_query_state", tags=["private"])
-    def manual_query_state(device_name: dev_mfcs = dev_names[0]):
+    def manual_query_state(device_name: app.driver.dev_mfcs = dev_names[0]):
         return app.driver.manual_query_status(device_name)
 
     @app.post("/read_valve_register", tags=["private"])
-    def read_valve_register(device_name: dev_mfcs = dev_names[0]):
+    def read_valve_register(device_name: app.driver.dev_mfcs = dev_names[0]):
         return app.driver._send(device_name, "R53")
 
     @app.post("/write_valve_register", tags=["private"])
-    def write_valve_register(device_name: dev_mfcs = dev_names[0], value: int = 20000):
+    def write_valve_register(
+        device_name: app.driver.dev_mfcs = dev_names[0], value: int = 20000
+    ):
         return app.driver._send(device_name, f"W53={value}")
 
     @app.post("/send_command", tags=["private"])
-    def send_command(device_name: dev_mfcs = dev_names[0], command: str = ""):
+    def send_command(
+        device_name: app.driver.dev_mfcs = dev_names[0], command: str = ""
+    ):
         return app.driver._send(device_name, command)
 
     return app
