@@ -20,7 +20,7 @@ async def mfc_dyn_endpoints(app=None):
     co2_sensor_key = app.base.server_cfg["params"].get("co2_server_name", None)
     app.base.print_message(app.base.server_cfg["params"])
     app.base.print_message(f"co2_server_name set to: {co2_sensor_key}")
-    dev_names = list(app.base.server_cfg["params"].get("devices", {}).keys())
+    dev_names = list(app.base.server_cfg["params"]["devices"].keys())
     dev_mfcs = make_str_enum("dev_mfcs", {k: k for k in dev_names})
     
     if co2_sensor_key in app.helao_cfg["servers"]:
