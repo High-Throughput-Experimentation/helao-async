@@ -18,6 +18,7 @@ from helao.helpers.make_str_enum import make_str_enum
 async def mfc_dyn_endpoints(app=None):
     server_key = app.base.server.server_name
     co2_sensor_key = app.base.server_cfg.get("co2_server_name", None)
+    app.base.print_message(app.base.server_cfg)
     app.base.print_message(f"co2_server_name set to: {co2_sensor_key}")
     dev_names = list(app.base.server_cfg.get("devices", {}).keys())
     dev_mfcs = make_str_enum("dev_mfcs", {k: k for k in dev_names})
