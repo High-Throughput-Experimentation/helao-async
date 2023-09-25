@@ -1128,6 +1128,87 @@ def CCSI_sub_co2massdose(
 
     return apm.action_list
 
+def CCSI_sub_co2maintainconcentration(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    co2measure_duration: float = 300,
+    co2measure_acqrate: float = 0.5,
+    flowrate_sccm: float = 0.5,
+    flowramp_sccm: float = 0,
+    target_co2concentration: float = 10000,
+    total_gas_scc: float = 7.0,
+    refill_freq_sec: float = 60.0,
+):
+
+    apm = ActionPlanMaker()
+    apm.add(ORCH_server, "wait", {"waittime": 0.25})
+#    apm.add(IO_server, "acquire_analog_in", {"duration":apm.pars.co2measure_duration + 1,"acquisition_rate": apm.pars.co2measure_acqrate, }, nonblocking=True)
+    apm.add(MFC_server, "acquire_flowrate", {"flowrate_sccm":None,"duration":-1,"acquisition_rate": apm.pars.co2measure_acqrate,},
+        nonblocking=True,
+        technique_name="Measure_added_co2",
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+        ],           
+    )
+    # apm.add(
+    #     MFC_server, 
+    #     "maintain_pressure", 
+    #     {
+    #         "flowrate_sccm":apm.pars.flowrate_sccm,
+    #         "ramp_sccm_sec":apm.pars.flowramp_sccm,
+    #         "duration":apm.pars.co2measure_duration + 30, #arbitrary time to allow for final correction
+    #         "target_pressure": apm.pars.target_pressure,
+    #         "total_gas_scc": apm.pars.total_gas_scc,
+    #         "refill_freq_sec": apm.pars.refill_freq_sec,
+    #     }, 
+    #     asc.no_wait,
+    #       nonblocking=True
+    #    )
+    apm.add(
+        CO2S_server,
+        "acquire_co2",
+        {
+            "duration": apm.pars.co2measure_duration,
+            "acquisition_rate": apm.pars.co2measure_acqrate,
+        },
+        asc.no_wait,
+        #nonblocking=True,
+        from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        technique_name="Measure_recirculated_headspace",
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
+
+
+    apm.add(
+        CALC_server,
+        "new_function",
+        {
+            "co2_ppm_target": apm.pars.target_co2concentration,
+            "flowrate_sccm":apm.pars.flowrate_sccm,
+            "ramp_sccm_sec":apm.pars.flowramp_sccm,
+            "duration":apm.pars.co2measure_duration + 30, #arbitrary time to allow for final correction
+            "total_gas_scc": apm.pars.total_gas_scc,
+            "refill_freq_sec": apm.pars.refill_freq_sec,
+        },
+        asc.no_wait,
+    )
+
+
+#    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
+    apm.add(MFC_server, "cancel_acquire_flowrate",{},
+            )
+
+    return apm.action_list
+
 
 def CCSI_sub_flowflush(
     experiment: Experiment,
