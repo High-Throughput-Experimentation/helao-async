@@ -15,6 +15,59 @@ from helao.helpers.config_loader import config_loader
 from helao.helpers.make_str_enum import make_str_enum
 
 
+async def mfc_dyn_endpoints(app=None):
+    server_key = app.base.server.server_name
+    co2_sensor_key = app.base.server_cfg.get("co2_server_name", None)
+    dev_names = list(app.base.server_cfg.get("devices", {}).keys())
+    dev_mfcs = make_str_enum("dev_mfcs", {k: k for k in dev_names})
+    
+    if co2_sensor_key in app.helao_cfg["servers"]:
+        
+        @app.post(f"/{server_key}/maintain_concentration", tags=["action"])
+        async def maintain_concentration(
+            action: Action = Body({}, embed=True),
+            action_version: int = 1,
+            device_name: dev_mfcs = dev_names[0],
+            target_ppm: float = 1e5,
+            headspace_scc: float = 7.5,
+            refill_freq_sec: float = 10.0,
+            flowrate_sccm: float = None,
+            ramp_sccm_sec: float = 0,
+            stay_open: bool = False,
+            duration: float = -1,
+            exec_id: Optional[str] = None,
+        ):
+            """Check pressure at refill freq and dose to target pressure."""
+            active = await app.base.setup_and_contain_action()
+            active.action.action_abbr = "hold_pres"
+            executor = MfcConstPresExec(
+                active=active,
+                oneoff=False,
+                poll_rate=0.05,
+            )
+            active_action_dict = active.start_executor(executor)
+            return active_action_dict
+
+        @app.post(f"/{server_key}/cancel_maintain_concentration", tags=["action"])
+        async def cancel_maintain_concentration(
+            action: Action = Body({}, embed=True),
+            action_version: int = 1,
+            device_name: Optional[str] = None,
+            exec_id: Optional[str] = None,
+        ):
+            """Stop flowrate & acquisition for given device_name."""
+            active = await app.base.setup_and_contain_action()
+            if active.action.action_params["exec_id"] is not None:
+                app.base.stop_executor(active.action.action_params["exec_id"])
+            else:
+                if active.action.action_params["device_name"] is None:
+                    dev_dict = {}
+                else:
+                    dev_dict = {"device_name": active.action.action_params["device_name"]}
+                app.base.stop_all_executor_prefix("maintain_concentration", dev_dict)
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
 def makeApp(confPrefix, server_key, helao_root):
     config = config_loader(confPrefix, helao_root)
 
@@ -29,6 +82,7 @@ def makeApp(confPrefix, server_key, helao_root):
         description="MFC server",
         version=0.1,
         driver_class=AliCatMFC,
+        dyn_endpoints=mfc_dyn_endpoints
     )
 
     @app.post(f"/{server_key}/acquire_flowrate", tags=["action"])
