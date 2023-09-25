@@ -322,49 +322,8 @@ class EcheUvisLoader(HelaoLoader):
             query_parts += f" & plate_id=={plate_id}"
         if sample_no is not None:
             query_parts += f" & sample_no=={sample_no}"
-        if recent_md and min_date >= recent_md[0]:
-            self.recent_cache[
-                (
-                    min_date,
-                    plate_id,
-                    sample_no,
-                )
-            ] = self.recent_cache[
-                (
-                    recent_md[0],
-                    None,
-                    None,
-                )
-            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
-        elif recent_mdpi and min_date >= recent_mdpi[0]:
-            self.recent_cache[
-                (
-                    min_date,
-                    plate_id,
-                    sample_no,
-                )
-            ] = self.recent_cache[
-                (
-                    recent_mdpi[0],
-                    plate_id,
-                    None,
-                )
-            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
-        elif recent_mdsn and min_date >= recent_mdsn[0]:
-            self.recent_cache[
-                (
-                    min_date,
-                    plate_id,
-                    sample_no,
-                )
-            ] = self.recent_cache[
-                (
-                    recent_mdsn[0],
-                    None,
-                    sample_no,
-                )
-            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
-        elif (
+
+        if (
             min_date,
             plate_id,
             sample_no,
@@ -412,6 +371,50 @@ class EcheUvisLoader(HelaoLoader):
                     sample_no,
                 )
             ] = pdf.sort_values("process_timestamp")
+
+        elif recent_md and min_date >= recent_md[0]:
+            self.recent_cache[
+                (
+                    min_date,
+                    plate_id,
+                    sample_no,
+                )
+            ] = self.recent_cache[
+                (
+                    recent_md[0],
+                    None,
+                    None,
+                )
+            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
+        elif recent_mdpi and min_date >= recent_mdpi[0]:
+            self.recent_cache[
+                (
+                    min_date,
+                    plate_id,
+                    sample_no,
+                )
+            ] = self.recent_cache[
+                (
+                    recent_mdpi[0],
+                    plate_id,
+                    None,
+                )
+            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
+        elif recent_mdsn and min_date >= recent_mdsn[0]:
+            self.recent_cache[
+                (
+                    min_date,
+                    plate_id,
+                    sample_no,
+                )
+            ] = self.recent_cache[
+                (
+                    recent_mdsn[0],
+                    None,
+                    sample_no,
+                )
+            ].query(f"process_timestamp >= '{min_date}'" + query_parts)
+
         return self.recent_cache[
             (
                 min_date,
