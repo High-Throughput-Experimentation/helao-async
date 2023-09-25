@@ -73,6 +73,7 @@ class AliCatMFC:
             self.fcinfo[dev_name] = {"gases": gas_dict, "info": mfg_dict}
 
         self.dev_mfcs = make_str_enum("dev_mfcs", {key: key for key in self.fcs})
+        self.first_mfc = list(self.fcs.keys())[0]
 
         self.base.print_message(f"Managing {len(self.fcs)} devices:\n{self.fcs.keys()}")
         # query status with self.mfc.get()
