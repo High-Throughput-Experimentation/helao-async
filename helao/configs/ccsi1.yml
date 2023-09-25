@@ -134,6 +134,7 @@ servers:
         CO2:
           port: COM7
           unit_id: A
+      co2_server_name: CO2SENSOR
     verbose: false
   CALC:
     host: hte-ccsi-01.htejcap.caltech.edu
