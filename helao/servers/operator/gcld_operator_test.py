@@ -11,7 +11,7 @@ env_config = sys.argv[3]
 load_dotenv(dotenv_path=Path(env_config))
 
 from helao.servers.operator.operator import Operator
-from helao.helpers.gcld_client import DataRequestsClient
+from helao.helpers.gcld_client import DataRequestsClient, CreateDataRequestModel
 from helao.helpers.premodels import Sequence, Experiment
 from helao.helpers.dispatcher import private_dispatcher
 from helao.helpers.config_loader import config_loader
@@ -112,14 +112,18 @@ if __name__ == "__main__":
         resp, err = private_dispatcher("DB", db_cfg["host"], db_cfg["port"], "running")
         return len(resp)
 
-    while True:
+    reqmodels = [
+        CreateDataRequestModel(composition = {"Mn": 1.0, "Sb": 0.0}, score = 1.0, sample_label="sample_1000"),
+        CreateDataRequestModel(composition = {"Mn": 0.5, "Sb": 0.5}, score = 1.0, sample_label="sample_3000"),
+    ]
+
+    for reqmod in reqmodels:
         with client:
             # get pending data requests
-            output = client.read_data_requests(status="pending")
+            output = client.create_data_request(reqmod)
 
         if output:
-            print(f"Pending data request count: {len(output)}")
-            data_request = output[0]
+            data_request = output
             sample_no = int(data_request.sample_label.split("_")[-1])
 
             seq = uvis_seq_constructor(PLATE_ID, sample_no, data_request.id)
