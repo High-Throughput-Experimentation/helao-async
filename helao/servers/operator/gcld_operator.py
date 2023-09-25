@@ -168,6 +168,6 @@ if __name__ == "__main__":
                 current_state = operator.orch_state()
                 
         print(
-            f"{gen_ts()} Orchestrator is idle. Checking for data requests in 30 seconds."
+            f"{gen_ts()} Orchestrator is idle. Checking for data requests in 15 seconds."
         )
         time.sleep(15)
