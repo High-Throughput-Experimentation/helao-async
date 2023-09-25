@@ -1275,20 +1275,6 @@ def CCSI_sub_co2maintainconcentration(
     )
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 1}, asc.no_wait)
 
-    apm.add(
-        CALC_server,
-        "new_function",
-        {
-            "co2_ppm_target": apm.pars.target_co2concentration,
-            "flowrate_sccm": apm.pars.flowrate_sccm,
-            "ramp_sccm_sec": apm.pars.flowramp_sccm,
-            "duration": apm.pars.co2measure_duration
-            + 30,  # arbitrary time to allow for final correction
-            "total_gas_scc": apm.pars.total_gas_scc,
-            "refill_freq_sec": apm.pars.refill_freq_sec,
-        },
-        asc.no_wait,
-    )
 
     #    apm.add(ORCH_server, "wait", {"waittime": apm.pars.co2measure_duration})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
