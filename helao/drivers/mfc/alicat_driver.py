@@ -28,6 +28,7 @@ from helaocore.error import ErrorCodes
 from helao.servers.base import Base
 from helao.helpers.executor import Executor
 from helaocore.models.hlostatus import HloStatus
+from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 from helao.helpers.ws_subscriber import WsSubscriber as Wss
 
@@ -70,6 +71,8 @@ class AliCatMFC:
             }
 
             self.fcinfo[dev_name] = {"gases": gas_dict, "info": mfg_dict}
+
+        self.dev_mfcs = make_str_enum("dev_mfcs", {key: key for key in self.fcs})
 
         self.base.print_message(f"Managing {len(self.fcs)} devices:\n{self.fcs.keys()}")
         # query status with self.mfc.get()
