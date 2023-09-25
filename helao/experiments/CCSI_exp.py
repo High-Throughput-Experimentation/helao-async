@@ -27,6 +27,7 @@ __all__ = [
     "CCSI_sub_co2constantpressure",
     "CCSI_sub_co2mass_temp",
     "CCSI_sub_co2massdose",
+    "CCSI_sub_co2maintainconcentration",
     "CCSI_sub_co2topup_mfcmassdose",
     "CCSI_sub_co2monitoring",
     "CCSI_sub_co2monitoring_mfcmasscotwo",
