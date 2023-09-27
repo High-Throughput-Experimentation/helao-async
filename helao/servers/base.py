@@ -1316,7 +1316,7 @@ class Active:
                         f" {self.listen_uuids}",
                         warning=True,
                     )
-                    self.base.print_message(f"data_msg: \n{data_msg}", warning=True)
+                    # self.base.print_message(f"data_msg: \n{data_msg}", warning=True)
 
                     continue
 
