@@ -540,17 +540,6 @@ class MfcConstConcExec(MfcExec):
         self.active.base.print_message(
             f"checking config for co2 server named: {self.co2serv_key}"
         )
-        co2serv_config = self.active.base.world_cfg["servers"].get(
-            self.co2serv_key, None
-        )
-        if co2serv_config is None:
-            return
-        co2serv_host = co2serv_config.get("host", None)
-        co2serv_port = co2serv_config.get("port", None)
-        self.active.base.print_message(
-            f"subscribing to {self.co2serv_key} at {co2serv_host}:{co2serv_port}"
-        )
-        self.wss = Wss(co2serv_host, co2serv_port, "ws_live")
 
     async def eval_conc(self):
         datapackage_list = []
@@ -589,6 +578,18 @@ class MfcConstConcExec(MfcExec):
         "Set flow rate."
         self.active.base.print_message("MfcConstConcExec running setup methods.")
 
+        co2serv_config = self.active.base.world_cfg["servers"].get(
+            self.co2serv_key, None
+        )
+        if co2serv_config is None:
+            return
+        co2serv_host = co2serv_config.get("host", None)
+        co2serv_port = co2serv_config.get("port", None)
+        self.active.base.print_message(
+            f"subscribing to {self.co2serv_key} at {co2serv_host}:{co2serv_port}"
+        )
+
+        self.wss = Wss(co2serv_host, co2serv_port, "ws_live")
         rate_resp = await self.active.base.fastapp.driver.set_flowrate(
             device_name=self.device_name,
             flowrate_sccm=self.flowrate_sccm,
