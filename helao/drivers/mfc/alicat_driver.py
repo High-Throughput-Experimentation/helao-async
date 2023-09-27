@@ -555,11 +555,13 @@ class MfcConstConcExec(MfcExec):
         "Set flow rate."
         self.active.base.print_message("MfcConstConcExec running setup methods.")
 
-        messages = await self.wss.read_messages()
+        messages = []
+        while not messages:
+            messages = await self.wss.read_messages()
+            self.active.base.print_message("No co2_ppm readings have been received, sleeping for 1 second")
+            time.sleep(1)
         self.active.base.print_message(messages)
 
-        messages = await self.wss.read_messages()
-        self.active.base.print_message(messages)
 
         rate_resp = await self.active.base.fastapp.driver.set_flowrate(
             device_name=self.device_name,
@@ -579,7 +581,11 @@ class MfcConstConcExec(MfcExec):
     async def _poll(self):
         """Read flow from live buffer."""
         iter_time = time.time()
-        datapackage_list = await self.wss.read_messages()
+        datapackage_list = []
+        while not datapackage_list:
+            datapackage_list = await self.wss.read_messages()
+            self.active.base.print_message("No co2_ppm readings have been received, sleeping for 1 second")
+            time.sleep(1)
         data_dict = defaultdict(list)
         for datapackage in datapackage_list:
             for datalab, (dataval, epochsec) in datapackage.items():
