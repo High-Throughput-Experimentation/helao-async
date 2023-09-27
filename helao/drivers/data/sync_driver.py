@@ -964,7 +964,6 @@ class HelaoSyncer:
                 save_dir = os.path.dirname(
                     os.path.join(
                         self.base.helaodirs.process_root,
-                        "PROCESSES",
                         exp_prog.yml.relative_path,
                     )
                 )
