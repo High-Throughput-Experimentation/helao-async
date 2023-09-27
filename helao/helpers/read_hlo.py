@@ -20,7 +20,7 @@ def read_hlo(path: str) -> Tuple[dict, dict]:
 
     sep_index = lines.index("%%\n")
 
-    meta = yml_load("".join(lines[:sep_index]))
+    meta = dict(yml_load("".join(lines[:sep_index])))
 
     data = defaultdict(list)
     for line in lines[sep_index + 1 :]:
