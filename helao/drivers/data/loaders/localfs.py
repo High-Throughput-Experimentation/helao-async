@@ -10,10 +10,7 @@ from collections import defaultdict
 import pandas as pd
 
 from helao.helpers.yml_tools import yml_load
-# from helao.helpers.read_hlo import read_hlo
 from helao.helpers.file_mapper import FileMapper
-
-# yaml reader
 
 
 class LocalLoader:
@@ -23,26 +20,35 @@ class LocalLoader:
         self.act_cache = {}  # {uuid: json_dict}
         self.exp_cache = {}
         self.seq_cache = {}
-        self.pro_cache = {}
+        self.prc_cache = {}
         self._yml_paths = {}
         self.target = os.path.abspath(os.path.normpath(data_path))
+        target_state = self.target.split("RUNS_")[-1].split(os.sep)[0]
+        states = ("RUNS_ACTIVE", "RUNS_FINISHED", "RUNS_SYNCED", "RUNS_DIAG")
+        state_dir = f"RUNS_{target_state}"
+        check_dirs = [
+            f"{self.target.replace(state_dir, x)}" for x in states
+        ] + [self.target.replace(state_dir, "PROCESSES")]
         if not os.path.exists(self.target):
             raise FileNotFoundError(
                 "data_path argument is not a valid file or folder path"
             )
+        _yml_paths = []
         if self.target.endswith(".zip"):
             with ZipFile(self.target, "r") as zf:
                 zip_contents = zf.namelist()
             _yml_paths = [x for x in zip_contents if x.endswith(".yml")]
         elif os.path.isdir(self.target):
-            _yml_paths = glob(os.path.join(self.target, "**", "*.yml"), recursive=True)
+            for check_dir in check_dirs:
+                _yml_paths += glob(os.path.join(check_dir, "**", "*.yml"), recursive=True)
         else:
-            _yml_paths = glob(
-                os.path.join(os.path.dirname(self.target), "**", "*.yml"),
-                recursive=True,
-            )
+            for check_dir in check_dirs:
+                _yml_paths += glob(
+                    os.path.join(os.path.dirname(check_dir), "**", "*.yml"),
+                    recursive=True,
+                )
 
-        for suffix in ("seq", "exp", "act"):
+        for suffix in ("seq", "exp", "act", "prc"):
             self._yml_paths[suffix] = [
                 x for x in _yml_paths if x.endswith(f"-{suffix}.yml")
             ]
@@ -135,17 +141,50 @@ class LocalLoader:
                 "action_localpath",
             ],
         )
+    
+        prc_parts = []
+        for ymlp in self._yml_paths["prc"]:
+            yml_dir = os.path.basename(os.path.dirname(ymlp))
+            _, exp_name = yml_dir.split("__")
+            yml_file = os.path.basename(ymlp)
+            idx, prc_uuid, techname = yml_file.replace("-prc.yml", "").split("__")
+            prc_idx = int(idx)
+            exp_timestamp = datetime.strptime(yml_dir.split("__")[0], "%Y%m%d.%H%M%S%f")
+            prc_parts.append(
+                (
+                    prc_idx,
+                    prc_uuid,
+                    techname,
+                    yml_dir,
+                    ymlp,
+                    exp_timestamp,
+                    exp_name,
+                )
+            )
+        self.processes = pd.DataFrame(
+            prc_parts,
+            columns=[
+                "process_group_index",
+                "process_uuid",
+                "technique_name",
+                "process_dir",
+                "process_localpath",
+                "experiment_timestamp",
+                "experiment_name",
+            ],
+        )
+
 
     def clear_cache(self):
         self.act_cache = {}  # {uuid: json_dict}
         self.exp_cache = {}
         self.seq_cache = {}
-        self.pro_cache = {}
+        self.prc_cache = {}
 
     def get_yml(self, path: str):
         if self.target.endswith(".zip"):
             with ZipFile(self.target, "r") as zf:
-                metad = yml_load(zf.open(path).read().decode("utf-8"))
+                metad = dict(yml_load(zf.open(path).read().decode("utf-8")))
         else:
             # metad = yml_load("".join(builtins.open(path, "r").readlines()))
             FM = FileMapper(path)
@@ -179,6 +218,15 @@ class LocalLoader:
         self.seq_cache[path] = metad
         return HelaoSequence(path, metad, self)
 
+    def get_prc(self, index=None, path: str = None):
+        if index is None and path is None:
+            raise IndexError("neither index, nor path arguments were supplied")
+        if path is None:
+            path = self.processes.iloc[index].process_localpath
+        metad = self.prc_cache.get(path, self.get_yml(path))
+        self.prc_cache[path] = metad
+        return HelaoProcess(path, metad, self)
+
     def get_hlo(self, yml_path: str, hlo_fn: str):
         if self.target.endswith(".zip"):
             hlotarget = os.path.join(os.path.dirname(yml_path), hlo_fn)
@@ -206,7 +254,7 @@ class LocalLoader:
             return FM.read_hlo(hlo_path)
 
 
-ABBR_MAP = {"act": "action", "exp": "experiment", "seq": "sequence"}
+ABBR_MAP = {"act": "action", "exp": "experiment", "seq": "sequence", "prc": "process"}
 
 
 class HelaoModel:
@@ -221,7 +269,10 @@ class HelaoModel:
         helao_type = ABBR_MAP[yml_type]
         self.yml_path = yml_path
         self.helao_type = helao_type
-        self.name = meta_dict[f"{helao_type}_name"]
+        if helao_type != "process":
+            self.name = meta_dict[f"{helao_type}_name"]
+        else:
+            self.name = meta_dict["technique_name"]
         self.uuid = meta_dict[f"{helao_type}_uuid"]
         self.timestamp = meta_dict[f"{helao_type}_timestamp"]
         self.params = meta_dict[f"{helao_type}_params"]
@@ -297,3 +348,16 @@ class HelaoSequence(HelaoModel):
         self.sequence_timestamp = self.timestamp
         self.sequence_params = self.params
         self.sequence_label = meta_dict.get("sequence_label", "")
+
+class HelaoProcess(HelaoModel):
+    technique_name: str
+    process_uuid: UUID
+    process_timestamp: datetime
+    process_params: dict
+
+    def __init__(self, yml_path: str, meta_dict: dict, loader: LocalLoader):
+        super().__init__(yml_path=yml_path, meta_dict=meta_dict, loader=loader)
+        self.process_uuid = self.uuid
+        self.process_timestamp = self.timestamp
+        self.process_params = self.params
+        self.technique_name = self.name
