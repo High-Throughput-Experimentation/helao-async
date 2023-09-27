@@ -552,6 +552,13 @@ class MfcConstConcExec(MfcExec):
     async def _pre_exec(self):
         "Set flow rate."
         self.active.base.print_message("MfcConstConcExec running setup methods.")
+
+        messages = await self.wss.read_messages()
+        self.active.base.print_message(messages)
+
+        messages = await self.wss.read_messages()
+        self.active.base.print_message(messages)
+
         rate_resp = await self.active.base.fastapp.driver.set_flowrate(
             device_name=self.device_name,
             flowrate_sccm=self.flowrate_sccm,
@@ -584,7 +591,7 @@ class MfcConstConcExec(MfcExec):
                 latest_epoch = max([epochsec, self.latest_epoch])
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
 
-        co2_vec = data_dict.get("co2_ppm")
+        co2_vec = data_dict.get("co2_ppm", [])
         self.active.base.print_message(f"got co2_ppm from {self.co2_server_name}: {co2_vec}")
         if len(co2_vec) > 10:  # default rate is 0.05, so 20 points per second
             co2_mean_ppm = np.mean(co2_vec[-10:])
