@@ -530,7 +530,8 @@ class MfcConstConcExec(MfcExec):
         self.last_fill = self.start_time
         action_params = self.active.action.action_params
 
-        co2_server_name = self.active.base.server_cfg.get("co2_server_name", None)
+        co2_server_name = self.active.base.server_params.get("co2_server_name", None)
+        self.active.base.print_message(f"checking config for co2 server named: {co2_server_name}")
         co2_server_cfg = self.active.base.world_cfg["servers"].get(
             co2_server_name, None
         )
