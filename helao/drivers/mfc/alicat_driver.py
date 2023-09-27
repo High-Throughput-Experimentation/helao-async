@@ -536,6 +536,8 @@ class MfcConstConcExec(MfcExec):
             self.co2_server_name, None
         )
         assert co2_server_cfg is not None
+        self.active.base.print_message(f"subscribing to {self.co2_server_name} at {co2_server_cfg['host']}:{co2_server_cfg['port']}")
+
         self.wss = Wss(
             host=co2_server_cfg["host"], port=co2_server_cfg["port"], path="ws_live"
         )
