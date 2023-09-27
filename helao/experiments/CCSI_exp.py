@@ -1247,8 +1247,7 @@ def CCSI_sub_co2maintainconcentration(
         {
             "flowrate_sccm": apm.pars.flowrate_sccm,
             "ramp_sccm_sec": apm.pars.flowramp_sccm,
-            "duration": apm.pars.co2measure_duration
-            + 30,  # arbitrary time to allow for final correction
+            "duration": apm.pars.co2measure_duration + 30,  # arbitrary time to allow for final correction
             "target_co2_ppm": apm.pars.target_co2_ppm,
             "headspace_scc": apm.pars.headspace_scc,
             "refill_freq_sec": apm.pars.refill_freq_sec,

@@ -589,7 +589,7 @@ class MfcConstConcExec(MfcExec):
             co2_mean_ppm = np.mean(co2_vec)
 
         fill_scc = self.headspace_vol_scc * co2_mean_ppm / 1e6
-        fill_time = fill_scc / self.flowrate_sccm / 60.0
+        fill_time = fill_scc / self.flowrate_sccm * 60.0
 
         if (
             fill_time
@@ -597,7 +597,7 @@ class MfcConstConcExec(MfcExec):
             and iter_time - self.last_fill >= self.refill_freq
         ):
             self.active.base.print_message(
-                f"pressure below {self.target_pressure}, filling {fill_scc} scc over {fill_time} seconds"
+                f"filling {fill_scc} scc over {fill_time} seconds"
             )
             self.filling = True
             openvlv_resp = await self.active.base.fastapp.driver.hold_cancel(

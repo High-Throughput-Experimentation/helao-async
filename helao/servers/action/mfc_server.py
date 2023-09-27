@@ -14,6 +14,7 @@ from helao.drivers.mfc.alicat_driver import (
     AliCatMFC,
     MfcExec,
     PfcExec,
+    MfcConstConcExec,
     MfcConstPresExec,
 )
 from helao.helpers.config_loader import config_loader
@@ -31,7 +32,7 @@ async def mfc_dyn_endpoints(app=None):
             action: Action = Body({}, embed=True),
             action_version: int = 1,
             device_name: app.driver.dev_mfcs = devices[0],
-            target_ppm: float = 1e5,
+            target_co2_ppm: float = 1e5,
             headspace_scc: float = 7.5,
             refill_freq_sec: float = 10.0,
             flowrate_sccm: float = None,
@@ -43,7 +44,7 @@ async def mfc_dyn_endpoints(app=None):
             """Check pressure at refill freq and dose to target pressure."""
             active = await app.base.setup_and_contain_action()
             active.action.action_abbr = "hold_pres"
-            executor = MfcConstPresExec(
+            executor = MfcConstConcExec(
                 active=active,
                 oneoff=False,
                 poll_rate=0.05,
