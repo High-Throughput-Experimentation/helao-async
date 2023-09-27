@@ -1298,10 +1298,10 @@ class Active:
             self.base.print_message("data writing disabled")
             return
 
-        self.base.print_message(
-            f"starting data logger for active action: {self.action.action_uuid}",
-            info=True,
-        )
+        # self.base.print_message(
+        #     f"starting data logger for active action: {self.action.action_uuid}",
+        #     info=True,
+        # )
 
         try:
             async for data_msg in self.base.data_q.subscribe():
