@@ -591,11 +591,11 @@ class MfcConstConcExec(MfcExec):
         else:
             co2_mean_ppm = np.mean(co2_vec)
 
-        fill_scc = self.headspace_vol_scc * co2_mean_ppm / 1e6
+        fill_scc = self.headspace_vol_scc * (self.target_co2_ppm - co2_mean_ppm) / 1e6
         fill_time = fill_scc / self.flowrate_sccm * 60.0
 
         if (
-            fill_time
+            fill_time > 0
             and not self.filling
             and iter_time - self.last_fill >= self.refill_freq
         ):
