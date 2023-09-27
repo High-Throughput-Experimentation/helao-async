@@ -19,7 +19,6 @@ import asyncio
 import serial
 from collections import defaultdict
 from typing import Union, Optional
-from datetime import datetime
 
 import numpy as np
 import scipy.ndimage as ndi
@@ -529,6 +528,13 @@ class MfcConstConcExec(MfcExec):
         super().__init__(*args, **kwargs)
         self.last_fill = self.start_time
         action_params = self.active.action.action_params
+        self.target_co2_ppm = action_params.get("target_co2_ppm", 1e5)
+        self.headspace_scc = action_params.get("headspace_scc", 7.5)
+        self.flowrate_sccm = action_params.get("flowrate_sccm", 0.5)
+        self.ramp_sccm_sec = action_params.get("ramp_sccm_sec", 0)
+        self.refill_freq = action_params.get("refill_freq_sec", 10.0)
+        self.filling = False
+        self.fill_end = self.start_time
 
         self.co2serv_key = self.active.base.server_params.get("co2_server_name", None)
         self.active.base.print_message(
@@ -546,27 +552,42 @@ class MfcConstConcExec(MfcExec):
         )
         self.wss = Wss(co2serv_host, co2serv_port, "ws_live")
 
-        self.target_co2_ppm = action_params.get("target_co2_ppm", 1e5)
-        self.headspace_scc = action_params.get("headspace_scc", 7.5)
-
-        self.flowrate_sccm = action_params.get("flowrate_sccm", 0.5)
-        self.ramp_sccm_sec = action_params.get("ramp_sccm_sec", 0)
-        self.refill_freq = action_params.get("refill_freq_sec", 10.0)
-        self.filling = False
-        self.fill_end = self.start_time
-
-    async def _pre_exec(self):
-        "Set flow rate."
-        self.active.base.print_message("MfcConstConcExec running setup methods.")
-
-        messages = []
-        while not messages:
-            messages = await self.wss.read_messages()
+    async def eval_conc(self):
+        datapackage_list = []
+        while not datapackage_list:
+            datapackage_list = await self.wss.read_messages()
             self.active.base.print_message(
                 "No co2_ppm readings have been received, sleeping for 1 second"
             )
             asyncio.sleep(1)
-        self.active.base.print_message(messages)
+        data_dict = defaultdict(list)
+        for datapackage in datapackage_list:
+            for datalab, (dataval, epochsec) in datapackage.items():
+                if datalab == "sim_dict":
+                    for k, v in dataval.items():
+                        data_dict[k].append(v)
+                elif isinstance(dataval, list):
+                    data_dict[datalab] += dataval
+                else:
+                    data_dict[datalab].append(dataval)
+
+        self.active.base.print_message(f"got co2 data: {data_dict}")
+        co2_vec = data_dict.get("co2_ppm", [])
+        self.active.base.print_message(
+            f"got co2_ppm from {self.co2_server_name}: {co2_vec}"
+        )
+        if len(co2_vec) > 10:  # default rate is 0.05, so 20 points per second
+            co2_mean_ppm = np.mean(co2_vec[-10:])
+        else:
+            co2_mean_ppm = np.mean(co2_vec)
+
+        fill_scc = self.headspace_vol_scc * (self.target_co2_ppm - co2_mean_ppm) / 1e6
+        fill_time = fill_scc / self.flowrate_sccm * 60.0
+        return fill_time, fill_scc
+
+    async def _pre_exec(self):
+        "Set flow rate."
+        self.active.base.print_message("MfcConstConcExec running setup methods.")
 
         rate_resp = await self.active.base.fastapp.driver.set_flowrate(
             device_name=self.device_name,
@@ -586,37 +607,7 @@ class MfcConstConcExec(MfcExec):
     async def _poll(self):
         """Read flow from live buffer."""
         iter_time = time.time()
-        datapackage_list = []
-        while not datapackage_list:
-            datapackage_list = await self.wss.read_messages()
-            self.active.base.print_message(
-                "No co2_ppm readings have been received, sleeping for 1 second"
-            )
-            asyncio.sleep(1)
-        data_dict = defaultdict(list)
-        for datapackage in datapackage_list:
-            for datalab, (dataval, epochsec) in datapackage.items():
-                if datalab == "sim_dict":
-                    for k, v in dataval.items():
-                        data_dict[k].append(v)
-                elif isinstance(dataval, list):
-                    data_dict[datalab] += dataval
-                else:
-                    data_dict[datalab].append(dataval)
-                latest_epoch = max([epochsec, self.latest_epoch])
-            data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
-
-        co2_vec = data_dict.get("co2_ppm", [])
-        self.active.base.print_message(
-            f"got co2_ppm from {self.co2_server_name}: {co2_vec}"
-        )
-        if len(co2_vec) > 10:  # default rate is 0.05, so 20 points per second
-            co2_mean_ppm = np.mean(co2_vec[-10:])
-        else:
-            co2_mean_ppm = np.mean(co2_vec)
-
-        fill_scc = self.headspace_vol_scc * (self.target_co2_ppm - co2_mean_ppm) / 1e6
-        fill_time = fill_scc / self.flowrate_sccm * 60.0
+        fill_time, fill_scc = await self.eval_conc()
 
         if (
             fill_time > 0

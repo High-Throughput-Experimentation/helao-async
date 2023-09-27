@@ -43,11 +43,11 @@ async def mfc_dyn_endpoints(app=None):
         ):
             """Check pressure at refill freq and dose to target pressure."""
             active = await app.base.setup_and_contain_action()
-            active.action.action_abbr = "hold_pres"
+            active.action.action_abbr = "hold_conc"
             executor = MfcConstConcExec(
                 active=active,
                 oneoff=False,
-                poll_rate=0.05,
+                poll_rate=0.1,
             )
             active_action_dict = active.start_executor(executor)
             return active_action_dict
