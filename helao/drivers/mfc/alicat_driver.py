@@ -530,17 +530,21 @@ class MfcConstConcExec(MfcExec):
         self.last_fill = self.start_time
         action_params = self.active.action.action_params
 
-        self.co2_server_name = self.active.base.server_params.get("co2_server_name", None)
-        self.active.base.print_message(f"checking config for co2 server named: {self.co2_server_name}")
-        co2_server_cfg = self.active.base.world_cfg["servers"].get(
-            self.co2_server_name, None
+        self.co2serv_key = self.active.base.server_params.get("co2_server_name", None)
+        self.active.base.print_message(
+            f"checking config for co2 server named: {self.co2serv_key}"
         )
-        assert co2_server_cfg is not None
-        self.active.base.print_message(f"subscribing to {self.co2_server_name} at {co2_server_cfg['host']}:{co2_server_cfg['port']}")
-
-        self.wss = Wss(
-            host=co2_server_cfg["host"], port=co2_server_cfg["port"], path="ws_live"
+        co2serv_config = self.active.base.world_cfg["servers"].get(
+            self.co2serv_key, None
         )
+        if co2serv_config is None:
+            return
+        co2serv_host = co2serv_config.get("host", None)
+        co2serv_port = co2serv_config.get("port", None)
+        self.active.base.print_message(
+            f"subscribing to {self.co2serv_key} at {co2serv_host}:{co2serv_port}"
+        )
+        self.wss = Wss(co2serv_host, co2serv_port, "ws_live")
 
         self.target_co2_ppm = action_params.get("target_co2_ppm", 1e5)
         self.headspace_scc = action_params.get("headspace_scc", 7.5)
@@ -558,10 +562,11 @@ class MfcConstConcExec(MfcExec):
         messages = []
         while not messages:
             messages = await self.wss.read_messages()
-            self.active.base.print_message("No co2_ppm readings have been received, sleeping for 1 second")
-            time.sleep(1)
+            self.active.base.print_message(
+                "No co2_ppm readings have been received, sleeping for 1 second"
+            )
+            asyncio.sleep(1)
         self.active.base.print_message(messages)
-
 
         rate_resp = await self.active.base.fastapp.driver.set_flowrate(
             device_name=self.device_name,
@@ -584,8 +589,10 @@ class MfcConstConcExec(MfcExec):
         datapackage_list = []
         while not datapackage_list:
             datapackage_list = await self.wss.read_messages()
-            self.active.base.print_message("No co2_ppm readings have been received, sleeping for 1 second")
-            time.sleep(1)
+            self.active.base.print_message(
+                "No co2_ppm readings have been received, sleeping for 1 second"
+            )
+            asyncio.sleep(1)
         data_dict = defaultdict(list)
         for datapackage in datapackage_list:
             for datalab, (dataval, epochsec) in datapackage.items():
@@ -600,7 +607,9 @@ class MfcConstConcExec(MfcExec):
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
 
         co2_vec = data_dict.get("co2_ppm", [])
-        self.active.base.print_message(f"got co2_ppm from {self.co2_server_name}: {co2_vec}")
+        self.active.base.print_message(
+            f"got co2_ppm from {self.co2_server_name}: {co2_vec}"
+        )
         if len(co2_vec) > 10:  # default rate is 0.05, so 20 points per second
             co2_mean_ppm = np.mean(co2_vec[-10:])
         else:
