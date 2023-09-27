@@ -530,10 +530,10 @@ class MfcConstConcExec(MfcExec):
         self.last_fill = self.start_time
         action_params = self.active.action.action_params
 
-        co2_server_name = self.active.base.server_params.get("co2_server_name", None)
-        self.active.base.print_message(f"checking config for co2 server named: {co2_server_name}")
+        self.co2_server_name = self.active.base.server_params.get("co2_server_name", None)
+        self.active.base.print_message(f"checking config for co2 server named: {self.co2_server_name}")
         co2_server_cfg = self.active.base.world_cfg["servers"].get(
-            co2_server_name, None
+            self.co2_server_name, None
         )
         assert co2_server_cfg is not None
         self.wss = Wss(
@@ -562,8 +562,9 @@ class MfcConstConcExec(MfcExec):
         return {"error": ErrorCodes.none}
 
     async def _exec(self):
-        "Cancel valve hold."
+        "Begin loop."
         self.start_time = time.time()
+        self.last_fill = self.start_time
         return {"error": ErrorCodes.none}
 
     async def _poll(self):
@@ -584,6 +585,7 @@ class MfcConstConcExec(MfcExec):
             data_dict["datetime"].append(datetime.fromtimestamp(latest_epoch))
 
         co2_vec = data_dict.get("co2_ppm")
+        self.active.base.print_message(f"got co2_ppm from {self.co2_server_name}: {co2_vec}")
         if len(co2_vec) > 10:  # default rate is 0.05, so 20 points per second
             co2_mean_ppm = np.mean(co2_vec[-10:])
         else:
