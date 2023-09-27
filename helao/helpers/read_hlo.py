@@ -40,9 +40,7 @@ class HelaoData:
         self.ord = ["seq", "exp", "act"]
         self.abbrd = {"seq": "sequence", "exp": "experiment", "act": "action"}
         self.target = target
-        if self.target.endswith(
-            ".zip"
-        ):  # this will always be a zipped sequence, helao does not zip actions, experiments
+        if self.target.endswith(".zip"):  # this will always be a zipped sequence
             with ZipFile(target, "r") as zf:
                 if "zflist" in kwargs:
                     self.zflist = kwargs["zflist"]
@@ -137,7 +135,7 @@ class HelaoData:
         self.params = self.yml.get(f"{self.abbrd[self.type]}_params", {})
         self.uuid = self.yml[f"{self.abbrd[self.type]}_uuid"]
         self.timestamp = self.yml[f"{self.abbrd[self.type]}_timestamp"]
-        self.samples_in = self.yml.get(f"samples_in", [])
+        self.samples_in = self.yml.get("samples_in", [])
         self.children = self.seq + self.exp + self.act
 
     @property

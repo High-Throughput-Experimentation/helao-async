@@ -10,7 +10,8 @@ from collections import defaultdict
 import pandas as pd
 
 from helao.helpers.yml_tools import yml_load
-from helao.helpers.read_hlo import read_hlo
+# from helao.helpers.read_hlo import read_hlo
+from helao.helpers.file_mapper import FileMapper
 
 # yaml reader
 
@@ -146,7 +147,9 @@ class LocalLoader:
             with ZipFile(self.target, "r") as zf:
                 metad = yml_load(zf.open(path).read().decode("utf-8"))
         else:
-            metad = yml_load("".join(builtins.open(path, "r").readlines()))
+            # metad = yml_load("".join(builtins.open(path, "r").readlines()))
+            FM = FileMapper(path)
+            metad = FM.read_yml(path)
         return metad
 
     def get_act(self, index=None, path: str = None):
@@ -197,7 +200,10 @@ class LocalLoader:
                         data[k].append(v)
             return meta, data
         else:
-            return read_hlo(os.path.join(os.path.dirname(yml_path), hlo_fn))
+            # return read_hlo(os.path.join(os.path.dirname(yml_path), hlo_fn))
+            FM = FileMapper(yml_path)
+            hlo_path = os.path.join(os.path.dirname(yml_path), hlo_fn)
+            return FM.read_hlo(hlo_path)
 
 
 ABBR_MAP = {"act": "action", "exp": "experiment", "seq": "sequence"}
