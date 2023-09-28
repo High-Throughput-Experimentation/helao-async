@@ -29,7 +29,7 @@ from helao.helpers.executor import Executor
 from helaocore.models.hlostatus import HloStatus
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.sample_api import UnifiedSampleDataAPI
-from helao.helpers.ws_subscriber import WsSubscriber as Wss
+from helao.helpers.ws_subscriber import WsSyncClient as WSC
 
 # setup pressure control and ramping
 
@@ -540,25 +540,36 @@ class MfcConstConcExec(MfcExec):
         self.active.base.print_message(
             f"checking config for co2 server named: {self.co2serv_key}"
         )
+        co2serv_config = self.active.base.world_cfg["servers"].get(
+            self.co2serv_key, None
+        )
+        if co2serv_config is None:
+            return
+        co2serv_host = co2serv_config.get("host", None)
+        co2serv_port = co2serv_config.get("port", None)
+        self.active.base.print_message(
+            f"subscribing to {self.co2serv_key} at {co2serv_host}:{co2serv_port}"
+        )
 
-    async def eval_conc(self):
-        datapackage_list = []
-        while not datapackage_list:
-            datapackage_list = await self.wss.read_messages()
+        self.wsc = WSC(co2serv_host, co2serv_port, "ws_live")
+
+    def eval_conc(self):
+        data_package = self.wsc.read_messages()
+        while not data_package:
+            data_package = self.wsc.read_messages()
             self.active.base.print_message(
                 "No co2_ppm readings have been received, sleeping for 1 second"
             )
-            asyncio.sleep(1)
+            time.sleep(1)
         data_dict = defaultdict(list)
-        for datapackage in datapackage_list:
-            for datalab, (dataval, epochsec) in datapackage.items():
-                if datalab == "sim_dict":
-                    for k, v in dataval.items():
-                        data_dict[k].append(v)
-                elif isinstance(dataval, list):
-                    data_dict[datalab] += dataval
-                else:
-                    data_dict[datalab].append(dataval)
+        for datalab, (dataval, epochsec) in data_package.items():
+            if datalab == "sim_dict":
+                for k, v in dataval.items():
+                    data_dict[k].append(v)
+            elif isinstance(dataval, list):
+                data_dict[datalab] += dataval
+            else:
+                data_dict[datalab].append(dataval)
 
         self.active.base.print_message(f"got co2 data: {data_dict}")
         co2_vec = data_dict.get("co2_ppm", [])
@@ -578,18 +589,6 @@ class MfcConstConcExec(MfcExec):
         "Set flow rate."
         self.active.base.print_message("MfcConstConcExec running setup methods.")
 
-        co2serv_config = self.active.base.world_cfg["servers"].get(
-            self.co2serv_key, None
-        )
-        if co2serv_config is None:
-            return
-        co2serv_host = co2serv_config.get("host", None)
-        co2serv_port = co2serv_config.get("port", None)
-        self.active.base.print_message(
-            f"subscribing to {self.co2serv_key} at {co2serv_host}:{co2serv_port}"
-        )
-
-        self.wss = Wss(co2serv_host, co2serv_port, "ws_live")
         rate_resp = await self.active.base.fastapp.driver.set_flowrate(
             device_name=self.device_name,
             flowrate_sccm=self.flowrate_sccm,
@@ -608,7 +607,7 @@ class MfcConstConcExec(MfcExec):
     async def _poll(self):
         """Read flow from live buffer."""
         iter_time = time.time()
-        fill_time, fill_scc = await self.eval_conc()
+        fill_time, fill_scc = self.eval_conc()
 
         if (
             fill_time > 0
@@ -648,6 +647,8 @@ class MfcConstConcExec(MfcExec):
     async def _post_exec(self):
         "Restore valve hold."
         self.active.base.print_message("MfcConstConcExec running cleanup methods.")
+        self.active.base.print_message("Closing websocket connection.")
+        self.wsc.close()
         if not self.active.action.action_params.get("stay_open", False):
             closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
                 device_name=self.device_name,
