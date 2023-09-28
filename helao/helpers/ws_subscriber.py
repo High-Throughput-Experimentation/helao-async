@@ -1,6 +1,7 @@
 import asyncio
 import pickle
 import collections
+import time
 
 import pyzstd
 import websockets
@@ -46,6 +47,7 @@ class WsSubscriber:
                 print(
                     f"Could not connect, retrying {retry_idx+1}/{retry_limit}"
                 )
+                time.sleep(2)
 
     async def read_messages(self):
         """Empties recv_queue and returns messages."""
