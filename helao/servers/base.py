@@ -1308,10 +1308,10 @@ class Active:
             async for data_msg in self.base.data_q.subscribe():
                 # check if the new data_msg is in listen_uuids
                 if data_msg.action_uuid not in self.listen_uuids:
-                    self.base.print_message(
-                        f"data logger for active action: {self.action.action_uuid} ; UUID {data_msg.action_uuid} is not in listen_uuids: {self.listen_uuids}",
-                        warning=True,
-                    )
+                    # self.base.print_message(
+                    #     f"data logger for active action: {self.action.action_uuid} ; UUID {data_msg.action_uuid} is not in listen_uuids: {self.listen_uuids}",
+                    #     warning=True,
+                    # )
                     # self.base.print_message(f"data_msg: \n{data_msg}", warning=True)
 
                     continue
