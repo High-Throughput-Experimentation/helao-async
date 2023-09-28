@@ -14,10 +14,18 @@ class WsSyncClient:
 
     def read_messages(self):
         """Reads messages once."""
-        with connect(self.data_url) as conn:
-            recv_bytes = conn.recv()
-        if recv_bytes:
-            return pickle.loads(pyzstd.decompress(recv_bytes))
+        retry_limit = 5
+        for retry_idx in range(retry_limit):
+            try:
+                with connect(self.data_url) as conn:
+                    recv_bytes = conn.recv()
+                if recv_bytes:
+                    return pickle.loads(pyzstd.decompress(recv_bytes))
+            except Exception:
+                print(
+                    f"Could not connect, retrying {retry_idx+1}/{retry_limit}"
+                )
+                time.sleep(2)
         return {}
 
 class WsSubscriber:
