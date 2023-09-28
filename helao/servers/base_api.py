@@ -13,6 +13,7 @@ from helaocore.models.hlostatus import HloStatus
 from helaocore.models.action_start_condition import ActionStartCondition as ASC
 from starlette.types import Message
 from starlette.responses import JSONResponse
+from websockets.exceptions import ConnectionClosedOK
 
 
 class BaseAPI(HelaoFastAPI):
@@ -115,6 +116,8 @@ class BaseAPI(HelaoFastAPI):
                 await self.base.status_publisher.broadcast(websocket)
             except WebSocketDisconnect:
                 self.base.status_publisher.disconnect(websocket)
+            except ConnectionClosedOK:
+                self.base.status_publisher.disconnect(websocket)
 
         @self.websocket("/ws_data")
         async def websocket_data(websocket: WebSocket):
@@ -128,6 +131,8 @@ class BaseAPI(HelaoFastAPI):
                 await self.base.data_publisher.broadcast(websocket)
             except WebSocketDisconnect:
                 self.base.data_publisher.disconnect(websocket)
+            except ConnectionClosedOK:
+                self.base.data_publisher.disconnect(websocket)
 
         @self.websocket("/ws_live")
         async def websocket_live(websocket: WebSocket):
@@ -140,6 +145,8 @@ class BaseAPI(HelaoFastAPI):
             try:
                 await self.base.live_publisher.broadcast(websocket)
             except WebSocketDisconnect:
+                self.base.live_publisher.disconnect(websocket)
+            except ConnectionClosedOK:
                 self.base.live_publisher.disconnect(websocket)
 
         @self.post("/get_config", tags=["private"])

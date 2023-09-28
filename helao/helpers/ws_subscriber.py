@@ -4,6 +4,23 @@ import collections
 
 import pyzstd
 import websockets
+from websockets.sync.client import connect
+
+
+class WsSyncClient:
+    def __init__(self, host, port, path):
+        self.data_url = f"ws://{host}:{port}/{path}"
+        self.conn = connect(self.data_url)
+
+    def read_messages(self):
+        """Reads messages once."""
+        recv_bytes = self.conn.recv()
+        if recv_bytes:
+            return pickle.loads(pyzstd.decompress(recv_bytes))
+        return {}
+    
+    def close(self):
+        self.conn.close()
 
 
 class WsSubscriber:
