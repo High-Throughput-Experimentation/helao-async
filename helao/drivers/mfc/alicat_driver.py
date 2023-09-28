@@ -571,11 +571,11 @@ class MfcConstConcExec(MfcExec):
             else:
                 data_dict[datalab].append(dataval)
 
-        self.active.base.print_message(f"got co2 data: {data_dict}")
+        # self.active.base.print_message(f"got co2 data: {data_dict}")
         co2_vec = data_dict.get("co2_ppm", [])
-        self.active.base.print_message(
-            f"got co2_ppm from {self.co2serv_key}: {co2_vec}"
-        )
+        # self.active.base.print_message(
+        #     f"got co2_ppm from {self.co2serv_key}: {co2_vec}"
+        # )
         if len(co2_vec) > 10:  # default rate is 0.05, so 20 points per second
             co2_mean_ppm = np.mean(co2_vec[-10:])
         else:
@@ -605,7 +605,7 @@ class MfcConstConcExec(MfcExec):
         """Read flow from live buffer."""
         iter_time = time.time()
         fill_time, fill_scc = self.eval_conc()
-        self.active.base.print_message(f"eval_conc() returned {fill_time}, {fill_scc}") 
+        # self.active.base.print_message(f"eval_conc() returned {fill_time}, {fill_scc}") 
         if (
             fill_time > 0
             and not self.filling
