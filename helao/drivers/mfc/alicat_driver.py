@@ -581,34 +581,31 @@ class MfcConstConcExec(MfcExec):
         else:
             co2_mean_ppm = np.mean(co2_vec)
 
-        fill_scc = self.headspace_vol_scc * (self.target_co2_ppm - co2_mean_ppm) / 1e6
+        fill_scc = self.headspace_scc * (self.target_co2_ppm - co2_mean_ppm) / 1e6
         fill_time = fill_scc / self.flowrate_sccm * 60.0
         return fill_time, fill_scc
 
     async def _pre_exec(self):
         "Set flow rate."
         self.active.base.print_message("MfcConstConcExec running setup methods.")
-
         rate_resp = await self.active.base.fastapp.driver.set_flowrate(
             device_name=self.device_name,
             flowrate_sccm=self.flowrate_sccm,
             ramp_sccm_sec=self.ramp_sccm_sec,
         )
         self.active.base.print_message(f"set_flowrate returned: {rate_resp}")
-        self.latest_epoch = 0
         return {"error": ErrorCodes.none}
 
     async def _exec(self):
         "Begin loop."
         self.start_time = time.time()
-        self.last_fill = self.start_time
         return {"error": ErrorCodes.none}
 
     async def _poll(self):
         """Read flow from live buffer."""
         iter_time = time.time()
         fill_time, fill_scc = self.eval_conc()
-
+        self.active.base.print_message(f"eval_conc() returned {fill_time}, {fill_scc}") 
         if (
             fill_time > 0
             and not self.filling
