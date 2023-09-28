@@ -994,7 +994,7 @@ class Active:
             info=True,
         )
 
-        self.data_logger = self.base.aloop.create_task(self.log_data_task())
+        # self.data_logger = self.base.aloop.create_task(self.log_data_task())
 
         self.manual_stop = False
         self.action_loop_running = False
@@ -1009,6 +1009,7 @@ class Active:
         await self.base.write_act(self.action)
 
     async def myinit(self):
+        self.data_logger = self.base.aloop.create_task(self.log_data_task())
         if self.action.save_act:
             os.makedirs(
                 os.path.join(
@@ -1308,12 +1309,7 @@ class Active:
                 # check if the new data_msg is in listen_uuids
                 if data_msg.action_uuid not in self.listen_uuids:
                     self.base.print_message(
-                        f"data logger for "
-                        f"active action: "
-                        f"{self.action.action_uuid} ; "
-                        f"UUID {data_msg.action_uuid} "
-                        f"is not in listen_uuids:"
-                        f" {self.listen_uuids}",
+                        f"data logger for active action: {self.action.action_uuid} ; UUID {data_msg.action_uuid} is not in listen_uuids: {self.listen_uuids}",
                         warning=True,
                     )
                     # self.base.print_message(f"data_msg: \n{data_msg}", warning=True)
