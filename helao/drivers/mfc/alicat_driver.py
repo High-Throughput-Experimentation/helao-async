@@ -647,8 +647,6 @@ class MfcConstConcExec(MfcExec):
     async def _post_exec(self):
         "Restore valve hold."
         self.active.base.print_message("MfcConstConcExec running cleanup methods.")
-        self.active.base.print_message("Closing websocket connection.")
-        self.wsc.close()
         if not self.active.action.action_params.get("stay_open", False):
             closevlv_resp = await self.active.base.fastapp.driver.hold_valve_closed(
                 device_name=self.device_name,
