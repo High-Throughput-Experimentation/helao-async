@@ -22,10 +22,10 @@ from helao.helpers.config_loader import config_loader
 
 async def mfc_dyn_endpoints(app=None):
     server_key = app.base.server.server_name
-    co2_sensor_key = app.base.server_cfg["params"].get("co2_server_name", None)
-    devices = list(app.base.server_cfg["params"]["devices"].keys())
+    co2_sensor_key = app.base.server_params.get("co2_server_name", None)
+    devices = list(app.base.server_params["devices"].keys())
 
-    if co2_sensor_key in app.helao_cfg["servers"]:
+    if co2_sensor_key in app.helao_cfg["servers"] and devices:
 
         @app.post(f"/{server_key}/maintain_concentration", tags=["action"])
         async def maintain_concentration(
