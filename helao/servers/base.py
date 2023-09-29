@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import pickle
+import pathlib
 from random import randint
 from socket import gethostname
 from time import ctime, time, time_ns, sleep
@@ -1453,6 +1454,12 @@ class Active:
                 action.action_output_dir,
             )
             output_file = os.path.join(output_path, file_info.file_name)
+            if os.name == "nt":
+                output_file = str(pathlib.PureWindowsPath(output_file))
+            elif os.name == "posix":
+                output_file = str(pathlib.PurePosixPath(output_file))
+            else:
+                self.base.print_message("could not detect OS, path seps may be mixed")
 
             if not os.path.exists(output_path):
                 os.makedirs(output_path, exist_ok=True)
@@ -1499,6 +1506,12 @@ class Active:
                 action.action_output_dir,
             )
             output_file = os.path.join(output_path, file_info.file_name)
+            if os.name == "nt":
+                output_file = str(pathlib.PureWindowsPath(output_file))
+            elif os.name == "posix":
+                output_file = str(pathlib.PurePosixPath(output_file))
+            else:
+                self.base.print_message("could not detect OS, path seps may be mixed")
 
             if not os.path.exists(output_path):
                 os.makedirs(output_path, exist_ok=True)
