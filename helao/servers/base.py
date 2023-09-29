@@ -182,9 +182,11 @@ class Base:
                             self.ntp_offset = float(self.ntp_offset)
 
     def exception_handler(self, loop, context):
-        self.print_message(f'Got exception from coroutine: {context}')
-        exc = context.get('exception')
-        self.print_message(f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}")
+        self.print_message(f"Got exception from coroutine: {context}")
+        exc = context.get("exception")
+        self.print_message(
+            f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}"
+        )
 
     def myinit(self):
         self.aloop = asyncio.get_running_loop()
@@ -848,12 +850,7 @@ class Base:
             "experiment_output_dir": str(exp.experiment_output_dir),
         }
         append_str = (
-            "\n".join(
-                [
-                    "  " + x
-                    for x in yml_dumps([append_dict]).split("\n")
-                ][:-1]
-            )
+            "\n".join(["  " + x for x in yml_dumps([append_dict]).split("\n")][:-1])
             + "\n"
         )
         sequence_dir = seq.get_sequence_dir()
@@ -1457,7 +1454,9 @@ class Active:
             if os.name == "nt":
                 output_file = str(pathlib.PureWindowsPath(output_file))
             elif os.name == "posix":
-                output_file = str(pathlib.PurePosixPath(output_file))
+                output_file = str(
+                    pathlib.PurePosixPath(pathlib.PureWindowsPath(output_file))
+                ).strip("\\")
             else:
                 self.base.print_message("could not detect OS, path seps may be mixed")
 
@@ -1509,7 +1508,9 @@ class Active:
             if os.name == "nt":
                 output_file = str(pathlib.PureWindowsPath(output_file))
             elif os.name == "posix":
-                output_file = str(pathlib.PurePosixPath(output_file))
+                output_file = str(
+                    pathlib.PurePosixPath(pathlib.PureWindowsPath(output_file))
+                ).strip("\\")
             else:
                 self.base.print_message("could not detect OS, path seps may be mixed")
 
@@ -1769,12 +1770,15 @@ class Active:
                 info=True,
             )
             retry_counter = 0
-            while not all(
-                [
-                    action.data_stream_status != HloStatus.active
-                    for action in self.action_list
-                ]
-            ) and retry_counter < 5:
+            while (
+                not all(
+                    [
+                        action.data_stream_status != HloStatus.active
+                        for action in self.action_list
+                    ]
+                )
+                and retry_counter < 5
+            ):
                 await self.enqueue_data(
                     datamodel=DataModel(data={}, errors=[], status=HloStatus.finished)
                 )
