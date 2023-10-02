@@ -45,3 +45,7 @@ Exercise caution when running multiple server groups as there is currently no ch
 | setup_env.sh | linux bash script, sets PYTHONPATH environment variable for `helao` conda environment, and clones `helao-core` repo if not colocated alongside `helao-async` in parent directory |
 | switch.bat | windows batch utility script for switching `helao-core` and `helao-async` branches |
 | update.bat | windows batch utility script for updating `helao-core` and `helao-async` simultaneously |
+
+## Development notes
+
+As of HELAO-async release 2023.09.28, new development branches will first be merged into "unstable" for stress testing prior to merging into "main". The "main" branch will only be used for stable releases.
