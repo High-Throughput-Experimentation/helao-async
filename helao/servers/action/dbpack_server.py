@@ -46,10 +46,13 @@ def makeApp(confPrefix, server_key, helao_root):
         app.driver.reset_sync(sync_path.strip('"').strip("'"))
         return sync_path
 
-    @app.post("/running", tags=["private"])
+    @app.post("/tasks", tags=["private"])
     async def running():
-        """List running sync tasks."""
-        return list(app.driver.running_tasks.keys())
+        """Num running sync tasks."""
+        return {
+            "running": list(app.driver.running_tasks.keys()),
+            "num_queued": (app.driver.task_queue.qsize()),
+        }
 
     @app.post("/list_exceptions", tags=["private"])
     async def list_exceptions():

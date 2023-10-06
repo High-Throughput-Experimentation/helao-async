@@ -1201,17 +1201,20 @@ class Orch(Base):
             for i in range(min(len(self.experiment_dq), limit))
         ]
 
-    def get_experiment(self, last=False):
+    def get_experiment(self, last=False) -> ExperimentModel:
         """Return the active or last experiment."""
-        active_experiment_list = []
-        if last:
-            experiment = self.last_experiment
-        else:
-            experiment = self.active_experiment
+        experiment = self.last_experiment if last else self.active_experiment
         if experiment is not None:
-            active_experiment_list.append(experiment.get_exp())
-        return active_experiment_list
+            return experiment.get_exp()
+        return {}
 
+    def get_sequence(self, last=False) -> SequenceModel:
+        """Return the active or last experiment."""
+        sequence = self.last_sequence if last else self.active_sequence
+        if sequence is not None:
+            return sequence.get_seq()
+        return {}
+    
     def list_active_actions(self):
         """Return the current queue running actions."""
         return [
