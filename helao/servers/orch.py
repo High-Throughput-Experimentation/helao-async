@@ -28,7 +28,7 @@ from helaocore.models.experiment import ExperimentModel
 from helaocore.models.action import ActionModel
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.server import ActionServerModel, GlobalStatusModel
-from helaocore.models.orchstatus import OrchStatus
+from helaocore.models.orchstatus import OrchStatus, LoopStatus, LoopIntent
 from helaocore.error import ErrorCodes
 
 from helao.servers.operator.bokeh_operator import BokehOperator
@@ -355,10 +355,10 @@ class Orch(Base):
                 hlostatus=HloStatus.errored,
             )
 
-            if estop_uuids and self.globalstatusmodel.loop_state == OrchStatus.started:
+            if estop_uuids and self.globalstatusmodel.loop_state == LoopStatus.started:
                 await self.estop_loop()
             elif (
-                error_uuids and self.globalstatusmodel.loop_state == OrchStatus.started
+                error_uuids and self.globalstatusmodel.loop_state == LoopStatus.started
             ):
                 self.globalstatusmodel.orch_state = OrchStatus.error
             elif not self.globalstatusmodel.active_dict:
@@ -418,7 +418,7 @@ class Orch(Base):
                 seq=self.seq_model, experimentmodel=experimentmodel
             )
             if i == 0:
-                self.globalstatusmodel.loop_state = OrchStatus.started
+                self.globalstatusmodel.loop_state = LoopStatus.started
 
     async def loop_task_dispatch_sequence(self) -> ErrorCodes:
         if self.sequence_dq:
@@ -467,7 +467,7 @@ class Orch(Base):
         else:
             self.print_message("sequence queue is empty, cannot start orch loop")
 
-            self.globalstatusmodel.loop_state = OrchStatus.stopped
+            self.globalstatusmodel.loop_state = LoopStatus.stopped
             await self.intend_none()
 
         return ErrorCodes.none
@@ -579,28 +579,28 @@ class Orch(Base):
 
     async def loop_task_dispatch_action(self) -> ErrorCodes:
         # self.print_message("actions in action_dq, processing them")
-        if self.globalstatusmodel.loop_intent == OrchStatus.stop:
+        if self.globalstatusmodel.loop_intent == LoopIntent.stop:
             self.print_message("stopping orchestrator")
             # monitor status of running action_dq, then end loop
-            while self.globalstatusmodel.loop_state != OrchStatus.stopped:
+            while self.globalstatusmodel.loop_state != LoopStatus.stopped:
                 # wait for all orch actions to finish first
                 await self.orch_wait_for_all_actions()
                 if self.globalstatusmodel.orch_state == OrchStatus.idle:
                     await self.intend_none()
                     self.print_message("got stop")
-                    self.globalstatusmodel.loop_state = OrchStatus.stopped
+                    self.globalstatusmodel.loop_state = LoopStatus.stopped
                     break
 
-        elif self.globalstatusmodel.loop_intent == OrchStatus.skip:
+        elif self.globalstatusmodel.loop_intent == LoopIntent.skip:
             # clear action queue, forcing next experiment
             self.action_dq.clear()
             await self.intend_none()
             self.print_message("skipping to next experiment")
-        elif self.globalstatusmodel.loop_intent == OrchStatus.estop:
+        elif self.globalstatusmodel.loop_intent == LoopIntent.estop:
             self.action_dq.clear()
             await self.intend_none()
             self.print_message("estopping")
-            self.globalstatusmodel.loop_state = OrchStatus.estop
+            self.globalstatusmodel.loop_state = LoopStatus.estopped
         else:
             # all action blocking is handled like preempt,
             # check Action requirements
@@ -847,10 +847,10 @@ class Orch(Base):
         # self.print_message(f"current orch actions: {list(self.action_dq)[:5]}... ({len(self.action_dq)})")
         # self.print_message("--- resuming orch loop now ---")
 
-        self.globalstatusmodel.loop_state = OrchStatus.started
+        self.globalstatusmodel.loop_state = LoopStatus.started
 
         try:
-            while self.globalstatusmodel.loop_state == OrchStatus.started and (
+            while self.globalstatusmodel.loop_state == LoopStatus.started and (
                 self.action_dq or self.experiment_dq or self.sequence_dq
             ):
                 self.print_message(
@@ -863,8 +863,8 @@ class Orch(Base):
                     f"current content of sequence_dq: {[self.sequence_dq[i] for i in range(min(len(self.sequence_dq), 5))]}... ({len(self.sequence_dq)})"
                 )
                 if (
-                    self.globalstatusmodel.loop_state == OrchStatus.estop
-                    or self.globalstatusmodel.loop_intent == OrchStatus.estop
+                    self.globalstatusmodel.loop_state == LoopStatus.estopped
+                    or self.globalstatusmodel.loop_intent == LoopIntent.estop
                 ):
                     await self.estop_loop()
                 elif self.action_dq:
@@ -936,8 +936,8 @@ class Orch(Base):
                 self.print_message("finishing final sequence")
                 await self.finish_active_sequence()
 
-            if self.globalstatusmodel.loop_state != OrchStatus.estop:
-                self.globalstatusmodel.loop_state = OrchStatus.stopped
+            if self.globalstatusmodel.loop_state != OrchStatus.estopped:
+                self.globalstatusmodel.loop_state = LoopStatus.stopped
             await self.intend_none()
             await self.update_operator(True)
             return True
@@ -973,7 +973,7 @@ class Orch(Base):
 
     async def start(self):
         """Begin experimenting experiment and action queues."""
-        if self.globalstatusmodel.loop_state == OrchStatus.stopped:
+        if self.globalstatusmodel.loop_state == LoopStatus.stopped:
             if (
                 self.action_dq or self.experiment_dq or self.sequence_dq
             ):  # resume actions from a paused run
@@ -986,10 +986,10 @@ class Orch(Base):
         await self.update_operator(True)
 
     async def start_loop(self):
-        if self.globalstatusmodel.loop_state == OrchStatus.stopped:
+        if self.globalstatusmodel.loop_state == LoopStatus.stopped:
             self.print_message("starting orch loop")
             self.loop_task = asyncio.create_task(self.dispatch_loop_task())
-        elif self.globalstatusmodel.loop_state == OrchStatus.estop:
+        elif self.globalstatusmodel.loop_state == LoopStatus.estopped:
             self.print_message(
                 "E-STOP flag was raised, clear E-STOP before starting.", error=True
             )
@@ -1001,7 +1001,7 @@ class Orch(Base):
         self.print_message("estopping orch", info=True)
 
         # set globalstatusmodel.loop_state to estop
-        self.globalstatusmodel.loop_state = OrchStatus.estop
+        self.globalstatusmodel.loop_state = LoopStatus.estopped
 
         # force stop all running actions in the status dict (for this orch)
         await self.estop_actions(switch=True)
@@ -1071,7 +1071,7 @@ class Orch(Base):
 
     async def skip(self):
         """Clear the present action queue while running."""
-        if self.globalstatusmodel.loop_state == OrchStatus.started:
+        if self.globalstatusmodel.loop_state == LoopStatus.started:
             await self.intend_skip()
         else:
             self.print_message("orchestrator not running, clearing action queue")
@@ -1080,32 +1080,32 @@ class Orch(Base):
 
     async def intend_skip(self):
         await asyncio.sleep(0.01)
-        self.globalstatusmodel.loop_intent = OrchStatus.skip
+        self.globalstatusmodel.loop_intent = LoopIntent.skip
         await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
     async def stop(self):
         """Stop experimenting experiment and
         action queues after current actions finish."""
-        if self.globalstatusmodel.loop_state == OrchStatus.started:
+        if self.globalstatusmodel.loop_state == LoopStatus.started:
             await self.intend_stop()
-        elif self.globalstatusmodel.loop_state == OrchStatus.estop:
+        elif self.globalstatusmodel.loop_state == LoopStatus.estopped:
             self.print_message("orchestrator E-STOP flag was raised; nothing to stop")
         else:
             self.print_message("orchestrator is not running")
 
     async def intend_stop(self):
         await asyncio.sleep(0.01)
-        self.globalstatusmodel.loop_intent = OrchStatus.stop
+        self.globalstatusmodel.loop_intent = LoopIntent.stop
         await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
     async def intend_estop(self):
         await asyncio.sleep(0.01)
-        self.globalstatusmodel.loop_intent = OrchStatus.estop
+        self.globalstatusmodel.loop_intent = LoopIntent.estop
         await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
     async def intend_none(self):
         await asyncio.sleep(0.01)
-        self.globalstatusmodel.loop_intent = OrchStatus.none
+        self.globalstatusmodel.loop_intent = LoopIntent.none
         await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
     async def clear_estop(self):
@@ -1116,7 +1116,7 @@ class Orch(Base):
         # release estop for all action servers
         await self.estop_actions(switch=False)
         # set orch status from estop back to stopped
-        self.globalstatusmodel.loop_state = OrchStatus.stopped
+        self.globalstatusmodel.loop_state = LoopStatus.stopped
         await self.interrupt_q.put("cleared_estop")
 
     async def clear_error(self):
