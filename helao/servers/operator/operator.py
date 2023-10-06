@@ -26,15 +26,20 @@ class Operator:
             f"Operator initialized for orchestrator {self.orch_key} on {self.orch_host}:{self.orch_port}"
         )
 
-    def request(self, endpoint: str, path_params: dict={}, json_params: dict={}):
-        resp, error_code = private_dispatcher(
-            self.orch_key,
-            self.orch_host,
-            self.orch_port,
-            endpoint,
-            path_params,
-            json_params,
-        )
+    def request(self, endpoint: str, path_params: dict = {}, json_params: dict = {}):
+        try:
+            resp, error_code = private_dispatcher(
+                self.orch_key,
+                self.orch_host,
+                self.orch_port,
+                endpoint,
+                path_params,
+                json_params,
+            )
+        except ConnectionError:
+            resp = {
+                k: "unreachable" for k in ("orch_state", "loop_state", "loop_intent")
+            }
         if error_code != ErrorCodes.none:
             print("Operator request got non-200 response.")
         return resp
@@ -73,4 +78,6 @@ class Operator:
 
     def add_sequence(self, sequence: Sequence):
         """add sequence to orch queue"""
-        return self.request("append_sequence", json_params={"sequence": sequence.as_dict()})
+        return self.request(
+            "append_sequence", json_params={"sequence": sequence.as_dict()}
+        )
