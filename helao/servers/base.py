@@ -111,13 +111,19 @@ class Base:
         self.server.hostname = self.server_cfg["host"]
         self.server.port = self.server_cfg["port"]
         self.world_cfg = self.fastapp.helao_cfg
-        self.orch_key = [
+        orch_keys = [
             k
             for k, d in self.world_cfg.get("servers", {}).items()
             if d["group"] == "orchestrator"
-        ][0]
-        self.orch_host = self.world_cfg["servers"][self.orch_key]["host"]
-        self.orch_port = self.world_cfg["servers"][self.orch_key]["port"]
+        ]
+        if orch_keys:
+            self.orch_key = orch_keys[0]
+            self.orch_host = self.world_cfg["servers"][self.orch_key]["host"]
+            self.orch_port = self.world_cfg["servers"][self.orch_key]["port"]
+        else:
+            self.orch_key = None
+            self.orch_host = None
+            self.orch_port = None
         self.run_type = None
 
         self.helaodirs = helao_dirs(self.world_cfg, self.server.server_name)
