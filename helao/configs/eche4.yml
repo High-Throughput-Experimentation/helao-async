@@ -5,18 +5,18 @@ builtin_ref_motorxy:
   - 12
 experiment_libraries:
   - samples_exp
-  - ECHE_exp
-  - ECHEUVIS_exp
-  - UVIS_exp
+  # - ECHE_exp
+  # - ECHEUVIS_exp
+  # - UVIS_exp
   - TEST_exp
 experiment_params:
   toggle_is_shutter: false
   gamrychannelwait: -1
   gamrychannelsend: 0
 sequence_libraries:
-  - ECHE_seq
-  - ECHEUVIS_seq
-  - UVIS_T_seq
+  # - ECHE_seq
+  # - ECHEUVIS_seq
+  # - UVIS_T_seq
   - TEST_seq
 sequence_params:
   led_wavelengths_nm:
