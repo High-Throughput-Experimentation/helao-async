@@ -171,8 +171,9 @@ servers:
     fast: kinesis_server
     params:
       axes:
-        serial_no: "49370234"
-        pos_scale: 1228800.0  # device to mm
-        vel_scale: 65970697.6  # device to mm/s
-        acc_scale: 13518.2  # device to mm/s2
-        max_z_mm: 5.0
+        z:
+          serial_no: "49370234"
+          pos_scale: 1228800.0  # device to mm
+          vel_scale: 65970697.6  # device to mm/s
+          acc_scale: 13518.2  # device to mm/s2
+          max_z_mm: 5.0
