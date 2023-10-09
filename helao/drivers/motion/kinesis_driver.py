@@ -53,7 +53,7 @@ class KinesisMotor:
                 dev_dict["acc_scale"],
             )
             self.motors[axis_name] = Thorlabs.KinesisMotor(
-                port=dev_dict["serial_no"], scale=scale_tup
+                conn=dev_dict["serial_no"], scale=scale_tup
             )
 
         self.dev_kinesis = make_str_enum(
