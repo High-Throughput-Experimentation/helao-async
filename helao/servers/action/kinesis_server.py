@@ -22,7 +22,7 @@ async def mfc_dyn_endpoints(app=None):
 
     if motors:
 
-        @app.post(f"/{server_key}/move", tags=["action"])
+        @app.post(f"/{server_key}/kmove", tags=["action"])
         async def kmove(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
@@ -45,7 +45,7 @@ async def mfc_dyn_endpoints(app=None):
             active_action_dict = active.start_executor(executor)
             return active_action_dict
 
-        @app.post(f"/{server_key}/cancel_move", tags=["action"])
+        @app.post(f"/{server_key}/cancel_kmove", tags=["action"])
         async def cancel_kmove(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
