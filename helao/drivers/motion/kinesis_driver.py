@@ -137,12 +137,12 @@ class KinesisMotor:
 class KinesisMotorExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.axis_name = self.active.action.action_params["axis"]
+        self.axis_name = self.active.action.action_params["axes"]
         self.current_position = self.active.base.get_lbuf(self.axis_name)[0].get(
             "position_mm", 9999
         )
         self.axis = self.active.base.fastapp.driver.motors[self.axis_name]
-        self.axis_params = self.active.base.server_params["axis"][self.axis_name]
+        self.axis_params = self.active.base.server_params["axes"][self.axis_name]
         self.active.base.print_message("KinesisMotorExec initialized.")
         self.start_time = time.time()
         self.duration = self.active.action.action_params.get("duration", -1)
