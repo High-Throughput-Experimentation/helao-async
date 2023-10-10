@@ -155,7 +155,8 @@ class KinesisMotorExec(Executor):
             "acceleration_mm_s2", None
         )
         self.move_mode = self.active.action.action_params.get("move_mode", "relative")
-        self.move_value = self.active.action.acton_params.get("value_mm", 0.0)
+        self.move_value = self.active.action.action_params.get("value_mm", 0.0)
+        self.active.base.print_message("KinesisMotorExec checking velocity and accel.")
         if self.velocity is not None or self.acceleration is not None:
             self.axis.setup_velocity(
                 acceleration=self.acceleration, max_velocity=self.velocity, scale=True
