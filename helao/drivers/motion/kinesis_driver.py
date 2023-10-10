@@ -160,10 +160,12 @@ class KinesisMotorExec(Executor):
             self.axis.setup_velocity(
                 acceleration=self.acceleration, max_velocity=self.velocity, scale=True
             )
+        self.active.base.print_message("KinesisMotorExec setup complete.")
         return {"error": ErrorCodes.none}
 
     async def _exec(self):
         "Execute motion."
+        self.active.base.print_message("KinesisMotorExec validating move mode & limit.")
         self.start_time = time.time()
         if self.move_mode == MoveModes.relative:
             move_func = self.axis.move_by
@@ -173,6 +175,7 @@ class KinesisMotorExec(Executor):
             final_pos = self.move_value
 
         if final_pos < self.axis_params.get("move_limit_mm", 3.0):
+            self.active.base.print_message("KinesisMotorExec starting motion.")
             move_func(self.move_value)
             return {"error": ErrorCodes.none}
         else:
