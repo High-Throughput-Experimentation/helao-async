@@ -1004,8 +1004,17 @@ class Active:
         self.action_loop_running = False
         self.action_task = None
 
+    def executor_done_callback(self, futr):
+        try:
+            _ = futr.result()
+        except Exception as exc:
+            self.print_message(
+                f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}"
+            )
+
     def start_executor(self, executor: Executor):
         self.action_task = self.base.aloop.create_task(self.action_loop_task(executor))
+        self.action_task.add_done_callback(self.executor_done_callback)
         self.base.print_message("Executor task started.")
         return self.action.as_dict()
 
