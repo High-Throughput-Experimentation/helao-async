@@ -111,13 +111,19 @@ class Base:
         self.server.hostname = self.server_cfg["host"]
         self.server.port = self.server_cfg["port"]
         self.world_cfg = self.fastapp.helao_cfg
-        self.orch_key = [
+        orch_keys = [
             k
             for k, d in self.world_cfg.get("servers", {}).items()
             if d["group"] == "orchestrator"
-        ][0]
-        self.orch_host = self.world_cfg["servers"][self.orch_key]["host"]
-        self.orch_port = self.world_cfg["servers"][self.orch_key]["port"]
+        ]
+        if orch_keys:
+            self.orch_key = orch_keys[0]
+            self.orch_host = self.world_cfg["servers"][self.orch_key]["host"]
+            self.orch_port = self.world_cfg["servers"][self.orch_key]["port"]
+        else:
+            self.orch_key = None
+            self.orch_host = None
+            self.orch_port = None
         self.run_type = None
 
         self.helaodirs = helao_dirs(self.world_cfg, self.server.server_name)
@@ -998,8 +1004,17 @@ class Active:
         self.action_loop_running = False
         self.action_task = None
 
+    def executor_done_callback(self, futr):
+        try:
+            _ = futr.result()
+        except Exception as exc:
+            self.print_message(
+                f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}"
+            )
+
     def start_executor(self, executor: Executor):
         self.action_task = self.base.aloop.create_task(self.action_loop_task(executor))
+        self.action_task.add_done_callback(self.executor_done_callback)
         self.base.print_message("Executor task started.")
         return self.action.as_dict()
 
