@@ -3,7 +3,6 @@ import time
 import os
 import pickle
 import asyncio
-from copy import copy
 from socket import gethostname
 
 from fastapi import Body, WebSocket, Request
@@ -14,7 +13,7 @@ from helao.servers.orch import Orch
 from helaocore.models.server import ActionServerModel
 from helaocore.models.action import ActionModel
 from helaocore.models.machine import MachineModel
-from helaocore.models.orchstatus import OrchStatus
+from helaocore.models.orchstatus import LoopStatus
 from helaocore.models.action_start_condition import ActionStartCondition as ASC
 from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.helpers.executor import Executor
@@ -57,7 +56,7 @@ class OrchAPI(HelaoFastAPI):
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
-            if request.method == "HEAD" :  # comes from endpoint checker, session.head()
+            if request.method == "HEAD":  # comes from endpoint checker, session.head()
                 response = await call_next(request)
             elif request.url.path.strip("/").startswith(f"{server_key}/"):
                 await set_body(request, await request.body())
@@ -313,9 +312,9 @@ class OrchAPI(HelaoFastAPI):
         @self.post("/estop", tags=["private"])
         async def estop():
             """Emergency stop experiment and action queues, interrupt running actions."""
-            if self.orch.globalstatusmodel.loop_state == OrchStatus.started:
+            if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
                 await self.orch.estop_loop()
-            elif self.orch.globalstatusmodel.loop_state == OrchStatus.estop:
+            elif self.orch.globalstatusmodel.loop_state == LoopStatus.estopped:
                 self.orch.print_message("orchestrator E-STOP flag already raised")
             else:
                 self.orch.print_message("orchestrator is not running")
@@ -330,7 +329,7 @@ class OrchAPI(HelaoFastAPI):
         @self.post("/clear_estop", tags=["private"])
         async def clear_estop():
             """Remove emergency stop condition."""
-            if self.orch.globalstatusmodel.loop_state != OrchStatus.estop:
+            if self.orch.globalstatusmodel.loop_state != LoopStatus.estopped:
                 self.orch.print_message("orchestrator is not currently in E-STOP")
             else:
                 await self.orch.clear_estop()
@@ -338,7 +337,7 @@ class OrchAPI(HelaoFastAPI):
         @self.post("/clear_error", tags=["private"])
         async def clear_error():
             """Remove error condition."""
-            if self.orch.globalstatusmodel.loop_state != OrchStatus.error:
+            if self.orch.globalstatusmodel.loop_state != LoopStatus.error:
                 self.orch.print_message("orchestrator is not currently in ERROR")
             else:
                 await self.orch.clear_error()
@@ -436,8 +435,31 @@ class OrchAPI(HelaoFastAPI):
             return self.orch.nonblocking
 
         @self.post("/get_orch_state", tags=["private"])
-        def get_orch_state():
-            return self.orch.globalstatusmodel.loop_state
+        def get_orch_state() -> dict:
+            """Get orchestrator and loop status.
+
+            Orch states: ["error", "idle", "busy", "estop"]
+            Loop states: ["started", "stopped", "estopped"]
+            Loop intents: ["stop", "skip", "estop", "none"]
+            """
+
+            resp = {
+                "orch_state": self.orch.globalstatusmodel.orch_state,
+                "loop_state": self.orch.globalstatusmodel.loop_state,
+                "loop_intent": self.orch.globalstatusmodel.loop_intent,
+            }
+
+            active_seq = self.orch.get_sequence()
+            last_seq = self.orch.get_sequence(last=True)
+            active_exp = self.orch.get_experiment()
+            last_exp = self.orch.get_experiment(last=True)
+
+            resp["active_sequence"] = active_seq.clean_dict() if active_seq else {}
+            resp["last_sequence"] = last_seq.clean_dict() if last_seq else {}
+            resp["active_experiment"] = active_exp.clean_dict() if active_exp else {}
+            resp["last_experiment"] = last_exp.clean_dict() if last_exp else {}
+
+            return resp
 
         @self.post(f"/{server_key}/wait", tags=["action"])
         async def wait(

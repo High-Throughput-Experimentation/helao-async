@@ -6,6 +6,7 @@ dependencies:
   - pip:
     - aioshutil
     - gpflow
+    - pylablib
     - git+https://github.com/spomjaksilp/pyMeCom
     - tensorflow
     - zeroconf

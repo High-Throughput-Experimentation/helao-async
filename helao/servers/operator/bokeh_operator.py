@@ -16,7 +16,7 @@ from helao.servers.vis import Vis
 from helao.helpers.legacy_api import HTELegacyAPI
 
 from helaocore.models.experiment import ExperimentModel
-from helaocore.models.orchstatus import OrchStatus
+from helaocore.models.orchstatus import LoopStatus
 from helao.helpers.premodels import Sequence, Experiment
 
 from bokeh.layouts import column
@@ -942,11 +942,11 @@ class BokehOperator:
         self.vis.doc.add_next_tick_callback(partial(self.orch.estop_loop))
 
     def callback_start_orch(self, event):
-        if self.orch.globalstatusmodel.loop_state == OrchStatus.stopped:
+        if self.orch.globalstatusmodel.loop_state == LoopStatus.stopped:
             self.vis.print_message("starting orch")
             self.vis.doc.add_next_tick_callback(partial(self.orch.start))
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
-        elif self.orch.globalstatusmodel.loop_state == OrchStatus.estop:
+        elif self.orch.globalstatusmodel.loop_state == LoopStatus.estopped:
             self.vis.print_message("orch is in estop", error=True)
         else:
             self.vis.print_message("Cannot start orch when not in a stopped state.")
@@ -1710,10 +1710,10 @@ class BokehOperator:
 
         self.experimentplan_source.data = self.experiment_plan_list
 
-        if self.orch.globalstatusmodel.loop_state == OrchStatus.started:
+        if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
             self.orch_status_button.label = "started"
             self.orch_status_button.button_type = "success"
-        elif self.orch.globalstatusmodel.loop_state == OrchStatus.stopped:
+        elif self.orch.globalstatusmodel.loop_state == LoopStatus.stopped:
             stop_msg = (
                 ": " + self.orch.current_stop_message
                 if self.orch.current_stop_message != ""
