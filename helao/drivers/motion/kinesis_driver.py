@@ -199,3 +199,9 @@ class KinesisMotorExec(Executor):
             "status": status,
             "data": {"position_mm": live_dict["position_mm"]},
         }
+
+    async def _manual_stop(self):
+        "Perform device manual stop, return error state."
+        self.axis.stop(immediate=True, sync=True)
+        self.stop_err = ErrorCodes.none
+        return {"error": self.stop_err}
