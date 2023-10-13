@@ -5,10 +5,11 @@ channels:
 dependencies:
   - pip:
     - aioshutil
+    - gpflow
     - pylablib
     - git+https://github.com/spomjaksilp/pyMeCom
     - tensorflow
-    - gpflow
+    - zeroconf
   - aiofiles
   - aiohttp
   - bokeh=2
@@ -41,6 +42,7 @@ dependencies:
   - python=3.8
   - python-dotenv
   - python-multipart
+  - pyzmq
   - pyzstd
   - requests
   - ruamel.yaml
