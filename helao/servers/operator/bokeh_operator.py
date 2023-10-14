@@ -27,6 +27,7 @@ from bokeh.models.widgets import Paragraph
 from bokeh.models import Select
 from bokeh.models import Button
 from bokeh.models import CheckboxGroup
+from bokeh.models import Panel, Tabs
 from bokeh.models.widgets import Div
 from bokeh.models.widgets.inputs import TextInput, TextAreaInput
 from bokeh.plotting import figure, Figure
@@ -96,10 +97,10 @@ class BokehOperator:
         self.exp_private_input = []
 
         self.sequence = None
-        self.experiment_plan_list = {}
-        self.experiment_plan_list["sequence_name"] = []
-        self.experiment_plan_list["sequence_label"] = []
-        self.experiment_plan_list["experiment_name"] = []
+        self.sequence_plan_list = {}
+        self.sequence_plan_list["sequence_name"] = []
+        self.sequence_plan_list["sequence_label"] = []
+        self.sequence_plan_list["experiment_name"] = []
 
         self.sequence_list = {}
         self.sequence_list["sequence_name"] = []
@@ -139,12 +140,12 @@ class BokehOperator:
         self.vis.doc.add_next_tick_callback(partial(self.get_actions))
         self.vis.doc.add_next_tick_callback(partial(self.get_active_actions))
 
-        self.experimentplan_source = ColumnDataSource(data=self.experiment_plan_list)
+        self.sequence_plan_source = ColumnDataSource(data=self.sequence_plan_list)
         self.columns_expplan = [
-            TableColumn(field=key, title=key) for key in self.experiment_plan_list
+            TableColumn(field=key, title=key) for key in self.sequence_plan_list
         ]
-        self.experimentplan_table = DataTable(
-            source=self.experimentplan_source,
+        self.sequence_plan_table = DataTable(
+            source=self.sequence_plan_source,
             columns=self.columns_expplan,
             width=self.max_width - 20,
             height=200,
@@ -185,6 +186,13 @@ class BokehOperator:
             width=self.max_width - 20,
             height=200,
             autosize_mode="fit_columns",
+        )
+
+        self.sequence_tab = Panel(child=self.sequence_table, title="Sequences")
+        self.experiment_tab = Panel(child=self.experiment_table, title="Experiments")
+        self.action_tab = Panel(child=self.action_table, title="Actions")
+        self.active_tabs = Tabs(
+            tabs=[self.sequence_tab, self.experiment_tab, self.action_tab]
         )
 
         self.active_action_source = ColumnDataSource(data=self.active_action_list)
@@ -372,7 +380,7 @@ class BokehOperator:
         )
 
         self.orch_section = Div(
-            text="<b>Orch:</b>",
+            text="<b>Orchestrator</b>",
             width=self.max_width - 20,
             height=32,
             style={"font-size": "150%", "color": "red"},
@@ -394,19 +402,10 @@ class BokehOperator:
                     width=self.max_width,
                 ),
                 Spacer(height=10),
-                layout(
-                    [
-                        Spacer(width=20),
-                        Div(
-                            text="<b>Sequences:</b>",
-                            width=self.max_width - 20,
-                            height=32,
-                            style={"font-size": "150%", "color": "red"},
-                        ),
-                    ],
-                    background="#C0C0C0",
-                    width=self.max_width,
-                ),
+            ]
+        )
+        self.layout1 = layout(
+            [
                 layout(
                     [
                         [
@@ -446,21 +445,6 @@ class BokehOperator:
 
         self.layout2 = layout(
             [
-                Spacer(height=10),
-                layout(
-                    [
-                        Spacer(width=20),
-                        Div(
-                            text="<b>Experiments:</b>",
-                            width=self.max_width - 20,
-                            height=32,
-                            style={"font-size": "150%", "color": "red"},
-                        ),
-                    ],
-                    background="#C0C0C0",
-                    width=self.max_width,
-                ),
-                Spacer(height=10),
                 layout(
                     [
                         [
@@ -478,7 +462,7 @@ class BokehOperator:
                             ),
                         ],
                         [self.experiment_descr_txt],
-                        Spacer(height=20),
+                        Spacer(height=10),
                     ],
                     background="#808080",
                     width=self.max_width,
@@ -551,37 +535,21 @@ class BokehOperator:
                         [
                             Spacer(width=20),
                             Div(
-                                text="<b>Experiment Plan:</b>",
+                                text="<b>Sequence Planner:</b>",
                                 width=200 + 50,
                                 height=15,
                             ),
                         ],
-                        [self.experimentplan_table],
+                        [self.sequence_plan_table],
                         [
                             Spacer(width=20),
                             Div(
-                                text="<b>queued sequences:</b>",
+                                text="<b>Queues:</b>",
                                 width=200 + 50,
                                 height=15,
                             ),
                         ],
-                        [self.sequence_table],
-                        [
-                            Spacer(width=20),
-                            Div(
-                                text="<b>queued experiments:</b>",
-                                width=200 + 50,
-                                height=15,
-                            ),
-                        ],
-                        [self.experiment_table],
-                        [
-                            Spacer(width=20),
-                            Div(
-                                text="<b>queued actions:</b>", width=200 + 50, height=15
-                            ),
-                        ],
-                        [self.action_table],
+                        [self.active_tabs],
                         [
                             Spacer(width=20),
                             Div(
@@ -621,20 +589,29 @@ class BokehOperator:
             ]
         )
 
+        self.sequence_select_tab = Panel(child=self.layout1, title="Sequence Selection")
+        self.experiment_select_tab = Panel(
+            child=self.layout2, title="Experiment Selection"
+        )
+        self.select_tabs = Tabs(
+            tabs=[self.sequence_select_tab, self.experiment_select_tab]
+        )
+        self.select_tabs.on_change('active', self.update_selector_layout)
         self.dynamic_col = column(
             self.layout0,
             layout(),
-            self.layout2,
+            self.select_tabs,
+            layout(),
             layout(),
             self.layout4,  # placeholder  # placeholder
         )
         self.vis.doc.add_root(self.dynamic_col)
 
         # select the first item to force an update of the layout
-        if self.experiment_select_list:
+        if self.experiment_select_list and self.select_tabs.active == 1:
             self.experiment_dropdown.value = self.experiment_select_list[0]
 
-        if self.sequence_select_list:
+        if self.sequence_select_list and self.select_tabs.active == 0:
             self.sequence_dropdown.value = self.sequence_select_list[0]
 
         self.IOloop_run = False
@@ -853,6 +830,15 @@ class BokehOperator:
         self.active_action_source.data = self.active_action_list
         self.vis.print_message(f"current active actions: {self.active_action_list}")
 
+    def update_selector_layout(self, attr, old, new):
+        if new == 1:
+            first_exp = self.experiment_select_list[0]
+            self.callback_experiment_select('value', first_exp, first_exp)
+        if new == 0:
+            first_seq = self.sequence_select_list[0]
+            self.callback_sequence_select('value', first_seq, first_seq)
+        
+
     def callback_sequence_select(self, attr, old, new):
         idx = self.sequence_select_list.index(new)
         self.update_seq_param_layout(idx)
@@ -961,7 +947,7 @@ class BokehOperator:
             self.vis.doc.add_next_tick_callback(
                 partial(self.orch.add_sequence, self.sequence)
             )
-            # clear current experiment_plan (sequence in operator)
+            # clear current sequence_plan (sequence in operator)
             self.sequence = None
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
@@ -1012,14 +998,14 @@ class BokehOperator:
 
     def callback_prepend_seq(self, event):
         sequence = self.populate_sequence()
-        for i, D in enumerate(sequence.experiment_plan_list):
-            self.sequence.experiment_plan_list.insert(i, D)
+        for i, D in enumerate(sequence.sequence_plan_list):
+            self.sequence.sequence_plan_list.insert(i, D)
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_append_seq(self, event):
         sequence = self.populate_sequence()
-        for D in sequence.experiment_plan_list:
-            self.sequence.experiment_plan_list.append(D)
+        for D in sequence.sequence_plan_list:
+            self.sequence.sequence_plan_list.append(D)
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_prepend_exp(self, event):
@@ -1035,11 +1021,11 @@ class BokehOperator:
 
     def append_experiment(self):
         experimentmodel = self.populate_experimentmodel()
-        self.sequence.experiment_plan_list.append(experimentmodel)
+        self.sequence.sequence_plan_list.append(experimentmodel)
 
     def prepend_experiment(self):
         experimentmodel = self.populate_experimentmodel()
-        self.sequence.experiment_plan_list.insert(0, experimentmodel)
+        self.sequence.sequence_plan_list.insert(0, experimentmodel)
 
     def write_params(self, ptype: str, name: str, pars: dict):
         param_file_path = os.path.join(
@@ -1093,7 +1079,7 @@ class BokehOperator:
         sequence.sequence_label = self.input_sequence_label.value
         sequence.sequence_params = sequence_params
         for expplan in expplan_list:
-            sequence.experiment_plan_list.append(expplan)
+            sequence.sequence_plan_list.append(expplan)
 
         if self.sequence is None:
             self.sequence = Sequence()
@@ -1182,7 +1168,7 @@ class BokehOperator:
         args = self.sequences[idx]["args"]
         defaults = self.sequences[idx]["defaults"]
         argtypes = self.sequences[idx]["argtypes"]
-        self.dynamic_col.children.pop(1)
+        self.dynamic_col.children.pop(4)
 
         for _ in range(len(args) - len(defaults)):
             defaults.insert(0, "")
@@ -1190,6 +1176,7 @@ class BokehOperator:
         self.seq_param_input = []
         self.seq_private_input = []
         self.seq_param_layout = [
+            Spacer(height=10),
             layout(
                 [
                     [
@@ -1235,7 +1222,7 @@ class BokehOperator:
                 ),
             )
 
-        self.dynamic_col.children.insert(1, layout(self.seq_param_layout))
+        self.dynamic_col.children.insert(4, layout(self.seq_param_layout))
 
         self.refresh_inputs(self.seq_param_input, self.seq_private_input)
 
@@ -1243,7 +1230,7 @@ class BokehOperator:
         args = self.experiments[idx]["args"]
         defaults = self.experiments[idx]["defaults"]
         argtypes = self.experiments[idx]["argtypes"]
-        self.dynamic_col.children.pop(3)
+        self.dynamic_col.children.pop(4)
 
         for _ in range(len(args) - len(defaults)):
             defaults.insert(0, "")
@@ -1251,6 +1238,7 @@ class BokehOperator:
         self.exp_param_input = []
         self.exp_private_input = []
         self.exp_param_layout = [
+            Spacer(height=10),
             layout(
                 [
                     [
@@ -1295,7 +1283,7 @@ class BokehOperator:
                 ),
             )
 
-        self.dynamic_col.children.insert(3, layout(self.exp_param_layout))
+        self.dynamic_col.children.insert(4, layout(self.exp_param_layout))
 
         self.refresh_inputs(self.exp_param_input, self.exp_private_input)
 
@@ -1696,19 +1684,19 @@ class BokehOperator:
         await self.get_experiments()
         await self.get_actions()
         await self.get_active_actions()
-        for key in self.experiment_plan_list:
-            self.experiment_plan_list[key] = []
+        for key in self.sequence_plan_list:
+            self.sequence_plan_list[key] = []
         if self.sequence is not None:
-            for D in self.sequence.experiment_plan_list:
-                self.experiment_plan_list["sequence_name"].append(
+            for D in self.sequence.sequence_plan_list:
+                self.sequence_plan_list["sequence_name"].append(
                     self.sequence.sequence_name
                 )
-                self.experiment_plan_list["sequence_label"].append(
+                self.sequence_plan_list["sequence_label"].append(
                     self.sequence.sequence_label
                 )
-                self.experiment_plan_list["experiment_name"].append(D.experiment_name)
+                self.sequence_plan_list["experiment_name"].append(D.experiment_name)
 
-        self.experimentplan_source.data = self.experiment_plan_list
+        self.sequence_plan_source.data = self.sequence_plan_list
 
         if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
             self.orch_status_button.label = "started"
