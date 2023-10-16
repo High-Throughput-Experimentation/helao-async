@@ -156,7 +156,8 @@ class BokehOperator:
         # FastAPI calls
         self.get_sequence_lib()
         self.get_experiment_lib()
-        self.get_seqspec_lib()
+        if self.seqspec_parser is not None and self.seqspec_folder is not None:
+            self.get_seqspec_lib()
 
         self.vis.doc.add_next_tick_callback(partial(self.get_sequences))
         self.vis.doc.add_next_tick_callback(partial(self.get_experiments))
@@ -822,7 +823,7 @@ class BokehOperator:
         """Populates sequence specification library (preset params) and dropdown."""
         self.seqspec_select_list = []
         self.seqspecs = []
-        specfiles = sorted(glob(os.path.join(self.seqspec_folder, "*")))
+        specfiles = sorted(glob.glob(os.path.join(self.seqspec_folder, "*")))
         self.vis.print_message(f"found specs: {specfiles}")
         for fp in specfiles:
             self.seqspecs.append(fp)
@@ -956,7 +957,8 @@ class BokehOperator:
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_reload_seqspec(self, event):
-        self.vis.doc.add_next_tick_callback(self.get_seqspec_lib)
+        if self.seqspec_parser is not None and self.seqspec_folder is not None:
+            self.vis.doc.add_next_tick_callback(self.get_seqspec_lib)
 
     def callback_clicked_pmplot(self, event, sender):
         """double click/tap on PM plot to add/move marker"""
