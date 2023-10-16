@@ -182,8 +182,8 @@ class Pidd:
         KILL_ORDER = ["operator", "visualizer", "action", "orchestrator"]
         for group in KILL_ORDER:
             print_message({}, "launcher", f"Killing {group} group.")
-            if group in pidd.servers.keys():
-                G = pidd.servers[group]
+            if group in self.servers.keys():
+                G = self.servers[group]
                 for server in G:
                     twait = 0.1
                     print_message(
