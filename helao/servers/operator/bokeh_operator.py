@@ -156,8 +156,6 @@ class BokehOperator:
         # FastAPI calls
         self.get_sequence_lib()
         self.get_experiment_lib()
-        if self.seqspec_parser is not None and self.seqspec_folder is not None:
-            self.get_seqspec_lib()
 
         self.vis.doc.add_next_tick_callback(partial(self.get_sequences))
         self.vis.doc.add_next_tick_callback(partial(self.get_experiments))
@@ -250,6 +248,9 @@ class BokehOperator:
         )
         self.seqspec_dropdown.on_change("value", self.callback_seqspec_select)
 
+        if self.seqspec_parser is not None and self.seqspec_folder is not None:
+            self.get_seqspec_lib()
+        
         # buttons to control orch
         self.button_start_orch = Button(
             label="Start Orch", button_type="default", width=70
