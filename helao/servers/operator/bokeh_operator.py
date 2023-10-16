@@ -940,12 +940,15 @@ class BokehOperator:
 
     def update_selector_layout(self, attr, old, new):
         if new == 2:
+            self.seqspec_dropdown.value = self.seqspec_select_list[0]
             first_spec = self.seqspec_select_list[0]
             self.callback_seqspec_select("value", first_spec, first_spec)
         if new == 1:
+            self.experiment_dropdown.value = self.experiment_select_list[0]
             first_exp = self.experiment_select_list[0]
             self.callback_experiment_select("value", first_exp, first_exp)
         if new == 0:
+            self.sequence_dropdown.value = self.sequence_select_list[0]
             first_seq = self.sequence_select_list[0]
             self.callback_sequence_select("value", first_seq, first_seq)
 
