@@ -250,7 +250,7 @@ class BokehOperator:
 
         if self.seqspec_parser is not None and self.seqspec_folder is not None:
             self.get_seqspec_lib()
-        
+
         # buttons to control orch
         self.button_start_orch = Button(
             label="Start Orch", button_type="default", width=70
@@ -369,7 +369,9 @@ class BokehOperator:
 
         self.sequence_descr_txt = Div(text="""select a sequence item""", width=600)
         self.experiment_descr_txt = Div(text="""select a experiment item""", width=600)
-        self.seqspec_descr_txt = Div(text="""select a sequence specification""", width=600)
+        self.seqspec_descr_txt = Div(
+            text="""select a sequence specification""", width=600
+        )
 
         self.error_txt = Paragraph(
             text="""no error""",
@@ -673,8 +675,13 @@ class BokehOperator:
         self.experiment_select_tab = Panel(
             child=self.layout2, title="Experiment Selection"
         )
+        self.seqspec_select_tab = Panel(child=self.layout3, title="Specification Files")
         self.select_tabs = Tabs(
-            tabs=[self.sequence_select_tab, self.experiment_select_tab]
+            tabs=[
+                self.sequence_select_tab,
+                self.experiment_select_tab,
+                self.seqspec_select_tab,
+            ]
         )
         self.select_tabs.on_change("active", self.update_selector_layout)
         self.dynamic_col = column(
@@ -824,7 +831,7 @@ class BokehOperator:
         """Populates sequence specification library (preset params) and dropdown."""
         self.seqspec_select_list = []
         self.seqspecs = []
-        specfiles = sorted(glob.glob(os.path.join(self.seqspec_folder, "*")))
+        specfiles = self.seqspec_parser.lister(self.seqspec_folder)
         self.vis.print_message(f"found specs: {specfiles}")
         for fp in specfiles:
             self.seqspecs.append(fp)
@@ -951,9 +958,9 @@ class BokehOperator:
 
     def callback_enqueue_seqspec(self, event):
         idx = self.seqspec_select_list.index(self.seqspec_dropdown.value)
-        specfn = self.seqspecs[idx]
+        specfile = self.seqspecs[idx]
         parser_kwargs = self.config_dict.get("parser_kwargs", {})
-        seq = self.seqspec_parser(specfn, **parser_kwargs)
+        seq = self.seqspec_parser.parser(specfile, self.orch, **parser_kwargs)
         self.orch.add_sequence(seq)
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
