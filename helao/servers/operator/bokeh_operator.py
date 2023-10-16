@@ -3,6 +3,9 @@ import asyncio
 import io
 import json
 import os
+import sys
+import importlib
+import glob
 from typing import List
 from pybase64 import b64decode
 from socket import gethostname
@@ -131,9 +134,29 @@ class BokehOperator:
         self.experiments = []
         self.experiment_lib = self.orch.experiment_lib
 
+        self.seqspec_select_list = []
+        self.seqspecs = []
+        self.seqspec_parser = None
+        self.seqspec_folder = None
+        self.parser_path = self.config_dict.get("seqspec_parser_path", None)
+        specs_folder = self.config_dict.get("seqspec_folder_path", None)
+        if self.parser_path is not None:
+            if os.path.exists(self.parser_path) and os.path.isfile(self.parser_path):
+                module_name = os.basename(self.parser_path).replace(".py", "")
+                spec = importlib.util.spec_from_file_location(
+                    module_name, self.parser_path
+                )
+                self.seqspec_parser = importlib.util.module_from_spec(spec)
+                sys.modules[module_name] = self.seqspec_parser
+                spec.loader.exec_module(self.seqspec_parser)
+        if specs_folder is not None:
+            if os.path.exists(specs_folder) and os.path.isdir(specs_folder):
+                self.seqspec_folder = specs_folder
+
         # FastAPI calls
         self.get_sequence_lib()
         self.get_experiment_lib()
+        self.get_seqspec_lib()
 
         self.vis.doc.add_next_tick_callback(partial(self.get_sequences))
         self.vis.doc.add_next_tick_callback(partial(self.get_experiments))
@@ -219,6 +242,12 @@ class BokehOperator:
             title="Select experiment:", value=None, options=self.experiment_select_list
         )
         self.experiment_dropdown.on_change("value", self.callback_experiment_select)
+
+        # specification file loader
+        self.seqspec_dropdown = Select(
+            title="Select spec file:", value=None, options=self.seqspec_select_list
+        )
+        self.seqspec_dropdown.on_change("value", self.callback_seqspec_select)
 
         # buttons to control orch
         self.button_start_orch = Button(
@@ -326,8 +355,20 @@ class BokehOperator:
         self.save_last_exp_pars = CheckboxGroup(labels=["save exp params"], active=[0])
         self.save_last_seq_pars = CheckboxGroup(labels=["save seq params"], active=[0])
 
+        self.button_enqueue_seqspec = Button(
+            label="Enqueue specs sequence", button_type="default", width=150
+        )
+        self.button_enqueue_seqspec.on_event(ButtonClick, self.callback_enqueue_seqspec)
+
+        self.button_reload_seqspec = Button(
+            label="Reload specs folder", button_type="default", width=150
+        )
+        self.button_reload_seqspec.on_event(ButtonClick, self.callback_reload_seqspec)
+
         self.sequence_descr_txt = Div(text="""select a sequence item""", width=600)
         self.experiment_descr_txt = Div(text="""select a experiment item""", width=600)
+        self.seqspec_descr_txt = Div(text="""select a sequence specification""", width=600)
+
         self.error_txt = Paragraph(
             text="""no error""",
             width=600,
@@ -482,6 +523,43 @@ class BokehOperator:
             ]
         )
 
+        self.layout3 = layout(
+            [
+                layout(
+                    [
+                        [
+                            self.seqspec_dropdown,
+                            Spacer(width=20),
+                            self.input_sequence_label2,
+                        ],
+                        [self.input_sequence_comment2],
+                        [
+                            Spacer(width=10),
+                            Div(
+                                text="<b>sequence spec description:</b>",
+                                width=200 + 50,
+                                height=15,
+                            ),
+                        ],
+                        [self.seqspec_descr_txt],
+                        Spacer(height=10),
+                    ],
+                    background="#808080",
+                    width=self.max_width,
+                ),
+                layout(
+                    [
+                        [
+                            self.button_enqueue_seqspec,
+                            self.button_reload_seqspec,
+                        ],
+                    ],
+                    background="#808080",
+                    width=self.max_width,
+                ),
+            ]
+        )
+
         self.layout4 = layout(
             [
                 Spacer(height=10),
@@ -596,7 +674,7 @@ class BokehOperator:
         self.select_tabs = Tabs(
             tabs=[self.sequence_select_tab, self.experiment_select_tab]
         )
-        self.select_tabs.on_change('active', self.update_selector_layout)
+        self.select_tabs.on_change("active", self.update_selector_layout)
         self.dynamic_col = column(
             self.layout0,
             layout(),
@@ -625,7 +703,7 @@ class BokehOperator:
         self.IOtask.cancel()
 
     def get_sequence_lib(self):
-        """Return the current list of sequences."""
+        """Populates sequences (library) and sequence_list (dropdown selector)."""
         self.sequences = []
         self.vis.print_message(f"found sequences: {list(self.sequence_lib)}")
         for i, sequence in enumerate(self.sequence_lib):
@@ -683,7 +761,7 @@ class BokehOperator:
             self.sequence_select_list.append(item["sequence_name"])
 
     def get_experiment_lib(self):
-        """Return the current list of experiments."""
+        """Populates experiments (library) and experiment_list (dropdown selector)."""
         self.experiments = []
         self.vis.print_message(f"found experiment: {list(self.experiment_lib)}")
         for i, experiment in enumerate(self.experiment_lib):
@@ -739,6 +817,17 @@ class BokehOperator:
             )
         for item in self.experiments:
             self.experiment_select_list.append(item["experiment_name"])
+
+    def get_seqspec_lib(self):
+        """Populates sequence specification library (preset params) and dropdown."""
+        self.seqspec_select_list = []
+        self.seqspecs = []
+        specfiles = sorted(glob(os.path.join(self.seqspec_folder, "*")))
+        self.vis.print_message(f"found specs: {specfiles}")
+        for fp in specfiles:
+            self.seqspecs.append(fp)
+            self.seqspec_select_list.append(os.path.basename(fp))
+        self.seqspec_dropdown.options = self.seqspec_select_list
 
     async def get_sequences(self):
         """get experiment list from orch"""
@@ -833,11 +922,10 @@ class BokehOperator:
     def update_selector_layout(self, attr, old, new):
         if new == 1:
             first_exp = self.experiment_select_list[0]
-            self.callback_experiment_select('value', first_exp, first_exp)
+            self.callback_experiment_select("value", first_exp, first_exp)
         if new == 0:
             first_seq = self.sequence_select_list[0]
-            self.callback_sequence_select('value', first_seq, first_seq)
-        
+            self.callback_sequence_select("value", first_seq, first_seq)
 
     def callback_sequence_select(self, attr, old, new):
         idx = self.sequence_select_list.index(new)
@@ -852,6 +940,23 @@ class BokehOperator:
         self.vis.doc.add_next_tick_callback(
             partial(self.update_exp_doc, self.experiments[idx]["doc"])
         )
+
+    def callback_seqspec_select(self, attr, old, new):
+        idx = self.seqspec_select_list.index(new)
+        self.vis.doc.add_next_tick_callback(
+            partial(self.update_seqspec_doc, self.seqspec[idx])
+        )
+
+    def callback_enqueue_seqspec(self, event):
+        idx = self.seqspec_select_list.index(self.seqspec_dropdown.value)
+        specfn = self.seqspecs[idx]
+        parser_kwargs = self.config_dict.get("parser_kwargs", {})
+        seq = self.seqspec_parser(specfn, **parser_kwargs)
+        self.orch.add_sequence(seq)
+        self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
+    def callback_reload_seqspec(self, event):
+        self.vis.doc.add_next_tick_callback(self.get_seqspec_lib)
 
     def callback_clicked_pmplot(self, event, sender):
         """double click/tap on PM plot to add/move marker"""
@@ -1469,6 +1574,10 @@ class BokehOperator:
 
     def update_exp_doc(self, value):
         self.experiment_descr_txt.text = value.replace("\n", "<br>")
+
+    def update_seqspec_doc(self, value):
+        fp = value.replace("\n", "<br>")
+        self.seqspec_descr_txt.text = f"Enqueue a sequence using parser:\n{self.parser_path}\n\non specification file:\n{fp}"
 
     def update_error(self, value):
         self.error_txt.text = value

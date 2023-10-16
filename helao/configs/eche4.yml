@@ -41,6 +41,8 @@ servers:
     params:
       enable_op: true
       bokeh_port: 5002
+      seqspec_parser_path: helao\helpers\seqspec_bimonthly_loader.py
+      seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
   MOTOR:
     host: hte-eche-04.htejcap.caltech.edu
     port: 8003
