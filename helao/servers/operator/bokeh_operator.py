@@ -971,12 +971,12 @@ class BokehOperator:
             partial(self.update_seqspec_doc, self.seqspecs[idx])
         )
 
-    async def callback_enqueue_seqspec(self, event):
+    def callback_enqueue_seqspec(self, event):
         idx = self.seqspec_select_list.index(self.seqspec_dropdown.value)
         specfile = self.seqspecs[idx]
         parser_kwargs = self.config_dict.get("parser_kwargs", {})
         seq = self.seqspec_parser.parser(specfile, self.orch, **parser_kwargs)
-        await self.orch.add_sequence(seq)
+        self.vis.doc.add_next_tick_callback(partial(self.orch.add_sequence, seq))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_reload_seqspec(self, event):
