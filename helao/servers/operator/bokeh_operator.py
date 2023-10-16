@@ -953,7 +953,7 @@ class BokehOperator:
     def callback_seqspec_select(self, attr, old, new):
         idx = self.seqspec_select_list.index(new)
         self.vis.doc.add_next_tick_callback(
-            partial(self.update_seqspec_doc, self.seqspec[idx])
+            partial(self.update_seqspec_doc, self.seqspecs[idx])
         )
 
     def callback_enqueue_seqspec(self, event):
