@@ -675,13 +675,21 @@ class BokehOperator:
             child=self.layout2, title="Experiment Selection"
         )
         self.seqspec_select_tab = Panel(child=self.layout3, title="Specification Files")
-        self.select_tabs = Tabs(
-            tabs=[
-                self.sequence_select_tab,
-                self.experiment_select_tab,
-                self.seqspec_select_tab,
-            ]
-        )
+        if self.seqspec_folder is not None and self.seqspec_parser is not None:
+            self.select_tabs = Tabs(
+                tabs=[
+                    self.sequence_select_tab,
+                    self.experiment_select_tab,
+                    self.seqspec_select_tab,
+                ]
+            )
+        else:
+            self.select_tabs = Tabs(
+                tabs=[
+                    self.sequence_select_tab,
+                    self.experiment_select_tab,
+                ]
+            )
         self.select_tabs.on_change("active", self.update_selector_layout)
         self.dynamic_col = column(
             self.layout0,
@@ -699,6 +707,9 @@ class BokehOperator:
 
         if self.sequence_select_list and self.select_tabs.active == 0:
             self.sequence_dropdown.value = self.sequence_select_list[0]
+
+        if self.seqspec_select_list and self.select_tabs.active == 2:
+            self.seqspec_dropdown.value = self.seqspec_select_list[0]
 
         self.IOloop_run = False
         self.IOtask = asyncio.create_task(self.IOloop())
@@ -960,12 +971,12 @@ class BokehOperator:
             partial(self.update_seqspec_doc, self.seqspecs[idx])
         )
 
-    def callback_enqueue_seqspec(self, event):
+    async def callback_enqueue_seqspec(self, event):
         idx = self.seqspec_select_list.index(self.seqspec_dropdown.value)
         specfile = self.seqspecs[idx]
         parser_kwargs = self.config_dict.get("parser_kwargs", {})
         seq = self.seqspec_parser.parser(specfile, self.orch, **parser_kwargs)
-        self.orch.add_sequence(seq)
+        await self.orch.add_sequence(seq)
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_reload_seqspec(self, event):
