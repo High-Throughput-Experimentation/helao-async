@@ -142,7 +142,7 @@ class BokehOperator:
         specs_folder = self.config_dict.get("seqspec_folder_path", None)
         if self.parser_path is not None:
             if os.path.exists(self.parser_path) and os.path.isfile(self.parser_path):
-                module_name = os.basename(self.parser_path).replace(".py", "")
+                module_name = os.path.basename(self.parser_path).replace(".py", "")
                 spec = importlib.util.spec_from_file_location(
                     module_name, self.parser_path
                 )
