@@ -954,8 +954,8 @@ class BokehOperator:
 
     def callback_seqspec_select(self, attr, old, new):
         idx = self.seqspec_select_list.index(new)
-        self.dynamic_col.pop(4)
-        self.dynamic_col.insert(4, layout())
+        self.dynamic_col.children.pop(4)
+        self.dynamic_col.children.insert(4, layout())
         self.vis.doc.add_next_tick_callback(
             partial(self.update_seqspec_doc, self.seqspecs[idx])
         )
