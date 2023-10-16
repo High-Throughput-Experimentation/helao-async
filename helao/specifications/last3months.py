@@ -7,7 +7,7 @@ from helao.helpers.read_hlo import HelaoData
 
 def lister(folderpath: str):
     specfiles = []
-    for i in range(2):
+    for i in range(15):
         yearweek = (datetime.now() + timedelta(weeks=-i)).strftime("%y.%W")
         specfiles += sorted(
             glob.glob(os.path.join(folderpath, yearweek, "**", "*.zip"), recursive=True),
