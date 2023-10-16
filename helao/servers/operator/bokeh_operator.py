@@ -979,6 +979,9 @@ class BokehOperator:
         specfile = self.seqspecs[idx]
         parser_kwargs = self.config_dict.get("parser_kwargs", {})
         seq = self.seqspec_parser.parser(specfile, self.orch, **parser_kwargs)
+        seq.sequence_label = self.input_sequence_label.value
+        if self.input_sequence_comment.value != "":
+            seq.sequence_comment = self.input_sequence_comment.value
         self.vis.doc.add_next_tick_callback(partial(self.orch.add_sequence, seq))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
