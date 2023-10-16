@@ -538,7 +538,6 @@ class BokehOperator:
                         ],
                         [self.input_sequence_comment2],
                         [
-                            Spacer(width=10),
                             Div(
                                 text="<b>sequence spec description:</b>",
                                 width=200 + 50,
@@ -929,6 +928,9 @@ class BokehOperator:
         self.vis.print_message(f"current active actions: {self.active_action_list}")
 
     def update_selector_layout(self, attr, old, new):
+        if new == 2:
+            first_spec = self.seqspec_select_list[0]
+            self.callback_seqspec_select("value", first_spec, first_spec)
         if new == 1:
             first_exp = self.experiment_select_list[0]
             self.callback_experiment_select("value", first_exp, first_exp)
@@ -952,6 +954,8 @@ class BokehOperator:
 
     def callback_seqspec_select(self, attr, old, new):
         idx = self.seqspec_select_list.index(new)
+        self.dynamic_col.pop(4)
+        self.dynamic_col.insert(4, layout())
         self.vis.doc.add_next_tick_callback(
             partial(self.update_seqspec_doc, self.seqspecs[idx])
         )
@@ -1295,7 +1299,6 @@ class BokehOperator:
             layout(
                 [
                     [
-                        Spacer(width=10),
                         Div(
                             text="<b>Optional sequence parameters:</b>",
                             width=200 + 50,
@@ -1357,7 +1360,6 @@ class BokehOperator:
             layout(
                 [
                     [
-                        Spacer(width=10),
                         Div(
                             text="<b>Optional experiment parameters:</b>",
                             width=200 + 50,
@@ -1587,7 +1589,7 @@ class BokehOperator:
 
     def update_seqspec_doc(self, value):
         fp = value.replace("\n", "<br>")
-        self.seqspec_descr_txt.text = f"Enqueue a sequence using parser:\n{self.parser_path}\n\non specification file:\n{fp}"
+        self.seqspec_descr_txt.text = f"Enqueue a sequence using parser:<br>{self.parser_path}<br><br>on specification file:<br>{fp}"
 
     def update_error(self, value):
         self.error_txt.text = value
