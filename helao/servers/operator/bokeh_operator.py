@@ -583,7 +583,7 @@ class BokehOperator:
                         ],
                     ],
                     background="#808080",
-                    width=self.max_width,
+                    # width=self.max_width,
                     height_policy="min",
                 ),
             ],
