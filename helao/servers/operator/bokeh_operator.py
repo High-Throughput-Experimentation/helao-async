@@ -711,10 +711,10 @@ class BokehOperator:
         self.select_tabs.on_change("active", self.update_selector_layout)
         self.dynamic_col = column(
             self.layout0,
-            layout(),
+            layout(height_policy="min"),
             self.select_tabs,
-            layout(),
-            layout(),
+            layout(height_policy="min"),
+            layout(height_policy="min"),
             self.layout4,  # placeholder  # placeholder
         )
         self.vis.doc.add_root(self.dynamic_col)
@@ -1380,7 +1380,7 @@ class BokehOperator:
                 ),
             )
 
-        self.dynamic_col.children.insert(4, layout(self.seq_param_layout))
+        self.dynamic_col.children.insert(4, layout(self.seq_param_layout, height_policy="min"))
 
         self.refresh_inputs(self.seq_param_input, self.seq_private_input)
 
@@ -1440,7 +1440,7 @@ class BokehOperator:
                 ),
             )
 
-        self.dynamic_col.children.insert(4, layout(self.exp_param_layout))
+        self.dynamic_col.children.insert(4, layout(self.exp_param_layout, height_policy="min"))
 
         self.refresh_inputs(self.exp_param_input, self.exp_private_input)
 
@@ -1505,7 +1505,7 @@ class BokehOperator:
                 ),
             )
 
-        self.dynamic_col.children.insert(4, layout(self.seqspec_param_layout))
+        self.dynamic_col.children.insert(4, layout(self.seqspec_param_layout, height_policy="min"))
 
     def add_dynamic_inputs(
         self, param_input, private_input, param_layout, args, defaults, argtypes
