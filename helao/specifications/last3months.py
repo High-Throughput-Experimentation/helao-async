@@ -5,12 +5,20 @@ from datetime import datetime, timedelta
 from helao.helpers.sequence_constructor import constructor
 from helao.helpers.read_hlo import HelaoData
 
+PARAM_TYPES = {
+    "plate_id": int,
+    "plate_sample_no": int,
+}
+
+
 def lister(folderpath: str):
     specfiles = []
     for i in range(15):
         yearweek = (datetime.now() + timedelta(weeks=-i)).strftime("%y.%W")
         specfiles += sorted(
-            glob.glob(os.path.join(folderpath, yearweek, "**", "*.zip"), recursive=True),
+            glob.glob(
+                os.path.join(folderpath, yearweek, "**", "*.zip"), recursive=True
+            ),
             reverse=True,
         )
     latest_50 = specfiles[:50]

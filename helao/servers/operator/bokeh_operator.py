@@ -99,6 +99,10 @@ class BokehOperator:
         self.exp_param_input = []
         self.exp_private_input = []
 
+        self.seqspec_param_layout = []
+        self.seqspec_param_input = []
+        self.seqspec_private_input = []
+
         self.sequence = None
         self.sequence_plan_list = {}
         self.sequence_plan_list["sequence_name"] = []
@@ -968,8 +972,7 @@ class BokehOperator:
 
     def callback_seqspec_select(self, attr, old, new):
         idx = self.seqspec_select_list.index(new)
-        self.dynamic_col.children.pop(4)
-        self.dynamic_col.children.insert(4, layout())
+        self.update_seqspec_param_layout(idx)
         self.vis.doc.add_next_tick_callback(
             partial(self.update_seqspec_doc, self.seqspecs[idx])
         )
@@ -978,7 +981,13 @@ class BokehOperator:
         idx = self.seqspec_select_list.index(self.seqspec_dropdown.value)
         specfile = self.seqspecs[idx]
         parser_kwargs = self.config_dict.get("parser_kwargs", {})
-        seq = self.seqspec_parser.parser(specfile, self.orch, **parser_kwargs)
+        input_params = {
+            paraminput.title: parse_bokeh_input(paraminput.value)
+            for paraminput in self.seqspec_param_input
+        }
+        seq = self.seqspec_parser.parser(
+            specfile, self.orch, params=input_params**parser_kwargs
+        )
         seq.sequence_label = self.input_sequence_label.value
         if self.input_sequence_comment.value != "":
             seq.sequence_comment = self.input_sequence_comment.value
@@ -1420,6 +1429,69 @@ class BokehOperator:
         self.dynamic_col.children.insert(4, layout(self.exp_param_layout))
 
         self.refresh_inputs(self.exp_param_input, self.exp_private_input)
+
+    def update_seqspec_param_layout(self, idx):
+        args = []
+        argtypes = []
+        defaults = []
+        for arg, argtype in self.seqspec_parser.PARAM_TYPES.items():
+            args.append(arg)
+            argtypes.append(argtype)
+
+        self.dynamic_col.children.pop(4)
+
+        for _ in range(len(args) - len(defaults)):
+            defaults.insert(0, "")
+
+        self.seqspec_param_input = []
+        self.seqspec_private_input = []
+        self.seqspec_param_layout = [
+            Spacer(height=10),
+            layout(
+                [
+                    [
+                        Div(
+                            text="<b>Required sequence parameters:</b>",
+                            width=200 + 50,
+                            height=15,
+                            style={"font-size": "100%", "color": "black"},
+                        ),
+                    ],
+                ],
+                background=self.color_sq_param_inputs,
+                width=self.max_width,
+            ),
+        ]
+
+        self.add_dynamic_inputs(
+            self.seqspec_param_input,
+            self.seqspec_private_input,
+            self.seqspec_param_layout,
+            args,
+            defaults,
+            argtypes,
+        )
+
+        if not self.seqspec_param_input:
+            self.seqspec_param_layout.append(
+                layout(
+                    [
+                        [
+                            Spacer(width=10),
+                            Div(
+                                text="-- none --",
+                                width=200 + 50,
+                                height=15,
+                                style={"font-size": "100%", "color": "black"},
+                            ),
+                        ],
+                    ],
+                    background=self.color_sq_param_inputs,
+                    width=self.max_width,
+                ),
+            )
+
+        self.dynamic_col.children.insert(4, layout(self.seqspec_param_layout))
 
     def add_dynamic_inputs(
         self, param_input, private_input, param_layout, args, defaults, argtypes
