@@ -1041,7 +1041,7 @@ class BokehOperator:
         # replace defaults with loaded params
         for i, x in enumerate(self.seq_param_input):
             if x.title in loaded_params:
-                self.seq_param_input[i].value = loaded_params[x.title]
+                self.seq_param_input[i].value = str(loaded_params[x.title])
 
     def callback_clicked_pmplot(self, event, sender):
         """double click/tap on PM plot to add/move marker"""
