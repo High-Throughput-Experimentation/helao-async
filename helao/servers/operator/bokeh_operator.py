@@ -489,7 +489,8 @@ class BokehOperator:
                     background="#808080",
                     width=self.max_width,
                 ),
-            ]
+            ],
+            sizing_mode="stretch_both"
         )
 
         self.layout2 = layout(
@@ -528,7 +529,8 @@ class BokehOperator:
                     background="#808080",
                     width=self.max_width,
                 ),
-            ]
+            ],
+            sizing_mode="stretch_both"
         )
 
         self.layout3 = layout(
@@ -564,7 +566,8 @@ class BokehOperator:
                     background="#808080",
                     width=self.max_width,
                 ),
-            ]
+            ],
+            sizing_mode="stretch_both"
         )
 
         self.layout4 = layout(
@@ -671,7 +674,8 @@ class BokehOperator:
                     background="#7fdbff",
                     width=self.max_width,
                 ),
-            ]
+            ],
+            sizing_mode="stretch_both"
         )
 
         self.sequence_select_tab = Panel(child=self.layout1, title="Sequence Selection")
@@ -702,6 +706,7 @@ class BokehOperator:
             layout(),
             layout(),
             self.layout4,  # placeholder  # placeholder
+            sizing_mode="stretch_both"
         )
         self.vis.doc.add_root(self.dynamic_col)
 
