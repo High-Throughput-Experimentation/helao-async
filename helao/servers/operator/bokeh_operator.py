@@ -218,7 +218,8 @@ class BokehOperator:
         self.experiment_tab = Panel(child=self.experiment_table, title="Experiments")
         self.action_tab = Panel(child=self.action_table, title="Actions")
         self.active_tabs = Tabs(
-            tabs=[self.sequence_tab, self.experiment_tab, self.action_tab]
+            tabs=[self.sequence_tab, self.experiment_tab, self.action_tab],
+            height_policy="min",
         )
 
         self.active_action_source = ColumnDataSource(data=self.active_action_list)
@@ -507,7 +508,6 @@ class BokehOperator:
                         ],
                         [self.input_sequence_comment2],
                         [
-                            Spacer(width=10),
                             Div(
                                 text="<b>experiment description:</b>",
                                 width=200 + 50,
@@ -612,7 +612,6 @@ class BokehOperator:
                         ],
                         Spacer(height=10),
                         [
-                            Spacer(width=10),
                             Div(
                                 text="<b>Error message:</b>",
                                 width=200 + 50,
@@ -630,7 +629,6 @@ class BokehOperator:
                 layout(
                     [
                         [
-                            Spacer(width=20),
                             Div(
                                 text="<b>Sequence Planner:</b>",
                                 width=200 + 50,
@@ -639,7 +637,6 @@ class BokehOperator:
                         ],
                         [self.sequence_plan_table],
                         [
-                            Spacer(width=20),
                             Div(
                                 text="<b>Queues:</b>",
                                 width=200 + 50,
@@ -648,7 +645,6 @@ class BokehOperator:
                         ],
                         [self.active_tabs],
                         [
-                            Spacer(width=20),
                             Div(
                                 text="<b>Active actions:</b>", width=200 + 50, height=15
                             ),
@@ -706,7 +702,8 @@ class BokehOperator:
                 tabs=[
                     self.sequence_select_tab,
                     self.experiment_select_tab,
-                ]
+                ],
+                height_policy="min",
             )
         self.select_tabs.on_change("active", self.update_selector_layout)
         self.dynamic_col = column(
