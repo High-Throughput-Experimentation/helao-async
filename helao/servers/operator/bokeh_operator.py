@@ -583,7 +583,7 @@ class BokehOperator:
                         ],
                     ],
                     background="#808080",
-                    # width=self.max_width,
+                    width=self.max_width,
                     height_policy="min",
                 ),
             ],
@@ -1038,6 +1038,7 @@ class BokehOperator:
         # switch tabs and update layout
         self.select_tabs.active = 0
         self.callback_sequence_select('value', seqname, seqname)
+        self.sequence_dropdown.value = seqname
         # replace defaults with loaded params
         for i, x in enumerate(self.seq_param_input):
             if x.title in loaded_params:
