@@ -1202,7 +1202,7 @@ def ANEC_sub_photo_CV(
     CV_duration_sec += (
         abs(apm.pars.WE_potential_apex2__V - apm.pars.WE_potential_apex1__V)
         / apm.pars.ScanRate_V_s
-        * apm.pars.Cycles
+#        * apm.pars.Cycles
     )
     CV_duration_sec += (
         abs(apm.pars.WE_potential_apex2__V - apm.pars.WE_potential_apex1__V)
