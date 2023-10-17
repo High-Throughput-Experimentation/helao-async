@@ -452,7 +452,7 @@ class BokehOperator:
                 ),
                 Spacer(height=10),
             ],
-            height_policy="min"
+            height_policy="min",
         )
         self.layout1 = layout(
             [
@@ -477,7 +477,7 @@ class BokehOperator:
                     ],
                     background="#808080",
                     width=self.max_width,
-                    height_policy="min"
+                    height_policy="min",
                 ),
                 layout(
                     [
@@ -490,10 +490,10 @@ class BokehOperator:
                     ],
                     background="#808080",
                     width=self.max_width,
-                    height_policy="min"
+                    height_policy="min",
                 ),
             ],
-            height_policy="min"
+            height_policy="min",
         )
 
         self.layout2 = layout(
@@ -519,7 +519,7 @@ class BokehOperator:
                     ],
                     background="#808080",
                     width=self.max_width,
-                    height_policy="min"
+                    height_policy="min",
                 ),
                 layout(
                     [
@@ -532,10 +532,10 @@ class BokehOperator:
                     ],
                     background="#808080",
                     width=self.max_width,
-                    height_policy="min"
+                    height_policy="min",
                 ),
             ],
-            height_policy="min"
+            height_policy="min",
         )
 
         self.layout3 = layout(
@@ -560,7 +560,7 @@ class BokehOperator:
                     ],
                     background="#808080",
                     width=self.max_width,
-                    height_policy="min"
+                    height_policy="min",
                 ),
                 layout(
                     [
@@ -571,10 +571,10 @@ class BokehOperator:
                     ],
                     background="#808080",
                     width=self.max_width,
-                    height_policy="min"
+                    height_policy="min",
                 ),
-            ]
-            height_policy="min"
+            ],
+            height_policy="min",
         )
 
         self.layout4 = layout(
@@ -587,7 +587,7 @@ class BokehOperator:
                     ],
                     background="#C0C0C0",
                     width=self.max_width,
-                    height_policy="min"
+                    height_policy="min",
                 ),
                 layout(
                     [
@@ -625,7 +625,7 @@ class BokehOperator:
                     ],
                     background="#808080",
                     width=self.max_width,
-                    height_policy="min"
+                    height_policy="min",
                 ),
                 layout(
                     [
@@ -682,10 +682,10 @@ class BokehOperator:
                     ],
                     background="#7fdbff",
                     width=self.max_width,
-                    height_policy="min"
+                    height_policy="min",
                 ),
-            ]
-            height_policy="min"
+            ],
+            height_policy="min",
         )
 
         self.sequence_select_tab = Panel(child=self.layout1, title="Sequence Selection")
@@ -1380,7 +1380,9 @@ class BokehOperator:
                 ),
             )
 
-        self.dynamic_col.children.insert(4, layout(self.seq_param_layout, height_policy="min"))
+        self.dynamic_col.children.insert(
+            4, layout(self.seq_param_layout, height_policy="min")
+        )
 
         self.refresh_inputs(self.seq_param_input, self.seq_private_input)
 
@@ -1440,7 +1442,9 @@ class BokehOperator:
                 ),
             )
 
-        self.dynamic_col.children.insert(4, layout(self.exp_param_layout, height_policy="min"))
+        self.dynamic_col.children.insert(
+            4, layout(self.exp_param_layout, height_policy="min")
+        )
 
         self.refresh_inputs(self.exp_param_input, self.exp_private_input)
 
@@ -1505,7 +1509,9 @@ class BokehOperator:
                 ),
             )
 
-        self.dynamic_col.children.insert(4, layout(self.seqspec_param_layout, height_policy="min"))
+        self.dynamic_col.children.insert(
+            4, layout(self.seqspec_param_layout, height_policy="min")
+        )
 
     def add_dynamic_inputs(
         self, param_input, private_input, param_layout, args, defaults, argtypes
