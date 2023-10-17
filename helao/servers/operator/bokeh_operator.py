@@ -374,6 +374,11 @@ class BokehOperator:
         )
         self.button_reload_seqspec.on_event(ButtonClick, self.callback_reload_seqspec)
 
+        self.button_to_seqtab = Button(
+            label="To sequence selection", button_type="default", width=150
+        )
+        self.button_to_seqtab.on_event(ButtonClick, self.callback_to_seqtab)
+
         self.sequence_descr_txt = Div(
             text="""select a sequence item""", width=600, height_policy="min"
         )
@@ -571,7 +576,10 @@ class BokehOperator:
                     [
                         [
                             self.button_enqueue_seqspec,
+                            Spacer(width=10),
                             self.button_reload_seqspec,
+                            Spacer(width=10),
+                            self.button_to_seqtab,
                         ],
                     ],
                     background="#808080",
@@ -1013,6 +1021,27 @@ class BokehOperator:
     def callback_reload_seqspec(self, event):
         if self.seqspec_parser is not None and self.seqspec_folder is not None:
             self.vis.doc.add_next_tick_callback(self.get_seqspec_lib)
+
+    def callback_to_seqtab(self, event):
+        idx = self.seqspec_select_list.index(self.seqspec_dropdown.value)
+        specfile = self.seqspecs[idx]
+        parser_kwargs = self.config_dict.get("parser_kwargs", {})
+        seqspec_input_params = {
+            paraminput.title: parse_bokeh_input(paraminput.value)
+            for paraminput in self.seqspec_param_input
+        }
+        seq = self.seqspec_parser.parser(
+            specfile, self.orch, params=seqspec_input_params, **parser_kwargs
+        )
+        seqname = seq.sequence_name
+        loaded_params = seq.sequence_params
+        # switch tabs and update layout
+        self.select_tabs.active = 0
+        self.callback_sequence_select('value', seqname, seqname)
+        # replace defaults with loaded params
+        for i, x in enumerate(self.seq_param_input):
+            if x.title in loaded_params:
+                self.seq_param_input[i].value = loaded_params[x.title]
 
     def callback_clicked_pmplot(self, event, sender):
         """double click/tap on PM plot to add/move marker"""
