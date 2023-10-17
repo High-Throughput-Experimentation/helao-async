@@ -451,7 +451,8 @@ class BokehOperator:
                     width=self.max_width,
                 ),
                 Spacer(height=10),
-            ]
+            ],
+            height_policy="min"
         )
         self.layout1 = layout(
             [
@@ -476,6 +477,7 @@ class BokehOperator:
                     ],
                     background="#808080",
                     width=self.max_width,
+                    height_policy="min"
                 ),
                 layout(
                     [
@@ -488,9 +490,10 @@ class BokehOperator:
                     ],
                     background="#808080",
                     width=self.max_width,
+                    height_policy="min"
                 ),
             ],
-            sizing_mode="stretch_both"
+            height_policy="min"
         )
 
         self.layout2 = layout(
@@ -516,6 +519,7 @@ class BokehOperator:
                     ],
                     background="#808080",
                     width=self.max_width,
+                    height_policy="min"
                 ),
                 layout(
                     [
@@ -528,9 +532,10 @@ class BokehOperator:
                     ],
                     background="#808080",
                     width=self.max_width,
+                    height_policy="min"
                 ),
             ],
-            sizing_mode="stretch_both"
+            height_policy="min"
         )
 
         self.layout3 = layout(
@@ -555,6 +560,7 @@ class BokehOperator:
                     ],
                     background="#808080",
                     width=self.max_width,
+                    height_policy="min"
                 ),
                 layout(
                     [
@@ -565,9 +571,10 @@ class BokehOperator:
                     ],
                     background="#808080",
                     width=self.max_width,
+                    height_policy="min"
                 ),
-            ],
-            sizing_mode="stretch_both"
+            ]
+            height_policy="min"
         )
 
         self.layout4 = layout(
@@ -580,6 +587,7 @@ class BokehOperator:
                     ],
                     background="#C0C0C0",
                     width=self.max_width,
+                    height_policy="min"
                 ),
                 layout(
                     [
@@ -617,6 +625,7 @@ class BokehOperator:
                     ],
                     background="#808080",
                     width=self.max_width,
+                    height_policy="min"
                 ),
                 layout(
                     [
@@ -673,9 +682,10 @@ class BokehOperator:
                     ],
                     background="#7fdbff",
                     width=self.max_width,
+                    height_policy="min"
                 ),
-            ],
-            sizing_mode="stretch_both"
+            ]
+            height_policy="min"
         )
 
         self.sequence_select_tab = Panel(child=self.layout1, title="Sequence Selection")
@@ -706,7 +716,6 @@ class BokehOperator:
             layout(),
             layout(),
             self.layout4,  # placeholder  # placeholder
-            sizing_mode="stretch_both"
         )
         self.vis.doc.add_root(self.dynamic_col)
 
