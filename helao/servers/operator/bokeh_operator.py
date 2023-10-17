@@ -372,10 +372,10 @@ class BokehOperator:
         )
         self.button_reload_seqspec.on_event(ButtonClick, self.callback_reload_seqspec)
 
-        self.sequence_descr_txt = Div(text="""select a sequence item""", width=600)
-        self.experiment_descr_txt = Div(text="""select a experiment item""", width=600)
+        self.sequence_descr_txt = Div(text="""select a sequence item""", width=600, height_policy="min")
+        self.experiment_descr_txt = Div(text="""select a experiment item""", width=600, height_policy="min")
         self.seqspec_descr_txt = Div(
-            text="""select a sequence specification""", width=600
+            text="""select a sequence specification""", width=600, height_policy="min"
         )
 
         self.error_txt = Paragraph(
@@ -466,7 +466,6 @@ class BokehOperator:
                         ],
                         [self.input_sequence_comment],
                         [
-                            Spacer(width=10),
                             Div(
                                 text="<b>sequence description:</b>",
                                 width=200 + 50,
@@ -1346,6 +1345,7 @@ class BokehOperator:
                 ],
                 background=self.color_sq_param_inputs,
                 width=self.max_width,
+                height_policy="min",
             ),
         ]
 
@@ -1409,6 +1409,7 @@ class BokehOperator:
                 ],
                 background=self.color_sq_param_inputs,
                 width=self.max_width,
+                height_policy="min",
             ),
         ]
         self.add_dynamic_inputs(
@@ -1436,6 +1437,7 @@ class BokehOperator:
                     ],
                     background=self.color_sq_param_inputs,
                     width=self.max_width,
+                    height_policy="min",
                 ),
             )
 
@@ -1475,6 +1477,7 @@ class BokehOperator:
                 ],
                 background=self.color_sq_param_inputs,
                 width=self.max_width,
+                height_policy="min",
             ),
         ]
 
@@ -1503,6 +1506,7 @@ class BokehOperator:
                     ],
                     background=self.color_sq_param_inputs,
                     width=self.max_width,
+                    height_policy="min",
                 ),
             )
 
