@@ -140,6 +140,7 @@ class BokehOperator:
 
         self.seqspec_select_list = []
         self.seqspecs = []
+        self.seqspec_parser_module = None
         self.seqspec_parser = None
         self.seqspec_folder = None
         self.parser_path = self.config_dict.get("seqspec_parser_path", None)
@@ -150,9 +151,10 @@ class BokehOperator:
                 spec = importlib.util.spec_from_file_location(
                     module_name, self.parser_path
                 )
-                self.seqspec_parser = importlib.util.module_from_spec(spec)
-                sys.modules[module_name] = self.seqspec_parser
-                spec.loader.exec_module(self.seqspec_parser)
+                self.seqspec_parser_module = importlib.util.module_from_spec(spec)
+                sys.modules[module_name] = self.seqspec_parser_module
+                spec.loader.exec_module(self.seqspec_parser_module)
+                self.seqspec_parser = self.seqspec_parser_module.SpecParser()
         if specs_folder is not None:
             if os.path.exists(specs_folder) and os.path.isdir(specs_folder):
                 self.seqspec_folder = specs_folder
@@ -1000,7 +1002,7 @@ class BokehOperator:
             for paraminput in self.seqspec_param_input
         }
         seq = self.seqspec_parser.parser(
-            specfile, self.orch, params=input_params**parser_kwargs
+            specfile, self.orch, params=input_params, **parser_kwargs
         )
         seq.sequence_label = self.input_sequence_label.value
         if self.input_sequence_comment.value != "":
@@ -1455,9 +1457,14 @@ class BokehOperator:
         args = []
         argtypes = []
         defaults = []
+
+        seqspec_path = self.seqspecs[idx]
+        seqfunc_params = self.seqspec_parser.list_params(seqspec_path, self.orch)
+        
         for arg, argtype in self.seqspec_parser.PARAM_TYPES.items():
-            args.append(arg)
-            argtypes.append(argtype)
+            if arg in seqfunc_params:
+                args.append(arg)
+                argtypes.append(argtype)
 
         self.dynamic_col.children.pop(4)
 
