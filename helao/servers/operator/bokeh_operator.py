@@ -104,10 +104,10 @@ class BokehOperator:
         self.seqspec_private_input = []
 
         self.sequence = None
-        self.sequence_plan_list = {}
-        self.sequence_plan_list["sequence_name"] = []
-        self.sequence_plan_list["sequence_label"] = []
-        self.sequence_plan_list["experiment_name"] = []
+        self.experiment_plan_list = {}
+        self.experiment_plan_list["sequence_name"] = []
+        self.experiment_plan_list["sequence_label"] = []
+        self.experiment_plan_list["experiment_name"] = []
 
         self.sequence_list = {}
         self.sequence_list["sequence_name"] = []
@@ -166,12 +166,12 @@ class BokehOperator:
         self.vis.doc.add_next_tick_callback(partial(self.get_actions))
         self.vis.doc.add_next_tick_callback(partial(self.get_active_actions))
 
-        self.sequence_plan_source = ColumnDataSource(data=self.sequence_plan_list)
+        self.experiment_plan_source = ColumnDataSource(data=self.experiment_plan_list)
         self.columns_expplan = [
-            TableColumn(field=key, title=key) for key in self.sequence_plan_list
+            TableColumn(field=key, title=key) for key in self.experiment_plan_list
         ]
-        self.sequence_plan_table = DataTable(
-            source=self.sequence_plan_source,
+        self.experiment_plan_table = DataTable(
+            source=self.experiment_plan_source,
             columns=self.columns_expplan,
             width=self.max_width - 20,
             height=200,
@@ -372,8 +372,12 @@ class BokehOperator:
         )
         self.button_reload_seqspec.on_event(ButtonClick, self.callback_reload_seqspec)
 
-        self.sequence_descr_txt = Div(text="""select a sequence item""", width=600, height_policy="min")
-        self.experiment_descr_txt = Div(text="""select a experiment item""", width=600, height_policy="min")
+        self.sequence_descr_txt = Div(
+            text="""select a sequence item""", width=600, height_policy="min"
+        )
+        self.experiment_descr_txt = Div(
+            text="""select a experiment item""", width=600, height_policy="min"
+        )
         self.seqspec_descr_txt = Div(
             text="""select a sequence specification""", width=600, height_policy="min"
         )
@@ -634,7 +638,7 @@ class BokehOperator:
                                 height=15,
                             ),
                         ],
-                        [self.sequence_plan_table],
+                        [self.experiment_plan_table],
                         [
                             Div(
                                 text="<b>Queues:</b>",
@@ -1102,7 +1106,7 @@ class BokehOperator:
             self.vis.doc.add_next_tick_callback(
                 partial(self.orch.add_sequence, self.sequence)
             )
-            # clear current sequence_plan (sequence in operator)
+            # clear current experiment_plan (sequence in operator)
             self.sequence = None
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
@@ -1153,14 +1157,14 @@ class BokehOperator:
 
     def callback_prepend_seq(self, event):
         sequence = self.populate_sequence()
-        for i, D in enumerate(sequence.sequence_plan_list):
-            self.sequence.sequence_plan_list.insert(i, D)
+        for i, D in enumerate(sequence.experiment_plan_list):
+            self.sequence.experiment_plan_list.insert(i, D)
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_append_seq(self, event):
         sequence = self.populate_sequence()
-        for D in sequence.sequence_plan_list:
-            self.sequence.sequence_plan_list.append(D)
+        for D in sequence.experiment_plan_list:
+            self.sequence.experiment_plan_list.append(D)
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_prepend_exp(self, event):
@@ -1176,11 +1180,11 @@ class BokehOperator:
 
     def append_experiment(self):
         experimentmodel = self.populate_experimentmodel()
-        self.sequence.sequence_plan_list.append(experimentmodel)
+        self.sequence.experiment_plan_list.append(experimentmodel)
 
     def prepend_experiment(self):
         experimentmodel = self.populate_experimentmodel()
-        self.sequence.sequence_plan_list.insert(0, experimentmodel)
+        self.sequence.experiment_plan_list.insert(0, experimentmodel)
 
     def write_params(self, ptype: str, name: str, pars: dict):
         param_file_path = os.path.join(
@@ -1234,7 +1238,7 @@ class BokehOperator:
         sequence.sequence_label = self.input_sequence_label.value
         sequence.sequence_params = sequence_params
         for expplan in expplan_list:
-            sequence.sequence_plan_list.append(expplan)
+            sequence.experiment_plan_list.append(expplan)
 
         if self.sequence is None:
             self.sequence = Sequence()
@@ -1915,19 +1919,19 @@ class BokehOperator:
         await self.get_experiments()
         await self.get_actions()
         await self.get_active_actions()
-        for key in self.sequence_plan_list:
-            self.sequence_plan_list[key] = []
+        for key in self.experiment_plan_list:
+            self.experiment_plan_list[key] = []
         if self.sequence is not None:
-            for D in self.sequence.sequence_plan_list:
-                self.sequence_plan_list["sequence_name"].append(
+            for D in self.sequence.experiment_plan_list:
+                self.experiment_plan_list["sequence_name"].append(
                     self.sequence.sequence_name
                 )
-                self.sequence_plan_list["sequence_label"].append(
+                self.experiment_plan_list["sequence_label"].append(
                     self.sequence.sequence_label
                 )
-                self.sequence_plan_list["experiment_name"].append(D.experiment_name)
+                self.experiment_plan_list["experiment_name"].append(D.experiment_name)
 
-        self.sequence_plan_source.data = self.sequence_plan_list
+        self.experiment_plan_source.data = self.experiment_plan_list
 
         if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
             self.orch_status_button.label = "started"
