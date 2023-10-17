@@ -43,9 +43,6 @@ servers:
       bokeh_port: 5002
       seqspec_parser_path: helao\specifications\last3months.py
       seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
-      parser_kwargs:
-        plate_id: int
-        plate_sample_no: int
   MOTOR:
     host: hte-eche-04.htejcap.caltech.edu
     port: 8003
