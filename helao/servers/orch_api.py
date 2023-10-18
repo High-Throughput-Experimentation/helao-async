@@ -5,6 +5,7 @@ import pickle
 import asyncio
 from socket import gethostname
 
+from contextlib import asynccontextmanager
 from fastapi import Body, WebSocket, Request
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.gen_uuid import gen_uuid
@@ -103,20 +104,29 @@ class OrchAPI(HelaoFastAPI):
                 response = await call_next(request)
             return response
 
-        @self.on_event("startup")
-        async def startup_event():
-            """Run startup actions.
-
-            When FastAPI server starts, create a global OrchHandler object,
-            initiate the monitor_states coroutine which runs forever,
-            and append dummy experiments to the
-            experiment queue for testing.
-            """
+        @asynccontextmanager
+        async def lifespan(self):
             self.orch = Orch(fastapp=self)
             self.orch.myinit()
             if driver_class:
                 self.driver = driver_class(self.orch)
             self.orch.endpoint_queues_init()
+            yield
+            
+        # @self.on_event("startup")
+        # async def startup_event():
+        #     """Run startup actions.
+
+        #     When FastAPI server starts, create a global OrchHandler object,
+        #     initiate the monitor_states coroutine which runs forever,
+        #     and append dummy experiments to the
+        #     experiment queue for testing.
+        #     """
+        #     self.orch = Orch(fastapp=self)
+        #     self.orch.myinit()
+        #     if driver_class:
+        #         self.driver = driver_class(self.orch)
+        #     self.orch.endpoint_queues_init()
 
         # --- BASE endpoints ---
         @self.websocket("/ws_status")

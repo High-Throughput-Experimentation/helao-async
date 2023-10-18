@@ -2,6 +2,8 @@ import json
 import time
 from copy import copy
 from socket import gethostname
+
+from contextlib import asynccontextmanager
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
 from helao.servers.base import Base
@@ -96,13 +98,41 @@ class BaseAPI(HelaoFastAPI):
                 response = await call_next(request)
             return response
 
-        @self.on_event("startup")
-        def startup_event():
+        @asynccontextmanager
+        async def lifespan(self):
             self.base = Base(fastapp=self, dyn_endpoints=dyn_endpoints)
             self.base.myinit()
             if driver_class is not None:
                 self.driver = driver_class(self.base)
             self.base.dyn_endpoints_init()
+            yield
+            self.base.print_message("action shutdown", info=True)
+            await self.base.shutdown()
+            shutdown = getattr(self.driver, "shutdown", None)
+            async_shutdown = getattr(self.driver, "async_shutdown", None)
+            retvals = {}
+            if shutdown is not None and callable(shutdown):
+                self.base.print_message("driver has shutdown function", info=True)
+                retvals["shutdown"] = shutdown()
+            else:
+                self.base.print_message("driver has NO shutdown function", info=True)
+                retvals["shutdown"] = None
+            if async_shutdown is not None and callable(async_shutdown):
+                self.base.print_message("driver has async_shutdown function", info=True)
+                retvals["async_shutdown"] = await async_shutdown()
+            else:
+                self.base.print_message(
+                    "driver has NO async_shutdown function", info=True
+                )
+                retvals["async_shutdown"] = None
+
+        # @self.on_event("startup")
+        # def startup_event():
+        #     self.base = Base(fastapp=self, dyn_endpoints=dyn_endpoints)
+        #     self.base.myinit()
+        #     if driver_class is not None:
+        #         self.driver = driver_class(self.base)
+        #     self.base.dyn_endpoints_init()
 
         @self.websocket("/ws_status")
         async def websocket_status(websocket: WebSocket):
@@ -192,32 +222,33 @@ class BaseAPI(HelaoFastAPI):
 
         @self.post("/shutdown", tags=["private"])
         async def post_shutdown():
-            await shutdown_event()
+            pass
+            # await shutdown_event()
 
-        @self.on_event("shutdown")
-        async def shutdown_event():
-            self.base.print_message("action shutdown", info=True)
-            await self.base.shutdown()
+        # @self.on_event("shutdown")
+        # async def shutdown_event():
+        #     self.base.print_message("action shutdown", info=True)
+        #     await self.base.shutdown()
 
-            shutdown = getattr(self.driver, "shutdown", None)
-            async_shutdown = getattr(self.driver, "async_shutdown", None)
+        #     shutdown = getattr(self.driver, "shutdown", None)
+        #     async_shutdown = getattr(self.driver, "async_shutdown", None)
 
-            retvals = {}
-            if shutdown is not None and callable(shutdown):
-                self.base.print_message("driver has shutdown function", info=True)
-                retvals["shutdown"] = shutdown()
-            else:
-                self.base.print_message("driver has NO shutdown function", info=True)
-                retvals["shutdown"] = None
-            if async_shutdown is not None and callable(async_shutdown):
-                self.base.print_message("driver has async_shutdown function", info=True)
-                retvals["async_shutdown"] = await async_shutdown()
-            else:
-                self.base.print_message(
-                    "driver has NO async_shutdown function", info=True
-                )
-                retvals["async_shutdown"] = None
-            return retvals
+        #     retvals = {}
+        #     if shutdown is not None and callable(shutdown):
+        #         self.base.print_message("driver has shutdown function", info=True)
+        #         retvals["shutdown"] = shutdown()
+        #     else:
+        #         self.base.print_message("driver has NO shutdown function", info=True)
+        #         retvals["shutdown"] = None
+        #     if async_shutdown is not None and callable(async_shutdown):
+        #         self.base.print_message("driver has async_shutdown function", info=True)
+        #         retvals["async_shutdown"] = await async_shutdown()
+        #     else:
+        #         self.base.print_message(
+        #             "driver has NO async_shutdown function", info=True
+        #         )
+        #         retvals["async_shutdown"] = None
+        #     return retvals
 
         @self.post(f"/{server_key}/estop", tags=["action"])
         async def estop(
