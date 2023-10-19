@@ -4,6 +4,7 @@ Sequence library for ADSS
 
 __all__ = [
     "ADSS_CA_cell_1potential",
+    "ADSS_PA_CVs_CAs_cell",
 ]
 
 from typing import List
@@ -75,7 +76,6 @@ def ADSS_CA_cell_1potential(
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
                 "solid_sample_no": plate_sample_no,
-                "previous_liquid": use_electrolyte,
                 "liquid_custom_position": "cell1_we",
                 "liquid_sample_no": liquid_sample_no,
                 "liquid_sample_volume_ul": liquid_sample_volume_ul,
@@ -299,6 +299,272 @@ def ADSS_CA_cell_1potential(
         epm.add_experiment("ADSS_sub_unloadall_customs",{})
 
 
+
+    if clean:
+
+        epm.add_experiment(
+            "ADSS_sub_move_to_clean_cell",
+            {}
+        )
+
+        epm.add_experiment(
+            "ADSS_sub_clean_cell",
+            {
+                "Clean_volume_ul": clean_volume_ul,
+                "Syringe_rate_ulsec": Syringe_rate_ulsec,
+                "ReturnLineWait_s": ReturnLineWait_s,
+                "DrainWait_s": Cell_draintime_s,
+                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+            #    "ResidualWait_s": ResidualWait_s,
+        }
+        )
+    if refill:
+        epm.add_experiment("ADSS_sub_refill_syringes", {
+            "Waterclean_volume_ul": water_refill_volume_ul ,
+            "Solution_volume_ul": refill_volume_ul,
+            "Syringe_rate_ulsec": 300,
+        })
+
+#    epm.add_experiment("ADSS_sub_tray_unload",{})
+
+
+        # epm.add_experiment("ADSS_sub_shutdown", {})
+
+    return epm.experiment_plan_list  # returns complete experiment list
+
+def ADSS_PA_CVs_CAs_cell(
+    sequence_version: int = 1, 
+    #solid_custom_position: str = "cell1_we",
+    plate_id: int = 5917,
+    plate_sample_no: int = 14050,  #  instead of map select
+    same_sample: bool = False,
+    stay_sample: bool = False,
+    #liquid_custom_position: str = "elec_res1",
+    liquid_sample_no: int = 220,
+    liquid_sample_volume_ul: float = 4000,
+    number_of_CVs: int = 3,
+    Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
+    Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
+    Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
+    Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
+    scanrate_voltsec: float = 0.02,  # scan rate in volts/second or amps/second.
+    cycles: List[int] = [5,3,3],
+    #number_of_preCAs: int = 3,
+    number_of_postCAs: int = 2,
+    CA_potential_vs: List[float] = [0.6,0.4],
+    potential_versus: str = "rhe",
+    CA_duration_sec: List[float] = [60,60],
+    samplerate_sec: float = 0.1,
+    gamry_i_range: str = "auto",
+    ph: float = 9.53,
+    ref_type: str = "leakless",
+    ref_offset__V: float = 0.0,
+    aliquot_postCV: List[bool] = [True,False,False],
+    aliquot_postCA: List[bool] = [True,False],
+    aliquot_volume_ul: int = 200,
+    Syringe_rate_ulsec: float = 300,
+    Cell_draintime_s: float = 60,
+    ReturnLineWait_s: float = 30,
+    ReturnLineReverseWait_s: float = 3,
+    ResidualWait_s: float = 15,
+    flush_volume_ul: float = 2000,
+    clean: bool = False,
+    clean_volume_ul: float = 5000,
+    refill: bool = False,
+    refill_volume_ul: float = 6000,
+    water_refill_volume_ul: float = 6000,
+    PAL_Injector: str = "LS 4",
+    PAL_Injector_id: str = "LS4_newsyringe040923"
+):
+
+    """tbd
+
+    last functionality test: tbd"""
+
+    epm = ExperimentPlanMaker()
+
+
+    #for solid_sample_no in plate_sample_no_list:  # have to indent add expts if used
+
+    if not same_sample:
+        
+        epm.add_experiment(
+            "ADSS_sub_move_to_sample",
+            {
+                "solid_custom_position": "cell1_we",
+                "solid_plate_id": plate_id,
+                "solid_sample_no": plate_sample_no,
+                "liquid_custom_position": "cell1_we",
+                "liquid_sample_no": liquid_sample_no,
+                "liquid_sample_volume_ul": liquid_sample_volume_ul,
+            },
+        )
+    epm.add_experiment(
+        "ADSS_sub_load",
+        {
+            "solid_custom_position": "cell1_we",
+            "solid_plate_id": plate_id,
+            "solid_sample_no": plate_sample_no,
+           # "previous_liquid": use_electrolyte,
+            "liquid_custom_position": "cell1_we",
+            "liquid_sample_no": liquid_sample_no,            
+            "liquid_sample_volume_ul": liquid_sample_volume_ul,
+        }
+    )
+    # if led_illumination:
+    #     epm.add_experiment(
+    #         "ADSS_sub_cell_illumination",
+    #         {
+    #             "led_wavelength": led_wavelength,
+    #             "illumination_on": led_illumination,
+    #         }
+            
+    #     )
+    #if not use_electrolyte:
+
+    epm.add_experiment(
+        "ADSS_sub_cellfill_prefilled",
+        {
+            "Solution_volume_ul": liquid_sample_volume_ul,
+            "Syringe_rate_ulsec": Syringe_rate_ulsec,
+        }
+    )
+# redundant?
+    # epm.add_experiment(    
+    #     "ADSS_sub_load_liquid",
+    #     {
+    #         "liquid_custom_position": liquid_custom_position,
+    #         "liquid_sample_no": liquid_sample_no,
+    #     }
+    # )
+    # epm.add_experiment(
+    #     "ADSS_sub_load_solid",
+    #     {
+    #         "solid_custom_position": solid_custom_position,
+    #         "solid_plate_id": plate_id,
+    #         "solid_sample_no": plate_sample_no,
+    #     }
+    # )
+    epm.add_experiment("ADSS_sub_recirculate",{})
+    washmod = 0
+
+    for i in range(number_of_CVs):
+
+        epm.add_experiment(
+            "ADSS_sub_CV",
+            {
+                "Vinit_vsRHE": Vinit_vsRHE[i],
+                "Vapex1_vsRHE": Vapex1_vsRHE[i],
+                "Vapex2_vsRHE": Vapex2_vsRHE[i],
+                "Vfinal_vsRHE": Vfinal_vsRHE[i],
+                "scanrate_voltsec": scanrate_voltsec,
+                "SampleRate": samplerate_sec,
+                "cycles": cycles,
+                "gamry_i_range": gamry_i_range,
+                "ph": ph,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
+                "aliquot_insitu": False,
+            },
+        )
+        if aliquot_postCV[i]:
+            washmod += 1
+            washone = washmod %4 %3 %2
+            washtwo = (washmod + 1) %4 %3 %2
+            washthree = (washmod + 2) %4 %3 %2
+            washfour = (washmod + 3) %4 %3 %2
+
+            epm.add_experiment(
+                "ADSS_sub_sample_aliquot",
+                {
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "EquilibrationTime_s": 0,
+                    "PAL_Injector": PAL_Injector,
+                    "PAL_Injector_id": PAL_Injector_id,
+                    "rinse_1": washone,
+                    "rinse_2": washtwo,
+                    "rinse_3": washthree,
+                    "rinse_4": washfour,
+                }
+            )
+
+    for i in range(number_of_postCAs):
+
+        epm.add_experiment(
+            "ADSS_sub_CA",
+            {
+                "CA_potential": CA_potential_vs[i],
+                "ph": ph,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
+                "potential_versus": potential_versus,
+                "samplerate_sec": samplerate_sec,
+                "CA_duration_sec": CA_duration_sec[i],
+                "gamry_i_range": gamry_i_range,
+                "aliquot_insitu": False,
+            },
+        )
+        if aliquot_postCA[i]:
+            washmod += 1
+            washone = washmod %4 %3 %2
+            washtwo = (washmod + 1) %4 %3 %2
+            washthree = (washmod + 2) %4 %3 %2
+            washfour = (washmod + 3) %4 %3 %2
+
+            epm.add_experiment(
+                "ADSS_sub_sample_aliquot",
+                {
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "EquilibrationTime_s": 0,
+                    "PAL_Injector": PAL_Injector,
+                    "PAL_Injector_id": PAL_Injector_id,
+                    "rinse_1": washone,
+                    "rinse_2": washtwo,
+                    "rinse_3": washthree,
+                    "rinse_4": washfour,
+                }
+            )
+
+    if keep_electrolyte:
+        epm.add_experiment(
+            "ADSS_sub_keep_electrolyte",
+            {
+                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+            }
+        )
+
+    else:
+        epm.add_experiment(
+            "ADSS_sub_drain_cell",
+            {
+                "DrainWait_s": Cell_draintime_s,
+                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+            #    "ResidualWait_s": ResidualWait_s,
+            }
+        )
+    if stay_sample:
+        epm.add_experiment(
+            "ADSS_sub_cellfill_flush",
+            {
+                "Solution_volume_ul": flush_volume_ul,
+                "Syringe_rate_ulsec": Syringe_rate_ulsec,
+                "ReturnLineWait_s": ReturnLineWait_s,
+            }
+        )
+        epm.add_experiment(
+            "ADSS_sub_drain_cell",
+            {
+                "DrainWait_s": Cell_draintime_s,
+                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+        #        "ResidualWait_s": ResidualWait_s,
+            }
+        )
+    if keep_electrolyte:
+        epm.add_experiment("ADSS_sub_unload_solid",{})
+
+    else:
+
+        epm.add_experiment("ADSS_sub_unloadall_customs",{})
 
     if clean:
 
