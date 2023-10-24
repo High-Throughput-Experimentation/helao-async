@@ -18,7 +18,9 @@ def constructor(
     seq_defaults = list(argspec.defaults)
     seq_uuid = gen_uuid()
     seq_params = {k: v for k, v in zip(seq_args, seq_defaults)}
-    seq_params.update(params)
+    for k, v in params.items():
+        if k in seq_params:
+            seq_params[k] = v
     experiment_list = sequence_function(**seq_params)
     seq = Sequence(
         sequence_name=sequence_function.__name__,
