@@ -136,7 +136,7 @@ class Orch(Base):
         self.step_thru_sequences = False
 
     def exception_handler(self, loop, context):
-        self.print_message(f'Got exception from coroutine: {context}')
+        self.print_message(f"Got exception from coroutine: {context}")
 
     def myinit(self):
         self.aloop = asyncio.get_running_loop()
@@ -220,7 +220,9 @@ class Orch(Base):
                 self.incoming = interrupt
         except asyncio.TimeoutError:
             if time.time() - self.last_interrupt > 10.0:
-                self.print_message("No interrupt, returning to while loop to check condition.")
+                self.print_message(
+                    "No interrupt, returning to while loop to check condition."
+                )
                 self.print_message("This message will print again after 10 seconds.")
                 self.last_interrupt = time.time()
             return None
@@ -631,9 +633,7 @@ class Orch(Base):
                         if server_free:
                             break
                 elif A.start_condition == ActionStartCondition.wait_for_orch:
-                    self.print_message(
-                        "orch is waiting for wait action to end"
-                    )
+                    self.print_message("orch is waiting for wait action to end")
                     while True:
                         await self.wait_for_interrupt()
                         wait_free = self.globalstatusmodel.endpoint_free(
@@ -927,11 +927,15 @@ class Orch(Base):
             # finish the last exp
             # this wait for all actions in active experiment
             # to finish and then updates the exp with the acts
-            if not self.action_dq:  # in case of interrupt, don't finish exp
+            if (
+                not self.action_dq and self.active_experiment is not None
+            ):  # in case of interrupt, don't finish exp
                 self.print_message("finishing final experiment")
                 await self.finish_active_experiment()
             if (
-                not self.experiment_dq and not self.action_dq
+                not self.experiment_dq
+                and not self.action_dq
+                and self.active_sequence is not None
             ):  # in case of interrupt, don't finish seq
                 self.print_message("finishing final sequence")
                 await self.finish_active_sequence()
@@ -1214,7 +1218,7 @@ class Orch(Base):
         if sequence is not None:
             return sequence.get_seq()
         return {}
-    
+
     def list_active_actions(self):
         """Return the current queue running actions."""
         return [
