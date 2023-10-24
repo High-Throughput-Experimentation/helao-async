@@ -27,6 +27,8 @@ class SpecParser(BaseParser):
                 ),
                 reverse=True,
             )
+        # filter manual experiments
+        specfiles = [x for x in specfiles if "__manual_orch_seq__" not in x]
         latest_50 = specfiles[:50]
         return latest_50
 
