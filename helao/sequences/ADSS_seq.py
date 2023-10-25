@@ -342,16 +342,15 @@ def ADSS_PA_CVs_CAs_cell(
     #liquid_custom_position: str = "elec_res1",
     liquid_sample_no: int = 220,
     liquid_sample_volume_ul: float = 4000,
-    number_of_CVs: int = 3,
+    CV_cycles: List[int] = [5,3,3],
     Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
     Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
     Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
     scanrate_voltsec: float = 0.02,  # scan rate in volts/second or amps/second.
-    cycles: List[int] = [5,3,3],
     #number_of_preCAs: int = 3,
     number_of_postCAs: int = 2,
-    CA_potential_vs: List[float] = [0.6,0.4],
+    CA_potentials_vs: List[float] = [0.6,0.4],
     potential_versus: str = "rhe",
     CA_duration_sec: List[float] = [60,60],
     samplerate_sec: float = 0.1,
@@ -448,7 +447,7 @@ def ADSS_PA_CVs_CAs_cell(
     epm.add_experiment("ADSS_sub_recirculate",{})
     washmod = 0
 
-    for i in range(number_of_CVs):
+    for i, CV_cycle in enumerate(CV_cycles):
 
         epm.add_experiment(
             "ADSS_sub_CV",
@@ -459,7 +458,7 @@ def ADSS_PA_CVs_CAs_cell(
                 "Vfinal_vsRHE": Vfinal_vsRHE[i],
                 "scanrate_voltsec": scanrate_voltsec,
                 "SampleRate": samplerate_sec,
-                "cycles": cycles,
+                "cycles": CV_cycle,
                 "gamry_i_range": gamry_i_range,
                 "ph": ph,
                 "ref_type": ref_type,
@@ -488,12 +487,12 @@ def ADSS_PA_CVs_CAs_cell(
                 }
             )
 
-    for i in range(number_of_postCAs):
+    for i, CA_potential_vs in enumerate(CA_potentials_vs):
 
         epm.add_experiment(
             "ADSS_sub_CA",
             {
-                "CA_potential": CA_potential_vs[i],
+                "CA_potential": CA_potential_vs,
                 "ph": ph,
                 "ref_type": ref_type,
                 "ref_offset__V": ref_offset__V,
