@@ -1748,6 +1748,68 @@ class Active:
             # write final act meta file (overwrite existing one)
             await self.base.write_act(action=finish_action)
 
+            # TODO: check if all actions in action_list are finished, if so then dispatch queued action and close data logger
+            # check if all actions are fininshed
+            # if yes close datalogger etc
+            all_finished = (
+                True
+                if all(
+                    [
+                        HloStatus.finished in action.action_status
+                        for action in self.action_list
+                    ]
+                )
+                else False
+            )
+            if all_finished:
+                self.base.print_message(
+                    "finish active: sending finish data_stream_status package",
+                    info=True,
+                )
+                await self.enqueue_data(
+                    datamodel=DataModel(data={}, errors=[], status=HloStatus.finished)
+                )
+                if self.action_list[-1].manual_action:
+                    await self.finish_manual_action()
+
+                # all actions are finished
+                self.base.print_message("finishing data logging.")
+                for filekey in self.file_conn_dict:
+                    if self.file_conn_dict[filekey].file:
+                        await self.file_conn_dict[filekey].file.close()
+                self.file_conn_dict = {}
+
+                # finish the data writer
+                self.data_logger.cancel()
+                l10 = self.base.actives.pop(self.active_uuid, None)
+                if l10 is not None:
+                    i10 = [
+                        i
+                        for i, (x, _) in enumerate(self.base.last_10_active)
+                        if x == self.active_uuid
+                    ]
+                    if i10:
+                        self.base.last_10_active.pop(i10[0])
+                    if len(self.base.last_10_active) > 10:
+                        self.base.last_10_active.pop(0)
+                    self.base.last_10_active.append((l10.action.action_uuid, l10))
+
+                self.base.print_message(
+                    "all active action are done, closing active", info=True
+                )
+                for action in self.action_list:
+                    self.base.aloop.create_task(move_dir(action, base=self.base))
+                
+                # # since all sub-actions of active are finished process endpoint queue
+                # if self.base.endpoint_queues[action.action_name].qsize() > 0:
+                #     self.base.print_message(f"{action.action_name} was previously queued")
+                #     qact, qpars = self.base.endpoint_queues[action.action_name].get()
+                #     self.base.print_message(f"running queued {action.action_name}")
+                #     qact.start_condition = ASC.no_wait
+                #     await async_action_dispatcher(self.base.world_cfg, qact, qpars)
+
+                # TODO: trigger endpoint queue monitor to dispatch waiting action
+
             # send the last status
             await self.add_status(action=finish_action)
 
@@ -1770,94 +1832,8 @@ class Active:
             if finish_action.to_globalseq_params:
                 pass
 
-        # check if all actions are fininshed
-        # if yes close datalogger etc
-        all_finished = True
-        for action in self.action_list:
-            if HloStatus.finished not in action.action_status:
-                # at least one is not finished
-                all_finished = False
-                break
 
-        if all_finished:
-            self.base.print_message(
-                "finish active: sending finish data_stream_status package",
-                info=True,
-            )
-            retry_counter = 0
-            while (
-                not all(
-                    [
-                        action.data_stream_status != HloStatus.active
-                        for action in self.action_list
-                    ]
-                )
-                and retry_counter < 5
-            ):
-                await self.enqueue_data(
-                    datamodel=DataModel(data={}, errors=[], status=HloStatus.finished)
-                )
-                self.base.print_message(
-                    f"Waiting for data_stream finished"
-                    f" package: "
-                    f" {[action.data_stream_status for action in self.action_list]}",
-                    info=True,
-                )
-                await asyncio.sleep(0.5)
-                retry_counter += 1
-            for action in self.action_list:
-                if action.data_stream_status != HloStatus.active:
-                    self.enqueue_data_nowait(
-                        datamodel=DataModel(
-                            data={}, errors=[], status=HloStatus.finished
-                        )
-                    )
-                    self.base.print_message(
-                        f"Setting datastream to finished:"
-                        f" {[action.data_stream_status for action in self.action_list]}",
-                        info=True,
-                    )
-            # self.action_list[-1] is the very first action
-            if self.action_list[-1].manual_action:
-                await self.finish_manual_action()
 
-            # all actions are finished
-            self.base.print_message("finishing data logging.")
-            for filekey in self.file_conn_dict:
-                if self.file_conn_dict[filekey].file:
-                    await self.file_conn_dict[filekey].file.close()
-            self.file_conn_dict = {}
-
-            # finish the data writer
-            self.data_logger.cancel()
-            l10 = self.base.actives.pop(self.active_uuid, None)
-            if l10 is not None:
-                i10 = [
-                    i
-                    for i, (x, _) in enumerate(self.base.last_10_active)
-                    if x == self.active_uuid
-                ]
-                if i10:
-                    self.base.last_10_active.pop(i10[0])
-                if len(self.base.last_10_active) > 10:
-                    self.base.last_10_active.pop(0)
-                self.base.last_10_active.append((l10.action.action_uuid, l10))
-
-            self.base.print_message(
-                "all active action are done, closing active", info=True
-            )
-
-            # DB server call to finish_yml if DB exists
-            for action in self.action_list:
-                self.base.aloop.create_task(move_dir(action, base=self.base))
-
-            # since all sub-actions of active are finished process endpoint queue
-            if self.base.endpoint_queues[action.action_name].qsize() > 0:
-                self.base.print_message(f"{action.action_name} was previously queued")
-                qact, qpars = self.base.endpoint_queues[action.action_name].get()
-                self.base.print_message(f"running queued {action.action_name}")
-                qact.start_condition = ASC.no_wait
-                await async_action_dispatcher(self.base.world_cfg, qact, qpars)
 
         # always returns the most recent action of active
         return self.action
