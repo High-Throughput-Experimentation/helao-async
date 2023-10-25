@@ -525,23 +525,23 @@ def ADSS_PA_CVs_CAs_cell(
                 }
             )
 
-    if keep_electrolyte:
-        epm.add_experiment(
-            "ADSS_sub_keep_electrolyte",
-            {
-                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-            }
-        )
+    # if keep_electrolyte:
+    #     epm.add_experiment(
+    #         "ADSS_sub_keep_electrolyte",
+    #         {
+    #             "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+    #         }
+    #     )
 
-    else:
-        epm.add_experiment(
-            "ADSS_sub_drain_cell",
-            {
-                "DrainWait_s": Cell_draintime_s,
-                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-            #    "ResidualWait_s": ResidualWait_s,
-            }
-        )
+    # else:
+    #     epm.add_experiment(
+    #         "ADSS_sub_drain_cell",
+    #         {
+    #             "DrainWait_s": Cell_draintime_s,
+    #             "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+    #         #    "ResidualWait_s": ResidualWait_s,
+    #         }
+    #     )
     if stay_sample:
         epm.add_experiment(
             "ADSS_sub_cellfill_flush",
@@ -559,12 +559,12 @@ def ADSS_PA_CVs_CAs_cell(
         #        "ResidualWait_s": ResidualWait_s,
             }
         )
-    if keep_electrolyte:
-        epm.add_experiment("ADSS_sub_unload_solid",{})
+    # if keep_electrolyte:
+    #     epm.add_experiment("ADSS_sub_unload_solid",{})
 
-    else:
+    # else:
 
-        epm.add_experiment("ADSS_sub_unloadall_customs",{})
+    #     epm.add_experiment("ADSS_sub_unloadall_customs",{})
 
     if clean:
 
