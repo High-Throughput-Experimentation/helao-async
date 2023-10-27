@@ -333,7 +333,7 @@ def ADSS_CA_cell_1potential(
     return epm.experiment_plan_list  # returns complete experiment list
 
 def ADSS_PA_CVs_CAs_cell(
-    sequence_version: int = 1, 
+    sequence_version: int = 2, 
     #solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no: int = 14050,  #  instead of map select
@@ -347,7 +347,7 @@ def ADSS_PA_CVs_CAs_cell(
     Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
     Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
-    scanrate_voltsec: float = 0.02,  # scan rate in volts/second or amps/second.
+    scanrate_voltsec: List[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
     #number_of_preCAs: int = 3,
     number_of_postCAs: int = 2,
     CA_potentials_vs: List[float] = [0.6,0.4],
@@ -362,6 +362,7 @@ def ADSS_PA_CVs_CAs_cell(
     aliquot_postCA: List[bool] = [True,False],
     aliquot_volume_ul: int = 200,
     Syringe_rate_ulsec: float = 300,
+    Drain: bool = False,
     Cell_draintime_s: float = 60,
     ReturnLineWait_s: float = 30,
     ReturnLineReverseWait_s: float = 3,
@@ -456,7 +457,7 @@ def ADSS_PA_CVs_CAs_cell(
                 "Vapex1_vsRHE": Vapex1_vsRHE[i],
                 "Vapex2_vsRHE": Vapex2_vsRHE[i],
                 "Vfinal_vsRHE": Vfinal_vsRHE[i],
-                "scanrate_voltsec": scanrate_voltsec,
+                "scanrate_voltsec": scanrate_voltsec[i],
                 "SampleRate": samplerate_sec,
                 "cycles": CV_cycle,
                 "gamry_i_range": gamry_i_range,
@@ -466,7 +467,7 @@ def ADSS_PA_CVs_CAs_cell(
                 "aliquot_insitu": False,
             },
         )
-        if aliquot_postCV[i]:
+        if aliquot_postCV[i] == True:
             washmod += 1
             washone = washmod %4 %3 %2
             washtwo = (washmod + 1) %4 %3 %2
@@ -503,7 +504,7 @@ def ADSS_PA_CVs_CAs_cell(
                 "aliquot_insitu": False,
             },
         )
-        if aliquot_postCA[i]:
+        if aliquot_postCA[i] == True:
             washmod += 1
             washone = washmod %4 %3 %2
             washtwo = (washmod + 1) %4 %3 %2
@@ -524,23 +525,16 @@ def ADSS_PA_CVs_CAs_cell(
                 }
             )
 
-    # if keep_electrolyte:
-    #     epm.add_experiment(
-    #         "ADSS_sub_keep_electrolyte",
-    #         {
-    #             "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-    #         }
-    #     )
+    if Drain:
+        epm.add_experiment(
+            "ADSS_sub_drain_cell",
+            {
+                "DrainWait_s": Cell_draintime_s,
+                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+            #    "ResidualWait_s": ResidualWait_s,
+            }
+        )
 
-    # else:
-    #     epm.add_experiment(
-    #         "ADSS_sub_drain_cell",
-    #         {
-    #             "DrainWait_s": Cell_draintime_s,
-    #             "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-    #         #    "ResidualWait_s": ResidualWait_s,
-    #         }
-    #     )
     if stay_sample:
         epm.add_experiment(
             "ADSS_sub_cellfill_flush",
