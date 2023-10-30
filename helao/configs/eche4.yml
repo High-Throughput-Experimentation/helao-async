@@ -178,4 +178,4 @@ servers:
           pos_scale: 1228800.0  # device to mm
           vel_scale: 65970697.6  # device to mm/s
           acc_scale: 13518.2  # device to mm/s2
-          move_limit_mm: 12.5
+          move_limit_mm: 2.0
