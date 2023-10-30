@@ -333,7 +333,7 @@ def ADSS_CA_cell_1potential(
     return epm.experiment_plan_list  # returns complete experiment list
 
 def ADSS_PA_CVs_CAs_cell(
-    sequence_version: int = 2, 
+    sequence_version: int = 3, 
     #solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no: int = 14050,  #  instead of map select
@@ -358,8 +358,8 @@ def ADSS_PA_CVs_CAs_cell(
     ph: float = 9.53,
     ref_type: str = "leakless",
     ref_offset__V: float = 0.0,
-    aliquot_postCV: List[bool] = [True,False,False],
-    aliquot_postCA: List[bool] = [True,False],
+    aliquot_postCV: List[int] = [1,0,0],
+    aliquot_postCA: List[int] = [1,0],
     aliquot_volume_ul: int = 200,
     Syringe_rate_ulsec: float = 300,
     Drain: bool = False,
@@ -467,7 +467,7 @@ def ADSS_PA_CVs_CAs_cell(
                 "aliquot_insitu": False,
             },
         )
-        if aliquot_postCV[i] == True:
+        if aliquot_postCV[i] == 1:
             washmod += 1
             washone = washmod %4 %3 %2
             washtwo = (washmod + 1) %4 %3 %2
@@ -504,7 +504,7 @@ def ADSS_PA_CVs_CAs_cell(
                 "aliquot_insitu": False,
             },
         )
-        if aliquot_postCA[i] == True:
+        if aliquot_postCA[i] == 1:
             washmod += 1
             washone = washmod %4 %3 %2
             washtwo = (washmod + 1) %4 %3 %2
