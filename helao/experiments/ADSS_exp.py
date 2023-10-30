@@ -23,6 +23,7 @@ __all__ = [
 #    "ADSS_sub_fill",
     "ADSS_sub_tray_unload",
 #    "ADSS_sub_rel_move",
+    "ADSS_sub_z_move",
 #    "ADSS_sub_heat",
 #    "ADSS_sub_stopheat",
     "ADSS_sub_cellfill_prefilled",
@@ -1492,6 +1493,31 @@ def ADSS_sub_tray_unload(
 
     return apm.action_list  # returns complete action list to orch
 
+def ADSS_sub_z_move(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    offset_z_mm: float = -8.0,
+):
+    """Sub experiment
+    last functionality test: -"""
+
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    # move to position
+    apm.add(
+        MOTOR_server,
+        "move",
+        {
+            "d_mm": [0, 0, apm.pars.offset_z_mm],
+            "axis": ["x", "y", "z"],
+            "mode": MoveModes.relative,
+            "transformation": TransformationModes.platexy,
+        },
+        #            "from_globalexp_params": {"_platexy": "d_mm"},
+        start_condition=ActionStartCondition.wait_for_all,
+    )
+
+    return apm.action_list  # returns complete action list to orch
 
 def ADSS_sub_rel_move(
     experiment: Experiment,
