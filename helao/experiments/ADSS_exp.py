@@ -5,13 +5,16 @@ server_key must be a FastAPI action server defined in config
 
 __all__ = [
 #    "ADSS_sub_sample_start",
+    "ADSS_sub_drain_cell",
+    "ADSS_sub_move_to_clean_cell",
+    "ADSS_sub_clean_cell",
+    "ADSS_sub_z_move",
+    "ADSS_sub_refill_syringe",
     "ADSS_sub_move_to_sample",
-    "ADSS_sub_shutdown",
-#    "ADSS_sub_drain",
-    "ADSS_sub_clean_PALtool",
     "ADSS_sub_CA",  # latest
     "ADSS_sub_CV",  # latest
     "ADSS_sub_OCV",  # at beginning of all sequences
+    "ADSS_sub_recirculate",
     "ADSS_sub_unloadall_customs",
     "ADSS_sub_unload_liquid",
     "ADSS_sub_unload_solid",
@@ -23,20 +26,17 @@ __all__ = [
 #    "ADSS_sub_fill",
     "ADSS_sub_tray_unload",
 #    "ADSS_sub_rel_move",
-    "ADSS_sub_z_move",
 #    "ADSS_sub_heat",
 #    "ADSS_sub_stopheat",
+    "ADSS_sub_shutdown",
+#    "ADSS_sub_drain",
+    "ADSS_sub_clean_PALtool",
     "ADSS_sub_cellfill_prefilled",
     "ADSS_sub_cellfill_flush",
-    "ADSS_sub_drain_cell",
     "ADSS_sub_keep_electrolyte",
     #    "ADSS_sub_empty_cell",
-    "ADSS_sub_move_to_clean_cell",
-    "ADSS_sub_clean_cell",
-    "ADSS_sub_refill_syringes",
     "ADSS_sub_sample_aliquot",
     "ADSS_sub_insitu_actions",
-    "ADSS_sub_recirculate",
 #    "ADSS_sub_abs_move",
     "ADSS_sub_cell_illumination",
     "ADSS_sub_CA_photo",
@@ -1929,53 +1929,53 @@ def ADSS_sub_move_to_clean_cell(
     return apm.action_list
 
 
-def ADSS_sub_refill_syringes(
-    experiment: Experiment,
-    experiment_version: int = 1,
-    Solution_volume_ul: float = 0,
-    Waterclean_volume_ul: float = 5000,
-    Syringe_rate_ulsec: float = 300,
-):
-    apm = ActionPlanMaker()
-    if apm.pars.Solution_volume_ul != 0:
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
-        apm.add(ORCH_server, "wait", {"waittime": 0.25})
-        apm.add(
-            SOLUTIONPUMP_server,
-            "withdraw",
-            {
-                "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-                "volume_uL": apm.pars.Solution_volume_ul + 25,
-            },
-        )
-        apm.add(
-            SOLUTIONPUMP_server,
-            "infuse",
-            {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": 25},
-        )
-        apm.add(ORCH_server, "wait", {"waittime": 40})
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
+# def ADSS_sub_refill_syringes(
+#     experiment: Experiment,
+#     experiment_version: int = 1,
+#     Solution_volume_ul: float = 0,
+#     Waterclean_volume_ul: float = 5000,
+#     Syringe_rate_ulsec: float = 300,
+# ):
+#     apm = ActionPlanMaker()
+#     if apm.pars.Solution_volume_ul != 0:
+#         apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
+#         apm.add(ORCH_server, "wait", {"waittime": 0.25})
+#         apm.add(
+#             SOLUTIONPUMP_server,
+#             "withdraw",
+#             {
+#                 "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+#                 "volume_uL": apm.pars.Solution_volume_ul + 25,
+#             },
+#         )
+#         apm.add(
+#             SOLUTIONPUMP_server,
+#             "infuse",
+#             {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": 25},
+#         )
+#         apm.add(ORCH_server, "wait", {"waittime": 40})
+#         apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
 
-    if apm.pars.Waterclean_volume_ul != 0:
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 1})
-        apm.add(ORCH_server, "wait", {"waittime": 0.25})
-        apm.add(
-            WATERCLEANPUMP_server,
-            "withdraw",
-            {
-                "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
-                "volume_uL": apm.pars.Waterclean_volume_ul + 25,
-            },
-        )
-        apm.add(
-            WATERCLEANPUMP_server,
-            "infuse",
-            {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": 25},
-        )
-        apm.add(ORCH_server, "wait", {"waittime": 10})
-        apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 0})
+#     if apm.pars.Waterclean_volume_ul != 0:
+#         apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 1})
+#         apm.add(ORCH_server, "wait", {"waittime": 0.25})
+#         apm.add(
+#             WATERCLEANPUMP_server,
+#             "withdraw",
+#             {
+#                 "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+#                 "volume_uL": apm.pars.Waterclean_volume_ul + 25,
+#             },
+#         )
+#         apm.add(
+#             WATERCLEANPUMP_server,
+#             "infuse",
+#             {"rate_uL_sec": apm.pars.Syringe_rate_ulsec, "volume_uL": 25},
+#         )
+#         apm.add(ORCH_server, "wait", {"waittime": 10})
+#         apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 0})
 
-    return apm.action_list
+#     return apm.action_list
 
 
 def ADSS_sub_sample_aliquot(
@@ -2039,8 +2039,9 @@ def ADSS_sub_sample_aliquot(
 
 def ADSS_sub_recirculate(
     experiment: Experiment,
-    experiment_version: int = 1,
+    experiment_version: int = 2,
     direction_forward_or_reverse: str = "forward",
+    wait_time_s: float = 10,
 ):
     apm = ActionPlanMaker()
     if apm.pars.direction_forward_or_reverse == "forward":
@@ -2050,6 +2051,7 @@ def ADSS_sub_recirculate(
     apm.add(NI_server, "gasvalve", {"gasvalve": "V1", "on": 1})
     apm.add(NI_server, "pump", {"pump": "direction", "on": dir})
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.wait_time_s})
     return apm.action_list  # returns complete action list to orch
 
 
@@ -2093,4 +2095,44 @@ def ADSS_sub_interrupt(
 ):
     apm = ActionPlanMaker()
     apm.add(ORCH_server, "interrupt", {"reason": apm.pars.reason})
+    return apm.action_list
+
+def ADSS_sub_refill_syringe(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    syringe: str = "waterclean",
+    fill_volume_ul: float = 0,
+    Syringe_rate_ulsec: float = 1000,
+):
+    apm = ActionPlanMaker()
+    if apm.pars.syringe == "waterclean":
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+        apm.add(
+            WATERCLEANPUMP_server,
+            "withdraw",
+            {
+                "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+                "volume_uL": apm.pars.fill_volume_ul,
+            },
+        )
+        apm.add(ORCH_server, "wait", {"waittime": 10})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V2", "on": 0})
+
+    if apm.pars.syringe == "electrolyte":
+        # need valve for this soln
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": 0.25})
+        apm.add(
+            SOLUTIONPUMP_server,
+            "withdraw",
+            {
+                "rate_uL_sec": apm.pars.Syringe_rate_ulsec,
+                "volume_uL": apm.pars.fill_volume_ul,
+            },
+        )
+        apm.add(ORCH_server, "wait", {"waittime": 10})
+        apm.add(NI_server, "gasvalve", {"gasvalve": "V3", "on": 0})
+
+
     return apm.action_list
