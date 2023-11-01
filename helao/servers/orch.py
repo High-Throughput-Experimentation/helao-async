@@ -487,6 +487,7 @@ class Orch(Base):
         self.active_experiment.orch_key = self.orch_key
         self.active_experiment.orch_host = self.orch_host
         self.active_experiment.orch_port = self.orch_port
+        self.active_experiment.sequence_uuid = self.active_sequence.sequence_uuid
         self.active_seq_exp_counter += 1
 
         # self.print_message("copying global vars to experiment")
