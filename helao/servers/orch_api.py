@@ -538,7 +538,7 @@ class OrchAPI(HelaoFastAPI):
             action_version: int = 1,
             check_parameter: str = "",
             check_condition: checkcond = checkcond.equals,
-            check_threshold: Union[float, int, bool] = True,
+            check_value: Union[float, int, bool] = True,
             conditional_experiment_name: str = "",
             conditional_experiment_params: dict = {},
         ):
@@ -565,9 +565,25 @@ class OrchAPI(HelaoFastAPI):
                 # orch_host=self.orch.orch_host,
                 # orch_port=self.orch.orch_port,
             )
-            await self.orch.insert_experiment(
-                seq=self.orch.seq_model, experimentmodel=experiment_model, prepend=True
-            )
+            cond = active.action.action_params["check_condition"]
+            param = active.action.action_params["check_parameter"]
+            thresh = active.action.action_params["check_value"]
+            check = False
+            if cond == checkcond.equals:
+                check = param == thresh
+            elif cond == checkcond.above:
+                check = param > thresh
+            elif cond == checkcond.below:
+                check = param < thresh
+            elif cond == checkcond.isnot:
+                check = param != thresh
+
+            if check:
+                await self.orch.insert_experiment(
+                    seq=self.orch.seq_model,
+                    experimentmodel=experiment_model,
+                    prepend=True,
+                )
             finished_action = await active.finish()
             return finished_action.as_dict()
 
