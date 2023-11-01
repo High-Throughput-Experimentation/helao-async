@@ -544,26 +544,13 @@ class OrchAPI(HelaoFastAPI):
         ):
             """Enqueue next experiment if condition is met."""
             active = await self.orch.setup_and_contain_action()
-            # experiment_acts = self.orch.experiment_lib[
-            #     active.action.action_params["conditional_experiment_name"]
-            # ](**active.action.action_params["conditional_experiment_params"])
             experiment_model = ExperimentModel(
-                # orchestrator=self.orch.server,
-                # access=self.orch.world_cfg.get("access", "hte"),
-                # dummy=self.orch.world_cfg.get("dummy", True),
-                # simulation=self.orch.world_cfg.get("simulation", False),
-                # run_type=self.orch.world_cfg.get("run_type", None),
-                # sequence_uuid=self.orch.active_sequence.sequence_uuid,
                 experiment_name=active.action.action_params[
                     "conditional_experiment_name"
                 ],
                 experiment_params=active.action.action_params[
                     "conditional_experiment_params"
                 ],
-                # action_list=experiment_acts,
-                # orch_key=self.orch.orch_key,
-                # orch_host=self.orch.orch_host,
-                # orch_port=self.orch.orch_port,
             )
             cond = active.action.action_params["check_condition"]
             param = active.action.action_params["check_parameter"]
