@@ -3,7 +3,9 @@ import time
 import os
 import pickle
 import asyncio
+from enum import Enum
 from socket import gethostname
+from typing import Union
 
 from fastapi import Body, WebSocket, Request
 from helao.helpers.server_api import HelaoFastAPI
@@ -18,6 +20,7 @@ from helaocore.models.action_start_condition import ActionStartCondition as ASC
 from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.helpers.executor import Executor
 from helaocore.error import ErrorCodes
+from helaocore.models.experiment import ExperimentModel
 from helaocore.models.hlostatus import HloStatus
 from starlette.types import Message
 from starlette.responses import JSONResponse
@@ -529,6 +532,45 @@ class OrchAPI(HelaoFastAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
+        @self.post(f"/{server_key}/conditional_exp", tags=["action"])
+        async def conditional_exp(
+            action: Action = Body({}, embed=True),
+            action_version: int = 1,
+            check_parameter: str = "",
+            check_condition: checkcond = checkcond.equals,
+            check_threshold: Union[float, int, bool] = True,
+            conditional_experiment_name: str = "",
+            conditional_experiment_params: dict = {},
+        ):
+            """Enqueue next experiment if condition is met."""
+            active = await self.orch.setup_and_contain_action()
+            # experiment_acts = self.orch.experiment_lib[
+            #     active.action.action_params["conditional_experiment_name"]
+            # ](**active.action.action_params["conditional_experiment_params"])
+            experiment_model = ExperimentModel(
+                # orchestrator=self.orch.server,
+                # access=self.orch.world_cfg.get("access", "hte"),
+                # dummy=self.orch.world_cfg.get("dummy", True),
+                # simulation=self.orch.world_cfg.get("simulation", False),
+                # run_type=self.orch.world_cfg.get("run_type", None),
+                # sequence_uuid=self.orch.active_sequence.sequence_uuid,
+                experiment_name=active.action.action_params[
+                    "conditional_experiment_name"
+                ],
+                experiment_params=active.action.action_params[
+                    "conditional_experiment_params"
+                ],
+                # action_list=experiment_acts,
+                # orch_key=self.orch.orch_key,
+                # orch_host=self.orch.orch_host,
+                # orch_port=self.orch.orch_port,
+            )
+            await self.orch.insert_experiment(
+                seq=self.orch.seq_model, experimentmodel=experiment_model, prepend=True
+            )
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
 
 class WaitExec(Executor):
     def __init__(self, *args, **kwargs):
@@ -563,3 +605,10 @@ class WaitExec(Executor):
     async def _post_exec(self):
         self.active.base.print_message(" ... wait action done")
         return {"error": ErrorCodes.none}
+
+
+class checkcond(str, Enum):
+    equals = "equals"
+    below = "below"
+    above = "above"
+    isnot = "isnot"
