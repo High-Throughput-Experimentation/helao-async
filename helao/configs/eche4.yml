@@ -99,21 +99,24 @@ servers:
     fast: galil_io
     params:
       galil_ip_str: 192.168.200.235
-      dev_ai: {}
-      dev_ao: {}
       dev_di:
         gamry_ttl0: 1
       dev_do:
-        gamry_aux: 1
         spec_trig: 1
-        led: 8
-        pump_ref_flush: 3
-        pump_supply: 2
+        ir_emitter: 2
+        doric_wled: 3
         doric_led1: 4
-        doric_wled: 5
-        doric_led2: 5
-        doric_led3: 6
-        ir_emitter: 7
+        we_pump: 5
+        we_vent: 6
+        ce_pump: 7
+        ce_vent: 8
+        # gamry_aux: 1
+        # led: 8
+        # pump_ref_flush: 3
+        # pump_supply: 2
+        # doric_led2: 5
+        # doric_led3: 6
+        # ir_emitter: 7
   PAL:
     host: hte-eche-04.htejcap.caltech.edu
     port: 8007
