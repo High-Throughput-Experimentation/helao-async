@@ -553,7 +553,9 @@ class OrchAPI(HelaoFastAPI):
                 ],
             )
             cond = active.action.action_params["check_condition"]
-            param = active.action.action_params["check_parameter"]
+            param = active.action.action_params.get(
+                active.action.action_params["check_parameter"], None
+            )
             thresh = active.action.action_params["check_value"]
             check = False
             if cond == checkcond.equals:
@@ -566,6 +568,8 @@ class OrchAPI(HelaoFastAPI):
                 check = param != thresh
             elif cond == checkcond.uncond:
                 check = True
+            elif cond is None:
+                check = False
 
             if check:
                 await self.orch.insert_experiment(
