@@ -12,7 +12,7 @@ SEQUENCES = __all__
 
 
 def UVIS_T(
-    sequence_version: int = 3,
+    sequence_version: int = 5,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reference_mode: str = "internal",
@@ -28,9 +28,14 @@ def UVIS_T(
     led_intensities_mw: list = [0.432],
     toggle_is_shutter: bool = False,
     analysis_seq_uuid: str = "",
+    use_z_motor: bool = False,
+    cell_engaged_z: float = 1.5,
+    cell_disengaged_z: float = 0,
 ):
     epm = ExperimentPlanMaker()
     epm.add_experiment("UVIS_sub_unloadall_customs", {})
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": True, "z_height": cell_disengaged_z})
     epm.add_experiment(
         "UVIS_sub_setup_ref",
         {
@@ -41,6 +46,8 @@ def UVIS_T(
             "specref_code": specref_code,
         },
     )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z})
     # dark ref
     epm.add_experiment(
         "UVIS_sub_measure",
@@ -80,6 +87,8 @@ def UVIS_T(
         },
     )
 
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z})
     for plate_sample in plate_sample_no_list:
         epm.add_experiment("UVIS_sub_unloadall_customs", {})
         epm.add_experiment(
@@ -90,6 +99,8 @@ def UVIS_T(
                 "solid_sample_no": plate_sample,
             },
         )
+        if use_z_motor:
+            epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z})
         # perform transmission spec
         epm.add_experiment(
             "UVIS_sub_measure",
@@ -109,6 +120,8 @@ def UVIS_T(
                 "reference_mode": reference_mode,
             },
         )
+        if use_z_motor:
+            epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z})
 
     epm.add_experiment("UVIS_sub_unloadall_customs", {})
     epm.add_experiment(
@@ -120,7 +133,9 @@ def UVIS_T(
             "solid_sample_no": plate_sample_no_list[-1],
             "specref_code": specref_code,
         },
-    )
+)
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z})
     # dark ref
     epm.add_experiment(
         "UVIS_sub_measure",
@@ -160,6 +175,8 @@ def UVIS_T(
         },
     )
 
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z})
     epm.add_experiment("UVIS_sub_shutdown", {})
 
     return epm.experiment_plan_list  # returns complete experiment list

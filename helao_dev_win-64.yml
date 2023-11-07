@@ -1,0 +1,59 @@
+name: helao
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - pip:
+    - aioshutil
+    # - gpflow
+    - psycopg2
+    - pylablib
+    - git+https://github.com/spomjaksilp/pyMeCom
+    # - tensorflow
+    - zeroconf
+  - aiofiles
+  - aiohttp
+  - bokeh=2
+  - boto3
+  - botocore
+  - colorama
+  - comtypes
+  - databases
+  - fastapi
+  - filelock
+  - git
+  - httpx
+  - ipykernel
+  - jupyterlab
+  - matplotlib
+  - munch
+  - nidaqmx-python
+  - ntplib
+  - numpy
+  - pandas
+  - paramiko
+  - pip
+  - psutil
+  - pyaml
+  - pybase64
+  - pydantic=1
+  - pyfiglet
+  - pyserial
+  - python
+  - python-dotenv
+  - python-multipart
+  - pyzmq
+  - pyzstd
+  - requests
+  - ruamel.yaml
+  - scikit-learn
+  - scipy
+  - shortuuid
+  - sqlalchemy
+  - sqlite
+  - sqlmodel
+  - sshtunnel
+  - starlette
+  - termcolor
+  - uvicorn
+  - websockets

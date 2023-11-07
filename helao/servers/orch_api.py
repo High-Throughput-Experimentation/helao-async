@@ -3,8 +3,9 @@ import time
 import os
 import pickle
 import asyncio
-from copy import copy
+from enum import Enum
 from socket import gethostname
+from typing import Union, Optional
 
 from fastapi import Body, WebSocket, Request
 from helao.helpers.server_api import HelaoFastAPI
@@ -14,11 +15,12 @@ from helao.servers.orch import Orch
 from helaocore.models.server import ActionServerModel
 from helaocore.models.action import ActionModel
 from helaocore.models.machine import MachineModel
-from helaocore.models.orchstatus import OrchStatus
+from helaocore.models.orchstatus import LoopStatus
 from helaocore.models.action_start_condition import ActionStartCondition as ASC
 from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.helpers.executor import Executor
 from helaocore.error import ErrorCodes
+from helaocore.models.experiment import ExperimentModel
 from helaocore.models.hlostatus import HloStatus
 from starlette.types import Message
 from starlette.responses import JSONResponse
@@ -57,7 +59,7 @@ class OrchAPI(HelaoFastAPI):
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
-            if request.method == "HEAD" :  # comes from endpoint checker, session.head()
+            if request.method == "HEAD":  # comes from endpoint checker, session.head()
                 response = await call_next(request)
             elif request.url.path.strip("/").startswith(f"{server_key}/"):
                 await set_body(request, await request.body())
@@ -313,9 +315,9 @@ class OrchAPI(HelaoFastAPI):
         @self.post("/estop", tags=["private"])
         async def estop():
             """Emergency stop experiment and action queues, interrupt running actions."""
-            if self.orch.globalstatusmodel.loop_state == OrchStatus.started:
+            if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
                 await self.orch.estop_loop()
-            elif self.orch.globalstatusmodel.loop_state == OrchStatus.estop:
+            elif self.orch.globalstatusmodel.loop_state == LoopStatus.estopped:
                 self.orch.print_message("orchestrator E-STOP flag already raised")
             else:
                 self.orch.print_message("orchestrator is not running")
@@ -330,7 +332,7 @@ class OrchAPI(HelaoFastAPI):
         @self.post("/clear_estop", tags=["private"])
         async def clear_estop():
             """Remove emergency stop condition."""
-            if self.orch.globalstatusmodel.loop_state != OrchStatus.estop:
+            if self.orch.globalstatusmodel.loop_state != LoopStatus.estopped:
                 self.orch.print_message("orchestrator is not currently in E-STOP")
             else:
                 await self.orch.clear_estop()
@@ -338,7 +340,7 @@ class OrchAPI(HelaoFastAPI):
         @self.post("/clear_error", tags=["private"])
         async def clear_error():
             """Remove error condition."""
-            if self.orch.globalstatusmodel.loop_state != OrchStatus.error:
+            if self.orch.globalstatusmodel.loop_state != LoopStatus.error:
                 self.orch.print_message("orchestrator is not currently in ERROR")
             else:
                 await self.orch.clear_error()
@@ -436,8 +438,31 @@ class OrchAPI(HelaoFastAPI):
             return self.orch.nonblocking
 
         @self.post("/get_orch_state", tags=["private"])
-        def get_orch_state():
-            return self.orch.globalstatusmodel.loop_state
+        def get_orch_state() -> dict:
+            """Get orchestrator and loop status.
+
+            Orch states: ["error", "idle", "busy", "estop"]
+            Loop states: ["started", "stopped", "estopped"]
+            Loop intents: ["stop", "skip", "estop", "none"]
+            """
+
+            resp = {
+                "orch_state": self.orch.globalstatusmodel.orch_state,
+                "loop_state": self.orch.globalstatusmodel.loop_state,
+                "loop_intent": self.orch.globalstatusmodel.loop_intent,
+            }
+
+            active_seq = self.orch.get_sequence()
+            last_seq = self.orch.get_sequence(last=True)
+            active_exp = self.orch.get_experiment()
+            last_exp = self.orch.get_experiment(last=True)
+
+            resp["active_sequence"] = active_seq.clean_dict() if active_seq else {}
+            resp["last_sequence"] = last_seq.clean_dict() if last_seq else {}
+            resp["active_experiment"] = active_exp.clean_dict() if active_exp else {}
+            resp["last_experiment"] = last_exp.clean_dict() if last_exp else {}
+
+            return resp
 
         @self.post(f"/{server_key}/wait", tags=["action"])
         async def wait(
@@ -507,6 +532,54 @@ class OrchAPI(HelaoFastAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
+        @self.post(f"/{server_key}/conditional_exp", tags=["action"])
+        async def conditional_exp(
+            action: Action = Body({}, embed=True),
+            action_version: int = 1,
+            check_parameter: Optional[str] = "",
+            check_condition: checkcond = checkcond.equals,
+            check_value: Union[float, int, bool] = True,
+            conditional_experiment_name: str = "",
+            conditional_experiment_params: dict = {},
+        ):
+            """Enqueue next experiment if condition is met."""
+            active = await self.orch.setup_and_contain_action()
+            experiment_model = ExperimentModel(
+                experiment_name=active.action.action_params[
+                    "conditional_experiment_name"
+                ],
+                experiment_params=active.action.action_params[
+                    "conditional_experiment_params"
+                ],
+            )
+            cond = active.action.action_params["check_condition"]
+            param = active.action.action_params.get(
+                active.action.action_params["check_parameter"], None
+            )
+            thresh = active.action.action_params["check_value"]
+            check = False
+            if cond == checkcond.equals:
+                check = param == thresh
+            elif cond == checkcond.above:
+                check = param > thresh
+            elif cond == checkcond.below:
+                check = param < thresh
+            elif cond == checkcond.isnot:
+                check = param != thresh
+            elif cond == checkcond.uncond:
+                check = True
+            elif cond is None:
+                check = False
+
+            if check:
+                await self.orch.add_experiment(
+                    seq=self.orch.seq_model,
+                    experimentmodel=experiment_model,
+                    prepend=True,
+                )
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
 
 class WaitExec(Executor):
     def __init__(self, *args, **kwargs):
@@ -541,3 +614,11 @@ class WaitExec(Executor):
     async def _post_exec(self):
         self.active.base.print_message(" ... wait action done")
         return {"error": ErrorCodes.none}
+
+
+class checkcond(str, Enum):
+    equals = "equals"
+    below = "below"
+    above = "above"
+    isnot = "isnot"
+    uncond = "uncond"

@@ -182,8 +182,8 @@ class Pidd:
         KILL_ORDER = ["operator", "visualizer", "action", "orchestrator"]
         for group in KILL_ORDER:
             print_message({}, "launcher", f"Killing {group} group.")
-            if group in pidd.servers.keys():
-                G = pidd.servers[group]
+            if group in self.servers.keys():
+                G = self.servers[group]
                 for server in G:
                     twait = 0.1
                     print_message(
@@ -412,8 +412,7 @@ def launcher(confArg, confDict, helao_root, extraopt=""):
     return pidd
 
 
-# def main():
-if __name__ == "__main__":
+def main():
     if not helao.tests.unit_test_sample_models.sample_model_unit_test():
         quit()
     colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
@@ -447,11 +446,6 @@ if __name__ == "__main__":
             for x in python_paths
         }
         print(branches)
-    # if not len(set(branches.values())) == 1:
-    #     print_message({}, "launcher", "", "Cannot start HELAO using mixed branches.")
-    #     for k, v in branches.items():
-    #         print_message({}, "launcher", "", f"local repo '{k}' on branch '{v}'")
-    #     quit()
     helao_root = os.path.dirname(os.path.realpath(__file__))
     confArg = sys.argv[1]
     config = config_loader(confArg, helao_root)
@@ -681,3 +675,6 @@ if __name__ == "__main__":
 
     x = threading.Thread(target=thread_waitforkey)
     x.start()
+
+if __name__ == "__main__":
+    main()
