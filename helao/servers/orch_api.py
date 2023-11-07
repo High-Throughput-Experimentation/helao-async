@@ -572,7 +572,7 @@ class OrchAPI(HelaoFastAPI):
                 check = False
 
             if check:
-                await self.orch.insert_experiment(
+                await self.orch.add_experiment(
                     seq=self.orch.seq_model,
                     experimentmodel=experiment_model,
                     prepend=True,
