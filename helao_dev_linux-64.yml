@@ -5,11 +5,11 @@ channels:
 dependencies:
   - pip:
     - aioshutil
-    - gpflow
+    # - gpflow
     - pyft232
     - pylablib
     - git+https://github.com/spomjaksilp/pyMeCom
-    - tensorflow
+    # - tensorflow
   - aiofiles
   - aiohttp
   - bokeh=2
@@ -39,7 +39,7 @@ dependencies:
   - pyftdi
   - pymodbus
   - pyserial
-  - python=3.8
+  - python
   - python-dotenv
   - python-multipart
   - pyusb
