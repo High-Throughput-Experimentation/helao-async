@@ -5,7 +5,7 @@ import pickle
 import asyncio
 from enum import Enum
 from socket import gethostname
-from typing import Union
+from typing import Union, Optional
 
 from fastapi import Body, WebSocket, Request
 from helao.helpers.server_api import HelaoFastAPI
@@ -536,7 +536,7 @@ class OrchAPI(HelaoFastAPI):
         async def conditional_exp(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            check_parameter: str = "",
+            check_parameter: Optional[str] = "",
             check_condition: checkcond = checkcond.equals,
             check_value: Union[float, int, bool] = True,
             conditional_experiment_name: str = "",
@@ -564,6 +564,8 @@ class OrchAPI(HelaoFastAPI):
                 check = param < thresh
             elif cond == checkcond.isnot:
                 check = param != thresh
+            elif cond == checkcond.uncond:
+                check = True
 
             if check:
                 await self.orch.insert_experiment(
@@ -615,3 +617,4 @@ class checkcond(str, Enum):
     below = "below"
     above = "above"
     isnot = "isnot"
+    uncond = "uncond"
