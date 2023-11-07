@@ -5,16 +5,17 @@ channels:
 dependencies:
   - pip:
     - aioshutil
+    # - gpflow
+    - pyft232
+    - pylablib
     - git+https://github.com/spomjaksilp/pyMeCom
-    - tensorflow
-    - gpflow
+    # - tensorflow
   - aiofiles
   - aiohttp
   - bokeh=2
   - boto3
   - botocore
   - colorama
-  - comtypes
   - databases
   - fastapi
   - filelock
@@ -24,7 +25,6 @@ dependencies:
   - jupyterlab
   - matplotlib
   - munch
-  - nidaqmx-python
   - ntplib
   - numpy
   - pandas
@@ -34,12 +34,17 @@ dependencies:
   - psycopg2
   - pyaml
   - pybase64
-  - pydantic=1.10.11
+  - pydantic=1
   - pyfiglet
+  - pyftdi
+  - pymodbus
   - pyserial
-  - python=3.8
+  - python
   - python-dotenv
   - python-multipart
+  - pyusb
+  - pyvisa
+  - pyzmq
   - pyzstd
   - requests
   - ruamel.yaml
@@ -54,3 +59,4 @@ dependencies:
   - termcolor
   - uvicorn
   - websockets
+  - zeroconf

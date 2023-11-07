@@ -511,7 +511,7 @@ def ECHE_sub_CV_led(
     CV_duration_sec += (
         abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE)
         / apm.pars.scanrate_voltsec
-        * apm.pars.cycles
+       # * apm.pars.cycles
     )
     CV_duration_sec += (
         abs(apm.pars.Vapex2_vsRHE - apm.pars.Vapex1_vsRHE)

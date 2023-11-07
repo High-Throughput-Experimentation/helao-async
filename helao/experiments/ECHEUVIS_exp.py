@@ -11,6 +11,8 @@ __all__ = [
     "ECHEUVIS_sub_interrupt",
     "ECHEUVIS_sub_startup",
     "ECHEUVIS_sub_shutdown",
+    "ECHEUVIS_sub_engage",
+    "ECHEUVIS_sub_disengage",
 ]
 
 
@@ -38,6 +40,7 @@ ORCH_server = MM(server_name="ORCH", machine_name=gethostname().lower()).as_dict
 PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
 CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict()
 CAM_server = MM(server_name="CAM", machine_name=gethostname().lower()).as_dict()
+KMOTOR_server = MM(server_name="KMOTOR", machine_name=gethostname().lower()).as_dict()
 
 toggle_triggertype = TriggerType.fallingedge
 
@@ -696,4 +699,45 @@ def ECHEUVIS_sub_OCV_led(
 
     apm.add(IO_server, "stop_digital_cycle", {})
 
+    return apm.action_list  # returns complete action list to orch
+
+
+def ECHEUVIS_sub_disengage(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    clear_we: bool = True,
+    clear_ce: bool = False,
+    z_height: float = 0,
+    ):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    if apm.pars.clear_we:
+        apm.add(IO_server, "set_digital_out", {"do_item": "we_air", "on": True})
+        apm.add(IO_server, "set_digital_out", {"do_item": "we_pump", "on": True})
+    if apm.pars.clear_ce:
+        apm.add(IO_server, "set_digital_out", {"do_item": "ce_air", "on": True})
+        apm.add(IO_server, "set_digital_out", {"do_item": "ce_pump", "on": True})
+    apm.add(ORCH_server, "wait", {"waittime": 5.0})
+    for item in ("we_air", "we_pump", "ce_air", "ce_pump"):
+        apm.add(IO_server, "set_digital_out", {"do_item": item, "on": False})
+    # lower z (disengage)
+    apm.add(KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": apm.pars.z_height})
+    return apm.action_list  # returns complete action list to orch
+
+
+def ECHEUVIS_sub_engage(
+    experiment: Experiment,
+    experiment_version: int = 1,
+    flow_we: bool = True,
+    flow_ce: bool = True,
+    z_height: float = 1.5,
+    ):
+    # raise z (engage)
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": apm.pars.z_height})
+    apm.add(IO_server, "set_digital_out", {"do_item": "we_air", "on": False})
+    apm.add(IO_server, "set_digital_out", {"do_item": "we_pump", "on": apm.pars.flow_we})
+    apm.add(IO_server, "set_digital_out", {"do_item": "ce_air", "on": False})
+    apm.add(IO_server, "set_digital_out", {"do_item": "ce_pump", "on": apm.pars.flow_ce})
+    if apm.pars.flow_we or apm.pars.flow_ce:
+        apm.add(ORCH_server, "wait", {"waittime": 5.0})
     return apm.action_list  # returns complete action list to orch

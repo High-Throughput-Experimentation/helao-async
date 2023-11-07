@@ -25,6 +25,8 @@ servers:
     params:
       enable_op: true
       bokeh_port: 5002
+      seqspec_parser_path: helao\specifications\last3months.py
+      seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
     verbose: true
   MOTOR:
     host: hte-adss-01.htejcap.caltech.edu

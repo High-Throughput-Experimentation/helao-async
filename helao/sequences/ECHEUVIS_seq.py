@@ -16,7 +16,7 @@ SEQUENCES = __all__
 
 
 def ECHEUVIS_CV_led(
-    sequence_version: int = 4,
+    sequence_version: int = 5,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -59,15 +59,21 @@ def ECHEUVIS_CV_led(
     calc_poly_order: int = 4,
     calc_lower_wl: float = 370.0,
     calc_upper_wl: float = 1020.0,
+    use_z_motor: bool = False,
+    cell_engaged_z: float = 1.5,
+    cell_disengaged_z: float = 0,
 ):
 
     epm = ExperimentPlanMaker()
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Stop flow and prepare for xy motion to ref location."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Stop flow and prepare for xy motion to ref location."},
+        )
     epm.add_experiment(
         "UVIS_sub_setup_ref",
         {
@@ -78,10 +84,13 @@ def ECHEUVIS_CV_led(
             "specref_code": 1,
         },
     )
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Restore flow and prepare for reference measurement."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": True, "flow_ce": True, "z_height": cell_engaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Restore flow and prepare for reference measurement."},
+        )
 
     # dark ref
     for st in SPEC_MAP[spec_technique]:
@@ -123,12 +132,18 @@ def ECHEUVIS_CV_led(
                 "reference_mode": "builtin",
             },
         )
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Stop flow and prepare for xy motion to starting sample."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Stop flow and prepare for xy motion to starting sample."},
+        )
 
     for i, plate_sample in enumerate(plate_sample_no_list):
+
+        if i>0 and use_z_motor:
+            epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z})
 
         epm.add_experiment(
             "ECHE_sub_startup",
@@ -142,11 +157,14 @@ def ECHEUVIS_CV_led(
             },
         )
 
-        if i == 0:  # initial sample
-            epm.add_experiment(
-                "ECHEUVIS_sub_interrupt",
-                {"reason": "Restore flow and prepare for sample measurement."},
-            )
+        if use_z_motor:
+            epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": True, "flow_ce": True, "z_height": cell_engaged_z})
+        else:
+            if i == 0:  # initial sample
+                epm.add_experiment(
+                    "ECHEUVIS_sub_interrupt",
+                    {"reason": "Restore flow and prepare for sample measurement."},
+                )
 
         # CV1
         epm.add_experiment(
@@ -199,10 +217,13 @@ def ECHEUVIS_CV_led(
         )
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Stop flow and prepare for xy motion to ref location."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Stop flow and prepare for xy motion to ref location."},
+        )
     epm.add_experiment(
         "UVIS_sub_setup_ref",
         {
@@ -213,10 +234,14 @@ def ECHEUVIS_CV_led(
             "specref_code": 1,
         },
     )
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Restore flow and prepare for reference measurement."},
-    )
+
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": True, "flow_ce": True, "z_height": cell_engaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Restore flow and prepare for reference measurement."},
+        )
     # dark ref
     for st in SPEC_MAP[spec_technique]:
         epm.add_experiment(
@@ -257,6 +282,10 @@ def ECHEUVIS_CV_led(
                 "reference_mode": "builtin",
             },
         )
+    
+    if use_z_motor:
+        # leave cell sealed w/solution for storage
+        epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z})
     epm.add_experiment(
         "UVIS_calc_abs",
         {
@@ -274,7 +303,7 @@ def ECHEUVIS_CV_led(
 
 
 def ECHEUVIS_CA_led(
-    sequence_version: int = 4,
+    sequence_version: int = 5,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -313,15 +342,21 @@ def ECHEUVIS_CA_led(
     calc_poly_order: int = 4,
     calc_lower_wl: float = 370.0,
     calc_upper_wl: float = 1020.0,
+    use_z_motor: bool = False,
+    cell_engaged_z: float = 1.5,
+    cell_disengaged_z: float = 0,
 ):
 
     epm = ExperimentPlanMaker()
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Stop flow and prepare for xy motion to ref location."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Stop flow and prepare for xy motion to ref location."},
+        )
     epm.add_experiment(
         "UVIS_sub_setup_ref",
         {
@@ -332,10 +367,13 @@ def ECHEUVIS_CA_led(
             "specref_code": 1,
         },
     )
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Restore flow and prepare for reference measurement."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": True, "flow_ce": True, "z_height": cell_engaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Restore flow and prepare for reference measurement."},
+        )
 
     # dark ref
     for st in SPEC_MAP[spec_technique]:
@@ -377,12 +415,18 @@ def ECHEUVIS_CA_led(
                 "reference_mode": "builtin",
             },
         )
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Stop flow and prepare for xy motion to starting sample."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Stop flow and prepare for xy motion to starting sample."},
+        )
 
     for i, plate_sample in enumerate(plate_sample_no_list):
+
+        if i>0 and use_z_motor:
+            epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z})
 
         epm.add_experiment(
             "ECHE_sub_startup",
@@ -396,11 +440,14 @@ def ECHEUVIS_CA_led(
             },
         )
 
-        if i == 0:  # initial sample
-            epm.add_experiment(
-                "ECHEUVIS_sub_interrupt",
-                {"reason": "Restore flow and prepare for sample measurement."},
-            )
+        if use_z_motor:
+            epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": True, "flow_ce": True, "z_height": cell_engaged_z})
+        else:
+            if i == 0:  # initial sample
+                epm.add_experiment(
+                    "ECHEUVIS_sub_interrupt",
+                    {"reason": "Restore flow and prepare for sample measurement."},
+                )
 
         # OCV
         epm.add_experiment(
@@ -449,10 +496,13 @@ def ECHEUVIS_CA_led(
         )
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Stop flow and prepare for xy motion to ref location."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Stop flow and prepare for xy motion to ref location."},
+        )
     epm.add_experiment(
         "UVIS_sub_setup_ref",
         {
@@ -463,10 +513,13 @@ def ECHEUVIS_CA_led(
             "specref_code": 1,
         },
     )
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Restore flow and prepare for reference measurement."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": True, "flow_ce": True, "z_height": cell_engaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Restore flow and prepare for reference measurement."},
+        )
     # dark ref
     for st in SPEC_MAP[spec_technique]:
         epm.add_experiment(
@@ -507,6 +560,9 @@ def ECHEUVIS_CA_led(
                 "reference_mode": "builtin",
             },
         )
+    if use_z_motor:
+        # leave cell sealed w/solution for storage
+        epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z})
     epm.add_experiment(
         "UVIS_calc_abs",
         {
@@ -524,7 +580,7 @@ def ECHEUVIS_CA_led(
 
 
 def ECHEUVIS_CP_led(
-    sequence_version: int = 4,
+    sequence_version: int = 5,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -562,15 +618,21 @@ def ECHEUVIS_CP_led(
     calc_poly_order: int = 4,
     calc_lower_wl: float = 370.0,
     calc_upper_wl: float = 1020.0,
+    use_z_motor: bool = False,
+    cell_engaged_z: float = 1.5,
+    cell_disengaged_z: float = 0,
 ):
 
     epm = ExperimentPlanMaker()
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Stop flow and prepare for xy motion to ref location."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Stop flow and prepare for xy motion to ref location."},
+        )
     epm.add_experiment(
         "UVIS_sub_setup_ref",
         {
@@ -581,10 +643,13 @@ def ECHEUVIS_CP_led(
             "specref_code": 1,
         },
     )
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Restore flow and prepare for reference measurement."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": True, "flow_ce": True, "z_height": cell_engaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Restore flow and prepare for reference measurement."},
+        )
 
     # dark ref
     for st in SPEC_MAP[spec_technique]:
@@ -626,12 +691,18 @@ def ECHEUVIS_CP_led(
                 "reference_mode": "builtin",
             },
         )
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Stop flow and prepare for xy motion to starting sample."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Stop flow and prepare for xy motion to starting sample."},
+        )
 
     for i, plate_sample in enumerate(plate_sample_no_list):
+
+        if i>0 and use_z_motor:
+            epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z})
 
         epm.add_experiment(
             "ECHE_sub_startup",
@@ -645,11 +716,14 @@ def ECHEUVIS_CP_led(
             },
         )
 
-        if i == 0:  # initial sample
-            epm.add_experiment(
-                "ECHEUVIS_sub_interrupt",
-                {"reason": "Restore flow and prepare for sample measurement."},
-            )
+        if use_z_motor:
+            epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": True, "flow_ce": True, "z_height": cell_engaged_z})
+        else:
+            if i == 0:  # initial sample
+                epm.add_experiment(
+                    "ECHEUVIS_sub_interrupt",
+                    {"reason": "Restore flow and prepare for sample measurement."},
+                )
 
         # CP1
         epm.add_experiment(
@@ -690,10 +764,13 @@ def ECHEUVIS_CP_led(
         )
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Stop flow and prepare for xy motion to ref location."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Stop flow and prepare for xy motion to ref location."},
+        )
     epm.add_experiment(
         "UVIS_sub_setup_ref",
         {
@@ -704,10 +781,13 @@ def ECHEUVIS_CP_led(
             "specref_code": 1,
         },
     )
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Restore flow and prepare for reference measurement."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": True, "flow_ce": True, "z_height": cell_engaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Restore flow and prepare for reference measurement."},
+        )
     # dark ref
     for st in SPEC_MAP[spec_technique]:
         epm.add_experiment(
@@ -748,6 +828,9 @@ def ECHEUVIS_CP_led(
                 "reference_mode": "builtin",
             },
         )
+    if use_z_motor:
+        # leave cell sealed w/solution for storage
+        epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z})
     epm.add_experiment(
         "UVIS_calc_abs",
         {
@@ -806,15 +889,21 @@ def ECHEUVIS_multiCA_led(
     calc_upper_wl: float = 700.0,
     calc_skip_nspec: int = 4,
     random_start_potential: bool = True,
+    use_z_motor: bool = False,
+    cell_engaged_z: float = 1.5,
+    cell_disengaged_z: float = 0,
 ):
 
     epm = ExperimentPlanMaker()
 
     epm.add_experiment("ECHEUVIS_sub_startup", {})
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Stop flow and prepare for xy motion to ref location."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Stop flow and prepare for xy motion to ref location."},
+        )
     epm.add_experiment(
         "UVIS_sub_setup_ref",
         {
@@ -825,10 +914,13 @@ def ECHEUVIS_multiCA_led(
             "specref_code": 1,
         },
     )
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Restore flow and prepare for reference measurement."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": True, "flow_ce": True, "z_height": cell_engaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Restore flow and prepare for reference measurement."},
+        )
 
     # dark ref
     for st in SPEC_MAP[spec_technique]:
@@ -870,12 +962,18 @@ def ECHEUVIS_multiCA_led(
                 "reference_mode": "builtin",
             },
         )
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Stop flow and prepare for xy motion to starting sample."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Stop flow and prepare for xy motion to starting sample."},
+        )
 
     for i, plate_sample in enumerate(plate_sample_no_list):
+
+        if i>0 and use_z_motor:
+            epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z})
 
         epm.add_experiment(
             "ECHE_sub_startup",
@@ -889,11 +987,15 @@ def ECHEUVIS_multiCA_led(
             },
         )
 
-        if i == 0:  # initial sample
-            epm.add_experiment(
-                "ECHEUVIS_sub_interrupt",
-                {"reason": "Restore flow and prepare for sample measurement."},
-            )
+        if use_z_motor:
+            epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": True, "flow_ce": True, "z_height": cell_engaged_z})
+        else:
+            if i == 0:  # initial sample
+                epm.add_experiment(
+                    "ECHEUVIS_sub_interrupt",
+                    {"reason": "Restore flow and prepare for sample measurement."},
+                )
+
         if random_start_potential:
             scan_down = random.choice([True, False])
             start_v = random.choice(CA_potential_vsRHE)
@@ -979,10 +1081,13 @@ def ECHEUVIS_multiCA_led(
             )
 
     epm.add_experiment("ECHE_sub_unloadall_customs", {})
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Stop flow and prepare for xy motion to ref location."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_disengage", {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Stop flow and prepare for xy motion to ref location."},
+        )
     epm.add_experiment(
         "UVIS_sub_setup_ref",
         {
@@ -993,10 +1098,13 @@ def ECHEUVIS_multiCA_led(
             "specref_code": 1,
         },
     )
-    epm.add_experiment(
-        "ECHEUVIS_sub_interrupt",
-        {"reason": "Restore flow and prepare for reference measurement."},
-    )
+    if use_z_motor:
+        epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": True, "flow_ce": True, "z_height": cell_engaged_z})
+    else:
+        epm.add_experiment(
+            "ECHEUVIS_sub_interrupt",
+            {"reason": "Restore flow and prepare for reference measurement."},
+        )
     # dark ref
     for st in SPEC_MAP[spec_technique]:
         epm.add_experiment(
@@ -1037,6 +1145,9 @@ def ECHEUVIS_multiCA_led(
                 "reference_mode": "builtin",
             },
         )
+    if use_z_motor:
+        # leave cell sealed w/solution for storage
+        epm.add_experiment("ECHEUVIS_sub_engage", {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z})
     epm.add_experiment(
         "UVIS_calc_abs",
         {

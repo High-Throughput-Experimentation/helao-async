@@ -168,7 +168,7 @@ class C_potvis:
         self.vis.doc.add_next_tick_callback(
             partial(
                 async_private_dispatcher,
-                server=self.potentiostat_key,
+                server_key=self.potentiostat_key,
                 host=self.potserv_host,
                 port=self.potserv_port,
                 private_action="stop_private",
