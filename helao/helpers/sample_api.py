@@ -70,7 +70,7 @@ class _BaseSampleAPI:
         self.column_count = len(self.column_names)
 
         self._sampleclass = sampleclass
-        self._sample_type = f"{sampleclass.sample_type}_sample"
+        self._sample_type = f"{str(sampleclass.sample_type)}_sample"
         self._dbfilename = gethostname().lower() + f"__{self._sample_type}.db"
         self._base = Serv_class
         self._dbfilepath = self._base.helaodirs.db_root
