@@ -334,7 +334,7 @@ def ADSS_CA_cell_1potential(
     return epm.experiment_plan_list  # returns complete experiment list
 
 def ADSS_PA_CVs_CAs_cell(
-    sequence_version: int = 4, 
+    sequence_version: int = 5, 
     #solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
     plate_sample_no: int = 14050,  #  instead of map select
@@ -343,6 +343,7 @@ def ADSS_PA_CVs_CAs_cell(
     #liquid_custom_position: str = "elec_res1",
     liquid_sample_no: int = 220,
     liquid_sample_volume_ul: float = 4000,
+    recirculate_wait_time_m: float = 0.5,
     CV_cycles: List[int] = [5,3,3],
     Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
     Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
@@ -447,7 +448,11 @@ def ADSS_PA_CVs_CAs_cell(
     #         "solid_sample_no": plate_sample_no,
     #     }
     # )
-    epm.add_experiment("ADSS_sub_recirculate",{})
+    epm.add_experiment(
+        "ADSS_sub_recirculate",
+        {
+            "wait_time_s": recirculate_wait_time_m * 60,
+        })
     washmod = 0
 
     for i, CV_cycle in enumerate(CV_cycles):
