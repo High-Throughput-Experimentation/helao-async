@@ -1,8 +1,8 @@
 dummy: true
 simulation: false
 builtin_ref_motorxy:
-  - 110
-  - 12
+  - 70.45251428071448
+  - -110.77107804587476
 experiment_libraries:
   - samples_exp
   - ECHE_exp
