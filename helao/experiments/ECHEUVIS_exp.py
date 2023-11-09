@@ -711,13 +711,13 @@ def ECHEUVIS_sub_disengage(
     ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     if apm.pars.clear_we:
-        apm.add(IO_server, "set_digital_out", {"do_item": "we_air", "on": True})
+        apm.add(IO_server, "set_digital_out", {"do_item": "we_vent", "on": True})
         apm.add(IO_server, "set_digital_out", {"do_item": "we_pump", "on": True})
     if apm.pars.clear_ce:
-        apm.add(IO_server, "set_digital_out", {"do_item": "ce_air", "on": True})
+        apm.add(IO_server, "set_digital_out", {"do_item": "ce_vent", "on": True})
         apm.add(IO_server, "set_digital_out", {"do_item": "ce_pump", "on": True})
     apm.add(ORCH_server, "wait", {"waittime": 5.0})
-    for item in ("we_air", "we_pump", "ce_air", "ce_pump"):
+    for item in ("we_vent", "we_pump", "ce_vent", "ce_pump"):
         apm.add(IO_server, "set_digital_out", {"do_item": item, "on": False})
     # lower z (disengage)
     apm.add(KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": apm.pars.z_height})
@@ -734,9 +734,9 @@ def ECHEUVIS_sub_engage(
     # raise z (engage)
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": apm.pars.z_height})
-    apm.add(IO_server, "set_digital_out", {"do_item": "we_air", "on": False})
+    apm.add(IO_server, "set_digital_out", {"do_item": "we_vent", "on": False})
     apm.add(IO_server, "set_digital_out", {"do_item": "we_pump", "on": apm.pars.flow_we})
-    apm.add(IO_server, "set_digital_out", {"do_item": "ce_air", "on": False})
+    apm.add(IO_server, "set_digital_out", {"do_item": "ce_vent", "on": False})
     apm.add(IO_server, "set_digital_out", {"do_item": "ce_pump", "on": apm.pars.flow_ce})
     if apm.pars.flow_we or apm.pars.flow_ce:
         apm.add(ORCH_server, "wait", {"waittime": 5.0})
