@@ -1136,7 +1136,9 @@ class TransformXY:
         plate warping (z) will be a different call"""
         if isinstance(platexy, str):
             platexy = [float(x.strip()) for x in platexy.split(",")]
-        platexy = np.array(platexy)
+        platexy = np.asarray(platexy)
+        if len(platexy) == 2:
+            platexy = np.insert(platexy, 2, 1)
         if len(platexy) == 3:
             platexy = np.insert(platexy, 2, 0)
         # for _ in range(4-len(platexy)):
@@ -1152,8 +1154,10 @@ class TransformXY:
         """simply calculates platexy from current motorxy"""
         if isinstance(motorxy, str):
             motorxy = [float(x.strip()) for x in motorxy.split(",")]
-        motorxy = np.array(motorxy)
+        motorxy = np.asarray(motorxy)
         print(motorxy)
+        if len(motorxy) == 2:
+            motorxy = np.insert(motorxy, 2, 1)
         if len(motorxy) == 3:
             motorxy = np.insert(motorxy, 2, 0)
         # self.base.print_message(" ... Minv:\n", self.Minv)
