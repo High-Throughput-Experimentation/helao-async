@@ -84,7 +84,6 @@ def UVIS_sub_startup(
     solid_plate_id: int = 4534,
     solid_sample_no: int = 1,
 ):
-
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add_action_list(UVIS_sub_unloadall_customs(experiment=experiment))
 
@@ -351,7 +350,9 @@ def UVIS_sub_setup_ref(
         {
             "axis": ["x", "y"],
             "mode": MoveModes.absolute,
-            "transformation": TransformationModes.platexy,
+            "transformation": TransformationModes.platexy
+            if apm.pars.reference_mode != "builtin"
+            else TransformationModes.motorxy,
         },
         from_globalexp_params={"_refxy": "d_mm"},
     )
@@ -392,13 +393,14 @@ def UVIS_calc_abs(
     )
     return apm.action_list  # returns complete action list to orch
 
+
 def UVIS_analysis_dry(
     experiment: Experiment,
     experiment_version: int = 2,
     sequence_uuid: str = "",
     plate_id: int = 0,
     recent: bool = True,
-    params: dict = {}
+    params: dict = {},
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
@@ -408,7 +410,7 @@ def UVIS_analysis_dry(
             "sequence_uuid": apm.pars.sequence_uuid,
             "plate_id": apm.pars.plate_id,
             "recent": apm.pars.recent,
-            "params": apm.pars.params
+            "params": apm.pars.params,
         },
     )
     return apm.action_list
