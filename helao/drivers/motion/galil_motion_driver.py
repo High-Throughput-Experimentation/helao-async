@@ -1135,7 +1135,7 @@ class TransformXY:
         """simply calculates motorxy based on platexy
         plate warping (z) will be a different call"""
         if isinstance(platexy, str):
-            platexy = [float(x.strip() for x in platexy.split(","))]
+            platexy = [float(x.strip() for x in list(platexy.split(",")))]
         platexy = np.asarray(platexy)
         if len(platexy) == 3:
             platexy = np.insert(platexy, 2, 0)
@@ -1151,7 +1151,7 @@ class TransformXY:
     def transform_motorxy_to_platexy(self, motorxy, *args, **kwargs):
         """simply calculates platexy from current motorxy"""
         if isinstance(motorxy, str):
-            motorxy = [float(x.strip() for x in motorxy.split(","))]
+            motorxy = [float(x.strip() for x in list(motorxy.split(",")))]
         motorxy = np.asarray(motorxy)
         if len(motorxy) == 3:
             motorxy = np.insert(motorxy, 2, 0)
