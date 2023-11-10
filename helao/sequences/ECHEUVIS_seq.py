@@ -60,8 +60,10 @@ def ECHEUVIS_CV_led(
     calc_lower_wl: float = 370.0,
     calc_upper_wl: float = 1020.0,
     use_z_motor: bool = False,
-    cell_engaged_z: float = 1.5,
+    cell_engaged_z: float = 2.5,
     cell_disengaged_z: float = 0,
+    cell_vent_wait: float = 10.0,
+    cell_fill_wait: float = 30.0,
 ):
     epm = ExperimentPlanMaker()
 
@@ -69,7 +71,12 @@ def ECHEUVIS_CV_led(
     if use_z_motor:
         epm.add_experiment(
             "ECHEUVIS_sub_disengage",
-            {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z},
+            {
+                "clear_we": True,
+                "clear_ce": False,
+                "z_height": cell_disengaged_z,
+                "vent_wait": cell_vent_wait,
+            },
         )
     else:
         epm.add_experiment(
@@ -89,7 +96,12 @@ def ECHEUVIS_CV_led(
     if use_z_motor:
         epm.add_experiment(
             "ECHEUVIS_sub_engage",
-            {"flow_we": True, "flow_ce": True, "z_height": cell_engaged_z},
+            {
+                "flow_we": True,
+                "flow_ce": True,
+                "z_height": cell_engaged_z,
+                "fill_wait": cell_fill_wait,
+            },
         )
     else:
         epm.add_experiment(
@@ -140,7 +152,12 @@ def ECHEUVIS_CV_led(
     if use_z_motor:
         epm.add_experiment(
             "ECHEUVIS_sub_disengage",
-            {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z},
+            {
+                "clear_we": True,
+                "clear_ce": False,
+                "z_height": cell_disengaged_z,
+                "vent_wait": cell_vent_wait,
+            },
         )
     else:
         epm.add_experiment(
@@ -152,7 +169,12 @@ def ECHEUVIS_CV_led(
         if i > 0 and use_z_motor:
             epm.add_experiment(
                 "ECHEUVIS_sub_disengage",
-                {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z},
+                {
+                    "clear_we": True,
+                    "clear_ce": False,
+                    "z_height": cell_disengaged_z,
+                    "vent_wait": cell_vent_wait,
+                },
             )
 
         epm.add_experiment(
@@ -170,7 +192,12 @@ def ECHEUVIS_CV_led(
         if use_z_motor:
             epm.add_experiment(
                 "ECHEUVIS_sub_engage",
-                {"flow_we": True, "flow_ce": True, "z_height": cell_engaged_z},
+                {
+                    "flow_we": True,
+                    "flow_ce": True,
+                    "z_height": cell_engaged_z,
+                    "fill_wait": cell_fill_wait,
+                },
             )
         else:
             if i == 0:  # initial sample
@@ -233,7 +260,12 @@ def ECHEUVIS_CV_led(
     if use_z_motor:
         epm.add_experiment(
             "ECHEUVIS_sub_disengage",
-            {"clear_we": True, "clear_ce": False, "z_height": cell_disengaged_z},
+            {
+                "clear_we": True,
+                "clear_ce": False,
+                "z_height": cell_disengaged_z,
+                "vent_wait": cell_vent_wait,
+            },
         )
     else:
         epm.add_experiment(
@@ -254,7 +286,12 @@ def ECHEUVIS_CV_led(
     if use_z_motor:
         epm.add_experiment(
             "ECHEUVIS_sub_engage",
-            {"flow_we": True, "flow_ce": True, "z_height": cell_engaged_z},
+            {
+                "flow_we": True,
+                "flow_ce": True,
+                "z_height": cell_engaged_z,
+                "fill_wait": cell_fill_wait,
+            },
         )
     else:
         epm.add_experiment(
@@ -306,7 +343,12 @@ def ECHEUVIS_CV_led(
         # leave cell sealed w/solution for storage
         epm.add_experiment(
             "ECHEUVIS_sub_engage",
-            {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z},
+            {
+                "flow_we": False,
+                "flow_ce": False,
+                "z_height": cell_engaged_z,
+                "fill_wait": cell_fill_wait,
+            },
         )
     epm.add_experiment(
         "UVIS_calc_abs",
@@ -368,7 +410,7 @@ def ECHEUVIS_CA_led(
     cell_engaged_z: float = 2.5,
     cell_disengaged_z: float = 0,
     cell_vent_wait: float = 10.0,
-    cell_fill_wait: float = 10.0,
+    cell_fill_wait: float = 30.0,
 ):
     epm = ExperimentPlanMaker()
 
@@ -705,10 +747,10 @@ def ECHEUVIS_CP_led(
     calc_lower_wl: float = 370.0,
     calc_upper_wl: float = 1020.0,
     use_z_motor: bool = False,
-    cell_engaged_z: float = 1.5,
+    cell_engaged_z: float = 2.5,
     cell_disengaged_z: float = 0,
     cell_vent_wait: float = 10.0,
-    cell_fill_wait: float = 10.0,
+    cell_fill_wait: float = 30.0,
 ):
     epm = ExperimentPlanMaker()
 
@@ -1040,10 +1082,10 @@ def ECHEUVIS_multiCA_led(
     calc_skip_nspec: int = 4,
     random_start_potential: bool = True,
     use_z_motor: bool = False,
-    cell_engaged_z: float = 1.5,
+    cell_engaged_z: float = 2.5,
     cell_disengaged_z: float = 0,
     cell_vent_wait: float = 10.0,
-    cell_fill_wait: float = 10.0,
+    cell_fill_wait: float = 30.0,
 ):
     epm = ExperimentPlanMaker()
 
