@@ -384,9 +384,9 @@ class Galil:
         self.motor_busy = True
 
         # in order to enable easy mode for swagger:
-        if type(axis) is not list:
+        if not isinstance(axis, list):
             axis = [axis]
-        if type(d_mm) is not list:
+        if not isinstance(d_mm, list):
             d_mm = [d_mm]
 
         error = ErrorCodes.none
@@ -771,7 +771,7 @@ class Galil:
             self.base.print_message("Galil is disabled", error=True)
             return {"ax": [], "position": []}
         # convert single axis move to list
-        if type(axis) is not list:
+        if not isinstance(axis, list):
             axis = [axis]
 
         # first get the relative position (actual only the current position of the encoders)
@@ -832,7 +832,7 @@ class Galil:
         axlett = "ABCDEFGH"
         axlett = axlett[0 : len(q.split(","))]
         # convert single axis move to list
-        if type(axis) is not list:
+        if not isinstance(axis, list):
             axis = [axis]
         ret_status = []
         ret_err_code = []
@@ -902,7 +902,7 @@ class Galil:
 
         if self.galil_enabled:
             # convert single axis move to list
-            if type(axis) is not list:
+            if not isinstance(axis, list):
                 axis = [axis]
             for ax in axis:
                 if ax in self.axis_id:
@@ -924,7 +924,7 @@ class Galil:
         # http://127.0.0.1:8000/motor/stop
         if self.galil_enabled:
             # convert single axis move to list
-            if type(axis) is not list:
+            if not isinstance(axis, list):
                 axis = [axis]
 
             for ax in axis:
@@ -945,7 +945,7 @@ class Galil:
 
     def motor_off_shutdown(self, axis, *args, **kwargs):
         if self.galil_enabled:
-            if type(axis) is not list:
+            if not isinstance(axis, list):
                 axis = [axis]
 
             for ax in axis:
@@ -970,7 +970,7 @@ class Galil:
 
         if self.galil_enabled:
             # convert single axis move to list
-            if type(axis) is not list:
+            if not isinstance(axis, list):
                 axis = [axis]
 
             for ax in axis:
@@ -1134,6 +1134,8 @@ class TransformXY:
     def transform_platexy_to_motorxy(self, platexy, *args, **kwargs):
         """simply calculates motorxy based on platexy
         plate warping (z) will be a different call"""
+        if isinstance(platexy, str):
+            platexy = [float(x.strip() for x in platexy.split(","))]
         platexy = np.asarray(platexy)
         if len(platexy) == 3:
             platexy = np.insert(platexy, 2, 0)
@@ -1148,6 +1150,8 @@ class TransformXY:
 
     def transform_motorxy_to_platexy(self, motorxy, *args, **kwargs):
         """simply calculates platexy from current motorxy"""
+        if isinstance(motorxy, str):
+            motorxy = [float(x.strip() for x in motorxy.split(","))]
         motorxy = np.asarray(motorxy)
         if len(motorxy) == 3:
             motorxy = np.insert(motorxy, 2, 0)
