@@ -214,18 +214,20 @@ class Orch(Base):
         # empty it and then return
 
         # get at least one status
-        try:
-            interrupt = await asyncio.wait_for(self.interrupt_q.get(), 0.5)
+        # try:
+        if 1:
+            # interrupt = await asyncio.wait_for(self.interrupt_q.get(), 0.5)
+            interrupt = await self.interrupt_q.get()
             if isinstance(interrupt, GlobalStatusModel):
                 self.incoming = interrupt
-        except asyncio.TimeoutError:
-            if time.time() - self.last_interrupt > 10.0:
-                self.print_message(
-                    "No interrupt, returning to while loop to check condition."
-                )
-                self.print_message("This message will print again after 10 seconds.")
-                self.last_interrupt = time.time()
-            return None
+        # except asyncio.TimeoutError:
+        #     if time.time() - self.last_interrupt > 10.0:
+        #         self.print_message(
+        #             "No interrupt, returning to while loop to check condition."
+        #         )
+        #         self.print_message("This message will print again after 10 seconds.")
+        #         self.last_interrupt = time.time()
+        #     return None
 
         self.last_interrupt = time.time()
         # if not empty clear it
@@ -233,7 +235,7 @@ class Orch(Base):
             interrupt = await self.interrupt_q.get()
             if isinstance(interrupt, GlobalStatusModel):
                 self.incoming = interrupt
-                await self.globstat_q.put(interrupt)
+                await self.globstat_q.put(interrupt.as_json())
         return None
 
     async def subscribe_all(self, retry_limit: int = 15):
@@ -375,7 +377,7 @@ class Orch(Base):
             # now push it to the interrupt_q
             await self.interrupt_q.put(self.globalstatusmodel)
             await self.update_operator(True)
-            await self.globstat_q.put(self.globalstatusmodel.as_json())
+            # await self.globstat_q.put(self.globalstatusmodel.as_json())
 
             return True
 
