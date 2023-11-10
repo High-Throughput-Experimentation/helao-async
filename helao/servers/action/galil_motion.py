@@ -136,7 +136,7 @@ async def galil_dyn_endpoints(app=None):
                 datadict={
                     "motorxy": app.driver.transform.transform_platexy_to_motorxy(
                         **active.action.action_params
-                    )
+                    ).tolist()
                 }
             )
             finished_action = await active.finish()
@@ -155,7 +155,7 @@ async def galil_dyn_endpoints(app=None):
                 datadict={
                     "platexy": app.driver.transform.transform_motorxy_to_platexy(
                         **active.action.action_params
-                    )
+                    ).tolist()
                 }
             )
             finished_action = await active.finish()
