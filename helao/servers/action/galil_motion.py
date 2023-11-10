@@ -88,7 +88,7 @@ async def galil_dyn_endpoints(app=None):
             return finished_action.as_dict()
 
         @app.post(f"/{server_key}/load_plate_alignment", tags=["action"])
-        async def load_plater_alignment(
+        async def load_plate_alignment(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
             matrix: List = [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
@@ -125,7 +125,7 @@ async def galil_dyn_endpoints(app=None):
 
         # parse as {'M':json.dumps(np.matrix(M).tolist()),'platexy':json.dumps(np.array(platexy).tolist())}
         @app.post(f"/{server_key}/toMotorXY", tags=["action"])
-        async def transform_platexy_to_motorxy(
+        async def toMotorXY(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
             platexy: str = None,
@@ -144,7 +144,7 @@ async def galil_dyn_endpoints(app=None):
 
         # parse as {'M':json.dumps(np.matrix(M).tolist()),'platexy':json.dumps(np.array(motorxy).tolist())}
         @app.post(f"/{server_key}/toPlateXY", tags=["action"])
-        async def transform_motorxy_to_platexy(
+        async def toPlateXY(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
             motorxy: str = None,
