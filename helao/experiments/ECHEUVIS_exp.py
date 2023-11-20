@@ -750,6 +750,7 @@ def ECHEUVIS_sub_engage(
     apm.add(
         KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": apm.pars.z_height}
     )
+    # close vent valves
     for item in ("we_vent", "ce_vent"):
         apm.add(
             IO_server,
@@ -757,7 +758,9 @@ def ECHEUVIS_sub_engage(
             {"do_item": item, "on": False},
             ActionStartCondition.no_wait,
         )
+    # pull electrolyte through WE and CE chambers
     for item, flow_flag in (
+        ("we_flow", apm.pars.flow_we),
         ("we_pump", apm.pars.flow_we),
         ("ce_pump", apm.pars.flow_ce),
     ):
@@ -767,5 +770,18 @@ def ECHEUVIS_sub_engage(
             {"do_item": item, "on": flow_flag},
             ActionStartCondition.no_wait,
         )
+    # wait for specified time (seconds)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.fill_wait})
+    # stop high speed flow, but keep low speed flow if flow_we is True
+    for item, flow_flag in (
+        ("we_flow", apm.pars.flow_we),
+        ("we_pump", False),
+        ("ce_pump", False),
+    ):
+        apm.add(
+            IO_server,
+            "set_digital_out",
+            {"do_item": item, "on": flow_flag},
+            ActionStartCondition.no_wait,
+        )
     return apm.action_list  # returns complete action list to orch
