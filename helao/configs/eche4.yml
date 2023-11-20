@@ -105,13 +105,14 @@ servers:
         spec_trig: 1
         ir_emitter: 2
         doric_wled: 3
-        doric_led1: 4
+        we_flow: 4
         we_pump: 5
         we_vent: 6
         ce_pump: 7
         ce_vent: 8
         # gamry_aux: 1
         # led: 8
+        # doric_led1: 4
         # pump_ref_flush: 3
         # pump_supply: 2
         # doric_led2: 5
