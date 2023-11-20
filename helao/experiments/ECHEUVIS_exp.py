@@ -711,19 +711,29 @@ def ECHEUVIS_sub_disengage(
     vent_wait: float = 10.0,
 ):
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    if apm.pars.clear_we:
-        apm.add(IO_server, "set_digital_out", {"do_item": "we_vent", "on": True})
-        apm.add(IO_server, "set_digital_out", {"do_item": "we_pump", "on": True})
-    if apm.pars.clear_ce:
-        apm.add(IO_server, "set_digital_out", {"do_item": "ce_vent", "on": True})
-        apm.add(IO_server, "set_digital_out", {"do_item": "ce_pump", "on": True})
+    for clear_flag, items in (
+        (apm.pars.clear_ce, ("ce_vent", "ce_pump")),
+        (apm.pars.clear_we, ("we_vent", "we_pump")),
+    ):
+        for item in items:
+            apm.add(
+                IO_server,
+                "set_digital_out",
+                {"do_item": item, "on": clear_flag},
+                ActionStartCondition.no_wait,
+            )
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.vent_wait})
     # lower z (disengage)
     apm.add(
         KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": apm.pars.z_height}
     )
     for item in ("we_vent", "we_pump", "ce_vent", "ce_pump"):
-        apm.add(IO_server, "set_digital_out", {"do_item": item, "on": False})
+        apm.add(
+            IO_server,
+            "set_digital_out",
+            {"do_item": item, "on": False},
+            ActionStartCondition.no_wait,
+        )
     return apm.action_list  # returns complete action list to orch
 
 
@@ -732,7 +742,7 @@ def ECHEUVIS_sub_engage(
     experiment_version: int = 1,
     flow_we: bool = True,
     flow_ce: bool = True,
-    z_height: float = 2.5,
+    z_height: float = 1.5,
     fill_wait: float = 10.0,
 ):
     # raise z (engage)
@@ -740,14 +750,22 @@ def ECHEUVIS_sub_engage(
     apm.add(
         KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": apm.pars.z_height}
     )
-    apm.add(IO_server, "set_digital_out", {"do_item": "we_vent", "on": False})
-    apm.add(
-        IO_server, "set_digital_out", {"do_item": "we_pump", "on": apm.pars.flow_we}
-    )
-    apm.add(IO_server, "set_digital_out", {"do_item": "ce_vent", "on": False})
-    apm.add(
-        IO_server, "set_digital_out", {"do_item": "ce_pump", "on": apm.pars.flow_ce}
-    )
-    if apm.pars.flow_we or apm.pars.flow_ce:
-        apm.add(ORCH_server, "wait", {"waittime": apm.pars.fill_wait})
+    for item in ("we_vent", "ce_vent"):
+        apm.add(
+            IO_server,
+            "set_digital_out",
+            {"do_item": item, "on": False},
+            ActionStartCondition.no_wait,
+        )
+    for item, flow_flag in (
+        ("we_pump", apm.pars.flow_we),
+        ("ce_pump", apm.pars.flow_ce),
+    ):
+        apm.add(
+            IO_server,
+            "set_digital_out",
+            {"do_item": item, "on": flow_flag},
+            ActionStartCondition.no_wait,
+        )
+    apm.add(ORCH_server, "wait", {"waittime": apm.pars.fill_wait})
     return apm.action_list  # returns complete action list to orch
