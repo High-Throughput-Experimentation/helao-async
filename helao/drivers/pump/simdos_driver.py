@@ -38,22 +38,52 @@ bBin = f"{bInt:08b}"
 print(bBin)
 ```
 
+polling loop will check 5 states: operation, system, run mode, dispense mode, fault
+
 """
 
-STATES = {
-    ":": "idle",
-    ">": "infusing",
-    "<": "withdrawing",
-    "*": "stalled",
-    "T*": "target reached",
-}
+OPSTAT = [
+    ("motor doesn't turn", "motor turns"),
+    ("no pump fault", "pump fault"),
+    ("display ON", "display OFF"),
+]
 
-ulmap = {
-    "pl": 0.000001,
-    "nl": 0.001,
-    "ul": 1.0,
-    "ml": 1000.0,
-}
+SYSTAT = [
+    ("motor not adjusted", "motor adjusted"),
+    ("I/O 1 input low", "I/O 1 input high"),
+    ("I/O 2 input low", "I/O 2 input high"),
+    ("motor not on UT", "motor on UT"),
+]
+
+RUSTAT = [("run-mode stopped", "run-mode started")]
+
+DISTAT = [
+    ("dispense-mode stopped", "dispense-mode started"),
+    ("", ""),
+    ("", ""),
+    ("user stop active", "user stop NOT active"),
+]
+
+FADIAG = [
+    "overpressure",
+    "reserved",
+    "reserved",
+    "analog signal under 4 mA",
+    "power supply failure",
+    "motor error",
+    "temperature exceeded",
+    "no encoder sensor signal",
+]
+
+
+def str2bin(val: str):
+    try:
+        bInt = int(val)
+        bBin = f"{bInt:08b}"
+        return [int(x) for x in bBin[::-1]]
+    except Exception:
+        print(f"could not parse string: {val}")
+        return []
 
 
 class SIMDOS:
@@ -94,21 +124,77 @@ class SIMDOS:
             self.polling = await self.poll_signalq.get()
             self.base.print_message("polling signal received")
 
-    def send(self, pump_name: str, cmd: str):
-        if not cmd.endswith("\r"):
-            cmd = cmd + "\r"
-        addr = self.config_dict["pumps"][pump_name]["address"]
-        command_str = f"{addr:02}@{cmd}"
-        self.sio.write(command_str)
-        self.sio.flush()
-        resp = [x.strip() for x in self.sio.readlines() if x.strip()]
-        # look for "\x11" end of response character when POLL is on
-        if resp:
-            while not resp[-1].endswith("\x11"):
-                time.sleep(0.1)  # wait 100 msec and re-read, response
-                newlines = [x.strip() for x in self.sio.readlines() if x.strip()]
-                resp += newlines
-        return resp
+    def send(self, cmd: str):
+        addr = self.config_dict["address"]
+        command_str = f"{addr:02}{cmd}"
+        self.com.write(command_str)
+        self.com.flush()
+        resp = self.com.readlines()
+        # keep only ack responses
+        resp = [
+            x
+            for x in resp
+            if x.decode("ascii").startswith("\x06\x02") and "\x03" in x.decode("ascii")
+        ]
+        # strip frame
+        resp = [x.decode("ascii").strip("\x06\x02").split("\x03")[0] for x in resp]
+        resp = [x for x in resp if x != ""]
+        if not resp:
+            self.base.print_message("command did not return a valid response")
+            return None
+        if len(resp)>1:
+            self.base.print_message("command returned multiple responses, using first")
+        return resp[0]
+
+    def get_opstat(self):
+        resp = self.send("?SS1")
+        if resp is None:
+            return {}
+        state_dict = {}
+        bits = str2bin(resp)
+        for i, casetup in enumerate(OPSTAT):
+            state_dict[i] = casetup[bits[i]]
+        return state_dict
+
+    def get_sysstat(self):
+        resp = self.send("?SS2")
+        if resp is None:
+            return {}
+        state_dict = {}
+        bits = str2bin(resp)
+        for i, casetup in enumerate(SYSTAT):
+            state_dict[i] = casetup[bits[i]]
+        return state_dict
+
+    def get_runstat(self):
+        resp = self.send("?SS3")
+        if resp is None:
+            return {}
+        state_dict = {}
+        bits = str2bin(resp)
+        for i, casetup in enumerate(RUSTAT):
+            state_dict[i] = casetup[bits[i]]
+        return state_dict
+
+    def get_dispstat(self):
+        resp = self.send("?SS4")
+        if resp is None:
+            return {}
+        state_dict = {}
+        bits = str2bin(resp)
+        for i, casetup in enumerate(DISTAT):
+            state_dict[i] = casetup[bits[i]]
+        return state_dict
+
+    def get_faults(self):
+        resp = self.send("?SS6")
+        if resp is None:
+            return {}
+        state_dict = {}
+        bits = str2bin(resp)
+        for i, fault in enumerate(FADIAG):
+            state_dict[i] = fault if bits[i] else "OK"
+        return state_dict
 
     async def poll_sensor_loop(self, frequency: int = 10):
         self.base.print_message("polling background task has started")
@@ -183,178 +269,7 @@ class SIMDOS:
             else:
                 await asyncio.sleep(0.05)
 
-    def update_status_from_response(self, response):
-        status = response[0]
-        addr_status = status.split()[0]
-        addr = int(addr_status[:2])
-        pump_name = [
-            k for k, d in self.config_dict["pumps"].items() if int(d["address"]) == addr
-        ][0]
-        state = "unknown"
-        for k, v in STATES.items():
-            if addr_status[2:].startswith(k):
-                state = v
-                break
-            else:
-                continue
-        self.base.print_message(f"command response returned status: {state}")
-        status_dict = {"status": state}
-        self.base.live_buffer[pump_name][0].update(status_dict)
-
-    def start_pump(self, pump_name: str, direction: int):
-        "Start motion in direction forward/infuse (1) or reverse/withdraw (-1)"
-        if direction == 1:
-            cmd = "irun"
-        elif direction == -1:
-            cmd = "wrun"
-        else:
-            return False
-        resp = self.send(pump_name, cmd)
-        self.update_status_from_response(resp)
-        return resp
-
-    def set_force(self, pump_name: str, force_val: int):
-        "Set infusion force value in percentage"
-        cmd = f"forc {force_val}"
-        resp = self.send(pump_name, cmd)
-        self.update_status_from_response(resp)
-        return resp
-
-    def set_rate(self, pump_name: str, rate_val: int, direction: int):
-        "Set infusion|withdraw rate in uL/sec"
-        if direction == 1:
-            cmd = "irate"
-        elif direction == -1:
-            cmd = "wrate"
-        else:
-            return False
-        resp = self.send(pump_name, f"{cmd} {rate_val} ul/sec")
-        self.update_status_from_response(resp)
-        return resp
-
-    def set_target_volume(self, pump_name: str, vol_val: float):
-        "Set infusion|withdraw volume in uL"
-        resp = self.send(pump_name, f"tvolume {vol_val} ul")
-        self.update_status_from_response(resp)
-        return resp
-
-    def set_diameter(self, pump_name: str, diameter_mm: float):
-        "Set syringe diameter in mm"
-        resp = self.send(pump_name, f"diameter {diameter_mm:.4f}")
-        self.update_status_from_response(resp)
-        return resp
-
-    # def set_ramp(self, pump_name: str, start_rate: int, end_rate: int, direction: int):
-    #     "Set infusion|withdraw ramp rate in units TODO"
-    #     pass
-
-    def clear_time(self, pump_name: Optional[str] = None, direction: Optional[int] = 0):
-        if direction == 1:
-            cmd = "citime"
-        elif direction == -1:
-            cmd = "cwtime"
-        else:
-            cmd = "ctime"
-        if pump_name is None:
-            for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
-                resp = self.send(cpump_name, cmd)
-                self.update_status_from_response(resp)
-            return []
-        else:
-            resp = self.send(pump_name, cmd)
-            self.update_status_from_response(resp)
-            return resp
-
-    def clear_volume(
-        self, pump_name: Optional[str] = None, direction: Optional[int] = 0
-    ):
-        if direction == 1:
-            cmd = "civolume"
-        elif direction == -1:
-            cmd = "cwvolume"
-        else:
-            cmd = "cvolume"
-        if pump_name is None:
-            for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
-                resp = self.send(cpump_name, cmd)
-                self.update_status_from_response(resp)
-            return []
-        else:
-            if direction != 0 and direction is not None:
-                vol_resp = self.send(pump_name, cmd[1:])[0].split(":")[-1]
-                vol_val, vol_units = vol_resp.lower().split()
-                vol_val = float(vol_val)
-                direct_vol_ul = vol_val * ulmap[vol_units] * direction * -1
-                self.present_volume_ul += direct_vol_ul
-            resp = self.send(pump_name, cmd)
-            self.update_status_from_response(resp)
-            return resp
-
-    def clear_target_volume(self, pump_name: Optional[str] = None):
-        if pump_name is None:
-            for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
-                resp = self.send(cpump_name, "ctvolume")
-                self.update_status_from_response(resp)
-            return []
-        else:
-            resp = self.send(pump_name, "ctvolume")
-            self.update_status_from_response(resp)
-            return resp
-
-    def stop_pump(self, pump_name: Optional[str] = None):
-        cmd = "stp"
-        if pump_name is None:
-            for cpump_name in self.config_dict.get("pump_addrs", {}).keys():
-                resp = self.send(cpump_name, cmd)
-                self.update_status_from_response(resp)
-            return []
-        else:
-            resp = self.send(pump_name, cmd)
-            self.update_status_from_response(resp)
-            return resp
-
-    def safe_state(self):
-        for plab, pdict in self.config_dict.get("pumps", {}).items():
-            addr = pdict["address"]
-            idle_resp = f"{addr:02}:\x11"
-            poll_resp = self.send(plab, "poll on")
-            if poll_resp[-1] != idle_resp:
-                self.base.print_message(f"Error setting pump '{plab}' to 'POLL on'.")
-                self.base.print_message(f"Server returned: {poll_resp[0]}")
-            nvram_resp = self.send(plab, "nvram off")
-            if nvram_resp[-1] != idle_resp:
-                self.base.print_message(f"Error setting pump '{plab}' to 'NVRAM off'.")
-                self.base.print_message(f"Server returned: {nvram_resp[0]}")
-            stop_resp = self.stop_pump(plab)
-            if stop_resp[-1] != idle_resp:
-                self.base.print_message(f"Error stopping pump '{plab}'.")
-                self.base.print_message(f"Server returned: {stop_resp[0]}")
-            cleartime_resp = self.clear_time(plab)
-            if cleartime_resp[-1] != idle_resp:
-                self.base.print_message(
-                    f"Error clearing time params for pump '{plab}'."
-                )
-                self.base.print_message(f"Server returned: {cleartime_resp[0]}")
-            clearvol_resp = self.clear_target_volume(plab)
-            if clearvol_resp[-1] != idle_resp:
-                self.base.print_message(
-                    f"Error clearing volume params for pump '{plab}'."
-                )
-                self.base.print_message(f"Server returned: {clearvol_resp[0]}")
-            diameter_resp = self.set_diameter(plab, pdict["diameter"])
-            if diameter_resp[-1] != idle_resp:
-                self.base.print_message(
-                    f"Error setting syringe diameter on pump '{plab}'."
-                )
-                self.base.print_message(f"Server returned: {diameter_resp[0]}")
-            self.update_status_from_response(diameter_resp)
-
     def shutdown(self):
-        # this gets called when the server is shut down
-        # or reloaded to ensure a clean
-        # disconnect ... just restart or terminate the server
-        self.base.print_message("shutting down syringe pump(s)")
-        self.safe_state()
         self.com.close()
 
 
