@@ -581,6 +581,46 @@ class OrchAPI(HelaoFastAPI):
             return finished_action.as_dict()
 
 
+        @self.post(f"/{server_key}/conditional_stop", tags=["action"])
+        async def conditional_stop(
+            action: Action = Body({}, embed=True),
+            action_version: int = 1,
+            stop_parameter: Optional[str] = "",
+            stop_condition: checkcond = checkcond.equals,
+            stop_value: Union[float, int, bool] = True,
+            reason: str = "conditional stop",
+        ):
+            """Stop and clear all orch queues if condition is met."""
+            active = await self.orch.setup_and_contain_action()
+            cond = active.action.action_params["stop_condition"]
+            param = active.action.action_params.get(
+                active.action.action_params["stop_parameter"], None
+            )
+            thresh = active.action.action_params["stop_value"]
+            stop = False
+            if cond == checkcond.equals:
+                stop = param == thresh
+            elif cond == checkcond.above:
+                stop = param > thresh
+            elif cond == checkcond.below:
+                stop = param < thresh
+            elif cond == checkcond.isnot:
+                stop = param != thresh
+            elif cond == checkcond.uncond:
+                stop = True
+            elif cond is None:
+                stop = False
+
+            if stop:
+                await self.orch.clear_actions()
+                await self.orch.clear_experiments()
+                await self.orch.clear_sequences()
+                self.orch.current_stop_message = active.action.action_params["reason"]
+                await self.orch.update_operator(True)
+
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
 class WaitExec(Executor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
