@@ -210,7 +210,6 @@ class SIMDOS:
                     ("dispense", self.get_dispstat),
                     ("fault", self.get_faults),
                 ]:
-                    pass
                     checktime = time.time()
                     if checktime - lastupdate < waittime:
                         # self.base.print_message("waiting for minimum update interval.")
