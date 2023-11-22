@@ -982,7 +982,10 @@ class Orch(Base):
         """Begin experimenting experiment and action queues."""
         if self.globalstatusmodel.loop_state == LoopStatus.stopped:
             if (
-                self.action_dq or self.experiment_dq or self.sequence_dq
+                self.action_dq
+                or self.experiment_dq
+                or self.sequence_dq
+                or self.active_sequence is not None
             ):  # resume actions from a paused run
                 await self.start_loop()
             else:
