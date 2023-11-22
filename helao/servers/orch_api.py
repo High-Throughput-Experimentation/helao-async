@@ -507,8 +507,8 @@ class OrchAPI(HelaoFastAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @self.post(f"/{server_key}/estop", tags=["action"])
-        async def act_estop(
+        @self.post(f"/{server_key}/estop_act", tags=["action"])
+        async def estop_act(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
             switch: bool = True,
