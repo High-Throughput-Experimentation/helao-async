@@ -142,7 +142,7 @@ class SIMDOS:
         if not resp:
             self.base.print_message("command did not return a valid response")
             return None
-        if len(resp)>1:
+        if len(resp) > 1:
             self.base.print_message("command returned multiple responses, using first")
         return resp[0]
 
@@ -153,7 +153,7 @@ class SIMDOS:
         state_dict = {}
         bits = str2bin(resp)
         for i, casetup in enumerate(OPSTAT):
-            state_dict[i] = casetup[bits[i]]
+            state_dict[i] = (casetup[bits[i]], bits[i])
         return state_dict
 
     def get_sysstat(self):
@@ -163,7 +163,7 @@ class SIMDOS:
         state_dict = {}
         bits = str2bin(resp)
         for i, casetup in enumerate(SYSTAT):
-            state_dict[i] = casetup[bits[i]]
+            state_dict[i] = (casetup[bits[i]], bits[i])
         return state_dict
 
     def get_runstat(self):
@@ -173,7 +173,7 @@ class SIMDOS:
         state_dict = {}
         bits = str2bin(resp)
         for i, casetup in enumerate(RUSTAT):
-            state_dict[i] = casetup[bits[i]]
+            state_dict[i] = (casetup[bits[i]], bits[i])
         return state_dict
 
     def get_dispstat(self):
@@ -183,7 +183,7 @@ class SIMDOS:
         state_dict = {}
         bits = str2bin(resp)
         for i, casetup in enumerate(DISTAT):
-            state_dict[i] = casetup[bits[i]]
+            state_dict[i] = (casetup[bits[i]], bits[i])
         return state_dict
 
     def get_faults(self):
@@ -193,7 +193,7 @@ class SIMDOS:
         state_dict = {}
         bits = str2bin(resp)
         for i, fault in enumerate(FADIAG):
-            state_dict[i] = fault if bits[i] else "OK"
+            state_dict[i] = (fault if bits[i] else "OK", bits[i])
         return state_dict
 
     async def poll_sensor_loop(self, frequency: int = 10):
@@ -202,69 +202,27 @@ class SIMDOS:
         lastupdate = 0
         while True:
             if self.polling:
-                for plab, pdict in self.config_dict.get("pumps", {}).items():
+                status_dict = {}
+                for group, func in [
+                    ("operation", self.get_opstat),
+                    ("system", self.get_sysstat),
+                    ("run", self.get_runstat),
+                    ("dispense", self.get_dispstat),
+                    ("fault", self.get_faults),
+                ]:
+                    pass
                     checktime = time.time()
                     if checktime - lastupdate < waittime:
                         # self.base.print_message("waiting for minimum update interval.")
                         await asyncio.sleep(waittime - (checktime - lastupdate))
-                    addr = pdict["address"]
-                    status_resp = self.send(plab, "status")
-                    # self.base.print_message(f"received status: {status_resp}")
+
+                    resp_dict = func()
+                    # self.base.print_message(f"received status: {resp_dict}")
+                    for k, v in resp_dict.items():
+                        status_dict[f"{group}_{k}"] = v
+
                     lastupdate = time.time()
-                    status_prompt = status_resp[-1]
-                    status = status_resp[0]
-                    # self.base.print_message(f"current status: {status}")
-                    addrstate_rate, pumptime, pumpvol, flags = status.split()
-                    raddr = int(addrstate_rate[:2])
-                    # self.base.print_message(
-                    #     f"received address: {raddr}, config address: {addr}"
-                    # )
-                    if addr == raddr:
-                        state = None
-                        state_split = None
-                        for k, v in STATES.items():
-                            if addrstate_rate[2:].startswith(k):
-                                state_split = k
-                            if status_prompt[2:].startswith(k):
-                                state = v
-                            else:
-                                continue
-                        if state != self.last_state:
-                            self.base.print_message(
-                                f"pump state changed from '{self.last_state}' to '{state}'"
-                            )
-                            self.last_state = state
-                        rate = int(addrstate_rate.split(state_split)[-1])
-                        pumptime = int(pumptime)
-                        pumpvol = int(pumpvol)
-                        # self.base.print_message(f"flags: {flags.lower()}")
-                        (
-                            motor_dir,
-                            limit_status,
-                            stall_status,
-                            trig_input,
-                            dir_port,
-                            target_reached,
-                        ) = flags.lower()
-                        status_dict = {
-                            plab: {
-                                "status": state,
-                                "rate_fL": rate,
-                                "pump_time_ms": pumptime,
-                                "pump_volume_fL": pumpvol,
-                                "motor_direction": motor_dir,
-                                "limit_switch_state": limit_status,
-                                "stall_status": stall_status,
-                                "trigger_input_state": trig_input,
-                                "direction_port": dir_port,
-                                "target_reached": target_reached,
-                            }
-                        }
-                        # self.base.print_message(status_dict[plab]["status"])
-                        await self.base.put_lbuf(status_dict)
-                        # self.base.print_message("status sent to live buffer")
-                    else:
-                        self.base.print_message("pump address does not match config")
+                await self.base.put_lbuf(status_dict)
                 # await asyncio.sleep(0.01)
             else:
                 await asyncio.sleep(0.05)
