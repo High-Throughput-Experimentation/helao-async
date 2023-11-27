@@ -1,6 +1,6 @@
 import json
-import time
-from copy import copy
+
+from typing import Union
 from socket import gethostname
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
@@ -50,7 +50,7 @@ class BaseAPI(HelaoFastAPI):
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
-            if request.method == "HEAD" :  # comes from endpoint checker, session.head()
+            if request.method == "HEAD":  # comes from endpoint checker, session.head()
                 response = await call_next(request)
             elif request.url.path.strip("/").startswith(f"{server_key}/"):
                 await set_body(request, await request.body())
