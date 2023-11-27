@@ -727,12 +727,14 @@ def ECHEUVIS_sub_disengage(
     apm.add(
         KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": apm.pars.z_height}
     )
-    for item in ("we_vent", "we_pump", "ce_vent", "ce_pump"):
+    for i, item in enumerate(["we_vent", "we_pump", "ce_vent", "ce_pump"]):
         apm.add(
             IO_server,
             "set_digital_out",
             {"do_item": item, "on": False},
-            ActionStartCondition.no_wait,
+            ActionStartCondition.no_wait
+            if i > 0
+            else ActionStartCondition.wait_for_all,
         )
     return apm.action_list  # returns complete action list to orch
 
@@ -773,15 +775,15 @@ def ECHEUVIS_sub_engage(
     # wait for specified time (seconds)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.fill_wait})
     # stop high speed flow, but keep low speed flow if flow_we is True
-    for item, flow_flag in (
-        ("we_flow", apm.pars.flow_we),
-        ("we_pump", False),
-        ("ce_pump", False),
+    for i, (item, flow_flag) in enumerate(
+        [("we_flow", apm.pars.flow_we), ("we_pump", False), ("ce_pump", False)]
     ):
         apm.add(
             IO_server,
             "set_digital_out",
             {"do_item": item, "on": flow_flag},
-            ActionStartCondition.no_wait,
+            ActionStartCondition.no_wait
+            if i > 0
+            else ActionStartCondition.wait_for_all,
         )
     return apm.action_list  # returns complete action list to orch
