@@ -88,7 +88,7 @@ class BokehOperator:
                 dev_custom = {}
             self.dev_customitems = [key for key in dev_custom.keys()]
 
-        self.color_sq_param_inputs = "#BDB76B"
+        self.color_sq_param_inputs = "#F1CE63"
         self.max_width = 1024
         # holds the page layout
         self.layout = []
@@ -286,7 +286,7 @@ class BokehOperator:
         )
         self.button_clear_expplan.on_event(ButtonClick, self.callback_clear_expplan)
         self.orch_status_button = Toggle(
-            label="Disabled", disabled=True, button_type="danger", width=400
+            label="Disabled", disabled=False, button_type="danger", width=400
         )  # success: green, danger: red
 
         if self.orch.step_thru_actions:
@@ -444,7 +444,7 @@ class BokehOperator:
             text="<b>Orchestrator</b>",
             width=self.max_width - 20,
             height=32,
-            style={"font-size": "150%", "color": "red"},
+            style={"font-size": "150%", "color": "#E15759"},
         )
 
         self.layout0 = layout(
@@ -456,10 +456,10 @@ class BokehOperator:
                             text=f"<b>{self.config_dict.get('doc_name', 'BokehOperator')} on {gethostname().lower()} -- config: {os.path.basename(self.loaded_config_path)}</b>",
                             width=self.max_width - 20,
                             height=32,
-                            style={"font-size": "200%", "color": "red"},
+                            style={"font-size": "200%", "color": "#E15759"},
                         ),
                     ],
-                    background="#C0C0C0",
+                    background="#BAB0AC",
                     width=self.max_width,
                 ),
                 Spacer(height=10),
@@ -486,7 +486,7 @@ class BokehOperator:
                         [self.sequence_descr_txt],
                         Spacer(height=10),
                     ],
-                    background="#808080",
+                    background="#BAB0AC",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -499,7 +499,7 @@ class BokehOperator:
                             self.save_last_seq_pars,
                         ]
                     ],
-                    background="#808080",
+                    background="#BAB0AC",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -527,7 +527,7 @@ class BokehOperator:
                         [self.experiment_descr_txt],
                         Spacer(height=10),
                     ],
-                    background="#808080",
+                    background="#BAB0AC",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -540,7 +540,7 @@ class BokehOperator:
                             self.save_last_exp_pars,
                         ],
                     ],
-                    background="#808080",
+                    background="#BAB0AC",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -568,7 +568,7 @@ class BokehOperator:
                         [self.seqspec_descr_txt],
                         Spacer(height=10),
                     ],
-                    background="#808080",
+                    background="#BAB0AC",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -582,7 +582,7 @@ class BokehOperator:
                             self.button_to_seqtab,
                         ],
                     ],
-                    background="#808080",
+                    background="#BAB0AC",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -598,7 +598,7 @@ class BokehOperator:
                         Spacer(width=20),
                         self.orch_section,
                     ],
-                    background="#C0C0C0",
+                    background="#BAB0AC",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -635,7 +635,7 @@ class BokehOperator:
                         [Spacer(width=10), self.error_txt],
                         Spacer(height=10),
                     ],
-                    background="#808080",
+                    background="#BAB0AC",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -689,7 +689,7 @@ class BokehOperator:
                         self.button_estop_orch,
                         Spacer(height=10),
                     ],
-                    background="#7fdbff",
+                    background="#A0CBE8",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -1971,8 +1971,8 @@ class BokehOperator:
         self.experiment_plan_source.data = self.experiment_plan_list
 
         if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
-            self.orch_status_button.label = "started"
-            self.orch_status_button.button_type = "success"
+            self.orch_status_button.label = "running"
+            self.orch_status_button.button_type = "primary"
         elif self.orch.globalstatusmodel.loop_state == LoopStatus.stopped:
             stop_msg = (
                 ": " + self.orch.current_stop_message
@@ -1980,8 +1980,10 @@ class BokehOperator:
                 else ""
             )
             self.orch_status_button.label = f"stopped{stop_msg}"
-            self.orch_status_button.button_type = "success"
-            # self.orch_status_button.button_type = "danger"
+            if stop_msg:
+                self.orch_status_button.button_type = "warning"
+            else:
+                self.orch_status_button.button_type = "success"
         else:
             self.orch_status_button.label = (
                 f"{self.orch.globalstatusmodel.loop_state.value}"
