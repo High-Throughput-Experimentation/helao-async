@@ -587,7 +587,7 @@ class OrchAPI(HelaoFastAPI):
             action_version: int = 1,
             stop_parameter: Optional[str] = "",
             stop_condition: checkcond = checkcond.equals,
-            stop_value: Union[float, int, bool] = True,
+            stop_value: Union[str, float, int, bool] = True,
             reason: str = "conditional stop",
         ):
             """Stop and clear all orch queues if condition is met."""

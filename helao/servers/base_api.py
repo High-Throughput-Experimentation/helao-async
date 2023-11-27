@@ -1,6 +1,6 @@
 import json
 
-from typing import Union, Dict, List
+from typing import Union
 from socket import gethostname
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
@@ -247,7 +247,7 @@ class BaseAPI(HelaoFastAPI):
         async def add_globalexp_param(
             action: Action = Body({}, embed=True),
             param_name: str = "globalexp_param_test",
-            param_value: Union[Dict, List, str, float, int, bool] = True,
+            param_value: Union[str, float, int, bool] = True,
         ):
             active = await self.base.setup_and_contain_action()
             pdict = {
