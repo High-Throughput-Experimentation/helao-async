@@ -107,7 +107,6 @@ class SIMDOS:
         self.poll_signalq = asyncio.Queue(1)
         self.poll_signal_task = self.aloop.create_task(self.poll_signal_loop())
         self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
-        self.present_volume_ul = 0.0
         self.last_state = "unknown"
 
     async def start_polling(self):
@@ -127,7 +126,7 @@ class SIMDOS:
     def send(self, cmd: str):
         addr = self.config_dict["address"]
         command_str = f"{addr:02}{cmd}"
-        self.com.write(command_str)
+        self.com.write(b"\x02" + command_str.encode() + b"\x03U")
         self.com.flush()
         resp = self.com.readlines()
         # keep only ack responses
