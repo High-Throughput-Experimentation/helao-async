@@ -280,7 +280,7 @@ def CCSI_sub_drain(
         apm.add(ORCH_server, "wait", {"waittime": apm.pars.DeltaDilute1_duration})  # DeltaDilute time usually 15
 
 #
-# MAIN HEADSPACE PURGE
+# MAIN HEADSPACE PURGE and FILL
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1A", "on": 0})
@@ -385,7 +385,7 @@ def CCSI_sub_initialization_firstpart(
     apm.add(ORCH_server, "wait", {"waittime": 0.25})
 
 #
-# MAIN HEADSPACE PURGE
+# MAIN HEADSPACE PURGE and FILL
     # headspace flow purge cell via v1 v6
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "6A-waste", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "1B", "on": 1}, asc.no_wait)
