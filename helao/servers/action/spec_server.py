@@ -118,7 +118,7 @@ def makeApp(confPrefix, server_key, helao_root):
         return active_dict
 
     @app.post(f"/{server_key}/stop_extrig_after", tags=["action"])
-    async def stop_extrig(
+    async def stop_extrig_after(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
         delay: int = 0,
