@@ -580,7 +580,6 @@ class OrchAPI(HelaoFastAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-
         @self.post(f"/{server_key}/conditional_stop", tags=["action"])
         async def conditional_stop(
             action: Action = Body({}, embed=True),
@@ -620,6 +619,24 @@ class OrchAPI(HelaoFastAPI):
 
             finished_action = await active.finish()
             return finished_action.as_dict()
+
+        @self.post(f"/{server_key}/add_globalexp_param", tags=["action"])
+        async def add_globalexp_param(
+            action: Action = Body({}, embed=True),
+            param_name: str = "globalexp_param_test",
+            param_value: Union[str, float, int, bool] = True,
+        ):
+            active = await self.base.setup_and_contain_action()
+            pdict = {
+                active.action.action_params["param_name"]: active.action.action_params[
+                    "param_value"
+                ]
+            }
+            active.action.action_params.update(pdict)
+            active.action.to_globalexp_params = list(pdict.keys())
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
 
 class WaitExec(Executor):
     def __init__(self, *args, **kwargs):
