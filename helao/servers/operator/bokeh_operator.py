@@ -285,7 +285,7 @@ class BokehOperator:
             label="Clear expplan", button_type="default", width=100
         )
         self.button_clear_expplan.on_event(ButtonClick, self.callback_clear_expplan)
-        self.orch_status_button = Toggle(
+        self.orch_status_button = Button(
             label="Disabled", disabled=False, button_type="danger", width=400
         )  # success: green, danger: red
 
