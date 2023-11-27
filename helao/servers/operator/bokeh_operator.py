@@ -444,7 +444,7 @@ class BokehOperator:
             text="<b>Orchestrator</b>",
             width=self.max_width - 20,
             height=32,
-            style={"font-size": "150%", "color": "black", "border": "1px solid #000000"},
+            style={"font-size": "150%", "color": "#E74C3C"},
         )
 
         self.layout0 = layout(
@@ -456,7 +456,7 @@ class BokehOperator:
                             text=f"<b>{self.config_dict.get('doc_name', 'BokehOperator')} on {gethostname().lower()} -- config: {os.path.basename(self.loaded_config_path)}</b>",
                             width=self.max_width - 20,
                             height=32,
-                            style={"font-size": "200%", "color": "black"},
+                            style={"font-size": "200%", "color": "#E74C3C"},
                         ),
                     ],
                     # background="#D6DBDF",
