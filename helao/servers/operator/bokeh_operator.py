@@ -444,7 +444,7 @@ class BokehOperator:
             text="<b>Orchestrator</b>",
             width=self.max_width - 20,
             height=32,
-            style={"font-size": "150%", "color": "black"},
+            style={"font-size": "150%", "color": "black", "border": "1px solid #000000"},
         )
 
         self.layout0 = layout(
