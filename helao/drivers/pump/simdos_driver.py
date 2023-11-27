@@ -230,64 +230,64 @@ class SIMDOS:
         self.com.close()
 
 
-class PumpExec(Executor):
-    def __init__(self, direction: int, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.direction = direction
-        # current plan is 1 pump per COM
-        self.pump_name = list(self.active.base.server_params["pumps"].keys())[0]
-        self.active.base.print_message("PumpExec initialized.")
+# class PumpExec(Executor):
+#     def __init__(self, direction: int, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+#         self.direction = direction
+#         # current plan is 1 pump per COM
+#         self.pump_name = list(self.active.base.server_params["pumps"].keys())[0]
+#         self.active.base.print_message("PumpExec initialized.")
 
-    async def _pre_exec(self):
-        "Set rate and volume params, then run."
-        self.active.base.print_message("PumpExec running setup methods.")
-        rate_resp = self.active.base.fastapp.driver.set_rate(
-            pump_name=self.pump_name,
-            rate_val=self.active.action.action_params["rate_uL_sec"],
-            direction=self.direction,
-        )
-        self.active.base.print_message(f"set_rate returned: {rate_resp}")
-        vol_resp = self.active.base.fastapp.driver.set_target_volume(
-            pump_name=self.pump_name,
-            vol_val=self.active.action.action_params["volume_uL"],
-        )
-        self.active.base.print_message(f"set_target_volume returned: {vol_resp}")
-        return {"error": ErrorCodes.none}
+#     async def _pre_exec(self):
+#         "Set rate and volume params, then run."
+#         self.active.base.print_message("PumpExec running setup methods.")
+#         rate_resp = self.active.base.fastapp.driver.set_rate(
+#             pump_name=self.pump_name,
+#             rate_val=self.active.action.action_params["rate_uL_sec"],
+#             direction=self.direction,
+#         )
+#         self.active.base.print_message(f"set_rate returned: {rate_resp}")
+#         vol_resp = self.active.base.fastapp.driver.set_target_volume(
+#             pump_name=self.pump_name,
+#             vol_val=self.active.action.action_params["volume_uL"],
+#         )
+#         self.active.base.print_message(f"set_target_volume returned: {vol_resp}")
+#         return {"error": ErrorCodes.none}
 
-    async def _exec(self):
-        start_resp = self.active.base.fastapp.driver.start_pump(
-            pump_name=self.pump_name,
-            direction=self.direction,
-        )
-        self.active.base.print_message(f"start_pump returned: {start_resp}")
-        return {"error": ErrorCodes.none}
+#     async def _exec(self):
+#         start_resp = self.active.base.fastapp.driver.start_pump(
+#             pump_name=self.pump_name,
+#             direction=self.direction,
+#         )
+#         self.active.base.print_message(f"start_pump returned: {start_resp}")
+#         return {"error": ErrorCodes.none}
 
-    async def _poll(self):
-        live_buffer, _ = self.active.base.get_lbuf(self.pump_name)
-        pump_status = live_buffer["status"]
-        # self.active.base.print_message(f"poll iter status: {pump_status}")
-        await asyncio.sleep(0.01)
-        if pump_status in ["infusing", "withdrawing"]:
-            return {"error": ErrorCodes.none, "status": HloStatus.active}
-        elif pump_status == "stalled":
-            return {"error": ErrorCodes.motor, "status": HloStatus.errored}
-        else:
-            return {"error": ErrorCodes.none, "status": HloStatus.finished}
+#     async def _poll(self):
+#         live_buffer, _ = self.active.base.get_lbuf(self.pump_name)
+#         pump_status = live_buffer["status"]
+#         # self.active.base.print_message(f"poll iter status: {pump_status}")
+#         await asyncio.sleep(0.01)
+#         if pump_status in ["infusing", "withdrawing"]:
+#             return {"error": ErrorCodes.none, "status": HloStatus.active}
+#         elif pump_status == "stalled":
+#             return {"error": ErrorCodes.motor, "status": HloStatus.errored}
+#         else:
+#             return {"error": ErrorCodes.none, "status": HloStatus.finished}
 
-    async def _manual_stop(self):
-        stop_resp = self.active.base.fastapp.driver.stop_pump(self.pump_name)
-        self.active.base.print_message(f"stop_pump returned: {stop_resp}")
-        return {"error": ErrorCodes.none}
+#     async def _manual_stop(self):
+#         stop_resp = self.active.base.fastapp.driver.stop_pump(self.pump_name)
+#         self.active.base.print_message(f"stop_pump returned: {stop_resp}")
+#         return {"error": ErrorCodes.none}
 
-    async def _post_exec(self):
-        self.active.base.print_message("PumpExec running cleanup methods.")
-        clearvol_resp = self.active.base.fastapp.driver.clear_volume(
-            pump_name=self.pump_name,
-            direction=self.direction,
-        )
-        self.active.base.print_message(f"clear_volume returned: {clearvol_resp}")
-        cleartar_resp = self.active.base.fastapp.driver.clear_target_volume(
-            pump_name=self.pump_name,
-        )
-        self.active.base.print_message(f"clear_target_volume returned: {cleartar_resp}")
-        return {"error": ErrorCodes.none}
+#     async def _post_exec(self):
+#         self.active.base.print_message("PumpExec running cleanup methods.")
+#         clearvol_resp = self.active.base.fastapp.driver.clear_volume(
+#             pump_name=self.pump_name,
+#             direction=self.direction,
+#         )
+#         self.active.base.print_message(f"clear_volume returned: {clearvol_resp}")
+#         cleartar_resp = self.active.base.fastapp.driver.clear_target_volume(
+#             pump_name=self.pump_name,
+#         )
+#         self.active.base.print_message(f"clear_target_volume returned: {cleartar_resp}")
+#         return {"error": ErrorCodes.none}
