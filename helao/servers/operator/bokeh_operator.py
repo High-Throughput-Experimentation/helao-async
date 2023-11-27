@@ -88,7 +88,7 @@ class BokehOperator:
                 dev_custom = {}
             self.dev_customitems = [key for key in dev_custom.keys()]
 
-        self.color_sq_param_inputs = "#F1CE63"
+        self.color_sq_param_inputs = "#FEF9E7"
         self.max_width = 1024
         # holds the page layout
         self.layout = []
@@ -444,7 +444,7 @@ class BokehOperator:
             text="<b>Orchestrator</b>",
             width=self.max_width - 20,
             height=32,
-            style={"font-size": "150%", "color": "#E15759"},
+            style={"font-size": "150%", "color": "black"},
         )
 
         self.layout0 = layout(
@@ -456,10 +456,10 @@ class BokehOperator:
                             text=f"<b>{self.config_dict.get('doc_name', 'BokehOperator')} on {gethostname().lower()} -- config: {os.path.basename(self.loaded_config_path)}</b>",
                             width=self.max_width - 20,
                             height=32,
-                            style={"font-size": "200%", "color": "#E15759"},
+                            style={"font-size": "200%", "color": "black"},
                         ),
                     ],
-                    background="#BAB0AC",
+                    # background="#EAECEE",
                     width=self.max_width,
                 ),
                 Spacer(height=10),
@@ -486,7 +486,7 @@ class BokehOperator:
                         [self.sequence_descr_txt],
                         Spacer(height=10),
                     ],
-                    background="#BAB0AC",
+                    background="#EAECEE",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -499,7 +499,7 @@ class BokehOperator:
                             self.save_last_seq_pars,
                         ]
                     ],
-                    background="#BAB0AC",
+                    background="#EAECEE",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -527,7 +527,7 @@ class BokehOperator:
                         [self.experiment_descr_txt],
                         Spacer(height=10),
                     ],
-                    background="#BAB0AC",
+                    background="#EAECEE",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -540,7 +540,7 @@ class BokehOperator:
                             self.save_last_exp_pars,
                         ],
                     ],
-                    background="#BAB0AC",
+                    background="#EAECEE",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -568,7 +568,7 @@ class BokehOperator:
                         [self.seqspec_descr_txt],
                         Spacer(height=10),
                     ],
-                    background="#BAB0AC",
+                    background="#EAECEE",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -582,7 +582,7 @@ class BokehOperator:
                             self.button_to_seqtab,
                         ],
                     ],
-                    background="#BAB0AC",
+                    background="#EAECEE",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -598,7 +598,7 @@ class BokehOperator:
                         Spacer(width=20),
                         self.orch_section,
                     ],
-                    background="#BAB0AC",
+                    # background="#EAECEE",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -635,7 +635,7 @@ class BokehOperator:
                         [Spacer(width=10), self.error_txt],
                         Spacer(height=10),
                     ],
-                    background="#BAB0AC",
+                    background="#EAECEE",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -689,7 +689,7 @@ class BokehOperator:
                         self.button_estop_orch,
                         Spacer(height=10),
                     ],
-                    background="#A0CBE8",
+                    background="#D6EAF8",
                     width=self.max_width,
                     height_policy="min",
                 ),
