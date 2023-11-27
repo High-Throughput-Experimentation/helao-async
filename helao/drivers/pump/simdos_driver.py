@@ -291,10 +291,3 @@ class PumpExec(Executor):
         )
         self.active.base.print_message(f"clear_target_volume returned: {cleartar_resp}")
         return {"error": ErrorCodes.none}
-
-
-# volume tracking notes
-# 1. init volume at 0, need endpoint for user to tell initial volume
-# 2. clear target vol is not necessary, but clear infused/withdrawn volume is needed before starting next syringe action
-# 3. withdraw will add to volume tracker
-# 4. infuse will remove from volume tracker
