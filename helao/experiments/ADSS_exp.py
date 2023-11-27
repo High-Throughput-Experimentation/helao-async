@@ -1828,13 +1828,14 @@ def ADSS_sub_keep_electrolyte(
 # need to move to clean spot first before beginning clean
 def ADSS_sub_clean_cell(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     Clean_volume_ul: float = 3000,
     Syringe_rate_ulsec: float = 300,
     PurgeWait_s: float = 3,
     ReturnLineWait_s: float = 30,
     DrainWait_s: float = 60,
     ReturnLineReverseWait_s: float = 5,
+    lift: bool = False,
     #    ResidualWait_s: float = 15,
 ):
     apm = ActionPlanMaker()
@@ -1895,8 +1896,8 @@ def ADSS_sub_clean_cell(
             # ResidualWait_s=apm.pars.ResidualWait_s,
         )
     )
-
-    apm.add(MOTOR_server, "z_move", {"z_position": "load"})
+    if lift:
+        apm.add(MOTOR_server, "z_move", {"z_position": "load"})
 
     return apm.action_list
 
