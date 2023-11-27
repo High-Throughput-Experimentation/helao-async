@@ -1,6 +1,6 @@
 import json
-import time
-from copy import copy
+
+from typing import Union, Dict, List
 from socket import gethostname
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
@@ -50,7 +50,7 @@ class BaseAPI(HelaoFastAPI):
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
-            if request.method == "HEAD" :  # comes from endpoint checker, session.head()
+            if request.method == "HEAD":  # comes from endpoint checker, session.head()
                 response = await call_next(request)
             elif request.url.path.strip("/").startswith(f"{server_key}/"):
                 await set_body(request, await request.body())
@@ -240,5 +240,22 @@ class BaseAPI(HelaoFastAPI):
                 self.base.actionservermodel.estop = switch
             if switch:
                 active.action.action_status.append(HloStatus.estopped)
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+        @self.post(f"/{server_key}/add_globalexp_param", tags=["action"])
+        async def add_globalexp_param(
+            action: Action = Body({}, embed=True),
+            param_name: str = "globalexp_param_test",
+            param_value: Union[Dict, List, str, float, int, bool] = True,
+        ):
+            active = await self.base.setup_and_contain_action()
+            pdict = {
+                active.action.action_params["param_name"]: active.action.action_params[
+                    "param_value"
+                ]
+            }
+            active.action.action_params.update(pdict)
+            active.action.to_globalexp_params = list(pdict.keys())
             finished_action = await active.finish()
             return finished_action.as_dict()
