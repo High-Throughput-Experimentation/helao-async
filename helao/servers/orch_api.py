@@ -626,7 +626,7 @@ class OrchAPI(HelaoFastAPI):
             param_name: str = "globalexp_param_test",
             param_value: Union[str, float, int, bool] = True,
         ):
-            active = await self.base.setup_and_contain_action()
+            active = await self.orch.setup_and_contain_action()
             pdict = {
                 active.action.action_params["param_name"]: active.action.action_params[
                     "param_value"
