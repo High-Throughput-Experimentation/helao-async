@@ -7,10 +7,12 @@ __all__ = ["TEST_sub_noblocking", "TEST_sub_conditional_stop"]
 
 
 from socket import gethostname
+
 # from typing import Optional
 
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helaocore.models.machine import MachineModel as MM
+
 # from helaocore.models.action_start_condition import ActionStartCondition
 # from helaocore.models.process_contrib import ProcessContrib
 
@@ -49,6 +51,7 @@ def TEST_sub_conditional_stop(
         ORCH_server,
         "conditional_stop",
         {"stop_parameter": "globalexp_test", "stop_value": True},
+        from_globalexp_params={"globalexp_test": "globalexp_test"},
     )
     apm.add(ORCH_server, "wait", {"waittime": 1})
     apm.add(ORCH_server, "wait", {"waittime": 1})
