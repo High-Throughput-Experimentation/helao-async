@@ -31,6 +31,7 @@ from helaocore.models.sample import SolidSample, LiquidSample
 from helaocore.models.machine import MachineModel
 from helaocore.models.process_contrib import ProcessContrib
 from helaocore.models.electrolyte import Electrolyte
+from helao.helpers.ref_electrode import REF_TABLE
 
 from helao.drivers.motion.enum import MoveModes, TransformationModes
 from helao.drivers.io.enum import TriggerType
@@ -214,15 +215,16 @@ def ECHE_sub_shutdown(experiment: Experiment):
 
 def ECHE_sub_CA_led(
     experiment: Experiment,
-    experiment_version: int = 3,
-    CA_potential_vsRHE: float = 0.0,
+    experiment_version: int = 4,
+    CA_potential: float = 0.0,
+    potential_versus: str = "rhe",
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
     solution_bubble_gas: str = "O2",
     measurement_area: float = 0.071,  # 3mm diameter droplet
-    ref_electrode_type: str = "NHE",
-    ref_vs_nhe: float = 0.21,
     samplerate_sec: float = 0.1,
     CA_duration_sec: float = 60,
     gamry_i_range: str = "auto",
@@ -280,12 +282,20 @@ def ECHE_sub_CA_led(
         ],
     )
 
-    # apply potential
-    potential = (
-        apm.pars.CA_potential_vsRHE
-        - 1.0 * apm.pars.ref_vs_nhe
-        - 0.059 * apm.pars.solution_ph
-    )
+    # # calculate potential
+    versus = 0  # for vs rhe
+    if apm.pars.potential_versus == "oer":
+        versus = 1.23
+    if apm.pars.ref_type == "rhe":
+        potential = apm.pars.CA_potential - apm.pars.ref_offset__V + versus
+    else:
+        potential = (
+            apm.pars.CA_potential
+            - 1.0 * apm.pars.ref_offset__V
+            + versus
+            - 0.059 * apm.pars.solution_ph
+            - REF_TABLE[apm.pars.ref_type]
+        )
     print(f"ECHE_sub_CA potential: {potential}")
     apm.add(
         PSTAT_server,
@@ -404,15 +414,16 @@ def ECHE_sub_preCV(
 
 def ECHE_sub_CA(
     experiment: Experiment,
-    experiment_version: int = 2,
-    CA_potential_vsRHE: float = 0.0,
+    experiment_version: int = 3,
+    CA_potential: float = 0.0,
+    potential_versus: str = "rhe",
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
     solution_bubble_gas: str = "O2",
     measurement_area: float = 0.071,  # 3mm diameter droplet
-    ref_electrode_type: str = "NHE",
-    ref_vs_nhe: float = 0.21,
     samplerate_sec: float = 0.1,
     CA_duration_sec: float = 60,
     gamry_i_range: str = "auto",
@@ -436,11 +447,24 @@ def ECHE_sub_CA(
     )
 
     # apply potential
-    potential = (
-        apm.pars.CA_potential_vsRHE
-        - 1.0 * apm.pars.ref_vs_nhe
-        - 0.059 * apm.pars.solution_ph
-    )
+    # potential = (
+    #     apm.pars.CA_potential_vsRHE
+    #     - 1.0 * apm.pars.ref_vs_nhe
+    #     - 0.059 * apm.pars.solution_ph
+    # # calculate potential
+    versus = 0  # for vs rhe
+    if apm.pars.potential_versus == "oer":
+        versus = 1.23
+    if apm.pars.ref_type == "rhe":
+        potential = apm.pars.CA_potential - apm.pars.ref_offset__V + versus
+    else:
+        potential = (
+            apm.pars.CA_potential
+            - 1.0 * apm.pars.ref_offset__V
+            + versus
+            - 0.059 * apm.pars.solution_ph
+            - REF_TABLE[apm.pars.ref_type]
+        )
     print(f"ECHE_sub_CA potential: {potential}")
     apm.add(
         PSTAT_server,
@@ -467,7 +491,7 @@ def ECHE_sub_CA(
 
 def ECHE_sub_CV_led(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 4,
     Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
@@ -485,8 +509,8 @@ def ECHE_sub_CV_led(
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
     solution_bubble_gas: str = "O2",
     measurement_area: float = 0.071,  # 3mm diameter droplet
-    ref_electrode_type: str = "NHE",
-    ref_vs_nhe: float = 0.21,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
     illumination_source: str = "doric_led1",
     illumination_wavelength: float = 0.0,
     illumination_intensity: float = 0.0,
@@ -565,16 +589,20 @@ def ECHE_sub_CV_led(
         "run_CV",
         {
             "Vinit__V": apm.pars.Vinit_vsRHE
-            - 1.0 * apm.pars.ref_vs_nhe
+            - 1.0 * apm.pars.ref_offset__V
+            - REF_TABLE[apm.pars.ref_type]
             - 0.059 * apm.pars.solution_ph,
             "Vapex1__V": apm.pars.Vapex1_vsRHE
-            - 1.0 * apm.pars.ref_vs_nhe
+            - 1.0 * apm.pars.ref_offset__V
+            - REF_TABLE[apm.pars.ref_type]
             - 0.059 * apm.pars.solution_ph,
             "Vapex2__V": apm.pars.Vapex2_vsRHE
-            - 1.0 * apm.pars.ref_vs_nhe
+            - 1.0 * apm.pars.ref_offset__V
+            - REF_TABLE[apm.pars.ref_type]
             - 0.059 * apm.pars.solution_ph,
             "Vfinal__V": apm.pars.Vfinal_vsRHE
-            - 1.0 * apm.pars.ref_vs_nhe
+            - 1.0 * apm.pars.ref_offset__V
+            - REF_TABLE[apm.pars.ref_type]
             - 0.059 * apm.pars.solution_ph,
             "ScanRate__V_s": apm.pars.scanrate_voltsec,
             "AcqInterval__s": apm.pars.samplerate_sec,
@@ -600,7 +628,7 @@ def ECHE_sub_CV_led(
 
 def ECHE_sub_CV(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
@@ -616,8 +644,8 @@ def ECHE_sub_CV(
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
     solution_bubble_gas: str = "O2",
     measurement_area: float = 0.071,  # 3mm diameter droplet
-    ref_electrode_type: str = "NHE",
-    ref_vs_nhe: float = 0.21,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
     comment: str = "",
 ):
     """last functionality test: -"""
@@ -643,16 +671,20 @@ def ECHE_sub_CV(
         "run_CV",
         {
             "Vinit__V": apm.pars.Vinit_vsRHE
-            - 1.0 * apm.pars.ref_vs_nhe
+            - 1.0 * apm.pars.ref_offset__V
+            - REF_TABLE[apm.pars.ref_type]
             - 0.059 * apm.pars.solution_ph,
             "Vapex1__V": apm.pars.Vapex1_vsRHE
-            - 1.0 * apm.pars.ref_vs_nhe
+            - 1.0 * apm.pars.ref_offset__V
+            - REF_TABLE[apm.pars.ref_type]
             - 0.059 * apm.pars.solution_ph,
             "Vapex2__V": apm.pars.Vapex2_vsRHE
-            - 1.0 * apm.pars.ref_vs_nhe
+            - 1.0 * apm.pars.ref_offset__V
+            - REF_TABLE[apm.pars.ref_type]
             - 0.059 * apm.pars.solution_ph,
             "Vfinal__V": apm.pars.Vfinal_vsRHE
-            - 1.0 * apm.pars.ref_vs_nhe
+            - 1.0 * apm.pars.ref_offset__V
+            - REF_TABLE[apm.pars.ref_type]
             - 0.059 * apm.pars.solution_ph,
             "ScanRate__V_s": apm.pars.scanrate_voltsec,
             "AcqInterval__s": apm.pars.samplerate_sec,
@@ -675,15 +707,15 @@ def ECHE_sub_CV(
 
 def ECHE_sub_CP(
     experiment: Experiment,
-    experiment_version: int = 2,
+    experiment_version: int = 3,
     CP_current: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
     solution_bubble_gas: str = "O2",
     measurement_area: float = 0.071,  # 3mm diameter droplet
-    ref_electrode_type: str = "NHE",
-    ref_vs_nhe: float = 0.21,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
     samplerate_sec: float = 0.1,
     CP_duration_sec: float = 60,
     gamry_i_range: str = "auto",
@@ -736,15 +768,15 @@ def ECHE_sub_CP(
 
 def ECHE_sub_CP_led(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 4,
     CP_current: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
     solution_bubble_gas: str = "O2",
     measurement_area: float = 0.071,  # 3mm diameter droplet
-    ref_electrode_type: str = "NHE",
-    ref_vs_nhe: float = 0.21,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
     samplerate_sec: float = 0.1,
     CP_duration_sec: float = 60,
     gamry_i_range: str = "auto",
