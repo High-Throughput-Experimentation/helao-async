@@ -1008,7 +1008,7 @@ class Active:
         try:
             _ = futr.result()
         except Exception as exc:
-            self.print_message(
+            self.base.print_message(
                 f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}"
             )
 
