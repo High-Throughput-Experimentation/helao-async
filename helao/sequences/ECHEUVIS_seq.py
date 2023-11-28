@@ -3,6 +3,7 @@ __all__ = [
     "ECHEUVIS_CA_led",
     "ECHEUVIS_multiCA_led",
     "ECHEUVIS_CP_led",
+    "ECHEUVIS_postseq",
 ]
 
 import random
@@ -1417,5 +1418,24 @@ def ECHEUVIS_multiCA_led(
         },
     )
     epm.add_experiment("ECHEUVIS_sub_shutdown", {})
+
+    return epm.experiment_plan_list  # returns complete experiment list
+
+
+def ECHEUVIS_postseq(
+    sequence_version: int = 1,
+    analysis_seq_uuid: str = "",
+    plate_id: int = 0,
+    recent: bool = False,
+):
+    epm = ExperimentPlanMaker()
+    epm.add_experiment(
+        "ECHEUVIS_analysis_stability",
+        {
+            "sequence_uuid": analysis_seq_uuid,
+            "plate_id": plate_id,
+            "recent": recent,
+        },
+    )
 
     return epm.experiment_plan_list  # returns complete experiment list

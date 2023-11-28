@@ -13,6 +13,7 @@ __all__ = [
     "ECHEUVIS_sub_shutdown",
     "ECHEUVIS_sub_engage",
     "ECHEUVIS_sub_disengage",
+    "ECHEUVIS_analysis_stability",
 ]
 
 
@@ -41,6 +42,7 @@ PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
 CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict()
 CAM_server = MM(server_name="CAM", machine_name=gethostname().lower()).as_dict()
 KMOTOR_server = MM(server_name="KMOTOR", machine_name=gethostname().lower()).as_dict()
+ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
 
 toggle_triggertype = TriggerType.fallingedge
 
@@ -787,3 +789,25 @@ def ECHEUVIS_sub_engage(
             else ActionStartCondition.wait_for_all,
         )
     return apm.action_list  # returns complete action list to orch
+
+
+def ECHEUVIS_analysis_stability(
+    experiment: Experiment,
+    experiment_version: int = 2,
+    sequence_uuid: str = "",
+    plate_id: int = 0,
+    recent: bool = True,
+    params: dict = {},
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(
+        ANA_server,
+        "analyze_echeuvis",
+        {
+            "sequence_uuid": apm.pars.sequence_uuid,
+            "plate_id": apm.pars.plate_id,
+            "recent": apm.pars.recent,
+            "params": apm.pars.params,
+        },
+    )
+    return apm.action_list
