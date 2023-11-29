@@ -37,75 +37,43 @@ def makeApp(confPrefix, server_key, helao_root):
     async def stop_polling():
         await app.driver.stop_polling()
 
-    # @app.post(f"/{server_key}/infuse", tags=["action"])
-    # async def infuse(
-    #     action: Action = Body({}, embed=True),
-    #     action_version: int = 1,
-    #     rate_uL_sec: int = 0,
-    #     volume_uL: int = 0,
-    # ):
+    @app.post("f{server_key}/run_continuous", tags=["action"])
+    async def run_continuous(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        rate_uL_min: int = 0,
+        duration_sec: float = 0.0,
+    ):
     #     active = await app.base.setup_and_contain_action()
-    #     executor = PumpExec(direction=1, active=active, oneoff=False, poll_rate=0.2)
+    #     executor = RunExec(direction=1, active=active, oneoff=False, poll_rate=0.2)
     #     active_action_dict = active.start_executor(executor)
     #     return active_action_dict
+        pass
 
-    # @app.post(f"/{server_key}/withdraw", tags=["action"])
-    # async def withdraw(
-    #     action: Action = Body({}, embed=True),
-    #     action_version: int = 1,
-    #     rate_uL_sec: int = 0,
-    #     volume_uL: int = 0,
-    # ):
+    @app.post("f{server_key}/dispense_byvolume", tags=["action"])
+    async def dispense_byvolume(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        volume_uL: int = 0,
+        dispense_duration_sec: int = 0,
+    ):
     #     active = await app.base.setup_and_contain_action()
-    #     executor = PumpExec(direction=-1, active=active, oneoff=False, poll_rate=0.2)
+    #     executor = VolExec(direction=1, active=active, oneoff=False, poll_rate=0.2)
     #     active_action_dict = active.start_executor(executor)
     #     return active_action_dict
+        pass
 
-    # @app.post(f"/{server_key}/get_present_volume", tags=["action"])
-    # async def get_present_volume(
-    #     action: Action = Body({}, embed=True),
-    #     action_version: int = 1,
-    # ):
+    @app.post("f{server_key}/dispense_byrate", tags=["action"])
+    async def dispense_byrate(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        rate_uL_min: int = 0,
+        dispense_duration_sec: int = 0,
+    ):
     #     active = await app.base.setup_and_contain_action()
-    #     present_volume = app.driver.present_volume_ul
-    #     datadict = {"present_volume_ul": present_volume, "error_code": ErrorCodes.none}
-    #     datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
-    #     active.action.action_params.update({"_present_volume_ul": present_volume})
-    #     active.enqueue_data_nowait(datamodel, action=active.action)
-    #     finished_action = await active.finish()
-    #     return finished_action.as_dict()
-
-    # @app.post(f"/set_present_volume", tags=["private"])
-    # async def set_present_volume(volume_uL: float = 0):
-    #     app.driver.present_volume_ul = volume_uL
-    #     return {"present_volume_ul": volume_uL}
-
-    # @app.post(f"/get_present_volume", tags=["private"])
-    # async def get_present_volume_priv():
-    #     return {"present_volume_ul": app.driver.present_volume_ul}
-
-    # @app.post("/set_rate", tags=["private"])
-    # async def set_rate(pump_name: str, rate_uL_sec: int, direction: int):
-    #     return app.driver.set_rate(pump_name, rate_uL_sec, direction)
-
-    # @app.post("/set_target_volume", tags=["private"])
-    # async def set_target_volume(pump_name: str, volume_uL: int):
-    #     return app.driver.set_target_volume(pump_name, volume_uL)
-
-    # @app.post("/start_pump", tags=["private"])
-    # async def start_pump(pump_name: str, direction: int):
-    #     return app.driver.start_pump(pump_name, direction)
-
-    # @app.post("/stop_pump", tags=["private"])
-    # async def stop_pump(pump_name: str):
-    #     return app.driver.stop_pump(pump_name)
-
-    # @app.post("/clear_volume", tags=["private"])
-    # async def clear_volume(pump_name: str):
-    #     return app.driver.clear_volume(pump_name)
-
-    # @app.post("/clear_target_volume", tags=["private"])
-    # async def clear_target_volume(pump_name: str):
-    #     return app.driver.clear_target_volume(pump_name)
+    #     executor = RateExec(direction=1, active=active, oneoff=False, poll_rate=0.2)
+    #     active_action_dict = active.start_executor(executor)
+    #     return active_action_dict
+        pass
 
     return app

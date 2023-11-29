@@ -229,7 +229,7 @@ class SIMDOS:
         self.com.close()
 
 
-# class PumpExec(Executor):
+# class RunExec(Executor):
 #     def __init__(self, direction: int, *args, **kwargs):
 #         super().__init__(*args, **kwargs)
 #         self.direction = direction
