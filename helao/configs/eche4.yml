@@ -30,7 +30,7 @@ sequence_params:
   toggle_is_shutter: false
   gamrychannelwait: -1
   gamrychannelsend: 0
-run_type: eche
+run_type: echeuvis
 root: C:\INST_hlo
 servers:
   ORCH:
