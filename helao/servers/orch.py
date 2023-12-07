@@ -108,6 +108,7 @@ class Orch(Base):
         self.bokehapp = None
         self.orch_op = None
         self.op_enabled = self.server_params.get("enable_op", False)
+        self.heartbeat_interval = self.server_params.get("heartbeat_interval", 10)
         # basemodel which holds all information for orch
         self.globalstatusmodel = GlobalStatusModel(orchestrator=self.server)
         self.globalstatusmodel._sort_status()
@@ -669,7 +670,7 @@ class Orch(Base):
                         {v: self.active_experiment.globalexp_params[k]}
                     )
 
-            actserv_exists = await endpoints_available([A.url])
+            actserv_exists, _ = await endpoints_available([A.url])
             if not actserv_exists:
                 stop_message = f"{A.url} is not available, orchestrator will stop. Rectify action server then resume orchestrator run."
                 self.stop_message = stop_message
@@ -1504,3 +1505,17 @@ class Orch(Base):
         finished_action = await active.finish()
         self.last_wait_ts = check_time
         return finished_action
+
+    async def active_action_monitor(self):
+        while self.globalstatusmodel.loop_state == LoopStatus.started:
+            still_alive = True
+            active_endpoints = [actmod.url for actmod in self.globalstatusmodel.active_dict.values()]
+            if active_endpoints:
+                unique_endpoints = list(set(active_endpoints))
+                still_alive, unavail = endpoints_available(unique_endpoints)
+            if not still_alive:
+                bad_serves = [x.strip('/'.split('/')[-2]) for x,_ in unavail]
+                self.orch.current_stop_message = f"{', '.join(bad_serves)} servers are unavailable"
+                await self.stop()
+                await self.update_operator(True)
+            await asyncio.sleep(self.heartbeat_interval)
