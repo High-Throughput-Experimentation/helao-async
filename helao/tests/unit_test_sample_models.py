@@ -214,7 +214,7 @@ def sample_model_unit_test():
         # testing sample list basemodel functions
         try:
             print(f"sample_model test {testcounter} ",end = "")
-            test_sample_list = SampleList(samples=[test_liquid.dict(),test_gas.dict(),test_solid.dict(),test_assembly.dict(), test_assembly2.dict()])
+            test_sample_list = SampleList(samples=[test_liquid.model_dump(),test_gas.model_dump(),test_solid.model_dump(),test_assembly.model_dump(), test_assembly2.model_dump()])
             print(passed_msg)
         except Exception as e:
             tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))

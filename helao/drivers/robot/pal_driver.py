@@ -56,9 +56,9 @@ class PALposition(BaseModel, HelaoDict):
     # will be also added to
     # sample in/out
     # depending on cam
-    tray: Optional[int]
-    slot: Optional[int]
-    vial: Optional[int]
+    tray: Optional[int] = None
+    slot: Optional[int] = None
+    vial: Optional[int] = None
     error: Optional[ErrorCodes] = ErrorCodes.none
 
 
@@ -72,8 +72,8 @@ class PalAction(BaseModel, HelaoDict):
 
     # this holds the runtime list for excution of the PAL cam
     # a microcam could run 'repeat' times
-    dest: Optional[PALposition]
-    source: Optional[PALposition]
+    dest: Optional[PALposition] = None
+    source: Optional[PALposition] = None
 
     dilute: List[bool] = Field(default=[])
     dilute_type: List[Union[str, None]] = Field(default=[])
@@ -83,9 +83,9 @@ class PalAction(BaseModel, HelaoDict):
     # for each repeat
 
     # I probably don't need them as lists but can keep it for now
-    start_time: Optional[int]
-    continue_time: Optional[int]
-    done_time: Optional[int]
+    start_time: Optional[int] = None
+    continue_time: Optional[int] = None
+    done_time: Optional[int] = None
 
 
 class PalMicroCam(BaseModel, HelaoDict):

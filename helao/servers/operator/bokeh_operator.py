@@ -802,7 +802,7 @@ class BokehOperator:
                     args=tmpargs,
                     defaults=tmpdefs,
                     argtypes=tmptypes,
-                ).dict()
+                ).model_dump()
             )
         for item in self.sequences:
             self.sequence_select_list.append(item["sequence_name"])
@@ -860,7 +860,7 @@ class BokehOperator:
                     args=tmpargs,
                     defaults=tmpdefs,
                     argtypes=tmptypes,
-                ).dict()
+                ).model_dump()
             )
         for item in self.experiments:
             self.experiment_select_list.append(item["experiment_name"])

@@ -96,7 +96,7 @@ def CCSI_sub_load_solid(
                     "plate_id": apm.pars.solid_plate_id,
                     "machine_name": "legacy",
                 }
-            ).dict(),
+            ).model_dump(),
         },
     )
 
@@ -126,7 +126,7 @@ def CCSI_sub_load_liquid(
             "custom": "cell1_we",
             "source_liquid_in": LiquidSample(
                 sample_no=apm.pars.reservoir_liquid_sample_no, machine_name=ORCH_HOST
-            ).dict(),
+            ).model_dump(),
             "volume_ml": apm.pars.volume_ul_cell_liquid / 1000,
             "combine_liquids": apm.pars.combine_True_False,
             "dilute_liquids": apm.pars.water_True_False,
@@ -151,7 +151,7 @@ def CCSI_sub_load_gas(
             "custom": "cell1_we",
             "load_sample_in": GasSample(
                 sample_no=apm.pars.reservoir_gas_sample_no, machine_name=ORCH_HOST
-            ).dict(),
+            ).model_dump(),
             "volume_ml": apm.pars.volume_ul_cell_gas / 1000,
         },
     )
