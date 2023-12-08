@@ -675,9 +675,9 @@ class Orch(Base):
             if not actserv_exists:
                 stop_message = f"{A.url} is not available, orchestrator will stop. Rectify action server then resume orchestrator run."
                 self.stop_message = stop_message
-                await self.orch.stop()
+                await self.stop()
                 self.action_dq.insert(0, A)
-                await self.orch.update_operator(True)
+                await self.update_operator(True)
                 return ErrorCodes.none
 
             self.print_message(
@@ -706,9 +706,9 @@ class Orch(Base):
                 if error_code != ErrorCodes.none:
                     stop_message = f"Dispatching action {A.action_name} did not return status code 200. Pausing orch."
                     self.stop_message = stop_message
-                    await self.orch.stop()
+                    await self.stop()
                     self.action_dq.insert(0, A)
-                    await self.orch.update_operator(True)
+                    await self.update_operator(True)
                     return ErrorCodes.none
 
                 # except asyncio.exceptions.TimeoutError:
@@ -1517,7 +1517,7 @@ class Orch(Base):
                     still_alive, unavail = await endpoints_available(unique_endpoints)
                 if not still_alive:
                     bad_serves = [x.strip('/'.split('/')[-2]) for x,_ in unavail]
-                    self.orch.current_stop_message = f"{', '.join(bad_serves)} servers are unavailable"
+                    self.current_stop_message = f"{', '.join(bad_serves)} servers are unavailable"
                     await self.stop()
                     await self.update_operator(True)
             await asyncio.sleep(self.heartbeat_interval)

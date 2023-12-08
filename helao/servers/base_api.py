@@ -1,4 +1,5 @@
 import json
+from copy import copy
 
 from typing import Union
 from socket import gethostname
@@ -9,6 +10,7 @@ from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.premodels import Action
 from helaocore.models.machine import MachineModel
 from fastapi import Body, WebSocket, WebSocketDisconnect, Request
+from fastapi.routing import APIRoute
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.action_start_condition import ActionStartCondition as ASC
 from starlette.types import Message
@@ -103,6 +105,16 @@ class BaseAPI(HelaoFastAPI):
             if driver_class is not None:
                 self.driver = driver_class(self.base)
             self.base.dyn_endpoints_init()
+
+        @self.on_event("startup")
+        async def add_default_head_endpoints() -> None:
+            for route in self.routes:
+                if isinstance(route, APIRoute) and "POST" in route.methods:
+                    new_route = copy(route)
+                    new_route.methods = {"HEAD"}
+                    new_route.include_in_schema = False
+                    self.routes.append(new_route)
+
 
         @self.websocket("/ws_status")
         async def websocket_status(websocket: WebSocket):

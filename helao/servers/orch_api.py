@@ -3,11 +3,13 @@ import time
 import os
 import pickle
 import asyncio
+from copy import copy
 from enum import Enum
 from socket import gethostname
 from typing import Union, Optional
 
 from fastapi import Body, WebSocket, Request
+from fastapi.routing import APIRoute
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
@@ -120,6 +122,15 @@ class OrchAPI(HelaoFastAPI):
             if driver_class:
                 self.driver = driver_class(self.orch)
             self.orch.endpoint_queues_init()
+
+        @self.on_event("startup")
+        async def add_default_head_endpoints() -> None:
+            for route in self.routes:
+                if isinstance(route, APIRoute) and "POST" in route.methods:
+                    new_route = copy(route)
+                    new_route.methods = {"HEAD"}
+                    new_route.include_in_schema = False
+                    self.routes.append(new_route)
 
         # --- BASE endpoints ---
         @self.websocket("/ws_status")
