@@ -7,7 +7,7 @@ git fetch --prune
 switch.bat main
 git branch -D unstable
 git pull
-switch.bar %corebranch%
+switch.bat %corebranch%
 git pull
 cd ..\helao-async
 for /f "delims=" %%i in ('git branch --show-current') do set asyncbranch=%%i
