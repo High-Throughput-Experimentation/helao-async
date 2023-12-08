@@ -25,7 +25,7 @@ from helaocore.error import ErrorCodes
 from helaocore.models.experiment import ExperimentModel
 from helaocore.models.hlostatus import HloStatus
 from starlette.types import Message
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 
 class OrchAPI(HelaoFastAPI):
@@ -62,7 +62,7 @@ class OrchAPI(HelaoFastAPI):
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
             if request.method == "HEAD":  # comes from endpoint checker, session.head()
-                response = await call_next(request)
+                response = Response()
             elif request.url.path.strip("/").startswith(f"{server_key}/"):
                 await set_body(request, await request.body())
                 # body_dict = await request.json()

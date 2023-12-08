@@ -14,7 +14,7 @@ from fastapi.routing import APIRoute
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.action_start_condition import ActionStartCondition as ASC
 from starlette.types import Message
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from websockets.exceptions import ConnectionClosedOK
 
 
@@ -53,7 +53,7 @@ class BaseAPI(HelaoFastAPI):
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
             if request.method == "HEAD":  # comes from endpoint checker, session.head()
-                response = await call_next(request)
+                response = Response()
             elif request.url.path.strip("/").startswith(f"{server_key}/"):
                 await set_body(request, await request.body())
                 body_bytes = await get_body(request)
