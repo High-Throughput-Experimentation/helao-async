@@ -157,6 +157,7 @@ class Orch(Base):
             self.start_operator()
         self.status_subscriber = asyncio.create_task(self.subscribe_all())
         self.globstat_broadcaster = asyncio.create_task(self.globstat_broadcast_task())
+        self.heartbeat_monitor = asyncio.create_task(self.active_action_monitor())
 
     def endpoint_queues_init(self):
         for urld in self.fast_urls:
