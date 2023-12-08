@@ -155,7 +155,7 @@ class DataRequestsClient:
             ReadDataRequest: Details of the created data request.
         """
         self._ensure_client_open()
-        response = self.client.post("/data-requests/", json=item.dict())
+        response = self.client.post("/data-requests/", json=item.model_dump())
         response.raise_for_status()
         return ReadDataRequest(**response.json())
 
@@ -171,7 +171,7 @@ class DataRequestsClient:
         """
         self._ensure_client_open()
         # convert UUID to string
-        payload = item.dict()
+        payload = item.model_dump()
         payload["id"] = str(payload["id"])
         response = self.client.put("/data-requests/", json=payload)
         response.raise_for_status()

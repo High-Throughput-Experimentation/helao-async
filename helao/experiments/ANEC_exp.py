@@ -183,7 +183,7 @@ def ANEC_sub_load_solid(
                     "plate_id": apm.pars.solid_plate_id,
                     "machine_name": "legacy",
                 }
-            ).dict(),
+            ).model_dump(),
         },
     )
 
@@ -346,7 +346,7 @@ def ANEC_sub_flush_fill_cell(
             "custom": "cell1_we",
             "source_liquid_in": LiquidSample(
                 sample_no=apm.pars.reservoir_liquid_sample_no, machine_name=ORCH_HOST
-            ).dict(),
+            ).model_dump(),
             "volume_ml": apm.pars.volume_ul_cell_liquid,
             "combine_liquids": True,
             "dilute_liquids": True,
@@ -492,7 +492,7 @@ def ANEC_sub_load_solid_only(
                 sample_no=apm.pars.solid_sample_no,
                 plate_id=apm.pars.solid_plate_id,
                 machine_name="legacy",
-            ).dict(),
+            ).model_dump(),
         },
     )
     return apm.action_list
@@ -521,7 +521,7 @@ def ANEC_sub_load_solid_and_clean_cell(
                 sample_no=apm.pars.solid_sample_no,
                 plate_id=apm.pars.solid_plate_id,
                 machine_name="legacy",
-            ).dict(),
+            ).model_dump(),
         },
     )
     apm.add_action_list(ANEC_sub_drain_cell(experiment))

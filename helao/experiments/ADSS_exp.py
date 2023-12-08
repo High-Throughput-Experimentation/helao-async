@@ -116,7 +116,7 @@ def debug(
             "custom": "cell1_we",
             "load_sample_in": SolidSample(
                 **{"sample_no": 1, "plate_id": 4534, "machine_name": "legacy"}
-            ).dict(),
+            ).model_dump(),
         },
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )
@@ -247,7 +247,7 @@ def ADSS_sub_load_solid(
                     "plate_id": apm.pars.solid_plate_id,
                     "machine_name": "legacy",
                 }
-            ).dict(),
+            ).model_dump(),
         },
         start_condition=ActionStartCondition.wait_for_orch,  #
     )
@@ -281,7 +281,7 @@ def ADSS_sub_load_liquid(
                     "sample_no": apm.pars.liquid_sample_no,
                     "machine_name": gethostname(),
                 }
-            ).dict(),
+            ).model_dump(),
             "volume_ml": apm.pars.volume_ul_cell_liquid / 1000,
             "combine_liquids": False,
             "dilute_liquids": False,
@@ -324,7 +324,7 @@ def ADSS_sub_load(
                     "plate_id": apm.pars.solid_plate_id,
                     "machine_name": "legacy",
                 }
-            ).dict(),
+            ).model_dump(),
         },
         start_condition=ActionStartCondition.wait_for_orch,
     )
@@ -355,7 +355,7 @@ def ADSS_sub_load(
                         "sample_no": apm.pars.liquid_sample_no,
                         "machine_name": gethostname(),
                     }
-                ).dict(),
+                ).model_dump(),
                 "volume_ml": apm.pars.liquid_sample_volume_ul / 1000,
                 "combine_liquids": False,
                 "dilute_liquids": False,
@@ -1326,7 +1326,7 @@ def ADSS_sub_insitu_actions(
                                 "sample_no": apm.pars.electrolyte_sample_no,
                                 "machine_name": gethostname(),
                             }
-                        ).dict(),
+                        ).model_dump(),
                         "volume_ml": apm.pars.insert_electrolyte_volume_ul / 1000,
                         "combine_liquids": True,
                         "dilute_liquids": False,
@@ -1361,7 +1361,7 @@ def ADSS_sub_insitu_actions(
                         "sample_no": apm.pars.electrolyte_sample_no,
                         "machine_name": gethostname(),
                     }
-                ).dict(),
+                ).model_dump(),
                 "volume_ml": apm.pars.insert_electrolyte_volume_ul / 1000,
                 "combine_liquids": True,
                 "dilute_liquids": False,
@@ -1407,7 +1407,7 @@ def ADSS_sub_add_liquid(
                     "sample_no": apm.pars.liquid_sample_no,
                     "machine_name": gethostname(),
                 }
-            ).dict(),
+            ).model_dump(),
             "volume_ml": apm.pars.added_liquid_volume_ul / 1000,
             "combine_liquids": True,
             "dilute_liquids": False,

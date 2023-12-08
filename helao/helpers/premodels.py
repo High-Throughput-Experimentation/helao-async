@@ -44,13 +44,13 @@ class Sequence(SequenceModel):
         return f"sequence_name:{self.sequence_name}"
 
     def get_seq(self):
-        seq = SequenceModel(**self.dict())
+        seq = SequenceModel(**self.model_dump())
         seq.experiment_list = [
-            ShortExperimentModel(**exp.dict()) for exp in self.experimentmodel_list
+            ShortExperimentModel(**exp.model_dump()) for exp in self.experimentmodel_list
         ]
         # either we have a plan at the beginning or not
         # don't add it later from the experimentmodel_list
-        # seq.experiment_plan_list = [ExperimentTemplate(**exp.dict()) for exp in self.experimentmodel_list]
+        # seq.experiment_plan_list = [ExperimentTemplate(**exp.model_dump()) for exp in self.experimentmodel_list]
         return seq
 
     def init_seq(self, time_offset: float = 0, force: Optional[bool] = False):
@@ -121,7 +121,7 @@ class Experiment(Sequence, ExperimentModel):
         ).replace(r"\\", "/")
 
     def get_exp(self):
-        exp = ExperimentModel(**self.dict())
+        exp = ExperimentModel(**self.model_dump())
         # now add all actions
         self._experiment_update_from_actlist(exp=exp)
         return exp
@@ -145,7 +145,7 @@ class Experiment(Sequence, ExperimentModel):
                 info=True,
             )
 
-            exp.action_list.append(ShortActionModel(**actm.dict()))
+            exp.action_list.append(ShortActionModel(**actm.model_dump()))
             for file in actm.files:
                 if file.action_uuid is None:
                     file.action_uuid = actm.action_uuid
@@ -241,7 +241,7 @@ class Action(Experiment, ActionModel):
         return f"action_name:{self.action_name}"
 
     def get_actmodel(self):
-        return ActionModel(**self.dict())
+        return ActionModel(**self.model_dump())
 
     def init_act(self, time_offset: float = 0, force: Optional[bool] = False):
         if self.sequence_timestamp is None or self.experiment_timestamp is None:

@@ -433,10 +433,10 @@ class EcheUvisAnalysis:
                 inputs.append(adm)
 
         scalar_outputs = [
-            k for k, v in self.outputs.dict().items() if not isinstance(v, list)
+            k for k, v in self.outputs.model_dump().items() if not isinstance(v, list)
         ]
         array_outputs = [
-            k for k in self.outputs.dict().keys() if k not in scalar_outputs
+            k for k in self.outputs.model_dump().keys() if k not in scalar_outputs
         ]
 
         outputs = []
@@ -456,9 +456,9 @@ class EcheUvisAnalysis:
                     output_keys=output_keys,
                     output_name=label,
                     output={
-                        k: self.outputs.dict()[k]
+                        k: self.outputs.model_dump()[k]
                         for k in output_keys
-                        if not isinstance(self.outputs.dict()[k], list)  # only scalars
+                        if not isinstance(self.outputs.model_dump()[k], list)  # only scalars
                     },
                 )
                 outputs.append(out_model)
@@ -478,4 +478,4 @@ class EcheUvisAnalysis:
             outputs=outputs,
             dummy=dummy,
         )
-        return ana_model.clean_dict(), self.outputs.dict()
+        return ana_model.clean_dict(), self.outputs.model_dump()
