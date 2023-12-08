@@ -4,10 +4,10 @@ cd ..\helao-core
 for /f "delims=" %%i in ('git branch --show-current') do set corebranch=%%i
 git reset --hard
 git fetch --prune
-switch.bat main
+..\helao-async\switch.bat main
 git branch -D unstable
 git pull
-switch.bat %corebranch%
+..\helao-async\switch.bat %corebranch%
 git pull
 cd ..\helao-async
 for /f "delims=" %%i in ('git branch --show-current') do set asyncbranch=%%i
