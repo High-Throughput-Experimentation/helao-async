@@ -1508,15 +1508,16 @@ class Orch(Base):
         return finished_action
 
     async def active_action_monitor(self):
-        while self.globalstatusmodel.loop_state == LoopStatus.started:
-            still_alive = True
-            active_endpoints = [actmod.url for actmod in self.globalstatusmodel.active_dict.values()]
-            if active_endpoints:
-                unique_endpoints = list(set(active_endpoints))
-                still_alive, unavail = endpoints_available(unique_endpoints)
-            if not still_alive:
-                bad_serves = [x.strip('/'.split('/')[-2]) for x,_ in unavail]
-                self.orch.current_stop_message = f"{', '.join(bad_serves)} servers are unavailable"
-                await self.stop()
-                await self.update_operator(True)
+        while True:
+            if self.globalstatusmodel.loop_state == LoopStatus.started:
+                still_alive = True
+                active_endpoints = [actmod.url for actmod in self.globalstatusmodel.active_dict.values()]
+                if active_endpoints:
+                    unique_endpoints = list(set(active_endpoints))
+                    still_alive, unavail = endpoints_available(unique_endpoints)
+                if not still_alive:
+                    bad_serves = [x.strip('/'.split('/')[-2]) for x,_ in unavail]
+                    self.orch.current_stop_message = f"{', '.join(bad_serves)} servers are unavailable"
+                    await self.stop()
+                    await self.update_operator(True)
             await asyncio.sleep(self.heartbeat_interval)
