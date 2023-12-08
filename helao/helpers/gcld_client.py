@@ -18,8 +18,8 @@ class ClientSettings(BaseSettings):
         API_KEY (str): The API key for authentication.
     """
 
-    BASE_URL: Optional[str]
-    API_KEY: Optional[str]
+    BASE_URL: Optional[str] = None
+    API_KEY: Optional[str] = None
 
     class Config:
         env_file = os.environ.get("DATA_REQ_CRED", ".env")
@@ -54,9 +54,9 @@ class BaseDataRequestModel(BaseModel):
 
     status: Status
     composition: dict
-    score: Optional[float]
-    sample_label: Optional[str]
-    analysis: Optional[dict]
+    score: Optional[float] = None
+    sample_label: Optional[str] = None
+    analysis: Optional[dict] = None
 
 
 class ReadDataRequest(BaseDataRequestModel):
@@ -76,9 +76,9 @@ class CreateDataRequestModel(BaseModel):
     """
 
     composition: Dict[str, float]
-    score: Optional[float]
-    sample_label: Optional[str]
-    analysis: Optional[dict]
+    score: Optional[float] = None
+    sample_label: Optional[str] = None
+    analysis: Optional[dict] = None
 
 
 class UpdateDataRequestModel(BaseModel):
@@ -93,9 +93,9 @@ class UpdateDataRequestModel(BaseModel):
     """
 
     id: UUID
-    sample_label: Optional[str]
-    score: Optional[float]
-    composition: Optional[dict]
+    sample_label: Optional[str] = None
+    score: Optional[float] = None
+    composition: Optional[dict] = None
 
 
 class DataRequestsClient:
