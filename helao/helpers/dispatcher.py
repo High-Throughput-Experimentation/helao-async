@@ -166,7 +166,8 @@ async def endpoints_available(req_list: list):
                 states.append('server error')
             else:
                 states.append('no success')
-                                
+        except aiohttp.ClientSSLError:
+            states.append('cert failure')
         except aiohttp.ClientConnectionError:
             states.append('could not connect')
         except asyncio.TimeoutError:
