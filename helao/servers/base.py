@@ -253,14 +253,14 @@ class Base:
                 flatParams = get_flat_params(route.dependant)
                 paramD = {
                     par.name: {
-                        # "outer_type": str(par.outer_type_).split("'")[1]
-                        # if len(str(par.outer_type_).split("'")) >= 2
-                        # else str(par.outer_type_),
+                        "outer_type": str(par.annotation).split("'")[1]
+                        if len(str(par.annotation).split("'")) >= 2
+                        else str(par.annotation),
                         "type": str(par.type_).split("'")[1]
                         if len(str(par.type_).split("'")) >= 2
                         else str(par.type_),
                         "required": par.required,
-                        "shape": par.shape,
+                        # "shape": par.shape,
                         "default": par.default if par.default is not ... else None,
                     }
                     for par in flatParams
