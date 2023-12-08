@@ -5,12 +5,12 @@ git reset --hard
 git switch main
 git branch -D unstable
 git fetch --prune
-git switch %currentbranch%
+git checkout %currentbranch%
 git pull
 cd ..\helao-core
 git reset --hard
 git switch main
 git branch -D unstable
 git fetch --prune
-git switch %currentbranch%
+git checkout %currentbranch%
 git pull
