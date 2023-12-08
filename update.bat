@@ -6,6 +6,7 @@ git reset --hard origin/main
 git checkout main
 git branch -D unstable
 git fetch --prune --all
+git pull
 git checkout %currentbranch%
 git pull
 
@@ -15,6 +16,7 @@ git reset --hard origin/main
 git checkout main
 git branch -D unstable
 git fetch --prune --all
+git pull
 git checkout %currentbranch%
 git pull
 
