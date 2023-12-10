@@ -140,6 +140,12 @@ servers:
           unit_id: A
       co2_server_name: CO2SENSOR
     verbose: false
+  SIM:
+    host: 127.0.0.1
+    port: 8002
+    group: action
+    fast: ws_simulator
+    params: {}
   CALC:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 8011
