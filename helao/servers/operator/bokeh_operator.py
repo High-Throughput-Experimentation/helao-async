@@ -1362,7 +1362,7 @@ class BokehOperator:
             (self.orch_stepact_button, len(self.orch.action_dq)),
         ]
         for sbutton, numq in stepwisebuttons:
-            sbutton.label = sbutton.label.split('[')[0] + f"[{numq}]"
+            sbutton.label = sbutton.label.split('[')[0].strip() + f" [{numq}]"
 
     def update_seq_param_layout(self, idx):
         args = self.sequences[idx]["args"]
