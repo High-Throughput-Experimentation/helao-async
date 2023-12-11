@@ -219,9 +219,17 @@ class BokehOperator:
         self.sequence_tab = Panel(child=self.sequence_table, title="Sequences")
         self.experiment_tab = Panel(child=self.experiment_table, title="Experiments")
         self.action_tab = Panel(child=self.action_table, title="Actions")
-        self.active_tabs = Tabs(
+        self.queue_tabs = Tabs(
             tabs=[self.sequence_tab, self.experiment_tab, self.action_tab],
             height_policy="min",
+        )
+
+        self.planner_tab = Panel(
+            child=self.experiment_plan_table, title="Sequence Planner"
+        )
+        self.active_tab = Panel(child=self.active_action_table, title="Active Actions")
+        self.planactive_tabs = Tabs(
+            tabs=[self.planner_tab, self.active_tab], height_policy="min"
         )
 
         self.active_action_source = ColumnDataSource(data=self.active_action_list)
@@ -643,12 +651,12 @@ class BokehOperator:
                     [
                         [
                             Div(
-                                text="<b>Sequence Planner:</b>",
+                                text="<b>Non-queued:</b>",
                                 width=200 + 50,
                                 height=15,
                             ),
                         ],
-                        [self.experiment_plan_table],
+                        [self.planactive_tabs],
                         [
                             Div(
                                 text="<b>Queues:</b>",
@@ -656,13 +664,7 @@ class BokehOperator:
                                 height=15,
                             ),
                         ],
-                        [self.active_tabs],
-                        [
-                            Div(
-                                text="<b>Active actions:</b>", width=200 + 50, height=15
-                            ),
-                        ],
-                        [self.active_action_table],
+                        [self.queue_tabs],
                         [
                             self.button_add_expplan,
                             Spacer(width=10),
@@ -1340,7 +1342,7 @@ class BokehOperator:
             self.orch.step_thru_sequences = not self.orch.step_thru_sequences
 
     def update_stepwise_toggle(self, sender):
-        sender_type = sender.label.split('[')[0].strip().split()[-1].strip()
+        sender_type = sender.label.split("[")[0].strip().split()[-1].strip()
         sender_map = {
             "actions": (self.orch_stepact_button, len(self.orch.action_dq)),
             "experiments": (self.orch_stepexp_button, len(self.orch.experiment_dq)),
@@ -1362,7 +1364,7 @@ class BokehOperator:
             (self.orch_stepact_button, len(self.orch.action_dq)),
         ]
         for sbutton, numq in stepwisebuttons:
-            sbutton.label = sbutton.label.split('[')[0].strip() + f" [{numq}]"
+            sbutton.label = sbutton.label.split("[")[0].strip() + f" [{numq}]"
 
     def update_seq_param_layout(self, idx):
         args = self.sequences[idx]["args"]
