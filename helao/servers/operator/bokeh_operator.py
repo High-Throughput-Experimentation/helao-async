@@ -898,6 +898,7 @@ class BokehOperator:
         self.vis.print_message(
             f"current queued sequences: ({len(self.orch.sequence_dq)})"
         )
+        self.sequence_tab.title = f"Sequences [{len(self.orch.sequence_dq)}]"
 
     async def get_experiments(self):
         """get experiment list from orch"""
@@ -918,6 +919,7 @@ class BokehOperator:
         self.vis.print_message(
             f"current queued experiments: ({len(self.orch.experiment_dq)})"
         )
+        self.experiment_tab.title = f"Experiments [{len(self.orch.experiment_dq)}]"
 
     async def get_actions(self):
         """get action list from orch"""
@@ -933,6 +935,7 @@ class BokehOperator:
 
         self.action_source.data = self.action_list
         self.vis.print_message(f"current queued actions: ({len(self.orch.action_dq)})")
+        self.action_tab.title = f"Actions [{len(self.orch.action_dq)}]"
 
     async def get_active_actions(self):
         """get action list from orch"""
