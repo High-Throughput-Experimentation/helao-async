@@ -1355,6 +1355,15 @@ class BokehOperator:
             sbutton.label = f"STEP-THRU {sender_type} [{numq}]"
             sbutton.button_type = "danger"
 
+    def update_queuecount_labels(self):
+        stepwisebuttons = [
+            (self.orch_stepseq_button, len(self.orch.sequence_dq)),
+            (self.orch_stepexp_button, len(self.orch.experiment_dq)),
+            (self.orch_stepact_button, len(self.orch.action_dq)),
+        ]
+        for sbutton, numq in stepwisebuttons:
+            sbutton.label = sbutton.label.split('[')[0] + f"[{numq}]"
+
     def update_seq_param_layout(self, idx):
         args = self.sequences[idx]["args"]
         defaults = self.sequences[idx]["defaults"]
@@ -1956,6 +1965,7 @@ class BokehOperator:
         await self.get_experiments()
         await self.get_actions()
         await self.get_active_actions()
+        self.update_queuecount_labels()
         for key in self.experiment_plan_list:
             self.experiment_plan_list[key] = []
         if self.sequence is not None:
