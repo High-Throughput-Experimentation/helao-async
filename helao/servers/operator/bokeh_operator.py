@@ -1960,6 +1960,9 @@ class BokehOperator:
         await self.get_sequences()
         await self.get_experiments()
         await self.get_actions()
+        self.active_tabs.update(
+            tabs=[self.sequence_tab, self.experiment_tab, self.action_tab]
+        )
         await self.get_active_actions()
         for key in self.experiment_plan_list:
             self.experiment_plan_list[key] = []
@@ -1977,7 +1980,7 @@ class BokehOperator:
 
         if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
             self.orch_status_button.label = "running"
-            self.orch_status_button.button_type = "primary"
+            self.orch_status_button.button_type = "success"
         elif self.orch.globalstatusmodel.loop_state == LoopStatus.stopped:
             stop_msg = (
                 ": " + self.orch.current_stop_message
@@ -1988,7 +1991,7 @@ class BokehOperator:
             if stop_msg:
                 self.orch_status_button.button_type = "warning"
             else:
-                self.orch_status_button.button_type = "success"
+                self.orch_status_button.button_type = "primary"
         else:
             self.orch_status_button.label = (
                 f"{self.orch.globalstatusmodel.loop_state.value}"
