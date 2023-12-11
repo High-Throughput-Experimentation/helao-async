@@ -106,28 +106,28 @@ servers:
       port: COM4
       start_margin: 0
     verbose: false
-  SYRINGE0:
-    host: hte-ccsi-02.htejcap.caltech.edu
-    port: 8013
-    group: action
-    fast: syringe_server
-    params:
-      port: COM5
-      pumps:
-        zero:
-          address: 0
-          diameter: 26.7
-  SYRINGE1:
-    host: hte-ccsi-02.htejcap.caltech.edu
-    port: 8014
-    group: action
-    fast: syringe_server
-    params:
-      port: COM6
-      pumps:
-        one:
-          address: 1
-          diameter: 26.7
+  # SYRINGE0:
+  #   host: hte-ccsi-02.htejcap.caltech.edu
+  #   port: 8013
+  #   group: action
+  #   fast: syringe_server
+  #   params:
+  #     port: COM5
+  #     pumps:
+  #       zero:
+  #         address: 0
+  #         diameter: 26.7
+  # SYRINGE1:
+  #   host: hte-ccsi-02.htejcap.caltech.edu
+  #   port: 8014
+  #   group: action
+  #   fast: syringe_server
+  #   params:
+  #     port: COM6
+  #     pumps:
+  #       one:
+  #         address: 1
+  #         diameter: 26.7
   MFC:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 8009
@@ -140,12 +140,6 @@ servers:
           unit_id: A
       co2_server_name: CO2SENSOR
     verbose: false
-  SIM:
-    host: 127.0.0.1
-    port: 8002
-    group: action
-    fast: ws_simulator
-    params: {}
   CALC:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 8011
