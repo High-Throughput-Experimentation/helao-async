@@ -43,7 +43,7 @@ class OrchAPI(HelaoFastAPI):
             helao_srv=server_key,
             title=server_title,
             description=description,
-            version=version,
+            version=str(version),
         )
         self.driver = None
 

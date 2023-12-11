@@ -138,6 +138,9 @@ servers:
         CO2:
           port: COM6
           unit_id: A
+        N2:
+          port: COM5
+          unit_id: B
       co2_server_name: CO2SENSOR
     verbose: false
   CALC:
