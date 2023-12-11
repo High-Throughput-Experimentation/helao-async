@@ -898,7 +898,7 @@ class BokehOperator:
         self.vis.print_message(
             f"current queued sequences: ({len(self.orch.sequence_dq)})"
         )
-        self.sequence_tab.title = f"Sequences [{len(self.orch.sequence_dq)}]"
+        self.sequence_tab.update(title=f"Sequences [{len(self.orch.sequence_dq)}]")
 
     async def get_experiments(self):
         """get experiment list from orch"""
@@ -919,7 +919,9 @@ class BokehOperator:
         self.vis.print_message(
             f"current queued experiments: ({len(self.orch.experiment_dq)})"
         )
-        self.experiment_tab.title = f"Experiments [{len(self.orch.experiment_dq)}]"
+        self.experiment_tab.update(
+            title=f"Experiments [{len(self.orch.experiment_dq)}]"
+        )
 
     async def get_actions(self):
         """get action list from orch"""
@@ -935,7 +937,7 @@ class BokehOperator:
 
         self.action_source.data = self.action_list
         self.vis.print_message(f"current queued actions: ({len(self.orch.action_dq)})")
-        self.action_tab.title = f"Actions [{len(self.orch.action_dq)}]"
+        self.action_tab.update(title=f"Actions [{len(self.orch.action_dq)}]")
 
     async def get_active_actions(self):
         """get action list from orch"""
@@ -1040,7 +1042,7 @@ class BokehOperator:
         loaded_params = seq.sequence_params
         # switch tabs and update layout
         self.select_tabs.active = 0
-        self.callback_sequence_select('value', seqname, seqname)
+        self.callback_sequence_select("value", seqname, seqname)
         self.sequence_dropdown.value = seqname
         # replace defaults with loaded params
         for i, x in enumerate(self.seq_param_input):
@@ -1493,7 +1495,7 @@ class BokehOperator:
 
         seqspec_path = self.seqspecs[idx]
         seqfunc_params = self.seqspec_parser.list_params(seqspec_path, self.orch)
-        
+
         for arg, argtype in self.seqspec_parser.PARAM_TYPES.items():
             if arg in seqfunc_params:
                 args.append(arg)
