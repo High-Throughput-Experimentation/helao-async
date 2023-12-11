@@ -1340,7 +1340,7 @@ class BokehOperator:
             self.orch.step_thru_sequences = not self.orch.step_thru_sequences
 
     def update_stepwise_toggle(self, sender):
-        sender_type = sender.label.split()[-1]
+        sender_type = sender.label.split()[-1].split('[')[0]
         sender_map = {
             "actions": (self.orch_stepact_button, len(self.orch.action_dq)),
             "experiments": (self.orch_stepexp_button, len(self.orch.experiment_dq)),
