@@ -898,7 +898,6 @@ class BokehOperator:
         self.vis.print_message(
             f"current queued sequences: ({len(self.orch.sequence_dq)})"
         )
-        self.sequence_tab.update(title=f"Sequences [{len(self.orch.sequence_dq)}]")
 
     async def get_experiments(self):
         """get experiment list from orch"""
@@ -919,9 +918,6 @@ class BokehOperator:
         self.vis.print_message(
             f"current queued experiments: ({len(self.orch.experiment_dq)})"
         )
-        self.experiment_tab.update(
-            title=f"Experiments [{len(self.orch.experiment_dq)}]"
-        )
 
     async def get_actions(self):
         """get action list from orch"""
@@ -937,7 +933,6 @@ class BokehOperator:
 
         self.action_source.data = self.action_list
         self.vis.print_message(f"current queued actions: ({len(self.orch.action_dq)})")
-        self.action_tab.update(title=f"Actions [{len(self.orch.action_dq)}]")
 
     async def get_active_actions(self):
         """get action list from orch"""
@@ -1347,17 +1342,17 @@ class BokehOperator:
     def update_stepwise_toggle(self, sender):
         sender_type = sender.label.split()[-1]
         sender_map = {
-            "actions": self.orch_stepact_button,
-            "experiments": self.orch_stepexp_button,
-            "sequences": self.orch_stepseq_button,
+            "actions": (self.orch_stepact_button, len(self.orch.action_dq)),
+            "experiments": (self.orch_stepexp_button, len(self.orch.experiment_dq)),
+            "sequences": (self.orch_stepseq_button, len(self.orch.sequence_dq)),
         }
-        sbutton = sender_map[sender_type]
+        sbutton, numq = sender_map[sender_type]
         self.flip_stepwise_flag(sender_type)
         if sbutton.button_type == "danger":
-            sbutton.label = f"RUN-THRU {sender_type}"
+            sbutton.label = f"RUN-THRU {sender_type} [{numq}]"
             sbutton.button_type = "success"
         else:
-            sbutton.label = f"STEP-THRU {sender_type}"
+            sbutton.label = f"STEP-THRU {sender_type} [{numq}]"
             sbutton.button_type = "danger"
 
     def update_seq_param_layout(self, idx):
@@ -1960,9 +1955,6 @@ class BokehOperator:
         await self.get_sequences()
         await self.get_experiments()
         await self.get_actions()
-        self.active_tabs.update(
-            tabs=[self.sequence_tab, self.experiment_tab, self.action_tab]
-        )
         await self.get_active_actions()
         for key in self.experiment_plan_list:
             self.experiment_plan_list[key] = []
