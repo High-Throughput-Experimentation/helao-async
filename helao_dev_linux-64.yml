@@ -34,7 +34,7 @@ dependencies:
   - psycopg2
   - pyaml
   - pybase64
-  - pydantic=1
+  - pydantic=2
   - pyfiglet
   - pyftdi
   - pymodbus
