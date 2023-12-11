@@ -88,7 +88,7 @@ def ECHE_sub_add_liquid(
                     "sample_no": apm.pars.reservoir_liquid_sample_no,
                     "machine_name": gethostname().lower(),
                 }
-            ).dict(),
+            ).model_dump(),
             "volume_ml": apm.pars.liquid_volume_ml,
             "reservoir_bubbler_gas": apm.pars.solution_bubble_gas,
             "combine_liquids": True,
@@ -122,7 +122,7 @@ def ECHE_sub_load_solid(
                     "plate_id": apm.pars.solid_plate_id,
                     "machine_name": "legacy",
                 }
-            ).dict(),
+            ).model_dump(),
         },
         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
     )

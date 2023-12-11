@@ -219,7 +219,7 @@ class BokehOperator:
         self.sequence_tab = Panel(child=self.sequence_table, title="Sequences")
         self.experiment_tab = Panel(child=self.experiment_table, title="Experiments")
         self.action_tab = Panel(child=self.action_table, title="Actions")
-        self.active_tabs = Tabs(
+        self.queue_tabs = Tabs(
             tabs=[self.sequence_tab, self.experiment_tab, self.action_tab],
             height_policy="min",
         )
@@ -235,6 +235,14 @@ class BokehOperator:
             height=200,
             autosize_mode="fit_columns",
             fit_columns=False,
+        )
+
+        self.planner_tab = Panel(
+            child=self.experiment_plan_table, title="Sequence Planner"
+        )
+        self.active_tab = Panel(child=self.active_action_table, title="Active Actions")
+        self.planactive_tabs = Tabs(
+            tabs=[self.planner_tab, self.active_tab], height_policy="min"
         )
 
         self.sequence_dropdown = Select(
@@ -643,12 +651,12 @@ class BokehOperator:
                     [
                         [
                             Div(
-                                text="<b>Sequence Planner:</b>",
+                                text="<b>Non-queued:</b>",
                                 width=200 + 50,
                                 height=15,
                             ),
                         ],
-                        [self.experiment_plan_table],
+                        [self.planactive_tabs],
                         [
                             Div(
                                 text="<b>Queues:</b>",
@@ -656,13 +664,7 @@ class BokehOperator:
                                 height=15,
                             ),
                         ],
-                        [self.active_tabs],
-                        [
-                            Div(
-                                text="<b>Active actions:</b>", width=200 + 50, height=15
-                            ),
-                        ],
-                        [self.active_action_table],
+                        [self.queue_tabs],
                         [
                             self.button_add_expplan,
                             Spacer(width=10),
@@ -802,7 +804,7 @@ class BokehOperator:
                     args=tmpargs,
                     defaults=tmpdefs,
                     argtypes=tmptypes,
-                ).dict()
+                ).model_dump()
             )
         for item in self.sequences:
             self.sequence_select_list.append(item["sequence_name"])
@@ -860,7 +862,7 @@ class BokehOperator:
                     args=tmpargs,
                     defaults=tmpdefs,
                     argtypes=tmptypes,
-                ).dict()
+                ).model_dump()
             )
         for item in self.experiments:
             self.experiment_select_list.append(item["experiment_name"])
@@ -1037,7 +1039,7 @@ class BokehOperator:
         loaded_params = seq.sequence_params
         # switch tabs and update layout
         self.select_tabs.active = 0
-        self.callback_sequence_select('value', seqname, seqname)
+        self.callback_sequence_select("value", seqname, seqname)
         self.sequence_dropdown.value = seqname
         # replace defaults with loaded params
         for i, x in enumerate(self.seq_param_input):
@@ -1340,20 +1342,29 @@ class BokehOperator:
             self.orch.step_thru_sequences = not self.orch.step_thru_sequences
 
     def update_stepwise_toggle(self, sender):
-        sender_type = sender.label.split()[-1]
+        sender_type = sender.label.split("[")[0].strip().split()[-1].strip()
         sender_map = {
-            "actions": self.orch_stepact_button,
-            "experiments": self.orch_stepexp_button,
-            "sequences": self.orch_stepseq_button,
+            "actions": (self.orch_stepact_button, len(self.orch.action_dq)),
+            "experiments": (self.orch_stepexp_button, len(self.orch.experiment_dq)),
+            "sequences": (self.orch_stepseq_button, len(self.orch.sequence_dq)),
         }
-        sbutton = sender_map[sender_type]
+        sbutton, numq = sender_map[sender_type]
         self.flip_stepwise_flag(sender_type)
         if sbutton.button_type == "danger":
-            sbutton.label = f"RUN-THRU {sender_type}"
+            sbutton.label = f"RUN-THRU {sender_type} [{numq}]"
             sbutton.button_type = "success"
         else:
-            sbutton.label = f"STEP-THRU {sender_type}"
+            sbutton.label = f"STEP-THRU {sender_type} [{numq}]"
             sbutton.button_type = "danger"
+
+    def update_queuecount_labels(self):
+        stepwisebuttons = [
+            (self.orch_stepseq_button, len(self.orch.sequence_dq)),
+            (self.orch_stepexp_button, len(self.orch.experiment_dq)),
+            (self.orch_stepact_button, len(self.orch.action_dq)),
+        ]
+        for sbutton, numq in stepwisebuttons:
+            sbutton.label = sbutton.label.split("[")[0].strip() + f" [{numq}]"
 
     def update_seq_param_layout(self, idx):
         args = self.sequences[idx]["args"]
@@ -1490,7 +1501,7 @@ class BokehOperator:
 
         seqspec_path = self.seqspecs[idx]
         seqfunc_params = self.seqspec_parser.list_params(seqspec_path, self.orch)
-        
+
         for arg, argtype in self.seqspec_parser.PARAM_TYPES.items():
             if arg in seqfunc_params:
                 args.append(arg)
@@ -1956,6 +1967,7 @@ class BokehOperator:
         await self.get_experiments()
         await self.get_actions()
         await self.get_active_actions()
+        self.update_queuecount_labels()
         for key in self.experiment_plan_list:
             self.experiment_plan_list[key] = []
         if self.sequence is not None:
@@ -1972,7 +1984,7 @@ class BokehOperator:
 
         if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
             self.orch_status_button.label = "running"
-            self.orch_status_button.button_type = "primary"
+            self.orch_status_button.button_type = "success"
         elif self.orch.globalstatusmodel.loop_state == LoopStatus.stopped:
             stop_msg = (
                 ": " + self.orch.current_stop_message
@@ -1983,7 +1995,7 @@ class BokehOperator:
             if stop_msg:
                 self.orch_status_button.button_type = "warning"
             else:
-                self.orch_status_button.button_type = "success"
+                self.orch_status_button.button_type = "primary"
         else:
             self.orch_status_button.label = (
                 f"{self.orch.globalstatusmodel.loop_state.value}"

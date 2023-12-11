@@ -5,11 +5,9 @@ channels:
 dependencies:
   - pip:
     - aioshutil
-    # - gpflow
     - psycopg2
     - pylablib
     - git+https://github.com/spomjaksilp/pyMeCom
-    # - tensorflow
     - zeroconf
   - aiofiles
   - aiohttp
@@ -36,10 +34,10 @@ dependencies:
   - psutil
   - pyaml
   - pybase64
-  - pydantic=1
+  - pydantic=2
   - pyfiglet
   - pyserial
-  - python
+  - python=3.11
   - python-dotenv
   - python-multipart
   - pyzmq

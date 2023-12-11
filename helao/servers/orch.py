@@ -1177,8 +1177,8 @@ class Orch(Base):
         prepend: bool = False,
         at_index: int = None,
     ):
-        Ddict = experimentmodel.dict()
-        Ddict.update(seq.dict())
+        Ddict = experimentmodel.model_dump()
+        Ddict.update(seq.model_dump())
         D = Experiment(**Ddict)
 
         # init uuid now for tracking later
