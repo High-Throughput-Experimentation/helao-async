@@ -224,14 +224,6 @@ class BokehOperator:
             height_policy="min",
         )
 
-        self.planner_tab = Panel(
-            child=self.experiment_plan_table, title="Sequence Planner"
-        )
-        self.active_tab = Panel(child=self.active_action_table, title="Active Actions")
-        self.planactive_tabs = Tabs(
-            tabs=[self.planner_tab, self.active_tab], height_policy="min"
-        )
-
         self.active_action_source = ColumnDataSource(data=self.active_action_list)
         self.columns_active_action = [
             TableColumn(field=key, title=key) for key in self.active_action_list
@@ -243,6 +235,14 @@ class BokehOperator:
             height=200,
             autosize_mode="fit_columns",
             fit_columns=False,
+        )
+
+        self.planner_tab = Panel(
+            child=self.experiment_plan_table, title="Sequence Planner"
+        )
+        self.active_tab = Panel(child=self.active_action_table, title="Active Actions")
+        self.planactive_tabs = Tabs(
+            tabs=[self.planner_tab, self.active_tab], height_policy="min"
         )
 
         self.sequence_dropdown = Select(
