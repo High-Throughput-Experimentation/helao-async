@@ -39,7 +39,7 @@ dependencies:
   - pydantic=2
   - pyfiglet
   - pyserial
-  - python
+  - python=3.11
   - python-dotenv
   - python-multipart
   - pyzmq
