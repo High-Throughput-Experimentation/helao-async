@@ -49,7 +49,7 @@ class _palcmd(BaseModel):
 
 
 class PALposition(BaseModel, HelaoDict):
-    position: Optional[str]  # dest can be cust. or tray
+    position: Optional[str] = None  # dest can be cust. or tray
     samples_initial: List[SampleUnion] = Field(default=[])
     samples_final: List[SampleUnion] = Field(default=[])
     # sample: List[SampleUnion] = Field(default=[])  # holds dest/source position
