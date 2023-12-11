@@ -1,15 +1,7 @@
 name: helao
 channels:
   - conda-forge
-  - defaults
 dependencies:
-  - pip:
-    - aioshutil
-    # - gpflow
-    - pyft232
-    - pylablib
-    - git+https://github.com/spomjaksilp/pyMeCom
-    # - tensorflow
   - aiofiles
   - aiohttp
   - bokeh=2
@@ -60,3 +52,10 @@ dependencies:
   - uvicorn
   - websockets
   - zeroconf
+  - zeromq
+  - pip:
+      - aioshutil
+      - git+https://github.com/spomjaksilp/pyMeCom
+      - plumbum
+      - pyft232
+      - pylablib
