@@ -9,6 +9,7 @@ import io
 import time
 import asyncio
 from typing import Optional
+from enum import IntEnum, Enum
 
 # import traceback
 
@@ -75,6 +76,22 @@ FADIAG = [
     "no encoder sensor signal",
 ]
 
+class PumpMode(IntEnum):
+    continuous = 0
+    volume = 1
+    rate = 2
+
+class PumpParam(Enum):
+    rate = "RV"
+    time = "DT"
+    volume = "DV"
+
+PUMPLIMS = {
+    PumpParam.rate: (30, 20000),
+    PumpParam.time: (100, 99595999),
+    PumpParam.volume: (30, 9999999)
+    
+}
 
 def str2bin(val: str):
     try:
@@ -220,46 +237,123 @@ class SIMDOS:
                         status_dict[f"{group}_{k}"] = v
 
                     lastupdate = time.time()
+
                 await self.base.put_lbuf(status_dict)
                 # await asyncio.sleep(0.01)
+
+                faults = [
+                    fk
+                    for k, ((fk, fv), _) in status_dict.values()
+                    if k.startswith("fault_") and fv != 0
+                ]
+                if faults:
+                    for executor in self.base.executors.values():
+                        executor.stop_action_task()
+
             else:
                 await asyncio.sleep(0.05)
+
+    def get_mode(self):
+        resp = self.send("?MS")
+        return PumpMode(int(resp))
+
+    def set_mode(self, mode: PumpMode):
+        success = False
+        modecmd = f"MS{int(mode)}"
+        _ = self.send(modecmd)
+        if self.get_mode() == mode:
+            success = True
+        else:
+            self.base.print_message(f"could not set pump mode to {mode.name}")
+        return success
+
+    def get_run_param(self, param: PumpParam):
+        parcmd = param.value
+        resp = self.send(f"?{parcmd}")
+        return int(resp)
+
+    def set_run_param(self, param: PumpParam, val: int):
+        success = False
+        lo_lim, hi_lim = PUMPLIMS[param]
+        parcmd = param.value
+        if val < lo_lim or val > hi_lim:
+            self.base.print_message(f"{param.name} setpoint is out of range [{lo_lim}, {hi_lim}]")
+        else:
+            resp = self.send(f"parcmd{val:08}")
+            check = None
+            if resp is not None:
+                check = self.send(f"?{parcmd}")
+            if check == val:
+                success = True
+            else:
+                self.base.print_message(f"could not validate {param.name} setpoint")
+        return success
+
+    def stop(self):
+        success = False
+        resp = self.send("KY0")
+        if resp is not None:
+            success = True
+        return success
+
+    def start(self):
+        success = False
+        resp = self.send("KY1")
+        if resp is not None:
+            success = True
+        return success
+
+    def prime(self):
+        success = False
+        resp = self.send("KY2")
+        if resp is not None:
+            success = True
+        return success
+
+    def pause(self):
+        success = False
+        resp = self.send("KY3")
+        if resp is not None:
+            success = True
+        return success
 
     def shutdown(self):
         self.com.close()
 
 
-# class RunExec(Executor):
-#     def __init__(self, direction: int, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         self.direction = direction
-#         # current plan is 1 pump per COM
-#         self.pump_name = list(self.active.base.server_params["pumps"].keys())[0]
-#         self.active.base.print_message("PumpExec initialized.")
+class RunExec(Executor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # current plan is 1 pump per COM
+        self.driver = self.active.base.fastapp.driver
+        self.active.base.print_message("RunExec initialized.")
 
-#     async def _pre_exec(self):
-#         "Set rate and volume params, then run."
-#         self.active.base.print_message("PumpExec running setup methods.")
-#         rate_resp = self.active.base.fastapp.driver.set_rate(
-#             pump_name=self.pump_name,
-#             rate_val=self.active.action.action_params["rate_uL_sec"],
-#             direction=self.direction,
-#         )
-#         self.active.base.print_message(f"set_rate returned: {rate_resp}")
-#         vol_resp = self.active.base.fastapp.driver.set_target_volume(
-#             pump_name=self.pump_name,
-#             vol_val=self.active.action.action_params["volume_uL"],
-#         )
-#         self.active.base.print_message(f"set_target_volume returned: {vol_resp}")
-#         return {"error": ErrorCodes.none}
+    async def _pre_exec(self):
+        "Set rate and volume params, then run."
+        self.active.base.print_message("RunExec running setup methods.")
+        await self.driver.stop_polling()
+        error = ErrorCodes.none
+        mode = PumpMode.continuous
+        setmode_resp = self.driver.set_mode(mode)
+        if not setmode_resp:
+            self.active.base.print_message(f"could not set pump mode to {mode.name}")
+            error = ErrorCodes.cmd_error
+        param = PumpParam.rate
+        val = self.active.action.action_params["volume_uL"]
+        setrate_resp = self.driver.set_run_param(param, val)
+        if not setrate_resp:
+            self.active.base.print_message(f"could not set pump {param.name} to {val}")
+            error = ErrorCodes.cmd_error
+        return {"error": error}
 
-#     async def _exec(self):
-#         start_resp = self.active.base.fastapp.driver.start_pump(
-#             pump_name=self.pump_name,
-#             direction=self.direction,
-#         )
-#         self.active.base.print_message(f"start_pump returned: {start_resp}")
-#         return {"error": ErrorCodes.none}
+    async def _exec(self):
+        error = ErrorCodes.none
+        start_resp = self.start()
+        if not start_resp:
+            self.active.base.print_message("could not start pump")
+            error = ErrorCodes.cmd_error
+        await self.driver.start_polling()
+        return {"error": error}
 
 #     async def _poll(self):
 #         live_buffer, _ = self.active.base.get_lbuf(self.pump_name)
@@ -273,10 +367,15 @@ class SIMDOS:
 #         else:
 #             return {"error": ErrorCodes.none, "status": HloStatus.finished}
 
-#     async def _manual_stop(self):
-#         stop_resp = self.active.base.fastapp.driver.stop_pump(self.pump_name)
-#         self.active.base.print_message(f"stop_pump returned: {stop_resp}")
-#         return {"error": ErrorCodes.none}
+    async def _manual_stop(self):
+        error = ErrorCodes.none
+        await self.driver.stop_polling()
+        stop_resp = self.stop()
+        if not stop_resp:
+            self.active.base.print_message("could not stop pump")
+            error = ErrorCodes.cmd_error
+        await self.driver.start_polling()
+        return {"error": error}
 
 #     async def _post_exec(self):
 #         self.active.base.print_message("PumpExec running cleanup methods.")

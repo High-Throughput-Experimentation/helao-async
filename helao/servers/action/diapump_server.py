@@ -37,7 +37,7 @@ def makeApp(confPrefix, server_key, helao_root):
     async def stop_polling():
         await app.driver.stop_polling()
 
-    @app.post("f{server_key}/run_continuous", tags=["action"])
+    @app.post(f"{server_key}/run_continuous", tags=["action"])
     async def run_continuous(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
@@ -50,7 +50,7 @@ def makeApp(confPrefix, server_key, helao_root):
     #     return active_action_dict
         pass
 
-    @app.post("f{server_key}/dispense_byvolume", tags=["action"])
+    @app.post(f"{server_key}/dispense_byvolume", tags=["action"])
     async def dispense_byvolume(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
@@ -63,7 +63,7 @@ def makeApp(confPrefix, server_key, helao_root):
     #     return active_action_dict
         pass
 
-    @app.post("f{server_key}/dispense_byrate", tags=["action"])
+    @app.post(f"{server_key}/dispense_byrate", tags=["action"])
     async def dispense_byrate(
         action: Action = Body({}, embed=True),
         action_version: int = 1,
