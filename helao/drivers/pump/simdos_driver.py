@@ -327,6 +327,8 @@ class RunExec(Executor):
         # current plan is 1 pump per COM
         self.driver = self.active.base.fastapp.driver
         self.active.base.print_message("RunExec initialized.")
+        self.start_time = time.time()
+        self.duration = self.active.action.action_params.get("duration_sec", -1)
 
     async def _pre_exec(self):
         "Set rate and volume params, then run."
@@ -348,6 +350,7 @@ class RunExec(Executor):
 
     async def _exec(self):
         error = ErrorCodes.none
+        self.start_time = time.time()
         start_resp = self.start()
         if not start_resp:
             self.active.base.print_message("could not start pump")
@@ -355,17 +358,16 @@ class RunExec(Executor):
         await self.driver.start_polling()
         return {"error": error}
 
-#     async def _poll(self):
-#         live_buffer, _ = self.active.base.get_lbuf(self.pump_name)
-#         pump_status = live_buffer["status"]
-#         # self.active.base.print_message(f"poll iter status: {pump_status}")
-#         await asyncio.sleep(0.01)
-#         if pump_status in ["infusing", "withdrawing"]:
-#             return {"error": ErrorCodes.none, "status": HloStatus.active}
-#         elif pump_status == "stalled":
-#             return {"error": ErrorCodes.motor, "status": HloStatus.errored}
-#         else:
-#             return {"error": ErrorCodes.none, "status": HloStatus.finished}
+    async def _poll(self):
+        (run_msg, run_bool), _ = self.active.base.get_lbuf("run_0")
+        iter_time = time.time()
+        elapsed_time = iter_time - self.start_time
+        status = HloStatus.active
+        if run_bool == 0 or ((elapsed_time > self.duration) and (self.duration > 0)):
+            self.active.base.print_message(run_msg)
+            status = HloStatus.finished
+        await asyncio.sleep(0.01)
+        return {"error": ErrorCodes.none, "status": status}
 
     async def _manual_stop(self):
         error = ErrorCodes.none
