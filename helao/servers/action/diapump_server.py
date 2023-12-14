@@ -37,6 +37,14 @@ def makeApp(confPrefix, server_key, helao_root):
     async def stop_polling():
         await app.driver.stop_polling()
 
+    @app.post("/start_pump", tags=["private"])
+    def start_pump():
+        app.driver.start()
+
+    @app.post("/stop_pump", tags=["private"])
+    def stop_pump():
+        app.driver.stop()
+    
     @app.post(f"/{server_key}/run_continuous", tags=["action"])
     async def run_continuous(
         action: Action = Body({}, embed=True),
