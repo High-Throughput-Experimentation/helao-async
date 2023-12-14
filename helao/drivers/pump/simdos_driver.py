@@ -154,7 +154,7 @@ class SIMDOS:
             if x.decode("ascii").startswith("\x06\x02") and "\x03" in x.decode("ascii")
         ]
         # strip frame
-        resp = [x.decode("ascii").strip("\x06\x02").split("\x03")[0] for x in resp]
+        resp = [x.decode("ascii").partition("\x06\x02")[-1].split("\x03")[0] for x in resp]
         resp = [x for x in resp if x != ""]
         if not resp:
             self.base.print_message("command did not return a valid response")
@@ -259,6 +259,7 @@ class SIMDOS:
 
     def get_mode(self):
         resp = self.send("?MS")
+        print(resp)
         return PumpMode(int(resp))
 
     def set_mode(self, mode: PumpMode):
@@ -274,6 +275,7 @@ class SIMDOS:
     def get_run_param(self, param: PumpParam):
         parcmd = param.value
         resp = self.send(f"?{parcmd}")
+        print(resp)
         return int(resp)
 
     def set_run_param(self, param: PumpParam, val: int):
