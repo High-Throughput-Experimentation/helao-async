@@ -238,7 +238,6 @@ class SIMDOS:
 
                     lastupdate = time.time()
 
-                print(status_dict)
                 await self.base.put_lbuf(status_dict)
                 # await asyncio.sleep(0.01)
 
@@ -247,7 +246,6 @@ class SIMDOS:
                     for k, (fk, fv) in status_dict.items()
                     if k.startswith("fault_") and fv != 0
                 ]
-                print(faults)
                 if faults:
                     self.base.print_message(f"fault detected, stopping simdos executors")
                     for executor in self.base.executors.values():
@@ -258,7 +256,6 @@ class SIMDOS:
 
     def get_mode(self):
         resp = self.send("?MS")
-        print(resp)
         return PumpMode(int(resp))
 
     def set_mode(self, mode: PumpMode):
@@ -274,7 +271,6 @@ class SIMDOS:
     def get_run_param(self, param: PumpParam):
         parcmd = param.value
         resp = self.send(f"?{parcmd}")
-        print(resp)
         return int(resp)
 
     def set_run_param(self, param: PumpParam, val: int):
