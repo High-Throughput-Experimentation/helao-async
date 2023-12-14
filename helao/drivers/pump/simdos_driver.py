@@ -287,6 +287,7 @@ class SIMDOS:
                 check = self.send(f"?{parcmd}")
             if int(check) == val:
                 success = True
+                self.base.print_message(f"successfully set {param.name} tp {val}")
             else:
                 self.base.print_message(f"could not validate {param.name} setpoint")
         return success
@@ -353,7 +354,7 @@ class RunExec(Executor):
     async def _exec(self):
         error = ErrorCodes.none
         self.start_time = time.time()
-        start_resp = self.start()
+        start_resp = self.driver.start()
         if not start_resp:
             self.active.base.print_message("could not start pump")
             error = ErrorCodes.cmd_error
@@ -374,7 +375,7 @@ class RunExec(Executor):
     async def _manual_stop(self):
         error = ErrorCodes.none
         await self.driver.stop_polling()
-        stop_resp = self.stop()
+        stop_resp = self.driver.stop()
         if not stop_resp:
             self.active.base.print_message("could not stop pump")
             error = ErrorCodes.cmd_error
