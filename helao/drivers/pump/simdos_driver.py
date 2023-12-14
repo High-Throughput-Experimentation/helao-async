@@ -361,15 +361,13 @@ class RunExec(Executor):
         return {"error": error}
 
     async def _poll(self):
-        (run_msg, run_bool), _ = self.active.base.get_lbuf("run_0")
         iter_time = time.time()
         elapsed_time = iter_time - self.start_time
         status = HloStatus.active
-        if run_bool == 0 or ((elapsed_time > self.duration) and (self.duration > 0)):
+        if (elapsed_time > self.duration) and (self.duration > 0):
             await self.driver.stop_polling()
             self.driver.stop()
             status = HloStatus.finished
-        await asyncio.sleep(0.01)
         return {"error": ErrorCodes.none, "status": status}
 
     async def _manual_stop(self):
