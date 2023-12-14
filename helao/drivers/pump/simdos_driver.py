@@ -362,12 +362,12 @@ class RunExec(Executor):
 
     async def _poll(self):
         (run_msg, run_bool), _ = self.active.base.get_lbuf("run_0")
-        self.active.base.print_message(f"current run state is: {run_msg}")
         iter_time = time.time()
         elapsed_time = iter_time - self.start_time
         status = HloStatus.active
         if run_bool == 0 or ((elapsed_time > self.duration) and (self.duration > 0)):
-            self.active.base.print_message(run_msg)
+            await self.driver.stop_polling()
+            self.driver.stop()
             status = HloStatus.finished
         await asyncio.sleep(0.01)
         return {"error": ErrorCodes.none, "status": status}
