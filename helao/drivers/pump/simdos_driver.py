@@ -280,7 +280,7 @@ class SIMDOS:
         if val < lo_lim or val > hi_lim:
             self.base.print_message(f"{param.name} setpoint is out of range [{lo_lim}, {hi_lim}]")
         else:
-            resp = self.send(f"parcmd{val:08}")
+            resp = self.send(f"{parcmd}{val:08}")
             check = None
             if resp is not None:
                 check = self.send(f"?{parcmd}")
