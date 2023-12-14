@@ -49,7 +49,7 @@ def makeApp(confPrefix, server_key, helao_root):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/cencel_run_continuous", tags=["action"])
+    @app.post(f"/{server_key}/cancel_run_continuous", tags=["action"])
     async def cancel_run_continuous(
             action: Action = Body({}, embed=True),
             action_version: int = 1,

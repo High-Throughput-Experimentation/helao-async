@@ -341,7 +341,7 @@ class RunExec(Executor):
             self.active.base.print_message(f"could not set pump mode to {mode.name}")
             error = ErrorCodes.cmd_error
         param = PumpParam.rate
-        val = self.active.action.action_params["volume_uL"]
+        val = self.active.action.action_params["rate_uL_min"]
         setrate_resp = self.driver.set_run_param(param, val)
         if not setrate_resp:
             self.active.base.print_message(f"could not set pump {param.name} to {val}")
