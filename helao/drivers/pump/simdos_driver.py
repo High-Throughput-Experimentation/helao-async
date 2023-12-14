@@ -150,7 +150,7 @@ class SIMDOS:
         resp = [
             x
             for x in resp
-            if x.decode("ascii").startswith("\x06\x02")
+            if x.decode("ascii").startswith("\x06")
         ]
         # strip frame
         resp = [x.decode("ascii").split("\x06\x02")[-1].split("\x03")[0] for x in resp]
@@ -228,11 +228,11 @@ class SIMDOS:
                 ]:
                     checktime = time.time()
                     if checktime - lastupdate < waittime:
-                        self.base.print_message("waiting for minimum update interval.")
+                        # self.base.print_message("waiting for minimum update interval.")
                         await asyncio.sleep(waittime - (checktime - lastupdate))
 
                     resp_dict = func()
-                    self.base.print_message(f"received status: {resp_dict}")
+                    # self.base.print_message(f"received status: {resp_dict}")
                     for k, v in resp_dict.items():
                         status_dict[f"{group}_{k}"] = v
 
