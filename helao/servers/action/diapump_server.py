@@ -45,7 +45,7 @@ def makeApp(confPrefix, server_key, helao_root):
         duration_sec: float = -1,
     ):
         active = await app.base.setup_and_contain_action()
-        executor = RunExec(direction=1, active=active, oneoff=False, poll_rate=0.2)
+        executor = RunExec(active=active, oneoff=False, poll_rate=0.2)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
@@ -73,7 +73,7 @@ def makeApp(confPrefix, server_key, helao_root):
     #     dispense_duration_sec: int = 0,
     # ):
     # #     active = await app.base.setup_and_contain_action()
-    # #     executor = VolExec(direction=1, active=active, oneoff=False, poll_rate=0.2)
+    # #     executor = VolExec(active=active, oneoff=False, poll_rate=0.2)
     # #     active_action_dict = active.start_executor(executor)
     # #     return active_action_dict
     #     pass
@@ -86,7 +86,7 @@ def makeApp(confPrefix, server_key, helao_root):
     #     dispense_duration_sec: int = 0,
     # ):
     # #     active = await app.base.setup_and_contain_action()
-    # #     executor = RateExec(direction=1, active=active, oneoff=False, poll_rate=0.2)
+    # #     executor = RateExec(active=active, oneoff=False, poll_rate=0.2)
     # #     active_action_dict = active.start_executor(executor)
     # #     return active_action_dict
     #     pass
