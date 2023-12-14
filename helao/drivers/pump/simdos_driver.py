@@ -213,7 +213,7 @@ class SIMDOS:
             state_dict[i] = (fault if bits[i] else "OK", bits[i])
         return state_dict
 
-    async def poll_sensor_loop(self, frequency: int = 5):
+    async def poll_sensor_loop(self, frequency: int = 2):
         self.base.print_message("polling background task has started")
         waittime = 1.0 / frequency
         lastupdate = 0
