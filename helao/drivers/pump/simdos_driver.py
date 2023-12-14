@@ -151,11 +151,10 @@ class SIMDOS:
         resp = [
             x
             for x in resp
-            if x.decode("ascii").startswith("\x06\x02") and "\x03" in x.decode("ascii")
+            if x.decode("ascii").startswith("\x06\x02")
         ]
         # strip frame
         resp = [x.decode("ascii").partition("\x06\x02")[-1].split("\x03")[0] for x in resp]
-        resp = [x for x in resp if x != ""]
         if not resp:
             self.base.print_message("command did not return a valid response")
             return None
