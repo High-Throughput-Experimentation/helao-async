@@ -155,8 +155,8 @@ class SIMDOS:
         # strip frame
         resp = [x.decode("ascii").split("\x06\x02")[-1].split("\x03")[0] for x in resp]
         if not resp:
-            print(full_resp)
             self.base.print_message("command did not return a valid response")
+            print(full_resp)
             return None
         if len(resp) > 1:
             self.base.print_message("command returned multiple responses, using first")
