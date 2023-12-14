@@ -244,7 +244,7 @@ class SIMDOS:
 
                 faults = [
                     fk
-                    for k, ((fk, fv), _) in status_dict.values()
+                    for k, ((fk, fv), _) in status_dict.items()
                     if k.startswith("fault_") and fv != 0
                 ]
                 print(faults)
