@@ -135,7 +135,6 @@ class SIMDOS:
         await self.poll_signalq.put(False)
 
     async def poll_signal_loop(self):
-        self.safe_state()
         while True:
             self.polling = await self.poll_signalq.get()
             self.base.print_message("polling signal received")
@@ -287,7 +286,7 @@ class SIMDOS:
                 check = self.send(f"?{parcmd}")
             if int(check) == val:
                 success = True
-                self.base.print_message(f"successfully set {param.name} tp {val}")
+                self.base.print_message(f"successfully set {param.name} to {val}")
             else:
                 self.base.print_message(f"could not validate {param.name} setpoint")
         return success
