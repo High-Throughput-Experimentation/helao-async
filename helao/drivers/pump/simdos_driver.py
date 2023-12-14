@@ -291,30 +291,38 @@ class SIMDOS:
                 self.base.print_message(f"could not validate {param.name} setpoint")
         return success
 
-    def stop(self):
+    async def stop(self):
+        await self.stop_polling()
         success = False
         resp = self.send("KY0")
+        await self.start_polling()
         if resp is not None:
             success = True
         return success
 
-    def start(self):
+    async def start(self):
+        await self.stop_polling()
         success = False
         resp = self.send("KY1")
+        await self.start_polling()
         if resp is not None:
             success = True
         return success
 
-    def prime(self):
+    async def prime(self):
+        await self.stop_polling()
         success = False
         resp = self.send("KY2")
+        await self.start_polling()
         if resp is not None:
             success = True
         return success
 
-    def pause(self):
+    async def pause(self):
+        await self.stop_polling()
         success = False
         resp = self.send("KY3")
+        await self.start_polling()
         if resp is not None:
             success = True
         return success
@@ -353,7 +361,7 @@ class RunExec(Executor):
     async def _exec(self):
         error = ErrorCodes.none
         self.start_time = time.time()
-        start_resp = self.driver.start()
+        start_resp = await self.driver.start()
         if not start_resp:
             self.active.base.print_message("could not start pump")
             error = ErrorCodes.cmd_error
@@ -365,19 +373,16 @@ class RunExec(Executor):
         elapsed_time = iter_time - self.start_time
         status = HloStatus.active
         if (elapsed_time > self.duration) and (self.duration > 0):
-            await self.driver.stop_polling()
-            self.driver.stop()
+            await self.driver.stop()
             status = HloStatus.finished
         return {"error": ErrorCodes.none, "status": status}
 
     async def _manual_stop(self):
         error = ErrorCodes.none
-        await self.driver.stop_polling()
-        stop_resp = self.driver.stop()
+        stop_resp = await self.driver.stop()
         if not stop_resp:
             self.active.base.print_message("could not stop pump")
             error = ErrorCodes.cmd_error
-        await self.driver.start_polling()
         return {"error": error}
 
 #     async def _post_exec(self):
