@@ -331,7 +331,7 @@ class RunExec(Executor):
         self.driver = self.active.base.fastapp.driver
         self.active.base.print_message("RunExec initialized.")
         self.start_time = time.time()
-        self.duration = self.active.action.action_params.get("duration_sec", -1)
+        self.duration = self.active.action.action_params["duration_sec"]
 
     async def _pre_exec(self):
         "Set rate and volume params, then run."
@@ -363,6 +363,7 @@ class RunExec(Executor):
 
     async def _poll(self):
         (run_msg, run_bool), _ = self.active.base.get_lbuf("run_0")
+        self.active.base.print_message(f"current run state is: {run_msg}")
         iter_time = time.time()
         elapsed_time = iter_time - self.start_time
         status = HloStatus.active

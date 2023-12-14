@@ -53,7 +53,6 @@ def makeApp(confPrefix, server_key, helao_root):
     async def cancel_run_continuous(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
-            device_name: Optional[str] = None,
             exec_id: Optional[str] = None,
         ):
             """Stop flowrate & acquisition for given device_name."""
