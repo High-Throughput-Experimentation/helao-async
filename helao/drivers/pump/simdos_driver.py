@@ -247,7 +247,9 @@ class SIMDOS:
                     for k, ((fk, fv), _) in status_dict.values()
                     if k.startswith("fault_") and fv != 0
                 ]
+                print(faults)
                 if faults:
+                    self.base.print_message(f"fault detected, stopping simdos executors")
                     for executor in self.base.executors.values():
                         executor.stop_action_task()
 
