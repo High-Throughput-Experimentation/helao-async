@@ -281,10 +281,11 @@ class SIMDOS:
             self.base.print_message(f"{param.name} setpoint is out of range [{lo_lim}, {hi_lim}]")
         else:
             resp = self.send(f"{parcmd}{val:08}")
+            print(resp)
             check = None
             if resp is not None:
                 check = self.send(f"?{parcmd}")
-            if check == val:
+            if int(check) == val:
                 success = True
             else:
                 self.base.print_message(f"could not validate {param.name} setpoint")
