@@ -213,7 +213,7 @@ class SIMDOS:
             state_dict[i] = (fault if bits[i] else "OK", bits[i])
         return state_dict
 
-    async def poll_sensor_loop(self, frequency: int = 2):
+    async def poll_sensor_loop(self, frequency: int = 10):
         self.base.print_message("polling background task has started")
         waittime = 1.0 / frequency
         lastupdate = 0
@@ -229,16 +229,17 @@ class SIMDOS:
                 ]:
                     checktime = time.time()
                     if checktime - lastupdate < waittime:
-                        # self.base.print_message("waiting for minimum update interval.")
+                        self.base.print_message("waiting for minimum update interval.")
                         await asyncio.sleep(waittime - (checktime - lastupdate))
 
                     resp_dict = func()
-                    # self.base.print_message(f"received status: {resp_dict}")
+                    self.base.print_message(f"received status: {resp_dict}")
                     for k, v in resp_dict.items():
                         status_dict[f"{group}_{k}"] = v
 
                     lastupdate = time.time()
 
+                print(status_dict)
                 await self.base.put_lbuf(status_dict)
                 # await asyncio.sleep(0.01)
 
