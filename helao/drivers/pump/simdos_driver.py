@@ -145,17 +145,17 @@ class SIMDOS:
         command_str = f"{addr:02}{cmd}"
         self.com.write(b"\x02" + command_str.encode() + b"\x03U")
         self.com.flush()
-        resp = self.com.readlines()
+        full_resp = self.com.readlines()
         # keep only ack responses
         resp = [
             x
-            for x in resp
+            for x in full_resp
             if x.decode("ascii").startswith("\x06")
         ]
         # strip frame
         resp = [x.decode("ascii").split("\x06\x02")[-1].split("\x03")[0] for x in resp]
         if not resp:
-            print(resp)
+            print(full_resp)
             self.base.print_message("command did not return a valid response")
             return None
         if len(resp) > 1:
