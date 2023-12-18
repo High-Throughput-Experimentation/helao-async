@@ -74,7 +74,7 @@ FROM
 WHERE
     true
     AND hs.sequence_name in ('ECHEUVIS_multiCA_led')
-    AND hp.run_type='eche'
+    AND hp.run_type='echeuvis'
     AND ha.action_name in ('run_OCV', 'run_CA', 'acquire_spec_adv', 'acquire_spec_extrig')
 """
 
