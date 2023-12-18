@@ -12,6 +12,7 @@ from helao.helpers.config_loader import config_loader
 
 
 if __name__ == "__main__":
+    log_root = "."
     try:
         colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
         helao_root = os.path.dirname(os.path.realpath(__file__))
