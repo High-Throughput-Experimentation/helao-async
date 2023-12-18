@@ -959,6 +959,7 @@ class Orch(Base):
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             self.print_message("serious orch exception occurred", error=True)
             self.print_message(f"ERROR: {repr(e), tb,}", error=True)
+            await self.estop_loop()
             return False
 
     async def orch_wait_for_all_actions(self):
