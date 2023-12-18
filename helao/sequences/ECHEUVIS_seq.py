@@ -1405,18 +1405,18 @@ def ECHEUVIS_multiCA_led(
                 "fill_wait": cell_fill_wait,
             },
         )
-    epm.add_experiment(
-        "UVIS_calc_abs",
-        {
-            "ev_parts": calc_ev_parts,
-            "bin_width": calc_bin_width,
-            "window_length": calc_window_length,
-            "poly_order": calc_poly_order,
-            "lower_wl": calc_lower_wl,
-            "upper_wl": calc_upper_wl,
-            "skip_nspec": calc_skip_nspec,
-        },
-    )
+    # epm.add_experiment(
+    #     "UVIS_calc_abs",
+    #     {
+    #         "ev_parts": calc_ev_parts,
+    #         "bin_width": calc_bin_width,
+    #         "window_length": calc_window_length,
+    #         "poly_order": calc_poly_order,
+    #         "lower_wl": calc_lower_wl,
+    #         "upper_wl": calc_upper_wl,
+    #         "skip_nspec": calc_skip_nspec,
+    #     },
+    # )
     epm.add_experiment("ECHEUVIS_sub_shutdown", {})
 
     return epm.experiment_plan_list  # returns complete experiment list

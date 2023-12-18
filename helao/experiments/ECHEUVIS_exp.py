@@ -39,7 +39,6 @@ SPEC_T_server = MM(server_name="SPEC_T", machine_name=gethostname().lower()).as_
 SPEC_R_server = MM(server_name="SPEC_R", machine_name=gethostname().lower()).as_dict()
 ORCH_server = MM(server_name="ORCH", machine_name=gethostname().lower()).as_dict()
 PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
-CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict()
 CAM_server = MM(server_name="CAM", machine_name=gethostname().lower()).as_dict()
 KMOTOR_server = MM(server_name="KMOTOR", machine_name=gethostname().lower()).as_dict()
 ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
