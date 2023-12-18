@@ -323,8 +323,8 @@ class OrchAPI(HelaoFastAPI):
             """Return active sequence."""
             return self.orch.active_sequence.clean_dict()
 
-        @self.post("/estop", tags=["private"])
-        async def estop():
+        @self.post("/estop_orch", tags=["private"])
+        async def estop_orch():
             """Emergency stop experiment and action queues, interrupt running actions."""
             if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
                 await self.orch.estop_loop()
@@ -518,8 +518,8 @@ class OrchAPI(HelaoFastAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @self.post(f"/{server_key}/estop_act", tags=["action"])
-        async def estop_act(
+        @self.post(f"/{server_key}/estop", tags=["action"])
+        async def estop(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
             switch: bool = True,
