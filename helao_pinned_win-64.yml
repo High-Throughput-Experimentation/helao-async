@@ -181,6 +181,7 @@ dependencies:
   - pycparser=2.21=pyhd8ed1ab_0
   - pydantic=2.5.2=pyhd8ed1ab_0
   - pydantic-core=2.14.5=py311hc37eb10_0
+  - pydantic-settings=2.1.0=pyhd8ed1ab_1
   - pyfiglet=0.8.post1=py_0
   - pyftdi=0.55.0=pyhd8ed1ab_0
   - pygments=2.16.1=pyhd8ed1ab_0
