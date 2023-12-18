@@ -1,9 +1,0 @@
-aioshutil
-databases
-plumbum
-psycopg2
-pyft232
-pylablib
-git+https://github.com/spomjaksilp/pyMeCom
-sqlalchemy
-sqlmodel>=0.0.14

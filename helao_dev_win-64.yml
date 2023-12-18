@@ -42,7 +42,7 @@ dependencies:
   - pyftdi
   - pymodbus
   - pyserial
-  - python>=3.11
+  - python=3.11
   - python-dotenv
   - python-multipart
   - pyusb
