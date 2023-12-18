@@ -49,7 +49,7 @@ dependencies:
   - shortuuid
   - sqlalchemy
   - sqlite
-  - sqlmodel
+  - sqlmodel>=0.0.14
   - sshtunnel
   - starlette
   - termcolor
