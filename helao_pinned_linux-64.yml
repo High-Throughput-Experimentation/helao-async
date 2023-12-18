@@ -228,6 +228,7 @@ dependencies:
   - pycparser=2.21=pyhd8ed1ab_0
   - pydantic=2.5.2=pyhd8ed1ab_0
   - pydantic-core=2.14.5=py311h46250e7_0
+  - pydantic-settings=2.1.0=pyhd8ed1ab_1
   - pyfiglet=0.8.post1=py_0
   - pyftdi=0.55.0=pyhd8ed1ab_0
   - pygments=2.15.1=pyhd8ed1ab_0
@@ -328,7 +329,7 @@ dependencies:
   - zstd=1.5.5=hfc55251_0
   - pip:
       - aioshutil==1.3
-      - databases==0.4.2
+      - databases==0.8.0
       - llvmlite==0.41.1
       - git+https://github.com/spomjaksilp/pyMeCom
       - numba==0.58.1

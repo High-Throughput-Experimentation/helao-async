@@ -36,6 +36,7 @@ dependencies:
   - psutil
   - pyaml
   - pybase64
+  - pydantic-settings
   - pydantic=2
   - pyfiglet
   - pyftdi
