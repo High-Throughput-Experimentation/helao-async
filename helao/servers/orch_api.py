@@ -648,6 +648,21 @@ class OrchAPI(HelaoFastAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
+        @self.post("/_raise_exception", tags=["private"])
+        def _raise_exception():
+            raise Exception("test exception for error recovery debugging")
+
+        @self.post("/_raise_async_exception", tags=["private"])
+        async def _raise_async_exception():
+            async def sleep_then_error():
+                print(f'Start time: {time.time()}')
+                await asyncio.sleep(10)
+                print(f'End time: {time.time()}')
+                raise Exception("test async exception for error recovery debugging")
+            loop = asyncio.get_running_loop()
+            loop.create_task(sleep_then_error())
+            return True
+
 
 class WaitExec(Executor):
     def __init__(self, *args, **kwargs):
