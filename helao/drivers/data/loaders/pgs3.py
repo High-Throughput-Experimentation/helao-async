@@ -144,7 +144,7 @@ class HelaoLoader:
                     obj_uuid,
                 )
             ] = (
-                resp[0].as_dict() if resp else {}
+                resp[0]._asdict() if resp else {}
             )
         return self.sql_cache[
             (
