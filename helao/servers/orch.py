@@ -144,7 +144,7 @@ class Orch(Base):
             error=True,
         )
         self.print_message("setting E-STOP flag on active actions")
-        for _, active in self.actives:
+        for _, active in self.actives.items():
             active.set_estop()
 
     def myinit(self):
