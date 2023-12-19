@@ -194,6 +194,10 @@ class BaseAPI(HelaoFastAPI):
         def list_executors():
             return list(self.base.executors.keys())
 
+        @self.post("/_raise_exception", tags=["private"])
+        def _raise_exception():
+            raise Exception("test exception for error recovery debugging")
+
         @self.post("/resend_active", tags=["private"])
         def resend_active(action_uuid: str):
             l10 = [y for x, y in self.base.last_10_active]
