@@ -1143,7 +1143,7 @@ class Active:
         if not action.nonblocking:
             await self.base.status_q.put(action.get_actmodel())
 
-    async def set_estop(self, action: Action = None):
+    def set_estop(self, action: Action = None):
         if action is None:
             action = self.action
         action.action_status.append(HloStatus.estopped)
