@@ -803,6 +803,7 @@ class Orch(Base):
                     error=True,
                 )
                 self.current_stop_message = f"{result_action.action_name} on {result_action.action_server.disp_name()} returned an error"
+                await self.stop()
                 return result_action.error_code
 
             if (
