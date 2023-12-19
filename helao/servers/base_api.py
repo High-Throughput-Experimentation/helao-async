@@ -1,7 +1,8 @@
 import json
+import time
+import asyncio
 from copy import copy
 
-from typing import Union
 from socket import gethostname
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
@@ -197,6 +198,17 @@ class BaseAPI(HelaoFastAPI):
         @self.post("/_raise_exception", tags=["private"])
         def _raise_exception():
             raise Exception("test exception for error recovery debugging")
+
+        @self.post("/_raise_async_exception", tags=["private"])
+        async def _raise_async_exception():
+            async def sleep_then_error():
+                print(f'Start time: {time.time()}')
+                await asyncio.sleep(10)
+                print(f'End time: {time.time()}')
+                raise Exception("test async exception for error recovery debugging")
+            loop = asyncio.get_running_loop()
+            loop.create_task(sleep_then_error())
+            return True
 
         @self.post("/resend_active", tags=["private"])
         def resend_active(action_uuid: str):
