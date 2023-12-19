@@ -188,11 +188,15 @@ class Base:
                             self.ntp_offset = float(self.ntp_offset)
 
     def exception_handler(self, loop, context):
-        self.print_message(f"Got exception from coroutine: {context}")
+        self.print_message(f"Got exception from coroutine: {context}", error=True)
         exc = context.get("exception")
         self.print_message(
-            f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}"
+            f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}", error=True
         )
+        self.print_message("setting E-STOP flag on active actions")
+        for _, active in self.actives:
+            active.set_estop()
+            
 
     def myinit(self):
         self.aloop = asyncio.get_running_loop()

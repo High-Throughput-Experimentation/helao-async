@@ -137,7 +137,15 @@ class Orch(Base):
         self.step_thru_sequences = False
 
     def exception_handler(self, loop, context):
-        self.print_message(f"Got exception from coroutine: {context}")
+        self.print_message(f"Got exception from coroutine: {context}", error=True)
+        exc = context.get("exception")
+        self.print_message(
+            f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}",
+            error=True,
+        )
+        self.print_message("setting E-STOP flag on active actions")
+        for _, active in self.actives:
+            active.set_estop()
 
     def myinit(self):
         self.aloop = asyncio.get_running_loop()
@@ -362,7 +370,7 @@ class Orch(Base):
             )
 
             if estop_uuids and self.globalstatusmodel.loop_state == LoopStatus.started:
-                await self.estop_loop()
+                await self.estop_loop(reason=f"due to action uuid(s): {estop_uuids}")
             elif (
                 error_uuids and self.globalstatusmodel.loop_state == LoopStatus.started
             ):
@@ -794,6 +802,7 @@ class Orch(Base):
                     f"{result_action.error_code}",
                     error=True,
                 )
+                self.current_stop_message = f"{result_action.action_name} on {result_action.action_server.disp_name()} returned an error"
                 return result_action.error_code
 
             if (
@@ -1010,8 +1019,9 @@ class Orch(Base):
             self.print_message("loop already started.")
         return self.globalstatusmodel.loop_state
 
-    async def estop_loop(self):
-        self.print_message("estopping orch", info=True)
+    async def estop_loop(self, reason: str = ""):
+        reason_suffix = f"{' ' + reason if reason else ''}"
+        self.print_message("estopping orch" + reason_suffix, error=True)
 
         # set globalstatusmodel.loop_state to estop
         self.globalstatusmodel.loop_state = LoopStatus.estopped
@@ -1022,6 +1032,7 @@ class Orch(Base):
         # reset loop intend
         await self.intend_none()
 
+        self.current_stop_message("E-STOP" + reason_suffix)
         await self.update_operator(True)
 
     async def stop_loop(self):
@@ -1512,13 +1523,17 @@ class Orch(Base):
         while True:
             if self.globalstatusmodel.loop_state == LoopStatus.started:
                 still_alive = True
-                active_endpoints = [actmod.url for actmod in self.globalstatusmodel.active_dict.values()]
+                active_endpoints = [
+                    actmod.url for actmod in self.globalstatusmodel.active_dict.values()
+                ]
                 if active_endpoints:
                     unique_endpoints = list(set(active_endpoints))
                     still_alive, unavail = await endpoints_available(unique_endpoints)
                 if not still_alive:
-                    bad_serves = [x.strip('/'.split('/')[-2]) for x,_ in unavail]
-                    self.current_stop_message = f"{', '.join(bad_serves)} servers are unavailable"
+                    bad_serves = [x.strip("/".split("/")[-2]) for x, _ in unavail]
+                    self.current_stop_message = (
+                        f"{', '.join(bad_serves)} servers are unavailable"
+                    )
                     await self.stop()
                     await self.update_operator(True)
             await asyncio.sleep(self.heartbeat_interval)
