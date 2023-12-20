@@ -58,6 +58,7 @@ dependencies:
   - sshtunnel
   - starlette
   - termcolor
+  - tqdm
   - uvicorn
   - websockets
   - zeroconf
