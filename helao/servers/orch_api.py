@@ -540,6 +540,8 @@ class OrchAPI(HelaoFastAPI):
                 self.orch.actionservermodel.estop = switch
             if switch:
                 active.action.action_status.append(HloStatus.estopped)
+            for k in self.base.executors:
+                self.base.stop_executor(k)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
