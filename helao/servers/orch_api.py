@@ -10,6 +10,8 @@ from typing import Union, Optional
 
 from fastapi import Body, WebSocket, Request
 from fastapi.routing import APIRoute
+from fastapi.exception_handlers import http_exception_handler
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
@@ -107,6 +109,16 @@ class OrchAPI(HelaoFastAPI):
             else:
                 response = await call_next(request)
             return response
+
+        @self.exception_handler(StarletteHTTPException)
+        async def custom_http_exception_handler(request, exc):
+            if request.url.path.strip("/").startswith(f"{server_key}/"):
+                print(f"Could not process request: {repr(exc)}")
+                for _, active in self.base.actives.items():
+                    active.set_estop()
+                for executor_id in self.base.executors:
+                    self.base.stop_executor(executor_id)
+            return await http_exception_handler(request, exc)
 
         @self.on_event("startup")
         async def startup_event():

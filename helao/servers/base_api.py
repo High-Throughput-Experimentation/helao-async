@@ -12,6 +12,8 @@ from helao.helpers.premodels import Action
 from helaocore.models.machine import MachineModel
 from fastapi import Body, WebSocket, WebSocketDisconnect, Request
 from fastapi.routing import APIRoute
+from fastapi.exception_handlers import http_exception_handler
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.action_start_condition import ActionStartCondition as ASC
 from starlette.types import Message
@@ -98,6 +100,16 @@ class BaseAPI(HelaoFastAPI):
             else:
                 response = await call_next(request)
             return response
+
+        @self.exception_handler(StarletteHTTPException)
+        async def custom_http_exception_handler(request, exc):
+            if request.url.path.strip("/").startswith(f"{server_key}/"):
+                print(f"Could not process request: {repr(exc)}")
+                for _, active in self.base.actives.items():
+                    active.set_estop()
+                for executor_id in self.base.executors:
+                    self.base.stop_executor(executor_id)
+            return await http_exception_handler(request, exc)
 
         @self.on_event("startup")
         def startup_event():
@@ -268,7 +280,7 @@ class BaseAPI(HelaoFastAPI):
                 self.base.actionservermodel.estop = switch
             if switch:
                 active.action.action_status.append(HloStatus.estopped)
-            for k in self.base.executors:
-                self.base.stop_executor(k)
+            for executor_id in self.base.executors:
+                self.base.stop_executor(executor_id)
             finished_action = await active.finish()
             return finished_action.as_dict()
