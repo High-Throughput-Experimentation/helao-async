@@ -114,10 +114,10 @@ class OrchAPI(HelaoFastAPI):
         async def custom_http_exception_handler(request, exc):
             if request.url.path.strip("/").startswith(f"{server_key}/"):
                 print(f"Could not process request: {repr(exc)}")
-                for _, active in self.base.actives.items():
+                for _, active in self.orch.actives.items():
                     active.set_estop()
-                for executor_id in self.base.executors:
-                    self.base.stop_executor(executor_id)
+                for executor_id in self.orch.executors:
+                    self.orch.stop_executor(executor_id)
             return await http_exception_handler(request, exc)
 
         @self.on_event("startup")
@@ -552,8 +552,8 @@ class OrchAPI(HelaoFastAPI):
                 self.orch.actionservermodel.estop = switch
             if switch:
                 active.action.action_status.append(HloStatus.estopped)
-            for k in self.base.executors:
-                self.base.stop_executor(k)
+            for k in self.orch.executors:
+                self.orch.stop_executor(k)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
