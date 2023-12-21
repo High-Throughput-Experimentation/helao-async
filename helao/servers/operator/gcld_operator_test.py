@@ -10,7 +10,7 @@ PLATE_ID = int(sys.argv[2])
 env_config = sys.argv[3]
 load_dotenv(dotenv_path=Path(env_config))
 
-from helao.servers.operator.operator import Operator
+from helao.servers.operator.operator import HelaoOperator
 from helao.helpers.gcld_client import DataRequestsClient, CreateDataRequestModel
 from helao.helpers.premodels import Sequence, Experiment
 from helao.helpers.dispatcher import private_dispatcher
@@ -103,7 +103,7 @@ if __name__ == "__main__":
     helao_root = os.path.dirname(os.path.realpath(__file__))
     while "helao.py" not in os.listdir(helao_root):
         helao_root = os.path.dirname(helao_root)
-    operator = Operator(inst_config, "ORCH")
+    operator = HelaoOperator(inst_config, "ORCH")
 
     world_cfg = config_loader(inst_config, helao_root)
     db_cfg = world_cfg["servers"]["DB"]

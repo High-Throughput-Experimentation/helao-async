@@ -204,7 +204,7 @@ class Orch(Base):
             doc=doc,
         )
 
-        # _ = Operator(app.vis)
+        # _ = HelaoOperator(app.vis)
         doc.operator = BokehOperator(app.vis, orch)
         # get the event loop
         # operatorloop = asyncio.get_event_loop()

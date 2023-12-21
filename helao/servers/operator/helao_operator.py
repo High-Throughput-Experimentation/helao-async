@@ -6,7 +6,7 @@ from helao.helpers.dispatcher import private_dispatcher
 from helao.helpers.config_loader import config_loader
 
 
-class Operator:
+class HelaoOperator:
     def __init__(self, config_arg, orch_key):
         helao_root = os.path.dirname(os.path.realpath(__file__))
         while "helao.py" not in os.listdir(helao_root):
@@ -23,7 +23,7 @@ class Operator:
         if self.orch_host is None or self.orch_port is None:
             raise (Exception("Orchestrator host and port not fully specified."))
         print(
-            f"Operator initialized for orchestrator {self.orch_key} on {self.orch_host}:{self.orch_port}"
+            f"HelaoOperator initialized for orchestrator {self.orch_key} on {self.orch_host}:{self.orch_port}"
         )
 
     def request(self, endpoint: str, path_params: dict = {}, json_params: dict = {}):
@@ -41,7 +41,7 @@ class Operator:
                 k: "unreachable" for k in ("orch_state", "loop_state", "loop_intent")
             }
         if error_code != ErrorCodes.none:
-            print("Operator request got non-200 response.")
+            print("HelaoOperator request got non-200 response.")
         return resp
 
     def start(self):

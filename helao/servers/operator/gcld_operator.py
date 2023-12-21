@@ -7,7 +7,7 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 from pathlib import Path
 
-from helao.servers.operator.operator import Operator
+from helao.servers.operator.helao_operator import HelaoOperator
 
 # from helao.helpers.gcld_client import DataRequestsClient
 from data_request_client.client import DataRequestsClient
@@ -195,7 +195,7 @@ def main():
     helao_root = os.path.dirname(os.path.realpath(__file__))
     while "helao.py" not in os.listdir(helao_root):
         helao_root = os.path.dirname(helao_root)
-    operator = Operator(inst_config, "ORCH")
+    operator = HelaoOperator(inst_config, "ORCH")
 
     world_cfg = config_loader(inst_config, helao_root)
     db_cfg = world_cfg["servers"]["DB"]
@@ -204,7 +204,7 @@ def main():
         resp, err = private_dispatcher("DB", db_cfg["host"], db_cfg["port"], "tasks")
         return len(resp.get("running", [])) + resp.get("num_queued", 0)
 
-    def wait_for_orch(op: Operator, orch_state: str = "busy", polling_time=5.0):
+    def wait_for_orch(op: HelaoOperator, orch_state: str = "busy", polling_time=5.0):
         progress = tqdm()
         current_state = op.orch_state()
         if current_state["orch_state"] != orch_state:
