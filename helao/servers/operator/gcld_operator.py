@@ -274,8 +274,12 @@ def main():
             print(f"Dispatching measurement sequence: {seq.sequence_uuid}")
             operator.start()
 
+            time.sleep(5)
+
             # wait for sequence start (orch_state == "busy")
             current_state, active_seq, last_seq = wait_for_orch(operator, "busy")
+            print("!!!")
+            print(active_seq["sequence_uuid"])
             if current_state in ["error", "estop"]:
                 with client:
                     output = client.set_status(
@@ -339,6 +343,8 @@ def main():
             operator.add_sequence(ana.get_seq())
             print(f"Dispatching analysis sequence: {ana.sequence_uuid}")
             operator.start()
+
+            time.sleep(5)
 
             # wait for analysis start (orch_state == "busy")
             current_state, active_seq, last_seq = wait_for_orch(operator, "busy")
