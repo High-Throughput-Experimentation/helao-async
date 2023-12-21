@@ -207,19 +207,22 @@ def main():
     def wait_for_orch(op: HelaoOperator, orch_state: str = "busy", polling_time=5.0):
         progress = tqdm()
         current_state = op.orch_state()
-        if current_state["orch_state"] != orch_state:
+        current_orch = current_state["orch_state"]
+        active_seq = current_state["active_sequence"]
+        last_seq = current_state["last_sequence"]
+        if current_orch != orch_state:
             print(
                 f"orchestrator status != {orch_state}, waiting {polling_time} per iter:"
             )
-        while current_state["orch_state"] != orch_state:
-            current_orch = current_state["orch_state"]
-            active_seq = current_state["active_sequence"]
-            last_seq = current_state["last_sequence"]
+        while current_orch != orch_state:
             if current_orch in ["error", "estop"]:
                 return current_orch, active_seq, last_seq
             progress.update()
             time.sleep(polling_time)
             current_state = op.orch_state()
+            current_orch = current_state["orch_state"]
+            active_seq = current_state["active_sequence"]
+            last_seq = current_state["last_sequence"]
         return orch_state, active_seq, last_seq
 
     while True:
