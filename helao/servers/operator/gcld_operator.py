@@ -290,7 +290,7 @@ def main():
                         Status.pending, data_request_id=data_request.id
                     )
                     return -1
-            elif active_seq["sequence_uuid"] == seq.sequence_uuid:
+            elif str(active_seq["sequence_uuid"]) == str(seq.sequence_uuid):
                 # Acknowledge the data request
                 with client:
                     output = client.acknowledge_data_request(data_request.id)
