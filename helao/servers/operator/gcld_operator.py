@@ -136,7 +136,7 @@ def seq_constructor(
     seq_params["plate_id"] = plate_id
     seq_params["plate_sample_no_list"] = [sample_no]
     seq_params.update({k: v for k, v in param_defaults.items() if k not in seq_params})
-    seq_params.update({"analysis_seq_uuid": str(seq_uuid)})
+    # seq_params.update({"seq_uuid": str(seq_uuid)})
     experiment_list = seq_func(**seq_params)
     seq = Sequence(
         sequence_name=seq_name,
