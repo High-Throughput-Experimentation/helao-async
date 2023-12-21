@@ -258,13 +258,14 @@ def main():
 
             # INSITU MEASUREMENT
             seq = seq_constructor(
-                PLATE_ID,
-                sample_no,
-                data_request.id,
-                ECHEUVIS_multiCA_led,
-                "ECHEUVIS_multiCA_led",
-                "gcld-wetdryrun",
-                insitu_params,
+                plate_id=PLATE_ID,
+                sample_no=sample_no,
+                data_request_id=data_request.id,
+                params=insitu_params,
+                seq_func=ECHEUVIS_multiCA_led,
+                seq_name="ECHEUVIS_multiCA_led",
+                seq_label="gcld-wetdryrun",
+                param_defaults=insitu_params,
             )
             operator.add_sequence(seq.get_seq())
             print(f"Dispatching measurement sequence: {seq.sequence_uuid}")
@@ -323,13 +324,14 @@ def main():
 
             # INSITU ANALYSIS
             ana = ana_constructor(
-                PLATE_ID,
-                str(seq.sequence_uuid),
-                data_request.id,
-                ECHEUVIS_postseq,
-                "ECHEUVIS_postseq",
-                "gcld-wetdryrun-analysis",
-                ECHEUVIS_postseq_defaults,
+                plate_id=PLATE_ID,
+                sequence_uuid=str(seq.sequence_uuid),
+                data_request_id=data_request.id,
+                params={},
+                seq_func=ECHEUVIS_postseq,
+                seq_name="ECHEUVIS_postseq",
+                seq_label="gcld-wetdryrun-analysis",
+                param_defaults=ECHEUVIS_postseq_defaults,
             )
             operator.add_sequence(ana.get_seq())
             print(f"Dispatching analysis sequence: {ana.sequence_uuid}")
