@@ -8,7 +8,10 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 from helao.servers.operator.operator import Operator
-from helao.helpers.gcld_client import DataRequestsClient
+
+# from helao.helpers.gcld_client import DataRequestsClient
+from data_request_client.client import DataRequestsClient
+from data_request_client.models import Status
 from helao.helpers.premodels import Sequence
 from helao.helpers.dispatcher import private_dispatcher
 from helao.helpers.config_loader import config_loader
@@ -52,22 +55,29 @@ ECHEUVIS_multiCA_led_defaults = {
     "liquid_volume_ml": 1.0,
     "ref_vs_nhe": 0.21,
     "CA_potential_vsRHE": [
-        -0.2,
-        0,
-        0.2,
         0.4,
-        0.6,
-        0.8,
         1.0,
-        1.2,
-        1.4,
         1.6,
-        1.8,
-        2.0,
         2.2,
-        2.4,
     ],
-    "CA_duration_sec": 85,
+    # "CA_potential_vsRHE": [
+    #     -0.2,
+    #     0,
+    #     0.2,
+    #     0.4,
+    #     0.6,
+    #     0.8,
+    #     1.0,
+    #     1.2,
+    #     1.4,
+    #     1.6,
+    #     1.8,
+    #     2.0,
+    #     2.2,
+    #     2.4,
+    # ],
+    # "CA_duration_sec": 85,
+    "CA_duration_sec": 15,
     "CA_samplerate_sec": 0.05,
     "OCV_duration_sec": 5,
     "gamry_i_range": "auto",
@@ -180,7 +190,8 @@ def gen_ts():
     return f"[{time.strftime('%H:%M:%S')}]"
 
 
-if __name__ == "__main__":
+    
+def main():
     helao_root = os.path.dirname(os.path.realpath(__file__))
     while "helao.py" not in os.listdir(helao_root):
         helao_root = os.path.dirname(helao_root)
@@ -219,7 +230,7 @@ if __name__ == "__main__":
             print(f"Pending data request count: {len(pending_requests)}")
             data_request = pending_requests[0]
             sample_no = int(data_request.sample_label.split("_")[-1])
-            
+
             # # DRY MEASUREMENT
             # seq = seq_constructor(
             #     PLATE_ID,
@@ -230,11 +241,15 @@ if __name__ == "__main__":
             #     "gcld-mvp-demo",
             #     UVIS_T_defaults,
             # )
-            
+
             # INSITU params
             z_start = data_request.parameters["z_start"]
-            scan_down = True if data_request.parameters["z_direction"] == "down" else False
-            ordered_vs = sorted(ECHEUVIS_multiCA_led_defaults["CA_potential_vsRHE"], reverse=scan_down)
+            scan_down = (
+                True if data_request.parameters["z_direction"] == "down" else False
+            )
+            ordered_vs = sorted(
+                ECHEUVIS_multiCA_led_defaults["CA_potential_vsRHE"], reverse=scan_down
+            )
             init_direction = ordered_vs[ordered_vs.index(z_start) :]
             rev_direction = ordered_vs[: ordered_vs.index(z_start)][::-1]
             potential_list = init_direction + rev_direction
@@ -259,9 +274,14 @@ if __name__ == "__main__":
             current_state, active_seq, last_seq = wait_for_orch(operator, "busy")
             if current_state in ["error", "estop"]:
                 with client:
-                    # TODO: update data request with new status (measurement setup error)
-                    output = client.update_data_request()
-                # TODO: pause loop here and wait for user input then retry
+                    output = client.set_status(
+                        Status.failed, data_request_id=data_request.id
+                    )
+                    input("Press Enter to reset failed request to pending and exit operator...")
+                    output = client.set_status(
+                        Status.pending, data_request_id=data_request.id
+                    )
+                    return -1
             elif active_seq["sequence_uuid"] == seq.sequence_uuid:
                 # Acknowledge the data request
                 with client:
@@ -272,9 +292,14 @@ if __name__ == "__main__":
             current_state, active_seq, last_seq = wait_for_orch(operator, "idle")
             if current_state in ["error", "estop"]:
                 with client:
-                    # TODO: update data request with new status (measurement insitu error)
-                    output = client.update_data_request()
-                # TODO: pause loop here and wait for user input then retry
+                    output = client.set_status(
+                        Status.failed, data_request_id=data_request.id
+                    )
+                    input("Press Enter to reset failed request to pending and exit operator...")
+                    output = client.set_status(
+                        Status.pending, data_request_id=data_request.id
+                    )
+                    return -1
 
             time.sleep(30)
 
@@ -295,7 +320,7 @@ if __name__ == "__main__":
             #     "gcld-mvp-demo-analysis",
             #     UVIS_T_postseq_defaults,
             # )
-            
+
             # INSITU ANALYSIS
             ana = ana_constructor(
                 PLATE_ID,
@@ -314,9 +339,14 @@ if __name__ == "__main__":
             current_state, active_seq, last_seq = wait_for_orch(operator, "busy")
             if current_state in ["error", "estop"]:
                 with client:
-                    # TODO: update data request with new status (analysis error)
-                    output = client.update_data_request()
-                # TODO: pause loop here and wait for user input then retry
+                    output = client.set_status(
+                        Status.failed, data_request_id=data_request.id
+                    )
+                    input("Press Enter to reset failed request to pending and exit operator...")
+                    output = client.set_status(
+                        Status.pending, data_request_id=data_request.id
+                    )
+                    return -1
             elif active_seq["sequence_uuid"] == seq.sequence_uuid:
                 # Acknowledge the data request
                 with client:
@@ -327,11 +357,19 @@ if __name__ == "__main__":
             current_state, active_seq, last_seq = wait_for_orch(operator, "idle")
             if current_state in ["error", "estop"]:
                 with client:
-                    # TODO: update data request with new status (analysis insitu error)
-                    output = client.update_data_request()
-                # TODO: pause loop here and wait for user input then retry
+                    output = client.set_status(
+                        Status.failed, data_request_id=data_request.id
+                    )
+                    input("Press Enter to reset failed request to pending and exit operator...")
+                    output = client.set_status(
+                        Status.pending, data_request_id=data_request.id
+                    )
+                    return -1
 
         print(
             f"{gen_ts()} Orchestrator is idle. Checking for data requests in 15 seconds."
         )
         time.sleep(15)
+
+if __name__ == "__main__":
+    main()
