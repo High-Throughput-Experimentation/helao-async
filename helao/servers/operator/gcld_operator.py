@@ -132,11 +132,13 @@ def seq_constructor(
     seq_args = list(argspec.args)
     seq_defaults = list(argspec.defaults)
     seq_uuid = gen_uuid()
-    seq_params = {k: v for k, v in zip(seq_args, seq_defaults)}
+    seq_params = copy(param_defaults)
     seq_params.update(params)
     seq_params["plate_id"] = plate_id
     seq_params["plate_sample_no_list"] = [sample_no]
-    seq_params.update({k: v for k, v in param_defaults.items() if k not in seq_params})
+    seq_params.update(
+        {k: v for k, v in zip(seq_args, seq_defaults) if k not in seq_params}
+    )
     experiment_list = seq_func(**seq_params)
     seq = Sequence(
         sequence_name=seq_name,
@@ -165,10 +167,12 @@ def ana_constructor(
     seq_args = list(argspec.args)
     seq_defaults = list(argspec.defaults)
     seq_uuid = gen_uuid()
-    seq_params = {k: v for k, v in zip(seq_args, seq_defaults)}
+    seq_params = copy(param_defaults)
     seq_params.update(params)
     seq_params["plate_id"] = plate_id
-    seq_params.update({k: v for k, v in param_defaults.items() if k not in seq_params})
+    seq_params.update(
+        {k: v for k, v in zip(seq_args, seq_defaults) if k not in seq_params}
+    )
     seq_params.update({"analysis_seq_uuid": sequence_uuid})
     experiment_list = seq_func(**seq_params)
     seq = Sequence(

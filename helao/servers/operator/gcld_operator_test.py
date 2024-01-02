@@ -2,6 +2,7 @@ import sys
 import os
 import inspect
 import time
+from copy import copy
 from tqdm import tqdm
 from dotenv import load_dotenv
 from pathlib import Path
@@ -44,17 +45,19 @@ def seq_constructor(
     seq_func=TEST_consecutive_noblocking,
     seq_name="TEST_consecutive_noblocking",
     seq_label="gcld-test",
-    param_defaults={},
+    param_defaults=TEST_defaults,
 ):
     argspec = inspect.getfullargspec(seq_func)
     seq_args = list(argspec.args)
     seq_defaults = list(argspec.defaults)
     seq_uuid = gen_uuid()
-    seq_params = {k: v for k, v in zip(seq_args, seq_defaults)}
+    seq_params = copy(param_defaults)
     seq_params.update(params)
     seq_params["plate_id"] = plate_id
     seq_params["plate_sample_no_list"] = [sample_no]
-    seq_params.update({k: v for k, v in param_defaults.items() if k not in seq_params})
+    seq_params.update(
+        {k: v for k, v in zip(seq_args, seq_defaults) if k not in seq_params}
+    )
     experiment_list = seq_func(**seq_params)
     seq = Sequence(
         sequence_name=seq_name,
@@ -82,7 +85,9 @@ def wait_for_orch(
     active_seq = current_state["active_sequence"]
     last_seq = current_state["last_sequence"]
     if current_orch != orch_state:
-        print(f"orchestrator status {current_orch} != {orch_state}, waiting {polling_time} per iter:")
+        print(
+            f"orchestrator status {current_orch} != {orch_state}, waiting {polling_time} per iter:"
+        )
         progress = tqdm()
         while current_orch != orch_state:
             if current_orch in [OrchStatus.error, OrchStatus.estopped]:
