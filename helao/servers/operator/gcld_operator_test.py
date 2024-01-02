@@ -30,7 +30,7 @@ CLIENT = DataRequestsClient(
 )
 
 TEST_defaults = {
-    "wait_time": 30.0,
+    "wait_time": 120.0,
     "cycles": 5,
     "dummy_list": [[0.0, 1.0], [2.0, 3.0]],
 }
@@ -77,23 +77,23 @@ def gen_ts():
 def wait_for_orch(
     op: HelaoOperator, orch_state: OrchStatus = OrchStatus.busy, polling_time=5.0
 ):
-    progress = tqdm()
     current_state = op.orch_state()
     current_orch = current_state["orch_state"]
     active_seq = current_state["active_sequence"]
     last_seq = current_state["last_sequence"]
     if current_orch != orch_state:
         print(f"orchestrator status {current_orch} != {orch_state}, waiting {polling_time} per iter:")
-    while current_orch != orch_state:
-        if current_orch in [OrchStatus.error, OrchStatus.estopped]:
-            return current_orch, active_seq, last_seq
-        progress.update()
-        time.sleep(polling_time)
-        current_state = op.orch_state()
-        current_orch = current_state["orch_state"]
-        active_seq = current_state["active_sequence"]
-        last_seq = current_state["last_sequence"]
-        print(f"orchestrator status is now {current_orch}")
+        progress = tqdm()
+        while current_orch != orch_state:
+            if current_orch in [OrchStatus.error, OrchStatus.estopped]:
+                return current_orch, active_seq, last_seq
+            time.sleep(polling_time)
+            current_state = op.orch_state()
+            current_orch = current_state["orch_state"]
+            active_seq = current_state["active_sequence"]
+            last_seq = current_state["last_sequence"]
+            print(f"orchestrator status is now {current_orch}")
+            progress.update()
     return orch_state, active_seq, last_seq
 
 
