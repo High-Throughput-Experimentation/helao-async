@@ -174,13 +174,14 @@ def main():
                     )
                     return -1
 
-        with CLIENT:
-            print("Test mode: resetting data request status to pending.")
-            output = CLIENT.set_status(Status.pending, data_request_id=data_request.id)
-        print(
-            f"{gen_ts()} Orchestrator is idle. Checking for data requests in 15 seconds."
-        )
-        time.sleep(15)
+            with CLIENT:
+                print("Test mode: resetting data request status to pending.")
+                output = CLIENT.set_status(Status.pending, data_request_id=data_request.id)
+        else:
+            print(
+                f"{gen_ts()} Orchestrator is idle. Checking for data requests in 15 seconds."
+            )
+            time.sleep(15)
 
 
 if __name__ == "__main__":

@@ -395,10 +395,11 @@ def main():
                     )
                     return -1
 
-        print(
-            f"{gen_ts()} Orchestrator is idle. Checking for data requests in 15 seconds."
-        )
-        time.sleep(15)
+        else:
+            print(
+                f"{gen_ts()} Orchestrator is idle. Checking for data requests in 15 seconds."
+            )
+            time.sleep(15)
 
 
 if __name__ == "__main__":
