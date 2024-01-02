@@ -83,7 +83,7 @@ def wait_for_orch(
     active_seq = current_state["active_sequence"]
     last_seq = current_state["last_sequence"]
     if current_orch != orch_state:
-        print(f"orchestrator status != {orch_state}, waiting {polling_time} per iter:")
+        print(f"orchestrator status {current_orch} != {orch_state}, waiting {polling_time} per iter:")
     while current_orch != orch_state:
         if current_orch in [OrchStatus.error, OrchStatus.estopped]:
             return current_orch, active_seq, last_seq
@@ -93,6 +93,7 @@ def wait_for_orch(
         current_orch = current_state["orch_state"]
         active_seq = current_state["active_sequence"]
         last_seq = current_state["last_sequence"]
+        print(f"orchestrator status is now {current_orch}")
     return orch_state, active_seq, last_seq
 
 
