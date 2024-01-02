@@ -15,7 +15,9 @@ def TEST_consecutive_noblocking(
     sequence_version: int = 1,
     wait_time: float = 3.0,
     cycles: int = 5,
-    dummy_list: List[List[float]] = [[0.0, 1.0], [2.0, 3.0]]
+    dummy_list: List[List[float]] = [[0.0, 1.0], [2.0, 3.0]],
+    *args,
+    **kwrags,
 ):
     epm = ExperimentPlanMaker()
 
