@@ -12,10 +12,9 @@ from helao.servers.operator.helao_operator import HelaoOperator
 
 from data_request_client.client import DataRequestsClient
 from data_request_client.models import Status
-from helao.helpers.dispatcher import private_dispatcher
 from helao.helpers.config_loader import config_loader
 from helao.sequences.TEST_seq import TEST_consecutive_noblocking
-from helaocore.models.orchstatus import OrchStatus
+from helaocore.models.orchstatus import LoopStatus
 
 inst_config = sys.argv[1]
 PLATE_ID = int(sys.argv[2])
@@ -72,11 +71,11 @@ def main():
 
             # wait for sequence start (orch_state == "busy")
             current_state, active_seq, last_seq = wait_for_orch(
-                operator, OrchStatus.busy
+                operator, LoopStatus.started
             )
             print("!!!")
             print(active_seq["sequence_uuid"])
-            if current_state in [OrchStatus.error, OrchStatus.estopped]:
+            if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
                     output = CLIENT.set_status(
                         Status.failed, data_request_id=data_request.id
@@ -96,9 +95,9 @@ def main():
 
             # wait for sequence end (orch_state == "idle")
             current_state, active_seq, last_seq = wait_for_orch(
-                operator, OrchStatus.idle
+                operator, LoopStatus.stopped
             )
-            if current_state in [OrchStatus.error, OrchStatus.estopped]:
+            if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
                     output = CLIENT.set_status(
                         Status.failed, data_request_id=data_request.id
@@ -138,9 +137,9 @@ def main():
 
             # wait for analysis start (orch_state == "busy")
             current_state, active_seq, last_seq = wait_for_orch(
-                operator, OrchStatus.busy
+                operator, LoopStatus.busy
             )
-            if current_state in [OrchStatus.error, OrchStatus.estopped]:
+            if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
                     output = CLIENT.set_status(
                         Status.failed, data_request_id=data_request.id
@@ -160,9 +159,9 @@ def main():
 
             # wait for analysis end (orch_state == "idle")
             current_state, active_seq, last_seq = wait_for_orch(
-                operator, OrchStatus.idle
+                operator, LoopStatus.idle
             )
-            if current_state in [OrchStatus.error, OrchStatus.estopped]:
+            if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
                     output = CLIENT.set_status(
                         Status.failed, data_request_id=data_request.id

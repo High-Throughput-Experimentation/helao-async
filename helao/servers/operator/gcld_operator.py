@@ -18,7 +18,7 @@ from helao.helpers.config_loader import config_loader
 from helao.helpers.gen_uuid import gen_uuid
 from helao.sequences.UVIS_T_seq import UVIS_T, UVIS_T_postseq
 from helao.sequences.ECHEUVIS_seq import ECHEUVIS_multiCA_led, ECHEUVIS_postseq
-from helaocore.models.orchstatus import OrchStatus
+from helaocore.models.orchstatus import LoopStatus
 
 inst_config = sys.argv[1]
 PLATE_ID = int(sys.argv[2])
@@ -193,25 +193,25 @@ def gen_ts():
 
 
 def wait_for_orch(
-    op: HelaoOperator, orch_state: OrchStatus = OrchStatus.busy, polling_time=5.0
+    op: HelaoOperator, loop_state: LoopStatus = LoopStatus.started, polling_time=5.0
 ):
     current_state = op.orch_state()
-    current_orch = current_state["orch_state"]
+    current_loop = current_state["loop_state"]
     active_seq = current_state["active_sequence"]
     last_seq = current_state["last_sequence"]
-    if current_orch != orch_state:
-        print(f"orchestrator status != {orch_state}, waiting {polling_time} per iter:")
+    if current_loop != loop_state:
+        print(f"orchestrator status != {loop_state}, waiting {polling_time} per iter:")
         progress = tqdm()
-        while current_orch != orch_state:
-            if current_orch in [OrchStatus.error, OrchStatus.estopped]:
-                return current_orch, active_seq, last_seq
+        while current_loop != loop_state:
+            if current_loop in [LoopStatus.error, LoopStatus.estopped]:
+                return current_loop, active_seq, last_seq
             progress.update()
             time.sleep(polling_time)
             current_state = op.orch_state()
-            current_orch = current_state["orch_state"]
+            current_loop = current_state["loop_state"]
             active_seq = current_state["active_sequence"]
             last_seq = current_state["last_sequence"]
-    return orch_state, active_seq, last_seq
+    return current_loop, active_seq, last_seq
 
 
 def num_uploads(db_cfg):
@@ -280,11 +280,11 @@ def main():
 
             # wait for sequence start (orch_state == "busy")
             current_state, active_seq, last_seq = wait_for_orch(
-                operator, OrchStatus.busy
+                operator, LoopStatus.started
             )
             print("!!!")
             print(active_seq["sequence_uuid"])
-            if current_state in [OrchStatus.error, OrchStatus.estopped]:
+            if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
                     output = CLIENT.set_status(
                         Status.failed, data_request_id=data_request.id
@@ -304,9 +304,9 @@ def main():
 
             # wait for sequence end (orch_state == "idle")
             current_state, active_seq, last_seq = wait_for_orch(
-                operator, OrchStatus.idle
+                operator, LoopStatus.stopped
             )
-            if current_state in [OrchStatus.error, OrchStatus.estopped]:
+            if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
                     output = CLIENT.set_status(
                         Status.failed, data_request_id=data_request.id
@@ -358,9 +358,9 @@ def main():
 
             # wait for analysis start (orch_state == "busy")
             current_state, active_seq, last_seq = wait_for_orch(
-                operator, OrchStatus.busy
+                operator, LoopStatus.busy
             )
-            if current_state in [OrchStatus.error, OrchStatus.estopped]:
+            if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
                     output = CLIENT.set_status(
                         Status.failed, data_request_id=data_request.id
@@ -380,9 +380,9 @@ def main():
 
             # wait for analysis end (orch_state == "idle")
             current_state, active_seq, last_seq = wait_for_orch(
-                operator, OrchStatus.idle
+                operator, LoopStatus.idle
             )
-            if current_state in [OrchStatus.error, OrchStatus.estopped]:
+            if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
                     output = CLIENT.set_status(
                         Status.failed, data_request_id=data_request.id
