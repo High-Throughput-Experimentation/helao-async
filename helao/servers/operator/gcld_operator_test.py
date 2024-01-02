@@ -7,15 +7,13 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 from pathlib import Path
 
+from gcld_operator import seq_constructor, gen_ts, wait_for_orch, num_uploads
 from helao.servers.operator.helao_operator import HelaoOperator
 
-# from helao.helpers.gcld_client import DataRequestsClient
 from data_request_client.client import DataRequestsClient
 from data_request_client.models import Status
-from helao.helpers.premodels import Sequence
 from helao.helpers.dispatcher import private_dispatcher
 from helao.helpers.config_loader import config_loader
-from helao.helpers.gen_uuid import gen_uuid
 from helao.sequences.TEST_seq import TEST_consecutive_noblocking
 from helaocore.models.orchstatus import OrchStatus
 
@@ -35,76 +33,6 @@ TEST_defaults = {
     "cycles": 5,
     "dummy_list": [[0.0, 1.0], [2.0, 3.0]],
 }
-
-
-def seq_constructor(
-    plate_id,
-    sample_no,
-    data_request_id,
-    params={},
-    seq_func=TEST_consecutive_noblocking,
-    seq_name="TEST_consecutive_noblocking",
-    seq_label="gcld-test",
-    param_defaults=TEST_defaults,
-):
-    argspec = inspect.getfullargspec(seq_func)
-    seq_args = list(argspec.args)
-    seq_defaults = list(argspec.defaults)
-    seq_uuid = gen_uuid()
-    seq_params = copy(param_defaults)
-    seq_params.update(params)
-    seq_params["plate_id"] = plate_id
-    seq_params["plate_sample_no_list"] = [sample_no]
-    seq_params.update(
-        {k: v for k, v in zip(seq_args, seq_defaults) if k not in seq_params}
-    )
-    experiment_list = seq_func(**seq_params)
-    seq = Sequence(
-        sequence_name=seq_name,
-        sequence_label=seq_label,
-        sequence_params=seq_params,
-        sequence_uuid=seq_uuid,
-        data_request_id=data_request_id,
-        experiment_list=[],
-        experiment_plan_list=experiment_list,
-        experimentmodel_list=experiment_list,
-    )
-    # seq.sequence_uuid = seq_uuid
-    return seq
-
-
-def gen_ts():
-    return f"[{time.strftime('%H:%M:%S')}]"
-
-
-def wait_for_orch(
-    op: HelaoOperator, orch_state: OrchStatus = OrchStatus.busy, polling_time=5.0
-):
-    current_state = op.orch_state()
-    current_orch = current_state["orch_state"]
-    active_seq = current_state["active_sequence"]
-    last_seq = current_state["last_sequence"]
-    if current_orch != orch_state:
-        print(
-            f"orchestrator status {current_orch} != {orch_state}, waiting {polling_time} per iter:"
-        )
-        progress = tqdm()
-        while current_orch != orch_state:
-            if current_orch in [OrchStatus.error, OrchStatus.estopped]:
-                return current_orch, active_seq, last_seq
-            time.sleep(polling_time)
-            current_state = op.orch_state()
-            current_orch = current_state["orch_state"]
-            active_seq = current_state["active_sequence"]
-            last_seq = current_state["last_sequence"]
-            print(f"orchestrator status is now {current_orch}")
-            progress.update()
-    return orch_state, active_seq, last_seq
-
-
-def num_uploads(db_cfg):
-    resp, err = private_dispatcher("DB", db_cfg["host"], db_cfg["port"], "tasks")
-    return len(resp.get("running", [])) + resp.get("num_queued", 0)
 
 
 def main():
