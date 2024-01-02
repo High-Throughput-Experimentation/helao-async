@@ -18,6 +18,7 @@ from helao.helpers.config_loader import config_loader
 from helao.helpers.gen_uuid import gen_uuid
 from helao.sequences.UVIS_T_seq import UVIS_T, UVIS_T_postseq
 from helao.sequences.ECHEUVIS_seq import ECHEUVIS_multiCA_led, ECHEUVIS_postseq
+from helaocore.models.orchstatus import OrchStatus
 
 inst_config = sys.argv[1]
 PLATE_ID = int(sys.argv[2])
@@ -26,7 +27,7 @@ load_dotenv(dotenv_path=Path(env_config))
 
 
 # print({k: v for k, v in os.environ.items() if k in ('API_KEY', 'BASE_URL')})
-client = DataRequestsClient(
+CLIENT = DataRequestsClient(
     base_url=os.environ["BASE_URL"], api_key=os.environ["API_KEY"]
 )
 
@@ -136,7 +137,6 @@ def seq_constructor(
     seq_params["plate_id"] = plate_id
     seq_params["plate_sample_no_list"] = [sample_no]
     seq_params.update({k: v for k, v in param_defaults.items() if k not in seq_params})
-    # seq_params.update({"seq_uuid": str(seq_uuid)})
     experiment_list = seq_func(**seq_params)
     seq = Sequence(
         sequence_name=seq_name,
@@ -148,7 +148,6 @@ def seq_constructor(
         experiment_plan_list=experiment_list,
         experimentmodel_list=experiment_list,
     )
-    seq.sequence_uuid = seq_uuid
     return seq
 
 
@@ -182,7 +181,6 @@ def ana_constructor(
         experiment_plan_list=experiment_list,
         experimentmodel_list=experiment_list,
     )
-    seq.sequence_uuid = seq_uuid
     return seq
 
 
@@ -190,7 +188,33 @@ def gen_ts():
     return f"[{time.strftime('%H:%M:%S')}]"
 
 
-    
+def wait_for_orch(
+    op: HelaoOperator, orch_state: OrchStatus = OrchStatus.busy, polling_time=5.0
+):
+    progress = tqdm()
+    current_state = op.orch_state()
+    current_orch = current_state["orch_state"]
+    active_seq = current_state["active_sequence"]
+    last_seq = current_state["last_sequence"]
+    if current_orch != orch_state:
+        print(f"orchestrator status != {orch_state}, waiting {polling_time} per iter:")
+    while current_orch != orch_state:
+        if current_orch in [OrchStatus.error, OrchStatus.estopped]:
+            return current_orch, active_seq, last_seq
+        progress.update()
+        time.sleep(polling_time)
+        current_state = op.orch_state()
+        current_orch = current_state["orch_state"]
+        active_seq = current_state["active_sequence"]
+        last_seq = current_state["last_sequence"]
+    return orch_state, active_seq, last_seq
+
+
+def num_uploads(db_cfg):
+    resp, err = private_dispatcher("DB", db_cfg["host"], db_cfg["port"], "tasks")
+    return len(resp.get("running", [])) + resp.get("num_queued", 0)
+
+
 def main():
     helao_root = os.path.dirname(os.path.realpath(__file__))
     while "helao.py" not in os.listdir(helao_root):
@@ -200,34 +224,9 @@ def main():
     world_cfg = config_loader(inst_config, helao_root)
     db_cfg = world_cfg["servers"]["DB"]
 
-    def num_uploads():
-        resp, err = private_dispatcher("DB", db_cfg["host"], db_cfg["port"], "tasks")
-        return len(resp.get("running", [])) + resp.get("num_queued", 0)
-
-    def wait_for_orch(op: HelaoOperator, orch_state: str = "busy", polling_time=5.0):
-        progress = tqdm()
-        current_state = op.orch_state()
-        current_orch = current_state["orch_state"]
-        active_seq = current_state["active_sequence"]
-        last_seq = current_state["last_sequence"]
-        if current_orch != orch_state:
-            print(
-                f"orchestrator status != {orch_state}, waiting {polling_time} per iter:"
-            )
-        while current_orch != orch_state:
-            if current_orch in ["error", "estop"]:
-                return current_orch, active_seq, last_seq
-            progress.update()
-            time.sleep(polling_time)
-            current_state = op.orch_state()
-            current_orch = current_state["orch_state"]
-            active_seq = current_state["active_sequence"]
-            last_seq = current_state["last_sequence"]
-        return orch_state, active_seq, last_seq
-
     while True:
-        with client:
-            pending_requests = client.read_data_requests(status="pending")
+        with CLIENT:
+            pending_requests = CLIENT.read_data_requests(status="pending")
 
         if pending_requests:
             print(f"Pending data request count: {len(pending_requests)}")
@@ -256,8 +255,7 @@ def main():
             init_direction = ordered_vs[ordered_vs.index(z_start) :]
             rev_direction = ordered_vs[: ordered_vs.index(z_start)][::-1]
             potential_list = init_direction + rev_direction
-            insitu_params = copy(ECHEUVIS_multiCA_led_defaults)
-            insitu_params.update({"CA_potential_vsRHE": potential_list})
+            insitu_params = {"CA_potential_vsRHE": potential_list}
 
             # INSITU MEASUREMENT
             seq = seq_constructor(
@@ -268,7 +266,7 @@ def main():
                 seq_func=ECHEUVIS_multiCA_led,
                 seq_name="ECHEUVIS_multiCA_led",
                 seq_label="gcld-wetdryrun",
-                param_defaults=insitu_params,
+                param_defaults=ECHEUVIS_multiCA_led_defaults,
             )
             operator.add_sequence(seq.get_seq())
             print(f"Dispatching measurement sequence: {seq.sequence_uuid}")
@@ -277,34 +275,42 @@ def main():
             time.sleep(5)
 
             # wait for sequence start (orch_state == "busy")
-            current_state, active_seq, last_seq = wait_for_orch(operator, "busy")
+            current_state, active_seq, last_seq = wait_for_orch(
+                operator, OrchStatus.busy
+            )
             print("!!!")
             print(active_seq["sequence_uuid"])
-            if current_state in ["error", "estop"]:
-                with client:
-                    output = client.set_status(
+            if current_state in [OrchStatus.error, OrchStatus.estopped]:
+                with CLIENT:
+                    output = CLIENT.set_status(
                         Status.failed, data_request_id=data_request.id
                     )
-                    input("Press Enter to reset failed request to pending and exit operator...")
-                    output = client.set_status(
+                    input(
+                        "Press Enter to reset failed request to pending and exit operator..."
+                    )
+                    output = CLIENT.set_status(
                         Status.pending, data_request_id=data_request.id
                     )
                     return -1
             elif str(active_seq["sequence_uuid"]) == str(seq.sequence_uuid):
                 # Acknowledge the data request
-                with client:
-                    output = client.acknowledge_data_request(data_request.id)
+                with CLIENT:
+                    output = CLIENT.acknowledge_data_request(data_request.id)
                 print(f"Data request status: {output.status}")
 
             # wait for sequence end (orch_state == "idle")
-            current_state, active_seq, last_seq = wait_for_orch(operator, "idle")
-            if current_state in ["error", "estop"]:
-                with client:
-                    output = client.set_status(
+            current_state, active_seq, last_seq = wait_for_orch(
+                operator, OrchStatus.idle
+            )
+            if current_state in [OrchStatus.error, OrchStatus.estopped]:
+                with CLIENT:
+                    output = CLIENT.set_status(
                         Status.failed, data_request_id=data_request.id
                     )
-                    input("Press Enter to reset failed request to pending and exit operator...")
-                    output = client.set_status(
+                    input(
+                        "Press Enter to reset failed request to pending and exit operator..."
+                    )
+                    output = CLIENT.set_status(
                         Status.pending, data_request_id=data_request.id
                     )
                     return -1
@@ -312,11 +318,11 @@ def main():
             time.sleep(30)
 
             # when orchestrator has stopped, check DB server for upload state
-            num_sync_tasks = num_uploads()
+            num_sync_tasks = num_uploads(db_cfg)
             while num_sync_tasks > 0:
                 print(f"Waiting for {num_sync_tasks} sequence uploads to finish.")
                 time.sleep(10)
-                num_sync_tasks = num_uploads()
+                num_sync_tasks = num_uploads(db_cfg)
 
             # # DRY ANALYSIS
             # ana = ana_constructor(
@@ -347,32 +353,40 @@ def main():
             time.sleep(5)
 
             # wait for analysis start (orch_state == "busy")
-            current_state, active_seq, last_seq = wait_for_orch(operator, "busy")
-            if current_state in ["error", "estop"]:
-                with client:
-                    output = client.set_status(
+            current_state, active_seq, last_seq = wait_for_orch(
+                operator, OrchStatus.busy
+            )
+            if current_state in [OrchStatus.error, OrchStatus.estopped]:
+                with CLIENT:
+                    output = CLIENT.set_status(
                         Status.failed, data_request_id=data_request.id
                     )
-                    input("Press Enter to reset failed request to pending and exit operator...")
-                    output = client.set_status(
+                    input(
+                        "Press Enter to reset failed request to pending and exit operator..."
+                    )
+                    output = CLIENT.set_status(
                         Status.pending, data_request_id=data_request.id
                     )
                     return -1
             elif active_seq["sequence_uuid"] == seq.sequence_uuid:
                 # Acknowledge the data request
-                with client:
-                    output = client.acknowledge_data_request(data_request.id)
+                with CLIENT:
+                    output = CLIENT.acknowledge_data_request(data_request.id)
                 print(f"Data request status: {output.status}")
 
             # wait for analysis end (orch_state == "idle")
-            current_state, active_seq, last_seq = wait_for_orch(operator, "idle")
-            if current_state in ["error", "estop"]:
-                with client:
-                    output = client.set_status(
+            current_state, active_seq, last_seq = wait_for_orch(
+                operator, OrchStatus.idle
+            )
+            if current_state in [OrchStatus.error, OrchStatus.estopped]:
+                with CLIENT:
+                    output = CLIENT.set_status(
                         Status.failed, data_request_id=data_request.id
                     )
-                    input("Press Enter to reset failed request to pending and exit operator...")
-                    output = client.set_status(
+                    input(
+                        "Press Enter to reset failed request to pending and exit operator..."
+                    )
+                    output = CLIENT.set_status(
                         Status.pending, data_request_id=data_request.id
                     )
                     return -1
@@ -381,6 +395,7 @@ def main():
             f"{gen_ts()} Orchestrator is idle. Checking for data requests in 15 seconds."
         )
         time.sleep(15)
+
 
 if __name__ == "__main__":
     main()
