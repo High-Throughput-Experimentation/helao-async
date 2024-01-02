@@ -28,8 +28,8 @@ CLIENT = DataRequestsClient(
 )
 
 TEST_defaults = {
-    "wait_time": 120.0,
-    "cycles": 5,
+    "wait_time": 5.0,
+    "cycles": 3,
     "dummy_list": [[0.0, 1.0], [2.0, 3.0]],
 }
 
