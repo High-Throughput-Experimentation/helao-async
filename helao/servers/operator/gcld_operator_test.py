@@ -179,7 +179,7 @@ def main():
         else:
             print(f"{gen_ts()} No data requests are pending, creating a new one.")
             test_req = CreateDataRequestModel(
-                composition={"Fe": 0.5, "Ni": 0.5},
+                composition={"Mn": 0.5, "Sb": 0.5},
                 parameters={},
                 sample_label="legacy__solid__6083_0",
             )
