@@ -13,6 +13,7 @@ __all__ = [
     "ECHEUVIS_sub_shutdown",
     "ECHEUVIS_sub_engage",
     "ECHEUVIS_sub_disengage",
+    "ECHEUVIS_analysis_stability",
 ]
 
 
@@ -38,9 +39,9 @@ SPEC_T_server = MM(server_name="SPEC_T", machine_name=gethostname().lower()).as_
 SPEC_R_server = MM(server_name="SPEC_R", machine_name=gethostname().lower()).as_dict()
 ORCH_server = MM(server_name="ORCH", machine_name=gethostname().lower()).as_dict()
 PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
-CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict()
 CAM_server = MM(server_name="CAM", machine_name=gethostname().lower()).as_dict()
 KMOTOR_server = MM(server_name="KMOTOR", machine_name=gethostname().lower()).as_dict()
+ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
 
 toggle_triggertype = TriggerType.fallingedge
 
@@ -727,12 +728,14 @@ def ECHEUVIS_sub_disengage(
     apm.add(
         KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": apm.pars.z_height}
     )
-    for item in ("we_vent", "we_pump", "ce_vent", "ce_pump"):
+    for i, item in enumerate(["we_vent", "we_pump", "ce_vent", "ce_pump"]):
         apm.add(
             IO_server,
             "set_digital_out",
             {"do_item": item, "on": False},
-            ActionStartCondition.no_wait,
+            ActionStartCondition.no_wait
+            if i > 0
+            else ActionStartCondition.wait_for_all,
         )
     return apm.action_list  # returns complete action list to orch
 
@@ -773,15 +776,37 @@ def ECHEUVIS_sub_engage(
     # wait for specified time (seconds)
     apm.add(ORCH_server, "wait", {"waittime": apm.pars.fill_wait})
     # stop high speed flow, but keep low speed flow if flow_we is True
-    for item, flow_flag in (
-        ("we_flow", apm.pars.flow_we),
-        ("we_pump", False),
-        ("ce_pump", False),
+    for i, (item, flow_flag) in enumerate(
+        [("we_flow", apm.pars.flow_we), ("we_pump", False), ("ce_pump", False)]
     ):
         apm.add(
             IO_server,
             "set_digital_out",
             {"do_item": item, "on": flow_flag},
-            ActionStartCondition.no_wait,
+            ActionStartCondition.no_wait
+            if i > 0
+            else ActionStartCondition.wait_for_all,
         )
     return apm.action_list  # returns complete action list to orch
+
+
+def ECHEUVIS_analysis_stability(
+    experiment: Experiment,
+    experiment_version: int = 2,
+    sequence_uuid: str = "",
+    plate_id: int = 0,
+    recent: bool = True,
+    params: dict = {},
+):
+    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm.add(
+        ANA_server,
+        "analyze_echeuvis",
+        {
+            "sequence_uuid": apm.pars.sequence_uuid,
+            "plate_id": apm.pars.plate_id,
+            "recent": apm.pars.recent,
+            "params": apm.pars.params,
+        },
+    )
+    return apm.action_list

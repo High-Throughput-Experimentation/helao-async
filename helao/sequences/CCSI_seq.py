@@ -22,42 +22,9 @@ from helao.helpers.premodels import ExperimentPlanMaker
 
 SEQUENCES = __all__
 
-# def CCSI_initialization_bysteps(
-#     sequence_version: int = 1,
-#     headspace_purge_cycles: int = 5,
-#     HSpurge1_duration: float = 30,
-#     Manpurge1_duration: float = 10,
-#     Alphapurge1_duration: float = 10,
-#     Probepurge1_duration: float = 10,
-#     Sensorpurge1_duration: float = 10,
-#     DeltaDilute1_duration: float = 10,
-#     HSpurge_duration: float = 20, 
-#     HSmeasure1_duration: float = 20,
-#     CO2measure_duration: float = 20,
-#     CO2measure_acqrate: float = 0.1,
-#     CO2threshold: float = 1  # value and units????
-# ):
-
-#     epm = ExperimentPlanMaker()
-    
-#     # all off
-#     epm.add_experiment("CCSI_sub_alloff",{})
-    
-#     #purges
-#     epm.add_experiment("CCSI_sub_headspace_purge_from_start", {"HSpurge1_duration": HSpurge1_duration})
-#     epm.add_experiment("CCSI_sub_solvent_purge", {"Manpurge1_duration": Manpurge1_duration})
-#     epm.add_experiment("CCSI_sub_alpha_purge", {"Alphapurge1_duration": Alphapurge1_duration})
-#     epm.add_experiment("CCSI_sub_probe_purge", {"Probepurge1_duration": Probepurge1_duration})
-#     epm.add_experiment("CCSI_sub_sensor_purge", {"Sensorpurge1_duration": Sensorpurge1_duration})
-#     epm.add_experiment("CCSI_sub_delta_purge", {"DeltaDilute1_duration": DeltaDilute1_duration})
-#     for _ in range(headspace_purge_cycles):
-#         epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {"HSpurge_duration": HSpurge_duration, "HSmeasure1_duration":HSmeasure1_duration, "CO2measure_duration": CO2measure_duration, "CO2measure_acqrate": CO2measure_acqrate})
-#     epm.add_experiment("CCSI_sub_initialization_end_state", {})
-
-#     return epm.experiment_plan_list
 
 def CCSI_initialization(
-    sequence_version: int = 3,
+    sequence_version: int = 4, #removed subdrain, added clean inject
     headspace_purge_cycles: int = 5,
     HSpurge1_duration: float = 60,
     Manpurge1_duration: float = 10,
@@ -69,12 +36,20 @@ def CCSI_initialization(
  #   HSmeasure1_duration: float = 20,
     CO2measure_duration: float = 20,
     CO2measure_acqrate: float = 1,
-    CO2threshold: float = 9000  # value and units????
+    CO2threshold: float = 9000,  # value and units????
+    Waterclean_volume_ul: float = 10000,
+    Syringe_rate_ulsec: float = 500,
+    LiquidCleanWait_s: float = 15,
+    use_co2_check: bool = True,
+    need_fill: bool = False,
+    max_repeats: int = 5,
+    drainrecirc: bool = True,
 ):
 
     epm = ExperimentPlanMaker()
-    
-   #purges
+
+#    
+# MAIN HEADSPACE PURGE, AUX PROBE PURGE, PCO2 SENSOR PURGE
     epm.add_experiment("CCSI_sub_initialization_firstpart", {
         "HSpurge1_duration": HSpurge1_duration,
         "Manpurge1_duration": Manpurge1_duration,
@@ -83,11 +58,8 @@ def CCSI_initialization(
         "Sensorpurge1_duration": Sensorpurge1_duration,
         })
 
-    epm.add_experiment("CCSI_sub_drain", {
-        "HSpurge_duration": HSpurge_duration,
-        "DeltaDilute1_duration": DeltaDilute1_duration,
-        "initialization": True,
-        })
+#
+# DILUTION PURGE, MAIN HEADSPACE PURGE AND HEADSPACE EVALUATION
     epm.add_experiment("CCSI_sub_headspace_purge_and_measure", {
         "HSpurge_duration": HSpurge_duration, 
         "DeltaDilute1_duration": DeltaDilute1_duration,
@@ -97,6 +69,38 @@ def CCSI_initialization(
         "co2_ppm_thresh": CO2threshold, 
         "purge_if": "below"
         })
+#    
+# PRE CLEAN PROCEDURE
+    epm.add_experiment("CCSI_sub_clean_inject", {
+        "Waterclean_volume_ul": Waterclean_volume_ul,
+        "Syringe_rate_ulsec": Syringe_rate_ulsec,
+        "LiquidCleanWait_s": LiquidCleanWait_s,
+        "use_co2_check": use_co2_check,
+        "LiquidCleanPurge_duration": HSpurge_duration, 
+        "DeltaDilute1_duration": DeltaDilute1_duration,
+        "initialization": True,
+        "co2measure_duration": CO2measure_duration, 
+        "co2measure_acqrate": CO2measure_acqrate, 
+        "use_co2_check": False,
+        "co2_ppm_thresh": CO2threshold, 
+        "purge_if": "below",
+        "drainrecirc": drainrecirc,
+        })
+    epm.add_experiment("CCSI_sub_clean_inject", {
+        "Waterclean_volume_ul": Waterclean_volume_ul,
+        "Syringe_rate_ulsec": Syringe_rate_ulsec,
+        "LiquidCleanWait_s": LiquidCleanWait_s,
+        "use_co2_check": use_co2_check,
+        "LiquidCleanPurge_duration": HSpurge_duration, 
+        "DeltaDilute1_duration": DeltaDilute1_duration,
+        "initialization": True,
+        "co2measure_duration": 0, 
+        "use_co2_check": False,
+        "drainrecirc": drainrecirc,
+        "need_fill": need_fill,
+        })
+
+
     epm.add_experiment("CCSI_sub_initialization_end_state", {})
 
     return epm.experiment_plan_list

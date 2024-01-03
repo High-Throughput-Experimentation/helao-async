@@ -1,6 +1,8 @@
 import json
 import time
+import asyncio
 from copy import copy
+
 from socket import gethostname
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
@@ -9,10 +11,13 @@ from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.premodels import Action
 from helaocore.models.machine import MachineModel
 from fastapi import Body, WebSocket, WebSocketDisconnect, Request
+from fastapi.routing import APIRoute
+from fastapi.exception_handlers import http_exception_handler
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from helaocore.models.hlostatus import HloStatus
 from helaocore.models.action_start_condition import ActionStartCondition as ASC
 from starlette.types import Message
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from websockets.exceptions import ConnectionClosedOK
 
 
@@ -32,7 +37,7 @@ class BaseAPI(HelaoFastAPI):
             helao_srv=server_key,
             title=server_title,
             description=description,
-            version=version,
+            version=str(version),
         )
         self.driver = None
 
@@ -50,8 +55,8 @@ class BaseAPI(HelaoFastAPI):
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
-            if request.method == "HEAD" :  # comes from endpoint checker, session.head()
-                response = await call_next(request)
+            if request.method == "HEAD":  # comes from endpoint checker, session.head()
+                response = Response()
             elif request.url.path.strip("/").startswith(f"{server_key}/"):
                 await set_body(request, await request.body())
                 body_bytes = await get_body(request)
@@ -96,6 +101,16 @@ class BaseAPI(HelaoFastAPI):
                 response = await call_next(request)
             return response
 
+        @self.exception_handler(StarletteHTTPException)
+        async def custom_http_exception_handler(request, exc):
+            if request.url.path.strip("/").startswith(f"{server_key}/"):
+                print(f"Could not process request: {repr(exc)}")
+                for _, active in self.base.actives.items():
+                    active.set_estop()
+                for executor_id in self.base.executors:
+                    self.base.stop_executor(executor_id)
+            return await http_exception_handler(request, exc)
+
         @self.on_event("startup")
         def startup_event():
             self.base = Base(fastapp=self, dyn_endpoints=dyn_endpoints)
@@ -103,6 +118,16 @@ class BaseAPI(HelaoFastAPI):
             if driver_class is not None:
                 self.driver = driver_class(self.base)
             self.base.dyn_endpoints_init()
+
+        @self.on_event("startup")
+        async def add_default_head_endpoints() -> None:
+            for route in self.routes:
+                if isinstance(route, APIRoute) and "POST" in route.methods:
+                    new_route = copy(route)
+                    new_route.methods = {"HEAD"}
+                    new_route.include_in_schema = False
+                    self.routes.append(new_route)
+
 
         @self.websocket("/ws_status")
         async def websocket_status(websocket: WebSocket):
@@ -182,6 +207,21 @@ class BaseAPI(HelaoFastAPI):
         def list_executors():
             return list(self.base.executors.keys())
 
+        @self.post("/_raise_exception", tags=["private"])
+        def _raise_exception():
+            raise Exception("test exception for error recovery debugging")
+
+        @self.post("/_raise_async_exception", tags=["private"])
+        async def _raise_async_exception():
+            async def sleep_then_error():
+                print(f'Start time: {time.time()}')
+                await asyncio.sleep(10)
+                print(f'End time: {time.time()}')
+                raise Exception("test async exception for error recovery debugging")
+            loop = asyncio.get_running_loop()
+            loop.create_task(sleep_then_error())
+            return True
+
         @self.post("/resend_active", tags=["private"])
         def resend_active(action_uuid: str):
             l10 = [y for x, y in self.base.last_10_active]
@@ -240,5 +280,7 @@ class BaseAPI(HelaoFastAPI):
                 self.base.actionservermodel.estop = switch
             if switch:
                 active.action.action_status.append(HloStatus.estopped)
+            for executor_id in self.base.executors:
+                self.base.stop_executor(executor_id)
             finished_action = await active.finish()
             return finished_action.as_dict()

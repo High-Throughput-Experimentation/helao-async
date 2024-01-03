@@ -13,11 +13,14 @@ __all__ = [
     "ECHE_CP_led",
     "ECHE_movetosample",
     "ECHE_move",
+    "ECHE_CVs_CAs",
+    "ECHE_cleanCVs_regCVs_CAs",
 ]
 
 
 from helao.helpers.premodels import ExperimentPlanMaker
 from helaocore.models.electrolyte import Electrolyte
+from helao.helpers.ref_electrode import REF_TABLE
 
 
 SEQUENCES = __all__
@@ -67,23 +70,25 @@ def ECHE_move(
 
 
 def ECHE_4CA_led_1CV_led(
-    sequence_version: int = 3,
+    sequence_version: int = 4,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
     solution_bubble_gas: str = "O2",
     solution_ph: float = 9.53,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
     measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
     ref_vs_nhe: float = 0.21,
-    CA1_potential_vsRHE: float = 1.23,
+    CA1_potential: float = 1.23,
     CA1_duration_sec: float = 15,
-    CA2_potential_vsRHE: float = 1.23,
+    CA2_potential: float = 1.23,
     CA2_duration_sec: float = 4,
-    CA3_potential_vsRHE: float = 1.23,
+    CA3_potential: float = 1.23,
     CA3_duration_sec: float = 4,
-    CA4_potential_vsRHE: float = 1.23,
+    CA4_potential: float = 1.23,
     CA4_duration_sec: float = 4,
     CA_samplerate_sec: float = 0.05,
     CV_Vinit_vsRHE: float = 1.23,
@@ -148,14 +153,14 @@ def ECHE_4CA_led_1CV_led(
         epm.add_experiment(
             "ECHE_sub_CA_led",
             {
-                "CA_potential_vsRHE": CA1_potential_vsRHE,
+                "CA_potential": CA1_potential,
                 "solution_ph": solution_ph,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
                 "solution_bubble_gas": solution_bubble_gas,
                 "measurement_area": measurement_area,
-                "reference_electrode_type": "NHE",
-                "ref_vs_nhe": ref_vs_nhe,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA1_duration_sec,
                 "gamry_i_range": gamry_i_range,
@@ -188,14 +193,14 @@ def ECHE_4CA_led_1CV_led(
         epm.add_experiment(
             "ECHE_sub_CA_led",
             {
-                "CA_potential_vsRHE": CA2_potential_vsRHE,
+                "CA_potential": CA2_potential,
                 "solution_ph": solution_ph,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
                 "solution_bubble_gas": solution_bubble_gas,
                 "measurement_area": measurement_area,
-                "reference_electrode_type": "NHE",
-                "ref_vs_nhe": ref_vs_nhe,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA2_duration_sec,
                 "gamry_i_range": gamry_i_range,
@@ -226,14 +231,14 @@ def ECHE_4CA_led_1CV_led(
         epm.add_experiment(
             "ECHE_sub_CA_led",
             {
-                "CA_potential_vsRHE": CA3_potential_vsRHE,
+                "CA_potential": CA3_potential,
                 "solution_ph": solution_ph,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
                 "solution_bubble_gas": solution_bubble_gas,
                 "measurement_area": measurement_area,
-                "reference_electrode_type": "NHE",
-                "ref_vs_nhe": ref_vs_nhe,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA3_duration_sec,
                 "gamry_i_range": gamry_i_range,
@@ -264,14 +269,14 @@ def ECHE_4CA_led_1CV_led(
         epm.add_experiment(
             "ECHE_sub_CA_led",
             {
-                "CA_potential_vsRHE": CA4_potential_vsRHE,
+                "CA_potential": CA4_potential,
                 "solution_ph": solution_ph,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
                 "solution_bubble_gas": solution_bubble_gas,
                 "measurement_area": measurement_area,
-                "reference_electrode_type": "NHE",
-                "ref_vs_nhe": ref_vs_nhe,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA4_duration_sec,
                 "gamry_i_range": gamry_i_range,
@@ -316,8 +321,8 @@ def ECHE_4CA_led_1CV_led(
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
                 "solution_bubble_gas": solution_bubble_gas,
                 "measurement_area": measurement_area,
-                "reference_electrode_type": "NHE",
-                "ref_vs_nhe": ref_vs_nhe,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
                 "illumination_source": led_name_CV,
                 "illumination_wavelength": led_wavelengths_nm[
                     led_names.index(led_name_CV)
@@ -340,16 +345,17 @@ def ECHE_4CA_led_1CV_led(
 
 
 def ECHE_CV_CA_CV(
-    sequence_version: int = 3,
+    sequence_version: int = 4,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,
     solution_bubble_gas: str = "O2",
     solution_ph: float = 9.53,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
     measurement_area: float = 0.071,  # 3mm diameter droplet    reference_electrode_type: str = "NHE",
     liquid_volume_ml: float = 1.0,
-    ref_vs_nhe: float = 0.21,
     CV1_Vinit_vsRHE: float = 1.23,
     CV1_Vapex1_vsRHE: float = 0.73,
     CV1_Vapex2_vsRHE: float = 1.73,
@@ -359,7 +365,7 @@ def ECHE_CV_CA_CV(
     CV1_cycles: int = 1,
     preCV_duration: float = 3,
     OCV_duration: float = 1,
-    CA2_potential_vsRHE: float = 1.23,
+    CA2_potential: float = 1.23,
     CA2_duration_sec: float = 4,
     CA_samplerate_sec: float = 0.05,
     CV3_Vinit_vsRHE: float = 1.23,
@@ -396,7 +402,8 @@ def ECHE_CV_CA_CV(
             "ECHE_sub_preCV",
             {
                 "CA_potential": CV1_Vinit_vsRHE
-                - 1.0 * ref_vs_nhe
+                - 1.0 * ref_offset__V
+                - REF_TABLE[ref_type]
                 - 0.059 * solution_ph,
                 "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
                 "CA_duration_sec": preCV_duration,
@@ -419,8 +426,8 @@ def ECHE_CV_CA_CV(
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
                 "solution_bubble_gas": solution_bubble_gas,
                 "measurement_area": measurement_area,
-                "reference_electrode_type": "NHE",
-                "ref_vs_nhe": ref_vs_nhe,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
             },
         )
 
@@ -436,14 +443,14 @@ def ECHE_CV_CA_CV(
         epm.add_experiment(
             "ECHE_sub_CA",
             {
-                "CA_potential_vsRHE": CA2_potential_vsRHE,
+                "CA_potential": CA2_potential,
                 "solution_ph": solution_ph,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
                 "solution_bubble_gas": solution_bubble_gas,
                 "measurement_area": measurement_area,
-                "reference_electrode_type": "NHE",
-                "ref_vs_nhe": ref_vs_nhe,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA2_duration_sec,
                 "gamry_i_range": gamry_i_range,
@@ -454,7 +461,8 @@ def ECHE_CV_CA_CV(
             "ECHE_sub_preCV",
             {
                 "CA_potential": CV3_Vinit_vsRHE
-                - 1.0 * ref_vs_nhe
+                - 1.0 * ref_offset__V
+                - REF_TABLE[ref_type]
                 - 0.059 * solution_ph,
                 "samplerate_sec": CV3_samplerate_mV / (CV3_scanrate_voltsec * 1000),
                 "CA_duration_sec": preCV_duration,
@@ -477,8 +485,8 @@ def ECHE_CV_CA_CV(
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
                 "solution_bubble_gas": solution_bubble_gas,
                 "measurement_area": measurement_area,
-                "reference_electrode_type": "NHE",
-                "ref_vs_nhe": ref_vs_nhe,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
             },
         )
 
@@ -488,7 +496,7 @@ def ECHE_CV_CA_CV(
 
 
 def ECHE_CV(
-    sequence_version: int = 3,
+    sequence_version: int = 4,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -497,7 +505,8 @@ def ECHE_CV(
     solution_ph: float = 9.53,
     measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
-    ref_vs_nhe: float = 0.21,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
     CV1_Vinit_vsRHE: float = 0.7,
     CV1_Vapex1_vsRHE: float = 1,
     CV1_Vapex2_vsRHE: float = 0,
@@ -532,7 +541,8 @@ def ECHE_CV(
             "ECHE_sub_preCV",
             {
                 "CA_potential": CV1_Vinit_vsRHE
-                - 1.0 * ref_vs_nhe
+                - 1.0 * ref_offset__V
+                - REF_TABLE[ref_type]
                 - 0.059 * solution_ph,
                 "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
                 "CA_duration_sec": preCV_duration,
@@ -555,8 +565,8 @@ def ECHE_CV(
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
                 "solution_bubble_gas": solution_bubble_gas,
                 "measurement_area": measurement_area,
-                "reference_electrode_type": "NHE",
-                "ref_vs_nhe": ref_vs_nhe,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
             },
         )
 
@@ -566,7 +576,7 @@ def ECHE_CV(
 
 
 def ECHE_CA(
-    sequence_version: int = 3,
+    sequence_version: int = 4,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -575,8 +585,9 @@ def ECHE_CA(
     solution_ph: float = 9.53,
     measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
-    ref_vs_nhe: float = 0.21,
-    CA_potential_vsRHE: float = 1.23,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
+    CA_potential: float = 1.23,
     CA_duration_sec: float = 4,
     CA_samplerate_sec: float = 0.05,
     OCV_duration: float = 1,
@@ -614,14 +625,14 @@ def ECHE_CA(
         epm.add_experiment(
             "ECHE_sub_CA",
             {
-                "CA_potential_vsRHE": CA_potential_vsRHE,
+                "CA_potential": CA_potential,
                 "solution_ph": solution_ph,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
                 "solution_bubble_gas": solution_bubble_gas,
                 "measurement_area": measurement_area,
-                "reference_electrode_type": "NHE",
-                "ref_vs_nhe": ref_vs_nhe,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA_duration_sec,
                 "gamry_i_range": gamry_i_range,
@@ -634,7 +645,7 @@ def ECHE_CA(
 
 
 def ECHE_CA_led(
-    sequence_version: int = 3,
+    sequence_version: int = 4,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -643,8 +654,9 @@ def ECHE_CA_led(
     solution_ph: float = 9.53,
     measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
-    ref_vs_nhe: float = 0.21,
-    CA_potential_vsRHE: float = 1.23,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
+    CA_potential: float = 1.23,
     CA_duration_sec: float = 15,
     CA_samplerate_sec: float = 0.05,
     OCV_duration: float = 1,
@@ -693,14 +705,14 @@ def ECHE_CA_led(
         epm.add_experiment(
             "ECHE_sub_CA_led",
             {
-                "CA_potential_vsRHE": CA_potential_vsRHE,
+                "CA_potential": CA_potential,
                 "solution_ph": solution_ph,
                 "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
                 "solution_bubble_gas": solution_bubble_gas,
                 "measurement_area": measurement_area,
-                "reference_electrode_type": "NHE",
-                "ref_vs_nhe": ref_vs_nhe,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
                 "samplerate_sec": CA_samplerate_sec,
                 "CA_duration_sec": CA_duration_sec,
                 "gamry_i_range": gamry_i_range,
@@ -728,7 +740,7 @@ def ECHE_CA_led(
 
 
 def ECHE_CV_led(
-    sequence_version: int = 3,
+    sequence_version: int = 4,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -737,7 +749,8 @@ def ECHE_CV_led(
     solution_ph: float = 9.53,
     measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
-    ref_vs_nhe: float = 0.21,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
     CV_Vinit_vsRHE: float = 1.23,
     CV_Vapex1_vsRHE: float = 0.73,
     CV_Vapex2_vsRHE: float = 1.73,
@@ -784,7 +797,10 @@ def ECHE_CV_led(
         epm.add_experiment(
             "ECHE_sub_preCV",
             {
-                "CA_potential": CV_Vinit_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
+                "CA_potential": CV_Vinit_vsRHE
+                - 1.0 * ref_offset__V
+                - REF_TABLE[ref_type]
+                - 0.059 * solution_ph,
                 "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
                 "CA_duration_sec": preCV_duration,
             },
@@ -807,8 +823,8 @@ def ECHE_CV_led(
                 "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
                 "solution_bubble_gas": solution_bubble_gas,
                 "measurement_area": measurement_area,
-                "reference_electrode_type": "NHE",
-                "ref_vs_nhe": ref_vs_nhe,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
                 "illumination_source": led_name_CV,
                 "illumination_wavelength": led_wavelengths_nm[
                     led_names.index(led_name_CV)
@@ -831,7 +847,7 @@ def ECHE_CV_led(
 
 
 def ECHE_CP(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -840,7 +856,8 @@ def ECHE_CP(
     solution_ph: float = 9.53,
     measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
-    ref_vs_nhe: float = 0.21,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
     CP_current: float = 0.000001,
     CP_duration_sec: float = 4,
     CP_samplerate_sec: float = 0.05,
@@ -877,7 +894,8 @@ def ECHE_CP(
                 "solution_bubble_gas": solution_bubble_gas,
                 "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
-                "ref_vs_nhe": ref_vs_nhe,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
                 "samplerate_sec": CP_samplerate_sec,
                 "CP_duration_sec": CP_duration_sec,
                 "gamry_i_range": gamry_i_range,
@@ -890,7 +908,7 @@ def ECHE_CP(
 
 
 def ECHE_CP_led(
-    sequence_version: int = 2,
+    sequence_version: int = 3,
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -899,7 +917,8 @@ def ECHE_CP_led(
     solution_ph: float = 9.53,
     measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
-    ref_vs_nhe: float = 0.21,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
     CP_current: float = 0.000001,
     CP_duration_sec: float = 15,
     CP_samplerate_sec: float = 0.05,
@@ -947,7 +966,8 @@ def ECHE_CP_led(
                 "solution_bubble_gas": solution_bubble_gas,
                 "measurement_area": measurement_area,
                 "reference_electrode_type": "NHE",
-                "ref_vs_nhe": ref_vs_nhe,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
                 "samplerate_sec": CP_samplerate_sec,
                 "CP_duration_sec": CP_duration_sec,
                 "gamry_i_range": gamry_i_range,
@@ -968,6 +988,426 @@ def ECHE_CP_led(
                 "toggle_dark_time_init": toggleCP_dark_time_init,
             },
         )
+
+        epm.add_experiment("ECHE_sub_shutdown", {})
+
+    return epm.experiment_plan_list  # returns complete experiment list
+
+def ECHE_CVs_CAs(
+    sequence_version: int = 1,
+    plate_id: int = 6307,
+    plate_sample_no_list: list = [2],
+    reservoir_electrolyte: Electrolyte = "perchloric acid",
+    reservoir_liquid_sample_no: int = 27,
+    solution_bubble_gas: str = "O2",
+    solution_ph: float = 1.24,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
+    measurement_area: float = 0.071,  # 3mm diameter droplet    reference_electrode_type: str = "NHE",
+    liquid_volume_ml: float = 1.0,
+    CV1_Vinit_vsRHE: float = 1.23,
+    CV1_Vapex1_vsRHE: float = 1.23,
+    CV1_Vapex2_vsRHE: float = 0.6,
+    CV1_Vfinal_vsRHE: float = 0.6,
+    CV1_scanrate_voltsec: float = 0.02,
+    CV1_samplerate_mV: float = 1,
+    CV1_cycles: int = 5,
+    CV2_Vinit_vsRHE: float = 1.23,
+    CV2_Vapex1_vsRHE: float = 1.23,
+    CV2_Vapex2_vsRHE: float = 0.4,
+    CV2_Vfinal_vsRHE: float = 0.4,
+    CV2_scanrate_voltsec: float = 0.02,
+    CV2_samplerate_mV: float = 1,
+    CV2_cycles: int = 3,
+    CV3_Vinit_vsRHE: float = 1.23,
+    CV3_Vapex1_vsRHE: float = 1.23,
+    CV3_Vapex2_vsRHE: float = 0,
+    CV3_Vfinal_vsRHE: float = 0,
+    CV3_scanrate_voltsec: float = 0.02,
+    CV3_samplerate_mV: float = 1,
+    CV3_cycles: int = 3,
+    preCV_duration: float = 3,
+    OCV_duration: float = 1,
+    CA1_potential: float = 0.6,
+    CA1_duration_sec: float = 300,
+    CA2_potential: float = 0.4,
+    CA2_duration_sec: float = 300,
+    CA_samplerate_sec: float = 0.05,
+    gamry_i_range: str = "auto",
+):
+
+    epm = ExperimentPlanMaker()
+
+    # (1) house keeping
+    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+
+    for plate_sample in plate_sample_no_list:
+
+        epm.add_experiment(
+            "ECHE_sub_startup",
+            {
+                "solid_custom_position": "cell1_we",
+                "solid_plate_id": plate_id,
+                "solid_sample_no": plate_sample,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "liquid_volume_ml": liquid_volume_ml,
+            },
+        )
+
+        # epm.add_experiment(
+        #     "ECHE_sub_preCV",
+        #     {
+        #         "CA_potential": CV1_Vinit_vsRHE
+        #         - 1.0 * ref_offset__V
+        #         - REF_TABLE[ref_type]
+        #         - 0.059 * solution_ph,
+        #         "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
+        #         "CA_duration_sec": preCV_duration,
+        #     },
+        # )
+        # CV1
+        epm.add_experiment(
+            "ECHE_sub_CV",
+            {
+                "Vinit_vsRHE": CV1_Vinit_vsRHE,
+                "Vapex1_vsRHE": CV1_Vapex1_vsRHE,
+                "Vapex2_vsRHE": CV1_Vapex2_vsRHE,
+                "Vfinal_vsRHE": CV1_Vfinal_vsRHE,
+                "scanrate_voltsec": CV1_scanrate_voltsec,
+                "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
+                "cycles": CV1_cycles,
+                "gamry_i_range": gamry_i_range,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
+            },
+        )
+        epm.add_experiment(
+            "ECHE_sub_CV",
+            {
+                "Vinit_vsRHE": CV2_Vinit_vsRHE,
+                "Vapex1_vsRHE": CV2_Vapex1_vsRHE,
+                "Vapex2_vsRHE": CV2_Vapex2_vsRHE,
+                "Vfinal_vsRHE": CV2_Vfinal_vsRHE,
+                "scanrate_voltsec": CV2_scanrate_voltsec,
+                "samplerate_sec": CV2_samplerate_mV / (CV2_scanrate_voltsec * 1000),
+                "cycles": CV2_cycles,
+                "gamry_i_range": gamry_i_range,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
+            },
+        )
+        # CV3
+        epm.add_experiment(
+            "ECHE_sub_CV",
+            {
+                "Vinit_vsRHE": CV3_Vinit_vsRHE,
+                "Vapex1_vsRHE": CV3_Vapex1_vsRHE,
+                "Vapex2_vsRHE": CV3_Vapex2_vsRHE,
+                "Vfinal_vsRHE": CV3_Vfinal_vsRHE,
+                "scanrate_voltsec": CV3_scanrate_voltsec,
+                "samplerate_sec": CV3_samplerate_mV / (CV3_scanrate_voltsec * 1000),
+                "cycles": CV3_cycles,
+                "gamry_i_range": gamry_i_range,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
+            },
+        )
+        epm.add_experiment(
+            "ECHE_sub_CA",
+            {
+                "CA_potential": CA1_potential,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
+                "samplerate_sec": CA_samplerate_sec,
+                "CA_duration_sec": CA1_duration_sec,
+                "gamry_i_range": gamry_i_range,
+            },
+        )
+
+        # # OCV
+        # epm.add_experiment(
+        #     "ECHE_sub_OCV",
+        #     {
+        #         "Tval__s": OCV_duration,
+        #         "SampleRate": 0.05,
+        #     },
+        # )
+        # CA2
+        epm.add_experiment(
+            "ECHE_sub_CA",
+            {
+                "CA_potential": CA2_potential,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
+                "samplerate_sec": CA_samplerate_sec,
+                "CA_duration_sec": CA2_duration_sec,
+                "gamry_i_range": gamry_i_range,
+            },
+        )
+
+        # epm.add_experiment(
+        #     "ECHE_sub_preCV",
+        #     {
+        #         "CA_potential": CV3_Vinit_vsRHE
+        #         - 1.0 * ref_offset__V
+        #         - REF_TABLE[ref_type]
+        #         - 0.059 * solution_ph,
+        #         "samplerate_sec": CV3_samplerate_mV / (CV3_scanrate_voltsec * 1000),
+        #         "CA_duration_sec": preCV_duration,
+        #     },
+        # )
+
+        epm.add_experiment("ECHE_sub_shutdown", {})
+
+    return epm.experiment_plan_list  # returns complete experiment list
+
+def ECHE_cleanCVs_regCVs_CAs(
+    sequence_version: int = 1,
+    plate_id: int = 6307,
+    plate_sample_no_list: list = [2],
+    reservoir_electrolyte: Electrolyte = "perchloric acid",
+    reservoir_liquid_sample_no: int = 27,
+    solution_bubble_gas: str = "O2",
+    solution_ph: float = 1.24,
+    ref_type: str = "inhouse",
+    ref_offset__V: float = 0.0,
+    measurement_area: float = 0.071,  # 3mm diameter droplet    reference_electrode_type: str = "NHE",
+    liquid_volume_ml: float = 1.0,
+    CVcln_Vinit_vsRHE: float = 1.23,
+    CVcln_Vapex1_vsRHE: float = 1.23,
+    CVcln_Vapex2_vsRHE: float = 0,
+    CVcln_Vfinal_vsRHE: float = 0,
+    CVcln_scanrate_voltsec: float = 0.1,
+    CVcln_samplerate_mV: float = 1,
+    CVcln_cycles: int = 20,
+    CV1_Vinit_vsRHE: float = 1.23,
+    CV1_Vapex1_vsRHE: float = 1.23,
+    CV1_Vapex2_vsRHE: float = 0.6,
+    CV1_Vfinal_vsRHE: float = 0.6,
+    CV1_scanrate_voltsec: float = 0.02,
+    CV1_samplerate_mV: float = 1,
+    CV1_cycles: int = 5,
+    CV2_Vinit_vsRHE: float = 1.23,
+    CV2_Vapex1_vsRHE: float = 1.23,
+    CV2_Vapex2_vsRHE: float = 0.4,
+    CV2_Vfinal_vsRHE: float = 0.4,
+    CV2_scanrate_voltsec: float = 0.02,
+    CV2_samplerate_mV: float = 1,
+    CV2_cycles: int = 3,
+    CV3_Vinit_vsRHE: float = 1.23,
+    CV3_Vapex1_vsRHE: float = 1.23,
+    CV3_Vapex2_vsRHE: float = 0,
+    CV3_Vfinal_vsRHE: float = 0,
+    CV3_scanrate_voltsec: float = 0.02,
+    CV3_samplerate_mV: float = 1,
+    CV3_cycles: int = 3,
+    preCV_duration: float = 3,
+    OCV_duration: float = 1,
+    CA1_potential: float = 0.6,
+    CA1_duration_sec: float = 300,
+    CA2_potential: float = 0.4,
+    CA2_duration_sec: float = 300,
+    CA_samplerate_sec: float = 0.05,
+    gamry_i_range: str = "auto",
+):
+
+    epm = ExperimentPlanMaker()
+
+    # (1) house keeping
+    epm.add_experiment("ECHE_sub_unloadall_customs", {})
+
+    for plate_sample in plate_sample_no_list:
+
+        epm.add_experiment(
+            "ECHE_sub_startup",
+            {
+                "solid_custom_position": "cell1_we",
+                "solid_plate_id": plate_id,
+                "solid_sample_no": plate_sample,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "liquid_volume_ml": liquid_volume_ml,
+            },
+        )
+
+        # epm.add_experiment(
+        #     "ECHE_sub_preCV",
+        #     {
+        #         "CA_potential": CV1_Vinit_vsRHE
+        #         - 1.0 * ref_offset__V
+        #         - REF_TABLE[ref_type]
+        #         - 0.059 * solution_ph,
+        #         "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
+        #         "CA_duration_sec": preCV_duration,
+        #     },
+        # )
+        #CVcleansweepfirst
+        epm.add_experiment(
+            "ECHE_sub_CV",
+            {
+                "Vinit_vsRHE": CVcln_Vinit_vsRHE,
+                "Vapex1_vsRHE": CVcln_Vapex1_vsRHE,
+                "Vapex2_vsRHE": CVcln_Vapex2_vsRHE,
+                "Vfinal_vsRHE": CVcln_Vfinal_vsRHE,
+                "scanrate_voltsec": CVcln_scanrate_voltsec,
+                "samplerate_sec": CVcln_samplerate_mV / (CVcln_scanrate_voltsec * 1000),
+                "cycles": CVcln_cycles,
+                "gamry_i_range": gamry_i_range,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
+            },
+        )
+
+
+        # CV1
+        epm.add_experiment(
+            "ECHE_sub_CV",
+            {
+                "Vinit_vsRHE": CV1_Vinit_vsRHE,
+                "Vapex1_vsRHE": CV1_Vapex1_vsRHE,
+                "Vapex2_vsRHE": CV1_Vapex2_vsRHE,
+                "Vfinal_vsRHE": CV1_Vfinal_vsRHE,
+                "scanrate_voltsec": CV1_scanrate_voltsec,
+                "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
+                "cycles": CV1_cycles,
+                "gamry_i_range": gamry_i_range,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
+            },
+        )
+        epm.add_experiment(
+            "ECHE_sub_CV",
+            {
+                "Vinit_vsRHE": CV2_Vinit_vsRHE,
+                "Vapex1_vsRHE": CV2_Vapex1_vsRHE,
+                "Vapex2_vsRHE": CV2_Vapex2_vsRHE,
+                "Vfinal_vsRHE": CV2_Vfinal_vsRHE,
+                "scanrate_voltsec": CV2_scanrate_voltsec,
+                "samplerate_sec": CV2_samplerate_mV / (CV2_scanrate_voltsec * 1000),
+                "cycles": CV2_cycles,
+                "gamry_i_range": gamry_i_range,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
+            },
+        )
+        # CV3
+        epm.add_experiment(
+            "ECHE_sub_CV",
+            {
+                "Vinit_vsRHE": CV3_Vinit_vsRHE,
+                "Vapex1_vsRHE": CV3_Vapex1_vsRHE,
+                "Vapex2_vsRHE": CV3_Vapex2_vsRHE,
+                "Vfinal_vsRHE": CV3_Vfinal_vsRHE,
+                "scanrate_voltsec": CV3_scanrate_voltsec,
+                "samplerate_sec": CV3_samplerate_mV / (CV3_scanrate_voltsec * 1000),
+                "cycles": CV3_cycles,
+                "gamry_i_range": gamry_i_range,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
+            },
+        )
+        epm.add_experiment(
+            "ECHE_sub_CA",
+            {
+                "CA_potential": CA1_potential,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
+                "samplerate_sec": CA_samplerate_sec,
+                "CA_duration_sec": CA1_duration_sec,
+                "gamry_i_range": gamry_i_range,
+            },
+        )
+
+        # # OCV
+        # epm.add_experiment(
+        #     "ECHE_sub_OCV",
+        #     {
+        #         "Tval__s": OCV_duration,
+        #         "SampleRate": 0.05,
+        #     },
+        # )
+        # CA2
+        epm.add_experiment(
+            "ECHE_sub_CA",
+            {
+                "CA_potential": CA2_potential,
+                "solution_ph": solution_ph,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,  # currently liquid sample database number
+                "reservoir_electrolyte": reservoir_electrolyte,  # currently liquid sample database number
+                "solution_bubble_gas": solution_bubble_gas,
+                "measurement_area": measurement_area,
+                "ref_type": ref_type,
+                "ref_offset__V": ref_offset__V,
+                "samplerate_sec": CA_samplerate_sec,
+                "CA_duration_sec": CA2_duration_sec,
+                "gamry_i_range": gamry_i_range,
+            },
+        )
+
+        # epm.add_experiment(
+        #     "ECHE_sub_preCV",
+        #     {
+        #         "CA_potential": CV3_Vinit_vsRHE
+        #         - 1.0 * ref_offset__V
+        #         - REF_TABLE[ref_type]
+        #         - 0.059 * solution_ph,
+        #         "samplerate_sec": CV3_samplerate_mV / (CV3_scanrate_voltsec * 1000),
+        #         "CA_duration_sec": preCV_duration,
+        #     },
+        # )
 
         epm.add_experiment("ECHE_sub_shutdown", {})
 

@@ -1,7 +1,7 @@
 @echo off
 call conda activate helao
 cd ..\helao-core
-git fetch
+git fetch --all
 if %~1=="main" (
     git switch main
 ) else (
@@ -9,5 +9,5 @@ if %~1=="main" (
 )
 git switch %1
 cd ..\helao-async
-git fetch
+git fetch --all
 git switch %1

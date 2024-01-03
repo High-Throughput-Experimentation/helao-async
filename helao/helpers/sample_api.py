@@ -679,13 +679,13 @@ class OldLiquidSampleAPI:
                 line += "\n"
             await self.fdb.write(line)
 
-        self._base.print_message(f"new entry dict: {new_sample.dict()}")
+        self._base.print_message(f"new entry dict: {new_sample.model_dump()}")
         new_sample.sample_no = await self.count_samples() + 1
         self._base.print_message(f"new liquid sample no: {new_sample.sample_no}")
         # dump dict to separate json file
         await write_sample_no_jsonfile(
             f"{new_sample.sample_no:08d}__{new_sample.sample_creation_experiment_uuid}__{new_sample.sample_creation_action_uuid}.json",
-            new_sample.dict(),
+            new_sample.model_dump(),
         )
         # add newid to db csv
         await self._open_db("a+")
@@ -791,7 +791,7 @@ class OldLiquidSampleAPI:
                 del liquid_sample_jsondict["DUID"]
 
             ret_liquid_sample = LiquidSample(**liquid_sample_jsondict)
-            self._base.print_message(f"data json content: {ret_liquid_sample.dict()}")
+            self._base.print_message(f"data json content: {ret_liquid_sample.model_dump()}")
 
             return ret_liquid_sample
         else:

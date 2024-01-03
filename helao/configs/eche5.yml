@@ -134,3 +134,11 @@ servers:
       aws_bucket: helao.data
       api_host: caltech-api.modelyst.com
       testing: false
+  DOSEPUMP:
+    host: hte-eche-05.htejcap.caltech.edu
+    port: 8016
+    group: action
+    fast: diapump_server
+    params:
+      port: COM12
+      address: 0

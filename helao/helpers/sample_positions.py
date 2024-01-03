@@ -225,4 +225,4 @@ VTUnion = Union[
     VT70,
 ]
 
-Positions.update_forward_refs()
+Positions.model_rebuild()

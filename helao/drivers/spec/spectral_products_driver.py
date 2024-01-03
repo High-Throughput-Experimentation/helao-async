@@ -455,7 +455,7 @@ class SM303:
                 await self.set_IO_signalq(False)
                 if self.active:
                     # add estop status to active.status
-                    await self.active.set_estop()
+                    self.active.set_estop()
         return switch
 
     def unset_external_trigger(self):

@@ -839,28 +839,28 @@ class gamry:
                                 True, act_params["stop_advmin"]
                             )
                         )
-                        dtaq_lims.append(
-                            lambda dtaq: dtaq.SetThreshADVMin(
-                                True, act_params["stop_advmin"]
-                            )
-                        )
+                        # dtaq_lims.append(
+                        #     lambda dtaq: dtaq.SetThreshADVMin(
+                        #         True, act_params["stop_advmin"]
+                        #     )
+                        # )
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopADVMin(False, 0.0))
-                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshADVMin(False, 0.0))
+                        # dtaq_lims.append(lambda dtaq: dtaq.SetThreshADVMin(False, 0.0))
                     if act_params.get("stop_advmax", None) is not None:
                         dtaq_lims.append(
                             lambda dtaq: dtaq.SetStopADVMax(
                                 True, act_params["stop_advmax"]
                             )
                         )
-                        dtaq_lims.append(
-                            lambda dtaq: dtaq.SetThreshADVMax(
-                                True, act_params["stop_advmax"]
-                            )
-                        )
+                        # dtaq_lims.append(
+                        #     lambda dtaq: dtaq.SetThreshADVMax(
+                        #         True, act_params["stop_advmax"]
+                        #     )
+                        # )
                     else:
                         dtaq_lims.append(lambda dtaq: dtaq.SetStopADVMax(False, 0.0))
-                        dtaq_lims.append(lambda dtaq: dtaq.SetThreshADVMax(False, 0.0))
+                        # dtaq_lims.append(lambda dtaq: dtaq.SetThreshADVMax(False, 0.0))
                 else:
                     self.base.print_message(f"'mode {mode} not supported'", error=True)
                     error = ErrorCodes.not_available
@@ -1129,7 +1129,7 @@ class gamry:
                 await self.set_IO_signalq(False)
                 if self.active:
                     # add estop status to active.status
-                    await self.active.set_estop()
+                    self.active.set_estop()
         return switch
 
     def shutdown(self):

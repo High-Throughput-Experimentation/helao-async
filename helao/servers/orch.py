@@ -108,6 +108,7 @@ class Orch(Base):
         self.bokehapp = None
         self.orch_op = None
         self.op_enabled = self.server_params.get("enable_op", False)
+        self.heartbeat_interval = self.server_params.get("heartbeat_interval", 10)
         # basemodel which holds all information for orch
         self.globalstatusmodel = GlobalStatusModel(orchestrator=self.server)
         self.globalstatusmodel._sort_status()
@@ -136,7 +137,15 @@ class Orch(Base):
         self.step_thru_sequences = False
 
     def exception_handler(self, loop, context):
-        self.print_message(f"Got exception from coroutine: {context}")
+        self.print_message(f"Got exception from coroutine: {context}", error=True)
+        exc = context.get("exception")
+        self.print_message(
+            f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}",
+            error=True,
+        )
+        self.print_message("setting E-STOP flag on active actions")
+        for _, active in self.actives.items():
+            active.set_estop()
 
     def myinit(self):
         self.aloop = asyncio.get_running_loop()
@@ -156,6 +165,7 @@ class Orch(Base):
             self.start_operator()
         self.status_subscriber = asyncio.create_task(self.subscribe_all())
         self.globstat_broadcaster = asyncio.create_task(self.globstat_broadcast_task())
+        self.heartbeat_monitor = asyncio.create_task(self.active_action_monitor())
 
     def endpoint_queues_init(self):
         for urld in self.fast_urls:
@@ -194,7 +204,7 @@ class Orch(Base):
             doc=doc,
         )
 
-        # _ = Operator(app.vis)
+        # _ = HelaoOperator(app.vis)
         doc.operator = BokehOperator(app.vis, orch)
         # get the event loop
         # operatorloop = asyncio.get_event_loop()
@@ -360,7 +370,7 @@ class Orch(Base):
             )
 
             if estop_uuids and self.globalstatusmodel.loop_state == LoopStatus.started:
-                await self.estop_loop()
+                await self.estop_loop(reason=f"due to action uuid(s): {estop_uuids}")
             elif (
                 error_uuids and self.globalstatusmodel.loop_state == LoopStatus.started
             ):
@@ -669,13 +679,13 @@ class Orch(Base):
                         {v: self.active_experiment.globalexp_params[k]}
                     )
 
-            actserv_exists = await endpoints_available([A.url])
+            actserv_exists, _ = await endpoints_available([A.url])
             if not actserv_exists:
                 stop_message = f"{A.url} is not available, orchestrator will stop. Rectify action server then resume orchestrator run."
                 self.stop_message = stop_message
-                await self.orch.stop()
+                await self.stop()
                 self.action_dq.insert(0, A)
-                await self.orch.update_operator(True)
+                await self.update_operator(True)
                 return ErrorCodes.none
 
             self.print_message(
@@ -704,9 +714,9 @@ class Orch(Base):
                 if error_code != ErrorCodes.none:
                     stop_message = f"Dispatching action {A.action_name} did not return status code 200. Pausing orch."
                     self.stop_message = stop_message
-                    await self.orch.stop()
+                    await self.stop()
                     self.action_dq.insert(0, A)
-                    await self.orch.update_operator(True)
+                    await self.update_operator(True)
                     return ErrorCodes.none
 
                 # except asyncio.exceptions.TimeoutError:
@@ -792,6 +802,8 @@ class Orch(Base):
                     f"{result_action.error_code}",
                     error=True,
                 )
+                stop_reason = f"{result_action.action_name} on {result_action.action_server.disp_name()} returned an error"
+                await self.estop_loop(stop_reason)
                 return result_action.error_code
 
             if (
@@ -957,6 +969,7 @@ class Orch(Base):
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             self.print_message("serious orch exception occurred", error=True)
             self.print_message(f"ERROR: {repr(e), tb,}", error=True)
+            await self.estop_loop()
             return False
 
     async def orch_wait_for_all_actions(self):
@@ -1007,8 +1020,9 @@ class Orch(Base):
             self.print_message("loop already started.")
         return self.globalstatusmodel.loop_state
 
-    async def estop_loop(self):
-        self.print_message("estopping orch", info=True)
+    async def estop_loop(self, reason: str = ""):
+        reason_suffix = f"{' ' + reason if reason else ''}"
+        self.print_message("estopping orch" + reason_suffix, error=True)
 
         # set globalstatusmodel.loop_state to estop
         self.globalstatusmodel.loop_state = LoopStatus.estopped
@@ -1019,6 +1033,7 @@ class Orch(Base):
         # reset loop intend
         await self.intend_none()
 
+        self.current_stop_message("E-STOP" + reason_suffix)
         await self.update_operator(True)
 
     async def stop_loop(self):
@@ -1175,8 +1190,8 @@ class Orch(Base):
         prepend: bool = False,
         at_index: int = None,
     ):
-        Ddict = experimentmodel.dict()
-        Ddict.update(seq.dict())
+        Ddict = experimentmodel.model_dump()
+        Ddict.update(seq.model_dump())
         D = Experiment(**Ddict)
 
         # init uuid now for tracking later
@@ -1504,3 +1519,22 @@ class Orch(Base):
         finished_action = await active.finish()
         self.last_wait_ts = check_time
         return finished_action
+
+    async def active_action_monitor(self):
+        while True:
+            if self.globalstatusmodel.loop_state == LoopStatus.started:
+                still_alive = True
+                active_endpoints = [
+                    actmod.url for actmod in self.globalstatusmodel.active_dict.values()
+                ]
+                if active_endpoints:
+                    unique_endpoints = list(set(active_endpoints))
+                    still_alive, unavail = await endpoints_available(unique_endpoints)
+                if not still_alive:
+                    bad_serves = [x.strip("/".split("/")[-2]) for x, _ in unavail]
+                    self.current_stop_message = (
+                        f"{', '.join(bad_serves)} servers are unavailable"
+                    )
+                    await self.stop()
+                    await self.update_operator(True)
+            await asyncio.sleep(self.heartbeat_interval)

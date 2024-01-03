@@ -821,7 +821,7 @@ class cNIMAX:
             if switch:
                 await self.set_IO_signalq(False)
                 if self.active:
-                    await self.active.set_estop()
+                    self.active.set_estop()
 
         return switch
 
