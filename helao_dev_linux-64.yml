@@ -5,18 +5,19 @@ channels:
 dependencies:
   - pip:
     - aioshutil
-    # - gpflow
+    - plumbum
+    - psycopg2
     - pyft232
     - pylablib
     - git+https://github.com/spomjaksilp/pyMeCom
-    # - tensorflow
+    - sqlalchemy
+    - sqlmodel>=0.0.14
   - aiofiles
   - aiohttp
   - bokeh=2
   - boto3
   - botocore
   - colorama
-  - databases
   - fastapi
   - filelock
   - git
@@ -31,15 +32,15 @@ dependencies:
   - paramiko
   - pip
   - psutil
-  - psycopg2
   - pyaml
   - pybase64
-  - pydantic=1
+  - pydantic-settings
+  - pydantic=2
   - pyfiglet
   - pyftdi
   - pymodbus
   - pyserial
-  - python
+  - python=3.11
   - python-dotenv
   - python-multipart
   - pyusb
@@ -51,12 +52,12 @@ dependencies:
   - scikit-learn
   - scipy
   - shortuuid
-  - sqlalchemy
   - sqlite
-  - sqlmodel
   - sshtunnel
   - starlette
   - termcolor
+  - tqdm
   - uvicorn
   - websockets
   - zeroconf
+  - zeromq

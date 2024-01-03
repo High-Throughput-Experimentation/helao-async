@@ -82,6 +82,27 @@ def makeApp(confPrefix, server_key, helao_root):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
+    @app.post(f"/{server_key}/analyze_echeuvis", tags=["action"])
+    async def analyze_echeuvis(
+        action: Action = Body({}, embed=True),
+        action_version: int = 1,
+        sequence_uuid: str = "",
+        plate_id: Union[int, None] = None,
+        recent: bool = True,
+        params: dict = {},
+    ):
+        """Generates ECHEUVIS stability analyses from sequence_uuid."""
+        active = await app.base.setup_and_contain_action()
+            
+        await app.driver.batch_calc_echeuvis(
+            plate_id=active.action.action_params['plate_id'],
+            sequence_uuid=UUID(active.action.action_params['sequence_uuid']),
+            params=active.action.action_params['params'],
+            recent=active.action.action_params['recent'],
+        )
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
     @app.post("/list_running_tasks", tags=["private"])
     def list_current_tasks():
         return list(app.driver.running_tasks.keys())

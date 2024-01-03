@@ -188,11 +188,15 @@ class Base:
                             self.ntp_offset = float(self.ntp_offset)
 
     def exception_handler(self, loop, context):
-        self.print_message(f"Got exception from coroutine: {context}")
+        self.print_message(f"Got exception from coroutine: {context}", error=True)
         exc = context.get("exception")
         self.print_message(
-            f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}"
+            f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}", error=True
         )
+        self.print_message("setting E-STOP flag on active actions")
+        for _, active in self.actives.items():
+            active.set_estop()
+            
 
     def myinit(self):
         self.aloop = asyncio.get_running_loop()
@@ -253,14 +257,14 @@ class Base:
                 flatParams = get_flat_params(route.dependant)
                 paramD = {
                     par.name: {
-                        "outer_type": str(par.outer_type_).split("'")[1]
-                        if len(str(par.outer_type_).split("'")) >= 2
-                        else str(par.outer_type_),
+                        "outer_type": str(par.field_info.annotation).split("'")[1]
+                        if len(str(par.field_info.annotation).split("'")) >= 2
+                        else str(par.field_info.annotation),
                         "type": str(par.type_).split("'")[1]
                         if len(str(par.type_).split("'")) >= 2
                         else str(par.type_),
                         "required": par.required,
-                        "shape": par.shape,
+                        # "shape": par.shape,
                         "default": par.default if par.default is not ... else None,
                     }
                     for par in flatParams
@@ -1008,7 +1012,7 @@ class Active:
         try:
             _ = futr.result()
         except Exception as exc:
-            self.print_message(
+            self.base.print_message(
                 f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}"
             )
 
@@ -1139,7 +1143,7 @@ class Active:
         if not action.nonblocking:
             await self.base.status_q.put(action.get_actmodel())
 
-    async def set_estop(self, action: Action = None):
+    def set_estop(self, action: Action = None):
         if action is None:
             action = self.action
         action.action_status.append(HloStatus.estopped)

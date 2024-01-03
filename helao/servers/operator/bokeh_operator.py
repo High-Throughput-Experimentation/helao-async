@@ -88,7 +88,7 @@ class BokehOperator:
                 dev_custom = {}
             self.dev_customitems = [key for key in dev_custom.keys()]
 
-        self.color_sq_param_inputs = "#BDB76B"
+        self.color_sq_param_inputs = "#F9E79F"
         self.max_width = 1024
         # holds the page layout
         self.layout = []
@@ -219,7 +219,7 @@ class BokehOperator:
         self.sequence_tab = Panel(child=self.sequence_table, title="Sequences")
         self.experiment_tab = Panel(child=self.experiment_table, title="Experiments")
         self.action_tab = Panel(child=self.action_table, title="Actions")
-        self.active_tabs = Tabs(
+        self.queue_tabs = Tabs(
             tabs=[self.sequence_tab, self.experiment_tab, self.action_tab],
             height_policy="min",
         )
@@ -235,6 +235,14 @@ class BokehOperator:
             height=200,
             autosize_mode="fit_columns",
             fit_columns=False,
+        )
+
+        self.planner_tab = Panel(
+            child=self.experiment_plan_table, title="Sequence Planner"
+        )
+        self.active_tab = Panel(child=self.active_action_table, title="Active Actions")
+        self.planactive_tabs = Tabs(
+            tabs=[self.planner_tab, self.active_tab], height_policy="min"
         )
 
         self.sequence_dropdown = Select(
@@ -285,8 +293,8 @@ class BokehOperator:
             label="Clear expplan", button_type="default", width=100
         )
         self.button_clear_expplan.on_event(ButtonClick, self.callback_clear_expplan)
-        self.orch_status_button = Toggle(
-            label="Disabled", disabled=True, button_type="danger", width=400
+        self.orch_status_button = Button(
+            label="Disabled", disabled=False, button_type="danger", width=400
         )  # success: green, danger: red
 
         if self.orch.step_thru_actions:
@@ -444,7 +452,7 @@ class BokehOperator:
             text="<b>Orchestrator</b>",
             width=self.max_width - 20,
             height=32,
-            style={"font-size": "150%", "color": "red"},
+            style={"font-size": "150%", "color": "#CB4335"},
         )
 
         self.layout0 = layout(
@@ -456,10 +464,10 @@ class BokehOperator:
                             text=f"<b>{self.config_dict.get('doc_name', 'BokehOperator')} on {gethostname().lower()} -- config: {os.path.basename(self.loaded_config_path)}</b>",
                             width=self.max_width - 20,
                             height=32,
-                            style={"font-size": "200%", "color": "red"},
+                            style={"font-size": "200%", "color": "#CB4335"},
                         ),
                     ],
-                    background="#C0C0C0",
+                    # background="#D6DBDF",
                     width=self.max_width,
                 ),
                 Spacer(height=10),
@@ -486,7 +494,7 @@ class BokehOperator:
                         [self.sequence_descr_txt],
                         Spacer(height=10),
                     ],
-                    background="#808080",
+                    background="#D6DBDF",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -499,7 +507,7 @@ class BokehOperator:
                             self.save_last_seq_pars,
                         ]
                     ],
-                    background="#808080",
+                    background="#D6DBDF",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -527,7 +535,7 @@ class BokehOperator:
                         [self.experiment_descr_txt],
                         Spacer(height=10),
                     ],
-                    background="#808080",
+                    background="#D6DBDF",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -540,7 +548,7 @@ class BokehOperator:
                             self.save_last_exp_pars,
                         ],
                     ],
-                    background="#808080",
+                    background="#D6DBDF",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -568,7 +576,7 @@ class BokehOperator:
                         [self.seqspec_descr_txt],
                         Spacer(height=10),
                     ],
-                    background="#808080",
+                    background="#D6DBDF",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -582,7 +590,7 @@ class BokehOperator:
                             self.button_to_seqtab,
                         ],
                     ],
-                    background="#808080",
+                    background="#D6DBDF",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -598,7 +606,7 @@ class BokehOperator:
                         Spacer(width=20),
                         self.orch_section,
                     ],
-                    background="#C0C0C0",
+                    # background="#D6DBDF",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -635,7 +643,7 @@ class BokehOperator:
                         [Spacer(width=10), self.error_txt],
                         Spacer(height=10),
                     ],
-                    background="#808080",
+                    background="#D6DBDF",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -643,12 +651,12 @@ class BokehOperator:
                     [
                         [
                             Div(
-                                text="<b>Sequence Planner:</b>",
+                                text="<b>Non-queued:</b>",
                                 width=200 + 50,
                                 height=15,
                             ),
                         ],
-                        [self.experiment_plan_table],
+                        [self.planactive_tabs],
                         [
                             Div(
                                 text="<b>Queues:</b>",
@@ -656,13 +664,7 @@ class BokehOperator:
                                 height=15,
                             ),
                         ],
-                        [self.active_tabs],
-                        [
-                            Div(
-                                text="<b>Active actions:</b>", width=200 + 50, height=15
-                            ),
-                        ],
-                        [self.active_action_table],
+                        [self.queue_tabs],
                         [
                             self.button_add_expplan,
                             Spacer(width=10),
@@ -689,7 +691,7 @@ class BokehOperator:
                         self.button_estop_orch,
                         Spacer(height=10),
                     ],
-                    background="#7fdbff",
+                    background="#AED6F1",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -802,7 +804,7 @@ class BokehOperator:
                     args=tmpargs,
                     defaults=tmpdefs,
                     argtypes=tmptypes,
-                ).dict()
+                ).model_dump()
             )
         for item in self.sequences:
             self.sequence_select_list.append(item["sequence_name"])
@@ -860,7 +862,7 @@ class BokehOperator:
                     args=tmpargs,
                     defaults=tmpdefs,
                     argtypes=tmptypes,
-                ).dict()
+                ).model_dump()
             )
         for item in self.experiments:
             self.experiment_select_list.append(item["experiment_name"])
@@ -1037,7 +1039,7 @@ class BokehOperator:
         loaded_params = seq.sequence_params
         # switch tabs and update layout
         self.select_tabs.active = 0
-        self.callback_sequence_select('value', seqname, seqname)
+        self.callback_sequence_select("value", seqname, seqname)
         self.sequence_dropdown.value = seqname
         # replace defaults with loaded params
         for i, x in enumerate(self.seq_param_input):
@@ -1340,20 +1342,29 @@ class BokehOperator:
             self.orch.step_thru_sequences = not self.orch.step_thru_sequences
 
     def update_stepwise_toggle(self, sender):
-        sender_type = sender.label.split()[-1]
+        sender_type = sender.label.split("[")[0].strip().split()[-1].strip()
         sender_map = {
-            "actions": self.orch_stepact_button,
-            "experiments": self.orch_stepexp_button,
-            "sequences": self.orch_stepseq_button,
+            "actions": (self.orch_stepact_button, len(self.orch.action_dq)),
+            "experiments": (self.orch_stepexp_button, len(self.orch.experiment_dq)),
+            "sequences": (self.orch_stepseq_button, len(self.orch.sequence_dq)),
         }
-        sbutton = sender_map[sender_type]
+        sbutton, numq = sender_map[sender_type]
         self.flip_stepwise_flag(sender_type)
         if sbutton.button_type == "danger":
-            sbutton.label = f"RUN-THRU {sender_type}"
+            sbutton.label = f"RUN-THRU {sender_type} [{numq}]"
             sbutton.button_type = "success"
         else:
-            sbutton.label = f"STEP-THRU {sender_type}"
+            sbutton.label = f"STEP-THRU {sender_type} [{numq}]"
             sbutton.button_type = "danger"
+
+    def update_queuecount_labels(self):
+        stepwisebuttons = [
+            (self.orch_stepseq_button, len(self.orch.sequence_dq)),
+            (self.orch_stepexp_button, len(self.orch.experiment_dq)),
+            (self.orch_stepact_button, len(self.orch.action_dq)),
+        ]
+        for sbutton, numq in stepwisebuttons:
+            sbutton.label = sbutton.label.split("[")[0].strip() + f" [{numq}]"
 
     def update_seq_param_layout(self, idx):
         args = self.sequences[idx]["args"]
@@ -1490,7 +1501,7 @@ class BokehOperator:
 
         seqspec_path = self.seqspecs[idx]
         seqfunc_params = self.seqspec_parser.list_params(seqspec_path, self.orch)
-        
+
         for arg, argtype in self.seqspec_parser.PARAM_TYPES.items():
             if arg in seqfunc_params:
                 args.append(arg)
@@ -1956,6 +1967,7 @@ class BokehOperator:
         await self.get_experiments()
         await self.get_actions()
         await self.get_active_actions()
+        self.update_queuecount_labels()
         for key in self.experiment_plan_list:
             self.experiment_plan_list[key] = []
         if self.sequence is not None:
@@ -1971,7 +1983,7 @@ class BokehOperator:
         self.experiment_plan_source.data = self.experiment_plan_list
 
         if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
-            self.orch_status_button.label = "started"
+            self.orch_status_button.label = "running"
             self.orch_status_button.button_type = "success"
         elif self.orch.globalstatusmodel.loop_state == LoopStatus.stopped:
             stop_msg = (
@@ -1980,8 +1992,10 @@ class BokehOperator:
                 else ""
             )
             self.orch_status_button.label = f"stopped{stop_msg}"
-            self.orch_status_button.button_type = "success"
-            # self.orch_status_button.button_type = "danger"
+            if stop_msg:
+                self.orch_status_button.button_type = "warning"
+            else:
+                self.orch_status_button.button_type = "primary"
         else:
             self.orch_status_button.label = (
                 f"{self.orch.globalstatusmodel.loop_state.value}"

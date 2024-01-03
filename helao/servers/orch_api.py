@@ -3,11 +3,15 @@ import time
 import os
 import pickle
 import asyncio
+from copy import copy
 from enum import Enum
 from socket import gethostname
 from typing import Union, Optional
 
 from fastapi import Body, WebSocket, Request
+from fastapi.routing import APIRoute
+from fastapi.exception_handlers import http_exception_handler
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.gen_uuid import gen_uuid
 from helao.helpers.eval import eval_val
@@ -23,7 +27,7 @@ from helaocore.error import ErrorCodes
 from helaocore.models.experiment import ExperimentModel
 from helaocore.models.hlostatus import HloStatus
 from starlette.types import Message
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 
 class OrchAPI(HelaoFastAPI):
@@ -41,7 +45,7 @@ class OrchAPI(HelaoFastAPI):
             helao_srv=server_key,
             title=server_title,
             description=description,
-            version=version,
+            version=str(version),
         )
         self.driver = None
 
@@ -60,7 +64,7 @@ class OrchAPI(HelaoFastAPI):
         async def app_entry(request: Request, call_next):
             endpoint = request.url.path.strip("/").split("/")[-1]
             if request.method == "HEAD":  # comes from endpoint checker, session.head()
-                response = await call_next(request)
+                response = Response()
             elif request.url.path.strip("/").startswith(f"{server_key}/"):
                 await set_body(request, await request.body())
                 # body_dict = await request.json()
@@ -106,6 +110,16 @@ class OrchAPI(HelaoFastAPI):
                 response = await call_next(request)
             return response
 
+        @self.exception_handler(StarletteHTTPException)
+        async def custom_http_exception_handler(request, exc):
+            if request.url.path.strip("/").startswith(f"{server_key}/"):
+                print(f"Could not process request: {repr(exc)}")
+                for _, active in self.orch.actives.items():
+                    active.set_estop()
+                for executor_id in self.orch.executors:
+                    self.orch.stop_executor(executor_id)
+            return await http_exception_handler(request, exc)
+
         @self.on_event("startup")
         async def startup_event():
             """Run startup actions.
@@ -120,6 +134,15 @@ class OrchAPI(HelaoFastAPI):
             if driver_class:
                 self.driver = driver_class(self.orch)
             self.orch.endpoint_queues_init()
+
+        @self.on_event("startup")
+        async def add_default_head_endpoints() -> None:
+            for route in self.routes:
+                if isinstance(route, APIRoute) and "POST" in route.methods:
+                    new_route = copy(route)
+                    new_route.methods = {"HEAD"}
+                    new_route.include_in_schema = False
+                    self.routes.append(new_route)
 
         # --- BASE endpoints ---
         @self.websocket("/ws_status")
@@ -312,8 +335,8 @@ class OrchAPI(HelaoFastAPI):
             """Return active sequence."""
             return self.orch.active_sequence.clean_dict()
 
-        @self.post("/estop", tags=["private"])
-        async def estop():
+        @self.post("/estop_orch", tags=["private"])
+        async def estop_orch():
             """Emergency stop experiment and action queues, interrupt running actions."""
             if self.orch.globalstatusmodel.loop_state == LoopStatus.started:
                 await self.orch.estop_loop()
@@ -508,7 +531,7 @@ class OrchAPI(HelaoFastAPI):
             return finished_action.as_dict()
 
         @self.post(f"/{server_key}/estop", tags=["action"])
-        async def act_estop(
+        async def estop(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
             switch: bool = True,
@@ -529,6 +552,8 @@ class OrchAPI(HelaoFastAPI):
                 self.orch.actionservermodel.estop = switch
             if switch:
                 active.action.action_status.append(HloStatus.estopped)
+            for k in self.orch.executors:
+                self.orch.stop_executor(k)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -580,14 +605,13 @@ class OrchAPI(HelaoFastAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-
         @self.post(f"/{server_key}/conditional_stop", tags=["action"])
         async def conditional_stop(
             action: Action = Body({}, embed=True),
             action_version: int = 1,
             stop_parameter: Optional[str] = "",
             stop_condition: checkcond = checkcond.equals,
-            stop_value: Union[float, int, bool] = True,
+            stop_value: Union[str, float, int, bool] = True,
             reason: str = "conditional stop",
         ):
             """Stop and clear all orch queues if condition is met."""
@@ -620,6 +644,39 @@ class OrchAPI(HelaoFastAPI):
 
             finished_action = await active.finish()
             return finished_action.as_dict()
+
+        @self.post(f"/{server_key}/add_globalexp_param", tags=["action"])
+        async def add_globalexp_param(
+            action: Action = Body({}, embed=True),
+            param_name: str = "globalexp_param_test",
+            param_value: Union[str, float, int, bool] = True,
+        ):
+            active = await self.orch.setup_and_contain_action()
+            pdict = {
+                active.action.action_params["param_name"]: active.action.action_params[
+                    "param_value"
+                ]
+            }
+            active.action.action_params.update(pdict)
+            active.action.to_globalexp_params = list(pdict.keys())
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+        @self.post("/_raise_exception", tags=["private"])
+        def _raise_exception():
+            raise Exception("test exception for error recovery debugging")
+
+        @self.post("/_raise_async_exception", tags=["private"])
+        async def _raise_async_exception():
+            async def sleep_then_error():
+                print(f'Start time: {time.time()}')
+                await asyncio.sleep(10)
+                print(f'End time: {time.time()}')
+                raise Exception("test async exception for error recovery debugging")
+            loop = asyncio.get_running_loop()
+            loop.create_task(sleep_then_error())
+            return True
+
 
 class WaitExec(Executor):
     def __init__(self, *args, **kwargs):

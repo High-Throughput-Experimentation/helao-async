@@ -188,10 +188,8 @@ async def galil_dyn_endpoints(app=None):
                 d_mm: List[float] = [0, 0],
                 axis: List[str] = ["x", "y"],
                 speed: int = None,
-                mode: MoveModes = "relative",
-                transformation: Optional[
-                    TransformationModes
-                ] = "motorxy",  # default, nothing to do
+                mode: MoveModes = MoveModes.relative,
+                transformation: TransformationModes = TransformationModes.motorxy,  # default, nothing to do
             ):
                 """Move a specified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
                 Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.
@@ -214,10 +212,8 @@ async def galil_dyn_endpoints(app=None):
                 axis: dev_axisitems = None,
                 d_mm: float = 0,
                 speed: int = None,
-                mode: MoveModes = "relative",
-                transformation: Optional[
-                    TransformationModes
-                ] = "motorxy",  # default, nothing to do
+                mode: MoveModes = MoveModes.relative,
+                transformation: TransformationModes = TransformationModes.motorxy,  # default, nothing to do
             ):
                 """Move a specified {axis} by {d_mm} distance at {speed} using {mode} i.e. relative.
                 Use Rx, Ry, Rz and not in combination with x,y,z only in motorxy.

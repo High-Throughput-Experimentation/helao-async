@@ -49,16 +49,16 @@ class _palcmd(BaseModel):
 
 
 class PALposition(BaseModel, HelaoDict):
-    position: Optional[str]  # dest can be cust. or tray
+    position: Optional[str] = None  # dest can be cust. or tray
     samples_initial: List[SampleUnion] = Field(default=[])
     samples_final: List[SampleUnion] = Field(default=[])
     # sample: List[SampleUnion] = Field(default=[])  # holds dest/source position
     # will be also added to
     # sample in/out
     # depending on cam
-    tray: Optional[int]
-    slot: Optional[int]
-    vial: Optional[int]
+    tray: Optional[int] = None
+    slot: Optional[int] = None
+    vial: Optional[int] = None
     error: Optional[ErrorCodes] = ErrorCodes.none
 
 
@@ -72,8 +72,8 @@ class PalAction(BaseModel, HelaoDict):
 
     # this holds the runtime list for excution of the PAL cam
     # a microcam could run 'repeat' times
-    dest: Optional[PALposition]
-    source: Optional[PALposition]
+    dest: Optional[PALposition] = None
+    source: Optional[PALposition] = None
 
     dilute: List[bool] = Field(default=[])
     dilute_type: List[Union[str, None]] = Field(default=[])
@@ -83,9 +83,9 @@ class PalAction(BaseModel, HelaoDict):
     # for each repeat
 
     # I probably don't need them as lists but can keep it for now
-    start_time: Optional[int]
-    continue_time: Optional[int]
-    done_time: Optional[int]
+    start_time: Optional[int] = None
+    continue_time: Optional[int] = None
+    done_time: Optional[int] = None
 
 
 class PalMicroCam(BaseModel, HelaoDict):
@@ -2881,7 +2881,7 @@ class PAL:
             if switch:
                 await self.set_IO_signalq(False)
                 if self.active:
-                    await self.active.set_estop()
+                    self.active.set_estop()
         return switch
 
     async def kill_PAL(self) -> ErrorCodes:

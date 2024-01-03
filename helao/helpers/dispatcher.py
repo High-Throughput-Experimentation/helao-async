@@ -1,6 +1,7 @@
 __all__ = ["async_action_dispatcher", "async_private_dispatcher", "private_dispatcher"]
 
 import traceback
+import asyncio
 import aiohttp
 import requests
 
@@ -149,20 +150,37 @@ async def check_endpoint(url: str):
 
 
 async def endpoints_available(req_list: list):
-    available = []
-    unavailable = []
+    responses = []
+    states = []
     for req in req_list:
         try:
             status = await check_endpoint(req)
-            available.append((req, status))
+            isavail = False
+            cent = status // 100
+            if cent == 2:
+                isavail = True
+                states.append('success')
+            elif cent == 4:
+                states.append('client error')
+            elif cent == 5:
+                states.append('server error')
+            else:
+                states.append('no success')
+        except aiohttp.ClientSSLError:
+            states.append('cert failure')
         except aiohttp.ClientConnectionError:
-            unavailable.append(req)
-    if unavailable:
+            states.append('could not connect')
+        except asyncio.TimeoutError:
+            states.append('timeout')
+        responses.append(isavail)
+    if not all(responses):
+        badinds = [i for i,v in enumerate(responses) if not v]
+        unavailable = [(req_list[i], [states[i]]) for i in badinds]
         print_message(
             {},
             "orchestrator",
             f"Cannot dispatch actions because the following endpoints are unavailable: {unavailable}",
         )
-        return False
+        return False, unavailable
     else:
-        return True
+        return True, []

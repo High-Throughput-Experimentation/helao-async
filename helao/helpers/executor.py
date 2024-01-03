@@ -63,7 +63,7 @@ class Executor:
     async def _post_exec(self):
         "Cleanup methods, return error state."
         self.cleanup_err = ErrorCodes.none
-        return {"error": self.cleanup_err}
+        return {"data": {}, "error": self.cleanup_err}
 
     def set_post_exec(self, post_exec_func):
         "Override the generic cleanup method."
