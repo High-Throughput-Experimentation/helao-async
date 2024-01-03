@@ -10,7 +10,7 @@ from pathlib import Path
 from gcld_operator import seq_constructor, gen_ts, wait_for_orch, num_uploads
 from helao.servers.operator.helao_operator import HelaoOperator
 
-from data_request_client.client import DataRequestsClient
+from data_request_client.client import DataRequestsClient, CreateDataRequestModel
 from data_request_client.models import Status
 from helao.helpers.config_loader import config_loader
 from helao.sequences.TEST_seq import TEST_consecutive_noblocking
@@ -179,8 +179,11 @@ def main():
                 output = CLIENT.set_status(Status.pending, data_request_id=data_request.id)
         else:
             print(
-                f"{gen_ts()} Orchestrator is idle. Checking for data requests in 15 seconds."
+                f"{gen_ts()} No data requests are pending, creating a new one."
             )
+            test_req = CreateDataRequestModel(composition={"Fe": 0.5, "Ni": 0.5}, parameters={}, sample_label="6083_1234")
+            with CLIENT:
+                output = CLIENT.create_data_request(test_req)
             time.sleep(15)
 
 
