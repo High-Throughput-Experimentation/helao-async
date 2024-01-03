@@ -5,7 +5,7 @@ git fetch --all
 if %~1=="main" (
     git switch main
 ) else (
-    git switch unstable
+    git switch unstable_2401
 )
 git switch %1
 cd ..\helao-async
