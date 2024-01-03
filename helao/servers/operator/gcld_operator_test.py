@@ -173,12 +173,16 @@ def main():
 
             with CLIENT:
                 print("Test mode: resetting data request status to pending.")
-                output = CLIENT.set_status(Status.pending, data_request_id=data_request.id)
+                output = CLIENT.set_status(
+                    Status.pending, data_request_id=data_request.id
+                )
         else:
-            print(
-                f"{gen_ts()} No data requests are pending, creating a new one."
+            print(f"{gen_ts()} No data requests are pending, creating a new one.")
+            test_req = CreateDataRequestModel(
+                composition={"Fe": 0.5, "Ni": 0.5},
+                parameters={},
+                sample_label="legacy__solid__6083_0",
             )
-            test_req = CreateDataRequestModel(composition={"Fe": 0.5, "Ni": 0.5}, parameters={}, sample_label="legacy__solid__6083_1234")
             with CLIENT:
                 output = CLIENT.create_data_request(test_req)
             time.sleep(15)
