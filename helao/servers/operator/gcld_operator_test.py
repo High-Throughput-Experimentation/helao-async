@@ -75,13 +75,13 @@ def main():
             if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
                     output = CLIENT.set_status(
-                        Status.failed, data_request_id=data_request.id
+                        "failed", data_request_id=data_request.id
                     )
                     input(
                         "Press Enter to reset failed request to pending and exit operator..."
                     )
                     output = CLIENT.set_status(
-                        Status.pending, data_request_id=data_request.id
+                        "pending", data_request_id=data_request.id
                     )
                     return -1
             elif str(active_seq["sequence_uuid"]) == str(seq.sequence_uuid):
@@ -97,13 +97,13 @@ def main():
             if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
                     output = CLIENT.set_status(
-                        Status.failed, data_request_id=data_request.id
+                        "failed", data_request_id=data_request.id
                     )
                     input(
                         "Press Enter to reset failed request to pending and exit operator..."
                     )
                     output = CLIENT.set_status(
-                        Status.pending, data_request_id=data_request.id
+                        "pending", data_request_id=data_request.id
                     )
                     return -1
 
@@ -139,13 +139,13 @@ def main():
             if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
                     output = CLIENT.set_status(
-                        Status.failed, data_request_id=data_request.id
+                        "failed", data_request_id=data_request.id
                     )
                     input(
                         "Press Enter to reset failed request to pending and exit operator..."
                     )
                     output = CLIENT.set_status(
-                        Status.pending, data_request_id=data_request.id
+                        "pending", data_request_id=data_request.id
                     )
                     return -1
             elif active_seq["sequence_uuid"] == seq.sequence_uuid:
@@ -161,20 +161,20 @@ def main():
             if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
                     output = CLIENT.set_status(
-                        Status.failed, data_request_id=data_request.id
+                        "failed", data_request_id=data_request.id
                     )
                     input(
                         "Press Enter to reset failed request to pending and exit operator..."
                     )
                     output = CLIENT.set_status(
-                        Status.pending, data_request_id=data_request.id
+                        "pending", data_request_id=data_request.id
                     )
                     return -1
 
             with CLIENT:
                 print("Test mode: resetting data request status to pending.")
                 output = CLIENT.set_status(
-                    Status.pending, data_request_id=data_request.id
+                    "pending", data_request_id=data_request.id
                 )
         else:
             print(f"{gen_ts()} No data requests are pending, creating a new one.")
