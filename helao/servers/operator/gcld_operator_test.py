@@ -134,7 +134,7 @@ def main():
 
             # wait for analysis start (orch_state == "busy")
             current_state, active_seq, last_seq = wait_for_orch(
-                operator, LoopStatus.busy
+                operator, LoopStatus.started
             )
             if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
@@ -156,7 +156,7 @@ def main():
 
             # wait for analysis end (orch_state == "idle")
             current_state, active_seq, last_seq = wait_for_orch(
-                operator, LoopStatus.idle
+                operator, LoopStatus.stopped
             )
             if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
