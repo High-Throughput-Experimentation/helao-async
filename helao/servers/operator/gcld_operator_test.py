@@ -1,9 +1,6 @@
 import sys
 import os
-import inspect
 import time
-from copy import copy
-from tqdm import tqdm
 from dotenv import load_dotenv
 from pathlib import Path
 
@@ -181,7 +178,7 @@ def main():
             print(
                 f"{gen_ts()} No data requests are pending, creating a new one."
             )
-            test_req = CreateDataRequestModel(composition={"Fe": 0.5, "Ni": 0.5}, parameters={}, sample_label="6083_1234")
+            test_req = CreateDataRequestModel(composition={"Fe": 0.5, "Ni": 0.5}, parameters={}, sample_label="legacy__solid__6083_1234")
             with CLIENT:
                 output = CLIENT.create_data_request(test_req)
             time.sleep(15)
