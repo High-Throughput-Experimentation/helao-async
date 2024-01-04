@@ -233,7 +233,7 @@ def main():
             pending_requests = CLIENT.read_data_requests(status="pending")
 
         if pending_requests:
-            print(f"Pending data request count: {len(pending_requests)}")
+            print(f"{gen_ts()} Pending data request count: {len(pending_requests)}")
             data_request = pending_requests[0]
             sample_no = int(data_request.sample_label.split("_")[-1])
 
@@ -273,7 +273,7 @@ def main():
                 param_defaults=ECHEUVIS_multiCA_led_defaults,
             )
             operator.add_sequence(seq.get_seq())
-            print(f"Dispatching measurement sequence: {seq.sequence_uuid}")
+            print(f"{gen_ts()} Dispatching measurement sequence: {seq.sequence_uuid}")
             operator.start()
 
             time.sleep(5)
@@ -282,8 +282,9 @@ def main():
             current_state, active_seq, last_seq = wait_for_orch(
                 operator, LoopStatus.started
             )
-            print("!!!")
-            print(active_seq["sequence_uuid"])
+            print(
+                f"{gen_ts()} Measurement sequence {active_seq['sequence_uuid']} has started."
+            )
             if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
                     output = CLIENT.set_status(
@@ -300,7 +301,7 @@ def main():
                 # Acknowledge the data request
                 with CLIENT:
                     output = CLIENT.acknowledge_data_request(data_request.id)
-                print(f"Data request status: {output.status}")
+                print(f"{gen_ts()} Data request status: {output.status}")
 
             # wait for sequence end (orch_state == "idle")
             current_state, active_seq, last_seq = wait_for_orch(
@@ -319,12 +320,17 @@ def main():
                     )
                     return -1
 
+            print(
+                f"{gen_ts()} Unconditional 30 second wait for upload tasks to process."
+            )
             time.sleep(30)
 
             # when orchestrator has stopped, check DB server for upload state
             num_sync_tasks = num_uploads(db_cfg)
             while num_sync_tasks > 0:
-                print(f"Waiting for {num_sync_tasks} sequence uploads to finish.")
+                print(
+                    f"{gen_ts()} Waiting for {num_sync_tasks} sequence uploads to finish."
+                )
                 time.sleep(10)
                 num_sync_tasks = num_uploads(db_cfg)
 
@@ -351,7 +357,7 @@ def main():
                 param_defaults=ECHEUVIS_postseq_defaults,
             )
             operator.add_sequence(ana.get_seq())
-            print(f"Dispatching analysis sequence: {ana.sequence_uuid}")
+            print(f"{gen_ts()} Dispatching analysis sequence: {ana.sequence_uuid}")
             operator.start()
 
             time.sleep(5)
@@ -359,6 +365,9 @@ def main():
             # wait for analysis start (orch_state == "busy")
             current_state, active_seq, last_seq = wait_for_orch(
                 operator, LoopStatus.started
+            )
+            print(
+                f"{gen_ts()} Analysis sequence {active_seq['sequence_uuid']} has started."
             )
             if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
@@ -394,12 +403,12 @@ def main():
                         "pending", data_request_id=data_request.id
                     )
                     return -1
-
+            print(f"{gen_ts()} Analysis sequence complete.")
         else:
             print(
-                f"{gen_ts()} Orchestrator is idle. Checking for data requests in 15 seconds."
+                f"{gen_ts()} Orchestrator is idle. Checking for data requests in 10 seconds."
             )
-            time.sleep(15)
+            time.sleep(10)
 
 
 if __name__ == "__main__":
