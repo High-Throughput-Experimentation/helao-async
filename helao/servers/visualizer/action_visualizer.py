@@ -43,7 +43,7 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
                     style={"font-size": "200%", "color": "#CB4335"},
                 ),
             ],
-            background="#D6DBDF",
+            # background="#D6DBDF",
             width=1024,
         )
     )
