@@ -423,6 +423,8 @@ def main():
                 f"{gen_ts()} Orchestrator is idle. Checking for data requests in 10 seconds."
             )
             time.sleep(10)
+        if TEST:
+            break
 
 
 if __name__ == "__main__":
