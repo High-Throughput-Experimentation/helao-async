@@ -233,7 +233,7 @@ def main():
         with CLIENT:
             pending_requests = CLIENT.read_data_requests(status="pending")
 
-        if pending_requests:
+        if pending_requests or TEST:
             if TEST:
                 test_req = CreateDataRequestModel(
                     composition={"Fe": 0.481632, "Sb": 0.518368},
