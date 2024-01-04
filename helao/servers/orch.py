@@ -1033,7 +1033,7 @@ class Orch(Base):
         # reset loop intend
         await self.intend_none()
 
-        self.current_stop_message("E-STOP" + reason_suffix)
+        self.current_stop_message = "E-STOP" + reason_suffix
         await self.update_operator(True)
 
     async def stop_loop(self):
