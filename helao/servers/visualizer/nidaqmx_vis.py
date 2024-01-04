@@ -133,7 +133,7 @@ class C_nidaqmxvis:
                 [self.plot_CURRENT, self.plot_CURRENT_prev],
                 Spacer(height=10),
             ],
-            background="#C0C0C0",
+            background="#D6DBDF",
             width=1024,
         )
 

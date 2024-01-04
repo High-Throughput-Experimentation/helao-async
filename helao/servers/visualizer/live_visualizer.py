@@ -40,10 +40,10 @@ def makeBokehApp(doc, confPrefix, server_key, helao_root):
                     text=f"<b>Live visualizer on {gethostname().lower()} -- config: {confPrefix}.py</b>",
                     width=1004,
                     height=32,
-                    style={"font-size": "200%", "color": "red"},
+                    style={"font-size": "200%", "color": "#CB4335"},
                 ),
             ],
-            background="#C0C0C0",
+            background="#D6DBDF",
             width=1024,
         )
     )
