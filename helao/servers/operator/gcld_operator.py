@@ -25,7 +25,7 @@ inst_config = sys.argv[1]
 PLATE_ID = int(sys.argv[2])
 env_config = sys.argv[3]
 load_dotenv(dotenv_path=Path(env_config))
-TEST = True
+TEST = False
 
 # print({k: v for k, v in os.environ.items() if k in ('API_KEY', 'BASE_URL')})
 CLIENT = DataRequestsClient(
