@@ -11,7 +11,7 @@ from pprint import pprint
 from helao.servers.operator.helao_operator import HelaoOperator
 
 # from helao.helpers.gcld_client import DataRequestsClient
-from data_request_client.client import DataRequestsClient
+from data_request_client.client import DataRequestsClient, CreateDataRequestModel
 from data_request_client.models import Status
 from helao.helpers.premodels import Sequence
 from helao.helpers.dispatcher import private_dispatcher
@@ -25,7 +25,7 @@ inst_config = sys.argv[1]
 PLATE_ID = int(sys.argv[2])
 env_config = sys.argv[3]
 load_dotenv(dotenv_path=Path(env_config))
-
+TEST = True
 
 # print({k: v for k, v in os.environ.items() if k in ('API_KEY', 'BASE_URL')})
 CLIENT = DataRequestsClient(
@@ -55,7 +55,7 @@ ECHEUVIS_multiCA_led_defaults = {
     "solution_ph": 10,
     "measurement_area": 0.071,  # 3mm diameter droplet
     "liquid_volume_ml": 1.0,
-    "ref_vs_nhe": 0.21 + 0.023,
+    "ref_vs_nhe": 0.21 + 0.049,
     "CA_potential_vsRHE": [
         0.4,
         1.0,
@@ -234,8 +234,18 @@ def main():
             pending_requests = CLIENT.read_data_requests(status="pending")
 
         if pending_requests:
-            print(f"{gen_ts()} Pending data request count: {len(pending_requests)}")
-            data_request = pending_requests[0]
+            if TEST:
+                test_req = CreateDataRequestModel(
+                    composition={"Fe": 0.481632, "Sb": 0.518368},
+                    score=1.0,
+                    parameters={"z_start": 1.0, "z_direction": "up"},
+                    sample_label="legacy__solid__2286_24971",
+                )
+                with CLIENT:
+                    data_request = CLIENT.create_data_request(test_req)
+            else:
+                print(f"{gen_ts()} Pending data request count: {len(pending_requests)}")
+                data_request = pending_requests[0]
             sample_no = int(data_request.sample_label.split("_")[-1])
 
             # # DRY MEASUREMENT
