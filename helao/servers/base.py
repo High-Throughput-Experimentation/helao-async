@@ -795,9 +795,12 @@ class Base:
             if not os.path.exists(output_path):
                 os.makedirs(output_path, exist_ok=True)
 
-            async with aiofiles.open(output_file, mode="w+") as f:
-                await f.write(yml_dumps({"file_type": "action"}))
-                await f.write(yml_dumps(act_dict))
+            # async with aiofiles.open(output_file, mode="w+") as f:
+            #     await f.write(yml_dumps({"file_type": "action"}))
+            #     await f.write(yml_dumps(act_dict))
+            with open(output_file, mode="w+") as f:
+                f.write(yml_dumps({"file_type": "action"}))
+                f.write(yml_dumps(act_dict))
         else:
             self.print_message(
                 f"writing meta file for action '{action.action_name}' is disabled.",
@@ -822,11 +825,16 @@ class Base:
         if not os.path.exists(output_path):
             os.makedirs(output_path, exist_ok=True)
 
-        async with aiofiles.open(output_file, mode="w+") as f:
-            await f.write(yml_dumps({"file_type": "experiment"}))
+        # async with aiofiles.open(output_file, mode="w+") as f:
+        #     await f.write(yml_dumps({"file_type": "experiment"}))
+        #     if not output_str.endswith("\n"):
+        #         output_str += "\n"
+        #     await f.write(output_str)
+        with open(output_file, mode="w+") as f:
+            f.write(yml_dumps({"file_type": "experiment"}))
             if not output_str.endswith("\n"):
                 output_str += "\n"
-            await f.write(output_str)
+            f.write(output_str)
 
     async def write_seq(self, sequence, manual=False):
         seq_dict = sequence.get_seq().clean_dict()
@@ -847,11 +855,16 @@ class Base:
         if not os.path.exists(output_path):
             os.makedirs(output_path, exist_ok=True)
 
-        async with aiofiles.open(output_file, mode="w+") as f:
-            await f.write(yml_dumps({"file_type": "sequence"}))
+        # async with aiofiles.open(output_file, mode="w+") as f:
+        #     await f.write(yml_dumps({"file_type": "sequence"}))
+        #     if not output_str.endswith("\n"):
+        #         output_str += "\n"
+        #     await f.write(output_str)
+        with open(output_file, mode="w+") as f:
+            f.write(yml_dumps({"file_type": "sequence"}))
             if not output_str.endswith("\n"):
                 output_str += "\n"
-            await f.write(output_str)
+            f.write(output_str)
 
     async def append_exp_to_seq(self, exp, seq):
         append_dict = {
@@ -870,8 +883,10 @@ class Base:
             output_path,
             f"{seq.sequence_timestamp.strftime('%Y%m%d.%H%M%S%f')}-seq.yml",
         )
-        async with aiofiles.open(output_file, mode="a") as f:
-            await f.write(append_str)
+        # async with aiofiles.open(output_file, mode="a") as f:
+        #     await f.write(append_str)
+        with open(output_file, mode="a") as f:
+            f.write(append_str)
 
     def new_file_conn_key(self, key: str) -> UUID:
         # return shortuuid.decode(key)
