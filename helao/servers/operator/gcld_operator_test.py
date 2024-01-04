@@ -3,6 +3,7 @@ import os
 import time
 from dotenv import load_dotenv
 from pathlib import Path
+from pprint import pprint
 
 from gcld_operator import seq_constructor, gen_ts, wait_for_orch, num_uploads
 from helao.servers.operator.helao_operator import HelaoOperator
@@ -60,6 +61,9 @@ def main():
                 seq_label="gcld-test",
                 param_defaults=TEST_defaults,
             )
+            print(f"{gen_ts()} Got measurement request for plate {PLATE_ID}, sample {sample_no}.")
+            print(f"{gen_ts()} Measurement parameters for sequence: {seq.sequence_uuid}:")
+            pprint(seq.sequence_params)
             operator.add_sequence(seq.get_seq())
             print(f"{gen_ts()} Dispatching measurement sequence: {seq.sequence_uuid}")
             operator.start()

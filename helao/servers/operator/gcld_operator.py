@@ -6,6 +6,7 @@ from copy import copy
 from tqdm import tqdm
 from dotenv import load_dotenv
 from pathlib import Path
+from pprint import pprint
 
 from helao.servers.operator.helao_operator import HelaoOperator
 
@@ -272,6 +273,9 @@ def main():
                 seq_label="gcld-wetdryrun",
                 param_defaults=ECHEUVIS_multiCA_led_defaults,
             )
+            print(f"{gen_ts()} Got measurement request for plate {PLATE_ID}, sample {sample_no}.")
+            print(f"{gen_ts()} Measurement parameters for sequence: {seq.sequence_uuid}:")
+            pprint(seq.sequence_params)
             operator.add_sequence(seq.get_seq())
             print(f"{gen_ts()} Dispatching measurement sequence: {seq.sequence_uuid}")
             operator.start()
