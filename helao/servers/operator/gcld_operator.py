@@ -25,7 +25,35 @@ inst_config = sys.argv[1]
 PLATE_ID = int(sys.argv[2])
 env_config = sys.argv[3]
 load_dotenv(dotenv_path=Path(env_config))
-TEST = False
+TEST = True
+
+TEST_SMPS_2286 = [
+    {
+        "sample_no": 14060,
+        "composition": {"Fe": 0.516317, "Sb": 0.483683},
+        "parameters": {"z_start": 1.0, "z_direction": "up"},
+    },
+    {
+        "sample_no": 10695,
+        "composition": {"Fe": 0.301409, "Sb": 0.698591},
+        "parameters": {"z_start": 0.2, "z_direction": "down"},
+    },
+    {
+        "sample_no": 3175,
+        "composition": {"Fe": 0.756378, "Sb": 0.243622},
+        "parameters": {"z_start": 0.6, "z_direction": "down"},
+    },
+    {
+        "sample_no": 9030,
+        "composition": {"Fe": 0.298030, "Sb": 0.701970},
+        "parameters": {"z_start": 2.0, "z_direction": "up"},
+    },
+    {
+        "sample_no": 18984,
+        "composition": {"Fe": 0.217839, "Sb": 0.782161},
+        "parameters": {"z_start": 1.4, "z_direction": "down"},
+    },
+]
 
 # print({k: v for k, v in os.environ.items() if k in ('API_KEY', 'BASE_URL')})
 CLIENT = DataRequestsClient(
@@ -56,30 +84,30 @@ ECHEUVIS_multiCA_led_defaults = {
     "measurement_area": 0.071,  # 3mm diameter droplet
     "liquid_volume_ml": 1.0,
     "ref_vs_nhe": 0.21 + 0.049,
-    "CA_potential_vsRHE": [
-        0.4,
-        1.0,
-        1.6,
-        2.2,
-    ],
     # "CA_potential_vsRHE": [
-    #     -0.2,
-    #     0,
-    #     0.2,
     #     0.4,
-    #     0.6,
-    #     0.8,
     #     1.0,
-    #     1.2,
-    #     1.4,
     #     1.6,
-    #     1.8,
-    #     2.0,
     #     2.2,
-    #     2.4,
     # ],
-    # "CA_duration_sec": 85,
-    "CA_duration_sec": 15,
+    # "CA_duration_sec": 15,
+    "CA_potential_vsRHE": [
+        -0.2,
+        0,
+        0.2,
+        0.4,
+        0.6,
+        0.8,
+        1.0,
+        1.2,
+        1.4,
+        1.6,
+        1.8,
+        2.0,
+        2.2,
+        2.4,
+    ],
+    "CA_duration_sec": 85,
     "CA_samplerate_sec": 0.05,
     "OCV_duration_sec": 5,
     "gamry_i_range": "auto",
@@ -228,6 +256,7 @@ def main():
 
     world_cfg = config_loader(inst_config, helao_root)
     db_cfg = world_cfg["servers"]["DB"]
+    test_idx = 0
 
     while True:
         with CLIENT:
@@ -235,14 +264,16 @@ def main():
 
         if pending_requests or TEST:
             if TEST:
+                smpd = TEST_SMPS_2286[test_idx]
                 test_req = CreateDataRequestModel(
-                    composition={"Fe": 0.481632, "Sb": 0.518368},
+                    composition=smpd["composition"],
                     score=1.0,
-                    parameters={"z_start": 1.0, "z_direction": "up"},
-                    sample_label="legacy__solid__2286_24971",
+                    parameters=smpd["parameters"],
+                    sample_label=f"legacy__solid__2286_{smpd['sample_no']}",
                 )
                 with CLIENT:
                     data_request = CLIENT.create_data_request(test_req)
+                test_idx += 1
             else:
                 print(f"{gen_ts()} Pending data request count: {len(pending_requests)}")
                 data_request = pending_requests[0]
@@ -283,8 +314,12 @@ def main():
                 seq_label="gcld-wetdryrun",
                 param_defaults=ECHEUVIS_multiCA_led_defaults,
             )
-            print(f"{gen_ts()} Got measurement request for plate {PLATE_ID}, sample {sample_no}.")
-            print(f"{gen_ts()} Measurement parameters for sequence: {seq.sequence_uuid}:")
+            print(
+                f"{gen_ts()} Got measurement request for plate {PLATE_ID}, sample {sample_no}."
+            )
+            print(
+                f"{gen_ts()} Measurement parameters for sequence: {seq.sequence_uuid}:"
+            )
             pprint(seq.sequence_params)
             operator.add_sequence(seq.get_seq())
             print(f"{gen_ts()} Dispatching measurement sequence: {seq.sequence_uuid}")
@@ -423,7 +458,7 @@ def main():
                 f"{gen_ts()} Orchestrator is idle. Checking for data requests in 10 seconds."
             )
             time.sleep(10)
-        if TEST:
+        if TEST & test_idx == len(TEST_SMPS_2286):
             break
 
 
