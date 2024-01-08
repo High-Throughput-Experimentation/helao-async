@@ -120,7 +120,7 @@ class SM303:
                 # endpoint can return even we got errors
                 self.IO_continue = True
 
-                if self.active:
+                if self.active is not None:
                     self.base.print_message("Spec finishes active action")
                     active_not_finished = True
                     while active_not_finished:
