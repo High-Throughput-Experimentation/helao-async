@@ -122,13 +122,14 @@ class SM303:
 
                 if self.active is not None:
                     self.base.print_message("Spec finishes active action")
-                    active_not_finished = True
-                    while active_not_finished or self.active is not None:
-                        try:
-                            await asyncio.wait_for(self.active.finish(), 1)
-                            active_not_finished = False
-                        except asyncio.exceptions.TimeoutError:
-                            pass
+                    # active_not_finished = True
+                    # while active_not_finished and self.active is not None:
+                    #     try:
+                    #         await asyncio.wait_for(self.active.finish(), 1)
+                    #         active_not_finished = False
+                    #     except asyncio.exceptions.TimeoutError:
+                    #         pass
+                    await self.active.finish()
                     self.active = None
                     self.action = None
                     self.samples_in = []
