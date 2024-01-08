@@ -318,9 +318,13 @@ def main():
                 f"{gen_ts()} Got measurement request for plate {PLATE_ID}, sample {sample_no}."
             )
             print(
+                f"{gen_ts()} Sample {sample_no} has composition:"
+            )
+            pprint(data_request.composition)
+            print(
                 f"{gen_ts()} Measurement parameters for sequence: {seq.sequence_uuid}:"
             )
-            pprint(seq.sequence_params)
+            pprint(data_request.parameters)
             operator.add_sequence(seq.get_seq())
             print(f"{gen_ts()} Dispatching measurement sequence: {seq.sequence_uuid}")
             operator.start()
@@ -460,6 +464,7 @@ def main():
             time.sleep(10)
         if TEST & test_idx == len(TEST_SMPS_2286):
             break
+        print("\n\n")
 
 
 if __name__ == "__main__":
