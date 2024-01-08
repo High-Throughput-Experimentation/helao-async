@@ -798,7 +798,7 @@ class Base:
             output_dict = {"file_type": "action"}
             output_dict.update(act_dict)
             async with aiofiles.open(output_file, mode="w+") as f:
-                await f.write(yml_dumps(act_dict))
+                await f.write(yml_dumps(output_dict))
         else:
             self.print_message(
                 f"writing meta file for action '{action.action_name}' is disabled.",
