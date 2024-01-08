@@ -107,7 +107,7 @@ class HelaoLoader:
             return HelaoSequence(sequence_uuid)
         return jd
 
-    def get_pro(self, process_uuid: UUID, hmod: bool = True):
+    def get_prc(self, process_uuid: UUID, hmod: bool = True):
         jd = self.pro_cache.get(process_uuid, self.get_json("process", process_uuid))
         if self.cache_json:
             self.pro_cache[process_uuid] = jd

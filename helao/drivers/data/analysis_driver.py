@@ -124,7 +124,7 @@ class HelaoAnalysisSyncer:
             region=self.region,
             dummy=self.world_config.get("dummy", True),
         )
-        process_dict = pgs3.LOADER.get_pro(process_uuid, hmod=False)
+        process_dict = pgs3.LOADER.get_prc(process_uuid, hmod=False)
         if process_dict.get("data_request_id", None) is not None:
             model_dict["data_request_id"] = process_dict["data_request_id"]
         ana_tsstr = model_dict.get(
