@@ -1752,11 +1752,6 @@ class Active:
                 new_status=HloStatus.finished,
             )
 
-            # write final act meta file (overwrite existing one)
-            await self.base.write_act(action=finish_action)
-
-            # send the last status
-            await self.add_status(action=finish_action)
 
             # send globalparams
             if finish_action.to_globalexp_params:
@@ -1853,6 +1848,11 @@ class Active:
             self.base.print_message(
                 "all active action are done, closing active", info=True
             )
+            # write final act meta file (overwrite existing one)
+            await self.base.write_act(action=finish_action)
+
+            # send the last status
+            await self.add_status(action=finish_action)
 
             # DB server call to finish_yml if DB exists
             for action in self.action_list:
