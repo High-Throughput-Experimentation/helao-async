@@ -364,13 +364,13 @@ class EcheUvisLoader(HelaoLoader):
                         pdf.query("sequence_uuid==@suuid & global_label==@alab").index,
                         "sample_no",
                     ] = slab
-            self.recent_cache[
-                (
-                    min_date,
-                    plate_id,
-                    sample_no,
-                )
-            ] = pdf.sort_values("process_timestamp")
+            # self.recent_cache[
+            #     (
+            #         min_date,
+            #         plate_id,
+            #         sample_no,
+            #     )
+            # ] = pdf.sort_values("process_timestamp")
 
         elif recent_md and min_date >= recent_md[0]:
             self.recent_cache[
