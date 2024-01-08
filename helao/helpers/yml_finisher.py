@@ -16,8 +16,7 @@ from helao.helpers.premodels import Sequence, Experiment, Action
 
 
 async def yml_finisher(yml_path: str, base: object = None, retry: int = 3):
-    ymld = yml_load(Path(yml_path))
-    yml_type = ymld["file_type"]
+    yp = Path(yml_path)
 
     def print_msg(msg):
         if base is not None:
@@ -30,6 +29,13 @@ async def yml_finisher(yml_path: str, base: object = None, retry: int = 3):
         dbp_port = base.world_cfg["servers"]["DB"]["port"]
     else:
         return False
+
+    if not yp.exists():
+        print_msg(f"{yml_path} was not found, was it already moved?")
+        return False
+    
+    ymld = yml_load(yp)
+    yml_type = ymld["file_type"]
 
     req_params = {"yml_path": yml_path}
     req_url = f"http://{dbp_host}:{dbp_port}/finish_yml"
