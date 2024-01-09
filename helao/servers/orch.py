@@ -395,8 +395,9 @@ class Orch(Base):
         """Subscribe to global status queue and send messages to websocket client."""
         self.print_message("got new global status subscriber")
         await websocket.accept()
+        gs_sub = self.globstat_q.subscribe()
         try:
-            async for globstat_msg in self.globstat_q.subscribe():
+            async for globstat_msg in gs_sub:
                 await websocket.send_text(json.dumps(globstat_msg.as_dict()))
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -404,7 +405,7 @@ class Orch(Base):
                 f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
                 warning=True,
             )
-
+            self.globstat_q.remove(gs_sub)
     async def globstat_broadcast_task(self):
         """Consume globstat_q. Does nothing for now."""
         async for _ in self.globstat_q.subscribe():

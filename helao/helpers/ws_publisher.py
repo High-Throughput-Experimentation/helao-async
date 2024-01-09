@@ -26,6 +26,7 @@ class WsPublisher:
         self.active_connections.remove(websocket)
 
     async def broadcast(self, websocket: WebSocket):
+        src_sub = self.source_queue.subscribe()
         try:
             async for source_msg in self.source_queue.subscribe():
                 await websocket.send_bytes(
@@ -33,3 +34,4 @@ class WsPublisher:
                 )
         except websockets.ConnectionClosedError:
             print("Client closed connection, but no close frame received or sent.")
+            self.source_queue.remove(src_sub)

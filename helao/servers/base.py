@@ -573,8 +573,9 @@ class Base:
         "Subscribe to status queue and send message to websocket client."
         self.print_message("got new status subscriber")
         await websocket.accept()
+        status_sub = self.status_q.subscribe()
         try:
-            async for status_msg in self.status_q.subscribe():
+            async for status_msg in status_sub:
                 await websocket.send_bytes(
                     pyzstd.compress(pickle.dumps(status_msg.as_dict()))
                 )
@@ -585,13 +586,15 @@ class Base:
                 f"Status websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
                 error=True,
             )
+            self.status_q.remove(status_sub)
 
     async def ws_data(self, websocket: WebSocket):
         """Subscribe to data queue and send messages to websocket client."""
         self.print_message("got new data subscriber")
         await websocket.accept()
+        data_sub = self.data_q.subscribe()
         try:
-            async for data_msg in self.data_q.subscribe():
+            async for data_msg in data_sub:
                 await websocket.send_bytes(
                     pyzstd.compress(pickle.dumps(data_msg.as_dict()))
                 )
@@ -602,13 +605,15 @@ class Base:
                 f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
                 error=True,
             )
+            self.data_q.remove(data_sub)
 
     async def ws_live(self, websocket: WebSocket):
         """Subscribe to data queue and send messages to websocket client."""
         self.print_message("got new live_buffer subscriber")
         await websocket.accept()
+        live_sub = self.live_q.subscribe()
         try:
-            async for live_msg in self.live_q.subscribe():
+            async for live_msg in live_sub:
                 await websocket.send_bytes(pyzstd.compress(pickle.dumps(live_msg)))
         # except WebSocketDisconnect:
         except Exception as e:
@@ -617,6 +622,7 @@ class Base:
                 f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
                 error=True,
             )
+            self.live_queue.remove(live_sub)
 
     async def live_buffer_task(self):
         """Self-subscribe to live_q, update live_buffer dict."""
@@ -1324,16 +1330,12 @@ class Active:
         #     info=True,
         # )
 
+        dq_sub = self.base.data_q.subscribe()
+
         try:
-            async for data_msg in self.base.data_q.subscribe():
+            async for data_msg in dq_sub:
                 # check if the new data_msg is in listen_uuids
                 if data_msg.action_uuid not in self.listen_uuids:
-                    # self.base.print_message(
-                    #     f"data logger for active action: {self.action.action_uuid} ; UUID {data_msg.action_uuid} is not in listen_uuids: {self.listen_uuids}",
-                    #     warning=True,
-                    # )
-                    # self.base.print_message(f"data_msg: \n{data_msg}", warning=True)
-
                     continue
 
                 data_status = data_msg.datamodel.status
@@ -1435,11 +1437,13 @@ class Active:
                     else:
                         self.base.print_message("output file closed?", error=True)
 
-        # except asyncio.CancelledError:
+        except asyncio.CancelledError:
+            self.base.print_message("removing data_q subscription for active", info=True)
+            self.base.data_q.remove(dq_sub)
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             self.base.print_message(
-                f"data logger task was cancelled with error: {repr(e), tb,}",
+                f"data logger task failed with error: {repr(e), tb,}",
                 error=True,
             )
 
