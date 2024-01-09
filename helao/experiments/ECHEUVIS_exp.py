@@ -250,7 +250,7 @@ def ECHEUVIS_sub_CV_led(
             "IErange": apm.pars.gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_server,
+        start_condition=ActionStartCondition.no_wait,
         technique_name="CV",
         process_finish=True,
         process_contrib=[
@@ -431,7 +431,7 @@ def ECHEUVIS_sub_CA_led(
             "IErange": apm.pars.gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_server,
+        start_condition=ActionStartCondition.no_wait,
         technique_name="CA",
         process_finish=True,
         process_contrib=[
@@ -605,7 +605,7 @@ def ECHEUVIS_sub_CP_led(
             "IErange": apm.pars.gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_server,
+        start_condition=ActionStartCondition.no_wait,
         technique_name="CP",
         process_finish=True,
         process_contrib=[
@@ -785,7 +785,7 @@ def ECHEUVIS_sub_OCV_led(
             "IErange": apm.pars.gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_server,
+        start_condition=ActionStartCondition.no_wait,
         technique_name="OCV",
         process_finish=True,
         process_contrib=[
