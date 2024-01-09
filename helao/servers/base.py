@@ -1831,6 +1831,7 @@ class Active:
             self.file_conn_dict = {}
 
             # finish the data writer
+            await asyncio.sleep(1)
             self.data_logger.cancel()
             l10 = self.base.actives.pop(self.active_uuid, None)
             if l10 is not None:
