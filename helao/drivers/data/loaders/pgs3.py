@@ -299,6 +299,48 @@ class EcheUvisLoader(HelaoLoader):
         self.recent_cache = {}  # {'%Y-%m-%d': dataframe}
         self.cache_sql = cache_sql
 
+    def get_sequence(
+        self,
+        query: str,
+        sequence_uuid: UUID,
+    ):
+        conditions = []
+        conditions.append(f"    AND hp.sequence_uuid = '{str(sequence_uuid)}'")
+        data = self.run_raw_query(query + "\n".join(conditions))
+        pdf = pd.DataFrame(data)
+        print("!!! dataframe shape:", pdf.shape)
+        print("!!! dataframe cols:", pdf.columns)
+        pdf["plate_id"] = pdf.global_label.apply(
+            lambda x: int(x.split("_")[-2])
+            if "solid" in x and "None" not in x
+            else None
+        )
+        pdf["sample_no"] = pdf.global_label.apply(
+            lambda x: int(x.split("_")[-1])
+            if "solid" in x and "None" not in x
+            else None
+        )
+        # assign solid samples from sequence params
+        for suuid in set(pdf.query("sample_no.isna()").sequence_uuid):
+            subdf = pdf.query("sequence_uuid==@suuid")
+            spars = subdf.iloc[0]["sequence_params"]
+            pid = spars["plate_id"]
+            solid_samples = spars["plate_sample_no_list"]
+            assemblies = sorted(
+                set(subdf.query("global_label.str.contains('assembly')").global_label)
+            )
+            for slab, alab in zip(solid_samples, assemblies):
+                pdf.loc[
+                    pdf.query("sequence_uuid==@suuid & global_label==@alab").index,
+                    "plate_id",
+                ] = pid
+                pdf.loc[
+                    pdf.query("sequence_uuid==@suuid & global_label==@alab").index,
+                    "sample_no",
+                ] = slab
+
+            return pdf.sort_values("process_timestamp").reset_index(drop=True)
+    
     def get_recent(
         self,
         query: str,
