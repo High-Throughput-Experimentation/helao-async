@@ -126,7 +126,7 @@ ECHEUVIS_multiCA_led_defaults = {
     "toggleSpec_init_delay": 0.0,
     "toggleSpec_time": -1,
     "spec_ref_duration": 5,
-    "spec_int_time_ms": 25,
+    "spec_int_time_ms": 35,
     "spec_n_avg": 5,
     "spec_technique": "T_UVVIS",
     "calc_ev_parts": [1.8, 2.2, 2.6, 3.0],
@@ -462,7 +462,7 @@ def main():
                 f"{gen_ts()} Orchestrator is idle. Checking for data requests in 10 seconds."
             )
             time.sleep(10)
-        if TEST & test_idx == len(TEST_SMPS_2286):
+        if TEST & test_idx == len(TEST_SMPS_2286) - 1:
             return 0
         print("\n\n")
 
