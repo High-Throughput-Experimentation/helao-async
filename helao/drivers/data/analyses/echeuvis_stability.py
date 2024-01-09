@@ -300,7 +300,7 @@ class EcheUvisAnalysis:
         btup = parse_spechlo(self.inputs.baseline_spec)
         itup = parse_spechlo(self.inputs.insitu_spec)
 
-        if any([x == False for x in rdtups + rltups + [btup, itup]]):
+        if any([x is False for x in rdtups + rltups + [btup, itup]]):
             return False
 
         ap = self.analysis_params
