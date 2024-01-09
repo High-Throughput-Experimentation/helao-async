@@ -38,6 +38,7 @@ class SM303:
         # self.n_cal = len(self.wl_cal)
         if os.path.exists(self.lib_path):
             self.spec = ctypes.CDLL(self.lib_path)
+            self.setup_sm303()
             self.spec.spCloseGivenChannel(self.dev_num)
         else:
             self.base.print_message("SMdbUSBm.dll not found.", error=True)
