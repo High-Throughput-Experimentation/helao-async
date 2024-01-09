@@ -28,21 +28,21 @@ load_dotenv(dotenv_path=Path(env_config))
 TEST = True
 
 TEST_SMPS_2286 = [
-    {
-        "sample_no": 14060,
-        "composition": {"Fe": 0.516317, "Sb": 0.483683},
-        "parameters": {"z_start": 1.0, "z_direction": "up"},
-    },
-    {
-        "sample_no": 10695,
-        "composition": {"Fe": 0.301409, "Sb": 0.698591},
-        "parameters": {"z_start": 0.2, "z_direction": "down"},
-    },
-    {
-        "sample_no": 3175,
-        "composition": {"Fe": 0.756378, "Sb": 0.243622},
-        "parameters": {"z_start": 0.6, "z_direction": "down"},
-    },
+    # {
+    #     "sample_no": 14060,
+    #     "composition": {"Fe": 0.516317, "Sb": 0.483683},
+    #     "parameters": {"z_start": 1.0, "z_direction": "up"},
+    # },
+    # {
+    #     "sample_no": 10695,
+    #     "composition": {"Fe": 0.301409, "Sb": 0.698591},
+    #     "parameters": {"z_start": 0.2, "z_direction": "down"},
+    # },
+    # {
+    #     "sample_no": 3175,
+    #     "composition": {"Fe": 0.756378, "Sb": 0.243622},
+    #     "parameters": {"z_start": 0.6, "z_direction": "down"},
+    # },
     {
         "sample_no": 9030,
         "composition": {"Fe": 0.298030, "Sb": 0.701970},
