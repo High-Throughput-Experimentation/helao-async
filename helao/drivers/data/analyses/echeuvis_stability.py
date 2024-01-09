@@ -136,7 +136,8 @@ class EcheUvisInputs:
         self.insitu = HelaoProcess(insitu_process_uuid, query_df)
         self.insitu_spec_act = HelaoAction(
             query_df.query(
-                "process_uuid==@insitu_process_uuid & action_name=='acquire_spec_extrig'"
+                # "process_uuid==@insitu_process_uuid & action_name=='acquire_spec_extrig'"
+                "process_uuid==@insitu_process_uuid & action_name=='acquire_spec_adv'"
             )
             .iloc[0]
             .action_uuid,
@@ -181,7 +182,8 @@ class EcheUvisInputs:
             query_df,
         )
         self.baseline_spec_act = HelaoAction(
-            bdf.query("action_name=='acquire_spec_extrig'")
+            # bdf.query("action_name=='acquire_spec_extrig'")
+            bdf.query("action_name=='acquire_spec_adv'")
             .sort_values("action_timestamp")
             .iloc[0]
             .action_uuid,
