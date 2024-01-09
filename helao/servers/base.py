@@ -1199,7 +1199,6 @@ class Active:
                 if not output_str.endswith("\n"):
                     output_str += "\n"
                 await self.file_conn_dict[file_conn_key].file.write(output_str)
-                self.num_data_written += 1
 
     async def enqueue_data_dflt(self, datadict: dict):
         """This is a simple wrapper for simple endpoints which just
@@ -1219,7 +1218,8 @@ class Active:
         await self.base.data_q.put(
             self.assemble_data_msg(datamodel=datamodel, action=action)
         )
-        self.num_data_queued += 1
+        if datamodel.data:
+            self.num_data_queued += 1
 
     def enqueue_data_nowait(self, datamodel: DataModel, action: Action = None):
         if action is None:
@@ -1227,7 +1227,8 @@ class Active:
         self.base.data_q.put_nowait(
             self.assemble_data_msg(datamodel=datamodel, action=action)
         )
-        self.num_data_queued += 1
+        if datamodel.data:
+            self.num_data_queued += 1
 
     def assemble_data_msg(
         self, datamodel: DataModel, action: Action = None
@@ -1443,6 +1444,8 @@ class Active:
                             )
                     else:
                         self.base.print_message("output file closed?", error=True)
+                if data_dict:
+                    self.num_data_written += 1
 
         except asyncio.CancelledError:
             self.base.print_message("removing data_q subscription for active", info=True)
