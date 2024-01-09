@@ -223,6 +223,8 @@ def ECHEUVIS_sub_CV_led(
                 ProcessContrib.files,
                 ProcessContrib.samples_out,
             ],
+            start_condition=ActionStartCondition.no_wait,
+            nonblocking=True,
         )
 
     # apply potential
@@ -409,6 +411,8 @@ def ECHEUVIS_sub_CA_led(
                 ProcessContrib.files,
                 ProcessContrib.samples_out,
             ],
+            start_condition=ActionStartCondition.no_wait,
+            nonblocking=True,
         )
 
     # apply potential
@@ -590,6 +594,8 @@ def ECHEUVIS_sub_CP_led(
                 ProcessContrib.files,
                 ProcessContrib.samples_out,
             ],
+            start_condition=ActionStartCondition.no_wait,
+            nonblocking=True,
         )
 
 
@@ -772,6 +778,8 @@ def ECHEUVIS_sub_OCV_led(
                 ProcessContrib.files,
                 ProcessContrib.samples_out,
             ],
+            start_condition=ActionStartCondition.no_wait,
+            nonblocking=True,
         )
 
     apm.add(
