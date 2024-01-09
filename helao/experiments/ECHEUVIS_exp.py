@@ -126,9 +126,9 @@ def ECHEUVIS_sub_CV_led(
     )
 
     if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = CV_duration_sec
+        apm.pars.toggle_illum_time = CV_duration_sec + 2
     if int(round(apm.pars.toggle2_time)) == -1:
-        apm.pars.toggle2_time = CV_duration_sec
+        apm.pars.toggle2_time = CV_duration_sec + 2
 
     # get sample for gamry
     apm.add(
@@ -279,9 +279,9 @@ def ECHEUVIS_sub_CA_led(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = apm.pars.CA_duration_sec
+        apm.pars.toggle_illum_time = apm.pars.CA_duration_sec + 2
     if int(round(apm.pars.toggle2_time)) == -1:
-        apm.pars.toggle2_time = apm.pars.CA_duration_sec
+        apm.pars.toggle2_time = apm.pars.CA_duration_sec + 2
 
     # get sample for gamry
     apm.add(
@@ -427,9 +427,9 @@ def ECHEUVIS_sub_CP_led(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = apm.pars.CP_duration_sec
+        apm.pars.toggle_illum_time = apm.pars.CP_duration_sec + 2
     if int(round(apm.pars.toggle2_time)) == -1:
-        apm.pars.toggle2_time = apm.pars.CP_duration_sec
+        apm.pars.toggle2_time = apm.pars.CP_duration_sec + 2
 
     # get sample for gamry
     apm.add(
@@ -576,9 +576,9 @@ def ECHEUVIS_sub_OCV_led(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     if int(round(apm.pars.toggle_illum_time)) == -1:
-        apm.pars.toggle_illum_time = apm.pars.OCV_duration_sec
+        apm.pars.toggle_illum_time = apm.pars.OCV_duration_sec + 2
     if int(round(apm.pars.toggle2_time)) == -1:
-        apm.pars.toggle2_time = apm.pars.OCV_duration_sec
+        apm.pars.toggle2_time = apm.pars.OCV_duration_sec + 2
 
     # get sample for gamry
     apm.add(
