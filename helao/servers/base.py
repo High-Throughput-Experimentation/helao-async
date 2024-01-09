@@ -1016,7 +1016,6 @@ class Active:
             info=True,
         )
 
-        # self.data_logger = self.base.aloop.create_task(self.log_data_task())
 
         self.manual_stop = False
         self.action_loop_running = False
@@ -1200,6 +1199,7 @@ class Active:
                 if not output_str.endswith("\n"):
                     output_str += "\n"
                 await self.file_conn_dict[file_conn_key].file.write(output_str)
+                self.num_data_written += 1
 
     async def enqueue_data_dflt(self, datadict: dict):
         """This is a simple wrapper for simple endpoints which just
@@ -1442,7 +1442,6 @@ class Active:
                             )
                     else:
                         self.base.print_message("output file closed?", error=True)
-                self.num_data_written += 1
 
         except asyncio.CancelledError:
             self.base.print_message("removing data_q subscription for active", info=True)
