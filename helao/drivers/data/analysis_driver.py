@@ -309,8 +309,8 @@ class HelaoAnalysisSyncer:
         eudf = (
             pdf.query("experiment_name=='ECHEUVIS_sub_CA_led'")
             .query("run_use=='data'")
-            # .query("action_name=='acquire_spec_extrig'")
-            .query("action_name=='acquire_spec_adv'")
+            .query("action_name=='acquire_spec_extrig'")
+            # .query("action_name=='acquire_spec_adv'")
         )
         for puuid in eudf.process_uuid:
             await self.enqueue_calc(

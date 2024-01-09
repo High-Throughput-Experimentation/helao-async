@@ -144,43 +144,43 @@ def ECHEUVIS_sub_CV_led(
     )
 
     # setup toggle on galil_io
-    # apm.add(
-    #     IO_server,
-    #     "set_digital_cycle",
-    #     {
-    #         "trigger_name": "gamry_ttl0",
-    #         "triggertype": toggle_triggertype,
-    #         "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
-    #         "out_name_gamry": None,
-    #         "toggle_init_delay": [
-    #             apm.pars.toggle_dark_time_init,
-    #             apm.pars.toggle2_init_delay,
-    #         ],
-    #         "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
-    #         "toggle_period": [
-    #             apm.pars.toggle_illum_period,
-    #             apm.pars.toggle2_period,
-    #         ],
-    #         "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
-    #     },
-    #     start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    #     process_finish=False,
-    #     process_contrib=[
-    #         ProcessContrib.files,
-    #         ProcessContrib.samples_out,
-    #     ],
-    # )
+    apm.add(
+        IO_server,
+        "set_digital_cycle",
+        {
+            "trigger_name": "gamry_ttl0",
+            "triggertype": toggle_triggertype,
+            "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
+            "out_name_gamry": None,
+            "toggle_init_delay": [
+                apm.pars.toggle_dark_time_init,
+                apm.pars.toggle2_init_delay,
+            ],
+            "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
+            "toggle_period": [
+                apm.pars.toggle_illum_period,
+                apm.pars.toggle2_period,
+            ],
+            "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
+        },
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_out,
+        ],
+    )
 
     # apm.add(ORCH_server, "wait", {"waittime": 5})
     
-    apm.add(
-        IO_server,
-        "set_digital_out",
-        {
-            "do_item": apm.pars.illumination_source,
-            "on": True,
-        },
-    )
+    # apm.add(
+    #     IO_server,
+    #     "set_digital_out",
+    #     {
+    #         "do_item": apm.pars.illumination_source,
+    #         "on": True,
+    #     },
+    # )
 
     apm.add(
         CAM_server,
@@ -191,41 +191,41 @@ def ECHEUVIS_sub_CV_led(
     )
 
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
-    #     apm.add(
-    #         ss,
-    #         "acquire_spec_extrig",
-    #         {
-    #             "int_time": apm.pars.spec_int_time_ms,
-    #             "n_avg": apm.pars.spec_n_avg,
-    #             "duration": apm.pars.toggle2_time,
-    #         },
-    #         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-    #         start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    #         technique_name=apm.pars.spec_technique,
-    #         process_contrib=[
-    #             ProcessContrib.files,
-    #             ProcessContrib.samples_out,
-    #         ],
-    #     )
         apm.add(
             ss,
-            "acquire_spec_adv",
+            "acquire_spec_extrig",
             {
-                "int_time_ms": apm.pars.spec_int_time_ms,
+                "int_time": apm.pars.spec_int_time_ms,
                 "n_avg": apm.pars.spec_n_avg,
-                "duration_sec": apm.pars.toggle2_time,
+                "duration": apm.pars.toggle2_time,
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-            run_use="data",
+            start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             technique_name=apm.pars.spec_technique,
-            process_finish=False,
             process_contrib=[
                 ProcessContrib.files,
                 ProcessContrib.samples_out,
             ],
-            start_condition=ActionStartCondition.no_wait,
-            nonblocking=True,
         )
+        # apm.add(
+        #     ss,
+        #     "acquire_spec_adv",
+        #     {
+        #         "int_time_ms": apm.pars.spec_int_time_ms,
+        #         "n_avg": apm.pars.spec_n_avg,
+        #         "duration_sec": apm.pars.toggle2_time,
+        #     },
+        #     from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        #     run_use="data",
+        #     technique_name=apm.pars.spec_technique,
+        #     process_finish=False,
+        #     process_contrib=[
+        #         ProcessContrib.files,
+        #         ProcessContrib.samples_out,
+        #     ],
+        #     start_condition=ActionStartCondition.no_wait,
+        #     nonblocking=True,
+        # )
 
     # apply potential
     apm.add(
@@ -252,7 +252,7 @@ def ECHEUVIS_sub_CV_led(
             "IErange": apm.pars.gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.no_wait,
+        start_condition=ActionStartCondition.wait_for_server,
         technique_name="CV",
         process_finish=True,
         process_contrib=[
@@ -262,14 +262,14 @@ def ECHEUVIS_sub_CV_led(
         ],
     )
 
-    apm.add(
-        IO_server,
-        "set_digital_out",
-        {
-            "do_item": apm.pars.illumination_source,
-            "on": False,
-        },
-    )
+    # apm.add(
+    #     IO_server,
+    #     "set_digital_out",
+    #     {
+    #         "do_item": apm.pars.illumination_source,
+    #         "on": False,
+    #     },
+    # )
 
     return apm.action_list  # returns complete action list to orch
 
@@ -332,43 +332,43 @@ def ECHEUVIS_sub_CA_led(
     )
 
     # setup toggle on galil_io
-    # apm.add(
-    #     IO_server,
-    #     "set_digital_cycle",
-    #     {
-    #         "trigger_name": "gamry_ttl0",
-    #         "triggertype": toggle_triggertype,
-    #         "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
-    #         "out_name_gamry": None,
-    #         "toggle_init_delay": [
-    #             apm.pars.toggle_dark_time_init,
-    #             apm.pars.toggle2_init_delay,
-    #         ],
-    #         "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
-    #         "toggle_period": [
-    #             apm.pars.toggle_illum_period,
-    #             apm.pars.toggle2_period,
-    #         ],
-    #         "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
-    #     },
-    #     start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    #     process_finish=False,
-    #     process_contrib=[
-    #         ProcessContrib.files,
-    #         ProcessContrib.samples_out,
-    #     ],
-    # )
+    apm.add(
+        IO_server,
+        "set_digital_cycle",
+        {
+            "trigger_name": "gamry_ttl0",
+            "triggertype": toggle_triggertype,
+            "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
+            "out_name_gamry": None,
+            "toggle_init_delay": [
+                apm.pars.toggle_dark_time_init,
+                apm.pars.toggle2_init_delay,
+            ],
+            "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
+            "toggle_period": [
+                apm.pars.toggle_illum_period,
+                apm.pars.toggle2_period,
+            ],
+            "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
+        },
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_out,
+        ],
+    )
 
     # apm.add(ORCH_server, "wait", {"waittime": 5})
 
-    apm.add(
-        IO_server,
-        "set_digital_out",
-        {
-            "do_item": apm.pars.illumination_source,
-            "on": True,
-        },
-    )
+    # apm.add(
+    #     IO_server,
+    #     "set_digital_out",
+    #     {
+    #         "do_item": apm.pars.illumination_source,
+    #         "on": True,
+    #     },
+    # )
 
     apm.add(
         CAM_server,
@@ -379,41 +379,41 @@ def ECHEUVIS_sub_CA_led(
     )
 
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
-        # apm.add(
-        #     ss,
-        #     "acquire_spec_extrig",
-        #     {
-        #         "int_time": apm.pars.spec_int_time_ms,
-        #         "n_avg": apm.pars.spec_n_avg,
-        #         "duration": apm.pars.toggle2_time,
-        #     },
-        #     from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        #     start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        #     technique_name=apm.pars.spec_technique,
-        #     process_contrib=[
-        #         ProcessContrib.files,
-        #         ProcessContrib.samples_out,
-        #     ],
-        # )
         apm.add(
             ss,
-            "acquire_spec_adv",
+            "acquire_spec_extrig",
             {
-                "int_time_ms": apm.pars.spec_int_time_ms,
+                "int_time": apm.pars.spec_int_time_ms,
                 "n_avg": apm.pars.spec_n_avg,
-                "duration_sec": apm.pars.toggle2_time,
+                "duration": apm.pars.toggle2_time,
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-            run_use="data",
+            start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             technique_name=apm.pars.spec_technique,
-            process_finish=False,
             process_contrib=[
                 ProcessContrib.files,
                 ProcessContrib.samples_out,
             ],
-            start_condition=ActionStartCondition.no_wait,
-            nonblocking=True,
         )
+        # apm.add(
+        #     ss,
+        #     "acquire_spec_adv",
+        #     {
+        #         "int_time_ms": apm.pars.spec_int_time_ms,
+        #         "n_avg": apm.pars.spec_n_avg,
+        #         "duration_sec": apm.pars.toggle2_time,
+        #     },
+        #     from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        #     run_use="data",
+        #     technique_name=apm.pars.spec_technique,
+        #     process_finish=False,
+        #     process_contrib=[
+        #         ProcessContrib.files,
+        #         ProcessContrib.samples_out,
+        #     ],
+        #     start_condition=ActionStartCondition.no_wait,
+        #     nonblocking=True,
+        # )
 
     # apply potential
     potential = (
@@ -435,7 +435,7 @@ def ECHEUVIS_sub_CA_led(
             "IErange": apm.pars.gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.no_wait,
+        start_condition=ActionStartCondition.wait_for_server,
         technique_name="CA",
         process_finish=True,
         process_contrib=[
@@ -445,14 +445,14 @@ def ECHEUVIS_sub_CA_led(
         ],
     )
 
-    apm.add(
-        IO_server,
-        "set_digital_out",
-        {
-            "do_item": apm.pars.illumination_source,
-            "on": False,
-        },
-    )
+    # apm.add(
+    #     IO_server,
+    #     "set_digital_out",
+    #     {
+    #         "do_item": apm.pars.illumination_source,
+    #         "on": False,
+    #     },
+    # )
 
     return apm.action_list  # returns complete action list to orch
 
@@ -515,43 +515,43 @@ def ECHEUVIS_sub_CP_led(
     )
 
     # setup toggle on galil_io
-    # apm.add(
-    #     IO_server,
-    #     "set_digital_cycle",
-    #     {
-    #         "trigger_name": "gamry_ttl0",
-    #         "triggertype": toggle_triggertype,
-    #         "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
-    #         "out_name_gamry": None,
-    #         "toggle_init_delay": [
-    #             apm.pars.toggle_dark_time_init,
-    #             apm.pars.toggle2_init_delay,
-    #         ],
-    #         "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
-    #         "toggle_period": [
-    #             apm.pars.toggle_illum_period,
-    #             apm.pars.toggle2_period,
-    #         ],
-    #         "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
-    #     },
-    #     start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    #     process_finish=False,
-    #     process_contrib=[
-    #         ProcessContrib.files,
-    #         ProcessContrib.samples_out,
-    #     ],
-    # )
+    apm.add(
+        IO_server,
+        "set_digital_cycle",
+        {
+            "trigger_name": "gamry_ttl0",
+            "triggertype": toggle_triggertype,
+            "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
+            "out_name_gamry": None,
+            "toggle_init_delay": [
+                apm.pars.toggle_dark_time_init,
+                apm.pars.toggle2_init_delay,
+            ],
+            "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
+            "toggle_period": [
+                apm.pars.toggle_illum_period,
+                apm.pars.toggle2_period,
+            ],
+            "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
+        },
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_out,
+        ],
+    )
 
     # apm.add(ORCH_server, "wait", {"waittime": 5})
     
-    apm.add(
-        IO_server,
-        "set_digital_out",
-        {
-            "do_item": apm.pars.illumination_source,
-            "on": True,
-        },
-    )
+    # apm.add(
+    #     IO_server,
+    #     "set_digital_out",
+    #     {
+    #         "do_item": apm.pars.illumination_source,
+    #         "on": True,
+    #     },
+    # )
 
     apm.add(
         CAM_server,
@@ -562,41 +562,41 @@ def ECHEUVIS_sub_CP_led(
     )
     
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
-        # apm.add(
-        #     ss,
-        #     "acquire_spec_extrig",
-        #     {
-        #         "int_time": apm.pars.spec_int_time_ms,
-        #         "n_avg": apm.pars.spec_n_avg,
-        #         "duration": apm.pars.toggle2_time,
-        #     },
-        #     from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        #     start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        #     technique_name=apm.pars.spec_technique,
-        #     process_contrib=[
-        #         ProcessContrib.files,
-        #         ProcessContrib.samples_out,
-        #     ],
-        # )
         apm.add(
             ss,
-            "acquire_spec_adv",
+            "acquire_spec_extrig",
             {
-                "int_time_ms": apm.pars.spec_int_time_ms,
+                "int_time": apm.pars.spec_int_time_ms,
                 "n_avg": apm.pars.spec_n_avg,
-                "duration_sec": apm.pars.toggle2_time,
+                "duration": apm.pars.toggle2_time,
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-            run_use="data",
+            start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             technique_name=apm.pars.spec_technique,
-            process_finish=False,
             process_contrib=[
                 ProcessContrib.files,
                 ProcessContrib.samples_out,
             ],
-            start_condition=ActionStartCondition.no_wait,
-            nonblocking=True,
         )
+        # apm.add(
+        #     ss,
+        #     "acquire_spec_adv",
+        #     {
+        #         "int_time_ms": apm.pars.spec_int_time_ms,
+        #         "n_avg": apm.pars.spec_n_avg,
+        #         "duration_sec": apm.pars.toggle2_time,
+        #     },
+        #     from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        #     run_use="data",
+        #     technique_name=apm.pars.spec_technique,
+        #     process_finish=False,
+        #     process_contrib=[
+        #         ProcessContrib.files,
+        #         ProcessContrib.samples_out,
+        #     ],
+        #     start_condition=ActionStartCondition.no_wait,
+        #     nonblocking=True,
+        # )
 
 
     apm.add(
@@ -611,7 +611,7 @@ def ECHEUVIS_sub_CP_led(
             "IErange": apm.pars.gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.no_wait,
+        start_condition=ActionStartCondition.wait_for_server,
         technique_name="CP",
         process_finish=True,
         process_contrib=[
@@ -621,14 +621,14 @@ def ECHEUVIS_sub_CP_led(
         ],
     )
 
-    apm.add(
-        IO_server,
-        "set_digital_out",
-        {
-            "do_item": apm.pars.illumination_source,
-            "on": False,
-        },
-    )
+    # apm.add(
+    #     IO_server,
+    #     "set_digital_out",
+    #     {
+    #         "do_item": apm.pars.illumination_source,
+    #         "on": False,
+    #     },
+    # )
 
     return apm.action_list  # returns complete action list to orch
 
@@ -700,42 +700,43 @@ def ECHEUVIS_sub_OCV_led(
     )
 
     # setup toggle on galil_io
-    # apm.add(
-    #     IO_server,
-    #     "set_digital_cycle",
-    #     {
-    #         "trigger_name": "gamry_ttl0",
-    #         "triggertype": toggle_triggertype,
-    #         "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
-    #         "out_name_gamry": None,
-    #         "toggle_init_delay": [
-    #             apm.pars.toggle_dark_time_init,
-    #             apm.pars.toggle2_init_delay,
-    #         ],
-    #         "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
-    #         "toggle_period": [
-    #             apm.pars.toggle_illum_period,
-    #             apm.pars.toggle2_period,
-    #         ],
-    #         "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
-    #     },
-    #     start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    #     process_finish=False,
-    #     process_contrib=[
-    #         ProcessContrib.files,
-    #         ProcessContrib.samples_out,
-    #     ],
-    # )
-    # apm.add(ORCH_server, "wait", {"waittime": 2})
-
     apm.add(
         IO_server,
-        "set_digital_out",
+        "set_digital_cycle",
         {
-            "do_item": apm.pars.illumination_source,
-            "on": True,
+            "trigger_name": "gamry_ttl0",
+            "triggertype": toggle_triggertype,
+            "out_name": [apm.pars.illumination_source, apm.pars.toggle2_source],
+            "out_name_gamry": None,
+            "toggle_init_delay": [
+                apm.pars.toggle_dark_time_init,
+                apm.pars.toggle2_init_delay,
+            ],
+            "toggle_duty": [apm.pars.toggle_illum_duty, apm.pars.toggle2_duty],
+            "toggle_period": [
+                apm.pars.toggle_illum_period,
+                apm.pars.toggle2_period,
+            ],
+            "toggle_duration": [apm.pars.toggle_illum_time, apm.pars.toggle2_time],
         },
+        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+        process_finish=False,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_out,
+        ],
     )
+
+    # apm.add(ORCH_server, "wait", {"waittime": 2})
+
+    # apm.add(
+    #     IO_server,
+    #     "set_digital_out",
+    #     {
+    #         "do_item": apm.pars.illumination_source,
+    #         "on": True,
+    #     },
+    # )
 
     apm.add(
         CAM_server,
@@ -746,41 +747,41 @@ def ECHEUVIS_sub_OCV_led(
     )
 
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
-        # apm.add(
-        #     ss,
-        #     "acquire_spec_extrig",
-        #     {
-        #         "int_time": apm.pars.spec_int_time_ms,
-        #         "n_avg": apm.pars.spec_n_avg,
-        #         "duration": apm.pars.toggle2_time,
-        #     },
-        #     from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        #     start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        #     technique_name=apm.pars.spec_technique,
-        #     process_contrib=[
-        #         ProcessContrib.files,
-        #         ProcessContrib.samples_out,
-        #     ],
-        # )
         apm.add(
             ss,
-            "acquire_spec_adv",
+            "acquire_spec_extrig",
             {
-                "int_time_ms": apm.pars.spec_int_time_ms,
+                "int_time": apm.pars.spec_int_time_ms,
                 "n_avg": apm.pars.spec_n_avg,
-                "duration_sec": apm.pars.toggle2_time,
+                "duration": apm.pars.toggle2_time,
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-            run_use="data",
+            start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
             technique_name=apm.pars.spec_technique,
-            process_finish=False,
             process_contrib=[
                 ProcessContrib.files,
                 ProcessContrib.samples_out,
             ],
-            start_condition=ActionStartCondition.no_wait,
-            nonblocking=True,
         )
+        # apm.add(
+        #     ss,
+        #     "acquire_spec_adv",
+        #     {
+        #         "int_time_ms": apm.pars.spec_int_time_ms,
+        #         "n_avg": apm.pars.spec_n_avg,
+        #         "duration_sec": apm.pars.toggle2_time,
+        #     },
+        #     from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
+        #     run_use="data",
+        #     technique_name=apm.pars.spec_technique,
+        #     process_finish=False,
+        #     process_contrib=[
+        #         ProcessContrib.files,
+        #         ProcessContrib.samples_out,
+        #     ],
+        #     start_condition=ActionStartCondition.no_wait,
+        #     nonblocking=True,
+        # )
 
     apm.add(
         PSTAT_server,
@@ -793,7 +794,7 @@ def ECHEUVIS_sub_OCV_led(
             "IErange": apm.pars.gamry_i_range,
         },
         from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.no_wait,
+        start_condition=ActionStartCondition.wait_for_server,
         technique_name="OCV",
         process_finish=True,
         process_contrib=[
