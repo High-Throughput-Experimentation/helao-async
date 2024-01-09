@@ -39,7 +39,6 @@ class SM303:
         if os.path.exists(self.lib_path):
             self.spec = ctypes.CDLL(self.lib_path)
             self.spec.spCloseGivenChannel(self.dev_num)
-            self.setup_sm303()
         else:
             self.base.print_message("SMdbUSBm.dll not found.", error=True)
             self.spec = None
@@ -95,12 +94,12 @@ class SM303:
                     if not self.base.actionservermodel.estop:
                         self.base.print_message("Spec got measurement request")
                         try:
+                            self.setup_sm303()
                             await asyncio.wait_for(
                                 self.continuous_read(),
                                 self.trigger_duration + self.start_margin,
                             )
                             self.spec.spCloseGivenChannel(self.dev_num)
-                            self.setup_sm303()
                         except asyncio.exceptions.TimeoutError:
                             pass
                         if self.base.actionservermodel.estop:
