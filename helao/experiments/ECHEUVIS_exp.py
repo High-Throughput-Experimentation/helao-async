@@ -522,7 +522,7 @@ def ECHEUVIS_sub_CP_led(
         ],
     )
 
-    apm.add(ORCH_server, "wait", {"waittime": 5})
+    apm.add(ORCH_server, "wait", {"waittime": 2})
 
     return apm.action_list  # returns complete action list to orch
 
@@ -620,7 +620,7 @@ def ECHEUVIS_sub_OCV_led(
             ProcessContrib.samples_out,
         ],
     )
-    apm.add(ORCH_server, "wait", {"waittime": 5})
+    apm.add(ORCH_server, "wait", {"waittime": 2})
 
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
         apm.add(

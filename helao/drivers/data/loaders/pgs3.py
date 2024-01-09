@@ -302,7 +302,7 @@ class EcheUvisLoader(HelaoLoader):
     def get_recent(
         self,
         query: str,
-        min_date: str = "2023-04-26",
+        min_date: str = "2024-01-01",
         plate_id: Optional[int] = None,
         sample_no: Optional[int] = None,
     ):
@@ -330,8 +330,8 @@ class EcheUvisLoader(HelaoLoader):
         # ) not in self.recent_cache or not self.cache_sql:
         data = self.run_raw_query(query + "\n".join(conditions))
         pdf = pd.DataFrame(data)
-        # print("!!! dataframe shape:", pdf.shape)
-        # print("!!! dataframe cols:", pdf.columns)
+        print("!!! dataframe shape:", pdf.shape)
+        print("!!! dataframe cols:", pdf.columns)
         pdf["plate_id"] = pdf.global_label.apply(
             lambda x: int(x.split("_")[-2])
             if "solid" in x and "None" not in x
@@ -349,11 +349,7 @@ class EcheUvisLoader(HelaoLoader):
             pid = spars["plate_id"]
             solid_samples = spars["plate_sample_no_list"]
             assemblies = sorted(
-                set(
-                    subdf.query(
-                        "global_label.str.contains('assembly')"
-                    ).global_label
-                )
+                set(subdf.query("global_label.str.contains('assembly')").global_label)
             )
             for slab, alab in zip(solid_samples, assemblies):
                 pdf.loc[
@@ -373,7 +369,11 @@ class EcheUvisLoader(HelaoLoader):
             #     )
             # ] = pdf.sort_values("process_timestamp")
 
-            return pdf.sort_values("process_timestamp")
+            return (
+                pdf.query(f"process_timestamp >= '{min_date}'" + query_parts)
+                .sort_values("process_timestamp")
+                .reset_index(drop=True)
+            )
 
         # elif recent_md and min_date >= recent_md[0]:
         #     self.recent_cache[
