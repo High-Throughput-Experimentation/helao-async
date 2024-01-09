@@ -216,7 +216,7 @@ def ECHEUVIS_sub_CV_led(
                 "duration_sec": apm.pars.toggle2_time,
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-            run_use=apm.pars.run_use,
+            run_use="data",
             technique_name=apm.pars.technique_name,
             process_finish=False,
             process_contrib=[
@@ -404,7 +404,7 @@ def ECHEUVIS_sub_CA_led(
                 "duration_sec": apm.pars.toggle2_time,
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-            run_use=apm.pars.run_use,
+            run_use="data",
             technique_name=apm.pars.technique_name,
             process_finish=False,
             process_contrib=[
@@ -587,7 +587,7 @@ def ECHEUVIS_sub_CP_led(
                 "duration_sec": apm.pars.toggle2_time,
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-            run_use=apm.pars.run_use,
+            run_use="data",
             technique_name=apm.pars.technique_name,
             process_finish=False,
             process_contrib=[
@@ -771,7 +771,7 @@ def ECHEUVIS_sub_OCV_led(
                 "duration_sec": apm.pars.toggle2_time,
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
-            run_use=apm.pars.run_use,
+            run_use="data",
             technique_name=apm.pars.technique_name,
             process_finish=False,
             process_contrib=[
