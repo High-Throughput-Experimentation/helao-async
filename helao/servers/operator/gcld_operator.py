@@ -463,7 +463,7 @@ def main():
             )
             time.sleep(10)
         if TEST & test_idx == len(TEST_SMPS_2286):
-            break
+            return 0
         print("\n\n")
 
 
