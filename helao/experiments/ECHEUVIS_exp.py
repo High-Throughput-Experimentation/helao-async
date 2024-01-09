@@ -217,13 +217,11 @@ def ECHEUVIS_sub_CV_led(
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
             run_use="data",
-            technique_name=apm.pars.technique_name,
+            technique_name=apm.pars.spec_technique,
             process_finish=False,
             process_contrib=[
                 ProcessContrib.files,
-                ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
-                ProcessContrib.run_use,
             ],
         )
 
@@ -405,13 +403,11 @@ def ECHEUVIS_sub_CA_led(
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
             run_use="data",
-            technique_name=apm.pars.technique_name,
+            technique_name=apm.pars.spec_technique,
             process_finish=False,
             process_contrib=[
                 ProcessContrib.files,
-                ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
-                ProcessContrib.run_use,
             ],
         )
 
@@ -588,13 +584,11 @@ def ECHEUVIS_sub_CP_led(
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
             run_use="data",
-            technique_name=apm.pars.technique_name,
+            technique_name=apm.pars.spec_technique,
             process_finish=False,
             process_contrib=[
                 ProcessContrib.files,
-                ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
-                ProcessContrib.run_use,
             ],
         )
 
@@ -772,13 +766,11 @@ def ECHEUVIS_sub_OCV_led(
             },
             from_globalexp_params={"_fast_samples_in": "fast_samples_in"},
             run_use="data",
-            technique_name=apm.pars.technique_name,
+            technique_name=apm.pars.spec_technique,
             process_finish=False,
             process_contrib=[
                 ProcessContrib.files,
-                ProcessContrib.samples_in,
                 ProcessContrib.samples_out,
-                ProcessContrib.run_use,
             ],
         )
 
