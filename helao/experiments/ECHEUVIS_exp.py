@@ -64,7 +64,7 @@ def ECHEUVIS_sub_shutdown(experiment: Experiment):
 
 def ECHEUVIS_sub_CV_led(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 4,
     Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
     Vapex2_vsRHE: float = -1.0,  # Apex 2 value in volts or amps.
@@ -171,6 +171,8 @@ def ECHEUVIS_sub_CV_led(
         ],
     )
 
+    apm.add(ORCH_server, "wait", {"waittime": 5})
+    
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
         apm.add(
             ss,
@@ -188,6 +190,8 @@ def ECHEUVIS_sub_CV_led(
                 ProcessContrib.samples_out,
             ],
         )
+
+    apm.add(ORCH_server, "wait", {"waittime": 5})
 
     apm.add(
         CAM_server,
@@ -232,22 +236,29 @@ def ECHEUVIS_sub_CV_led(
         ],
     )
 
+    apm.add(
+        IO_server,
+        "stop_digital_cycle",
+        {},
+        start_condition=ActionStartCondition.wait_for_previous,
+    )
+
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
         apm.add(
             ss,
             "stop_extrig_after",
-            {"delay": apm.pars.toggle2_time},
-            start_condition=ActionStartCondition.no_wait,
+            {"delay": 1},
+            start_condition=ActionStartCondition.wait_for_previous,
         )
 
-    apm.add(IO_server, "stop_digital_cycle", {})
+    apm.add(ORCH_server, "wait", {"waittime": 5})
 
     return apm.action_list  # returns complete action list to orch
 
 
 def ECHEUVIS_sub_CA_led(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 4,
     CA_potential_vsRHE: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -330,6 +341,8 @@ def ECHEUVIS_sub_CA_led(
         ],
     )
 
+    apm.add(ORCH_server, "wait", {"waittime": 5})
+
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
         apm.add(
             ss,
@@ -347,6 +360,8 @@ def ECHEUVIS_sub_CA_led(
                 ProcessContrib.samples_out,
             ],
         )
+
+    apm.add(ORCH_server, "wait", {"waittime": 5})
 
     # apply potential
     potential = (
@@ -386,22 +401,29 @@ def ECHEUVIS_sub_CA_led(
         ],
     )
 
+    apm.add(
+        IO_server,
+        "stop_digital_cycle",
+        {},
+        start_condition=ActionStartCondition.wait_for_previous,
+    )
+
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
         apm.add(
             ss,
             "stop_extrig_after",
-            {"delay": apm.pars.toggle2_time},
-            start_condition=ActionStartCondition.no_wait,
+            {"delay": 1},
+            start_condition=ActionStartCondition.wait_for_previous,
         )
 
-    apm.add(IO_server, "stop_digital_cycle", {})
+    apm.add(ORCH_server, "wait", {"waittime": 5})
 
     return apm.action_list  # returns complete action list to orch
 
 
 def ECHEUVIS_sub_CP_led(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 4,
     CP_current: float = 0.0,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
@@ -484,6 +506,8 @@ def ECHEUVIS_sub_CP_led(
         ],
     )
 
+    apm.add(ORCH_server, "wait", {"waittime": 5})
+    
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
         apm.add(
             ss,
@@ -501,6 +525,8 @@ def ECHEUVIS_sub_CP_led(
                 ProcessContrib.samples_out,
             ],
         )
+
+    apm.add(ORCH_server, "wait", {"waittime": 5})
 
     apm.add(
         CAM_server,
@@ -532,19 +558,22 @@ def ECHEUVIS_sub_CP_led(
         ],
     )
 
-    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
-        apm.add(
-            ss,
-            "stop_extrig_after",
-            {"delay": apm.pars.toggle2_time},
-            start_condition=ActionStartCondition.no_wait,
-        )
-
     apm.add(
         IO_server,
         "stop_digital_cycle",
         {},
+        start_condition=ActionStartCondition.wait_for_previous,
     )
+
+    for ss in SPECSRV_MAP[apm.pars.spec_technique]:
+        apm.add(
+            ss,
+            "stop_extrig_after",
+            {"delay": 1},
+            start_condition=ActionStartCondition.wait_for_previous,
+        )
+
+    apm.add(ORCH_server, "wait", {"waittime": 5})
 
     return apm.action_list  # returns complete action list to orch
 
@@ -561,7 +590,7 @@ def ECHEUVIS_sub_interrupt(
 
 def ECHEUVIS_sub_OCV_led(
     experiment: Experiment,
-    experiment_version: int = 3,
+    experiment_version: int = 4,
     solution_ph: float = 9.53,
     reservoir_electrolyte: Electrolyte = "SLF10",
     reservoir_liquid_sample_no: int = 1,  # currently liquid sample database number
@@ -642,6 +671,7 @@ def ECHEUVIS_sub_OCV_led(
             ProcessContrib.samples_out,
         ],
     )
+    apm.add(ORCH_server, "wait", {"waittime": 5})
 
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
         apm.add(
@@ -661,11 +691,13 @@ def ECHEUVIS_sub_OCV_led(
             ],
         )
 
+    apm.add(ORCH_server, "wait", {"waittime": 5})
+
     apm.add(
         CAM_server,
         "acquire_image",
         {"duration": min(apm.pars.OCV_duration_sec, 10), "acqusition_rate": 0.5},
-        start_condition=ActionStartCondition.no_wait,
+        start_condition=ActionStartCondition.wait_for_orch,
         nonblocking=True,
     )
 
@@ -690,15 +722,22 @@ def ECHEUVIS_sub_OCV_led(
         ],
     )
 
+    apm.add(
+        IO_server,
+        "stop_digital_cycle",
+        {},
+        start_condition=ActionStartCondition.wait_for_previous,
+    )
+
     for ss in SPECSRV_MAP[apm.pars.spec_technique]:
         apm.add(
             ss,
             "stop_extrig_after",
-            {"delay": apm.pars.toggle2_time},
-            start_condition=ActionStartCondition.no_wait,
+            {"delay": 1},
+            start_condition=ActionStartCondition.wait_for_previous,
         )
 
-    apm.add(IO_server, "stop_digital_cycle", {})
+    apm.add(ORCH_server, "wait", {"waittime": 5})
 
     return apm.action_list  # returns complete action list to orch
 
