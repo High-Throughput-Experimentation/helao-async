@@ -1219,6 +1219,7 @@ class Active:
         await self.base.data_q.put(
             self.assemble_data_msg(datamodel=datamodel, action=action)
         )
+        self.num_data_queued += 1
 
     def enqueue_data_nowait(self, datamodel: DataModel, action: Action = None):
         if action is None:
@@ -1226,11 +1227,11 @@ class Active:
         self.base.data_q.put_nowait(
             self.assemble_data_msg(datamodel=datamodel, action=action)
         )
+        self.num_data_queued += 1
 
     def assemble_data_msg(
         self, datamodel: DataModel, action: Action = None
     ) -> DataPackageModel:
-        self.num_data_queued += 1
         if action is None:
             action = self.action
         return DataPackageModel(
