@@ -25,7 +25,7 @@ inst_config = sys.argv[1]
 PLATE_ID = int(sys.argv[2])
 env_config = sys.argv[3]
 load_dotenv(dotenv_path=Path(env_config))
-TEST = True
+TEST = False
 
 TEST_SMPS_2286 = [
     # {
@@ -90,26 +90,25 @@ ECHEUVIS_multiCA_led_defaults = {
     #     1.6,
     #     2.2,
     # ],
-    # "CA_duration_sec": 15,
+    "CA_duration_sec": 85,
     "CA_potential_vsRHE": [
-        # -0.2,
-        # 0,
-        # 0.2,
-        # 0.4,
-        # 0.6,
-        # 0.8,
-        # 1.0,
-        # 1.2,
+        -0.2,
+        0,
+        0.2,
+        0.4,
+        0.6,
+        0.8,
+        1.0,
+        1.2,
         1.4,
-        # 1.6,
-        # 1.8,
+        1.6,
+        1.8,
         2.0,
-        # 2.2,
-        # 2.4,
+        2.2,
+        2.4,
     ],
-    "CA_duration_sec": 10,
     "CA_samplerate_sec": 0.05,
-    "OCV_duration_sec": 10,
+    "OCV_duration_sec": 5,
     "gamry_i_range": "auto",
     "led_type": "front",
     "led_date": "04/28/2023",
