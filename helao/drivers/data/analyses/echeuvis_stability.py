@@ -270,7 +270,7 @@ class EcheUvisAnalysis:
         self.analysis_uuid = gen_uuid()
         self.analysis_params = copy(ANALYSIS_DEFAULTS)
         self.analysis_params.update(analysis_params)
-        pdf = query_df.query("process_uuid==@process_uuid")
+        pdf = query_df.query("process_uuid==@process_uuid").reset_index(drop=True)
         # print("filtered data has shape:", pdf.shape)
         self.plate_id = int(pdf.iloc[0].plate_id)
         self.sample_no = int(pdf.iloc[0].sample_no)
