@@ -1830,6 +1830,13 @@ class Active:
                     await self.file_conn_dict[filekey].file.close()
             self.file_conn_dict = {}
 
+            # wait for data_q to finish
+            while not all([q.empty() for q in self.base.data_q.subscribers]):
+                self.base.print_message(
+                    "waiting for data_q to empty", info=True
+                )
+                asyncio.sleep(1)
+            
             # finish the data writer
             self.data_logger.cancel()
             l10 = self.base.actives.pop(self.active_uuid, None)
@@ -1848,6 +1855,7 @@ class Active:
             self.base.print_message(
                 "all active action are done, closing active", info=True
             )
+
             # write final act meta file (overwrite existing one)
             await self.base.write_act(action=finish_action)
 
