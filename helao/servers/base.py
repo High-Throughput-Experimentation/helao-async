@@ -586,7 +586,8 @@ class Base:
                 f"Status websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
                 error=True,
             )
-            self.status_q.remove(status_sub)
+            if status_sub in self.status_q.subscribers:
+                self.status_q.remove(status_sub)
 
     async def ws_data(self, websocket: WebSocket):
         """Subscribe to data queue and send messages to websocket client."""
@@ -605,7 +606,8 @@ class Base:
                 f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
                 error=True,
             )
-            self.data_q.remove(data_sub)
+            if data_sub in self.data_q.subscribers:
+                self.data_q.remove(data_sub)
 
     async def ws_live(self, websocket: WebSocket):
         """Subscribe to data queue and send messages to websocket client."""
@@ -622,7 +624,8 @@ class Base:
                 f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
                 error=True,
             )
-            self.live_queue.remove(live_sub)
+            if live_sub in self.live_q.subscribers:
+                self.live_q.remove(live_sub)
 
     async def live_buffer_task(self):
         """Self-subscribe to live_q, update live_buffer dict."""
@@ -957,6 +960,8 @@ class Active:
         # position 0
         self.action_list = [self.action]
         self.listen_uuids = []
+        self.num_data_queued = 0
+        self.num_data_written = 0
 
         # this updates timestamp and uuid
         # only if they are None
@@ -1225,6 +1230,7 @@ class Active:
     def assemble_data_msg(
         self, datamodel: DataModel, action: Action = None
     ) -> DataPackageModel:
+        self.num_data_queued += 1
         if action is None:
             action = self.action
         return DataPackageModel(
@@ -1436,10 +1442,12 @@ class Active:
                             )
                     else:
                         self.base.print_message("output file closed?", error=True)
+                self.num_data_written += 1
 
         except asyncio.CancelledError:
             self.base.print_message("removing data_q subscription for active", info=True)
-            self.base.data_q.remove(dq_sub)
+            if dq_sub in self.base.data_q.subscribers:
+                self.base.data_q.remove(dq_sub)
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             self.base.print_message(
@@ -1827,6 +1835,10 @@ class Active:
             if self.action_list[-1].manual_action:
                 await self.finish_manual_action()
 
+            self.base.print_message("checking if all queued data has written.")
+            while self.num_data_queued > self.num_data_written:
+                self.base.print_message(f"num_queued {self.num_data_queued} > num_written {self.num_data_written}, sleeping for 1 second.")
+                await asyncio.sleep(1)
             # all actions are finished
             self.base.print_message("finishing data logging.")
             for filekey in self.file_conn_dict:
@@ -1835,7 +1847,6 @@ class Active:
             self.file_conn_dict = {}
 
             # finish the data writer
-            await asyncio.sleep(1)
             self.data_logger.cancel()
             l10 = self.base.actives.pop(self.active_uuid, None)
             if l10 is not None:

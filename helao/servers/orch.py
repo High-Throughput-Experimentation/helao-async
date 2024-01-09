@@ -405,7 +405,8 @@ class Orch(Base):
                 f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
                 warning=True,
             )
-            self.globstat_q.remove(gs_sub)
+            if gs_sub in self.globstat_q.subscribers:
+                self.globstat_q.remove(gs_sub)
     async def globstat_broadcast_task(self):
         """Consume globstat_q. Does nothing for now."""
         async for _ in self.globstat_q.subscribe():

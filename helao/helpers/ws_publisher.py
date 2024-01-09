@@ -34,4 +34,5 @@ class WsPublisher:
                 )
         except websockets.ConnectionClosedError:
             print("Client closed connection, but no close frame received or sent.")
-            self.source_queue.remove(src_sub)
+            if src_sub in self.source_queue.subscribers:
+                self.source_queue.remove(src_sub)
