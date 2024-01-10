@@ -125,7 +125,7 @@ ECHEUVIS_multiCA_led_defaults = {
     "toggleSpec_init_delay": 0.0,
     "toggleSpec_time": -1,
     "spec_ref_duration": 5,
-    "spec_int_time_ms": 35,
+    "spec_int_time_ms": 50,
     "spec_n_avg": 5,
     "spec_technique": "T_UVVIS",
     "calc_ev_parts": [1.8, 2.2, 2.6, 3.0],
@@ -140,7 +140,7 @@ ECHEUVIS_multiCA_led_defaults = {
     "cell_engaged_z": 1.5,
     "cell_disengaged_z": 0,
     "cell_vent_wait": 10.0,
-    "cell_fill_wait": 45.0,
+    "cell_fill_wait": 35.0,
 }
 
 ECHEUVIS_postseq_defaults = {"recent": False}
@@ -314,10 +314,10 @@ def main():
                 param_defaults=ECHEUVIS_multiCA_led_defaults,
             )
             print(
-                f"{gen_ts()} Got measurement request for plate {PLATE_ID}, sample {sample_no}."
+                f"{gen_ts()} Got measurement request {data_request.id}"
             )
             print(
-                f"{gen_ts()} Sample {sample_no} has composition:"
+                f"{gen_ts()} Plate {PLATE_ID} sample {sample_no} has composition:"
             )
             pprint(data_request.composition)
             print(
@@ -353,7 +353,7 @@ def main():
                 # Acknowledge the data request
                 with CLIENT:
                     output = CLIENT.acknowledge_data_request(data_request.id)
-                print(f"{gen_ts()} Data request status: {output.status}")
+                print(f"{gen_ts()} Data request {data_request.id} status: {output.status}")
 
             # wait for sequence end (orch_state == "idle")
             current_state, active_seq, last_seq = wait_for_orch(
@@ -371,6 +371,12 @@ def main():
                         "pending", data_request_id=data_request.id
                     )
                     return -1
+
+            # with CLIENT:
+            #     output = CLIENT.set_status(
+            #         "process_finished", data_request_id=data_request.id
+            #     )
+            #     print(f"{gen_ts()} Data request {data_request.id} status: {output.status}")
 
             print(
                 f"{gen_ts()} Unconditional 30 second wait for upload tasks to process."
@@ -456,6 +462,13 @@ def main():
                     )
                     return -1
             print(f"{gen_ts()} Analysis sequence complete.")
+
+            # with CLIENT:
+            #     output = CLIENT.set_status(
+            #         "analysis_finished", data_request_id=data_request.id
+            #     )
+            #     print(f"{gen_ts()} Data request {data_request.id} status: {output.status}")
+
         else:
             print(
                 f"{gen_ts()} Orchestrator is idle. Checking for data requests in 10 seconds."
@@ -463,7 +476,7 @@ def main():
             time.sleep(10)
         if TEST & test_idx == len(TEST_SMPS_2286) - 1:
             return 0
-        print("\n\n")
+        print("\n")
 
 
 if __name__ == "__main__":
