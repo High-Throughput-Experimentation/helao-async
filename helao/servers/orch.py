@@ -631,41 +631,46 @@ class Orch(Base):
                     self.print_message(
                         "orch is waiting for endpoint to become available"
                     )
-                    while True:
+                    endpoint_free = self.globalstatusmodel.endpoint_free(
+                        action_server=A.action_server, endpoint_name=A.action_name
+                    )
+                    while not endpoint_free:
                         await self.wait_for_interrupt()
                         endpoint_free = self.globalstatusmodel.endpoint_free(
                             action_server=A.action_server, endpoint_name=A.action_name
                         )
-                        if endpoint_free:
-                            break
                 elif A.start_condition == ActionStartCondition.wait_for_server:
                     self.print_message("orch is waiting for server to become available")
-                    while True:
+                    server_free = self.globalstatusmodel.server_free(
+                        action_server=A.action_server
+                    )
+                    while not server_free:
                         await self.wait_for_interrupt()
                         server_free = self.globalstatusmodel.server_free(
                             action_server=A.action_server
                         )
-                        if server_free:
-                            break
                 elif A.start_condition == ActionStartCondition.wait_for_orch:
                     self.print_message("orch is waiting for wait action to end")
-                    while True:
+                    wait_free = self.globalstatusmodel.endpoint_free(
+                        action_server=A.orchestrator, endpoint_name="wait"
+                    )
+                    while not wait_free:
                         await self.wait_for_interrupt()
                         wait_free = self.globalstatusmodel.endpoint_free(
                             action_server=A.orchestrator, endpoint_name="wait"
                         )
-                        if wait_free:
-                            break
                 elif A.start_condition == ActionStartCondition.wait_for_previous:
                     self.print_message("orch is waiting for previous action to finish")
-                    while True:
+                    previous_action_free = (
+                        self.last_action_uuid
+                        not in self.globalstatusmodel.active_dict.keys()
+                    )
+                    while not previous_action_free:
                         await self.wait_for_interrupt()
                         previous_action_free = (
                             self.last_action_uuid
                             not in self.globalstatusmodel.active_dict.keys()
                         )
-                        if previous_action_free:
-                            break
                 elif A.start_condition == ActionStartCondition.wait_for_all:
                     await self.orch_wait_for_all_actions()
 
