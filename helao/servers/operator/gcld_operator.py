@@ -24,6 +24,9 @@ from helaocore.models.orchstatus import LoopStatus
 inst_config = sys.argv[1]
 PLATE_ID = int(sys.argv[2])
 env_config = sys.argv[3]
+RESUME_ID = False
+if len(sys.argv) == 5:
+    RESUME_ID = sys.argv[4]
 load_dotenv(dotenv_path=Path(env_config))
 TEST = False
 
@@ -256,12 +259,22 @@ def main():
     world_cfg = config_loader(inst_config, helao_root)
     db_cfg = world_cfg["servers"]["DB"]
     test_idx = 0
+    resumed = False
 
     while True:
+        data_request = False
+
         with CLIENT:
             pending_requests = CLIENT.read_data_requests(status="pending")
+            acknowledged_requests = CLIENT.read_data_requests(status="acknowledged")
 
-        if pending_requests or TEST:
+        if RESUME_ID and not resumed:
+            matching_requests = [req for req in acknowledged_requests if req.id == RESUME_ID]
+            if matching_requests:
+                data_request = matching_requests[0]
+                resumed = True
+        
+        elif pending_requests or TEST:
             if TEST:
                 smpd = TEST_SMPS_2286[test_idx]
                 test_req = CreateDataRequestModel(
@@ -273,9 +286,10 @@ def main():
                 with CLIENT:
                     data_request = CLIENT.create_data_request(test_req)
                 test_idx += 1
-            else:
+            elif pending_requests:
                 print(f"{gen_ts()} Pending data request count: {len(pending_requests)}")
                 data_request = pending_requests[0]
+
             sample_no = int(data_request.sample_label.split("_")[-1])
 
             # # DRY MEASUREMENT
@@ -327,7 +341,6 @@ def main():
             operator.add_sequence(seq.get_seq())
             print(f"{gen_ts()} Dispatching measurement sequence: {seq.sequence_uuid}")
             operator.start()
-
             time.sleep(5)
 
             # wait for sequence start (orch_state == "busy")
@@ -355,6 +368,7 @@ def main():
                     output = CLIENT.acknowledge_data_request(data_request.id)
                 print(f"{gen_ts()} Data request {data_request.id} status: {output.status}")
 
+        if data_request:
             # wait for sequence end (orch_state == "idle")
             current_state, active_seq, last_seq = wait_for_orch(
                 operator, LoopStatus.stopped
