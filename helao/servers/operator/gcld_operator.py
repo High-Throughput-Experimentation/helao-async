@@ -320,7 +320,7 @@ def main():
             insitu_params = {"CA_potential_vsRHE": potential_list}
 
             # INSITU MEASUREMENT
-            seq = seq_constructor(
+            insitu_seq = seq_constructor(
                 plate_id=PLATE_ID,
                 sample_no=sample_no,
                 data_request_id=data_request.id,
@@ -338,20 +338,20 @@ def main():
             )
             pprint(data_request.composition)
             print(
-                f"{gen_ts()} Measurement parameters for sequence: {seq.sequence_uuid}:"
+                f"{gen_ts()} Measurement parameters for sequence: {insitu_seq.sequence_uuid}:"
             )
             pprint(data_request.parameters)
-            operator.add_sequence(seq.get_seq())
-            print(f"{gen_ts()} Dispatching measurement sequence: {seq.sequence_uuid}")
+            operator.add_sequence(insitu_seq.get_seq())
+            print(f"{gen_ts()} Dispatching measurement sequence: {insitu_seq.sequence_uuid}")
             operator.start()
             time.sleep(5)
 
             # wait for sequence start (orch_state == "busy")
-            current_state, active_seq, last_seq = wait_for_orch(
+            current_state, active_insitu_seq, last_seq = wait_for_orch(
                 operator, LoopStatus.started
             )
             print(
-                f"{gen_ts()} Measurement sequence {active_seq['sequence_uuid']} has started."
+                f"{gen_ts()} Measurement sequence {active_insitu_seq['sequence_uuid']} has started."
             )
             if current_state in [LoopStatus.error, LoopStatus.estopped]:
                 with CLIENT:
@@ -365,7 +365,7 @@ def main():
                         "pending", data_request_id=data_request.id
                     )
                     return -1
-            elif str(active_seq["sequence_uuid"]) == str(seq.sequence_uuid):
+            elif str(active_insitu_seq["sequence_uuid"]) == str(insitu_seq.sequence_uuid):
                 # Acknowledge the data request
                 with CLIENT:
                     output = CLIENT.acknowledge_data_request(data_request.id)
@@ -373,7 +373,7 @@ def main():
 
         if data_request:
             # wait for sequence end (orch_state == "idle")
-            current_state, active_seq, last_seq = wait_for_orch(
+            current_state, _, _ = wait_for_orch(
                 operator, LoopStatus.stopped
             )
             if current_state in [LoopStatus.error, LoopStatus.estopped]:
@@ -421,9 +421,9 @@ def main():
             # )
 
             # INSITU ANALYSIS
-            ana = ana_constructor(
+            ana_seq = ana_constructor(
                 plate_id=PLATE_ID,
-                sequence_uuid=str(seq.sequence_uuid),
+                sequence_uuid=str(active_insitu_seq["sequence_uuid"]),
                 data_request_id=data_request.id,
                 params={},
                 seq_func=ECHEUVIS_postseq,
@@ -431,8 +431,8 @@ def main():
                 seq_label="gcld-wetdryrun-analysis",
                 param_defaults=ECHEUVIS_postseq_defaults,
             )
-            operator.add_sequence(ana.get_seq())
-            print(f"{gen_ts()} Dispatching analysis sequence: {ana.sequence_uuid}")
+            operator.add_sequence(ana_seq.get_seq())
+            print(f"{gen_ts()} Dispatching analysis sequence: {ana_seq.sequence_uuid}")
             operator.start()
 
             time.sleep(5)
@@ -456,14 +456,9 @@ def main():
                         "pending", data_request_id=data_request.id
                     )
                     return -1
-            elif active_seq["sequence_uuid"] == seq.sequence_uuid:
-                # Acknowledge the data request
-                with CLIENT:
-                    output = CLIENT.acknowledge_data_request(data_request.id)
-                print(f"Data request status: {output.status}")
 
             # wait for analysis end (orch_state == "idle")
-            current_state, active_seq, last_seq = wait_for_orch(
+            current_state, active_ana_seq, last_seq = wait_for_orch(
                 operator, LoopStatus.stopped
             )
             if current_state in [LoopStatus.error, LoopStatus.estopped]:
