@@ -146,7 +146,6 @@ async def move_dir(
                         if not finish_success:
                             print_msg(
                                 f"DB server could not sync {yml_path}. Check DB logs.",
-                                warning=True,
                             )
                 if rm_success and obj_type == "action" and is_manual:
                     # remove active sequence and experiment dirs
