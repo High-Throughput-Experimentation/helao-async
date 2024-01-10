@@ -269,7 +269,7 @@ def main():
             acknowledged_requests = CLIENT.read_data_requests(status="acknowledged")
 
         if RESUME_ID and not resumed:
-            matching_requests = [req for req in acknowledged_requests if req.id == RESUME_ID]
+            matching_requests = [req for req in acknowledged_requests if str(req.id) == RESUME_ID]
             if matching_requests:
                 data_request = matching_requests[0]
                 resumed = True
