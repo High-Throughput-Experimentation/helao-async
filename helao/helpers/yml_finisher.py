@@ -39,7 +39,7 @@ async def yml_finisher(yml_path: str, base: object = None, retry: int = 3):
 
     req_params = {"yml_path": yml_path}
     req_url = f"http://{dbp_host}:{dbp_port}/finish_yml"
-    async with aiohttp.ClientSession(timeout=300) as session:
+    async with aiohttp.ClientSession() as session:
         for i in range(retry):
             try:
                 async with session.post(req_url, params=req_params) as resp:
