@@ -289,6 +289,9 @@ def main():
             elif pending_requests:
                 print(f"{gen_ts()} Pending data request count: {len(pending_requests)}")
                 data_request = pending_requests[0]
+            elif acknowledged_requests:
+                print(f"{gen_ts()} Restarting acknowledged data request from beginning")
+                data_request = acknowledged_requests[0]
 
             sample_no = int(data_request.sample_label.split("_")[-1])
 
