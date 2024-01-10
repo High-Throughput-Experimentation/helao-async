@@ -28,6 +28,7 @@ async def yml_finisher(yml_path: str, base: object = None, retry: int = 3):
         dbp_host = base.world_cfg["servers"]["DB"]["host"]
         dbp_port = base.world_cfg["servers"]["DB"]["port"]
     else:
+        print_msg(f"DB server not defined in config, {yml_path} will not sync.")
         return False
 
     if not yp.exists():
@@ -142,11 +143,7 @@ async def move_dir(
                     )
                     yml_path = os.path.join(new_dir, f"{timestamp}-{obj_type[:3]}.yml")
                     if not is_manual:
-                        finish_success = await yml_finisher(yml_path, base=base)
-                        if not finish_success:
-                            print_msg(
-                                f"DB server could not sync {yml_path}. Check DB logs.",
-                            )
+                        await yml_finisher(yml_path, base=base)
                 if rm_success and obj_type == "action" and is_manual:
                     # remove active sequence and experiment dirs
                     exp_dir = os.path.dirname(yml_dir)
