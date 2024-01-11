@@ -573,8 +573,9 @@ class Base:
         "Subscribe to status queue and send message to websocket client."
         self.print_message("got new status subscriber")
         await websocket.accept()
+        status_sub = self.status_q.subscribe()
         try:
-            async for status_msg in self.status_q.subscribe():
+            async for status_msg in status_sub:
                 await websocket.send_bytes(
                     pyzstd.compress(pickle.dumps(status_msg.as_dict()))
                 )
@@ -585,13 +586,16 @@ class Base:
                 f"Status websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
                 error=True,
             )
+            if status_sub in self.status_q.subscribers:
+                self.status_q.remove(status_sub)
 
     async def ws_data(self, websocket: WebSocket):
         """Subscribe to data queue and send messages to websocket client."""
         self.print_message("got new data subscriber")
         await websocket.accept()
+        data_sub = self.data_q.subscribe()
         try:
-            async for data_msg in self.data_q.subscribe():
+            async for data_msg in data_sub:
                 await websocket.send_bytes(
                     pyzstd.compress(pickle.dumps(data_msg.as_dict()))
                 )
@@ -602,13 +606,16 @@ class Base:
                 f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
                 error=True,
             )
+            if data_sub in self.data_q.subscribers:
+                self.data_q.remove(data_sub)
 
     async def ws_live(self, websocket: WebSocket):
         """Subscribe to data queue and send messages to websocket client."""
         self.print_message("got new live_buffer subscriber")
         await websocket.accept()
+        live_sub = self.live_q.subscribe()
         try:
-            async for live_msg in self.live_q.subscribe():
+            async for live_msg in live_sub:
                 await websocket.send_bytes(pyzstd.compress(pickle.dumps(live_msg)))
         # except WebSocketDisconnect:
         except Exception as e:
@@ -617,6 +624,8 @@ class Base:
                 f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
                 error=True,
             )
+            if live_sub in self.live_q.subscribers:
+                self.live_q.remove(live_sub)
 
     async def live_buffer_task(self):
         """Self-subscribe to live_q, update live_buffer dict."""
@@ -795,9 +804,10 @@ class Base:
             if not os.path.exists(output_path):
                 os.makedirs(output_path, exist_ok=True)
 
+            output_dict = {"file_type": "action"}
+            output_dict.update(act_dict)
             async with aiofiles.open(output_file, mode="w+") as f:
-                await f.write(yml_dumps({"file_type": "action"}))
-                await f.write(yml_dumps(act_dict))
+                await f.write(yml_dumps(output_dict))
         else:
             self.print_message(
                 f"writing meta file for action '{action.action_name}' is disabled.",
@@ -817,15 +827,16 @@ class Base:
         )
 
         self.print_message(f"writing to exp meta file: {output_file}")
-        output_str = yml_dumps(exp_dict)
+        output_dict = {"file_type": "experiment"}
+        output_dict.update(exp_dict)
+        output_str = yml_dumps(output_dict)
+        if not output_str.endswith("\n"):
+            output_str += "\n"
 
         if not os.path.exists(output_path):
             os.makedirs(output_path, exist_ok=True)
 
         async with aiofiles.open(output_file, mode="w+") as f:
-            await f.write(yml_dumps({"file_type": "experiment"}))
-            if not output_str.endswith("\n"):
-                output_str += "\n"
             await f.write(output_str)
 
     async def write_seq(self, sequence, manual=False):
@@ -842,15 +853,16 @@ class Base:
         )
 
         self.print_message(f"writing to seq meta file: {output_file}")
-        output_str = yml_dumps(seq_dict)
+        output_dict = {"file_type": "sequence"}
+        output_dict.update(seq_dict)
+        output_str = yml_dumps(output_dict)
+        if not output_str.endswith("\n"):
+            output_str += "\n"
 
         if not os.path.exists(output_path):
             os.makedirs(output_path, exist_ok=True)
 
         async with aiofiles.open(output_file, mode="w+") as f:
-            await f.write(yml_dumps({"file_type": "sequence"}))
-            if not output_str.endswith("\n"):
-                output_str += "\n"
             await f.write(output_str)
 
     async def append_exp_to_seq(self, exp, seq):
@@ -948,6 +960,8 @@ class Active:
         # position 0
         self.action_list = [self.action]
         self.listen_uuids = []
+        self.num_data_queued = 0
+        self.num_data_written = 0
 
         # this updates timestamp and uuid
         # only if they are None
@@ -1002,7 +1016,6 @@ class Active:
             info=True,
         )
 
-        # self.data_logger = self.base.aloop.create_task(self.log_data_task())
 
         self.manual_stop = False
         self.action_loop_running = False
@@ -1205,6 +1218,8 @@ class Active:
         await self.base.data_q.put(
             self.assemble_data_msg(datamodel=datamodel, action=action)
         )
+        if datamodel.data:
+            self.num_data_queued += 1
 
     def enqueue_data_nowait(self, datamodel: DataModel, action: Action = None):
         if action is None:
@@ -1212,6 +1227,8 @@ class Active:
         self.base.data_q.put_nowait(
             self.assemble_data_msg(datamodel=datamodel, action=action)
         )
+        if datamodel.data:
+            self.num_data_queued += 1
 
     def assemble_data_msg(
         self, datamodel: DataModel, action: Action = None
@@ -1321,16 +1338,12 @@ class Active:
         #     info=True,
         # )
 
+        dq_sub = self.base.data_q.subscribe()
+
         try:
-            async for data_msg in self.base.data_q.subscribe():
+            async for data_msg in dq_sub:
                 # check if the new data_msg is in listen_uuids
                 if data_msg.action_uuid not in self.listen_uuids:
-                    # self.base.print_message(
-                    #     f"data logger for active action: {self.action.action_uuid} ; UUID {data_msg.action_uuid} is not in listen_uuids: {self.listen_uuids}",
-                    #     warning=True,
-                    # )
-                    # self.base.print_message(f"data_msg: \n{data_msg}", warning=True)
-
                     continue
 
                 data_status = data_msg.datamodel.status
@@ -1431,12 +1444,17 @@ class Active:
                             )
                     else:
                         self.base.print_message("output file closed?", error=True)
+                if data_dict:
+                    self.num_data_written += 1
 
-        # except asyncio.CancelledError:
+        except asyncio.CancelledError:
+            self.base.print_message("removing data_q subscription for active", info=True)
+            if dq_sub in self.base.data_q.subscribers:
+                self.base.data_q.remove(dq_sub)
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             self.base.print_message(
-                f"data logger task was cancelled with error: {repr(e), tb,}",
+                f"data logger task failed with error: {repr(e), tb,}",
                 error=True,
             )
 
@@ -1749,11 +1767,6 @@ class Active:
                 new_status=HloStatus.finished,
             )
 
-            # write final act meta file (overwrite existing one)
-            await self.base.write_act(action=finish_action)
-
-            # send the last status
-            await self.add_status(action=finish_action)
 
             # send globalparams
             if finish_action.to_globalexp_params:
@@ -1825,6 +1838,10 @@ class Active:
             if self.action_list[-1].manual_action:
                 await self.finish_manual_action()
 
+            self.base.print_message("checking if all queued data has written.")
+            while self.num_data_queued > self.num_data_written:
+                self.base.print_message(f"num_queued {self.num_data_queued} > num_written {self.num_data_written}, sleeping for 1 second.")
+                await asyncio.sleep(1)
             # all actions are finished
             self.base.print_message("finishing data logging.")
             for filekey in self.file_conn_dict:
@@ -1850,6 +1867,12 @@ class Active:
             self.base.print_message(
                 "all active action are done, closing active", info=True
             )
+
+            # write final act meta file (overwrite existing one)
+            await self.base.write_act(action=finish_action)
+
+            # send the last status
+            await self.add_status(action=finish_action)
 
             # DB server call to finish_yml if DB exists
             for action in self.action_list:

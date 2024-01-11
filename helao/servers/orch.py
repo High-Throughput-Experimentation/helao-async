@@ -395,8 +395,9 @@ class Orch(Base):
         """Subscribe to global status queue and send messages to websocket client."""
         self.print_message("got new global status subscriber")
         await websocket.accept()
+        gs_sub = self.globstat_q.subscribe()
         try:
-            async for globstat_msg in self.globstat_q.subscribe():
+            async for globstat_msg in gs_sub:
                 await websocket.send_text(json.dumps(globstat_msg.as_dict()))
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -404,7 +405,8 @@ class Orch(Base):
                 f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}",
                 warning=True,
             )
-
+            if gs_sub in self.globstat_q.subscribers:
+                self.globstat_q.remove(gs_sub)
     async def globstat_broadcast_task(self):
         """Consume globstat_q. Does nothing for now."""
         async for _ in self.globstat_q.subscribe():
@@ -629,41 +631,46 @@ class Orch(Base):
                     self.print_message(
                         "orch is waiting for endpoint to become available"
                     )
-                    while True:
+                    endpoint_free = self.globalstatusmodel.endpoint_free(
+                        action_server=A.action_server, endpoint_name=A.action_name
+                    )
+                    while not endpoint_free:
                         await self.wait_for_interrupt()
                         endpoint_free = self.globalstatusmodel.endpoint_free(
                             action_server=A.action_server, endpoint_name=A.action_name
                         )
-                        if endpoint_free:
-                            break
                 elif A.start_condition == ActionStartCondition.wait_for_server:
                     self.print_message("orch is waiting for server to become available")
-                    while True:
+                    server_free = self.globalstatusmodel.server_free(
+                        action_server=A.action_server
+                    )
+                    while not server_free:
                         await self.wait_for_interrupt()
                         server_free = self.globalstatusmodel.server_free(
                             action_server=A.action_server
                         )
-                        if server_free:
-                            break
                 elif A.start_condition == ActionStartCondition.wait_for_orch:
                     self.print_message("orch is waiting for wait action to end")
-                    while True:
+                    wait_free = self.globalstatusmodel.endpoint_free(
+                        action_server=A.orchestrator, endpoint_name="wait"
+                    )
+                    while not wait_free:
                         await self.wait_for_interrupt()
                         wait_free = self.globalstatusmodel.endpoint_free(
                             action_server=A.orchestrator, endpoint_name="wait"
                         )
-                        if wait_free:
-                            break
                 elif A.start_condition == ActionStartCondition.wait_for_previous:
                     self.print_message("orch is waiting for previous action to finish")
-                    while True:
+                    previous_action_free = (
+                        self.last_action_uuid
+                        not in self.globalstatusmodel.active_dict.keys()
+                    )
+                    while not previous_action_free:
                         await self.wait_for_interrupt()
                         previous_action_free = (
                             self.last_action_uuid
                             not in self.globalstatusmodel.active_dict.keys()
                         )
-                        if previous_action_free:
-                            break
                 elif A.start_condition == ActionStartCondition.wait_for_all:
                     await self.orch_wait_for_all_actions()
 
@@ -1033,7 +1040,7 @@ class Orch(Base):
         # reset loop intend
         await self.intend_none()
 
-        self.current_stop_message("E-STOP" + reason_suffix)
+        self.current_stop_message = "E-STOP" + reason_suffix
         await self.update_operator(True)
 
     async def stop_loop(self):

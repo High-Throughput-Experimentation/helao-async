@@ -38,8 +38,8 @@ class SM303:
         # self.n_cal = len(self.wl_cal)
         if os.path.exists(self.lib_path):
             self.spec = ctypes.CDLL(self.lib_path)
-            self.spec.spCloseGivenChannel(self.dev_num)
             self.setup_sm303()
+            self.spec.spCloseGivenChannel(self.dev_num)
         else:
             self.base.print_message("SMdbUSBm.dll not found.", error=True)
             self.spec = None
@@ -100,7 +100,6 @@ class SM303:
                                 self.trigger_duration + self.start_margin,
                             )
                             self.spec.spCloseGivenChannel(self.dev_num)
-                            self.setup_sm303()
                         except asyncio.exceptions.TimeoutError:
                             pass
                         if self.base.actionservermodel.estop:
@@ -120,15 +119,16 @@ class SM303:
                 # endpoint can return even we got errors
                 self.IO_continue = True
 
-                if self.active:
+                if self.active is not None:
                     self.base.print_message("Spec finishes active action")
-                    active_not_finished = True
-                    while active_not_finished:
-                        try:
-                            await asyncio.wait_for(self.active.finish(), 1)
-                            active_not_finished = False
-                        except asyncio.exceptions.TimeoutError:
-                            pass
+                    # active_not_finished = True
+                    # while active_not_finished and self.active is not None:
+                    #     try:
+                    #         await asyncio.wait_for(self.active.finish(), 1)
+                    #         active_not_finished = False
+                    #     except asyncio.exceptions.TimeoutError:
+                    #         pass
+                    await self.active.finish()
                     self.active = None
                     self.action = None
                     self.samples_in = []
@@ -228,6 +228,7 @@ class SM303:
         return False
 
     def acquire_spec_adv(self, int_time_ms: float, **kwargs):
+        self.setup_sm303()
         trigset = self.set_trigger_mode(SpecTrigType.off)
         intmset = self.spec.spSetIntMode(
             ctypes.c_short(2), ctypes.c_double(float(int_time_ms)), self.dev_num
@@ -268,6 +269,7 @@ class SM303:
         Return active dict.
         """
 
+        self.setup_sm303()
         params = A.action_params
         self.n_avg = params["n_avg"]
         self.fft = params["fft"]

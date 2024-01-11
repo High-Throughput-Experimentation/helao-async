@@ -167,7 +167,7 @@ class C_palvis:
                 [self.sample_tables["solid"]],
                 Spacer(height=10),
             ],
-            background="#C0C0C0",
+            background="#D6DBDF",
             width=1024,
         )
 

@@ -3,6 +3,7 @@ from copy import copy
 from typing import List
 from uuid import UUID
 from datetime import datetime
+import traceback
 
 import pandas as pd
 import numpy as np
@@ -81,14 +82,21 @@ WHERE
 
 def parse_spechlo(hlod: dict):
     """Read spectrometer hlo into wavelength, epoch, spectra tuple."""
-    wl = np.array(hlod["meta"]["optional"]["wl"])
-    epochs = np.array(hlod["data"]["epoch_s"])
-    specarr = (
-        pd.DataFrame(hlod["data"])
-        .sort_index(axis=1)
-        .drop([x for x in hlod["data"].keys() if not x.startswith("ch_")], axis=1)
-        .to_numpy()
-    )
+    try:
+        wl = np.array(hlod["meta"]["optional"]["wl"])
+        epochs = np.array(hlod["data"]["epoch_s"])
+        specarr = (
+            pd.DataFrame(hlod["data"])
+            .sort_index(axis=1)
+            .drop([x for x in hlod["data"].keys() if not x.startswith("ch_")], axis=1)
+            .to_numpy()
+        )
+    except Exception as err:
+        str_err = "".join(
+            traceback.format_exception(type(err), err, err.__traceback__)
+        )
+        print(str_err)
+        return False
     return wl, epochs, specarr
 
 
@@ -137,6 +145,7 @@ class EcheUvisInputs:
         self.insitu_spec_act = HelaoAction(
             query_df.query(
                 "process_uuid==@insitu_process_uuid & action_name=='acquire_spec_extrig'"
+                # "process_uuid==@insitu_process_uuid & action_name=='acquire_spec_adv'"
             )
             .iloc[0]
             .action_uuid,
@@ -182,6 +191,7 @@ class EcheUvisInputs:
         )
         self.baseline_spec_act = HelaoAction(
             bdf.query("action_name=='acquire_spec_extrig'")
+            # bdf.query("action_name=='acquire_spec_adv'")
             .sort_values("action_timestamp")
             .iloc[0]
             .action_uuid,
@@ -270,7 +280,7 @@ class EcheUvisAnalysis:
         self.analysis_uuid = gen_uuid()
         self.analysis_params = copy(ANALYSIS_DEFAULTS)
         self.analysis_params.update(analysis_params)
-        pdf = query_df.query("process_uuid==@process_uuid")
+        pdf = query_df.query("process_uuid==@process_uuid").reset_index(drop=True)
         # print("filtered data has shape:", pdf.shape)
         self.plate_id = int(pdf.iloc[0].plate_id)
         self.sample_no = int(pdf.iloc[0].sample_no)
@@ -289,6 +299,9 @@ class EcheUvisAnalysis:
         rltups = [parse_spechlo(x) for x in self.inputs.ref_light_spec]
         btup = parse_spechlo(self.inputs.baseline_spec)
         itup = parse_spechlo(self.inputs.insitu_spec)
+
+        if any([x is False for x in rdtups + rltups + [btup, itup]]):
+            return False
 
         ap = self.analysis_params
         aggfunc = np.mean if ap["agg_method"] == "mean" else np.median
@@ -404,6 +417,7 @@ class EcheUvisAnalysis:
             ),
             mean_abs_omT_diff=np.mean(np.abs((1 - rscl_insitu) - (1 - rscl_baseline))),
         )
+        return True
 
     def export_analysis(
         self, analysis_name: str, bucket: str, region: str, dummy: bool = True

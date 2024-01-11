@@ -67,7 +67,7 @@ def makeApp(confPrefix, server_key, helao_root):
         action_version: int = 1,
         sequence_uuid: str = "",
         plate_id: Union[int, None] = None,
-        recent: bool = True,
+        recent: bool = False,
         params: dict = {},
     ):
         """Generates dry UVIS-T analyses from sequence_uuid."""
@@ -88,7 +88,7 @@ def makeApp(confPrefix, server_key, helao_root):
         action_version: int = 1,
         sequence_uuid: str = "",
         plate_id: Union[int, None] = None,
-        recent: bool = True,
+        recent: bool = False,
         params: dict = {},
     ):
         """Generates ECHEUVIS stability analyses from sequence_uuid."""
