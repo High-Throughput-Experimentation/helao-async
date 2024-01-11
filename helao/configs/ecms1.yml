@@ -50,22 +50,20 @@ servers:
     fast: nidaqmx_server
     params:
       dev_gasvalve:
-        1A: dev1/port0/line0
-        1B: dev1/port0/line1
-        7A: dev1/port1/line1
-        7B: dev1/port1/line2
-      dev_liquidvalve:
-        '2': dev1/port0/line2
-        '3': dev1/port0/line3
-        '4': dev1/port0/line4
-        5A-cell: dev1/port0/line5
-        5B-waste: dev1/port0/line6
-        6A-waste: dev1/port0/line7
-        6B: dev1/port1/line0
-       # '8': dev1/port0/line11
-        #'9': dev1/port0/line12
+        1: dev1/port0/line0
+        2A: dev1/port0/line1
+        2B: dev1/port0/line2
+        3A: dev1/port0/line3
+        3B: dev1/port0/line4
+        4A: dev1/port0/line5
+        4B: dev1/port0/line6
+        5A: dev1/port0/line7
+        5B: dev1/port1/line0
       dev_pump:
-        RecirculatingPeriPump1: dev1/port0/line12
+        RecirculatingPeriPump1: dev1/port1/line1
+        RecirculatingPeriPump1-dir: dev1/port1/line2
+        RecirculatingPeriPump2: dev1/port1/line3
+        RecirculatingPeriPump2-dir: dev1/port1/line4
   PAL:
     host: hte-ecms-01.htejcap.caltech.edu
     port: 8007
@@ -98,20 +96,19 @@ servers:
     params:
       devices:
         CO2:
-          port: COM6
-          unit_id: A
-      co2_server_name: CO2SENSOR
-    verbose: false
-  N2MFC:
-    host: hte-ecms-01.htejcap.caltech.edu
-    port: 8019
-    group: action
-    fast: mfc_server
-    params:
-      devices:
-        N2:
           port: COM5
-          unit_id: B
+          unit_id: A
+    verbose: false
+  # N2MFC:
+  #   host: hte-ecms-01.htejcap.caltech.edu
+  #   port: 8019
+  #   group: action
+  #   fast: mfc_server
+  #   params:
+  #     devices:
+  #       N2:
+  #         port: COM5
+  #         unit_id: B
 
 
   CALC:
